@@ -23,4 +23,4 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Notes
 
-- The protected `main` branch contains only the minimal bootstrap commit. This baseline is proposed through `feat/foundation-product-baseline` and becomes shipped truth only after review and merge.
+- The protected default branch contains only the minimal bootstrap commit. This baseline is proposed through `feat/foundation-product-baseline` and becomes shipped truth only after review and merge.

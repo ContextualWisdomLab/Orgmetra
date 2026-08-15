@@ -30,8 +30,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "ee2d414a16c70efcc7afdf7bb6d8060130a5f05c751938ea94d7bf7a1e19a447",
-      "bytes": 1094,
+      "sha256": "96e193c605f7168ca76c0ea11ef31b5369ad5724db3fc7b1edef4dda125e01a7",
+      "bytes": 1095,
       "lines": 26
     },
     {
@@ -54,8 +54,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "e3449fc31671f124477cc91866cc9b880871f06adb4b179f1e65102044737bea",
-      "bytes": 3599,
+      "sha256": "5e58366e81d983d202e9352c989a27b8bcc34de45c754e6640b5437a635c4c8e",
+      "bytes": 3609,
       "lines": 86
     },
     {

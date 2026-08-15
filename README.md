@@ -83,4 +83,4 @@ Job evidence
 
 ## Status
 
-The foundation documentation is proposed in PR #2. The bitemporal domain kernel is proposed in a stacked implementation PR and is not protected-main truth until both PRs merge in dependency order.
+The foundation documentation is proposed in PR #2. The bitemporal domain kernel is proposed in a stacked implementation PR and is not protected default-branch truth until both PRs merge in dependency order.
