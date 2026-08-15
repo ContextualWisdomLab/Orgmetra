@@ -5,3 +5,4 @@
 | 0001 | Accepted baseline | Orgmetra owns authoritative HRIS records |
 | 0002 | Accepted baseline | Federated CWL integration boundaries |
 | 0003 | Accepted baseline | Bitemporal HRIS data contract |
+| 0004 | Proposed in active PR | Framework-independent domain kernel |

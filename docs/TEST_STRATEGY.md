@@ -31,3 +31,18 @@ Required evidence for any Orgmetra-owned mathematical compute:
 - Exact-value table for every chart.
 - Permission-denied states.
 - High-risk confirmation preview.
+
+## Active domain-kernel test evidence
+
+The stacked implementation runs 17 behavioral domain tests plus three repository-contract tests. It proves:
+
+- reversed and ambiguous bitemporal intervals fail closed;
+- half-open boundaries behave correctly;
+- valid values normalize without silently accepting blanks;
+- multiple assignments can sum to one but cannot exceed one during overlap;
+- adjacent assignments do not overlap;
+- people are validated independently;
+- candidate-worker registration is idempotent and cannot relink a candidate to a different person;
+- owned production statement and branch coverage are exactly 100%;
+- public modules, classes, and functions have docstrings;
+- CI actions are commit-pinned and dependencies are hash-locked.

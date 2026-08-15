@@ -85,3 +85,17 @@ Adapters must fail closed, never log credentials, and never promote external dat
 - Criterion and validation registry tests.
 - Integration adapter fake-server tests.
 - Accessibility tests for role workspaces.
+
+## 8. Active implementation evidence
+
+The stacked bitemporal domain slice implements these P0 contracts as a pure Python package:
+
+- half-open effective and recorded intervals;
+- timezone-aware system timestamps;
+- distinct person, employment, and position records;
+- multiple simultaneous assignments with total allocation no greater than one per person;
+- append-only candidate-worker linkage;
+- a PEP 561 typed-package marker;
+- Python 3.11-3.14 CI, exact 100% production statement/branch coverage, and public docstring validation.
+
+Psychometric and mathematical production arithmetic is intentionally absent from this package and remains Rust-first in its owning service.

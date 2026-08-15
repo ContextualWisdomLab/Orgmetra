@@ -4,6 +4,8 @@
   "private": true,
   "description": "Orgmetra evidence-centered HRIS foundation baseline.",
   "scripts": {
-    "validate": "python3 tests/validate_repository.py"
+    "validate": "python3 tests/validate_repository.py && ./scripts/run_domain_quality.sh",
+    "validate:foundation": "python3 tests/validate_repository.py",
+    "validate:domain": "./scripts/run_domain_quality.sh"
   }
 }

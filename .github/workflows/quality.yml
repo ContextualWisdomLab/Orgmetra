@@ -1,0 +1,48 @@
+name: Domain Quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orgmetra-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  domain-quality-matrix:
+    name: domain-quality (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install hash-locked quality dependency
+        run: >-
+          python -m pip install
+          --only-binary=:all:
+          --require-hashes
+          -r requirements/ci.txt
+      - name: Verify domain and repository contracts
+        run: ./scripts/run_domain_quality.sh
+
+  domain-quality:
+    name: domain-quality
+    needs: domain-quality-matrix
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every supported Python lane
+        run: |
+          echo "domain-quality-matrix result=${{ needs.domain-quality-matrix.result }}"
+          test "${{ needs.domain-quality-matrix.result }}" = "success"

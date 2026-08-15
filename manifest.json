@@ -1,8 +1,15 @@
 {
-  "package": "orgmetra-foundation-pack",
-  "version": "0.1.0",
-  "generated_for_branch": "feat/foundation-product-baseline",
+  "package": "orgmetra-active-stacked-tree",
+  "version": "0.2.0-draft",
+  "base_pr": 2,
+  "generated_for_branch": "feat/bitemporal-people-core",
   "files": [
+    {
+      "path": ".github/workflows/quality.yml",
+      "sha256": "2360359b169de1faebd7884ca622d02d5aac4a0b624ef1d3720d77dc5fd2db61",
+      "bytes": 1369,
+      "lines": 48
+    },
     {
       "path": ".gitignore",
       "sha256": "ff202785c11e37e6c8b4581512ffcf6812fc591e4f08d8e46b2190a55cd429bb",
@@ -17,15 +24,15 @@
     },
     {
       "path": "ARCHITECTURE.md",
-      "sha256": "b164a1cef02b279aa6481fef74aa6ea1f4cb10f3835dec2d68bf15b6a57b2de1",
-      "bytes": 2698,
-      "lines": 60
+      "sha256": "fa35991965deeefb00a04237ea11942ab62e9255f1bee8a343d799df489db1a8",
+      "bytes": 3093,
+      "lines": 64
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "fc4c78ae5450cda7ceb40d372918a93dc31c2f24b915a6d2a52e9235603556ec",
-      "bytes": 733,
-      "lines": 22
+      "sha256": "ee2d414a16c70efcc7afdf7bb6d8060130a5f05c751938ea94d7bf7a1e19a447",
+      "bytes": 1094,
+      "lines": 26
     },
     {
       "path": "CLAUDE.md",
@@ -47,9 +54,9 @@
     },
     {
       "path": "README.md",
-      "sha256": "fb14efc5c59860ce2fb969a1911f5430630e15eb59540d83d4b9716f2770a0f4",
-      "bytes": 3364,
-      "lines": 81
+      "sha256": "e3449fc31671f124477cc91866cc9b880871f06adb4b179f1e65102044737bea",
+      "bytes": 3599,
+      "lines": 86
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
@@ -107,9 +114,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "d68a5d2727ae5a817497948c45ad6bead9644ef04e5626693af5e4224bc7fd88",
-      "bytes": 984,
-      "lines": 33
+      "sha256": "795421c1e33caec9ac66cf961929a1482ce8f2cf360c9c3283b88d71288bf407",
+      "bytes": 1735,
+      "lines": 48
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -119,15 +126,15 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "f05114bdee055d1c75ab05a400272c8824d0fee29502a20751ea3c46eda5a543",
-      "bytes": 924,
+      "sha256": "901e4580d27e5b486aaefbd8a7197ace0fd8632c96a10cadc3178e6d67f1ea4c",
+      "bytes": 1038,
       "lines": 10
     },
     {
       "path": "docs/TRD.md",
-      "sha256": "b759a615c1b02f67a01f1aa0cc99ffd50516e727525a05371ef5136321f8bd68",
-      "bytes": 3344,
-      "lines": 87
+      "sha256": "7f393ed1ea80667a94f37534f86da2f840bc3413f0b06e5b68dcde1a5d2f5b1f",
+      "bytes": 4021,
+      "lines": 101
     },
     {
       "path": "docs/UML.md",
@@ -166,10 +173,16 @@
       "lines": 19
     },
     {
+      "path": "docs/adr/0004-framework-independent-domain-kernel.md",
+      "sha256": "0b972e02cf1d7e1d361b12df543b4ae04265f237fe49db3e7c531a491b20582e",
+      "bytes": 1237,
+      "lines": 27
+    },
+    {
       "path": "docs/adr/README.md",
-      "sha256": "25a450d4936877097a8d4312f3c80f1211390ca2613ac4329872bb187ca559f3",
-      "bytes": 253,
-      "lines": 7
+      "sha256": "7f6a41701820357430234842eb675f5e2d0f33f6ee37e9cc294cb40d6119e2f6",
+      "bytes": 324,
+      "lines": 8
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
@@ -179,15 +192,99 @@
     },
     {
       "path": "package.json",
-      "sha256": "3b4495b25e2e8c68cf4932c9fb2bba46829bde6f31f7a565b024922a820a1077",
-      "bytes": 230,
-      "lines": 9
+      "sha256": "d6555507db329d38752c5e7983ea7ba5e162e7ad914dc86cf635b6998bb26ff5",
+      "bytes": 390,
+      "lines": 11
+    },
+    {
+      "path": "packages/orgmetra-domain/README.md",
+      "sha256": "d657d42b65da221776303cca25d7e4dbde72d5bce539e689e373f30ba0e363c5",
+      "bytes": 1399,
+      "lines": 41
+    },
+    {
+      "path": "packages/orgmetra-domain/pyproject.toml",
+      "sha256": "80ff42dcb3c4aeaa597f838778c28501e2e3f801f21474ee8a0be605e072150b",
+      "bytes": 451,
+      "lines": 19
+    },
+    {
+      "path": "packages/orgmetra-domain/src/orgmetra_domain/__init__.py",
+      "sha256": "ea2134802e3b6a93078255c0b2dc8bd9b3f3a1e39c00984640cce3fa70460649",
+      "bytes": 812,
+      "lines": 27
+    },
+    {
+      "path": "packages/orgmetra-domain/src/orgmetra_domain/assignment.py",
+      "sha256": "e628df6037ecfbff6f1a035ab3995e4a1a4f35cc8b8cebfa0df6cf9090bc0ff9",
+      "bytes": 2343,
+      "lines": 60
+    },
+    {
+      "path": "packages/orgmetra-domain/src/orgmetra_domain/candidate.py",
+      "sha256": "3e2ca1e830f3d92c4cb26f531712a8718fe3e6a3130fc402b9bdd636d4abc04f",
+      "bytes": 1662,
+      "lines": 47
+    },
+    {
+      "path": "packages/orgmetra-domain/src/orgmetra_domain/errors.py",
+      "sha256": "afc33574369e9787b8fb6543454577370cf2e7ac18881f766d68bf818d1ed398",
+      "bytes": 576,
+      "lines": 17
+    },
+    {
+      "path": "packages/orgmetra-domain/src/orgmetra_domain/py.typed",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "lines": 0
+    },
+    {
+      "path": "packages/orgmetra-domain/src/orgmetra_domain/records.py",
+      "sha256": "65c6b9fade6047a61b339448e5c6e65946e922b0f6c21e23d839bad3c7235879",
+      "bytes": 2085,
+      "lines": 71
+    },
+    {
+      "path": "packages/orgmetra-domain/src/orgmetra_domain/temporal.py",
+      "sha256": "40655d875831536f7f6b3b1239b5f650ec8fc8fa90d74b56b88dd904210fb590",
+      "bytes": 2114,
+      "lines": 54
+    },
+    {
+      "path": "packages/orgmetra-domain/tests/test_domain.py",
+      "sha256": "5231dd433aeff470817aa483f34b47e947d32badbfc4466f2320ccdd8fa2d5fe",
+      "bytes": 8297,
+      "lines": 218
+    },
+    {
+      "path": "requirements/ci.txt",
+      "sha256": "7cddb7b97deb48e939a0e6d3159f47caecf8a7ed5b985339827cb85f63a0ea58",
+      "bytes": 603,
+      "lines": 8
     },
     {
       "path": "schemas/openapi.yaml",
       "sha256": "30f23c9cd9d19efee0f53e34f54a0e58ce2640826548f3b1bb8101022d536ee9",
       "bytes": 1233,
       "lines": 51
+    },
+    {
+      "path": "scripts/run_domain_quality.sh",
+      "sha256": "85a5d33d23e016cf490afe5411296e211d1d6e5f49dafe956f9ab63aa8c6cb36",
+      "bytes": 470,
+      "lines": 10
+    },
+    {
+      "path": "tests/test_repository_contract.py",
+      "sha256": "75c7b6baf50f1f100237081878e761e15b1f98f5f364555e2340164ea0d9fde9",
+      "bytes": 1447,
+      "lines": 43
+    },
+    {
+      "path": "tests/validate_docstrings.py",
+      "sha256": "f4ecf094ed2be3faa2f3ad978b3c0f0a35cef46b9761984fb7c71512cf5fd72a",
+      "bytes": 1401,
+      "lines": 34
     },
     {
       "path": "tests/validate_repository.py",

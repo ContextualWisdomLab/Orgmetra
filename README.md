@@ -76,6 +76,11 @@ Job evidence
 - `docs/adr/README.md`
 - `docs/doctoring/REFERENCES.md`
 
+## Implementation slices
+
+- `packages/orgmetra-domain`: bitemporal people, employment, position, assignment, and candidate-worker invariants.
+- `.github/workflows/quality.yml`: pinned Python 3.11-3.14 quality matrix with an aggregate required check.
+
 ## Status
 
-Foundation phase. The protected `main` branch contains the minimal repository bootstrap; this product baseline is proposed through a reviewed pull request and must not be treated as shipped behavior before merge.
+The foundation documentation is proposed in PR #2. The bitemporal domain kernel is proposed in a stacked implementation PR and is not protected-main truth until both PRs merge in dependency order.

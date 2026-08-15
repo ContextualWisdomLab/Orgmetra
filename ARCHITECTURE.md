@@ -58,3 +58,7 @@ The foundation can start as a monorepo with separately deployable services. Serv
 ## Security posture
 
 Access is tenant, actor, purpose, resource, and lifetime scoped. High-impact decisions require evidence, explicit decision records, and human accountability. LLM outputs are draft evidence only.
+
+## Active implementation slice: bitemporal domain kernel
+
+`packages/orgmetra-domain` implements framework-independent invariants for effective/system time, distinct HRIS records, multiple assignments, and candidate-worker continuity. It has no persistence or transport dependency and can be embedded by future services. This section describes active-PR work until merged into protected `main`.
