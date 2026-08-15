@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools==82.0.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orgmetra-keyverse-auth"
+version = "0.1.0"
+description = "Strict offline JWT access-token verification adapter for Keyverse and Orgmetra."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "ContextualWisdomLab" }]
+dependencies = [
+  "orgmetra-people-api==0.1.0",
+  "PyJWT[crypto]>=2.10,<3",
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Security",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+orgmetra_keyverse_auth = ["py.typed"]
