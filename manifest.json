@@ -1,0 +1,199 @@
+{
+  "package": "orgmetra-foundation-pack",
+  "version": "0.1.0",
+  "generated_for_branch": "feat/foundation-product-baseline",
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "ff202785c11e37e6c8b4581512ffcf6812fc591e4f08d8e46b2190a55cd429bb",
+      "bytes": 363,
+      "lines": 36
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "e9583d615c7a48975687b549d89eafd10d050a59337f26277ed47d6d380dc6e1",
+      "bytes": 2236,
+      "lines": 34
+    },
+    {
+      "path": "ARCHITECTURE.md",
+      "sha256": "b164a1cef02b279aa6481fef74aa6ea1f4cb10f3835dec2d68bf15b6a57b2de1",
+      "bytes": 2698,
+      "lines": 60
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "fc4c78ae5450cda7ceb40d372918a93dc31c2f24b915a6d2a52e9235603556ec",
+      "bytes": 733,
+      "lines": 22
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "add33884f466d324e20875388d103de41c6e062938a6e98727dc83a87ffe976f",
+      "bytes": 1229,
+      "lines": 20
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358,
+      "lines": 202
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "34b4618e946bdd8d33407d6ac5279f0a0388f5e7c8f79d2e7d8c3c47d0266042",
+      "bytes": 305,
+      "lines": 4
+    },
+    {
+      "path": "README.md",
+      "sha256": "fb14efc5c59860ce2fb969a1911f5430630e15eb59540d83d4b9716f2770a0f4",
+      "bytes": 3364,
+      "lines": 81
+    },
+    {
+      "path": "database/migrations/0001_foundation_schema.sql",
+      "sha256": "2a590e922768a24ce04855c8e7bc2bb77ac7beca218d0bdb5292a955fa79dc04",
+      "bytes": 4762,
+      "lines": 133
+    },
+    {
+      "path": "docs/API_CONTRACT.md",
+      "sha256": "feb86361e973f3bbc59066a2135abd9fa0e98b009667b69e28212ecf18d420c4",
+      "bytes": 936,
+      "lines": 43
+    },
+    {
+      "path": "docs/DATA_MODEL.md",
+      "sha256": "1d3a0fa52333e6434c9205777b6995a1edbc56023061342c2af3dc42cd541071",
+      "bytes": 1345,
+      "lines": 33
+    },
+    {
+      "path": "docs/ERD.md",
+      "sha256": "7887929619fb4ed65f276bc7063346c93ac085512b5ef85f3bf88e4bd05be006",
+      "bytes": 1120,
+      "lines": 24
+    },
+    {
+      "path": "docs/OPERABILITY.md",
+      "sha256": "550887bd6caced70db7b5efb64c06677e314a52560db37a43af6caf528d0d2f8",
+      "bytes": 1153,
+      "lines": 30
+    },
+    {
+      "path": "docs/PRD.md",
+      "sha256": "5ed938a661084b593408d6bc275a29f0ca30b3cc7036ddcd452ea4221f9bcd7e",
+      "bytes": 5337,
+      "lines": 110
+    },
+    {
+      "path": "docs/SECURITY.md",
+      "sha256": "10e47aa682349c85cb9d93bdd4a1dcd02915eb92090ea3d437f0338b4eaac24e",
+      "bytes": 893,
+      "lines": 33
+    },
+    {
+      "path": "docs/STORYBOARD.md",
+      "sha256": "6e4ffb0eb03a80343f50d363ffc43b34da9348a44232dd947a9ff416ea92a3d2",
+      "bytes": 1342,
+      "lines": 28
+    },
+    {
+      "path": "docs/STORYBOOK.md",
+      "sha256": "86660120277f6791a11d7743113ce9c5eaeff6acf61b070b046f33744a74ac09",
+      "bytes": 921,
+      "lines": 47
+    },
+    {
+      "path": "docs/TEST_STRATEGY.md",
+      "sha256": "d68a5d2727ae5a817497948c45ad6bead9644ef04e5626693af5e4224bc7fd88",
+      "bytes": 984,
+      "lines": 33
+    },
+    {
+      "path": "docs/THREAT_MODEL.md",
+      "sha256": "82356987eddb83a79663d347e6a4f95668aa470f8e1ea0a03060cd1ffa133c74",
+      "bytes": 1110,
+      "lines": 20
+    },
+    {
+      "path": "docs/TRACEABILITY.md",
+      "sha256": "f05114bdee055d1c75ab05a400272c8824d0fee29502a20751ea3c46eda5a543",
+      "bytes": 924,
+      "lines": 10
+    },
+    {
+      "path": "docs/TRD.md",
+      "sha256": "b759a615c1b02f67a01f1aa0cc99ffd50516e727525a05371ef5136321f8bd68",
+      "bytes": 3344,
+      "lines": 87
+    },
+    {
+      "path": "docs/UML.md",
+      "sha256": "e6d3a66604d339709a8d7d9c4c1c45eb26bf575a91bead3e0bdea8cb5ce110a9",
+      "bytes": 1524,
+      "lines": 53
+    },
+    {
+      "path": "docs/USER_STORIES.md",
+      "sha256": "ad7cd6487991dcca6f8be82372e8b4b74beb8ad75033fcad708b7da10edde71d",
+      "bytes": 2181,
+      "lines": 34
+    },
+    {
+      "path": "docs/WIREFRAMES.md",
+      "sha256": "bbcf2de59269c3e3cd37e6787fd70ad8470ba18ce00a31b489cd10d63fcaa200",
+      "bytes": 1221,
+      "lines": 73
+    },
+    {
+      "path": "docs/adr/0001-orgmetra-authoritative-hris-record.md",
+      "sha256": "21ba75ee775c6eb44ed574d448a179efa18637aef4703f638ba58f04d81359a8",
+      "bytes": 879,
+      "lines": 19
+    },
+    {
+      "path": "docs/adr/0002-federated-cwl-integration-boundaries.md",
+      "sha256": "ce8fa703d3ca41371255f59ab1e6ffdca8cf633287be54df3861b0f041e0d5b1",
+      "bytes": 726,
+      "lines": 20
+    },
+    {
+      "path": "docs/adr/0003-bitemporal-hris-data-contract.md",
+      "sha256": "0c47d32d1050a507150cd76b9f345273616855c5ae2e9c56cfb76046be3f419f",
+      "bytes": 692,
+      "lines": 19
+    },
+    {
+      "path": "docs/adr/README.md",
+      "sha256": "25a450d4936877097a8d4312f3c80f1211390ca2613ac4329872bb187ca559f3",
+      "bytes": 253,
+      "lines": 7
+    },
+    {
+      "path": "docs/doctoring/REFERENCES.md",
+      "sha256": "473e0a346207cde4754b6287042773c67b108dc9336db45d4566990065b8eb0f",
+      "bytes": 1206,
+      "lines": 17
+    },
+    {
+      "path": "package.json",
+      "sha256": "3b4495b25e2e8c68cf4932c9fb2bba46829bde6f31f7a565b024922a820a1077",
+      "bytes": 230,
+      "lines": 9
+    },
+    {
+      "path": "schemas/openapi.yaml",
+      "sha256": "30f23c9cd9d19efee0f53e34f54a0e58ce2640826548f3b1bb8101022d536ee9",
+      "bytes": 1233,
+      "lines": 51
+    },
+    {
+      "path": "tests/validate_repository.py",
+      "sha256": "71e6229a10f851c987e3cca8a1dc92c622ab46c0ae01579da03af154a7f1d3fb",
+      "bytes": 1805,
+      "lines": 39
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+
+# Node and web tooling
+node_modules/
+.next/
+dist/
+coverage/
+.turbo/
+
+# Rust
+/target/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Generated artifacts
+artifacts/
+reports/
+*.log

@@ -1,0 +1,51 @@
+openapi: 3.2.0
+info:
+  title: Orgmetra API
+  version: 0.1.0
+  summary: Evidence-centered HRIS foundation API
+servers:
+  - url: https://api.orgmetra.example/v1
+paths:
+  /person-records:
+    post:
+      operationId: createPersonRecord
+      summary: Create a person record
+      tags:
+        - name: people-core
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [display_name]
+              properties:
+                display_name:
+                  type: string
+      responses:
+        '201':
+          description: Created
+  /job-profiles:
+    post:
+      operationId: createJobProfile
+      summary: Create a draft job profile
+      tags:
+        - name: job-architecture
+      responses:
+        '201':
+          description: Created
+  /selection-decisions:
+    post:
+      operationId: recordSelectionDecision
+      summary: Record an evidence-backed selection decision
+      tags:
+        - name: talent-acquisition
+      responses:
+        '201':
+          description: Created
