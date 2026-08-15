@@ -1,11 +1,28 @@
 -- Orgmetra foundation schema.
 -- Every owned object uses descriptive two-or-more-word snake_case names.
+-- This baseline keeps tables unqualified while the modular deployment assigns
+-- them to the service-owned schemas and roles defined in ARCHITECTURE.md.
 
 CREATE TABLE person_record (
     person_record_id uuid PRIMARY KEY,
-    display_name text NOT NULL,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT person_record_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+);
+
+CREATE TABLE person_name_record (
+    person_name_record_id uuid PRIMARY KEY,
+    person_record_id uuid NOT NULL REFERENCES person_record(person_record_id),
+    display_name text NOT NULL,
+    effective_from date NOT NULL,
+    effective_to date,
+    recorded_from timestamptz NOT NULL DEFAULT now(),
+    recorded_to timestamptz,
+    CONSTRAINT person_name_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT person_name_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE employment_record (
@@ -15,7 +32,11 @@ CREATE TABLE employment_record (
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT employment_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT employment_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE organization_unit (
@@ -24,7 +45,11 @@ CREATE TABLE organization_unit (
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT organization_unit_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT organization_unit_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE job_profile (
@@ -34,7 +59,11 @@ CREATE TABLE job_profile (
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT job_profile_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT job_profile_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE position_record (
@@ -45,25 +74,37 @@ CREATE TABLE position_record (
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT position_record_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT position_record_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE assignment_record (
     assignment_record_id uuid PRIMARY KEY,
     person_record_id uuid NOT NULL REFERENCES person_record(person_record_id),
     position_record_id uuid NOT NULL REFERENCES position_record(position_record_id),
-    allocation_ratio numeric(5,4) NOT NULL CHECK (allocation_ratio > 0 AND allocation_ratio <= 1),
+    allocation_ratio numeric(5,4) NOT NULL
+        CONSTRAINT assignment_allocation_ratio_check
+        CHECK (allocation_ratio > 0 AND allocation_ratio <= 1),
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT assignment_record_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT assignment_record_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE candidate_profile (
     candidate_profile_id uuid PRIMARY KEY,
     application_status_code text NOT NULL,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT candidate_profile_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE candidate_worker_link (
@@ -81,7 +122,11 @@ CREATE TABLE criterion_blueprint (
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT criterion_blueprint_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT criterion_blueprint_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE criterion_observation (
@@ -91,17 +136,33 @@ CREATE TABLE criterion_observation (
     observed_value numeric NOT NULL,
     observed_at timestamptz NOT NULL,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT criterion_observation_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE selection_decision (
     selection_decision_id uuid PRIMARY KEY,
     candidate_profile_id uuid NOT NULL REFERENCES candidate_profile(candidate_profile_id),
     job_profile_id uuid NOT NULL REFERENCES job_profile(job_profile_id),
+    tenant_reference text NOT NULL,
+    actor_reference text NOT NULL,
+    purpose_code text NOT NULL,
     decision_code text NOT NULL,
+    decision_reason text NOT NULL,
+    confirmation_reference text NOT NULL,
     decided_at timestamptz NOT NULL,
-    recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE selection_decision_evidence (
+    selection_decision_evidence_id uuid PRIMARY KEY,
+    selection_decision_id uuid NOT NULL REFERENCES selection_decision(selection_decision_id),
+    evidence_reference text NOT NULL,
+    evidence_version_code text NOT NULL,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT selection_decision_evidence_unique
+        UNIQUE (selection_decision_id, evidence_reference, evidence_version_code)
 );
 
 CREATE TABLE validity_study (
@@ -109,7 +170,9 @@ CREATE TABLE validity_study (
     criterion_blueprint_id uuid NOT NULL REFERENCES criterion_blueprint(criterion_blueprint_id),
     study_status_code text NOT NULL,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT validity_study_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE compensation_record (
@@ -120,7 +183,11 @@ CREATE TABLE compensation_record (
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT compensation_record_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT compensation_record_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
 
 CREATE TABLE employment_transition (
@@ -129,5 +196,32 @@ CREATE TABLE employment_transition (
     transition_type_code text NOT NULL,
     effective_date date NOT NULL,
     recorded_from timestamptz NOT NULL DEFAULT now(),
-    recorded_to timestamptz
+    recorded_to timestamptz,
+    CONSTRAINT employment_transition_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
 );
+
+CREATE FUNCTION reject_append_only_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RAISE EXCEPTION 'append-only relation cannot be updated or deleted'
+        USING ERRCODE = '55000';
+END;
+$$;
+
+CREATE TRIGGER candidate_worker_link_append_only_guard
+BEFORE UPDATE OR DELETE ON candidate_worker_link
+FOR EACH ROW
+EXECUTE FUNCTION reject_append_only_mutation();
+
+CREATE TRIGGER selection_decision_append_only_guard
+BEFORE UPDATE OR DELETE ON selection_decision
+FOR EACH ROW
+EXECUTE FUNCTION reject_append_only_mutation();
+
+CREATE TRIGGER selection_decision_evidence_append_only_guard
+BEFORE UPDATE OR DELETE ON selection_decision_evidence
+FOR EACH ROW
+EXECUTE FUNCTION reject_append_only_mutation();
