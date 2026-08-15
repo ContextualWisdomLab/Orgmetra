@@ -78,4 +78,4 @@ Job evidence
 
 ## Status
 
-Foundation phase. The protected `main` branch contains the minimal repository bootstrap; this product baseline is proposed through a reviewed pull request and must not be treated as shipped behavior before merge.
+Foundation phase. The protected default branch contains the minimal repository bootstrap; this product baseline is proposed through a reviewed pull request and must not be treated as shipped behavior before merge.
