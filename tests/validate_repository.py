@@ -151,6 +151,10 @@ def _validate_database_contract() -> None:
 
     required_fragments = [
         "CREATE TABLE person_name_record",
+        "CREATE TABLE performance_cycle",
+        "performance_cycle_id uuid NOT NULL REFERENCES performance_cycle(performance_cycle_id)",
+        "CONSTRAINT performance_cycle_effective_period_check",
+        "CONSTRAINT performance_cycle_recorded_period_check",
         "CREATE TABLE selection_decision_evidence",
         "CREATE FUNCTION reject_append_only_mutation",
         "CREATE TRIGGER candidate_worker_link_append_only_guard",

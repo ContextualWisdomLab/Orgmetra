@@ -114,6 +114,20 @@ CREATE TABLE candidate_worker_link (
     linked_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE performance_cycle (
+    performance_cycle_id uuid PRIMARY KEY,
+    cycle_name text NOT NULL,
+    cycle_status_code text NOT NULL,
+    effective_from date NOT NULL,
+    effective_to date,
+    recorded_from timestamptz NOT NULL DEFAULT now(),
+    recorded_to timestamptz,
+    CONSTRAINT performance_cycle_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+    CONSTRAINT performance_cycle_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+);
+
 CREATE TABLE criterion_blueprint (
     criterion_blueprint_id uuid PRIMARY KEY,
     job_profile_id uuid NOT NULL REFERENCES job_profile(job_profile_id),
@@ -132,6 +146,7 @@ CREATE TABLE criterion_blueprint (
 CREATE TABLE criterion_observation (
     criterion_observation_id uuid PRIMARY KEY,
     criterion_blueprint_id uuid NOT NULL REFERENCES criterion_blueprint(criterion_blueprint_id),
+    performance_cycle_id uuid NOT NULL REFERENCES performance_cycle(performance_cycle_id),
     person_record_id uuid NOT NULL REFERENCES person_record(person_record_id),
     observed_value numeric NOT NULL,
     observed_at timestamptz NOT NULL,

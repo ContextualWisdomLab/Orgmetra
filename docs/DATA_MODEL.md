@@ -12,8 +12,9 @@
 | `assignment_record` | A person's allocation to a position over time. |
 | `candidate_profile` | Applicant/candidate record before hire. |
 | `candidate_worker_link` | Append-only linkage from candidate to worker after hiring. |
+| `performance_cycle` | Effective-dated performance period that schedules criterion observations. |
 | `criterion_blueprint` | Job-related performance criterion definition. |
-| `criterion_observation` | Observed criterion result. |
+| `criterion_observation` | Observed criterion result linked to one performance cycle. |
 | `selection_decision` | Human accountable decision with evidence references. |
 | `validity_study` | Study linking selection evidence to outcomes. |
 

@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8278bc81efb0862a389f7f0872d4e9cc43953212e65000616836bc2fb07672cc",
-      "bytes": 1768,
-      "lines": 34
+      "sha256": "272d49ab34fdfcb59e382a2f80ba7fd48d980f7f37cbd47691c5325dfce0978c",
+      "bytes": 1846,
+      "lines": 35
     },
     {
       "path": "CLAUDE.md",
@@ -59,9 +59,9 @@
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
-      "sha256": "6b903b37806c1c6c0b28d4481e099e1490f97823a6b0e810252ea3c976a094dd",
-      "bytes": 9196,
-      "lines": 227
+      "sha256": "dcf100fd23baebfde7cfd6ca535e141b848ecaa18129ec228873e1d7b46db795",
+      "bytes": 9825,
+      "lines": 242
     },
     {
       "path": "docs/API_CONTRACT.md",
@@ -71,15 +71,15 @@
     },
     {
       "path": "docs/DATA_MODEL.md",
-      "sha256": "1d3a0fa52333e6434c9205777b6995a1edbc56023061342c2af3dc42cd541071",
-      "bytes": 1345,
-      "lines": 33
+      "sha256": "ab1e06b6c2ef6a4aab61627b876139d540e8873a1e7454d472d2333f4234338b",
+      "bytes": 1477,
+      "lines": 34
     },
     {
       "path": "docs/ERD.md",
-      "sha256": "3fd27092d1120f23aadd5442b09558cad81f3b1793db9e0db8143f7ded6dfe75",
-      "bytes": 1800,
-      "lines": 32
+      "sha256": "d782f7ba7ba2bba4795e9835c81bf82092d06df5eebbbdb039b49b504ac5c401",
+      "bytes": 2018,
+      "lines": 35
     },
     {
       "path": "docs/OPERABILITY.md",
@@ -89,9 +89,9 @@
     },
     {
       "path": "docs/PRD.md",
-      "sha256": "5ed938a661084b593408d6bc275a29f0ca30b3cc7036ddcd452ea4221f9bcd7e",
-      "bytes": 5337,
-      "lines": 110
+      "sha256": "3ad85ae633cce0fc7a93af39b21d7a7c70bb2efa786da6b12f3c5327906e34f1",
+      "bytes": 5490,
+      "lines": 111
     },
     {
       "path": "docs/SECURITY.md",
@@ -197,9 +197,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "1270302999910235723b933e3001c72a650186d0880be600cccea10c5d41f9c8",
-      "bytes": 8071,
-      "lines": 227
+      "sha256": "123df6ba068b4d8d57ebdf0e1288d900dd3cf2b88a91dc6d179fa8f191325d6a",
+      "bytes": 8335,
+      "lines": 231
     }
   ]
 }

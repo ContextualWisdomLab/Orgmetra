@@ -11,6 +11,7 @@ erDiagram
     candidate_profile ||--o| candidate_worker_link : may_become
     person_record ||--o{ candidate_worker_link : links_worker
     job_profile ||--o{ criterion_blueprint : requires
+    performance_cycle ||--o{ criterion_observation : schedules
     criterion_blueprint ||--o{ criterion_observation : produces
     person_record ||--o{ criterion_observation : observed_for
     candidate_profile ||--o{ selection_decision : receives
@@ -24,6 +25,8 @@ erDiagram
 ## Cardinality decisions
 
 A candidate profile can be linked to at most one worker identity because `candidate_profile_id` is unique in `candidate_worker_link`. A person identity can have multiple candidate-worker links across reapplications or historical candidate profiles, so the person-side cardinality is one-to-many.
+
+Each criterion observation belongs to one effective-dated performance cycle so reporting periods remain reconstructable across effective and system time.
 
 A selection decision requires one or more immutable evidence-reference rows. Evidence versions are stored separately from the decision header to preserve 3NF and permit an auditable evidence set without repeating decision attributes.
 

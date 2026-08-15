@@ -10,6 +10,7 @@ All notable changes to Orgmetra will be documented in this file.
 - CWL federated integration boundary map.
 - Bitemporal HRIS data contract with stable identity anchors and versioned person-name facts.
 - Core ERD, UML, PRD, TRD, user stories, storyboard, wireframes, Storybook inventory, security, test, and operability baseline.
+- Effective-dated performance-cycle records linked to criterion observations.
 - Versioned selection-decision evidence records and complete mutation-context OpenAPI schemas.
 - Manifest digest, byte-count, and line-count validation.
 
