@@ -10,6 +10,12 @@
       "lines": 36
     },
     {
+      "path": ".github/workflows/foundation-ci.yml",
+      "sha256": "9ecbcdddc5b6e12ef11e08450a456cf1965dd8d28feb8192b14853871468aa12",
+      "bytes": 1008,
+      "lines": 39
+    },
+    {
       "path": "AGENTS.md",
       "sha256": "e9583d615c7a48975687b549d89eafd10d050a59337f26277ed47d6d380dc6e1",
       "bytes": 2236,
@@ -191,9 +197,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "9adcfd7604bd536154f0b7581739b705d8de5ed82c9ebc611fc6ae17647aa49d",
-      "bytes": 8026,
-      "lines": 226
+      "sha256": "2f4931295530ccc1ce9c74b7e24e23e1bbe9ef4b696b2a23921f4e1a12d3a97b",
+      "bytes": 8069,
+      "lines": 227
     }
   ]
 }
