@@ -22,6 +22,7 @@ REQUIRED = [
     "NOTICE",
     "manifest.json",
     "package.json",
+    ".github/workflows/foundation-ci.yml",
     "docs/PRD.md",
     "docs/TRD.md",
     "docs/USER_STORIES.md",
