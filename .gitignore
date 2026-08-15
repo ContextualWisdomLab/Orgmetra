@@ -1,0 +1,23 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+secrets/
+
+# Dependencies and build output
+node_modules/
+target/
+dist/
+coverage/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+
+# Local databases and generated artifacts
+*.db
+*.sqlite
+*.sqlite3
+artifacts/
+.tmp/
