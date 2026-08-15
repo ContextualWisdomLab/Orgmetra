@@ -17,15 +17,15 @@
     },
     {
       "path": "ARCHITECTURE.md",
-      "sha256": "b164a1cef02b279aa6481fef74aa6ea1f4cb10f3835dec2d68bf15b6a57b2de1",
-      "bytes": 2698,
-      "lines": 60
+      "sha256": "408f136e491fe06d50bd9059e1423fb3133c54d496aa0d74abf718e135034890",
+      "bytes": 6016,
+      "lines": 99
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "2958060ec8ea6d07b9bb7934c2e52e965665bc11d376548a1d87e016274d7136",
-      "bytes": 734,
-      "lines": 22
+      "sha256": "8278bc81efb0862a389f7f0872d4e9cc43953212e65000616836bc2fb07672cc",
+      "bytes": 1768,
+      "lines": 34
     },
     {
       "path": "CLAUDE.md",
@@ -53,15 +53,15 @@
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
-      "sha256": "2a590e922768a24ce04855c8e7bc2bb77ac7beca218d0bdb5292a955fa79dc04",
-      "bytes": 4762,
-      "lines": 133
+      "sha256": "6b903b37806c1c6c0b28d4481e099e1490f97823a6b0e810252ea3c976a094dd",
+      "bytes": 9196,
+      "lines": 227
     },
     {
       "path": "docs/API_CONTRACT.md",
-      "sha256": "feb86361e973f3bbc59066a2135abd9fa0e98b009667b69e28212ecf18d420c4",
-      "bytes": 936,
-      "lines": 43
+      "sha256": "96876957a3b655b01b533f39353485631fb84b539fc5a939cd5068699957f6d2",
+      "bytes": 1924,
+      "lines": 61
     },
     {
       "path": "docs/DATA_MODEL.md",
@@ -71,15 +71,15 @@
     },
     {
       "path": "docs/ERD.md",
-      "sha256": "7887929619fb4ed65f276bc7063346c93ac085512b5ef85f3bf88e4bd05be006",
-      "bytes": 1120,
-      "lines": 24
+      "sha256": "3fd27092d1120f23aadd5442b09558cad81f3b1793db9e0db8143f7ded6dfe75",
+      "bytes": 1800,
+      "lines": 32
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "550887bd6caced70db7b5efb64c06677e314a52560db37a43af6caf528d0d2f8",
-      "bytes": 1153,
-      "lines": 30
+      "sha256": "feeac6cd3aff7d8d478a7c95c67a6ac03f317b179ed41f83e3c70b2a61b851dc",
+      "bytes": 2611,
+      "lines": 44
     },
     {
       "path": "docs/PRD.md",
@@ -89,9 +89,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "10e47aa682349c85cb9d93bdd4a1dcd02915eb92090ea3d437f0338b4eaac24e",
-      "bytes": 893,
-      "lines": 33
+      "sha256": "abfbbb2088565d4dc85a9f0b1f8e5f479f8147e2d28c07d2a6fbbcdca0bfe9b9",
+      "bytes": 2325,
+      "lines": 46
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -107,15 +107,15 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "d68a5d2727ae5a817497948c45ad6bead9644ef04e5626693af5e4224bc7fd88",
-      "bytes": 984,
-      "lines": 33
+      "sha256": "713d52db50bb11c0da72929845efdbc34ec4cd3bc724a249ef5706b340b0c8a0",
+      "bytes": 6614,
+      "lines": 103
     },
     {
       "path": "docs/THREAT_MODEL.md",
-      "sha256": "82356987eddb83a79663d347e6a4f95668aa470f8e1ea0a03060cd1ffa133c74",
-      "bytes": 1110,
-      "lines": 20
+      "sha256": "b1d3bd92db8f7f8bee5320a3f32d26ecd4dd4c9562f7d6a6a1de868823b1582a",
+      "bytes": 2751,
+      "lines": 21
     },
     {
       "path": "docs/TRACEABILITY.md",
@@ -125,15 +125,15 @@
     },
     {
       "path": "docs/TRD.md",
-      "sha256": "b759a615c1b02f67a01f1aa0cc99ffd50516e727525a05371ef5136321f8bd68",
-      "bytes": 3344,
-      "lines": 87
+      "sha256": "c9880065b2ba87fdfb2c56f282c9a5de2879c2a1e3f01abcf05fcd04cbcfb0a8",
+      "bytes": 6655,
+      "lines": 92
     },
     {
       "path": "docs/UML.md",
-      "sha256": "e6d3a66604d339709a8d7d9c4c1c45eb26bf575a91bead3e0bdea8cb5ce110a9",
-      "bytes": 1524,
-      "lines": 53
+      "sha256": "0e27d25f4ebde14ed6105616fdf541302cdd90a1d1b4f9b51dd4c8f4e1f5c766",
+      "bytes": 3439,
+      "lines": 86
     },
     {
       "path": "docs/USER_STORIES.md",
@@ -161,9 +161,9 @@
     },
     {
       "path": "docs/adr/0003-bitemporal-hris-data-contract.md",
-      "sha256": "0c47d32d1050a507150cd76b9f345273616855c5ae2e9c56cfb76046be3f419f",
-      "bytes": 692,
-      "lines": 19
+      "sha256": "e2bd3197fc862ff115e1bb0380e1d55f6f21d3fb4b9a5ca9f2ebcff81734e3d5",
+      "bytes": 1560,
+      "lines": 28
     },
     {
       "path": "docs/adr/README.md",
@@ -173,9 +173,9 @@
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
-      "sha256": "473e0a346207cde4754b6287042773c67b108dc9336db45d4566990065b8eb0f",
-      "bytes": 1206,
-      "lines": 17
+      "sha256": "39a430d03e41839fe8d7fef256d742bc24f689ef121b278c280509828b7d5157",
+      "bytes": 1497,
+      "lines": 21
     },
     {
       "path": "package.json",
@@ -185,15 +185,15 @@
     },
     {
       "path": "schemas/openapi.yaml",
-      "sha256": "30f23c9cd9d19efee0f53e34f54a0e58ce2640826548f3b1bb8101022d536ee9",
-      "bytes": 1233,
-      "lines": 51
+      "sha256": "024c467fd0aa199710b1ce5d8a37f5eec151b27dbe6a99bcf81a122111318c11",
+      "bytes": 8283,
+      "lines": 290
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "71e6229a10f851c987e3cca8a1dc92c622ab46c0ae01579da03af154a7f1d3fb",
-      "bytes": 1805,
-      "lines": 39
+      "sha256": "9adcfd7604bd536154f0b7581739b705d8de5ed82c9ebc611fc6ae17647aa49d",
+      "bytes": 8026,
+      "lines": 226
     }
   ]
 }
