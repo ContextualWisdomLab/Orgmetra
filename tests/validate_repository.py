@@ -185,7 +185,7 @@ def _validate_openapi_contract() -> None:
         if fragment not in openapi:
             _fail(f"Missing OpenAPI contract fragment: {fragment}")
 
-    if re.search(r"(?m)^\s+-\s+name:\s+(?:people-core|job-architecture|talent-acquisition)\s*$", openapi):
+    if re.search(r"(?m)^ {8,}-\s+name:\s+(?:people-core|job-architecture|talent-acquisition)\s*$", openapi):
         _fail("Operation tags must be string values, not tag objects")
 
 
