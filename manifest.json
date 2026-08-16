@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "10f1943436cbe2d935f794e445fa2ca14a0ddf03fecb8b9a9c8eea424f28c05a",
-      "bytes": 6183,
-      "lines": 62
+      "sha256": "b007d70d3a6c4fa2ca5f623ed59a91e1fc7a6caef4c8e28ca6f436d15c85e73b",
+      "bytes": 6576,
+      "lines": 63
     },
     {
       "path": "CLAUDE.md",
@@ -131,9 +131,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "bfd6d265bd5c859a74e6187aafc0e2f23050d8676f3773dadc751f80aac5a3d7",
-      "bytes": 5177,
-      "lines": 30
+      "sha256": "8d76f7756a3ebeaffc328c2aa5bf9da304ab54d58105cc79d8124a10192afb19",
+      "bytes": 5577,
+      "lines": 31
     },
     {
       "path": "docs/TRD.md",
@@ -191,15 +191,15 @@
     },
     {
       "path": "docs/adr/README.md",
-      "sha256": "41b15d664c009cdee97cbc792c46a68e54f9ca9f7d11fd8dabccda78e7db63c9",
-      "bytes": 610,
-      "lines": 9
+      "sha256": "72f7a588fd85e77be1ea2babac1887415465f4bf065ab74a73713a69efa78d6e",
+      "bytes": 737,
+      "lines": 10
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
-      "sha256": "b6e963f51d7f5b1a8dc1144d508399770b6d4b9e27e69bd1c7a380ac4051bb0c",
-      "bytes": 2749,
-      "lines": 37
+      "sha256": "9999c85ef98dd3ec8ecb481e93464ac72fbde4dbdea50023c35d5e1ca57b32e8",
+      "bytes": 3079,
+      "lines": 41
     },
     {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
