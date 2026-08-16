@@ -9,6 +9,7 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0003_audit_outb
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0004_outbox_delivery_claim.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0005_outbox_delivery_finalization.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0006_outbox_delivery_dead_letter.sql
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0007_outbox_retry_exhaustion.sql
 
 TENANT_ID="10000000-0000-7000-8000-000000000001"
 EVENT_ID="00000000-0000-4000-8000-000000000081"
