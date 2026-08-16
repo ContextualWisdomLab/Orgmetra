@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "4e1d55ba9a99500b0e385da555f1ef63b9b6d07c76bb26cf3e6a6854261351ec",
-      "bytes": 3522,
-      "lines": 105
+      "sha256": "cf3dccb723d59700d974a2ced1bc808b121ff04906670d0091f4ccfc31d1af90",
+      "bytes": 3565,
+      "lines": 106
     },
     {
       "path": ".gitignore",
@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b007d70d3a6c4fa2ca5f623ed59a91e1fc7a6caef4c8e28ca6f436d15c85e73b",
-      "bytes": 6576,
-      "lines": 63
+      "sha256": "d0995b78bffafe7be3b136bf31a9f2fb512edfc40b8c0bd0b2d2b9b21c181635",
+      "bytes": 7151,
+      "lines": 64
     },
     {
       "path": "CLAUDE.md",
@@ -77,15 +77,15 @@
     },
     {
       "path": "docs/DATA_MODEL.md",
-      "sha256": "b5266757e1d527ea909de0b78107ffc90ea2f0c543503e4d7521662b879916ee",
-      "bytes": 5729,
-      "lines": 59
+      "sha256": "d54765318b163ec42160321ab87d1f7ec2c060f598933f871fe49fc1e7580cc4",
+      "bytes": 7430,
+      "lines": 70
     },
     {
       "path": "docs/ERD.md",
-      "sha256": "9a4b433b23a6ec100fce87ec3041a25e29b6acde894b44b043f988fbf03514b9",
-      "bytes": 5367,
-      "lines": 59
+      "sha256": "9a28728e44ad8383567cdf76a62416e34157a83fd4193f99a2a02143d435741e",
+      "bytes": 6012,
+      "lines": 62
     },
     {
       "path": "docs/OPERABILITY.md",
@@ -131,8 +131,8 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "8d76f7756a3ebeaffc328c2aa5bf9da304ab54d58105cc79d8124a10192afb19",
-      "bytes": 5577,
+      "sha256": "54461695583ccb997fbc7d8c201d083ced48df2a0265b392cf73c4c490edda58",
+      "bytes": 5584,
       "lines": 31
     },
     {
