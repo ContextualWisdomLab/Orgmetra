@@ -14,6 +14,7 @@ from orgmetra_domain import (
     CandidateWorkerRelinkError,
     EmploymentRecord,
     InvalidDomainValueError,
+    PersonNameRecord,
     PersonRecord,
     PositionRecord,
     validate_assignment_portfolio,
@@ -29,6 +30,7 @@ ORG_ID = UUID("00000000-0000-7000-8000-000000000006")
 JOB_ID = UUID("00000000-0000-7000-8000-000000000007")
 CANDIDATE_ID = UUID("00000000-0000-7000-8000-000000000008")
 LINK_ID = UUID("00000000-0000-7000-8000-000000000009")
+PERSON_NAME_ID = UUID("00000000-0000-7000-8000-000000000011")
 
 
 def period(
@@ -81,9 +83,15 @@ class BitemporalPeriodTests(unittest.TestCase):
 class RecordValidationTests(unittest.TestCase):
     """Verify beginner-visible validation at aggregate construction."""
 
-    def test_person_requires_visible_name(self) -> None:
+    def test_person_anchor_has_no_mutable_descriptive_attributes(self) -> None:
+        person = PersonRecord(PERSON_ID)
+        self.assertEqual(person.person_record_id, PERSON_ID)
+        self.assertFalse(hasattr(person, "display_name"))
+        self.assertFalse(hasattr(person, "period"))
+
+    def test_person_name_requires_visible_name(self) -> None:
         with self.assertRaisesRegex(InvalidDomainValueError, "display_name"):
-            PersonRecord(PERSON_ID, "   ", period())
+            PersonNameRecord(PERSON_NAME_ID, PERSON_ID, "   ", period())
 
     def test_employment_requires_status_code(self) -> None:
         with self.assertRaisesRegex(InvalidDomainValueError, "employment_status_code"):
@@ -93,8 +101,10 @@ class RecordValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(InvalidDomainValueError, "position_status_code"):
             PositionRecord(POSITION_ID, ORG_ID, JOB_ID, "  ", period())
 
-    def test_valid_records_normalize_human_readable_values(self) -> None:
-        person = PersonRecord(PERSON_ID, "  Ada Lovelace  ", period())
+    def test_valid_versioned_records_normalize_human_readable_values(self) -> None:
+        person_name = PersonNameRecord(
+            PERSON_NAME_ID, PERSON_ID, "  Ada Lovelace  ", period()
+        )
         employment = EmploymentRecord(
             EMPLOYMENT_ID, PERSON_ID, "  active  ", period()
         )
@@ -102,7 +112,7 @@ class RecordValidationTests(unittest.TestCase):
             POSITION_ID, ORG_ID, JOB_ID, "  open  ", period()
         )
 
-        self.assertEqual(person.display_name, "Ada Lovelace")
+        self.assertEqual(person_name.display_name, "Ada Lovelace")
         self.assertEqual(employment.employment_status_code, "active")
         self.assertEqual(position.position_status_code, "open")
 
@@ -119,6 +129,8 @@ class AssignmentPortfolioTests(unittest.TestCase):
         start: date,
         end: date | None,
     ) -> AssignmentRecord:
+        """Create one assignment for allocation-boundary tests."""
+
         return AssignmentRecord(
             assignment_record_id=UUID(
                 f"00000000-0000-7000-8000-{assignment_id:012d}"
