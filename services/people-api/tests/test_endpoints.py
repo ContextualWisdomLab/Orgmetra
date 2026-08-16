@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
+import re
 from uuid import UUID, uuid4
 
 import pytest
@@ -19,16 +20,16 @@ from conftest import FakeAuthorizer, FakeRepository
 
 
 AUTHORIZATION = {"Authorization": "Bearer valid-token"}
+SUPPORT_PATTERN = re.compile(r"^err_[A-Za-z0-9_-]{20,80}$")
 
 
 def _person_payload(person_record_id: UUID | None = None) -> dict[str, object]:
-    """Return one valid person creation document."""
+    """Return one valid person creation document without caller-owned system time."""
 
     return {
         "person_record_id": str(person_record_id or uuid4()),
         "display_name": "  Seongho Bae  ",
         "effective_from": "2026-08-15",
-        "recorded_at": "2026-08-15T08:30:00Z",
     }
 
 
@@ -40,9 +41,8 @@ def test_health_is_public_and_security_headers_are_applied(client: TestClient) -
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["referrer-policy"] == "no-referrer"
-    assert response.headers["x-request-id"] == (
-        "0198a412-6000-7000-8000-000000000003"
-    )
+    assert SUPPORT_PATTERN.fullmatch(response.headers["x-support-reference"])
+    assert "x-request-id" not in response.headers
 
 
 def test_openapi_exposes_stable_operations_and_bearer_scheme(client: TestClient) -> None:
@@ -84,12 +84,11 @@ def test_create_and_get_person_preserve_server_selected_context(
 ) -> None:
     person_id = uuid4()
     correlation_id = uuid4()
-    decision_id = uuid4()
     headers = {
         **AUTHORIZATION,
         "X-Correlation-Id": str(correlation_id),
-        "X-Decision-Reference": str(decision_id),
-        "X-Evidence-Reference": " evidence://job-analysis/42 ",
+        "X-Decision-Reference": str(uuid4()),
+        "X-Evidence-Reference": "evidence://caller-controlled/ignored",
     }
 
     created = client.post(
@@ -104,24 +103,29 @@ def test_create_and_get_person_preserve_server_selected_context(
         "display_name": "Seongho Bae",
         "effective_from": "2026-08-15",
         "effective_to": None,
-        "recorded_from": "2026-08-15T08:30:00Z",
+        "recorded_from": "2026-08-15T09:00:00Z",
     }
-    assert authorizer.calls[-1] == ("valid-token", "people_admin")
+    assert authorizer.calls[-1] == (
+        "valid-token",
+        "orgmetra.people.write",
+        "people_admin",
+    )
     assert repository.last_context is not None
     assert repository.last_context.tenant_reference == authorizer.principal.tenant_reference
     assert repository.last_context.actor_reference == authorizer.principal.actor_reference
     assert repository.last_context.purpose_code == "people_admin"
     assert repository.last_context.correlation_reference == correlation_id
-    assert repository.last_context.decision_reference == decision_id
-    assert repository.last_context.evidence_reference == "evidence://job-analysis/42"
+    assert repository.last_context.decision_reference is None
+    assert repository.last_context.evidence_reference is None
 
-    fetched = client.get(
-        f"/v1/people/{person_id}",
-        headers=AUTHORIZATION,
-    )
+    fetched = client.get(f"/v1/people/{person_id}", headers=AUTHORIZATION)
     assert fetched.status_code == 200
     assert fetched.json() == created.json()
-    assert authorizer.calls[-1] == ("valid-token", "people_read")
+    assert authorizer.calls[-1] == (
+        "valid-token",
+        "orgmetra.people.read",
+        "people_read",
+    )
     assert repository.last_context is not None
     assert repository.last_context.correlation_reference == UUID(
         "0198a412-6000-7000-8000-000000000003"
@@ -186,15 +190,14 @@ def test_candidate_link_and_audit_workflow(
     assert "assessment_response" not in audited.text
 
 
-def test_absent_person_returns_uniform_not_found(
-    client: TestClient,
-) -> None:
+def test_absent_person_returns_uniform_not_found(client: TestClient) -> None:
     response = client.get(f"/v1/people/{uuid4()}", headers=AUTHORIZATION)
 
     assert response.status_code == 404
     assert response.headers["content-type"].startswith("application/problem+json")
     assert response.json()["error_code"] == "resource_not_found"
     assert "not visible" in response.json()["detail"]
+    assert response.json()["next_action"]
 
 
 @pytest.mark.parametrize(
@@ -224,6 +227,7 @@ def test_authorizer_cannot_return_an_insufficient_principal(
     principal = AuthorizedPrincipal(
         tenant_reference=uuid4(),
         actor_reference=uuid4(),
+        allowed_scope_codes=frozenset({"orgmetra.people.write"}),
         allowed_purpose_codes=frozenset({"people_read"}),
     )
     client = TestClient(
@@ -237,7 +241,7 @@ def test_authorizer_cannot_return_an_insufficient_principal(
         json=_person_payload(),
     )
     assert response.status_code == 403
-    assert response.json()["error_code"] == "purpose_not_authorized"
+    assert response.json()["error_code"] == "authorization_denied"
 
 
 def test_invalid_principal_fails_as_authentication_error(
@@ -251,29 +255,28 @@ def test_invalid_principal_fails_as_authentication_error(
     assert response.json()["error_code"] == "authentication_failed"
 
 
-@pytest.mark.parametrize(
-    "header_name,header_value",
-    [
-        ("X-Correlation-Id", "not-a-uuid"),
-        ("X-Decision-Reference", "not-a-uuid"),
-        ("X-Evidence-Reference", "   "),
-        ("X-Evidence-Reference", "x" * 513),
-    ],
-)
-def test_invalid_request_metadata_is_rejected(
-    client: TestClient,
-    header_name: str,
-    header_value: str,
-) -> None:
+def test_invalid_correlation_metadata_is_rejected(client: TestClient) -> None:
+    header_value = "not-a-uuid"
     response = client.post(
         "/v1/people",
-        headers={**AUTHORIZATION, header_name: header_value},
+        headers={**AUTHORIZATION, "X-Correlation-Id": header_value},
         json=_person_payload(),
     )
 
     assert response.status_code == 400
     assert response.json()["error_code"] == "invalid_request_metadata"
-    assert header_value.strip() not in response.text
+    assert header_value not in response.text
+
+
+def test_system_recorded_time_is_not_accepted_from_request(client: TestClient) -> None:
+    payload = _person_payload()
+    payload["recorded_at"] = "1900-01-01T00:00:00Z"
+
+    response = client.post("/v1/people", headers=AUTHORIZATION, json=payload)
+
+    assert response.status_code == 422
+    assert "recorded_at" in response.text
+    assert "1900-01-01" not in response.text
 
 
 def test_validation_errors_do_not_echo_rejected_hr_content(client: TestClient) -> None:
@@ -318,6 +321,7 @@ def test_repository_and_unexpected_errors_are_safely_translated(
     response = client.get(f"/v1/people/{uuid4()}", headers=AUTHORIZATION)
     assert response.status_code == status_code
     assert response.json()["error_code"] == error_code
+    assert response.json()["next_action"]
     assert str(error) not in response.text
     if status_code == 503:
         assert response.headers["retry-after"] == "5"
