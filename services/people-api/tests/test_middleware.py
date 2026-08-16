@@ -15,6 +15,7 @@ from orgmetra_people_api.middleware import RequestBoundaryMiddleware
 
 
 TRACE_REFERENCE = UUID("0198a412-6000-7000-8000-000000000004")
+SUPPORT_REFERENCE = UUID("0198a412-6000-7000-8000-000000000104")
 
 
 def _http_scope(headers: list[tuple[bytes, bytes]] | None = None) -> Scope:
@@ -35,6 +36,20 @@ def _http_scope(headers: list[tuple[bytes, bytes]] | None = None) -> Scope:
         "server": ("testserver", 443),
         "state": {},
     }
+
+
+def _middleware(
+    app: Callable[[Scope, Receive, Send], Awaitable[None]],
+    maximum_body_bytes: int,
+) -> RequestBoundaryMiddleware:
+    """Create middleware with separate deterministic internal and client IDs."""
+
+    return RequestBoundaryMiddleware(
+        app,
+        maximum_body_bytes=maximum_body_bytes,
+        identifier_factory=lambda: TRACE_REFERENCE,
+        support_identifier_factory=lambda: SUPPORT_REFERENCE,
+    )
 
 
 def _run(
@@ -101,22 +116,22 @@ def test_declared_length_failures_are_rejected_before_dispatch(
         nonlocal called
         called = True
 
-    middleware = RequestBoundaryMiddleware(
-        app,
-        maximum_body_bytes=5,
-        identifier_factory=lambda: TRACE_REFERENCE,
-    )
     sent = _run(
-        middleware,
+        _middleware(app, 5),
         _http_scope(headers),
         [{"type": "http.request", "body": b"", "more_body": False}],
     )
 
     assert called is False
     assert sent[0]["status"] == status_code
-    assert _problem(sent)["error_code"] == error_code
+    problem = _problem(sent)
+    assert problem["error_code"] == error_code
+    assert problem["support_reference"] == str(SUPPORT_REFERENCE)
+    assert problem["next_action"]
+    assert "trace_reference" not in problem
     headers_map = dict(sent[0]["headers"])
-    assert headers_map[b"x-request-id"] == str(TRACE_REFERENCE).encode()
+    assert headers_map[b"x-support-reference"] == str(SUPPORT_REFERENCE).encode()
+    assert b"x-request-id" not in headers_map
     assert headers_map[b"content-type"] == b"application/problem+json"
 
 
@@ -129,13 +144,8 @@ def test_actual_streamed_bytes_cannot_bypass_missing_length() -> None:
         await send({"type": "http.response.start", "status": 204, "headers": []})
         await send({"type": "http.response.body", "body": b""})
 
-    middleware = RequestBoundaryMiddleware(
-        app,
-        maximum_body_bytes=5,
-        identifier_factory=lambda: TRACE_REFERENCE,
-    )
     sent = _run(
-        middleware,
+        _middleware(app, 5),
         _http_scope(),
         [
             {"type": "http.request", "body": b"abc", "more_body": True},
@@ -144,12 +154,16 @@ def test_actual_streamed_bytes_cannot_bypass_missing_length() -> None:
     )
 
     assert sent[0]["status"] == 413
-    assert _problem(sent)["error_code"] == "request_body_too_large"
+    problem = _problem(sent)
+    assert problem["error_code"] == "request_body_too_large"
+    assert problem["support_reference"] == str(SUPPORT_REFERENCE)
+    assert str(TRACE_REFERENCE) not in json.dumps(problem)
 
 
 def test_exact_limit_passes_and_security_headers_are_added_once() -> None:
     async def app(scope: Scope, receive: Receive, send: Send) -> None:
         assert scope["state"]["trace_reference"] == TRACE_REFERENCE
+        assert scope["state"]["support_reference"] == SUPPORT_REFERENCE
         message = await receive()
         assert message["body"] == b"12345"
         await send(
@@ -161,13 +175,8 @@ def test_exact_limit_passes_and_security_headers_are_added_once() -> None:
         )
         await send({"type": "http.response.body", "body": b"ok"})
 
-    middleware = RequestBoundaryMiddleware(
-        app,
-        maximum_body_bytes=5,
-        identifier_factory=lambda: TRACE_REFERENCE,
-    )
     sent = _run(
-        middleware,
+        _middleware(app, 5),
         _http_scope([(b"content-length", b"5")]),
         [{"type": "http.request", "body": b"12345", "more_body": False}],
     )
@@ -177,7 +186,8 @@ def test_exact_limit_passes_and_security_headers_are_added_once() -> None:
     assert headers.count((b"cache-control", b"private")) == 1
     assert (b"x-content-type-options", b"nosniff") in headers
     assert (b"referrer-policy", b"no-referrer") in headers
-    assert (b"x-request-id", str(TRACE_REFERENCE).encode()) in headers
+    assert (b"x-support-reference", str(SUPPORT_REFERENCE).encode()) in headers
+    assert not any(name.lower() == b"x-request-id" for name, _value in headers)
 
 
 def test_non_http_protocol_is_passed_through() -> None:
@@ -204,11 +214,7 @@ def test_crossing_limit_after_response_start_fails_closed() -> None:
         await send({"type": "http.response.start", "status": 200, "headers": []})
         await receive()
 
-    middleware = RequestBoundaryMiddleware(
-        app,
-        maximum_body_bytes=2,
-        identifier_factory=lambda: TRACE_REFERENCE,
-    )
+    middleware = _middleware(app, 2)
 
     with pytest.raises(RuntimeError, match="after response start"):
         _run(
