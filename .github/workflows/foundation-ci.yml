@@ -44,3 +44,33 @@ jobs:
         run: npm run validate
       - name: Prove validation is read-only
         run: git diff --exit-code
+
+  postgres_contract:
+    name: PostgreSQL bitemporal contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: orgmetra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d orgmetra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run bitemporal concurrency contract
+        run: bash tests/test_bitemporal_postgres.sh
+      - name: Prove test is read-only
+        run: git diff --exit-code
