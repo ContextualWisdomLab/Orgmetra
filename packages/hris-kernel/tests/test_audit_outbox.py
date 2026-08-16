@@ -10,6 +10,7 @@ from orgmetra_hris_kernel.audit import AuditOutboxEvent
 TENANT_ID = UUID("00000000-0000-4000-8000-000000000001")
 EVENT_ID = UUID("00000000-0000-4000-8000-000000000002")
 NIL_ID = UUID(int=0)
+MAX_ID = UUID(int=(1 << 128) - 1)
 OCCURRED_AT = datetime(2026, 8, 17, 1, 30, tzinfo=timezone.utc)
 
 
@@ -143,6 +144,13 @@ def test_event_rejects_nil_uuid_identities(field_name):
     """Reserved nil UUIDs cannot become durable event or tenant identities."""
     with pytest.raises(ValueError, match="nil UUID"):
         _event(**{field_name: NIL_ID})
+
+
+@pytest.mark.parametrize("field_name", ["event_id", "tenant_record_id"])
+def test_event_rejects_max_uuid_identities(field_name):
+    """RFC 9562 Max UUID sentinels cannot become durable event or tenant identities."""
+    with pytest.raises(ValueError, match="max UUID"):
+        _event(**{field_name: MAX_ID})
 
 
 def test_event_rejects_naive_occurrence_time():
