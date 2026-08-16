@@ -1,5 +1,7 @@
 # ERD
 
+For readability, the diagram renders representative `tenant_record` scoping edges rather than repeating the same edge for every tenant-owned relation. The authoritative tenant-isolation contract is `docs/DATA_MODEL.md`: **every owned HRIS fact** stores `tenant_record_id`, every cross-table reference is tenant-qualified, and forced row-level security applies independently to every tenant-scoped table. This omission is visual only; it does not weaken the relational or authorization contract for employment, candidate, evidence, decision, validation-link, compensation, or transition entities.
+
 ```mermaid
 erDiagram
     tenant_record ||--o{ person_record : scopes
@@ -8,7 +10,7 @@ erDiagram
     person_record ||--o{ person_name_record : has_names
     person_record ||--o{ employment_record : has
     organization_unit ||--o{ organization_unit_version : has_versions
-    organization_unit ||--o{ organization_unit_version : may_parent
+    organization_unit_version }o--o| organization_unit : may_parent
     organization_unit ||--o{ position_record : contains
     job_profile ||--o{ job_profile_version : has_versions
     job_profile ||--o{ position_record : defines
