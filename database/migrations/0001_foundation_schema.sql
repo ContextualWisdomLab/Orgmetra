@@ -8,7 +8,7 @@ CREATE TABLE person_record (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT person_record_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE person_name_record (
@@ -20,9 +20,9 @@ CREATE TABLE person_name_record (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT person_name_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT person_name_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE employment_record (
@@ -34,36 +34,59 @@ CREATE TABLE employment_record (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT employment_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT employment_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE organization_unit (
     organization_unit_id uuid PRIMARY KEY,
+    recorded_from timestamptz NOT NULL DEFAULT now(),
+    recorded_to timestamptz,
+    CONSTRAINT organization_unit_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
+);
+
+CREATE TABLE organization_unit_version (
+    organization_unit_version_id uuid PRIMARY KEY,
+    organization_unit_id uuid NOT NULL REFERENCES organization_unit(organization_unit_id),
     unit_name text NOT NULL,
+    organization_type_code text NOT NULL,
+    parent_organization_unit_id uuid REFERENCES organization_unit(organization_unit_id),
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
-    CONSTRAINT organization_unit_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to >= effective_from),
-    CONSTRAINT organization_unit_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+    CONSTRAINT organization_unit_parent_not_self_check
+        CHECK (parent_organization_unit_id IS NULL OR parent_organization_unit_id <> organization_unit_id),
+    CONSTRAINT organization_unit_version_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
+    CONSTRAINT organization_unit_version_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE job_profile (
     job_profile_id uuid PRIMARY KEY,
+    recorded_from timestamptz NOT NULL DEFAULT now(),
+    recorded_to timestamptz,
+    CONSTRAINT job_profile_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
+);
+
+CREATE TABLE job_profile_version (
+    job_profile_version_id uuid PRIMARY KEY,
+    job_profile_id uuid NOT NULL REFERENCES job_profile(job_profile_id),
     job_title text NOT NULL,
+    job_family_code text NOT NULL,
     job_version_code text NOT NULL,
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
-    CONSTRAINT job_profile_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to >= effective_from),
-    CONSTRAINT job_profile_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+    CONSTRAINT job_profile_version_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
+    CONSTRAINT job_profile_version_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE position_record (
@@ -76,9 +99,9 @@ CREATE TABLE position_record (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT position_record_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT position_record_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE assignment_record (
@@ -93,9 +116,9 @@ CREATE TABLE assignment_record (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT assignment_record_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT assignment_record_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE candidate_profile (
@@ -104,7 +127,7 @@ CREATE TABLE candidate_profile (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT candidate_profile_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE candidate_worker_link (
@@ -123,9 +146,9 @@ CREATE TABLE performance_cycle (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT performance_cycle_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT performance_cycle_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE criterion_blueprint (
@@ -138,9 +161,9 @@ CREATE TABLE criterion_blueprint (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT criterion_blueprint_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT criterion_blueprint_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE criterion_observation (
@@ -153,7 +176,7 @@ CREATE TABLE criterion_observation (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT criterion_observation_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE selection_decision (
@@ -187,7 +210,7 @@ CREATE TABLE validity_study (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT validity_study_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE compensation_record (
@@ -200,9 +223,9 @@ CREATE TABLE compensation_record (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT compensation_record_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to >= effective_from),
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT compensation_record_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE TABLE employment_transition (
@@ -213,7 +236,7 @@ CREATE TABLE employment_transition (
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT employment_transition_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to >= recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
 
 CREATE FUNCTION reject_append_only_mutation()
