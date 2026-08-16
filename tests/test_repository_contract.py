@@ -38,6 +38,24 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("unset PYTHONPATH", script)
         self.assertIn("import orgmetra_domain", script)
 
+    def test_person_anchor_recorded_lifecycle_boundary_is_explicit(self) -> None:
+        adr = (
+            ROOT / "docs" / "adr" / "0004-framework-independent-domain-kernel.md"
+        ).read_text(encoding="utf-8")
+        schema = (
+            ROOT / "database" / "migrations" / "0001_foundation_schema.sql"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("identity-only `PersonRecord`", adr)
+        self.assertIn("persistence-owned lifecycle metadata", adr)
+        self.assertIn("recorded_from", adr)
+        self.assertIn("recorded_to", adr)
+        person_block = schema.split("CREATE TABLE person_record (", 1)[1].split(
+            ");", 1
+        )[0]
+        self.assertIn("recorded_from", person_block)
+        self.assertIn("recorded_to", person_block)
+
     def test_package_declares_typed_interface(self) -> None:
         marker = (
             ROOT
