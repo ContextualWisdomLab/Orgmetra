@@ -8,7 +8,10 @@ from uuid import UUID, uuid4
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from .support import new_support_reference
+
 IdentifierFactory = Callable[[], UUID]
+SupportReferenceFactory = Callable[[], str]
 
 
 class _BodyLimitExceeded(RuntimeError):
@@ -24,7 +27,7 @@ class RequestBoundaryMiddleware:
         *,
         maximum_body_bytes: int = 65_536,
         identifier_factory: IdentifierFactory = uuid4,
-        support_identifier_factory: IdentifierFactory = uuid4,
+        support_reference_factory: SupportReferenceFactory = new_support_reference,
     ) -> None:
         """Configure a positive byte limit and independent identifier sources."""
 
@@ -33,7 +36,7 @@ class RequestBoundaryMiddleware:
         self._app = app
         self._maximum_body_bytes = maximum_body_bytes
         self._identifier_factory = identifier_factory
-        self._support_identifier_factory = support_identifier_factory
+        self._support_reference_factory = support_reference_factory
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Apply the boundary to HTTP traffic and pass through other protocols."""
@@ -43,7 +46,7 @@ class RequestBoundaryMiddleware:
             return
 
         trace_reference = self._identifier_factory()
-        support_reference = self._support_identifier_factory()
+        support_reference = self._support_reference_factory()
         state = scope.setdefault("state", {})
         state["trace_reference"] = trace_reference
         state["support_reference"] = support_reference
@@ -121,7 +124,7 @@ class RequestBoundaryMiddleware:
                     b"cache-control": b"no-store",
                     b"x-content-type-options": b"nosniff",
                     b"referrer-policy": b"no-referrer",
-                    b"x-support-reference": str(support_reference).encode("ascii"),
+                    b"x-support-reference": support_reference.encode("ascii"),
                 }
                 headers.extend(
                     (name, value)
@@ -153,7 +156,7 @@ class RequestBoundaryMiddleware:
         self,
         scope: Scope,
         send: Send,
-        support_reference: UUID,
+        support_reference: str,
         *,
         status_code: int,
         error_code: str,
@@ -171,7 +174,7 @@ class RequestBoundaryMiddleware:
                 "detail": detail,
                 "instance": scope.get("path", "/"),
                 "error_code": error_code,
-                "support_reference": str(support_reference),
+                "support_reference": support_reference,
                 "next_action": next_action,
             },
             separators=(",", ":"),
@@ -182,7 +185,7 @@ class RequestBoundaryMiddleware:
             (b"cache-control", b"no-store"),
             (b"x-content-type-options", b"nosniff"),
             (b"referrer-policy", b"no-referrer"),
-            (b"x-support-reference", str(support_reference).encode("ascii")),
+            (b"x-support-reference", support_reference.encode("ascii")),
         ]
         await send(
             {
