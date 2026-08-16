@@ -292,4 +292,60 @@ if [[ "${rolled_back_audit_count}" != "0" ]]; then
     exit 1
 fi
 
+assert_reserved_uuid_rejected() {
+    local case_name="$1"
+    local event_id="$2"
+    local delivery_id="$3"
+    local expected_label="$4"
+    local payload
+    local output
+    local status
+
+    payload="${canonical_event/00000000-0000-4000-8000-000000000041/${event_id}}"
+
+    set +e
+    output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+        -v event_id="${event_id}" \
+        -v delivery_id="${delivery_id}" \
+        -v payload="${payload}" <<'SQL'
+SELECT record_audit_outbox_event(
+    '10000000-0000-7000-8000-000000000001'::uuid,
+    :'event_id'::uuid,
+    :'delivery_id'::uuid,
+    :'payload',
+    encode(digest(convert_to(:'payload', 'UTF8'), 'sha256'), 'hex'),
+    'integration_hub'
+);
+SQL
+    } 2>&1)"
+    status=$?
+    set -e
+
+    if [[ ${status} -eq 0 || "${output}" != *"audit/outbox identity uses reserved UUID sentinel"* ]]; then
+        echo "${expected_label} escaped ${case_name} identity validation or failed for the wrong reason: ${output}" >&2
+        exit 1
+    fi
+}
+
+assert_reserved_uuid_rejected \
+    "audit-event" \
+    "00000000-0000-0000-0000-000000000000" \
+    "00000000-0000-4000-8000-000000000061" \
+    "RFC 9562 Nil UUID"
+assert_reserved_uuid_rejected \
+    "audit-event" \
+    "ffffffff-ffff-ffff-ffff-ffffffffffff" \
+    "00000000-0000-4000-8000-000000000062" \
+    "RFC 9562 Max UUID"
+assert_reserved_uuid_rejected \
+    "outbox-delivery" \
+    "00000000-0000-4000-8000-000000000063" \
+    "00000000-0000-0000-0000-000000000000" \
+    "RFC 9562 Nil UUID"
+assert_reserved_uuid_rejected \
+    "outbox-delivery" \
+    "00000000-0000-4000-8000-000000000064" \
+    "ffffffff-ffff-ffff-ffff-ffffffffffff" \
+    "RFC 9562 Max UUID"
+
 echo "PostgreSQL immutable audit/outbox persistence contract passed"
