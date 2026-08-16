@@ -18,6 +18,8 @@ class KeyverseOidcAuthorizer:
         self._jwks_provider = jwks_provider
         self._identity_resolver = identity_resolver
     async def authorize(self, bearer_token: str, required_purpose_code: str) -> AuthorizedPrincipal:
+        """Return an authorized principal or fail without token or claim leakage."""
+
         token = _compact_token(bearer_token)
         required_purpose = _purpose_code(required_purpose_code)
         header = _unverified_header(token)
@@ -119,7 +121,7 @@ def _select_signing_key(key_set: Mapping[str, object], *, key_identifier: str, a
     _validate_key_operations(matching_keys[0])
     try:
         signing_key = PyJWK.from_dict(dict(matching_keys[0]))
-    except (InvalidTokenError, KeyError, TypeError,ValueError) as error:
+    except (InvalidTokenError, KeyError, TypeError, ValueError) as error:
         raise IdentityProviderUnavailable("identity signing key is invalid") from error
     if signing_key.algorithm_name != algorithm:
         raise AuthenticationFailed("token signing key algorithm does not match")
