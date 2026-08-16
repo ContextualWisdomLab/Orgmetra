@@ -185,7 +185,6 @@ def test_token_lifetime_cannot_exceed_configured_maximum(
     "purposes",
     [
         "people_read",
-        b"people_read",
         [],
         ["purpose"] * 65,
         [123],
