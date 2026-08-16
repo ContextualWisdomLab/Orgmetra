@@ -1,0 +1,128 @@
+from datetime import datetime, timezone
+from uuid import UUID
+
+import pytest
+
+from orgmetra_hris_kernel.audit import AuditOutboxEvent
+
+TENANT_ID = UUID("00000000-0000-4000-8000-000000000001")
+EVENT_ID = UUID("00000000-0000-4000-8000-000000000002")
+OCCURRED_AT = datetime(2026, 8, 17, 1, 30, tzinfo=timezone.utc)
+
+
+def _event(**overrides):
+    """Build one governed event and allow one test to override selected fields."""
+    values = {
+        "event_id": EVENT_ID,
+        "tenant_record_id": TENANT_ID,
+        "source_service": "people_core",
+        "event_type": "orgmetra.people.assignment.recorded",
+        "resource_reference": "assignment_record:01JTESTOPAQUE",
+        "actor_reference": "keyverse_subject:01JACTOROPAQUE",
+        "purpose_code": "workforce_administration",
+        "reason_code": "hire_completion",
+        "evidence_version_code": "employment-offer:v3",
+        "result_code": "recorded",
+        "occurred_at": OCCURRED_AT,
+        "high_impact": True,
+        "confirmation_reference": "confirmation:01JCONFIRMOPAQUE",
+    }
+    values.update(overrides)
+    return AuditOutboxEvent(**values)
+
+
+def test_cloud_event_contains_governance_context_without_raw_hr_payload():
+    """The audit envelope carries accountability metadata, not shadow HR facts."""
+    event = _event()
+    envelope = event.to_cloudevent()
+
+    assert envelope == {
+        "specversion": "1.0",
+        "id": str(EVENT_ID),
+        "source": "urn:orgmetra:people_core",
+        "type": "orgmetra.people.assignment.recorded",
+        "subject": "assignment_record:01JTESTOPAQUE",
+        "time": "2026-08-17T01:30:00Z",
+        "datacontenttype": "application/json",
+        "orgmetratenant": str(TENANT_ID),
+        "orgmetraactor": "keyverse_subject:01JACTOROPAQUE",
+        "orgmetrapurpose": "workforce_administration",
+        "orgmetrareason": "hire_completion",
+        "orgmetraevidence": "employment-offer:v3",
+        "orgmetraconfirmation": "confirmation:01JCONFIRMOPAQUE",
+        "data": {"result_code": "recorded", "high_impact": True},
+    }
+    assert len(event.content_digest()) == 64
+    assert event.content_digest() == event.content_digest()
+
+
+def test_low_impact_event_may_omit_confirmation_and_normalizes_offset_to_utc():
+    """Routine events remain auditable without manufacturing human confirmation."""
+    event = _event(
+        high_impact=False,
+        confirmation_reference=None,
+        occurred_at=datetime(2026, 8, 17, 10, 30, tzinfo=timezone.utc),
+    )
+
+    envelope = event.to_cloudevent()
+    assert "orgmetraconfirmation" not in envelope
+    assert envelope["time"] == "2026-08-17T10:30:00Z"
+
+
+def test_high_impact_event_requires_human_confirmation_reference():
+    """High-impact employment evidence cannot be emitted without a human confirmation."""
+    with pytest.raises(ValueError, match="confirmation_reference"):
+        _event(confirmation_reference=None)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "bad_value"),
+    [
+        ("source_service", "People-Core"),
+        ("event_type", "people.assignment.recorded"),
+        ("resource_reference", "   "),
+        ("actor_reference", ""),
+        ("purpose_code", " "),
+        ("reason_code", "\t"),
+        ("evidence_version_code", "\n"),
+        ("result_code", ""),
+    ],
+)
+def test_event_rejects_noncanonical_or_blank_contract_fields(field_name, bad_value):
+    """Invalid governance identifiers fail closed before reaching persistence."""
+    with pytest.raises(ValueError):
+        _event(**{field_name: bad_value})
+
+
+def test_event_rejects_naive_occurrence_time():
+    """Audit ordering requires an unambiguous system time."""
+    with pytest.raises(ValueError, match="timezone-aware"):
+        _event(occurred_at=datetime(2026, 8, 17, 1, 30))
+
+
+def test_digest_changes_when_governance_context_changes():
+    """A reason-code change is detectable by the immutable envelope digest."""
+    original = _event().content_digest()
+    changed = _event(reason_code="manager_transfer").content_digest()
+    assert original != changed
+
+
+def test_event_rejects_timezone_object_without_resolved_offset():
+    """A tzinfo object that cannot resolve an offset is not auditable time evidence."""
+    from datetime import tzinfo
+
+    class UnresolvedTimezone(tzinfo):
+        """Minimal tzinfo fixture with intentionally unresolved UTC offset."""
+
+        def utcoffset(self, dt):
+            """Return no offset so the contract must reject this timestamp."""
+            return None
+
+    with pytest.raises(ValueError, match="resolve to a UTC offset"):
+        _event(occurred_at=datetime(2026, 8, 17, 1, 30, tzinfo=UnresolvedTimezone()))
+
+
+def test_event_rejects_blank_optional_confirmation_reference():
+    """An explicitly supplied confirmation identifier must be meaningful."""
+    with pytest.raises(ValueError, match="must not be blank"):
+        _event(high_impact=False, confirmation_reference="   ")
