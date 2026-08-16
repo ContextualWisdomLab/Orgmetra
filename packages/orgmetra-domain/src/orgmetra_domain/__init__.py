@@ -7,6 +7,7 @@ from .errors import (
     CandidateWorkerRelinkError,
     InvalidDomainValueError,
     OrgmetraDomainError,
+    TemporalAmbiguityError,
 )
 from .records import (
     EmploymentRecord,
@@ -18,7 +19,7 @@ from .records import (
     PersonRecord,
     PositionRecord,
 )
-from .temporal import BitemporalPeriod
+from .temporal import BitemporalPeriod, resolve_bitemporal_fact
 
 __all__ = [
     "AllocationExceededError",
@@ -37,5 +38,7 @@ __all__ = [
     "PersonNameRecord",
     "PersonRecord",
     "PositionRecord",
+    "TemporalAmbiguityError",
+    "resolve_bitemporal_fact",
     "validate_assignment_portfolio",
 ]
