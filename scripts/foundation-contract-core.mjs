@@ -41,6 +41,7 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0002-federated-cwl-integration-boundaries.md',
   'docs/adr/0003-bitemporal-hris-data-contract.md',
   'docs/adr/0004-employment-position-version-and-assignment-binding.md',
+  'docs/adr/0005-exclusive-employment-and-staffable-seats.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
@@ -267,6 +268,27 @@ export function validateOpenApiContract(openapiText) {
       scope: 'orgmetra.talent_acquisition.write',
       requestSchema: 'RecordSelectionDecisionCommand',
       extraResponses: ["        '422':"]
+    },
+    {
+      pathMarker: '  /employment-records:',
+      operationId: 'createEmploymentRecord',
+      scope: 'orgmetra.people.write',
+      requestSchema: 'CreateEmploymentRecordCommand',
+      extraResponses: []
+    },
+    {
+      pathMarker: '  /position-records:',
+      operationId: 'createPositionRecord',
+      scope: 'orgmetra.job_architecture.write',
+      requestSchema: 'CreatePositionRecordCommand',
+      extraResponses: []
+    },
+    {
+      pathMarker: '  /assignment-records:',
+      operationId: 'createAssignmentRecord',
+      scope: 'orgmetra.people.write',
+      requestSchema: 'CreateAssignmentRecordCommand',
+      extraResponses: []
     }
   ];
 
@@ -329,6 +351,22 @@ export function validateOpenApiContract(openapiText) {
     requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '        - confirmation_reference', 'human confirmation reference');
     requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '          maxItems: 100', 'evidence_references maxItems 100');
     requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '          uniqueItems: true', 'unique evidence_references');
+  }
+
+  for (const schemaName of [
+    'CreateEmploymentRecordCommand',
+    'CreatePositionRecordCommand',
+    'CreateAssignmentRecordCommand'
+  ]) {
+    const commandBlock = extractYamlBlock(openapiText, `    ${schemaName}:`);
+    if (!commandBlock) {
+      errors.push(`${schemaName}: schema block is missing`);
+      continue;
+    }
+    requireWithin(errors, schemaName, commandBlock, '        - evidence_references', 'required evidence_references');
+    requireWithin(errors, schemaName, commandBlock, '        - confirmation_reference', 'human confirmation reference');
+    requireWithin(errors, schemaName, commandBlock, '          maxItems: 100', 'evidence_references maxItems 100');
+    requireWithin(errors, schemaName, commandBlock, '          uniqueItems: true', 'unique evidence_references');
   }
 
   const errorSchema = extractYamlBlock(openapiText, '    ErrorResponse:');

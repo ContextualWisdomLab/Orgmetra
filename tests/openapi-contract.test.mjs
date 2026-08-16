@@ -121,6 +121,51 @@ for (const testCase of [
     name: 'safe support reference error field',
     fragment: '        - support_reference\n',
     expected: /ErrorResponse.*support_reference/
+  },
+  {
+    name: 'createEmploymentRecord path',
+    fragment: '  /employment-records:\n',
+    expected: /createEmploymentRecord.*path block/
+  },
+  {
+    name: 'createEmploymentRecord scope',
+    fragment: '            - orgmetra.people.write\n',
+    occurrence: 2,
+    expected: /createEmploymentRecord.*scope/
+  },
+  {
+    name: 'createPositionRecord path',
+    fragment: '  /position-records:\n',
+    expected: /createPositionRecord.*path block/
+  },
+  {
+    name: 'createPositionRecord scope',
+    fragment: '            - orgmetra.job_architecture.write\n',
+    occurrence: 2,
+    expected: /createPositionRecord.*scope/
+  },
+  {
+    name: 'createAssignmentRecord path',
+    fragment: '  /assignment-records:\n',
+    expected: /createAssignmentRecord.*path block/
+  },
+  {
+    name: 'createAssignmentRecord scope',
+    fragment: '            - orgmetra.people.write\n',
+    occurrence: 3,
+    expected: /createAssignmentRecord.*scope/
+  },
+  {
+    name: 'employment evidence requirement',
+    fragment: '        - evidence_references\n',
+    occurrence: 3,
+    expected: /CreateEmploymentRecordCommand.*evidence_references/
+  },
+  {
+    name: 'assignment confirmation requirement',
+    fragment: '        - confirmation_reference\n',
+    occurrence: 5,
+    expected: /CreateAssignmentRecordCommand.*confirmation/
   }
 ]) {
   test(`structural OpenAPI gate rejects missing ${testCase.name}`, () => {

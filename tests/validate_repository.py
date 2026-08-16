@@ -44,6 +44,7 @@ REQUIRED = [
     "docs/adr/0002-federated-cwl-integration-boundaries.md",
     "docs/adr/0003-bitemporal-hris-data-contract.md",
     "docs/adr/0004-employment-position-version-and-assignment-binding.md",
+    "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -344,6 +345,27 @@ def _validate_openapi_contract() -> None:
             "RecordSelectionDecisionCommand",
             ("        '422':",),
         ),
+        (
+            "  /employment-records:",
+            "createEmploymentRecord",
+            "orgmetra.people.write",
+            "CreateEmploymentRecordCommand",
+            (),
+        ),
+        (
+            "  /position-records:",
+            "createPositionRecord",
+            "orgmetra.job_architecture.write",
+            "CreatePositionRecordCommand",
+            (),
+        ),
+        (
+            "  /assignment-records:",
+            "createAssignmentRecord",
+            "orgmetra.people.write",
+            "CreateAssignmentRecordCommand",
+            (),
+        ),
     ]
     for marker, operation_id, scope, request_schema, extra_responses in operations:
         block = _yaml_block(openapi, marker)
@@ -385,7 +407,13 @@ def _validate_openapi_contract() -> None:
             _require_in_block(block, operation_id, response, f"response {response.strip()}")
         _require_in_block(block, operation_id, "            Location:", "201 Location header")
 
-    for schema_name in ("CreateJobProfileCommand", "RecordSelectionDecisionCommand"):
+    for schema_name in (
+        "CreateJobProfileCommand",
+        "RecordSelectionDecisionCommand",
+        "CreateEmploymentRecordCommand",
+        "CreatePositionRecordCommand",
+        "CreateAssignmentRecordCommand",
+    ):
         block = _yaml_block(openapi, f"    {schema_name}:")
         if not block:
             _fail(f"{schema_name}: schema block is missing")
@@ -397,6 +425,13 @@ def _validate_openapi_contract() -> None:
         )
         _require_in_block(block, schema_name, "          maxItems: 100", "maxItems 100")
         _require_in_block(block, schema_name, "          uniqueItems: true", "uniqueItems")
+        if schema_name != "CreateJobProfileCommand":
+            _require_in_block(
+                block,
+                schema_name,
+                "        - confirmation_reference",
+                "human confirmation reference",
+            )
 
     decision_block = _yaml_block(openapi, "    RecordSelectionDecisionCommand:")
     if not decision_block:
