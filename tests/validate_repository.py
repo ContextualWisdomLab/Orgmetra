@@ -52,15 +52,21 @@ REQUIRED = [
     "database/migrations/0001_foundation_schema.sql",
     "database/migrations/0002_sealed_evidence_digest.sql",
     "database/migrations/0003_audit_outbox_persistence.sql",
+    "database/migrations/0004_outbox_delivery_claim.sql",
+    "database/migrations/0005_outbox_delivery_finalization.sql",
+    "database/migrations/0006_outbox_delivery_dead_letter.sql",
     "schemas/openapi.yaml",
     "scripts/foundation-contract-core.mjs",
     "scripts/foundation-contract.mjs",
+    "tests/dispatcher-inventory.test.mjs",
     "tests/foundation-contract.test.mjs",
     "tests/openapi-contract.test.mjs",
     "tests/test_bitemporal_postgres.sh",
     "tests/test_tenant_isolation_postgres.sh",
     "tests/test_evidence_sealing_postgres.sh",
     "tests/test_audit_outbox_postgres.sh",
+    "tests/test_outbox_claim_postgres.sh",
+    "tests/test_outbox_dead_letter_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -177,8 +183,25 @@ def _validate_database_contract() -> None:
     audit_sql = (ROOT / "database/migrations/0003_audit_outbox_persistence.sql").read_text(
         encoding="utf-8"
     )
-    table_sql = foundation_sql + "\n" + audit_sql
-    sql = table_sql + "\n" + evidence_sql
+    claim_sql = (ROOT / "database/migrations/0004_outbox_delivery_claim.sql").read_text(
+        encoding="utf-8"
+    )
+    finalization_sql = (
+        ROOT / "database/migrations/0005_outbox_delivery_finalization.sql"
+    ).read_text(encoding="utf-8")
+    dead_letter_sql = (
+        ROOT / "database/migrations/0006_outbox_delivery_dead_letter.sql"
+    ).read_text(encoding="utf-8")
+    table_sql = foundation_sql + "\n" + audit_sql + "\n" + dead_letter_sql
+    sql = (
+        table_sql
+        + "\n"
+        + evidence_sql
+        + "\n"
+        + claim_sql
+        + "\n"
+        + finalization_sql
+    )
 
     table_pattern = re.compile(
         r"\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
@@ -283,10 +306,17 @@ def _validate_database_contract() -> None:
         "audit event records are append-only",
         "CREATE FUNCTION protect_outbox_delivery_transition",
         "outbox delivery must transition pending -> leased before completion",
-        "delivered outbox records are immutable",
         "CREATE FUNCTION record_audit_outbox_event",
         "CREATE POLICY audit_event_record_scope_policy",
         "CREATE POLICY outbox_delivery_record_scope_policy",
+        "CREATE FUNCTION claim_outbox_delivery",
+        "CREATE FUNCTION complete_outbox_delivery",
+        "CREATE FUNCTION retry_outbox_delivery",
+        "CREATE TABLE outbox_delivery_escalation_record",
+        "CREATE TRIGGER outbox_delivery_escalation_append_only_guard",
+        "CREATE POLICY outbox_delivery_escalation_scope_policy",
+        "CREATE FUNCTION dead_letter_outbox_delivery",
+        "terminal outbox delivery records are immutable",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
