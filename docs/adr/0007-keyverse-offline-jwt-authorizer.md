@@ -11,10 +11,17 @@
 The People API intentionally has no default production identity implementation.
 Orgmetra needs a Keyverse integration without giving token verification ambient
 network access, environment-owned credentials, tenant-table access, or authority
-to invent HR purposes. Combining discovery, DNS, HTTP caching, JOSE verification
-and internal identity mapping in one component would make the most security-
-critical code difficult to test and would expose it to SSRF and key-cache failure
-modes.
+to invent HR purposes or operation capabilities. Combining discovery, DNS, HTTP
+caching, JOSE verification and internal identity mapping in one component would
+make the most security-critical code difficult to test and would expose it to
+SSRF and key-cache failure modes.
+
+The protected People API contract requires two independent authorization axes:
+OAuth operation scope (for example `orgmetra.people.write`) and the finer lawful
+HR business purpose (for example `people_admin`). RFC 9068 uses the `scope` claim
+for JWT access-token authorization and delegates its JSON representation to RFC
+8693 §4.2: a string containing space-delimited scopes. A business-purpose claim
+must never substitute for a missing operation capability.
 
 ## Decision
 
@@ -31,18 +38,35 @@ Orgmetra will provide an independently importable, offline
 4. JOSE routing metadata is parsed as untrusted and must contain a bounded
    `kid`, allowed `alg`, and `typ=at+jwt` profile;
 5. exactly one compatible signature key may match; no symmetric algorithm,
-   algorithm inference from caller input, or ambiguous duplicate key is allowed;
+   algorithm inference from caller input, ambiguous duplicate key, or JWK
+   `key_ops` incompatible with verification is allowed;
 6. signature, issuer, audience, expiration, issued-at, not-before and mandatory
    registered claims are verified;
 7. token lifetime is positive and no longer than the configured maximum;
-8. tenant, subject, token identifier and purpose collection are bounded and
-   validated before reference resolution;
-9. the server-selected route purpose must be present in the token;
-10. malformed or unauthorized tokens fail as authentication/authorization;
+8. tenant, subject, token identifier, standard space-delimited `scope` claim and
+   application-purpose collection are bounded and validated before reference
+   resolution;
+9. the server-selected route operation scope must be present in `scope` and the
+   separately selected route purpose must be present in `orgmetra_purposes`;
+10. the returned `AuthorizedPrincipal` carries both complete validated grant sets
+    for a defensive API-boundary check;
+11. malformed or unauthorized tokens fail as authentication/authorization;
     key-provider and identity-mapping outages fail as retryable identity-provider
     unavailability.
 
 ## Alternatives considered
+
+### Treat business purpose as the API capability
+
+Rejected. Purpose answers why an HR action is being performed; OAuth scope
+answers which API capability the token grants. Collapsing them lets a purpose
+claim enlarge token authority and diverges from the protected API contract.
+
+### Encode JWT scope as a JSON array
+
+Rejected for this profile. RFC 9068 points to RFC 8693 §4.2, where `scope` is a
+JSON string containing a space-separated list. Vendor-specific alternatives need
+an explicit versioned profile rather than silent polymorphism.
 
 ### PyJWT `PyJWKClient` inside the authorizer
 
@@ -75,6 +99,8 @@ safe retry and incident diagnosis.
   egress, caching, refresh and provenance under a separate ADR.
 - A future identity-link service must own subject/tenant mapping, deprovisioning
   and merge/split governance.
+- Each People API route must supply both an operation scope and business purpose;
+  neither grant can enlarge the other.
 - The authorizer can be tested with generated asymmetric keys and no network.
 - Token payloads, bearer strings and external identifiers are not logged or
   persisted by this package.
@@ -84,9 +110,10 @@ safe retry and incident diagnosis.
 ## Failure and recovery
 
 A bad signature, wrong issuer/audience, invalid time, malformed claim, missing
-purpose or unknown key fails closed. Provider and resolver failures expose only a
-stable retryable error. Recovery refreshes or repairs the external dependency;
-operators do not disable signature, issuer, audience or lifetime verification.
+operation scope, missing purpose or unknown key fails closed. Provider and
+resolver failures expose only a stable retryable error. Recovery refreshes or
+repairs the external dependency; operators do not disable signature, issuer,
+audience, scope, purpose or lifetime verification.
 
 ## Verification
 
@@ -94,8 +121,9 @@ operators do not disable signature, issuer, audience or lifetime verification.
 - invalid signature, issuer, audience, expiration, future time and missing claim;
 - malformed `typ`, `kid`, algorithm and compact-token surfaces;
 - absent, duplicate, encryption-use, incompatible and malformed JWKs;
-- bounded tenant, subject, `jti`, lifetime and purpose collection;
-- insufficient purpose denial before identity mapping;
+- bounded tenant, subject, `jti`, lifetime, operation-scope and purpose grants;
+- purpose cannot enlarge a token lacking the route operation scope;
+- insufficient scope and insufficient purpose both deny before identity mapping;
 - provider/resolver outage translation without identity or endpoint leakage;
 - static proof of no verifier-owned network/environment/logging authority;
 - immutable action pins, minimal CI permissions, Python 3.12/3.14;
