@@ -132,7 +132,14 @@ SELECT retry_outbox_delivery(
 SQL
     sleep 1.2
 
-    claimed_attempt="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
+    lease_duration_seconds=300
+    if [[ ${expected_attempt} -eq 5 ]]; then
+        lease_duration_seconds=5
+    fi
+
+    claimed_attempt="$(psql "${DATABASE_URL}" -Atq \
+        -v tenant_id="${TENANT_ID}" \
+        -v lease_duration_seconds="${lease_duration_seconds}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
 WITH claimed_delivery AS (
     SELECT *
@@ -140,7 +147,7 @@ WITH claimed_delivery AS (
         :'tenant_id'::uuid,
         'payroll_gateway',
         'dispatcher_worker:dead-letter-owner',
-        300
+        :'lease_duration_seconds'::integer
     )
 )
 SELECT
@@ -159,8 +166,68 @@ SQL
     fi
 done
 
+# Once the database-owned attempt budget is exhausted, a dispatcher cannot put
+# the row back into the pending queue and create an unbounded sixth attempt.
+set +e
+exhausted_retry_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v tenant_id="${TENANT_ID}" \
+    -v delivery_id="${DELIVERY_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT retry_outbox_delivery(
+    :'tenant_id'::uuid,
+    :'delivery_id'::uuid,
+    'dispatcher_worker:dead-letter-owner',
+    'remote_timeout',
+    1
+);
+SQL
+} 2>&1)"
+exhausted_retry_status=$?
+set -e
+if [[ ${exhausted_retry_status} -eq 0 || "${exhausted_retry_output}" != *"outbox delivery stored attempt budget is exhausted and requires terminal dead-lettering"* ]]; then
+    echo "exhausted delivery re-entered retry or failed for the wrong reason: ${exhausted_retry_output}" >&2
+    exit 1
+fi
+
+# A crashed final-attempt worker must not create attempt six after lease expiry.
+# The exact recorded owner may still terminalize exhausted work so the queue
+# cannot strand a permanently leased row when the final worker dies.
+sleep 5.2
+exhausted_reclaim="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT outbox_delivery_record_id::text
+FROM claim_outbox_delivery(
+    :'tenant_id'::uuid,
+    'payroll_gateway',
+    'dispatcher_worker:replacement-worker',
+    300
+);
+SQL
+)"
+if [[ -n "${exhausted_reclaim}" ]]; then
+    echo "expired exhausted delivery was reclaimed beyond its stored attempt budget: ${exhausted_reclaim}" >&2
+    exit 1
+fi
+
+exhausted_state="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" -v delivery_id="${DELIVERY_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT
+    delivery_state_code || '|'
+    || delivery_attempt_count::text || '|'
+    || maximum_attempt_count::text || '|'
+    || lease_owner_reference || '|'
+    || (lease_expires_at <= transaction_timestamp())::text
+FROM outbox_delivery_record
+WHERE outbox_delivery_record_id = :'delivery_id'::uuid;
+SQL
+)"
+if [[ "${exhausted_state}" != "leased|5|5|dispatcher_worker:dead-letter-owner|true" ]]; then
+    echo "exhausted final lease did not remain bounded and recoverable: ${exhausted_state}" >&2
+    exit 1
+fi
+
 # Lease ownership remains a capability boundary even after the durable retry
-# budget is exhausted.
+# budget is exhausted, including an expired final lease.
 set +e
 foreign_owner_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
@@ -325,4 +392,4 @@ if [[ ${fabricated_status} -eq 0 || "${fabricated_output}" != *"outbox delivery 
     exit 1
 fi
 
-echo "PostgreSQL governed outbox dead-letter, stored retry budget, and immutable escalation contract passed"
+echo "PostgreSQL governed outbox dead-letter, bounded retry budget, exhausted-lease recovery, and immutable escalation contract passed"
