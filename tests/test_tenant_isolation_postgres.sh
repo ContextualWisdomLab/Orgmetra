@@ -334,7 +334,18 @@ DO $$
 DECLARE
     table_name text;
     visible_count bigint;
+    visible_tenant_ids uuid[];
 BEGIN
+    SELECT array_agg(tenant_record_id ORDER BY tenant_record_id)
+    INTO visible_tenant_ids
+    FROM tenant_record;
+
+    IF visible_tenant_ids IS DISTINCT FROM ARRAY[
+        '20000000-0000-7000-8000-000000000001'::uuid
+    ] THEN
+        RAISE EXCEPTION 'tenant beta observed an unexpected tenant_record set';
+    END IF;
+
     FOREACH table_name IN ARRAY ARRAY[
         'person_record', 'person_name_record', 'employment_record',
         'organization_unit', 'organization_unit_version', 'job_profile',
