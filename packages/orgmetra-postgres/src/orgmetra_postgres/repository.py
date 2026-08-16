@@ -140,11 +140,6 @@ class PostgresPeopleRepository:
                     effective_to,
                 ),
             ).fetchone()
-            if row is None:
-                raise RepositoryUnavailableError(
-                    "PostgreSQL did not return the created person-name version"
-                )
-
             snapshot = _person_snapshot(row)
             self._record_audit(
                 connection,
