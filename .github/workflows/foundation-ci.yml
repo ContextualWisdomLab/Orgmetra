@@ -10,6 +10,7 @@ on:
     branches:
       - bootstrap
       - main
+      - feat/audit-outbox-envelope
   workflow_dispatch:
 
 permissions:
