@@ -18,6 +18,9 @@ TENANT_BETA = UUID("00000000-0000-7000-8000-000000000002")
 UNIT_A = UUID("50000000-0000-7000-8000-000000000001")
 UNIT_B = UUID("50000000-0000-7000-8000-000000000002")
 UNIT_C = UUID("50000000-0000-7000-8000-000000000003")
+UNIT_D = UUID("50000000-0000-7000-8000-000000000004")
+UNIT_E = UUID("50000000-0000-7000-8000-000000000005")
+UNIT_F = UUID("50000000-0000-7000-8000-000000000006")
 
 
 def _unit(
@@ -28,6 +31,7 @@ def _unit(
     tenant_id: UUID = TENANT_ALPHA,
     recorded_from_year: int = 2024,
 ) -> OrganizationUnitVersion:
+    """Build one organization parent-link fact for hierarchy examples."""
     return OrganizationUnitVersion(
         tenant_record_id=tenant_id,
         organization_unit_id=unit_id,
@@ -55,28 +59,34 @@ def test_rejects_indirect_cycle_visible_in_one_tenant() -> None:
         )
 
 
-def test_future_recorded_foreign_tenant_cycle_does_not_poison_current_hierarchy() -> None:
+def test_future_and_foreign_tenant_facts_do_not_poison_current_hierarchy() -> None:
     """Only facts visible at the requested tenant/effective/knowledge coordinate count."""
     versions = [
         _unit(version_id="52000000-0000-7000-8000-000000000001", unit_id=UNIT_A, parent_id=None),
         _unit(version_id="52000000-0000-7000-8000-000000000002", unit_id=UNIT_B, parent_id=UNIT_A),
         _unit(
             version_id="52000000-0000-7000-8000-000000000003",
-            unit_id=UNIT_A,
+            unit_id=UNIT_C,
             parent_id=UNIT_B,
             recorded_from_year=2026,
         ),
         _unit(
             version_id="52000000-0000-7000-8000-000000000004",
-            unit_id=UNIT_A,
-            parent_id=UNIT_B,
+            unit_id=UNIT_D,
+            parent_id=UNIT_E,
             tenant_id=TENANT_BETA,
         ),
         _unit(
             version_id="52000000-0000-7000-8000-000000000005",
-            unit_id=UNIT_B,
-            parent_id=UNIT_A,
+            unit_id=UNIT_E,
+            parent_id=UNIT_D,
             tenant_id=TENANT_BETA,
+        ),
+        _unit(
+            version_id="52000000-0000-7000-8000-000000000006",
+            unit_id=UNIT_F,
+            parent_id=UNIT_B,
+            tenant_id=TENANT_ALPHA,
         ),
     ]
 
