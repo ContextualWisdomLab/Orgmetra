@@ -79,13 +79,22 @@ def test_high_impact_event_requires_human_confirmation_reference():
     ("field_name", "bad_value"),
     [
         ("source_service", "People-Core"),
+        ("source_service", "people"),
         ("event_type", "people.assignment.recorded"),
+        ("event_type", "orgmetra."),
+        ("event_type", "orgmetra.People.assignment.recorded"),
         ("resource_reference", "   "),
+        ("resource_reference", "person@example.com"),
         ("actor_reference", ""),
+        ("actor_reference", "Ada Lovelace"),
         ("purpose_code", " "),
+        ("purpose_code", "Workforce Administration"),
         ("reason_code", "\t"),
+        ("reason_code", "Hire Completion"),
         ("evidence_version_code", "\n"),
+        ("evidence_version_code", "offer version 3"),
         ("result_code", ""),
+        ("result_code", "Recorded Result"),
     ],
 )
 def test_event_rejects_noncanonical_or_blank_contract_fields(field_name, bad_value):
@@ -126,3 +135,9 @@ def test_event_rejects_blank_optional_confirmation_reference():
     """An explicitly supplied confirmation identifier must be meaningful."""
     with pytest.raises(ValueError, match="must not be blank"):
         _event(high_impact=False, confirmation_reference="   ")
+
+
+def test_event_rejects_nonopaque_optional_confirmation_reference():
+    """Confirmation identifiers cannot smuggle human-readable PII into the envelope."""
+    with pytest.raises(ValueError, match="opaque reference"):
+        _event(high_impact=False, confirmation_reference="approved by Ada")
