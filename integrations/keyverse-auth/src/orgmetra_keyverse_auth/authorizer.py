@@ -7,6 +7,9 @@ from jwt import InvalidTokenError, PyJWK
 from orgmetra_people_api import AuthenticationFailed, AuthorizationDenied, AuthorizedPrincipal, IdentityProviderUnavailable
 from .contracts import IdentityReferenceResolver, JwksProvider, KeyverseOidcConfig, ResolvedIdentityReferences
 
+_SCOPE_CHARACTERS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789_.:")
+
+
 class KeyverseOidcAuthorizer:
     """Verify one JWT access token and resolve its external identities."""
     def __init__(self, config: KeyverseOidcConfig, jwks_provider: JwksProvider, identity_resolver: IdentityReferenceResolver) -> None:
@@ -17,10 +20,12 @@ class KeyverseOidcAuthorizer:
         self._config = config
         self._jwks_provider = jwks_provider
         self._identity_resolver = identity_resolver
-    async def authorize(self, bearer_token: str, required_purpose_code: str) -> AuthorizedPrincipal:
-        """Return an authorized principal or fail without token or claim leakage."""
+
+    async def authorize(self, bearer_token: str, required_scope_code: str, required_purpose_code: str) -> AuthorizedPrincipal:
+        """Return a principal only when independent scope and purpose grants pass."""
 
         token = _compact_token(bearer_token)
+        required_scope = _scope_code(required_scope_code)
         required_purpose = _purpose_code(required_purpose_code)
         header = _unverified_header(token)
         algorithm = _header_value(header, "alg", 16)
@@ -42,11 +47,20 @@ class KeyverseOidcAuthorizer:
             raise AuthenticationFailed("token lifetime is invalid")
         if expires_at - issued_at > self._config.maximum_token_lifetime_seconds:
             raise AuthenticationFailed("token lifetime exceeds the allowed maximum")
+        scope_codes = _scope_collection(claims)
+        if required_scope not in scope_codes:
+            raise AuthorizationDenied("required scope is not authorized")
         purpose_codes = _purpose_collection(claims, self._config.purposes_claim_name)
         if required_purpose not in purpose_codes:
             raise AuthorizationDenied("required purpose is not authorized")
         references = await self._resolve_references(subject=subject, tenant_external_id=tenant_external_id)
-        return AuthorizedPrincipal(tenant_reference=references.tenant_reference, actor_reference=references.actor_reference, allowed_purpose_codes=purpose_codes)
+        return AuthorizedPrincipal(
+            tenant_reference=references.tenant_reference,
+            actor_reference=references.actor_reference,
+            allowed_scope_codes=scope_codes,
+            allowed_purpose_codes=purpose_codes,
+        )
+
     async def _load_key_set(self) -> Mapping[str, object]:
         try:
             key_set = await self._jwks_provider.get_jwks(self._config.issuer)
@@ -62,6 +76,7 @@ class KeyverseOidcAuthorizer:
         if not all(isinstance(key, Mapping) for key in keys):
             raise IdentityProviderUnavailable("identity signing key set is invalid")
         return key_set
+
     async def _resolve_references(self, *, subject: str, tenant_external_id: str) -> ResolvedIdentityReferences:
         try:
             references = await self._identity_resolver.resolve(issuer=self._config.issuer, subject=subject, tenant_external_id=tenant_external_id)
@@ -73,6 +88,7 @@ class KeyverseOidcAuthorizer:
             raise IdentityProviderUnavailable("identity reference mapping is invalid")
         return references
 
+
 def _compact_token(value: str) -> str:
     if not isinstance(value, str):
         raise AuthenticationFailed("bearer token is invalid")
@@ -83,6 +99,7 @@ def _compact_token(value: str) -> str:
         raise AuthenticationFailed("bearer token is invalid")
     return token
 
+
 def _unverified_header(token: str) -> Mapping[str, object]:
     try:
         header = jwt.get_unverified_header(token)
@@ -91,6 +108,7 @@ def _unverified_header(token: str) -> Mapping[str, object]:
     if not isinstance(header, Mapping):
         raise AuthenticationFailed("token header is invalid")
     return header
+
 
 def _header_value(header: Mapping[str, object], name: str, maximum_length: int) -> str:
     value = header.get(name)
@@ -102,6 +120,7 @@ def _header_value(header: Mapping[str, object], name: str, maximum_length: int) 
     if any(ord(c) < 0x21 or ord(c) > 0x7E for c in normalized):
         raise AuthenticationFailed(f"token {name} header is invalid")
     return normalized
+
 
 def _select_signing_key(key_set: Mapping[str, object], *, key_identifier: str, algorithm: str) -> PyJWK:
     """Select exactly one signature key without algorithm or key-use ambiguity."""
@@ -126,6 +145,7 @@ def _select_signing_key(key_set: Mapping[str, object], *, key_identifier: str, a
     if signing_key.algorithm_name != algorithm:
         raise AuthenticationFailed("token signing key algorithm does not match")
     return signing_key
+
 
 def _validate_key_operations(jwk: Mapping[str, object]) -> None:
     """Accept only a well-formed public verification operation declaration."""
@@ -157,6 +177,7 @@ def _decode_claims(token: str, signing_key: PyJWK, *, algorithm: str, config: Ke
         raise AuthenticationFailed("token claims are invalid")
     return claims
 
+
 def _claim_string(claims: Mapping[str, object], name: str, maximum_length: int) -> str:
     value = claims.get(name)
     if not isinstance(value, str):
@@ -168,6 +189,7 @@ def _claim_string(claims: Mapping[str, object], name: str, maximum_length: int) 
         raise AuthenticationFailed(f"token {name} claim is invalid")
     return normalized
 
+
 def _numeric_date(claims: Mapping[str, object], name: str) -> float:
     value = claims.get(name)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -177,6 +199,35 @@ def _numeric_date(claims: Mapping[str, object], name: str) -> float:
         raise AuthenticationFailed(f"token {name} claim is invalid")
     return numeric_value
 
+
+def _scope_collection(claims: Mapping[str, object]) -> frozenset[str]:
+    """Parse one bounded RFC 9068 space-delimited operation-scope claim."""
+
+    raw_scope = claims.get("scope")
+    if not isinstance(raw_scope, str) or not raw_scope or len(raw_scope) > 8_192:
+        raise AuthenticationFailed("token scope claim is invalid")
+    scope_values = raw_scope.split(" ")
+    if not scope_values or len(scope_values) > 64 or any(not value for value in scope_values):
+        raise AuthenticationFailed("token scope claim is invalid")
+    scopes = tuple(_scope_code(value) for value in scope_values)
+    if len(set(scopes)) != len(scopes):
+        raise AuthenticationFailed("token scope claim contains duplicates")
+    return frozenset(scopes)
+
+
+def _scope_code(value: object) -> str:
+    """Normalize one operation scope using the People API scope vocabulary."""
+
+    if not isinstance(value, str):
+        raise AuthenticationFailed("token scope code is invalid")
+    normalized = value.strip()
+    if not normalized or len(normalized) > 128:
+        raise AuthenticationFailed("token scope code is invalid")
+    if not all(character in _SCOPE_CHARACTERS for character in normalized):
+        raise AuthenticationFailed("token scope code is invalid")
+    return normalized
+
+
 def _purpose_collection(claims: Mapping[str, object], claim_name: str) -> frozenset[str]:
     raw_purposes = claims.get(claim_name)
     if not isinstance(raw_purposes, Sequence) or isinstance(raw_purposes, (str, bytes, bytearray)) or not raw_purposes or len(raw_purposes) > 64:
@@ -185,6 +236,7 @@ def _purpose_collection(claims: Mapping[str, object], claim_name: str) -> frozen
     if len(set(purposes)) != len(purposes):
         raise AuthenticationFailed(f"token {claim_name} claim contains duplicates")
     return frozenset(purposes)
+
 
 def _purpose_code(value: object) -> str:
     if not isinstance(value, str):
