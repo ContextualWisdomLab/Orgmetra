@@ -135,12 +135,20 @@ class AuditOutboxEvent:
             envelope["orgmetraconfirmation"] = self.confirmation_reference
         return envelope
 
-    def content_digest(self) -> str:
-        """Return a deterministic SHA-256 digest of the canonical event envelope."""
-        canonical = json.dumps(
+    def canonical_json(self) -> str:
+        """Return the exact deterministic UTF-8 JSON text persisted and digested.
+
+        The database verifies the SHA-256 digest over these exact bytes. Callers
+        must therefore persist this string directly instead of independently
+        serializing :meth:`to_cloudevent` with library-specific defaults.
+        """
+        return json.dumps(
             self.to_cloudevent(),
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,
-        ).encode("utf-8")
-        return sha256(canonical).hexdigest()
+        )
+
+    def content_digest(self) -> str:
+        """Return a deterministic SHA-256 digest of the canonical event envelope."""
+        return sha256(self.canonical_json().encode("utf-8")).hexdigest()
