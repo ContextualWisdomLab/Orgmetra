@@ -1,7 +1,8 @@
-"""Identity-scoped bitemporal employment-truth kernel.
+"""Tenant- and identity-scoped bitemporal employment-truth kernel.
 
-Use these functions to reconstruct, correct, or reject HR facts before they
-are persisted. Persistence, authorization, and UI stay outside this package.
+Use these functions to reconstruct, correct, or reject HR facts inside an
+explicit tenant boundary before they are persisted. Persistence,
+authorization, and UI stay outside this package.
 """
 
 from orgmetra_hris_kernel.assignment import (
