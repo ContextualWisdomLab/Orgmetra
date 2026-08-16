@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Request
@@ -15,8 +14,29 @@ from orgmetra_postgres import (
     RepositoryUnavailableError,
 )
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.exceptions import HTTPException
 
-from .auth import AuthenticationFailed, AuthorizationDenied
+from .auth import (
+    AuthenticationFailed,
+    AuthorizationDenied,
+    IdentityProviderUnavailable,
+)
+
+_SAFE_HTTP_RESPONSE_HEADERS = frozenset({"www-authenticate", "retry-after"})
+_NEXT_ACTIONS = {
+    "authentication_failed": "Obtain a valid bearer credential and retry.",
+    "purpose_not_authorized": "Request the required purpose grant before retrying.",
+    "repository_access_denied": "Verify the authorized tenant and repository policy before retrying.",
+    "immutable_identity_conflict": "Use the existing identity facts or submit the correct versioned change.",
+    "repository_unavailable": "Retry after the indicated interval; contact support if the problem persists.",
+    "identity_provider_unavailable": "Retry authentication after the indicated interval.",
+    "resource_not_found": "Verify the resource reference and authorized scope before retrying.",
+    "request_body_too_large": "Submit a smaller request body and retry.",
+    "invalid_request_metadata": "Correct the bounded request metadata and retry.",
+    "request_validation_failed": "Correct the indicated request fields and retry.",
+    "http_error": "Correct the HTTP request and retry.",
+    "internal_error": "Contact an authorized support operator with the support reference.",
+}
 
 
 class ValidationIssue(BaseModel):
@@ -39,7 +59,8 @@ class ProblemDetail(BaseModel):
     detail: str = Field(min_length=1, max_length=500)
     instance: str = Field(min_length=1, max_length=2048)
     error_code: str = Field(min_length=1, max_length=128)
-    trace_reference: UUID
+    support_reference: UUID
+    next_action: str = Field(min_length=1, max_length=500)
     invalid_fields: tuple[ValidationIssue, ...] | None = None
 
 
@@ -63,6 +84,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     app.add_exception_handler(AuthenticationFailed, _authentication_handler)
     app.add_exception_handler(AuthorizationDenied, _authorization_handler)
+    app.add_exception_handler(IdentityProviderUnavailable, _identity_provider_handler)
     app.add_exception_handler(RepositoryAuthorizationError, _repository_auth_handler)
     app.add_exception_handler(RepositoryConflictError, _conflict_handler)
     app.add_exception_handler(RepositoryUnavailableError, _unavailable_handler)
@@ -70,6 +92,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestTooLarge, _too_large_handler)
     app.add_exception_handler(InvalidRequestMetadata, _metadata_handler)
     app.add_exception_handler(RequestValidationError, _validation_handler)
+    app.add_exception_handler(HTTPException, _http_exception_handler)
     app.add_exception_handler(Exception, _unexpected_handler)
 
 
@@ -99,6 +122,21 @@ async def _authorization_handler(
         error_code="purpose_not_authorized",
         title="Purpose not authorized",
         detail="The authenticated principal is not authorized for this purpose.",
+    )
+
+
+async def _identity_provider_handler(
+    request: Request, _error: IdentityProviderUnavailable
+) -> JSONResponse:
+    """Return a fixed retryable identity-provider outage response."""
+
+    return _response(
+        request,
+        status_code=503,
+        error_code="identity_provider_unavailable",
+        title="Identity provider unavailable",
+        detail="Authentication services are temporarily unavailable.",
+        headers={"Retry-After": "5"},
     )
 
 
@@ -209,6 +247,26 @@ async def _validation_handler(
     )
 
 
+async def _http_exception_handler(
+    request: Request, error: HTTPException
+) -> JSONResponse:
+    """Normalize framework HTTP failures and preserve only safe response headers."""
+
+    safe_headers = {
+        name: value
+        for name, value in (error.headers or {}).items()
+        if name.casefold() in _SAFE_HTTP_RESPONSE_HEADERS
+    }
+    return _response(
+        request,
+        status_code=error.status_code,
+        error_code="http_error",
+        title="HTTP request failed",
+        detail="The HTTP request could not be completed.",
+        headers=safe_headers or None,
+    )
+
+
 async def _unexpected_handler(request: Request, _error: Exception) -> JSONResponse:
     """Return a fixed internal failure without exception or content leakage."""
 
@@ -231,9 +289,9 @@ def _response(
     invalid_fields: tuple[ValidationIssue, ...] | None = None,
     headers: dict[str, str] | None = None,
 ) -> JSONResponse:
-    """Build one canonical problem response with an opaque trace reference."""
+    """Build one canonical problem response with a client-safe support reference."""
 
-    trace_reference = getattr(request.state, "trace_reference", uuid4())
+    support_reference = getattr(request.state, "support_reference", uuid4())
     document = ProblemDetail(
         type=f"urn:orgmetra:problem:{error_code}",
         title=title,
@@ -241,10 +299,17 @@ def _response(
         detail=detail,
         instance=request.url.path,
         error_code=error_code,
-        trace_reference=trace_reference,
+        support_reference=support_reference,
+        next_action=_NEXT_ACTIONS.get(
+            error_code,
+            "Correct the request or contact support with the support reference.",
+        ),
         invalid_fields=invalid_fields,
     )
-    response_headers = {"Cache-Control": "no-store"}
+    response_headers = {
+        "Cache-Control": "no-store",
+        "X-Support-Reference": str(support_reference),
+    }
     if headers is not None:
         response_headers.update(headers)
     return JSONResponse(
