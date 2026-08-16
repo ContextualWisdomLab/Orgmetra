@@ -6,6 +6,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Added
 
+- Stacked audit/outbox envelope contract via `AuditOutboxEvent`: CloudEvents 1.0-compatible metadata, tenant/actor/purpose/reason/evidence extensions, mandatory human confirmation for high-impact events, PII-minimized event data, and deterministic SHA-256 envelope digests at exact 100% new-module statement and branch coverage.
 - `orgmetra_hris_kernel` 0.4.0 with exclusive-versus-concurrent employment, staffable position coverage, exclusive-seat capacity, and `validate_assignment_write` at 100% statement and branch coverage.
 - `POST /v1/employment-records`, `POST /v1/position-records`, and `POST /v1/assignment-records` with the same Keyverse mutation context, confirmation, and versioned evidence composition as other high-impact commands.
 - `employment_record_version.employment_concurrency_code` constrained to `exclusive` or `concurrent`.
@@ -59,4 +60,4 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Notes
 
-- The protected default branch contains only the minimal bootstrap commit. This baseline is proposed through `feat/foundation-product-baseline` and becomes shipped truth only after review and merge.
+- The protected default branch contains only the minimal bootstrap commit. The canonical foundation is PR #22; the audit/outbox envelope is stacked on that exact head and is not protected-main truth until both dependency order and fresh merge gates are satisfied.
