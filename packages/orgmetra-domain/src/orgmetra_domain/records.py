@@ -65,50 +65,62 @@ class EmploymentRecord:
 
 @dataclass(frozen=True, slots=True)
 class OrganizationUnitRecord:
-    """Represent one bitemporal version of an organizational unit.
-
-    The stable ``organization_unit_id`` can be reused by successive versions
-    while name, type, parent relationship, and bitemporal period describe the
-    fact that was effective in the business and known by Orgmetra at that time.
-    """
+    """Represent a durable organizational identity without mutable attributes."""
 
     organization_unit_id: UUID
-    organization_unit_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class OrganizationUnitVersionRecord:
+    """Represent one bitemporal descriptive version of an organization unit.
+
+    ``organization_unit_id`` is the durable identity referenced by positions.
+    The version owns mutable name, type, and parent facts so retroactive
+    corrections preserve both business time and Orgmetra's knowledge history.
+    """
+
+    organization_unit_version_id: UUID
+    organization_unit_id: UUID
+    unit_name: str
     organization_type_code: str
     period: BitemporalPeriod
     parent_organization_unit_id: UUID | None = None
 
     def __post_init__(self) -> None:
-        """Normalize and validate organization display and classification values."""
+        """Normalize organization facts and reject an immediate self-parent."""
 
-        object.__setattr__(
-            self,
-            "organization_unit_name",
-            _require_non_blank(self.organization_unit_name, "organization_unit_name"),
-        )
+        object.__setattr__(self, "unit_name", _require_non_blank(self.unit_name, "unit_name"))
         object.__setattr__(
             self,
             "organization_type_code",
             _require_non_blank(self.organization_type_code, "organization_type_code"),
         )
+        if self.parent_organization_unit_id == self.organization_unit_id:
+            raise InvalidDomainValueError(
+                "parent_organization_unit_id must reference another organization unit"
+            )
 
 
 @dataclass(frozen=True, slots=True)
 class JobProfileRecord:
-    """Represent one bitemporal version of an enterprise job definition.
+    """Represent a durable enterprise job identity without mutable attributes."""
 
-    Jobs describe work independently of organizational seats. Positions refer
-    to the stable ``job_profile_id`` while title and family remain correctable
-    through effective-time and system-recorded-time versions.
-    """
+    job_profile_id: UUID
 
+
+@dataclass(frozen=True, slots=True)
+class JobProfileVersionRecord:
+    """Represent one bitemporal definition of work for a durable job profile."""
+
+    job_profile_version_id: UUID
     job_profile_id: UUID
     job_title: str
     job_family_code: str
+    job_version_code: str
     period: BitemporalPeriod
 
     def __post_init__(self) -> None:
-        """Normalize and validate the job title and family classification."""
+        """Normalize and validate the job title, family, and version code."""
 
         object.__setattr__(
             self, "job_title", _require_non_blank(self.job_title, "job_title")
@@ -118,11 +130,16 @@ class JobProfileRecord:
             "job_family_code",
             _require_non_blank(self.job_family_code, "job_family_code"),
         )
+        object.__setattr__(
+            self,
+            "job_version_code",
+            _require_non_blank(self.job_version_code, "job_version_code"),
+        )
 
 
 @dataclass(frozen=True, slots=True)
 class PositionRecord:
-    """Represent an organizational seat that instantiates a versioned job profile."""
+    """Represent an organizational seat that instantiates a durable job profile."""
 
     position_record_id: UUID
     organization_unit_id: UUID
