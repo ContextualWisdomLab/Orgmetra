@@ -129,6 +129,26 @@ def test_assignment_requires_covering_active_employment(
         )
 
 
+def test_assignment_allows_leave_but_rejects_terminated_employment(
+    jordan_icu_assignment,
+    jordan_active_employment,
+) -> None:
+    """Leave preserves staffing coverage, while termination ends it."""
+    leave = replace(jordan_active_employment, employment_status_code="leave")
+    validate_assignment_employment_coverage(
+        jordan_icu_assignment,
+        [leave],
+        known_at=utc(2024, 5, 1),
+    )
+    terminated = replace(jordan_active_employment, employment_status_code="terminated")
+    with pytest.raises(EmploymentCoverageError, match="employment"):
+        validate_assignment_employment_coverage(
+            jordan_icu_assignment,
+            [terminated],
+            known_at=utc(2024, 5, 1),
+        )
+
+
 def test_assignment_rejects_person_employment_mismatch(
     jordan_icu_assignment,
     jordan_active_employment,
