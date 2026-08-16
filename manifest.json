@@ -29,8 +29,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "784eb165db659165a6cc99572121fb9ca2365250ee7e85c8f64b27edb46381ff",
-      "bytes": 7073,
+      "sha256": "f0af6c4dfa6d85a8e53d790595aff36a3361aed0c39711f11c70945e9b738a71",
+      "bytes": 7448,
       "lines": 63
     },
     {
@@ -95,9 +95,9 @@
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "950d9f60fd21dab90589d0bb61c603e9e1471855bdf739143cfe3942628e0d5d",
-      "bytes": 4375,
-      "lines": 55
+      "sha256": "0e4844620b6809db646b21de2db51b08dd55c3c6743522bc3f439cab91564369",
+      "bytes": 5168,
+      "lines": 58
     },
     {
       "path": "docs/PRD.md",
@@ -137,9 +137,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "dac94acba56cd5ffecaeb32636d3e329ae9e3eae8ae2e6a925713a96625a5922",
-      "bytes": 5878,
-      "lines": 32
+      "sha256": "50419030882e1b3298f067df109ae077c4f026f3ff57d59387606acbe9369e7e",
+      "bytes": 6236,
+      "lines": 33
     },
     {
       "path": "docs/TRD.md",
@@ -197,9 +197,9 @@
     },
     {
       "path": "docs/adr/0006-governed-audit-outbox-envelope.md",
-      "sha256": "81a55c75e4c54efaa0d8de475ca204c2ecf7acd164f5765f23cbc04e86b38a37",
-      "bytes": 5584,
-      "lines": 48
+      "sha256": "d2e198e4ebfc9e32154c359a82060540ace33188e674361bfb0a61a9b0daaf68",
+      "bytes": 7148,
+      "lines": 51
     },
     {
       "path": "docs/adr/README.md",
@@ -209,9 +209,9 @@
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
-      "sha256": "beec970b430a1c8dd50e21dad17d1ce3b4488c28bef527bdb13f340c50c4c045",
-      "bytes": 3677,
-      "lines": 47
+      "sha256": "f829b5297013c554678a9dde2a0519096fc68e8e366e74dc320b1cbf1b8dac46",
+      "bytes": 4050,
+      "lines": 51
     },
     {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
