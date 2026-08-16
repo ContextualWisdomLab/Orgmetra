@@ -53,6 +53,7 @@ def test_header_value_accepts_mapping_and_rejects_invalid_shapes() -> None:
         {"kid": ""},
         {"kid": "x" * 11},
         {"kid": "key\x7f"},
+        {"kid": "kéy"},
     ):
         with pytest.raises(AuthenticationFailed, match="kid"):
             _header_value(header, "kid", 10)
@@ -127,7 +128,10 @@ def test_purpose_collection_accepts_tuple_and_normalizes() -> None:
     ) == frozenset({"people_read", "audit_review"})
 
 
-@pytest.mark.parametrize("value", [None, 1, "", "x" * 129, "UPPER", "café", "a-b"])
+@pytest.mark.parametrize(
+    "value",
+    [None, 1, "", "x" * 129, "UPPER", "café", "a-b", "people_read\x1f"],
+)
 def test_purpose_code_rejects_invalid_values(value: object) -> None:
     with pytest.raises(AuthenticationFailed, match="purpose code"):
         _purpose_code(value)
@@ -160,7 +164,16 @@ def test_scope_collection_rejects_duplicates_and_accepts_valid_set() -> None:
 
 @pytest.mark.parametrize(
     "value",
-    [None, 1, "", "x" * 129, "UPPER", "café", "orgmetra/people/read"],
+    [
+        None,
+        1,
+        "",
+        "x" * 129,
+        "UPPER",
+        "café",
+        "orgmetra/people/read",
+        "orgmetra.people.read\x1f",
+    ],
 )
 def test_scope_code_rejects_invalid_values(value: object) -> None:
     """Reject route or token scopes outside the bounded API vocabulary."""
