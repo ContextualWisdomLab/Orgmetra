@@ -9,6 +9,10 @@ class InvalidDomainValueError(OrgmetraDomainError):
     """Raised when a value violates a stable HRIS domain invariant."""
 
 
+class TemporalAmbiguityError(OrgmetraDomainError):
+    """Raised when more than one fact is visible at one bitemporal coordinate."""
+
+
 class AllocationExceededError(OrgmetraDomainError):
     """Raised when a person's overlapping assignment allocation exceeds one."""
 
