@@ -23,7 +23,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Core ERD, UML, PRD, TRD, user stories, storyboard, wireframes, Storybook inventory, security, test, and operability baseline.
 - Effective-dated performance-cycle records linked to criterion observations.
 - Versioned selection-decision evidence sets, normalized evidence membership, and validity-study links to exact decisions, evidence, and outcomes.
-- PostgreSQL contract tests for bitemporal concurrency, tenant isolation, NOBYPASSRLS write isolation, and decision-evidence sealing.
+- PostgreSQL contract tests for bitemporal concurrency, tenant isolation, NOBYPASSRLS write isolation, decision-evidence sealing, and reserved UUID sentinel rejection.
 - Structural OpenAPI mutation tests that bind authorization scopes, command schemas, evidence limits, human confirmation, creation-location headers, and client-safe error contracts to their owning operations.
 - Manifest digest, byte-count, and line-count validation with a regression preventing Python and Node foundation-artifact inventories from drifting apart.
 - Deterministic unfinished-work marker regressions that reject explicit TODO/TBD/FIXME markers while allowing ordinary explanatory prose.
@@ -51,7 +51,7 @@ All notable changes to Orgmetra will be documented in this file.
 - No direct cross-service application-table access.
 - Service-owned database schemas and roles inside the initially shared physical PostgreSQL cluster.
 - Database guards for reversed or zero-length temporal intervals and append-only candidate-worker, selection-decision, decision-evidence, and validation-study linkage records.
-- Database-level rejection of cross-tenant references, post-decision evidence insertion, caller-supplied open-set evidence digests, empty decision evidence, and sealed evidence-set reuse.
+- Database-level rejection of cross-tenant references, post-decision evidence insertion, caller-supplied open-set evidence digests, empty decision evidence, sealed evidence-set reuse, and RFC 9562 Nil/Max UUID sentinels across foundation identity columns.
 - Bitemporal reconstruction plus assignment, position-seat, and employment-exclusivity kernel decisions are tenant-scoped so foreign-tenant identifiers cannot leak historical facts, provide coverage, consume capacity, or create false conflicts.
 - Keyverse outage policy that blocks PII and high-risk actions when current authorization cannot be verified.
 - Cross-tenant threat, denial evidence, and negative authorization test contracts.
