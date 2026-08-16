@@ -1,0 +1,117 @@
+# Test Strategy
+
+## Canonical coverage gate
+
+This document is the canonical owned-code coverage requirement. Every production implementation must achieve 100% statement and 100% branch coverage where its pinned toolchain exposes those metrics. An unmet threshold fails CI. Generated code, vendored code, migrations that cannot be instrumented, and declarative schemas require explicit contract or execution tests rather than silent exclusion.
+
+The current foundation pack is executable documentation. Its validation command is:
+
+```text
+npm run validate
+```
+
+The command runs Python repository-integrity validation, the dependency-free Node foundation validator, Node regression tests, and mutation-style OpenAPI operation-contract tests. It must fail on a missing required artifact, manifest mismatch, invalid database name, missing tenant/evidence/temporal DDL contract, incomplete high-risk OpenAPI operation context, empty OpenID Connect scope requirement, internal trace identifier in a client error schema, explicit unfinished-work marker, unbalanced Markdown fence, or incomplete Apache-2.0 license. Ordinary explanatory prose may contain words such as `placeholder`; only explicit TODO/TBD/FIXME marker forms are treated as unfinished work.
+
+## Foundation test matrix
+
+| Evidence | Execution command |
+|---|---|
+| Required artifacts, manifest SHA-256/byte/line integrity, package metadata, Markdown, license, database naming, tenant/evidence DDL fragments | `npm run validate` |
+| Structural OpenAPI 3.2 operation ownership: exact scopes, mutation headers, request-schema binding, evidence requirements, human confirmation, creation `Location` headers, required response codes, and client-safe error fields | `node --test tests/openapi-contract.test.mjs` (also included in `npm run validate`) |
+| Bitemporal non-overlap, observably concurrent conflicting version insert, retroactive correction, and in-place rewrite rejection for versioned and other recorded-time HRIS facts | `bash tests/test_bitemporal_postgres.sh` against PostgreSQL 16 in Foundation CI |
+| Cross-tenant composite-FK rejection, missing-context fail-closed RLS reads and writes, cross-context write rejection, and tenant-visible row isolation over every current HRIS table | `bash tests/test_tenant_isolation_postgres.sh` against PostgreSQL 16 in Foundation CI |
+| Open-set caller-digest rejection, non-empty evidence enforcement, independently precomputed SHA-256 membership digest, membership/finalization race serialization, post-decision evidence-insert rejection, and evidence-set single-use enforcement | `bash tests/test_evidence_sealing_postgres.sh` against PostgreSQL 16 in Foundation CI |
+| Tenant/actor/purpose authorization matrix and negative high-impact commands | service-specific unit and integration test commands recorded in each service package |
+| AsyncAPI/CloudEvents envelope compatibility | provider and consumer contract test commands recorded beside the versioned event schema |
+| External adapter timeout, malformed response, tenant mismatch, and unavailable-state handling | fake-server tests in each adapter package |
+| Role-workspace keyboard, focus, exact-value, permission-denied, and confirmation states | Storybook interaction/a11y tests plus browser E2E for the owning workspace |
+
+The PostgreSQL scripts apply the complete checked-in migration chain required by the contract under test to a fresh database. The bitemporal and evidence-sealing tests execute concurrency regressions with an observable database barrier instead of a fixed scheduling assumption. The tenant-isolation test proves both read and write enforcement with unprivileged `NOLOGIN NOBYPASSRLS` roles, so table-owner/superuser bypass cannot manufacture a passing tenant result. The evidence-sealing test compares database output with independently precomputed canonical SHA-256 fixtures and forces a membership transaction to hold the evidence-set row lock before finalization, proving the digest snapshot includes evidence that committed first. The CI matrix runs all three database contracts independently, and a cancelled, skipped, queued, or predecessor-head matrix result is not database evidence for the current head.
+
+Future service packages must publish their exact test, statement-coverage, branch-coverage, docstring, typecheck, and build commands in the package manifest and CI log.
+
+## High-impact decision tests
+
+Required negative and provenance tests include:
+
+- an LLM or orchestration credential cannot create a selection-decision record;
+- an LLM or integration adapter cannot transition `Candidate` to `Offered` or `Offered` to `Worker`;
+- missing or insufficient Keyverse scope, actor, tenant, purpose, reason, confirmation, evidence reference, or evidence version fails closed;
+- a reused confirmation or idempotency key cannot bind to different command content;
+- previewed evidence versions must equal recorded evidence versions;
+- an open evidence set rejects a caller-supplied digest, preventing a client assertion from masquerading as database-observed membership;
+- finalizing a selection decision requires at least one versioned evidence member, computes the canonical SHA-256 digest in PostgreSQL, and seals exactly one evidence set in the same transaction;
+- a membership write that acquired the evidence-set lock before finalization commits before the finalization snapshot is computed, and the resulting digest includes that member;
+- a sealed evidence set rejects later membership changes and cannot be reused by another decision;
+- a sealed evidence-set pointer must resolve back to the exact decision that consumed it;
+- record and audit append either complete together or leave no authoritative decision;
+- a cross-tenant foreign-key reference is rejected even when the referenced identifier exists in another tenant;
+- an application role with missing tenant context sees no tenant-owned rows and cannot insert tenant-owned rows;
+- a tenant-alpha application context cannot insert a tenant-beta row even when that beta tenant exists;
+- a cross-tenant read or mutation is denied and produces a bounded audit event once the audit service slice lands;
+- a purpose header cannot enlarge a token's operation scope; and
+- client errors contain an actionable `next_action` and random `support_reference` but no internal trace/span identifier, topology, tenant identifier, or PII.
+
+## External psychometric contracts
+
+Orgmetra does not combine fast-mlsirm and TEPP into one dependency.
+
+### fast-mlsirm
+
+- Canonical repository: `ContextualWisdomLab/fast-mlsirm`.
+- Reviewed immutable revision for this baseline: `fb67ced09d8ee00542c05d56374537a9a7239751`.
+- Orgmetra contract identifier: `orgmetra.fast_mlsirm.v1`.
+- Owner: `workforce_validation`; the normal online path consumes a Psychometrics Commons immutable result snapshot rather than calling the kernel from a role workspace.
+- Backend: Rust production arithmetic with bounded CPU multithreading and GPU parity for material kernels. NumPy is a reference/parity path only.
+- Request/result contract: versioned model identifier, response-snapshot reference, seed manifest, backend, precision, estimates, uncertainty, diagnostics, convergence, and provenance digest.
+- Failure semantics: bounded timeout, typed unavailable/invalid/nonconverged result, no partial score publication, and no invented fallback estimate.
+
+### TEPP
+
+- Canonical repository: `ContextualWisdomLab/TEPP`.
+- Reviewed immutable revision for this baseline: `40adac9a26a8af85147ffa2795fb548ea243e0e5`.
+- Orgmetra contract identifier: `orgmetra.tepp.v1`.
+- Owner: `workforce_validation`.
+- Backend: Rust temporal/event/multilevel analysis services and immutable analytical artifacts.
+- Request/result contract: tenant-scoped evidence references, event/effective/available times, knowledge cutoff, multiple-membership weights, model manifest, uncertainty, leakage audit, and provenance digest.
+- Failure semantics: bounded timeout, typed invalid-temporal-order/insufficient-evidence/nonconverged/unavailable result, and no promotion of an analytical artifact to HRIS truth.
+
+### Psychometrics Commons snapshot linkage
+
+- Canonical repository: `ContextualWisdomLab/psychometrics-commons`.
+- Reviewed immutable revision for this baseline: `cc5850a0d1eacbbf16d03075534fce460a8286e6`.
+- Orgmetra stores the immutable `snapshot_ref`, instrument/model version, scoring-contract version, event count, payload digest, result artifact reference, and provenance reference.
+- A snapshot may be consumed only when tenant, session, instrument version, event prefix, digest, and result identity all match.
+
+Before production integration, each contract requires:
+
+- schema compatibility tests against the immutable revision;
+- fake-server timeout, malformed result, unavailable, and tenant-mismatch tests;
+- exact replay and provenance-link tests;
+- fast-mlsirm Rust/NumPy and CPU/GPU parity evidence where supported;
+- TEPP CPU/GPU parity for material kernels and leakage-safe temporal replay;
+- upgrade tests proving a new revision cannot silently change a pinned result schema.
+
+## Psychometric and mathematical evidence
+
+Any Orgmetra-owned or integrated model must provide evidence appropriate to its structure:
+
+- true-parameter recovery;
+- bias, MAE, and RMSE;
+- interval coverage;
+- convergence and failure-rate evidence;
+- deterministic replay under a recorded seed manifest;
+- CPU/GPU parity where material;
+- multilevel, longitudinal, and temporal recovery where relevant; and
+- cross-classified multiple-membership recovery using known membership weights, including bias/MAE/RMSE, interval coverage, and convergence.
+
+A model that omits evidence for a structural feature it uses is not eligible for a production decision workflow.
+
+## UI tests
+
+- Keyboard navigation and visible focus.
+- Accessible names, roles, states, and error association.
+- Exact-value table for every chart.
+- Permission-denied and Keyverse-unavailable states.
+- High-risk review, confirmation, recording, and audit states.
+- Narrow viewport, 200% zoom/reflow, reduced-motion, and high-contrast review.

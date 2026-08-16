@@ -1,0 +1,277 @@
+{
+  "package": "orgmetra-foundation-pack",
+  "version": "0.1.0",
+  "generated_for_branch": "feat/foundation-product-baseline",
+  "files": [
+    {
+      "path": ".github/workflows/foundation-ci.yml",
+      "sha256": "f8986936abc2bab086a6e9db0d10efc3048be102da358f180f4f5be247798452",
+      "bytes": 3832,
+      "lines": 111
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "145fda644f5209fa1fb3e3b40c9af9258bfac6d1a634bba2520fd08fe6d77a21",
+      "bytes": 375,
+      "lines": 37
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "28f7b7bc010a7739cfdc3e793fb5d39a0e74b842ea9c190e9a251e2d0cbc3a16",
+      "bytes": 2246,
+      "lines": 34
+    },
+    {
+      "path": "ARCHITECTURE.md",
+      "sha256": "bddc0023259306f2b9de2a67160aa5523d140270691ba42816c34c362e342d7d",
+      "bytes": 7809,
+      "lines": 107
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "f0a31c33803a9ca730d04a0215ac491f8580874bd2b32b519fe3cfdf2ec0a84d",
+      "bytes": 6285,
+      "lines": 62
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "add33884f466d324e20875388d103de41c6e062938a6e98727dc83a87ffe976f",
+      "bytes": 1229,
+      "lines": 20
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358,
+      "lines": 202
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "34b4618e946bdd8d33407d6ac5279f0a0388f5e7c8f79d2e7d8c3c47d0266042",
+      "bytes": 305,
+      "lines": 4
+    },
+    {
+      "path": "README.md",
+      "sha256": "136b08e69ac73ea01659b18c7a162bef1930742e1429ee179b25313a431c4698",
+      "bytes": 3482,
+      "lines": 81
+    },
+    {
+      "path": "database/migrations/0001_foundation_schema.sql",
+      "sha256": "ce2ae52fc66b2f99597ea5285df82c66f90caa46174fef4930d68a8b6177d0dd",
+      "bytes": 38747,
+      "lines": 916
+    },
+    {
+      "path": "database/migrations/0002_sealed_evidence_digest.sql",
+      "sha256": "93d659ca8e0e9293a83d5422d043be7b1022c5470a5b22670aa3416fa334a04c",
+      "bytes": 6649,
+      "lines": 202
+    },
+    {
+      "path": "docs/API_CONTRACT.md",
+      "sha256": "29edb2c18cb56b8df42322fcf049447da63a1ec00e16ae3ae58e29f4d97ed5cf",
+      "bytes": 2878,
+      "lines": 73
+    },
+    {
+      "path": "docs/DATA_MODEL.md",
+      "sha256": "b5266757e1d527ea909de0b78107ffc90ea2f0c543503e4d7521662b879916ee",
+      "bytes": 5729,
+      "lines": 59
+    },
+    {
+      "path": "docs/ERD.md",
+      "sha256": "9a4b433b23a6ec100fce87ec3041a25e29b6acde894b44b043f988fbf03514b9",
+      "bytes": 5367,
+      "lines": 59
+    },
+    {
+      "path": "docs/OPERABILITY.md",
+      "sha256": "feeac6cd3aff7d8d478a7c95c67a6ac03f317b179ed41f83e3c70b2a61b851dc",
+      "bytes": 2611,
+      "lines": 44
+    },
+    {
+      "path": "docs/PRD.md",
+      "sha256": "3ad85ae633cce0fc7a93af39b21d7a7c70bb2efa786da6b12f3c5327906e34f1",
+      "bytes": 5490,
+      "lines": 111
+    },
+    {
+      "path": "docs/SECURITY.md",
+      "sha256": "b169d658002fda644608a4fd1bbc071a8999d2749f72d1ac13c289a3789ad7f0",
+      "bytes": 3477,
+      "lines": 52
+    },
+    {
+      "path": "docs/STORYBOARD.md",
+      "sha256": "6e4ffb0eb03a80343f50d363ffc43b34da9348a44232dd947a9ff416ea92a3d2",
+      "bytes": 1342,
+      "lines": 28
+    },
+    {
+      "path": "docs/STORYBOOK.md",
+      "sha256": "82f79029b3c2b7a45393bad5ba8fabe61014d4b6149c7d4e73f70ba447f885e9",
+      "bytes": 1389,
+      "lines": 50
+    },
+    {
+      "path": "docs/TEST_STRATEGY.md",
+      "sha256": "8ba3c5c8f9f84f7bf5f80d9513d0e6c0ceebfa0f98dd0756448d173799708746",
+      "bytes": 10105,
+      "lines": 117
+    },
+    {
+      "path": "docs/THREAT_MODEL.md",
+      "sha256": "a82b80fee8ca65be614dc7d2a9de793732f7b65759996953bf08f7e39e2c2382",
+      "bytes": 3027,
+      "lines": 21
+    },
+    {
+      "path": "docs/TRACEABILITY.md",
+      "sha256": "e1e4e0a3d432a8354783aa79caf05f06cb732c62a0cdf1b38c654fba8242b306",
+      "bytes": 5417,
+      "lines": 31
+    },
+    {
+      "path": "docs/TRD.md",
+      "sha256": "23697d88a4882698e1a2782b7da3f2ccd0d3cd2d6d1bffe89b6597dc16851077",
+      "bytes": 9064,
+      "lines": 101
+    },
+    {
+      "path": "docs/UML.md",
+      "sha256": "fa4dc4caf95f033d2896c89793f21e6d81a034e490416ede7c4346b2a7b0abeb",
+      "bytes": 5213,
+      "lines": 120
+    },
+    {
+      "path": "docs/USER_STORIES.md",
+      "sha256": "5535b39d8c71a36c81f78e2d6dbd90a2d32e6541790f0d28f6dd4baf3ea7b45f",
+      "bytes": 2670,
+      "lines": 37
+    },
+    {
+      "path": "docs/WIREFRAMES.md",
+      "sha256": "b03aa6419aeaf5d42a5698c4d43a434c1633b7ac6fd0b0bd0cda979077adc56e",
+      "bytes": 2005,
+      "lines": 77
+    },
+    {
+      "path": "docs/adr/0001-orgmetra-authoritative-hris-record.md",
+      "sha256": "1122c3755a5b765f93c942089a25aec42e63cb6e1448ff10a921335989edfa43",
+      "bytes": 877,
+      "lines": 19
+    },
+    {
+      "path": "docs/adr/0002-federated-cwl-integration-boundaries.md",
+      "sha256": "5886a5ac960273e2c99dadce6dfab04a33d19693ebff52152d0adb04e8f90b61",
+      "bytes": 724,
+      "lines": 20
+    },
+    {
+      "path": "docs/adr/0003-bitemporal-hris-data-contract.md",
+      "sha256": "9e3653c7eab86996ea6b53cc7e34dc562ce9dfd1dadc5c5f4260c8cadb691c1d",
+      "bytes": 1877,
+      "lines": 28
+    },
+    {
+      "path": "docs/adr/0004-employment-position-version-and-assignment-binding.md",
+      "sha256": "455f5a1cca6c96d2cfd0cf63a95c5ac30ab449efeb068a45223ad5a77c86d05f",
+      "bytes": 1688,
+      "lines": 26
+    },
+    {
+      "path": "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
+      "sha256": "a01ade272ecc05666e6319d9597006f0a5282696ec0c1380e867023770d98fe9",
+      "bytes": 1895,
+      "lines": 30
+    },
+    {
+      "path": "docs/adr/README.md",
+      "sha256": "41b15d664c009cdee97cbc792c46a68e54f9ca9f7d11fd8dabccda78e7db63c9",
+      "bytes": 610,
+      "lines": 9
+    },
+    {
+      "path": "docs/doctoring/REFERENCES.md",
+      "sha256": "b6e963f51d7f5b1a8dc1144d508399770b6d4b9e27e69bd1c7a380ac4051bb0c",
+      "bytes": 2749,
+      "lines": 37
+    },
+    {
+      "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
+      "sha256": "b64f21abb19373e780db8b9e64deb8ba9a6219ccf9625a651f25407b8691fcbd",
+      "bytes": 8227,
+      "lines": 226
+    },
+    {
+      "path": "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
+      "sha256": "4a0e1a7943e40d12bd3082db3757045b4085e5a089fea7bc0d8a1565ffcbcf1d",
+      "bytes": 6237,
+      "lines": 187
+    },
+    {
+      "path": "package.json",
+      "sha256": "51e503678f6217ec26bdd51c0e380ae5840e58f3cf99749b226658547f4e9011",
+      "bytes": 352,
+      "lines": 9
+    },
+    {
+      "path": "schemas/openapi.yaml",
+      "sha256": "3e4e5d3f896a874eb152fe7252672cd576e993c0755fb33ec303d5dc4a317f01",
+      "bytes": 18988,
+      "lines": 644
+    },
+    {
+      "path": "scripts/foundation-contract-core.mjs",
+      "sha256": "1da09a67ae0d81775025975605bbf75463c7cefd59714c0a3ad8c06686284eb1",
+      "bytes": 18988,
+      "lines": 471
+    },
+    {
+      "path": "scripts/foundation-contract.mjs",
+      "sha256": "5242dcdbe0935775edf074462c82600e9bc4927d9fdc50c47727af915fd4b23a",
+      "bytes": 218,
+      "lines": 6
+    },
+    {
+      "path": "tests/foundation-contract.test.mjs",
+      "sha256": "98d7d2b614b30791487efcb6447c84b7cd065dbbe7e921d20e74033a9e4ff19b",
+      "bytes": 11686,
+      "lines": 312
+    },
+    {
+      "path": "tests/openapi-contract.test.mjs",
+      "sha256": "80c1610ef1c189fa325e55389501e0e51531ddf61ee335bb94d9cb3aa55a9fdc",
+      "bytes": 6438,
+      "lines": 195
+    },
+    {
+      "path": "tests/test_bitemporal_postgres.sh",
+      "sha256": "7684b8c2ff52c044c081135515bd5aabbfd00e2daad0d471b0868701af2df6cc",
+      "bytes": 8209,
+      "lines": 230
+    },
+    {
+      "path": "tests/test_evidence_sealing_postgres.sh",
+      "sha256": "57d16b632a0c60ffdcb4842ceb1cfe25d19c54cefeeefb622ff4fa6e83441ad7",
+      "bytes": 11349,
+      "lines": 370
+    },
+    {
+      "path": "tests/test_tenant_isolation_postgres.sh",
+      "sha256": "dd649435ef8ab9e57f0609c101917e36656a6d40d63de9bcdbdac23d764f6c3a",
+      "bytes": 15134,
+      "lines": 388
+    },
+    {
+      "path": "tests/validate_repository.py",
+      "sha256": "536d207dd8b9ecc10a258302b115edce88b019d4a5fde206d4814a3f6deb2bfb",
+      "bytes": 20147,
+      "lines": 510
+    }
+  ]
+}
