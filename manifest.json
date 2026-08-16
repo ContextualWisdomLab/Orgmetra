@@ -125,9 +125,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "509dcb8deccc2ffa0ba1e91198f343281c578f365e00a60bb841b6841cf7d769",
-      "bytes": 11251,
-      "lines": 121
+      "sha256": "4a308e1624efb44975d5a9998b779093ee126db6c1676de967a7cad44a80d941",
+      "bytes": 12195,
+      "lines": 124
     },
     {
       "path": "docs/THREAT_MODEL.md",
