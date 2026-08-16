@@ -2,9 +2,6 @@ name: Foundation CI
 
 on:
   pull_request:
-    branches:
-      - bootstrap
-      - main
   push:
     branches:
       - bootstrap
