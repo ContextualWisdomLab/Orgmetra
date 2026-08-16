@@ -49,15 +49,21 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0001_foundation_schema.sql',
   'database/migrations/0002_sealed_evidence_digest.sql',
   'database/migrations/0003_audit_outbox_persistence.sql',
+  'database/migrations/0004_outbox_delivery_claim.sql',
+  'database/migrations/0005_outbox_delivery_finalization.sql',
+  'database/migrations/0006_outbox_delivery_dead_letter.sql',
   'schemas/openapi.yaml',
   'scripts/foundation-contract-core.mjs',
   'scripts/foundation-contract.mjs',
+  'tests/dispatcher-inventory.test.mjs',
   'tests/foundation-contract.test.mjs',
   'tests/openapi-contract.test.mjs',
   'tests/test_bitemporal_postgres.sh',
   'tests/test_tenant_isolation_postgres.sh',
   'tests/test_evidence_sealing_postgres.sh',
   'tests/test_audit_outbox_postgres.sh',
+  'tests/test_outbox_claim_postgres.sh',
+  'tests/test_outbox_dead_letter_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -97,7 +103,8 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'document_record', 'document_version', 'document_segment', 'image_artifact',
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
   'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
-  'outbox_event', 'outbox_delivery_record', 'inbox_event', 'integration_delivery'
+  'outbox_event', 'outbox_delivery_record', 'outbox_delivery_escalation_record',
+  'inbox_event', 'integration_delivery'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
