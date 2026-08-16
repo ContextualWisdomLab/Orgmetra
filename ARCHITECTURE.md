@@ -86,6 +86,14 @@ The initial deployment may share one physical PostgreSQL cluster. Logical isolat
 
 A service role may read and write only its owned application tables. Cross-service foreign identifiers are opaque references or explicitly approved database constraints inside the modular deployment. A service must never query another service's application tables directly. Cross-boundary reads and commands use generated OpenAPI clients; asynchronous propagation uses versioned AsyncAPI/CloudEvents contracts. Extraction into separate databases must not change those contracts.
 
+## Evidence object and search store ownership
+
+Non-relational stores never become a back door around service ownership. `document_records` owns canonical document/image artifact objects and their retention/export/delete lifecycle. `workforce_validation` may own immutable derived analysis artifacts. Each object key is bound to one opaque tenant identifier, one owning bounded context, one classification, one retention policy, and one immutable provenance reference. Clients receive short-lived, purpose-bound access through the owning service; bucket- or collection-wide credentials are not exposed to workspaces or peer services.
+
+The search/vector store is a derived index, not a system of record. Its write boundary is an `integration_hub` indexing adapter consuming versioned owner events. Each indexed segment carries tenant, source-owner, source-version, field-sensitivity, retention-expiry, and provenance metadata. Query filters must enforce tenant and authorized field sensitivity before ranking or vector similarity. Deletion, legal hold, correction, retention expiry, and export events from an authoritative owner are propagated idempotently to every derived index; a stale or unverifiable index entry is excluded rather than served.
+
+Both stores require encryption in transit and at rest, deny-by-default tenant and field ACLs, immutable access/audit events routed to `audit_provenance`, lifecycle reconciliation, and export inventories that map every derived object back to its authoritative record/version. Cross-context access uses the owning service's published artifact/search adapter contract; direct object-store or vector-store reads by another domain service are prohibited. Search results and object references never grant employment-decision authority by themselves.
+
 ## Data ownership
 
 Orgmetra is authoritative for employment facts. It stores foreign references to external artifacts but not external service internals. External products can provide evidence and computation but do not own employment truth.
