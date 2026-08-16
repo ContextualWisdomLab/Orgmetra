@@ -7,6 +7,7 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evidence_digest.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0003_audit_outbox_persistence.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0004_outbox_delivery_claim.sql
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0005_outbox_delivery_finalization.sql
 
 TENANT_ID="10000000-0000-7000-8000-000000000001"
 canonical_event='{"data":{"high_impact":false,"result_code":"recorded"},"datacontenttype":"application/json","id":"00000000-0000-4000-8000-000000000061","orgmetraactor":"keyverse_subject:01JACTOROPAQUE","orgmetraevidence":"employment-offer:v3","orgmetrapurpose":"workforce_administration","orgmetrareason":"hire_completion","orgmetratenant":"10000000-0000-7000-8000-000000000001","source":"urn:orgmetra:people_core","specversion":"1.0","subject":"assignment_record:01JTESTOPAQUE","time":"2026-08-17T02:30:00Z","type":"orgmetra.people.assignment.recorded"}'
@@ -279,9 +280,9 @@ if [[ ${invalid_duration_status} -eq 0 || "${invalid_duration_output}" != *"leas
     exit 1
 fi
 
-# RED: a dispatcher lease must be a capability, not merely descriptive metadata.
-# Only the current live owner may complete or release its claimed row. A stale or
-# foreign worker must not be able to acknowledge another worker's delivery.
+# A dispatcher lease is an executable capability. Only the current live owner
+# may complete or release its claimed row. A stale or foreign worker must not
+# be able to acknowledge another worker's delivery.
 seed_delivery \
     "00000000-0000-4000-8000-000000000064" \
     "00000000-0000-4000-8000-000000000074" \
