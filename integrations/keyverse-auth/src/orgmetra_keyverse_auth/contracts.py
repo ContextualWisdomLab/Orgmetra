@@ -26,6 +26,8 @@ class KeyverseOidcConfig:
     def __post_init__(self) -> None:
         """Normalize bounded fields and reject permissive verification profiles."""
 
+        if _contains_control(self.issuer):
+            raise ValueError("issuer must not contain control characters")
         issuer = self.issuer.strip()
         parsed_issuer = urlsplit(issuer)
         if (
@@ -54,6 +56,8 @@ class KeyverseOidcConfig:
             _claim_name(self.purposes_claim_name, "purposes_claim_name"),
         )
 
+        if any(_contains_control(algorithm) for algorithm in self.allowed_algorithms):
+            raise ValueError("allowed_algorithms must not contain control characters")
         algorithms = tuple(algorithm.strip() for algorithm in self.allowed_algorithms)
         if not algorithms or len(set(algorithms)) != len(algorithms):
             raise ValueError("allowed_algorithms must be a non-empty unique tuple")
@@ -108,7 +112,7 @@ class IdentityReferenceResolver(Protocol):
 def _claim_name(value: str, field_name: str) -> str:
     """Normalize one lower-case ASCII JWT claim name."""
 
-    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
+    if _contains_control(value):
         raise ValueError(f"{field_name} must not contain control characters")
     normalized = value.strip()
     if not normalized or len(normalized) > 64:
@@ -127,7 +131,7 @@ def _claim_name(value: str, field_name: str) -> str:
 def _bounded_printable(value: str, field_name: str, maximum_length: int) -> str:
     """Normalize one required printable value without control characters."""
 
-    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
+    if _contains_control(value):
         raise ValueError(f"{field_name} must not contain control characters")
     normalized = value.strip()
     if not normalized or len(normalized) > maximum_length:
@@ -135,3 +139,9 @@ def _bounded_printable(value: str, field_name: str, maximum_length: int) -> str:
             f"{field_name} must contain at most {maximum_length} characters"
         )
     return normalized
+
+
+def _contains_control(value: str) -> bool:
+    """Return whether a configuration string contains C0 or DEL controls."""
+
+    return any(ord(character) < 0x20 or ord(character) == 0x7F for character in value)
