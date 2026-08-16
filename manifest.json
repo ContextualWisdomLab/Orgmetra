@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "cf3dccb723d59700d974a2ced1bc808b121ff04906670d0091f4ccfc31d1af90",
-      "bytes": 3565,
-      "lines": 106
+      "sha256": "908e95b2d6578a8ed917a80ff6612a75e6d474c1c3a16723ba03ce3ad86c4943",
+      "bytes": 3611,
+      "lines": 107
     },
     {
       "path": ".gitignore",
@@ -29,8 +29,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "dec0d7b693c63ac9d26c3bfd6f2aa6871b07bb8bc836557c71f9fd7182b88c1f",
-      "bytes": 6957,
+      "sha256": "784eb165db659165a6cc99572121fb9ca2365250ee7e85c8f64b27edb46381ff",
+      "bytes": 7073,
       "lines": 63
     },
     {
@@ -65,9 +65,9 @@
     },
     {
       "path": "database/migrations/0002_sealed_evidence_digest.sql",
-      "sha256": "16505d70b710f5f789541ba8ea7ee57b65ffe950bdaa2014b46b46dcb7ea9dd5",
-      "bytes": 4866,
-      "lines": 149
+      "sha256": "93d659ca8e0e9293a83d5422d043be7b1022c5470a5b22670aa3416fa334a04c",
+      "bytes": 6649,
+      "lines": 202
     },
     {
       "path": "database/migrations/0003_audit_outbox_persistence.sql",
@@ -107,9 +107,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "8a0a9f3c0f98aadc2e6796ef87e15dceb71526931024b686eb79189f5081d196",
-      "bytes": 4005,
-      "lines": 54
+      "sha256": "c8decf52625209561ca21fd9dca3e882e83d3e42162ba521e03048eae22917f1",
+      "bytes": 4320,
+      "lines": 55
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -137,9 +137,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "4d0b040a17ce235490b7469a9a331dd3abea93642c979c5c1fa2e19668ebbbb3",
-      "bytes": 5597,
-      "lines": 31
+      "sha256": "dac94acba56cd5ffecaeb32636d3e329ae9e3eae8ae2e6a925713a96625a5922",
+      "bytes": 5878,
+      "lines": 32
     },
     {
       "path": "docs/TRD.md",

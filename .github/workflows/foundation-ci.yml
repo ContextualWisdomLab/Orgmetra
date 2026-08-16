@@ -71,6 +71,7 @@ jobs:
           - test_bitemporal_postgres.sh
           - test_tenant_isolation_postgres.sh
           - test_evidence_sealing_postgres.sh
+          - test_operational_uuid_postgres.sh
           - test_audit_outbox_postgres.sh
     services:
       postgres:
