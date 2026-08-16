@@ -108,6 +108,8 @@ class IdentityReferenceResolver(Protocol):
 def _claim_name(value: str, field_name: str) -> str:
     """Normalize one lower-case ASCII JWT claim name."""
 
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
+        raise ValueError(f"{field_name} must not contain control characters")
     normalized = value.strip()
     if not normalized or len(normalized) > 64:
         raise ValueError(f"{field_name} must contain at most 64 characters")
@@ -125,11 +127,11 @@ def _claim_name(value: str, field_name: str) -> str:
 def _bounded_printable(value: str, field_name: str, maximum_length: int) -> str:
     """Normalize one required printable value without control characters."""
 
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
+        raise ValueError(f"{field_name} must not contain control characters")
     normalized = value.strip()
     if not normalized or len(normalized) > maximum_length:
         raise ValueError(
             f"{field_name} must contain at most {maximum_length} characters"
         )
-    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in normalized):
-        raise ValueError(f"{field_name} must not contain control characters")
     return normalized
