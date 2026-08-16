@@ -14,8 +14,9 @@ transaction and the database row-level-security policy.
 
 - create a tenant record
 - create and read a person record
-- create a candidate profile
-- link a candidate to one worker idempotently
+- create and read an employment record
+- create and read a candidate profile
+- link a candidate to one worker idempotently and read that hire link
 - write purpose-bound audit evidence atomically
 - deny cross-tenant reads through PostgreSQL RLS
 

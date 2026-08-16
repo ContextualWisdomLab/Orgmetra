@@ -13,6 +13,7 @@ from orgmetra_people_api.schemas import (
     AuditEventResponse,
     CandidateCreateRequest,
     CandidateWorkerLinkCreateRequest,
+    EmploymentCreateRequest,
     HealthResponse,
     PersonCreateRequest,
 )
@@ -69,6 +70,25 @@ def test_models_forbid_unknown_fields() -> None:
         CandidateWorkerLinkCreateRequest(
             person_record_id=uuid4(),
             unexpected_value="not allowed",  # type: ignore[call-arg]
+        )
+
+
+def test_employment_request_rejects_caller_recorded_time_and_non_positive_period() -> None:
+    with pytest.raises(ValidationError, match="recorded_at"):
+        EmploymentCreateRequest(
+            employment_record_id=uuid4(),
+            person_record_id=uuid4(),
+            employment_status_code="active",
+            effective_from=date(2026, 8, 16),
+            recorded_at=datetime(1900, 1, 1, tzinfo=timezone.utc),  # type: ignore[call-arg]
+        )
+    with pytest.raises(ValidationError, match="effective_to"):
+        EmploymentCreateRequest(
+            employment_record_id=uuid4(),
+            person_record_id=uuid4(),
+            employment_status_code="active",
+            effective_from=date(2026, 8, 16),
+            effective_to=date(2026, 8, 16),
         )
 
 

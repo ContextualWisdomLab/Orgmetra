@@ -8,7 +8,7 @@ flowchart LR
     api -->|"Validate token and purpose"| identity["Injected TokenAuthorizer"]
     api -->|"PurposeContext"| repository["PeopleRepository port"]
     repository -->|"Transaction-local tenant"| postgres["Orgmetra PostgreSQL"]
-    postgres -->|"Forced RLS"| records["People and candidate records"]
+    postgres -->|"Forced RLS"| records["People, candidate, and employment records"]
     postgres -->|"Same transaction"| audit["Reference-only audit_event"]
     identity -.->|"Future adapter"| keyverse["Keyverse OIDC / SCIM"]
 ```
@@ -36,7 +36,33 @@ sequenceDiagram
     Repo->>DB: INSERT audit_event
     DB-->>Repo: COMMIT both facts
     Repo-->>API: PersonSnapshot
-    API-->>Client: 201 PersonResponse + X-Request-Id
+    API-->>Client: 201 PersonResponse + X-Support-Reference
+```
+
+## Hire-to-employment sequence
+
+```mermaid
+sequenceDiagram
+    participant Recruiter
+    participant HR as HR Operations
+    participant API as People API
+    participant Repo as PeopleRepository
+    participant DB as PostgreSQL
+
+    Recruiter->>API: POST /v1/candidates
+    API->>Repo: create_candidate
+    Recruiter->>API: GET /v1/candidates/{id}
+    API-->>Recruiter: Confirm application status
+    Recruiter->>API: POST /v1/candidates/{id}/worker-links
+    API->>Repo: link_candidate_to_worker
+    Recruiter->>API: GET /v1/candidates/{id}/worker-links
+    API-->>Recruiter: Confirm linked person
+    HR->>API: POST /v1/employment-records
+    API->>Repo: create_employment
+    Repo->>DB: INSERT employment_record + audit_event
+    API-->>HR: 201 EmploymentResponse
+    HR->>API: GET /v1/employment-records/{id}
+    API-->>HR: Confirm recorded employment
 ```
 
 ## Failure sequence

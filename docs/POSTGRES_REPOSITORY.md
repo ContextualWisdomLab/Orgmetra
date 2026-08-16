@@ -29,6 +29,9 @@ The repository never accepts an untrusted request header as tenant authority.
 - Accepted mutations and their audit evidence commit or roll back together.
 - Candidate-to-worker linkage is idempotent for the same identity and refuses a
   conflicting worker identity.
+- Employment create is idempotent for the same identity, refuses conflicting
+  facts, and returns no row when the person is hidden so HTTP can keep a uniform
+  404.
 - Audit payloads contain references and action metadata, not names, documents or
   assessment responses.
 
@@ -61,6 +64,6 @@ isolated disposable database.
 - connection-pool integration and recovery tests;
 - backup, restore and point-in-time recovery evidence;
 - encryption and key-management deployment profile;
-- complete people/employment/position/assignment repository surface;
+- complete organization/job/position/assignment repository surface;
 - OpenTelemetry metrics that contain no HR content;
 - external penetration and procurement review.

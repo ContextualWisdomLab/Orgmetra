@@ -13,6 +13,7 @@ from orgmetra_postgres import (
     AuditEvent,
     CandidateSnapshot,
     CandidateWorkerLink,
+    EmploymentSnapshot,
     PersonSnapshot,
     PurposeContext,
 )
@@ -26,6 +27,7 @@ class FakeRepository:
 
         self.person: PersonSnapshot | None = None
         self.candidate: CandidateSnapshot | None = None
+        self.employment: EmploymentSnapshot | None = None
         self.worker_link: CandidateWorkerLink | None = None
         self.audit_events: tuple[AuditEvent, ...] = ()
         self.next_error: Exception | None = None
@@ -108,6 +110,65 @@ class FakeRepository:
         )
         return self.candidate
 
+    def get_candidate(
+        self, context: PurposeContext, candidate_profile_id: UUID
+    ) -> CandidateSnapshot | None:
+        """Return the configured candidate when identifiers match."""
+
+        self._before("get_candidate", context, candidate_profile_id)
+        if (
+            self.candidate is None
+            or self.candidate.candidate_profile_id != candidate_profile_id
+        ):
+            return None
+        return self.candidate
+
+    def create_employment(
+        self,
+        context: PurposeContext,
+        *,
+        employment_record_id: UUID,
+        person_record_id: UUID,
+        employment_status_code: str,
+        effective_from: date,
+        effective_to: date | None = None,
+    ) -> EmploymentSnapshot | None:
+        """Return an employment projection only when the person is visible."""
+
+        self._before(
+            "create_employment",
+            context,
+            employment_record_id,
+            person_record_id,
+            employment_status_code,
+            effective_from,
+            effective_to,
+        )
+        if self.person is None or self.person.person_record_id != person_record_id:
+            return None
+        self.employment = EmploymentSnapshot(
+            employment_record_id=employment_record_id,
+            person_record_id=person_record_id,
+            employment_status_code=employment_status_code,
+            effective_from=effective_from,
+            effective_to=effective_to,
+            recorded_from=datetime(2026, 8, 16, 9, 20, tzinfo=timezone.utc),
+        )
+        return self.employment
+
+    def get_employment(
+        self, context: PurposeContext, employment_record_id: UUID
+    ) -> EmploymentSnapshot | None:
+        """Return the configured employment record when identifiers match."""
+
+        self._before("get_employment", context, employment_record_id)
+        if (
+            self.employment is None
+            or self.employment.employment_record_id != employment_record_id
+        ):
+            return None
+        return self.employment
+
     def link_candidate_to_worker(
         self,
         context: PurposeContext,
@@ -131,6 +192,19 @@ class FakeRepository:
             person_record_id=person_record_id,
             linked_at=datetime(2026, 8, 15, 9, 10, tzinfo=timezone.utc),
         )
+        return self.worker_link
+
+    def get_candidate_worker_link(
+        self, context: PurposeContext, candidate_profile_id: UUID
+    ) -> CandidateWorkerLink | None:
+        """Return the configured hire link when the candidate matches."""
+
+        self._before("get_candidate_worker_link", context, candidate_profile_id)
+        if (
+            self.worker_link is None
+            or self.worker_link.candidate_profile_id != candidate_profile_id
+        ):
+            return None
         return self.worker_link
 
     def list_audit_events(
@@ -189,11 +263,18 @@ def authorizer() -> FakeAuthorizer:
                 "orgmetra.people.write",
                 "orgmetra.people.read",
                 "orgmetra.talent_acquisition.write",
+                "orgmetra.talent_acquisition.read",
                 "orgmetra.audit.read",
             }
         ),
         allowed_purpose_codes=frozenset(
-            {"people_admin", "people_read", "talent_acquisition", "audit_review"}
+            {
+                "people_admin",
+                "people_read",
+                "talent_acquisition",
+                "talent_acquisition_read",
+                "audit_review",
+            }
         ),
     )
     return FakeAuthorizer(principal)

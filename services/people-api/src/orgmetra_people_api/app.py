@@ -28,6 +28,8 @@ from .schemas import (
     CandidateResponse,
     CandidateWorkerLinkCreateRequest,
     CandidateWorkerLinkResponse,
+    EmploymentCreateRequest,
+    EmploymentResponse,
     HealthResponse,
     PersonCreateRequest,
     PersonResponse,
@@ -110,7 +112,7 @@ def create_app(
 
     app = FastAPI(
         title="Orgmetra People API",
-        summary="Purpose-bound people and candidate record operations.",
+        summary="Purpose-bound people, candidate, and employment record operations.",
         version="0.1.0",
         docs_url=None,
         redoc_url=None,
@@ -133,6 +135,10 @@ def create_app(
     talent_acquisition = RequiredPurpose(
         "orgmetra.talent_acquisition.write",
         "talent_acquisition",
+    )
+    talent_read = RequiredPurpose(
+        "orgmetra.talent_acquisition.read",
+        "talent_acquisition_read",
     )
     audit_review = RequiredPurpose("orgmetra.audit.read", "audit_review")
 
@@ -193,6 +199,55 @@ def create_app(
         return PersonResponse.model_validate(snapshot)
 
     @app.post(
+        "/v1/employment-records",
+        response_model=EmploymentResponse,
+        status_code=status.HTTP_201_CREATED,
+        operation_id="createEmploymentRecord",
+    )
+    async def create_employment(
+        payload: EmploymentCreateRequest,
+        context: PurposeContext = Depends(people_admin),
+        repository_port: PeopleRepository = Depends(get_people_repository),
+    ) -> EmploymentResponse:
+        """Create one effective-dated employment relationship after hire."""
+
+        snapshot = await run_in_threadpool(
+            partial(
+                repository_port.create_employment,
+                context,
+                employment_record_id=payload.employment_record_id,
+                person_record_id=payload.person_record_id,
+                employment_status_code=payload.employment_status_code,
+                effective_from=payload.effective_from,
+                effective_to=payload.effective_to,
+            )
+        )
+        if snapshot is None:
+            raise ResourceNotFound("person_record")
+        return EmploymentResponse.model_validate(snapshot)
+
+    @app.get(
+        "/v1/employment-records/{employment_record_id}",
+        response_model=EmploymentResponse,
+        operation_id="getEmploymentRecord",
+    )
+    async def get_employment(
+        employment_record_id: UUID,
+        context: PurposeContext = Depends(people_read),
+        repository_port: PeopleRepository = Depends(get_people_repository),
+    ) -> EmploymentResponse:
+        """Return one current employment record without cross-tenant disclosure."""
+
+        snapshot = await run_in_threadpool(
+            repository_port.get_employment,
+            context,
+            employment_record_id,
+        )
+        if snapshot is None:
+            raise ResourceNotFound("employment_record")
+        return EmploymentResponse.model_validate(snapshot)
+
+    @app.post(
         "/v1/candidates",
         response_model=CandidateResponse,
         status_code=status.HTTP_201_CREATED,
@@ -213,6 +268,27 @@ def create_app(
                 application_status_code=payload.application_status_code,
             )
         )
+        return CandidateResponse.model_validate(snapshot)
+
+    @app.get(
+        "/v1/candidates/{candidate_profile_id}",
+        response_model=CandidateResponse,
+        operation_id="getCandidateProfile",
+    )
+    async def get_candidate(
+        candidate_profile_id: UUID,
+        context: PurposeContext = Depends(talent_read),
+        repository_port: PeopleRepository = Depends(get_people_repository),
+    ) -> CandidateResponse:
+        """Return one current candidate profile without cross-tenant disclosure."""
+
+        snapshot = await run_in_threadpool(
+            repository_port.get_candidate,
+            context,
+            candidate_profile_id,
+        )
+        if snapshot is None:
+            raise ResourceNotFound("candidate_profile")
         return CandidateResponse.model_validate(snapshot)
 
     @app.post(
@@ -238,6 +314,27 @@ def create_app(
                 candidate_worker_link_id=payload.candidate_worker_link_id,
             )
         )
+        return CandidateWorkerLinkResponse.model_validate(link)
+
+    @app.get(
+        "/v1/candidates/{candidate_profile_id}/worker-links",
+        response_model=CandidateWorkerLinkResponse,
+        operation_id="getCandidateWorkerLink",
+    )
+    async def get_candidate_worker_link(
+        candidate_profile_id: UUID,
+        context: PurposeContext = Depends(talent_read),
+        repository_port: PeopleRepository = Depends(get_people_repository),
+    ) -> CandidateWorkerLinkResponse:
+        """Return the hire link without disclosing an unauthorized candidate."""
+
+        link = await run_in_threadpool(
+            repository_port.get_candidate_worker_link,
+            context,
+            candidate_profile_id,
+        )
+        if link is None:
+            raise ResourceNotFound("candidate_worker_link")
         return CandidateWorkerLinkResponse.model_validate(link)
 
     @app.get(

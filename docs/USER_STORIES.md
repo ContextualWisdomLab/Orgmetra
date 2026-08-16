@@ -3,6 +3,7 @@
 ## HRIS administrator
 
 - As an HRIS administrator, I need people, employment, positions, and assignments to be separate so that organization changes do not corrupt historical records.
+- As an HRIS administrator, I need to create and retrieve an employment record after a candidate is linked to a worker so that hire completion is an explicit HRIS fact.
 - As an HRIS administrator, I need effective time and system-recorded time so that audits can reconstruct what was true and what was known at a decision point.
 - As an HRIS administrator, I need field-level access controls so that authorized HR work can use necessary PII without exposing it broadly.
 

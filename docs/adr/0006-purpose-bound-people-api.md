@@ -30,8 +30,9 @@ these contracts:
 4. the API constructs `PurposeContext`; callers cannot select tenant, actor,
    purpose, decision reference, or evidence reference;
 5. `X-Correlation-Id` is the only optional workflow metadata header in this slice;
-6. person commands accept effective/business time but not system-recorded time;
-   persistence owns `recorded_from` using the database clock;
+6. person and employment commands accept effective/business time but not
+   system-recorded time; persistence owns `recorded_from` using the database
+   clock;
 7. synchronous repository calls execute through Starlette's threadpool boundary;
 8. declared and observed request bytes are bounded;
 9. explicit and framework HTTP failures use RFC 9457-compatible non-leaking
@@ -95,7 +96,10 @@ client-safe support reference.
   substitute for purpose;
 - server-selected tenant/actor/purpose context tests;
 - caller decision/evidence headers cannot become repository audit provenance;
-- caller `recorded_at` is rejected and excluded from the repository port;
+- caller `recorded_at` is rejected and excluded from the person and employment
+  repository ports;
+- hire-to-employment workflow tests cover candidate read, hire-link read, and
+  employment create/get with uniform 404 for hidden persons;
 - declared and observed request-byte probes;
 - random support-reference shape plus no internal trace disclosure;
 - RFC 9457 problem shape, safe framework-error normalization, and non-echo tests;

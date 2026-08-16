@@ -54,6 +54,46 @@ class PersonResponse(ApiModel):
     recorded_from: datetime
 
 
+class EmploymentCreateRequest(ApiModel):
+    """Request creation of one effective-dated employment relationship."""
+
+    employment_record_id: UUID
+    person_record_id: UUID
+    employment_status_code: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9_]+$",
+    )
+    effective_from: date
+    effective_to: date | None = None
+
+    @model_validator(mode="after")
+    def validate_effective_period(self) -> EmploymentCreateRequest:
+        """Require a positive half-open effective-time interval."""
+
+        if self.effective_to is not None and self.effective_to <= self.effective_from:
+            raise ValueError("effective_to must be later than effective_from")
+        return self
+
+
+class EmploymentResponse(ApiModel):
+    """Return one current employment projection visible to the caller."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        from_attributes=True,
+        str_strip_whitespace=True,
+    )
+
+    employment_record_id: UUID
+    person_record_id: UUID
+    employment_status_code: str
+    effective_from: date
+    effective_to: date | None
+    recorded_from: datetime
+
+
 class CandidateCreateRequest(ApiModel):
     """Request creation of one candidate profile."""
 

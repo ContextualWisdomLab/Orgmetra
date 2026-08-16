@@ -21,12 +21,14 @@ All notable changes to Orgmetra will be documented in this file.
 - Organization and job mutable descriptions now live in version records rather than durable identity anchors, preserving normalized history and stable position references.
 - Effective and system-recorded intervals are non-empty half-open periods; equal start/end bounds are rejected.
 - People API route handlers now inject `PurposeContext` and the repository through runtime `Depends` defaults so callers cannot supply those objects as query fields.
+- People API now exposes candidate and hire-link reads plus create/get employment so an authorized HR actor can complete the hire-to-employment path without caller-owned knowledge time.
 
 ### Fixed
 
 - People API Quality no longer fails with HTTP 422 on every protected route when FastAPI 0.116 interprets postponed annotations as query parameters.
 - Bearer token parsing now splits only on the first ASCII space so C0 separators such as `\\x1f` remain visible and are rejected.
 - People API CI now pins the same Python 3.14-compatible Pydantic lock as Keyverse authorization and includes `certifi` so `pip check` can close the httpx dependency set.
+- People API OpenAPI tests now whitelist published parameters and reject attacker query names instead of only blacklisting `context`, `request`, and `repository_port`.
 
 ### Security
 

@@ -7,13 +7,20 @@ from .errors import (
     RepositoryError,
     RepositoryUnavailableError,
 )
-from .models import AuditEvent, CandidateSnapshot, CandidateWorkerLink, PersonSnapshot
+from .models import (
+    AuditEvent,
+    CandidateSnapshot,
+    CandidateWorkerLink,
+    EmploymentSnapshot,
+    PersonSnapshot,
+)
 from .repository import PostgresPeopleRepository
 
 __all__ = [
     "AuditEvent",
     "CandidateSnapshot",
     "CandidateWorkerLink",
+    "EmploymentSnapshot",
     "PersonSnapshot",
     "PostgresPeopleRepository",
     "PurposeContext",

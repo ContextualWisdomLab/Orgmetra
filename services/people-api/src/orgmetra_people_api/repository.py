@@ -10,6 +10,7 @@ from orgmetra_postgres import (
     AuditEvent,
     CandidateSnapshot,
     CandidateWorkerLink,
+    EmploymentSnapshot,
     PersonSnapshot,
     PurposeContext,
 )
@@ -44,6 +45,28 @@ class PeopleRepository(Protocol):
     ) -> CandidateSnapshot:
         """Create or return an idempotent candidate profile."""
 
+    def get_candidate(
+        self, context: PurposeContext, candidate_profile_id: UUID
+    ) -> CandidateSnapshot | None:
+        """Return one current candidate profile visible to the caller."""
+
+    def create_employment(
+        self,
+        context: PurposeContext,
+        *,
+        employment_record_id: UUID,
+        person_record_id: UUID,
+        employment_status_code: str,
+        effective_from: date,
+        effective_to: date | None = None,
+    ) -> EmploymentSnapshot | None:
+        """Create or return one employment relationship, or None if the person is hidden."""
+
+    def get_employment(
+        self, context: PurposeContext, employment_record_id: UUID
+    ) -> EmploymentSnapshot | None:
+        """Return one current employment record visible to the caller."""
+
     def link_candidate_to_worker(
         self,
         context: PurposeContext,
@@ -53,6 +76,11 @@ class PeopleRepository(Protocol):
         candidate_worker_link_id: UUID | None = None,
     ) -> CandidateWorkerLink:
         """Append or return an idempotent candidate-to-worker link."""
+
+    def get_candidate_worker_link(
+        self, context: PurposeContext, candidate_profile_id: UUID
+    ) -> CandidateWorkerLink | None:
+        """Return the hire link visible for one candidate."""
 
     def list_audit_events(
         self, context: PurposeContext, resource_record_id: UUID

@@ -65,4 +65,4 @@ Access is tenant, actor, purpose, resource, and lifetime scoped. High-impact dec
 
 ## Active implementation slice: purpose-bound People API
 
-`services/people-api` is an independently importable FastAPI factory. Hosts inject `TokenAuthorizer` and `PeopleRepository`. Protected routes select both an OAuth operation scope and a finer HR purpose in server code. `PurposeContext` and the repository port are runtime `Depends` values, not caller query fields. This section describes active-PR work until merged into the protected default branch.
+`services/people-api` is an independently importable FastAPI factory. Hosts inject `TokenAuthorizer` and `PeopleRepository`. Protected routes select both an OAuth operation scope and a finer HR purpose in server code. `PurposeContext` and the repository port are runtime `Depends` values, not caller query fields. The current slice covers person, candidate, hire-link, employment, and reference-only audit operations. This section describes active-PR work until merged into the protected default branch.

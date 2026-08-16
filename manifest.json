@@ -24,15 +24,15 @@
     },
     {
       "path": "ARCHITECTURE.md",
-      "sha256": "9bffdf514d5743fe0612557d73e0ba7cb6940dfb4ebe8355ec6e8d2bb352fb09",
-      "bytes": 3564,
+      "sha256": "dbd34d4bb8092052558cca953b19a0c5a917b91d238cfb5c781a79c3d3efb748",
+      "bytes": 3668,
       "lines": 68
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9e1af4a8c06b32a8bb9ef53ed54010648bf68064d10d7f08b4710b404a82e1b1",
-      "bytes": 2305,
-      "lines": 40
+      "sha256": "d44bdd91817ca34356417513fa297f9ecef5304a227b4889175b334269b90120",
+      "bytes": 2659,
+      "lines": 42
     },
     {
       "path": "CLAUDE.md",
@@ -54,8 +54,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "3e55026dc9fbe7d85fffbf52dd5d5840d6f25f70cbd750c63012438682e59a32",
-      "bytes": 3829,
+      "sha256": "e3eead40a7f14f3dcde1cbb1ad47dc949dd3615b7c0acb192edf827a7f3c37d1",
+      "bytes": 3889,
       "lines": 87
     },
     {
@@ -66,9 +66,9 @@
     },
     {
       "path": "docs/API_CONTRACT.md",
-      "sha256": "feb86361e973f3bbc59066a2135abd9fa0e98b009667b69e28212ecf18d420c4",
-      "bytes": 936,
-      "lines": 43
+      "sha256": "f650287651a6aa2048361450d2f49561eb191480b1cd04256d223ec1b496fd2d",
+      "bytes": 987,
+      "lines": 44
     },
     {
       "path": "docs/DATA_MODEL.md",
@@ -108,9 +108,9 @@
     },
     {
       "path": "docs/STORYBOOK.md",
-      "sha256": "86660120277f6791a11d7743113ce9c5eaeff6acf61b070b046f33744a74ac09",
-      "bytes": 921,
-      "lines": 47
+      "sha256": "64a26509e4e0985b1286cafb4e39bfbd41e1dc6906919ee9b305429805251434",
+      "bytes": 946,
+      "lines": 48
     },
     {
       "path": "docs/TEST_STRATEGY.md",
@@ -126,9 +126,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "247215a5999a3a1b3bd0a3a0d3fda35f3ff9939b5b12846a82ceb3edda3ecddf",
-      "bytes": 1416,
-      "lines": 11
+      "sha256": "682709afeb02b3d860e2cd4fc4aabf037d96fe36b576e368ac42584dfb9b241f",
+      "bytes": 1648,
+      "lines": 12
     },
     {
       "path": "docs/TRD.md",
@@ -144,15 +144,15 @@
     },
     {
       "path": "docs/UML_PEOPLE_API.md",
-      "sha256": "2d9c4958169a1ff92bc5f5ea79c86ab1a8ddb9afc2580ff53254915707aa09d9",
-      "bytes": 2751,
-      "lines": 77
+      "sha256": "cf6aac01327d6df97b30c234cb13cb4d2af7bc0178ee189709f8cfae17b5f746",
+      "bytes": 3633,
+      "lines": 103
     },
     {
       "path": "docs/USER_STORIES.md",
-      "sha256": "ad7cd6487991dcca6f8be82372e8b4b74beb8ad75033fcad708b7da10edde71d",
-      "bytes": 2181,
-      "lines": 34
+      "sha256": "bdbdcf6fd73a8a5642d2f23f97f897e9f621a15ca888a99cb415a4c2b04b9eeb",
+      "bytes": 2350,
+      "lines": 35
     },
     {
       "path": "docs/WIREFRAMES.md",
@@ -186,21 +186,21 @@
     },
     {
       "path": "docs/adr/README.md",
-      "sha256": "7f6a41701820357430234842eb675f5e2d0f33f6ee37e9cc294cb40d6119e2f6",
-      "bytes": 324,
-      "lines": 8
+      "sha256": "868fb3eba91080b9a8b9f82856f802585b7785f97ff8a3e0eba301b0bebc5365",
+      "bytes": 523,
+      "lines": 11
     },
     {
       "path": "docs/contracts/people-api-v1.md",
-      "sha256": "6bd145dd822a8390a838f9bf75909a73c14a49fa595d846a795ba6ba040a9179",
-      "bytes": 6078,
-      "lines": 145
+      "sha256": "b185bfedb2035505114f0db3b3561af1f5e66df2b005b3a6a43766fcff29f722",
+      "bytes": 7913,
+      "lines": 188
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
-      "sha256": "473e0a346207cde4754b6287042773c67b108dc9336db45d4566990065b8eb0f",
-      "bytes": 1206,
-      "lines": 17
+      "sha256": "ab90cd997b2d205414922bf26aa9e64ba05f117c15eb4a96b73e918a9177a9bb",
+      "bytes": 1483,
+      "lines": 21
     },
     {
       "path": "package.json",
@@ -270,9 +270,9 @@
     },
     {
       "path": "packages/orgmetra-postgres/src/orgmetra_postgres/repository.py",
-      "sha256": "c8894ec2b5fee90decae2fd5c4caf92a3accd487cdb1b4c87a1d9a8fa60fe6a6",
-      "bytes": 15969,
-      "lines": 412
+      "sha256": "708472d05846f09ecac978d790ab52ce07b273f66b3305e9004b1b537dbe4985",
+      "bytes": 21794,
+      "lines": 564
     },
     {
       "path": "requirements/ci.txt",
@@ -294,9 +294,9 @@
     },
     {
       "path": "services/people-api/src/orgmetra_people_api/app.py",
-      "sha256": "97d60378149d0687c1aca6e18d6551283c10f2e47bc6b886b20aa430aa48bc99",
-      "bytes": 9946,
-      "lines": 284
+      "sha256": "21aea95f21c528604f1013dc686c2c3d40ea9c86f68801e33307f51b9ec8d44f",
+      "bytes": 13601,
+      "lines": 381
     },
     {
       "path": "tests/test_repository_contract.py",

@@ -12,6 +12,9 @@
 | Requests are finite | declared and observed byte counting | `RequestBoundaryMiddleware` | direct ASGI framing tests | implemented_on_active_pr |
 | Blocking DB calls do not run on event loop | Starlette threadpool boundary | route handlers | endpoint workflow tests | implemented_on_active_pr |
 | Person/candidate/link/audit operations are stable | explicit v1 routes and operation IDs | `create_app` | OpenAPI contract test | implemented_on_active_pr |
+| Recruiter can retrieve a created candidate and hire link | dedicated talent-acquisition read scope and purpose | `GET /v1/candidates/{id}` and worker-link GET | endpoint workflow tests | implemented_on_active_pr |
+| HR can record employment after hire without caller-owned knowledge time | employment HTTP slice plus repository-owned `recorded_from` | `POST/GET /v1/employment-records` | hire-to-employment workflow and OpenAPI whitelist | implemented_on_active_pr |
+| OpenAPI cannot publish leaked server dependencies | published-parameter whitelist and no query parameters | `test_openapi_exposes_stable_operations_and_bearer_scheme` | OpenAPI and attacker-query tests | implemented_on_active_pr |
 | Browser exposure is not accidentally permissive | docs UI disabled, no CORS default | app factory | source and endpoint tests | implemented_on_active_pr |
 | CI is secret-minimal and immutable | read-only permissions and full action SHAs | quality workflow | workflow contract test | implemented_on_active_pr |
 | Public code is explainable and fully exercised | docstring and exact coverage gates | quality workflow | Python 3.12/3.14 jobs | implemented_on_active_pr |

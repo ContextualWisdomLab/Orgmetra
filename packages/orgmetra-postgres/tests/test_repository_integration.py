@@ -208,6 +208,11 @@ def test_candidate_link_is_idempotent_and_append_only(application_dsn: str) -> N
             person_record_id=other_person_id,
         )
 
+    assert repository.get_candidate(context, candidate_id) == candidate
+    assert repository.get_candidate(context, uuid4()) is None
+    assert repository.get_candidate_worker_link(context, candidate_id) == link
+    assert repository.get_candidate_worker_link(context, uuid4()) is None
+
     with psycopg.connect(application_dsn) as connection:
         with pytest.raises(
             ObjectNotInPrerequisiteState,
@@ -287,3 +292,80 @@ def test_invalid_input_and_relationship_failure_are_fail_closed(
             candidate_profile_id=uuid4(),
             person_record_id=uuid4(),
         )
+    with pytest.raises(ValueError, match="employment_status_code"):
+        repository.create_employment(
+            context,
+            employment_record_id=uuid4(),
+            person_record_id=uuid4(),
+            employment_status_code="Active",
+            effective_from=date(2026, 8, 16),
+        )
+    with pytest.raises(ValueError, match="effective_to"):
+        repository.create_employment(
+            context,
+            employment_record_id=uuid4(),
+            person_record_id=uuid4(),
+            employment_status_code="active",
+            effective_from=date(2026, 8, 16),
+            effective_to=date(2026, 8, 16),
+        )
+    assert (
+        repository.create_employment(
+            context,
+            employment_record_id=uuid4(),
+            person_record_id=uuid4(),
+            employment_status_code="active",
+            effective_from=date(2026, 8, 16),
+        )
+        is None
+    )
+
+
+def test_employment_is_idempotent_and_tenant_isolated(application_dsn: str) -> None:
+    repository = PostgresPeopleRepository(application_dsn)
+    tenant_a = uuid4()
+    tenant_b = uuid4()
+    context_a = _context(tenant_a, purpose_code="people_admin")
+    context_b = _context(tenant_b, purpose_code="people_admin")
+    repository.create_tenant(context_a, "Employment Tenant A")
+    repository.create_tenant(context_b, "Employment Tenant B")
+
+    person_id = uuid4()
+    repository.create_person(
+        context_a,
+        person_record_id=person_id,
+        display_name="Hired Worker",
+        effective_from=date(2026, 8, 1),
+    )
+    employment_id = uuid4()
+    created = repository.create_employment(
+        context_a,
+        employment_record_id=employment_id,
+        person_record_id=person_id,
+        employment_status_code="active",
+        effective_from=date(2026, 8, 16),
+    )
+    assert created is not None
+    assert created.employment_status_code == "active"
+    assert created.person_record_id == person_id
+    assert repository.create_employment(
+        context_a,
+        employment_record_id=employment_id,
+        person_record_id=person_id,
+        employment_status_code="active",
+        effective_from=date(2026, 8, 16),
+    ) == created
+    with pytest.raises(RepositoryConflictError, match="different data"):
+        repository.create_employment(
+            context_a,
+            employment_record_id=employment_id,
+            person_record_id=person_id,
+            employment_status_code="leave",
+            effective_from=date(2026, 8, 16),
+        )
+    assert repository.get_employment(context_a, employment_id) == created
+    assert repository.get_employment(context_b, employment_id) is None
+    events = repository.list_audit_events(context_a, employment_id)
+    assert [(event.action_code, event.purpose_code) for event in events] == [
+        ("employment_created", "people_admin")
+    ]

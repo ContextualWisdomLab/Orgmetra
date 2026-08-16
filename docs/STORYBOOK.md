@@ -15,6 +15,7 @@
 - `Timeline`
 - `OrgTreeNode`
 - `PersonSummary`
+- `EmploymentRecordCard`
 - `PositionCard`
 - `AssignmentSplit`
 - `DecisionRecord`

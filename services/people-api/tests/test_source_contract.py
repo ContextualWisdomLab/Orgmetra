@@ -62,6 +62,7 @@ def test_route_scopes_and_purposes_are_server_selected_constants() -> None:
     assert 'RequiredPurpose("orgmetra.people.write", "people_admin")' in source
     assert 'RequiredPurpose("orgmetra.people.read", "people_read")' in source
     assert '"orgmetra.talent_acquisition.write",\n        "talent_acquisition"' in source
+    assert '"orgmetra.talent_acquisition.read",\n        "talent_acquisition_read"' in source
     assert 'RequiredPurpose("orgmetra.audit.read", "audit_review")' in source
     assert "X-Purpose" not in source
     assert "X-Decision-Reference" not in source
@@ -75,6 +76,7 @@ def test_route_dependencies_stay_server_owned_at_runtime() -> None:
     assert "context: PurposeContext = Depends(" in source
     assert "repository_port: PeopleRepository = Depends(get_people_repository)" in source
     assert "Annotated[PurposeContext" not in source
+    assert "Annotated[" not in source
     assert "request.app.state.repository" not in source.split("async def create_person", 1)[1]
 
 
@@ -87,8 +89,16 @@ def test_person_command_cannot_accept_system_recorded_time() -> None:
     person_schema = schema_source.split("class PersonCreateRequest", 1)[1].split(
         "class PersonResponse", 1
     )[0]
+    employment_schema = schema_source.split("class EmploymentCreateRequest", 1)[1].split(
+        "class EmploymentResponse", 1
+    )[0]
     person_port = repository_source.split("def create_person", 1)[1].split(
         "def get_person", 1
     )[0]
+    employment_port = repository_source.split("def create_employment", 1)[1].split(
+        "def get_employment", 1
+    )[0]
     assert "recorded_at" not in person_schema
     assert "recorded_at" not in person_port
+    assert "recorded_at" not in employment_schema
+    assert "recorded_at" not in employment_port

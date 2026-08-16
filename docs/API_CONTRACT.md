@@ -20,6 +20,7 @@ Every mutating request requires:
 POST /v1/person-records
 GET  /v1/person-records/{person_record_id}
 POST /v1/employment-records
+GET  /v1/employment-records/{employment_record_id}
 POST /v1/job-profiles
 POST /v1/job-profiles/{job_profile_id}/publish
 POST /v1/candidate-profiles

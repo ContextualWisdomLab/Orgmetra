@@ -109,3 +109,33 @@ def test_hidden_candidate_link_conflict_fails_closed() -> None:
             candidate_profile_id=uuid4(),
             person_record_id=uuid4(),
         )
+
+
+def test_hidden_employment_identity_conflict_fails_closed() -> None:
+    person_row = (
+        uuid4(),
+        "Visible Person",
+        date(2026, 8, 15),
+        None,
+        date(2026, 8, 15),
+    )
+    with pytest.raises(RepositoryConflictError, match="different data"):
+        _repository(person_row, None, None).create_employment(
+            _context(),
+            employment_record_id=uuid4(),
+            person_record_id=person_row[0],
+            employment_status_code="active",
+            effective_from=date(2026, 8, 16),
+        )
+
+
+def test_employment_without_visible_person_returns_none() -> None:
+    snapshot = _repository(None).create_employment(
+        _context(),
+        employment_record_id=uuid4(),
+        person_record_id=uuid4(),
+        employment_status_code="active",
+        effective_from=date(2026, 8, 16),
+    )
+
+    assert snapshot is None

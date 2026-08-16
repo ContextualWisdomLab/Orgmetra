@@ -80,7 +80,7 @@ Job evidence
 
 - `packages/orgmetra-domain`: bitemporal people, employment, position, assignment, and candidate-worker invariants.
 - `packages/orgmetra-postgres`: tenant-isolated purpose-bound PostgreSQL persistence.
-- `services/people-api`: purpose-bound customer-facing People API boundary.
+- `services/people-api`: purpose-bound customer-facing People API boundary for person, candidate, hire-link, and employment operations.
 
 ## Status
 

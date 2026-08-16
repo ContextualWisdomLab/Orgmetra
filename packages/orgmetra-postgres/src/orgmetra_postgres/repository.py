@@ -19,7 +19,13 @@ from .errors import (
     RepositoryConflictError,
     RepositoryUnavailableError,
 )
-from .models import AuditEvent, CandidateSnapshot, CandidateWorkerLink, PersonSnapshot
+from .models import (
+    AuditEvent,
+    CandidateSnapshot,
+    CandidateWorkerLink,
+    EmploymentSnapshot,
+    PersonSnapshot,
+)
 
 ConnectFactory = Callable[..., Connection[Any]]
 IdentifierFactory = Callable[[], UUID]
@@ -213,6 +219,94 @@ class PostgresPeopleRepository:
             )
             return snapshot
 
+    def get_candidate(
+        self, context: PurposeContext, candidate_profile_id: UUID
+    ) -> CandidateSnapshot | None:
+        """Return the current candidate profile visible to the caller."""
+
+        with self._transaction(context) as connection:
+            return self._select_candidate(connection, candidate_profile_id)
+
+    def create_employment(
+        self,
+        context: PurposeContext,
+        *,
+        employment_record_id: UUID,
+        person_record_id: UUID,
+        employment_status_code: str,
+        effective_from: date,
+        effective_to: date | None = None,
+    ) -> EmploymentSnapshot | None:
+        """Create one employment relationship with repository-owned knowledge time.
+
+        Return ``None`` when the person is absent or not visible so the HTTP
+        boundary can use the same 404 as an unauthorized person read.
+        """
+
+        normalized_status = _normalize_code(
+            employment_status_code, "employment_status_code"
+        )
+        _validate_effective_period(effective_from, effective_to)
+        with self._transaction(context) as connection:
+            if self._select_person(connection, person_record_id) is None:
+                return None
+            inserted = connection.execute(
+                """
+                INSERT INTO employment_record (
+                    tenant_record_id, employment_record_id, person_record_id,
+                    employment_status_code, effective_from, effective_to,
+                    recorded_from, recorded_to
+                ) VALUES (%s, %s, %s, %s, %s, %s, now(), NULL)
+                ON CONFLICT (employment_record_id) DO NOTHING
+                RETURNING employment_record_id, person_record_id,
+                          employment_status_code, effective_from, effective_to,
+                          recorded_from
+                """,
+                (
+                    context.tenant_reference,
+                    employment_record_id,
+                    person_record_id,
+                    normalized_status,
+                    effective_from,
+                    effective_to,
+                ),
+            ).fetchone()
+            if inserted is None:
+                existing = self._select_employment(connection, employment_record_id)
+                if existing is None or (
+                    existing.person_record_id,
+                    existing.employment_status_code,
+                    existing.effective_from,
+                    existing.effective_to,
+                ) != (
+                    person_record_id,
+                    normalized_status,
+                    effective_from,
+                    effective_to,
+                ):
+                    raise RepositoryConflictError(
+                        "employment identity already exists with different data"
+                    )
+                return existing
+
+            snapshot = EmploymentSnapshot(*inserted)
+            self._record_audit(
+                connection,
+                context,
+                action_code="employment_created",
+                resource_type_code="employment_record",
+                resource_record_id=employment_record_id,
+            )
+            return snapshot
+
+    def get_employment(
+        self, context: PurposeContext, employment_record_id: UUID
+    ) -> EmploymentSnapshot | None:
+        """Return one current employment record visible to the caller."""
+
+        with self._transaction(context) as connection:
+            return self._select_employment(connection, employment_record_id)
+
     def link_candidate_to_worker(
         self,
         context: PurposeContext,
@@ -268,6 +362,16 @@ class PostgresPeopleRepository:
             )
             return link
 
+    def get_candidate_worker_link(
+        self, context: PurposeContext, candidate_profile_id: UUID
+    ) -> CandidateWorkerLink | None:
+        """Return the immutable hire link visible for one candidate."""
+
+        with self._transaction(context) as connection:
+            return self._select_candidate_worker_link(
+                connection, candidate_profile_id
+            )
+
     def list_audit_events(
         self, context: PurposeContext, resource_record_id: UUID
     ) -> tuple[AuditEvent, ...]:
@@ -309,6 +413,54 @@ class PostgresPeopleRepository:
             (person_record_id,),
         ).fetchone()
         return None if row is None else _person_snapshot(row)
+
+    def _select_candidate(
+        self, connection: Connection[Any], candidate_profile_id: UUID
+    ) -> CandidateSnapshot | None:
+        """Read the current candidate profile through active RLS."""
+
+        row = connection.execute(
+            """
+            SELECT candidate_profile_id, application_status_code, recorded_from
+            FROM candidate_profile
+            WHERE candidate_profile_id = %s AND recorded_to IS NULL
+            """,
+            (candidate_profile_id,),
+        ).fetchone()
+        return None if row is None else CandidateSnapshot(*row)
+
+    def _select_employment(
+        self, connection: Connection[Any], employment_record_id: UUID
+    ) -> EmploymentSnapshot | None:
+        """Read the current employment relationship through active RLS."""
+
+        row = connection.execute(
+            """
+            SELECT employment_record_id, person_record_id,
+                   employment_status_code, effective_from, effective_to,
+                   recorded_from
+            FROM employment_record
+            WHERE employment_record_id = %s AND recorded_to IS NULL
+            """,
+            (employment_record_id,),
+        ).fetchone()
+        return None if row is None else EmploymentSnapshot(*row)
+
+    def _select_candidate_worker_link(
+        self, connection: Connection[Any], candidate_profile_id: UUID
+    ) -> CandidateWorkerLink | None:
+        """Read the immutable hire link through active RLS."""
+
+        row = connection.execute(
+            """
+            SELECT candidate_worker_link_id, candidate_profile_id,
+                   person_record_id, linked_at
+            FROM candidate_worker_link
+            WHERE candidate_profile_id = %s
+            """,
+            (candidate_profile_id,),
+        ).fetchone()
+        return None if row is None else CandidateWorkerLink(*row)
 
     def _record_audit(
         self,

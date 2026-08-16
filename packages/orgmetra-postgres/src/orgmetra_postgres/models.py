@@ -19,6 +19,18 @@ class PersonSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class EmploymentSnapshot:
+    """Represent one tenant-scoped employment relationship."""
+
+    employment_record_id: UUID
+    person_record_id: UUID
+    employment_status_code: str
+    effective_from: date
+    effective_to: date | None
+    recorded_from: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class CandidateSnapshot:
     """Represent one tenant-scoped candidate profile."""
 

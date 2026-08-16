@@ -61,10 +61,11 @@ standard `scope` claim, validates the route-selected purpose against
 `orgmetra_purposes`, and returns both complete validated grant sets for defensive
 checks by the API boundary.
 
-Examples of operation scopes include `orgmetra.people.read` and
-`orgmetra.people.write`. Higher-risk talent-acquisition or job-architecture
-commands use their own reviewed scopes rather than inheriting a broad people
-capability.
+Examples of operation scopes include `orgmetra.people.read`,
+`orgmetra.people.write`, `orgmetra.talent_acquisition.read`, and
+`orgmetra.talent_acquisition.write`. Higher-risk talent-acquisition or
+job-architecture commands use their own reviewed scopes rather than inheriting a
+broad people capability.
 
 ## Identity mapping
 

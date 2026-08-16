@@ -53,7 +53,10 @@ def test_openapi_exposes_stable_operations_and_bearer_scheme(client: TestClient)
     assert set(document["paths"]) == {
         "/v1/people",
         "/v1/people/{person_record_id}",
+        "/v1/employment-records",
+        "/v1/employment-records/{employment_record_id}",
         "/v1/candidates",
+        "/v1/candidates/{candidate_profile_id}",
         "/v1/candidates/{candidate_profile_id}/worker-links",
         "/v1/audit-events/{resource_record_id}",
     }
@@ -65,22 +68,56 @@ def test_openapi_exposes_stable_operations_and_bearer_scheme(client: TestClient)
     assert operation_ids == {
         "createPersonRecord",
         "getPersonRecord",
+        "createEmploymentRecord",
+        "getEmploymentRecord",
         "createCandidateProfile",
+        "getCandidateProfile",
         "linkCandidateToWorker",
+        "getCandidateWorkerLink",
         "listResourceAuditEvents",
     }
     assert document["components"]["securitySchemes"]["KeyverseBearer"] == {
         "type": "http",
         "scheme": "bearer",
     }
-    for path_item in document["paths"].values():
+    allowed_parameters = {
+        "/v1/people": {"X-Correlation-Id"},
+        "/v1/people/{person_record_id}": {"person_record_id", "X-Correlation-Id"},
+        "/v1/employment-records": {"X-Correlation-Id"},
+        "/v1/employment-records/{employment_record_id}": {
+            "employment_record_id",
+            "X-Correlation-Id",
+        },
+        "/v1/candidates": {"X-Correlation-Id"},
+        "/v1/candidates/{candidate_profile_id}": {
+            "candidate_profile_id",
+            "X-Correlation-Id",
+        },
+        "/v1/candidates/{candidate_profile_id}/worker-links": {
+            "candidate_profile_id",
+            "X-Correlation-Id",
+        },
+        "/v1/audit-events/{resource_record_id}": {
+            "resource_record_id",
+            "X-Correlation-Id",
+        },
+    }
+    forbidden_caller_names = {
+        "context",
+        "request",
+        "repository_port",
+        "credentials",
+        "tenant_reference",
+        "purpose_code",
+    }
+    for path, path_item in document["paths"].items():
         for operation in path_item.values():
+            published_names = set()
             for parameter in operation.get("parameters", []):
-                assert parameter["name"] not in {
-                    "context",
-                    "request",
-                    "repository_port",
-                }
+                assert parameter["name"] not in forbidden_caller_names
+                assert parameter["in"] != "query"
+                published_names.add(parameter["name"])
+            assert published_names <= allowed_parameters[path]
     assert client.get("/docs").status_code == 404
     assert client.get("/redoc").status_code == 404
 
@@ -140,6 +177,41 @@ def test_create_and_get_person_preserve_server_selected_context(
     )
 
 
+def test_attacker_query_names_cannot_become_required_or_accepted_input(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        f"/v1/people/{uuid4()}",
+        headers=AUTHORIZATION,
+        params={
+            "context": "attacker-context",
+            "request": "attacker-request",
+            "repository_port": "attacker-repository",
+            "credentials": "attacker-credentials",
+            "tenant_reference": str(uuid4()),
+            "purpose_code": "people_admin",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "resource_not_found"
+    assert "attacker-context" not in response.text
+    assert "people_admin" not in response.text
+
+
+def test_hidden_control_in_bearer_token_is_rejected_without_echo(
+    client: TestClient,
+) -> None:
+    response = client.get(
+        f"/v1/people/{uuid4()}",
+        headers={"Authorization": "Bearer bad\x1ftoken"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error_code"] == "authentication_failed"
+    assert "bad" not in response.text
+
+
 def test_candidate_link_and_audit_workflow(
     client: TestClient,
     repository: FakeRepository,
@@ -160,6 +232,13 @@ def test_candidate_link_and_audit_workflow(
     assert candidate.json()["candidate_profile_id"] == str(candidate_id)
     assert candidate.json()["application_status_code"] == "structured_screen"
 
+    fetched_candidate = client.get(
+        f"/v1/candidates/{candidate_id}",
+        headers=AUTHORIZATION,
+    )
+    assert fetched_candidate.status_code == 200
+    assert fetched_candidate.json() == candidate.json()
+
     linked = client.post(
         f"/v1/candidates/{candidate_id}/worker-links",
         headers=AUTHORIZATION,
@@ -175,6 +254,13 @@ def test_candidate_link_and_audit_workflow(
         "person_record_id": str(person_id),
         "linked_at": "2026-08-15T09:10:00Z",
     }
+
+    fetched_link = client.get(
+        f"/v1/candidates/{candidate_id}/worker-links",
+        headers=AUTHORIZATION,
+    )
+    assert fetched_link.status_code == 200
+    assert fetched_link.json() == linked.json()
 
     event_id = uuid4()
     repository.audit_events = (
@@ -196,6 +282,114 @@ def test_candidate_link_and_audit_workflow(
     assert audited.json()["audit_events"][0]["audit_event_id"] == str(event_id)
     assert "display_name" not in audited.text
     assert "assessment_response" not in audited.text
+
+
+def test_hire_to_employment_workflow_uses_server_owned_recorded_time(
+    client: TestClient,
+    repository: FakeRepository,
+    authorizer: FakeAuthorizer,
+) -> None:
+    person_id = uuid4()
+    employment_id = uuid4()
+    created_person = client.post(
+        "/v1/people",
+        headers=AUTHORIZATION,
+        json=_person_payload(person_id),
+    )
+    assert created_person.status_code == 201
+
+    created = client.post(
+        "/v1/employment-records",
+        headers=AUTHORIZATION,
+        json={
+            "employment_record_id": str(employment_id),
+            "person_record_id": str(person_id),
+            "employment_status_code": "active",
+            "effective_from": "2026-08-16",
+            "recorded_at": "1900-01-01T00:00:00Z",
+        },
+    )
+    assert created.status_code == 422
+    assert "recorded_at" in created.text
+    assert "1900-01-01" not in created.text
+
+    created = client.post(
+        "/v1/employment-records",
+        headers=AUTHORIZATION,
+        json={
+            "employment_record_id": str(employment_id),
+            "person_record_id": str(person_id),
+            "employment_status_code": "active",
+            "effective_from": "2026-08-16",
+        },
+    )
+    assert created.status_code == 201
+    assert created.json() == {
+        "employment_record_id": str(employment_id),
+        "person_record_id": str(person_id),
+        "employment_status_code": "active",
+        "effective_from": "2026-08-16",
+        "effective_to": None,
+        "recorded_from": "2026-08-16T09:20:00Z",
+    }
+    assert authorizer.calls[-1] == (
+        "valid-token",
+        "orgmetra.people.write",
+        "people_admin",
+    )
+    fetched = client.get(
+        f"/v1/employment-records/{employment_id}",
+        headers=AUTHORIZATION,
+    )
+    assert fetched.status_code == 200
+    assert fetched.json() == created.json()
+    assert authorizer.calls[-1] == (
+        "valid-token",
+        "orgmetra.people.read",
+        "people_read",
+    )
+
+
+def test_employment_for_hidden_person_is_uniform_not_found(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/v1/employment-records",
+        headers=AUTHORIZATION,
+        json={
+            "employment_record_id": str(uuid4()),
+            "person_record_id": str(uuid4()),
+            "employment_status_code": "active",
+            "effective_from": "2026-08-16",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error_code"] == "resource_not_found"
+
+
+def test_absent_candidate_and_employment_return_uniform_not_found(
+    client: TestClient,
+) -> None:
+    missing_candidate = client.get(
+        f"/v1/candidates/{uuid4()}",
+        headers=AUTHORIZATION,
+    )
+    missing_link = client.get(
+        f"/v1/candidates/{uuid4()}/worker-links",
+        headers=AUTHORIZATION,
+    )
+    missing_employment = client.get(
+        f"/v1/employment-records/{uuid4()}",
+        headers=AUTHORIZATION,
+    )
+
+    assert missing_candidate.status_code == 404
+    assert missing_link.status_code == 404
+    assert missing_employment.status_code == 404
+    assert missing_candidate.json()["error_code"] == "resource_not_found"
+    assert missing_link.json()["error_code"] == "resource_not_found"
+    assert missing_employment.json()["error_code"] == "resource_not_found"
 
 
 def test_absent_person_returns_uniform_not_found(client: TestClient) -> None:

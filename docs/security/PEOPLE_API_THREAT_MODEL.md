@@ -3,7 +3,7 @@
 ## Scope
 
 This model covers the `orgmetra-people-api` factory, injected identity and
-repository ports, HTTP boundary, and people/candidate/worker-link/audit routes.
+repository ports, HTTP boundary, and people/candidate/worker-link/employment/audit routes.
 Keyverse acquisition/caching, PostgreSQL deployment, ingress, and customer
 identity governance remain separate trust domains.
 
@@ -11,7 +11,7 @@ identity governance remain separate trust domains.
 
 - opaque tenant and actor identities;
 - OAuth-style operation scopes and HR business-purpose grants;
-- person and candidate records and candidate-to-worker linkage;
+- person, candidate, employment records and candidate-to-worker linkage;
 - effective/business time versus system-recorded time integrity;
 - governed decision/evidence provenance and audit evidence;
 - internal trace topology, database credentials, and service availability.
@@ -41,7 +41,7 @@ metadata only.
 | Purpose escalation | independent route-owned HR purpose | centralized purpose administration |
 | Purpose used as scope substitute | negative tests require both dimensions | live adapter must parse scope claim correctly |
 | Caller-forged decision/evidence provenance | decision/evidence headers not accepted as audit authority | governed evidence resolver and sealed evidence-set contract |
-| Back/future-dated system history | person command has no `recorded_at`; repository/database own knowledge time | integrated DB evidence after stack retarget |
+| Back/future-dated system history | person and employment commands have no `recorded_at`; repository/database own knowledge time | integrated DB evidence after stack retarget |
 | Internal trace disclosure | client receives random non-semantic `err_...` support reference only | privacy-safe operator trace correlation |
 | Bearer-token leakage | bounded token, never echoed | TLS, revocation, secret scanning, short lifetimes |
 | Cross-tenant probing | uniform not-found behavior plus RLS boundary | rate limits/anomaly detection |

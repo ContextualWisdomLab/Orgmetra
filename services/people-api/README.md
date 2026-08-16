@@ -10,8 +10,12 @@ without accepting tenant identity from an untrusted header.
 - `GET /health`
 - `POST /v1/people`
 - `GET /v1/people/{person_record_id}`
+- `POST /v1/employment-records`
+- `GET /v1/employment-records/{employment_record_id}`
 - `POST /v1/candidates`
+- `GET /v1/candidates/{candidate_profile_id}`
 - `POST /v1/candidates/{candidate_profile_id}/worker-links`
+- `GET /v1/candidates/{candidate_profile_id}/worker-links`
 - `GET /v1/audit-events/{resource_record_id}`
 
 ## Trust boundary

@@ -46,8 +46,12 @@ contract before a high-impact decision surface can rely on them.
 | --- | --- | --- |
 | Create person | `orgmetra.people.write` | `people_admin` |
 | Read person | `orgmetra.people.read` | `people_read` |
+| Create employment | `orgmetra.people.write` | `people_admin` |
+| Read employment | `orgmetra.people.read` | `people_read` |
 | Create candidate | `orgmetra.talent_acquisition.write` | `talent_acquisition` |
+| Read candidate | `orgmetra.talent_acquisition.read` | `talent_acquisition_read` |
 | Link candidate to worker | `orgmetra.talent_acquisition.write` | `talent_acquisition` |
+| Read candidate-to-worker link | `orgmetra.talent_acquisition.read` | `talent_acquisition_read` |
 | Read audit evidence | `orgmetra.audit.read` | `audit_review` |
 
 Both dimensions must be present. A valid purpose cannot substitute for a missing
@@ -86,10 +90,43 @@ identifier returns `409` without revealing existing values.
 Returns the current recorded version visible to the authenticated tenant. An
 absent and an unauthorized record produce the same `404` response.
 
+### `POST /v1/employment-records`
+
+Creates one effective-dated employment relationship for an existing person. The
+request may specify business time but cannot specify system-recorded time.
+
+```json
+{
+  "employment_record_id": "0198a412-6000-7000-8000-000000000020",
+  "person_record_id": "0198a412-6000-7000-8000-000000000010",
+  "employment_status_code": "active",
+  "effective_from": "2026-08-16",
+  "effective_to": null
+}
+```
+
+A missing or unauthorized person returns the same `404` as a hidden person
+read. Conflicting reuse of an immutable employment identifier returns `409`
+without revealing existing values. Review the created employment, then add
+position and assignment records before treating the hire as operationally
+complete.
+
+### `GET /v1/employment-records/{employment_record_id}`
+
+Returns the current recorded employment version visible to the authenticated
+tenant. An absent and an unauthorized record produce the same `404` response.
+
 ### `POST /v1/candidates`
 
 Creates one candidate profile. `application_status_code` uses lower-case ASCII
 letters, digits and underscores and is at most 64 characters.
+
+### `GET /v1/candidates/{candidate_profile_id}`
+
+Returns the current candidate profile visible to a talent-acquisition reader.
+An absent and an unauthorized record produce the same `404` response. Use this
+to confirm the created application status before linking the candidate to a
+worker.
 
 ### `POST /v1/candidates/{candidate_profile_id}/worker-links`
 
@@ -97,6 +134,12 @@ Appends the candidate-to-worker bridge after hire. The current endpoint has only
 identity-level idempotency and therefore remains pre-GA until the shared
 idempotency ledger and governed human-confirmation/evidence contract are wired
 through persistence atomically.
+
+### `GET /v1/candidates/{candidate_profile_id}/worker-links`
+
+Returns the immutable hire link visible to a talent-acquisition reader. An
+absent and an unauthorized link produce the same `404` response. After a
+successful read, create the employment record for the linked worker.
 
 ### `GET /v1/audit-events/{resource_record_id}`
 
