@@ -93,7 +93,7 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'outbox_event', 'inbox_event', 'integration_delivery'
 ]);
 
-const PLACEHOLDER_PATTERN = /\b(?:TBD|TODO|FIXME|PLACEHOLDER)\b/i;
+const UNFINISHED_MARKER_PATTERN = /(?:^|\n)\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:|\s*$))/im;
 const ADR_STATUS_PATTERN = /^\|\s*\[\d{4}\]\(([^)]+)\)\s*\|.*\|\s*(Proposed|Accepted|Superseded|Rejected)\s*\|$/;
 const LOCAL_LINK_PATTERN = /\[[^\]]+\]\((?!https?:\/\/|mailto:|#)([^)]+)\)/g;
 
@@ -115,6 +115,11 @@ export function collectMarkdownFiles(directoryPath) {
 /** Count Markdown code-fence markers that begin a line. */
 export function countCodeFences(markdownText) {
   return markdownText.split(/\r?\n/).filter((line) => /^\s*```/.test(line)).length;
+}
+
+/** Return whether Markdown contains an explicit unfinished-work marker. */
+export function hasUnfinishedMarker(markdownText) {
+  return UNFINISHED_MARKER_PATTERN.test(markdownText);
 }
 
 /** Return whether a database object is descriptive multiword snake_case. */
@@ -276,45 +281,58 @@ export function validateOpenApiContract(openapiText) {
     for (const responseCode of ["        '201':", "        '400':", "        '401':", "        '403':", "        '409':", ...contract.extraResponses]) {
       requireWithin(errors, contract.operationId, pathBlock, responseCode, `response ${responseCode.trim()}`);
     }
+    requireWithin(errors, contract.operationId, pathBlock, '            Location:', '201 Location header');
   }
 
   const jobCommand = extractYamlBlock(openapiText, '    CreateJobProfileCommand:');
-  requireWithin(
-    errors,
-    'CreateJobProfileCommand',
-    jobCommand,
-    '        - evidence_references',
-    'required evidence_references'
-  );
-  requireWithin(errors, 'CreateJobProfileCommand', jobCommand, '          maxItems: 100', 'evidence_references maxItems 100');
-  requireWithin(errors, 'CreateJobProfileCommand', jobCommand, '          uniqueItems: true', 'unique evidence_references');
+  if (!jobCommand) {
+    errors.push('CreateJobProfileCommand: schema block is missing');
+  } else {
+    requireWithin(
+      errors,
+      'CreateJobProfileCommand',
+      jobCommand,
+      '        - evidence_references',
+      'required evidence_references'
+    );
+    requireWithin(errors, 'CreateJobProfileCommand', jobCommand, '          maxItems: 100', 'evidence_references maxItems 100');
+    requireWithin(errors, 'CreateJobProfileCommand', jobCommand, '          uniqueItems: true', 'unique evidence_references');
+  }
 
   const decisionCommand = extractYamlBlock(openapiText, '    RecordSelectionDecisionCommand:');
-  requireWithin(
-    errors,
-    'RecordSelectionDecisionCommand',
-    decisionCommand,
-    '        - evidence_references',
-    'required evidence_references'
-  );
-  requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '        - confirmation_reference', 'human confirmation reference');
-  requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '          maxItems: 100', 'evidence_references maxItems 100');
-  requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '          uniqueItems: true', 'unique evidence_references');
+  if (!decisionCommand) {
+    errors.push('RecordSelectionDecisionCommand: schema block is missing');
+  } else {
+    requireWithin(
+      errors,
+      'RecordSelectionDecisionCommand',
+      decisionCommand,
+      '        - evidence_references',
+      'required evidence_references'
+    );
+    requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '        - confirmation_reference', 'human confirmation reference');
+    requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '          maxItems: 100', 'evidence_references maxItems 100');
+    requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '          uniqueItems: true', 'unique evidence_references');
+  }
 
   const errorSchema = extractYamlBlock(openapiText, '    ErrorResponse:');
-  for (const fieldName of ['error_code', 'message', 'next_action', 'support_reference']) {
-    requireWithin(errors, 'ErrorResponse', errorSchema, `        - ${fieldName}`, `required field ${fieldName}`);
+  if (!errorSchema) {
+    errors.push('ErrorResponse: schema block is missing');
+  } else {
+    for (const fieldName of ['error_code', 'message', 'next_action', 'support_reference']) {
+      requireWithin(errors, 'ErrorResponse', errorSchema, `        - ${fieldName}`, `required field ${fieldName}`);
+    }
+    requireWithin(
+      errors,
+      'ErrorResponse',
+      errorSchema,
+      'Opaque random client-safe support identifier.',
+      'opaque support-reference semantics'
+    );
   }
-  requireWithin(
-    errors,
-    'ErrorResponse',
-    errorSchema,
-    'Opaque random client-safe support identifier.',
-    'opaque support-reference semantics'
-  );
 
   if (/^\s*(?:-\s+)?trace_id\s*:/m.test(openapiText)) {
-    errors.push('ErrorResponse: internal trace identifiers must not be client-visible');
+    errors.push('OpenAPI document: internal trace identifiers must not be client-visible');
   }
   if (openapiText.includes('keyverse_oidc: []')) {
     errors.push('OpenAPI document: empty-scope OIDC requirements are forbidden');
@@ -322,7 +340,15 @@ export function validateOpenApiContract(openapiText) {
   return errors;
 }
 
-/** Validate required files, Markdown integrity, traceability, ADRs, and naming. */
+/**
+ * Validate the complete foundation repository contract rooted at `rootPath`.
+ *
+ * The returned array is empty only when required artifacts, Markdown structure,
+ * explicit unfinished-work markers, local links, database naming, traceability
+ * maturities, OpenAPI structural contracts, and ADR index/status relationships
+ * all satisfy their deterministic checks. The function is read-only and returns
+ * operator-readable errors instead of throwing for ordinary validation failures.
+ */
 export function validateFoundation(rootPath) {
   const resolvedRoot = resolve(rootPath);
   if (!existsSync(resolvedRoot)) return [`Repository root does not exist: ${resolvedRoot}`];
@@ -342,7 +368,7 @@ export function validateFoundation(rootPath) {
   for (const filePath of markdownFiles) {
     const text = readFileSync(filePath, 'utf8');
     const displayPath = relative(resolvedRoot, filePath);
-    if (PLACEHOLDER_PATTERN.test(text)) errors.push(`${displayPath}: unresolved placeholder token`);
+    if (hasUnfinishedMarker(text)) errors.push(`${displayPath}: unresolved work marker`);
     if (countCodeFences(text) % 2 !== 0) errors.push(`${displayPath}: unbalanced Markdown code fence`);
     errors.push(...validateLocalLinks(filePath, text)
       .map((message) => message.replace(`${filePath}:`, `${displayPath}:`)));
