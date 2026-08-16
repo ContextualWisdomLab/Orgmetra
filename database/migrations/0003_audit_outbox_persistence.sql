@@ -55,6 +55,11 @@ DECLARE
         'type'
     ];
 BEGIN
+    IF is_operational_uuid(p_audit_event_record_id) IS NOT TRUE
+       OR is_operational_uuid(p_tenant_record_id) IS NOT TRUE THEN
+        RETURN false;
+    END IF;
+
     BEGIN
         event_envelope := p_canonical_event_json::jsonb;
     EXCEPTION
@@ -167,6 +172,10 @@ CREATE TABLE audit_event_record (
     digest_algorithm_code text NOT NULL DEFAULT 'sha256',
     event_envelope_digest text NOT NULL,
     recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT audit_event_tenant_operational_uuid_check
+        CHECK (is_operational_uuid(tenant_record_id)),
+    CONSTRAINT audit_event_record_operational_uuid_check
+        CHECK (is_operational_uuid(audit_event_record_id)),
     CONSTRAINT audit_event_tenant_identity_unique
         UNIQUE (tenant_record_id, audit_event_record_id),
     CONSTRAINT audit_event_digest_algorithm_check
@@ -197,6 +206,12 @@ CREATE TABLE outbox_delivery_record (
     last_failure_code text,
     delivered_at timestamptz,
     recorded_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT outbox_delivery_tenant_operational_uuid_check
+        CHECK (is_operational_uuid(tenant_record_id)),
+    CONSTRAINT outbox_delivery_record_operational_uuid_check
+        CHECK (is_operational_uuid(outbox_delivery_record_id)),
+    CONSTRAINT outbox_delivery_audit_operational_uuid_check
+        CHECK (is_operational_uuid(audit_event_record_id)),
     CONSTRAINT outbox_delivery_event_tenant_fk
         FOREIGN KEY (tenant_record_id, audit_event_record_id)
         REFERENCES audit_event_record(tenant_record_id, audit_event_record_id),
@@ -350,6 +365,13 @@ RETURNS void
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    IF is_operational_uuid(p_tenant_record_id) IS NOT TRUE
+       OR is_operational_uuid(p_audit_event_record_id) IS NOT TRUE
+       OR is_operational_uuid(p_outbox_delivery_record_id) IS NOT TRUE THEN
+        RAISE EXCEPTION 'audit/outbox identity uses reserved UUID sentinel'
+            USING ERRCODE = '23514';
+    END IF;
+
     IF NOT validate_audit_event_envelope(
         p_canonical_event_json,
         p_audit_event_record_id,
