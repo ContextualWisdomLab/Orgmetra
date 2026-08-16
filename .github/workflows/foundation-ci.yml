@@ -49,9 +49,16 @@ jobs:
         run: git diff --exit-code
 
   postgres_contract:
-    name: PostgreSQL bitemporal contract
+    name: PostgreSQL integrity contracts
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        contract:
+          - test_bitemporal_postgres.sh
+          - test_tenant_isolation_postgres.sh
+          - test_evidence_sealing_postgres.sh
     services:
       postgres:
         image: postgres:16
@@ -73,7 +80,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Run bitemporal concurrency contract
-        run: bash tests/test_bitemporal_postgres.sh
+      - name: Run PostgreSQL contract
+        run: bash "tests/${{ matrix.contract }}"
       - name: Prove test is read-only
         run: git diff --exit-code
