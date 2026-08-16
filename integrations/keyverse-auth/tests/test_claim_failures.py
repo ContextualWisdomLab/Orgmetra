@@ -1,4 +1,4 @@
-"""Fail-closed registered, identity, and purpose claim verification tests."""
+"""Fail-closed registered, identity, scope, and purpose claim verification tests."""
 
 from __future__ import annotations
 
@@ -19,6 +19,9 @@ from conftest import (
     KeyMaterial,
     encode_token,
 )
+
+_READ_SCOPE = "orgmetra.people.read"
+_WRITE_SCOPE = "orgmetra.people.write"
 
 
 def _authorizer(config, provider, resolver) -> KeyverseOidcAuthorizer:
@@ -60,7 +63,7 @@ def test_invalid_signature_is_rejected(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="signature or claims"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 @pytest.mark.parametrize(
@@ -88,7 +91,7 @@ def test_invalid_registered_claims_are_rejected(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="signature or claims"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 @pytest.mark.parametrize("claim_name", ["iss", "sub", "aud", "exp", "iat", "jti"])
@@ -103,7 +106,7 @@ def test_missing_mandatory_registered_claim_is_rejected(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="signature or claims"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 @pytest.mark.parametrize(
@@ -139,7 +142,7 @@ def test_identity_claims_are_required_bounded_strings(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="claim is invalid"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 def test_token_lifetime_must_be_positive_after_clock_skew(
@@ -157,7 +160,7 @@ def test_token_lifetime_must_be_positive_after_clock_skew(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="lifetime is invalid"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 def test_token_lifetime_cannot_exceed_configured_maximum(
@@ -175,7 +178,7 @@ def test_token_lifetime_cannot_exceed_configured_maximum(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="allowed maximum"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 @pytest.mark.parametrize(
@@ -209,7 +212,7 @@ def test_purpose_collection_is_bounded_and_duplicate_free(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="purpose"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 def test_token_without_required_route_purpose_is_denied(
@@ -227,8 +230,8 @@ def test_token_without_required_route_purpose_is_denied(
     )
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
-    with pytest.raises(AuthorizationDenied, match="not authorized"):
-        asyncio.run(authorizer.authorize(token, "people_admin"))
+    with pytest.raises(AuthorizationDenied, match="purpose"):
+        asyncio.run(authorizer.authorize(token, _WRITE_SCOPE, "people_admin"))
 
 
 @pytest.mark.parametrize("purpose", ["", "UPPER", "people-read", "café", "x" * 129])
@@ -243,6 +246,6 @@ def test_invalid_route_purpose_fails_before_key_provider_access(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="purpose code"):
-        asyncio.run(authorizer.authorize(token, purpose))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, purpose))
     assert jwks_provider.calls == []
     assert identity_resolver.calls == []
