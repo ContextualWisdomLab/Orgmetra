@@ -1,14 +1,14 @@
 {
   "package": "orgmetra-active-stacked-tree",
   "version": "0.2.0-draft",
-  "base_pr": 2,
-  "generated_for_branch": "feat/bitemporal-people-core",
+  "base_pr": 8,
+  "generated_for_branch": "feat/people-api",
   "files": [
     {
       "path": ".github/workflows/quality.yml",
-      "sha256": "2360359b169de1faebd7884ca622d02d5aac4a0b624ef1d3720d77dc5fd2db61",
-      "bytes": 1369,
-      "lines": 48
+      "sha256": "0bc432115580227806c840a7039739d348dc0a036a94ac7feb34f6c1aa957ca2",
+      "bytes": 1491,
+      "lines": 51
     },
     {
       "path": ".gitignore",
@@ -18,21 +18,21 @@
     },
     {
       "path": "AGENTS.md",
-      "sha256": "e9583d615c7a48975687b549d89eafd10d050a59337f26277ed47d6d380dc6e1",
-      "bytes": 2236,
+      "sha256": "28f7b7bc010a7739cfdc3e793fb5d39a0e74b842ea9c190e9a251e2d0cbc3a16",
+      "bytes": 2246,
       "lines": 34
     },
     {
       "path": "ARCHITECTURE.md",
-      "sha256": "fa35991965deeefb00a04237ea11942ab62e9255f1bee8a343d799df489db1a8",
-      "bytes": 3093,
-      "lines": 64
+      "sha256": "9bffdf514d5743fe0612557d73e0ba7cb6940dfb4ebe8355ec6e8d2bb352fb09",
+      "bytes": 3564,
+      "lines": 68
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "96e193c605f7168ca76c0ea11ef31b5369ad5724db3fc7b1edef4dda125e01a7",
-      "bytes": 1095,
-      "lines": 26
+      "sha256": "daac20bbf0219566e1ace8b742259ebe1fc5f3a50a3bcefa60b292323154c45e",
+      "bytes": 2134,
+      "lines": 39
     },
     {
       "path": "CLAUDE.md",
@@ -54,9 +54,9 @@
     },
     {
       "path": "README.md",
-      "sha256": "5e58366e81d983d202e9352c989a27b8bcc34de45c754e6640b5437a635c4c8e",
-      "bytes": 3609,
-      "lines": 86
+      "sha256": "3e55026dc9fbe7d85fffbf52dd5d5840d6f25f70cbd750c63012438682e59a32",
+      "bytes": 3829,
+      "lines": 87
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
@@ -126,9 +126,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "901e4580d27e5b486aaefbd8a7197ace0fd8632c96a10cadc3178e6d67f1ea4c",
-      "bytes": 1038,
-      "lines": 10
+      "sha256": "247215a5999a3a1b3bd0a3a0d3fda35f3ff9939b5b12846a82ceb3edda3ecddf",
+      "bytes": 1416,
+      "lines": 11
     },
     {
       "path": "docs/TRD.md",
@@ -141,6 +141,12 @@
       "sha256": "e6d3a66604d339709a8d7d9c4c1c45eb26bf575a91bead3e0bdea8cb5ce110a9",
       "bytes": 1524,
       "lines": 53
+    },
+    {
+      "path": "docs/UML_PEOPLE_API.md",
+      "sha256": "2d9c4958169a1ff92bc5f5ea79c86ab1a8ddb9afc2580ff53254915707aa09d9",
+      "bytes": 2751,
+      "lines": 77
     },
     {
       "path": "docs/USER_STORIES.md",
@@ -174,15 +180,21 @@
     },
     {
       "path": "docs/adr/0004-framework-independent-domain-kernel.md",
-      "sha256": "0b972e02cf1d7e1d361b12df543b4ae04265f237fe49db3e7c531a491b20582e",
-      "bytes": 1237,
-      "lines": 27
+      "sha256": "77085c39848d927d0259b4eae16ddeb5899cac507d1b74f4a6d452d2fe2353d9",
+      "bytes": 2877,
+      "lines": 34
     },
     {
       "path": "docs/adr/README.md",
       "sha256": "7f6a41701820357430234842eb675f5e2d0f33f6ee37e9cc294cb40d6119e2f6",
       "bytes": 324,
       "lines": 8
+    },
+    {
+      "path": "docs/contracts/people-api-v1.md",
+      "sha256": "6bd145dd822a8390a838f9bf75909a73c14a49fa595d846a795ba6ba040a9179",
+      "bytes": 6078,
+      "lines": 145
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
@@ -198,9 +210,9 @@
     },
     {
       "path": "packages/orgmetra-domain/README.md",
-      "sha256": "d657d42b65da221776303cca25d7e4dbde72d5bce539e689e373f30ba0e363c5",
-      "bytes": 1399,
-      "lines": 41
+      "sha256": "2419489cbdc1d4e87793304c6561adf7ca8cf0221a6b45706356b115431d8190",
+      "bytes": 2345,
+      "lines": 47
     },
     {
       "path": "packages/orgmetra-domain/pyproject.toml",
@@ -210,15 +222,15 @@
     },
     {
       "path": "packages/orgmetra-domain/src/orgmetra_domain/__init__.py",
-      "sha256": "ea2134802e3b6a93078255c0b2dc8bd9b3f3a1e39c00984640cce3fa70460649",
-      "bytes": 812,
-      "lines": 27
+      "sha256": "21642ad411742590b2f7ae995aa9114d88b1f816a5b9e3eac76e58343825a9a4",
+      "bytes": 1111,
+      "lines": 41
     },
     {
       "path": "packages/orgmetra-domain/src/orgmetra_domain/assignment.py",
-      "sha256": "e628df6037ecfbff6f1a035ab3995e4a1a4f35cc8b8cebfa0df6cf9090bc0ff9",
-      "bytes": 2343,
-      "lines": 60
+      "sha256": "bde40737accd4c1fea51aed95322f23f620afed5c89f3bc7c5a54c08762156b1",
+      "bytes": 2534,
+      "lines": 65
     },
     {
       "path": "packages/orgmetra-domain/src/orgmetra_domain/candidate.py",
@@ -240,9 +252,9 @@
     },
     {
       "path": "packages/orgmetra-domain/src/orgmetra_domain/records.py",
-      "sha256": "65c6b9fade6047a61b339448e5c6e65946e922b0f6c21e23d839bad3c7235879",
-      "bytes": 2085,
-      "lines": 71
+      "sha256": "b72ac9a22669a16ae8f4c5e47ed62fc41658e396a1c69c6331d6c1f46c092bd4",
+      "bytes": 4855,
+      "lines": 157
     },
     {
       "path": "packages/orgmetra-domain/src/orgmetra_domain/temporal.py",
@@ -252,15 +264,21 @@
     },
     {
       "path": "packages/orgmetra-domain/tests/test_domain.py",
-      "sha256": "5231dd433aeff470817aa483f34b47e947d32badbfc4466f2320ccdd8fa2d5fe",
-      "bytes": 8297,
-      "lines": 218
+      "sha256": "dc8b9d7eb4e6888ac95b707e670847c636b898befd146f14f7bfbb8a5599ab1d",
+      "bytes": 12503,
+      "lines": 321
+    },
+    {
+      "path": "packages/orgmetra-postgres/src/orgmetra_postgres/repository.py",
+      "sha256": "c8894ec2b5fee90decae2fd5c4caf92a3accd487cdb1b4c87a1d9a8fa60fe6a6",
+      "bytes": 15969,
+      "lines": 412
     },
     {
       "path": "requirements/ci.txt",
-      "sha256": "7cddb7b97deb48e939a0e6d3159f47caecf8a7ed5b985339827cb85f63a0ea58",
-      "bytes": 603,
-      "lines": 8
+      "sha256": "0f84bffdca3d0bbb2f50264c744f589b88e1a7e2fe84baa7643fcbae74257e2a",
+      "bytes": 716,
+      "lines": 10
     },
     {
       "path": "schemas/openapi.yaml",
@@ -270,15 +288,21 @@
     },
     {
       "path": "scripts/run_domain_quality.sh",
-      "sha256": "85a5d33d23e016cf490afe5411296e211d1d6e5f49dafe956f9ab63aa8c6cb36",
-      "bytes": 470,
-      "lines": 10
+      "sha256": "2a82081bb1d9484e07a2fea2931f878645781c0aadb87cbe0ce38ff72d26ca11",
+      "bytes": 1822,
+      "lines": 58
+    },
+    {
+      "path": "services/people-api/src/orgmetra_people_api/app.py",
+      "sha256": "97d60378149d0687c1aca6e18d6551283c10f2e47bc6b886b20aa430aa48bc99",
+      "bytes": 9946,
+      "lines": 284
     },
     {
       "path": "tests/test_repository_contract.py",
-      "sha256": "75c7b6baf50f1f100237081878e761e15b1f98f5f364555e2340164ea0d9fde9",
-      "bytes": 1447,
-      "lines": 43
+      "sha256": "470c46de2d4bd684fb69f705fdf797b024b4a9289e074c2972ef79b6d80a4eba",
+      "bytes": 4577,
+      "lines": 108
     },
     {
       "path": "tests/validate_docstrings.py",
