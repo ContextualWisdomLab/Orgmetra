@@ -10,23 +10,24 @@ The current foundation pack is executable documentation. Its validation command 
 npm run validate
 ```
 
-The command runs Python repository-integrity validation, the dependency-free Node foundation validator, Node regression tests, and mutation-style OpenAPI operation-contract tests. It must fail on a missing required artifact, manifest mismatch, invalid database name, missing tenant/evidence/temporal DDL contract, incomplete high-risk OpenAPI operation context, empty OpenID Connect scope requirement, internal trace identifier in a client error schema, explicit unfinished-work marker, unbalanced Markdown fence, or incomplete Apache-2.0 license. Ordinary explanatory prose may contain words such as `placeholder`; only explicit TODO/TBD/FIXME marker forms are treated as unfinished work.
+The command runs Python repository-integrity validation, the dependency-free Node foundation validator, Node regression tests, and mutation-style OpenAPI operation-contract tests. It must fail on a missing required artifact, manifest mismatch, invalid database name, missing tenant/evidence/audit/temporal DDL contract, incomplete high-risk OpenAPI operation context, empty OpenID Connect scope requirement, internal trace identifier in a client error schema, explicit unfinished-work marker, unbalanced Markdown fence, or incomplete Apache-2.0 license. Ordinary explanatory prose may contain words such as `placeholder`; only explicit TODO/TBD/FIXME marker forms are treated as unfinished work.
 
 ## Foundation test matrix
 
 | Evidence | Execution command |
 |---|---|
-| Required artifacts, manifest SHA-256/byte/line integrity, package metadata, Markdown, license, database naming, tenant/evidence DDL fragments | `npm run validate` |
+| Required artifacts, manifest SHA-256/byte/line integrity, package metadata, Markdown, license, database naming, tenant/evidence/audit DDL fragments | `npm run validate` |
 | Structural OpenAPI 3.2 operation ownership: exact scopes, mutation headers, request-schema binding, evidence requirements, human confirmation, creation `Location` headers, required response codes, and client-safe error fields | `node --test tests/openapi-contract.test.mjs` (also included in `npm run validate`) |
 | Bitemporal non-overlap, observably concurrent conflicting version insert, retroactive correction, and in-place rewrite rejection for versioned and other recorded-time HRIS facts | `bash tests/test_bitemporal_postgres.sh` against PostgreSQL 16 in Foundation CI |
 | Cross-tenant composite-FK rejection, missing-context fail-closed RLS reads and writes, cross-context write rejection, and tenant-visible row isolation over every current HRIS table | `bash tests/test_tenant_isolation_postgres.sh` against PostgreSQL 16 in Foundation CI |
 | Open-set caller-digest rejection, non-empty evidence enforcement, independently precomputed SHA-256 membership digest, membership/finalization race serialization, post-decision evidence-insert rejection, and evidence-set single-use enforcement | `bash tests/test_evidence_sealing_postgres.sh` against PostgreSQL 16 in Foundation CI |
+| Canonical audit-envelope digest verification, top-level PII allowlist, high-impact confirmation, atomic audit/outbox insertion, append-only audit mutation denial, legal/illegal lease transitions, terminal delivery immutability, and rollback on outbox failure | `bash tests/test_audit_outbox_postgres.sh` against PostgreSQL 16 in Foundation CI |
 | Tenant/actor/purpose authorization matrix and negative high-impact commands | service-specific unit and integration test commands recorded in each service package |
 | AsyncAPI/CloudEvents envelope compatibility | provider and consumer contract test commands recorded beside the versioned event schema |
 | External adapter timeout, malformed response, tenant mismatch, and unavailable-state handling | fake-server tests in each adapter package |
 | Role-workspace keyboard, focus, exact-value, permission-denied, and confirmation states | Storybook interaction/a11y tests plus browser E2E for the owning workspace |
 
-The PostgreSQL scripts apply the complete checked-in migration chain required by the contract under test to a fresh database. The bitemporal and evidence-sealing tests execute concurrency regressions with an observable database barrier instead of a fixed scheduling assumption. The tenant-isolation test proves both read and write enforcement with unprivileged `NOLOGIN NOBYPASSRLS` roles, so table-owner/superuser bypass cannot manufacture a passing tenant result. The evidence-sealing test compares database output with independently precomputed canonical SHA-256 fixtures and forces a membership transaction to hold the evidence-set row lock before finalization, proving the digest snapshot includes evidence that committed first. The CI matrix runs all three database contracts independently, and a cancelled, skipped, queued, or predecessor-head matrix result is not database evidence for the current head.
+The PostgreSQL scripts apply the complete checked-in migration chain required by the contract under test to a fresh database. The bitemporal and evidence-sealing tests execute concurrency regressions with an observable database barrier instead of a fixed scheduling assumption. The tenant-isolation test proves both read and write enforcement with unprivileged `NOLOGIN NOBYPASSRLS` roles, so table-owner/superuser bypass cannot manufacture a passing tenant result. The evidence-sealing test compares database output with independently precomputed canonical SHA-256 fixtures and forces a membership transaction to hold the evidence-set row lock before finalization, proving the digest snapshot includes evidence that committed first. The audit/outbox contract stores exact `AuditOutboxEvent.canonical_json()` bytes, independently verifies their SHA-256 digest in PostgreSQL, rejects extra top-level PII fields even when a caller recomputes the digest, and exercises outbox lifecycle invariants separately from immutable audit facts. The CI matrix runs all four database contracts independently, and a cancelled, skipped, queued, absent, or predecessor-head matrix result is not database evidence for the current head.
 
 Future service packages must publish their exact test, statement-coverage, branch-coverage, docstring, typecheck, and build commands in the package manifest and CI log.
 
@@ -44,11 +45,14 @@ Required negative and provenance tests include:
 - a membership write that acquired the evidence-set lock before finalization commits before the finalization snapshot is computed, and the resulting digest includes that member;
 - a sealed evidence set rejects later membership changes and cannot be reused by another decision;
 - a sealed evidence-set pointer must resolve back to the exact decision that consumed it;
-- record and audit append either complete together or leave no authoritative decision;
+- record, immutable audit evidence, and pending outbox delivery either complete in one business transaction or leave no partial authoritative mutation;
+- the database rejects digest-tampered audit bytes, non-allowlisted event fields, an event-id/tenant mismatch, and a high-impact event with no human confirmation reference;
+- audit event rows reject update/delete and delivered outbox rows reject later mutation;
+- an outbox row cannot skip its lease state before delivery, and a retry can return to pending only with cleared lease metadata and bounded failure classification;
 - a cross-tenant foreign-key reference is rejected even when the referenced identifier exists in another tenant;
 - an application role with missing tenant context sees no tenant-owned rows and cannot insert tenant-owned rows;
 - a tenant-alpha application context cannot insert a tenant-beta row even when that beta tenant exists;
-- a cross-tenant read or mutation is denied and produces a bounded audit event once the audit service slice lands;
+- a cross-tenant read or mutation is denied and its audit envelope cannot claim another tenant identity;
 - a purpose header cannot enlarge a token's operation scope; and
 - client errors contain an actionable `next_action` and random `support_reference` but no internal trace/span identifier, topology, tenant identifier, or PII.
 
