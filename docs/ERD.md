@@ -1,6 +1,6 @@
 # ERD
 
-For readability, the diagram renders representative `tenant_record` scoping edges rather than repeating the same edge for every tenant-owned relation. The authoritative tenant-isolation contract is `docs/DATA_MODEL.md`: **every owned HRIS fact** stores `tenant_record_id`, every cross-table reference is tenant-qualified, and forced row-level security applies independently to every tenant-scoped table. This omission is visual only; it does not weaken the relational or authorization contract for employment, candidate, evidence, decision, validation-link, compensation, transition, audit, or outbox entities.
+For readability, the diagram renders representative `tenant_record` scoping edges rather than repeating the same edge for every tenant-owned relation. The authoritative tenant-isolation contract is `docs/DATA_MODEL.md`: **every owned HRIS fact** stores `tenant_record_id`, every cross-table reference is tenant-qualified, and forced row-level security applies independently to every tenant-scoped table. This omission is visual only; it does not weaken the relational or authorization contract for employment, candidate, evidence, decision, validation-link, compensation, transition, audit, outbox, or outbox-escalation entities.
 
 ```mermaid
 erDiagram
@@ -8,6 +8,7 @@ erDiagram
     tenant_record ||--o{ organization_unit : scopes
     tenant_record ||--o{ job_profile : scopes
     tenant_record ||--o{ audit_event_record : scopes
+    tenant_record ||--o{ outbox_delivery_escalation_record : scopes
     person_record ||--o{ person_name_record : has_names
     person_record ||--o{ employment_record : has
     employment_record ||--o{ employment_record_version : has_versions
@@ -40,6 +41,7 @@ erDiagram
     person_record ||--o{ compensation_record : has
     employment_record ||--o{ employment_transition : changes_through
     audit_event_record ||--o{ outbox_delivery_record : delivers_through
+    outbox_delivery_record ||--o| outbox_delivery_escalation_record : terminally_escalates
 ```
 
 ## Cardinality decisions
@@ -57,6 +59,8 @@ A high-impact selection decision seals exactly one versioned `decision_evidence_
 A `validity_study` connects the criterion blueprint to the exact selection decisions, sealed evidence sets, and criterion observations used as outcomes through append-only link relations. This makes predictor/decision-policy evidence and observed outcomes reconstructable without copying specialist-system payloads into Orgmetra.
 
 One immutable `audit_event_record` may have multiple `outbox_delivery_record` rows when the same event must reach multiple delivery targets. The unique `(tenant_record_id, audit_event_record_id, delivery_target_code)` key permits at most one delivery lifecycle per target. Delivery retries mutate only the delivery relation; the canonical event bytes and digest are append-only and therefore cannot drift with transport state.
+
+A delivery can have at most one `outbox_delivery_escalation_record`, enforced by the unique `(tenant_record_id, outbox_delivery_record_id)` key. The escalation row exists only for a terminal `dead_lettered` delivery and records the failure classification, terminal attempt count, recorded time, and an opaque operator/customer escalation reference without copying the event payload. The row is append-only; terminal queue history is not reopened or rewritten.
 
 ## Naming contract
 
