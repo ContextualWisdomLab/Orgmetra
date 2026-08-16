@@ -76,12 +76,6 @@
       "lines": 423
     },
     {
-      "path": "database/migrations/0004_outbox_delivery_claim.sql",
-      "sha256": "0aeb4b2a7fbc9d576fe5e61f78551b5bbd0b4b8e7bd0d7e185ecf8aa7f48adb9",
-      "bytes": 9437,
-      "lines": 234
-    },
-    {
       "path": "docs/API_CONTRACT.md",
       "sha256": "29edb2c18cb56b8df42322fcf049447da63a1ec00e16ae3ae58e29f4d97ed5cf",
       "bytes": 2878,
@@ -284,12 +278,6 @@
       "sha256": "57d16b632a0c60ffdcb4842ceb1cfe25d19c54cefeeefb622ff4fa6e83441ad7",
       "bytes": 11349,
       "lines": 370
-    },
-    {
-      "path": "tests/test_outbox_claim_postgres.sh",
-      "sha256": "9613d0dac767cd1134fc9816262fe866f4f34da64702ec665d36fc40b2c6781e",
-      "bytes": 9314,
-      "lines": 261
     },
     {
       "path": "tests/test_tenant_isolation_postgres.sh",
