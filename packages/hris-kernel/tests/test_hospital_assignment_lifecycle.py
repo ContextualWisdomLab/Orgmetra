@@ -17,6 +17,7 @@ from .conftest import (
     ICU_POSITION,
     JORDAN,
     JORDAN_EMPLOYMENT,
+    TENANT,
     effective,
     recorded,
     utc,
@@ -41,6 +42,7 @@ def test_june_correction_changes_may_history_only_after_it_is_recorded(
     )
     validate_assignment_portfolio(
         [jordan_icu_assignment, jordan_float_assignment],
+        tenant_record_id=TENANT,
         person_record_id=JORDAN,
         employment_record_id=JORDAN_EMPLOYMENT,
         effective_on=date(2024, 5, 1),
@@ -106,6 +108,7 @@ def test_june_correction_changes_may_history_only_after_it_is_recorded(
     ]
     validate_assignment_portfolio(
         known_in_july,
+        tenant_record_id=TENANT,
         person_record_id=JORDAN,
         employment_record_id=JORDAN_EMPLOYMENT,
         effective_on=date(2024, 5, 1),
