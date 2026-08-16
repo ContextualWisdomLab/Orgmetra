@@ -1,8 +1,8 @@
-# ADR 0005: Recorded-time assignment integrity and versioned employment/position
+# ADR 0006: Recorded-time assignment integrity and versioned employment/position
 
 ## Status
 
-Proposed in the active domain-kernel implementation PR.
+Proposed in the active domain-kernel repair PR.
 
 ## Context
 
@@ -11,6 +11,8 @@ PR #3's first kernel could answer “what name did we know on this date?” and 
 Those gaps contradict the bitemporal contract in ADR 0003 and the identity-versus-version split already accepted for organization and job. They also recreate the atomistic fallacy: a person can hold more than one employment and more than one assignment, and a position can be job-shared, so allocation must be evaluated per person and per position at a knowledge-time coordinate (Browne et al., 2001; Raudenbush & Bryk, 2002).
 
 SQL period predicates and asserted-versioning practice require both valid time and transaction time to reconstruct what was known (International Organization for Standardization, 2023; Jensen & Snodgrass, 1999).
+
+ADR 0005 is reserved for the purpose-bound PostgreSQL persistence slice (PR #5). This decision is therefore numbered 0006 so the stacked tree does not collide.
 
 ## Decision
 

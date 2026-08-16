@@ -15,7 +15,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Organization hierarchy cycle rejection for visible A→B→A parent links.
 - Multiple-membership assignment allocation validation with half-open effective intervals.
 - Append-only, idempotent candidate-to-worker linkage.
-- ADR 0005 for recorded-time assignment integrity and versioned employment/position.
+- ADR 0006 for recorded-time assignment integrity and versioned employment/position. Persistence PR #5 keeps ADR 0005.
 - Hash-locked Python 3.11-3.14 quality workflow with exact 100% production statement/branch coverage and public docstring checks.
 - Foundation product baseline for Orgmetra as evidence-centered HRIS/HCM.
 - CWL federated integration boundary map.

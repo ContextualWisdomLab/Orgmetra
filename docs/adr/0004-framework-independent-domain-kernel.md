@@ -14,7 +14,7 @@ ADR 0003 requires effective/business time and system-recorded time to remain ind
 
 Implement bitemporal people, employment, position, assignment, and candidate-worker invariants in the independently installable `orgmetra-domain` Python package. Keep persistence, authorization, transport, and external integrations outside the package. Include a PEP 561 marker and exact coverage/docstring gates.
 
-Keep durable identity anchors intentionally small. `PersonRecord` contains only the opaque durable identity; persistence owns the recorded lifecycle of that identity. Mutable person names and other effective-dated facts use explicit version records with `BitemporalPeriod`. `EmploymentRecord` and `PositionRecord` are likewise identity-only; status and dates live on version records (ADR 0005). Repository adapters are responsible for preserving the anchor's system-recorded lifecycle alongside the identity, and repository-contract tests require both lifecycle columns to remain present in the authoritative schema.
+Keep durable identity anchors intentionally small. `PersonRecord` contains only the opaque durable identity; persistence owns the recorded lifecycle of that identity. Mutable person names and other effective-dated facts use explicit version records with `BitemporalPeriod`. `EmploymentRecord` and `PositionRecord` are likewise identity-only; status and dates live on version records (ADR 0006). Repository adapters are responsible for preserving the anchor's system-recorded lifecycle alongside the identity, and repository-contract tests require both lifecycle columns to remain present in the authoritative schema.
 
 ## Consequences
 
