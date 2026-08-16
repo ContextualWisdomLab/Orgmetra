@@ -58,13 +58,16 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("recorded_to", person_block)
 
     def test_active_stack_points_to_canonical_foundation_pr(self) -> None:
-        """Prevent buyer-facing stack metadata from reviving superseded PR #2."""
+        """Prevent buyer-facing stack metadata from reviving superseded governance."""
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        architecture = (ROOT / "ARCHITECTURE.md").read_text(encoding="utf-8")
         manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
 
         self.assertEqual(manifest["base_pr"], 8)
         self.assertIn("foundation baseline is proposed in PR #8", readme)
         self.assertNotIn("foundation documentation is proposed in PR #2", readme.lower())
+        self.assertNotIn("protected `main`", architecture)
+        self.assertIn("protected default branch", architecture)
 
     def test_package_declares_typed_interface(self) -> None:
         marker = (
