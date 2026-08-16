@@ -4,16 +4,16 @@
   "generated_for_branch": "feat/foundation-product-baseline",
   "files": [
     {
+      "path": ".github/workflows/foundation-ci.yml",
+      "sha256": "5d0e8a2ef9440eae35adb3467c4b0e824cdc2ebad1aab623a506091414563e55",
+      "bytes": 3190,
+      "lines": 100
+    },
+    {
       "path": ".gitignore",
       "sha256": "ff202785c11e37e6c8b4581512ffcf6812fc591e4f08d8e46b2190a55cd429bb",
       "bytes": 363,
       "lines": 36
-    },
-    {
-      "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "66290ae2382c1c5c0ce2e85c9a4a814d6ec1b18aaaaaf02ff3b17438b34ee5fd",
-      "bytes": 1034,
-      "lines": 41
     },
     {
       "path": "AGENTS.md",
@@ -23,15 +23,15 @@
     },
     {
       "path": "ARCHITECTURE.md",
-      "sha256": "408f136e491fe06d50bd9059e1423fb3133c54d496aa0d74abf718e135034890",
-      "bytes": 6016,
-      "lines": 99
+      "sha256": "bddc0023259306f2b9de2a67160aa5523d140270691ba42816c34c362e342d7d",
+      "bytes": 7809,
+      "lines": 107
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f6f4fcd4ca21a0f1c70c1436e7f5d5ec13eaa3488a63054b0255349ffb510f1e",
-      "bytes": 2348,
-      "lines": 39
+      "sha256": "abaff1269d0fb3c8c65f640bd2447e2598f732a8d21c141fe09dd3a1177aa681",
+      "bytes": 4123,
+      "lines": 48
     },
     {
       "path": "CLAUDE.md",
@@ -59,9 +59,15 @@
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
-      "sha256": "0f308a5a1d1f0826b1416b6e32204305b11973c165e0470b1356c8e33dd037dc",
-      "bytes": 10911,
-      "lines": 265
+      "sha256": "facf1adb29bec861640796ad78113335d89cf0b6fef6c3e28e391d37ec412185",
+      "bytes": 35424,
+      "lines": 846
+    },
+    {
+      "path": "database/migrations/0002_sealed_evidence_digest.sql",
+      "sha256": "16505d70b710f5f789541ba8ea7ee57b65ffe950bdaa2014b46b46dcb7ea9dd5",
+      "bytes": 4866,
+      "lines": 149
     },
     {
       "path": "docs/API_CONTRACT.md",
@@ -71,15 +77,15 @@
     },
     {
       "path": "docs/DATA_MODEL.md",
-      "sha256": "375fe167bc8737b7e4d918bc1f397ee836bb24ebaf33b8041109046948c8d91b",
-      "bytes": 2045,
-      "lines": 37
+      "sha256": "80a4f6e5d72fc689fc0b740ba5d9b127b5de2ae658d7cfa3a26c43cc55b9b130",
+      "bytes": 5066,
+      "lines": 57
     },
     {
       "path": "docs/ERD.md",
-      "sha256": "758226630d6b1acd6bcc734d575cc64492866f492048b9dd98ba9c446f9b00e0",
-      "bytes": 2690,
-      "lines": 40
+      "sha256": "e72b7c4d288f7da74357b7555146bda4a207cf090baa90ea51a9cd59589b738c",
+      "bytes": 4803,
+      "lines": 56
     },
     {
       "path": "docs/OPERABILITY.md",
@@ -113,9 +119,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "c8af237e849e0535f2595872246a44f1b252d1c064e4464023464e5f7121cb41",
-      "bytes": 7020,
-      "lines": 105
+      "sha256": "8ba3c5c8f9f84f7bf5f80d9513d0e6c0ceebfa0f98dd0756448d173799708746",
+      "bytes": 10105,
+      "lines": 117
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -125,21 +131,21 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "06e0829f9e5ce1db2f5eab8b828ec21e641ae75b46f2725698205d19879f2599",
-      "bytes": 1455,
-      "lines": 13
+      "sha256": "29693a7c07603fa9871e3538b2056fa4a655c8d4f3f9da7f8b84c852f9748c2e",
+      "bytes": 4394,
+      "lines": 29
     },
     {
       "path": "docs/TRD.md",
-      "sha256": "c9880065b2ba87fdfb2c56f282c9a5de2879c2a1e3f01abcf05fcd04cbcfb0a8",
-      "bytes": 6655,
-      "lines": 92
+      "sha256": "6b9856efb3d2d5b451b65b878ab9b43c0b0ff09d8883874cc855fd5198588464",
+      "bytes": 8825,
+      "lines": 99
     },
     {
       "path": "docs/UML.md",
-      "sha256": "0e27d25f4ebde14ed6105616fdf541302cdd90a1d1b4f9b51dd4c8f4e1f5c766",
-      "bytes": 3439,
-      "lines": 86
+      "sha256": "d44cf2212d33eb0c6a4284703d55d114e72bc7baed2c95ce8a3b8739b8d2836c",
+      "bytes": 3847,
+      "lines": 90
     },
     {
       "path": "docs/USER_STORIES.md",
@@ -149,32 +155,32 @@
     },
     {
       "path": "docs/WIREFRAMES.md",
-      "sha256": "bbcf2de59269c3e3cd37e6787fd70ad8470ba18ce00a31b489cd10d63fcaa200",
-      "bytes": 1221,
-      "lines": 73
+      "sha256": "aeba88a495ef2332ee7450fa171b1e6c9e24ff9e28646b4c07576e1fb66074b1",
+      "bytes": 1841,
+      "lines": 75
     },
     {
       "path": "docs/adr/0001-orgmetra-authoritative-hris-record.md",
-      "sha256": "21ba75ee775c6eb44ed574d448a179efa18637aef4703f638ba58f04d81359a8",
-      "bytes": 879,
+      "sha256": "1122c3755a5b765f93c942089a25aec42e63cb6e1448ff10a921335989edfa43",
+      "bytes": 877,
       "lines": 19
     },
     {
       "path": "docs/adr/0002-federated-cwl-integration-boundaries.md",
-      "sha256": "ce8fa703d3ca41371255f59ab1e6ffdca8cf633287be54df3861b0f041e0d5b1",
-      "bytes": 726,
+      "sha256": "5886a5ac960273e2c99dadce6dfab04a33d19693ebff52152d0adb04e8f90b61",
+      "bytes": 724,
       "lines": 20
     },
     {
       "path": "docs/adr/0003-bitemporal-hris-data-contract.md",
-      "sha256": "e2bd3197fc862ff115e1bb0380e1d55f6f21d3fb4b9a5ca9f2ebcff81734e3d5",
-      "bytes": 1560,
+      "sha256": "9e3653c7eab86996ea6b53cc7e34dc562ce9dfd1dadc5c5f4260c8cadb691c1d",
+      "bytes": 1877,
       "lines": 28
     },
     {
       "path": "docs/adr/README.md",
-      "sha256": "25a450d4936877097a8d4312f3c80f1211390ca2613ac4329872bb187ca559f3",
-      "bytes": 253,
+      "sha256": "0f90e13c70ba0167551c756883d9ab33d906b89f1183026c49d9aa7a4035ce82",
+      "bytes": 361,
       "lines": 7
     },
     {
@@ -184,22 +190,76 @@
       "lines": 21
     },
     {
+      "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
+      "sha256": "b64f21abb19373e780db8b9e64deb8ba9a6219ccf9625a651f25407b8691fcbd",
+      "bytes": 8227,
+      "lines": 226
+    },
+    {
+      "path": "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
+      "sha256": "4a0e1a7943e40d12bd3082db3757045b4085e5a089fea7bc0d8a1565ffcbcf1d",
+      "bytes": 6237,
+      "lines": 187
+    },
+    {
       "path": "package.json",
-      "sha256": "3b4495b25e2e8c68cf4932c9fb2bba46829bde6f31f7a565b024922a820a1077",
-      "bytes": 230,
+      "sha256": "51e503678f6217ec26bdd51c0e380ae5840e58f3cf99749b226658547f4e9011",
+      "bytes": 352,
       "lines": 9
     },
     {
       "path": "schemas/openapi.yaml",
-      "sha256": "7268a41ef17debb3c5b57dc3c0ceb15de91f8b5c8409da61cea52faa4dcc55bf",
-      "bytes": 9137,
-      "lines": 309
+      "sha256": "5024f6aee929c923ef62e77d8750fe76918489228d92cc0bc1b72a7316ca1eb1",
+      "bytes": 10942,
+      "lines": 373
+    },
+    {
+      "path": "scripts/foundation-contract-core.mjs",
+      "sha256": "b23dfebfd73fcc18210a0561257cf32f718971a8d8ac130f69371677cb343c8f",
+      "bytes": 17342,
+      "lines": 428
+    },
+    {
+      "path": "scripts/foundation-contract.mjs",
+      "sha256": "5242dcdbe0935775edf074462c82600e9bc4927d9fdc50c47727af915fd4b23a",
+      "bytes": 218,
+      "lines": 6
+    },
+    {
+      "path": "tests/foundation-contract.test.mjs",
+      "sha256": "48a4208bf3a0bab1533844d8800f15fbb212d1cc8ba068cf0c3839501895036b",
+      "bytes": 10961,
+      "lines": 294
+    },
+    {
+      "path": "tests/openapi-contract.test.mjs",
+      "sha256": "fbb960002fdf36bd5de73bb7c21823241bbc55f83160db579dc70e07784a978f",
+      "bytes": 5118,
+      "lines": 150
+    },
+    {
+      "path": "tests/test_bitemporal_postgres.sh",
+      "sha256": "e311b8403f2a3a22bb25093ffa127d190074f0050e7f14efe27c5f94d7ef0a63",
+      "bytes": 7057,
+      "lines": 199
+    },
+    {
+      "path": "tests/test_evidence_sealing_postgres.sh",
+      "sha256": "57d16b632a0c60ffdcb4842ceb1cfe25d19c54cefeeefb622ff4fa6e83441ad7",
+      "bytes": 11349,
+      "lines": 370
+    },
+    {
+      "path": "tests/test_tenant_isolation_postgres.sh",
+      "sha256": "8f63d1b01f8f0cdebaa19cc0c6616792702072e09bea5b03fc6fcd737008f866",
+      "bytes": 13981,
+      "lines": 361
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "57877dc98d6915afe4b19042aca4a99b416494ab4116e9f4eb609a0f8ff4edd2",
-      "bytes": 9412,
-      "lines": 252
+      "sha256": "221a3f3beb53102a21e9d504dd8717e670fccef8b040b13364e99f32629e96b1",
+      "bytes": 18656,
+      "lines": 469
     }
   ]
 }
