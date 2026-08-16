@@ -10,6 +10,16 @@
 - stable OpenAPI operation identifiers and bearer security scheme
 - Python 3.12/3.14 exact coverage and docstring quality gates
 
+## Fixed
+
+- People API composition keeps runtime type annotations and injects
+  `PurposeContext` plus the repository through `Depends(...)` defaults so
+  FastAPI cannot expose `context` or `request` as query fields or fail
+  OpenAPI generation
+- bearer-token parsing splits on the first ASCII space so control characters
+  inside the credential are rejected instead of being treated as extra scheme
+  parts
+
 ## Security
 
 - tenant identity comes only from an injected authorizer

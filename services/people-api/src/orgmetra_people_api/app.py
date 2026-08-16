@@ -1,10 +1,7 @@
 """FastAPI composition for the first purpose-bound Orgmetra HTTP slice."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from functools import partial
-from typing import Annotated
 from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, Header, Request, Security, status
@@ -52,14 +49,8 @@ class RequiredPurpose:
     async def __call__(
         self,
         request: Request,
-        credentials: Annotated[
-            HTTPAuthorizationCredentials | None,
-            Security(_BEARER_SCHEME),
-        ] = None,
-        correlation_header: Annotated[
-            str | None,
-            Header(alias="X-Correlation-Id"),
-        ] = None,
+        credentials: HTTPAuthorizationCredentials | None = Security(_BEARER_SCHEME),
+        correlation_header: str | None = Header(default=None, alias="X-Correlation-Id"),
     ) -> PurposeContext:
         """Authenticate, authorize two dimensions, and return repository context."""
 
@@ -95,6 +86,12 @@ class RequiredPurpose:
             )
         except ValueError as error:
             raise InvalidRequestMetadata from error
+
+
+def get_people_repository(request: Request) -> PeopleRepository:
+    """Return the repository injected when the application factory ran."""
+
+    return request.app.state.repository
 
 
 def create_app(
@@ -157,12 +154,11 @@ def create_app(
     )
     async def create_person(
         payload: PersonCreateRequest,
-        context: Annotated[PurposeContext, Depends(people_admin)],
-        request: Request,
+        context: PurposeContext = Depends(people_admin),
+        repository_port: PeopleRepository = Depends(get_people_repository),
     ) -> PersonResponse:
         """Create one effective-dated person record idempotently."""
 
-        repository_port: PeopleRepository = request.app.state.repository
         snapshot = await run_in_threadpool(
             partial(
                 repository_port.create_person,
@@ -182,12 +178,11 @@ def create_app(
     )
     async def get_person(
         person_record_id: UUID,
-        context: Annotated[PurposeContext, Depends(people_read)],
-        request: Request,
+        context: PurposeContext = Depends(people_read),
+        repository_port: PeopleRepository = Depends(get_people_repository),
     ) -> PersonResponse:
         """Return one current person record without cross-tenant disclosure."""
 
-        repository_port: PeopleRepository = request.app.state.repository
         snapshot = await run_in_threadpool(
             repository_port.get_person,
             context,
@@ -205,12 +200,11 @@ def create_app(
     )
     async def create_candidate(
         payload: CandidateCreateRequest,
-        context: Annotated[PurposeContext, Depends(talent_acquisition)],
-        request: Request,
+        context: PurposeContext = Depends(talent_acquisition),
+        repository_port: PeopleRepository = Depends(get_people_repository),
     ) -> CandidateResponse:
         """Create one candidate profile under a talent-acquisition purpose."""
 
-        repository_port: PeopleRepository = request.app.state.repository
         snapshot = await run_in_threadpool(
             partial(
                 repository_port.create_candidate,
@@ -230,12 +224,11 @@ def create_app(
     async def link_candidate_to_worker(
         candidate_profile_id: UUID,
         payload: CandidateWorkerLinkCreateRequest,
-        context: Annotated[PurposeContext, Depends(talent_acquisition)],
-        request: Request,
+        context: PurposeContext = Depends(talent_acquisition),
+        repository_port: PeopleRepository = Depends(get_people_repository),
     ) -> CandidateWorkerLinkResponse:
         """Append one immutable candidate-to-worker identity link."""
 
-        repository_port: PeopleRepository = request.app.state.repository
         link = await run_in_threadpool(
             partial(
                 repository_port.link_candidate_to_worker,
@@ -254,12 +247,11 @@ def create_app(
     )
     async def list_audit_events(
         resource_record_id: UUID,
-        context: Annotated[PurposeContext, Depends(audit_review)],
-        request: Request,
+        context: PurposeContext = Depends(audit_review),
+        repository_port: PeopleRepository = Depends(get_people_repository),
     ) -> AuditEventListResponse:
         """Return reference-only audit evidence visible to the audit purpose."""
 
-        repository_port: PeopleRepository = request.app.state.repository
         events = await run_in_threadpool(
             repository_port.list_audit_events,
             context,

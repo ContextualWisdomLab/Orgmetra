@@ -11,7 +11,11 @@ import pytest
 from starlette.requests import Request
 
 from orgmetra_people_api.app import _parse_uuid_header, create_app
-from orgmetra_people_api.problems import RequestTooLarge, _too_large_handler
+from orgmetra_people_api.problems import (
+    InvalidRequestMetadata,
+    RequestTooLarge,
+    _too_large_handler,
+)
 
 from conftest import FakeAuthorizer, FakeRepository
 
@@ -46,7 +50,7 @@ def test_uuid_header_helper_returns_defaults_and_rejects_non_string() -> None:
 
     assert _parse_uuid_header(None, "X-Test", default=default) == default
     assert _parse_uuid_header(None, "X-Test", default=None) is None
-    with pytest.raises(Exception, match="metadata"):
+    with pytest.raises(InvalidRequestMetadata, match="X-Test is invalid"):
         _parse_uuid_header(object(), "X-Test", default=None)  # type: ignore[arg-type]
 
 

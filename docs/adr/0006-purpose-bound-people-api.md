@@ -95,7 +95,15 @@ client-safe support reference.
 - random support-reference shape plus no internal trace disclosure;
 - RFC 9457 problem shape, safe framework-error normalization, and non-echo tests;
 - exact 100% production statement/branch coverage and public docstring gates on
-  supported Python lanes once the stack can obtain fresh hosted evidence.
+  supported Python lanes once the stack can obtain fresh hosted evidence;
+- `app.py` keeps runtime type annotations so FastAPI can recognize `Request`,
+  `Depends`, and `PurposeContext`; postponed annotations in this module would
+  turn those values into query fields and break `/openapi.json`;
+- factory-nested routes bind `PurposeContext` and the repository with runtime
+  `Depends(...)` defaults as a second guard against caller-visible context
+  parameters;
+- bearer tokens are split on the first ASCII space so C0 separators inside the
+  credential are rejected as invalid token characters.
 
 ## Security and governance impact
 

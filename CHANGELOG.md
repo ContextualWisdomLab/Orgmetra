@@ -20,6 +20,8 @@ All notable changes to Orgmetra will be documented in this file.
 
 - Organization and job mutable descriptions now live in version records rather than durable identity anchors, preserving normalized history and stable position references.
 - Effective and system-recorded intervals are non-empty half-open periods; equal start/end bounds are rejected.
+- People API composition keeps runtime type annotations and binds repository context plus the persistence port with `Depends(...)` defaults so FastAPI cannot turn `PurposeContext` or `Request` into caller query fields.
+- People API bearer parsing splits on the first ASCII space so C0 separators inside a token are rejected as invalid characters.
 
 ### Security
 

@@ -66,6 +66,11 @@ def test_route_scopes_and_purposes_are_server_selected_constants() -> None:
     assert "X-Purpose" not in source
     assert "X-Decision-Reference" not in source
     assert "X-Evidence-Reference" not in source
+    assert "from __future__ import annotations" not in source
+    assert "Annotated[PurposeContext, Depends" not in source
+    assert "context: PurposeContext = Depends(" in source
+    assert "repository_port: PeopleRepository = Depends(get_people_repository)" in source
+    assert source.count("request.app.state.repository") == 1
 
 
 def test_person_command_cannot_accept_system_recorded_time() -> None:
