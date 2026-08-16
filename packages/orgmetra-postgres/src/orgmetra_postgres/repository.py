@@ -94,30 +94,22 @@ class PostgresPeopleRepository:
         effective_from: date,
         effective_to: date | None = None,
     ) -> PersonSnapshot:
-        """Create one person record using database-owned knowledge time."""
+        """Create a durable person anchor and its first bitemporal name fact."""
 
         normalized_name = _normalize_text(display_name, "display_name", 300)
         _validate_effective_period(effective_from, effective_to)
         with self._transaction(context) as connection:
-            row = connection.execute(
+            inserted = connection.execute(
                 """
                 INSERT INTO person_record (
-                    tenant_record_id, person_record_id, display_name,
-                    effective_from, effective_to, recorded_from, recorded_to
-                ) VALUES (%s, %s, %s, %s, %s, now(), NULL)
+                    tenant_record_id, person_record_id, recorded_from, recorded_to
+                ) VALUES (%s, %s, now(), NULL)
                 ON CONFLICT (person_record_id) DO NOTHING
-                RETURNING person_record_id, display_name, effective_from,
-                          effective_to, recorded_from
+                RETURNING person_record_id
                 """,
-                (
-                    context.tenant_reference,
-                    person_record_id,
-                    normalized_name,
-                    effective_from,
-                    effective_to,
-                ),
+                (context.tenant_reference, person_record_id),
             ).fetchone()
-            if row is None:
+            if inserted is None:
                 existing = self._select_person(connection, person_record_id)
                 if existing is None or (
                     existing.display_name,
@@ -128,6 +120,30 @@ class PostgresPeopleRepository:
                         "person identity already exists with different data"
                     )
                 return existing
+
+            row = connection.execute(
+                """
+                INSERT INTO person_name_record (
+                    person_name_record_id, tenant_record_id, person_record_id,
+                    display_name, effective_from, effective_to,
+                    recorded_from, recorded_to
+                ) VALUES (%s, %s, %s, %s, %s, %s, now(), NULL)
+                RETURNING person_record_id, display_name, effective_from,
+                          effective_to, recorded_from
+                """,
+                (
+                    self._identifier_factory(),
+                    context.tenant_reference,
+                    person_record_id,
+                    normalized_name,
+                    effective_from,
+                    effective_to,
+                ),
+            ).fetchone()
+            if row is None:
+                raise RepositoryUnavailableError(
+                    "PostgreSQL did not return the created person-name version"
+                )
 
             snapshot = _person_snapshot(row)
             self._record_audit(
@@ -142,7 +158,7 @@ class PostgresPeopleRepository:
     def get_person(
         self, context: PurposeContext, person_record_id: UUID
     ) -> PersonSnapshot | None:
-        """Return the current visible person record or ``None``."""
+        """Return the latest visible recorded name for one person anchor."""
 
         with self._transaction(context) as connection:
             return self._select_person(connection, person_record_id)
@@ -164,11 +180,11 @@ class PostgresPeopleRepository:
                 """
                 INSERT INTO candidate_profile (
                     tenant_record_id, candidate_profile_id,
-                    application_status_code, recorded_at
-                ) VALUES (%s, %s, %s, now())
+                    application_status_code, recorded_from, recorded_to
+                ) VALUES (%s, %s, %s, now(), NULL)
                 ON CONFLICT (candidate_profile_id) DO NOTHING
                 RETURNING candidate_profile_id, application_status_code,
-                          recorded_at
+                          recorded_from
                 """,
                 (
                     context.tenant_reference,
@@ -180,9 +196,9 @@ class PostgresPeopleRepository:
                 existing = connection.execute(
                     """
                     SELECT candidate_profile_id, application_status_code,
-                           recorded_at
+                           recorded_from
                     FROM candidate_profile
-                    WHERE candidate_profile_id = %s
+                    WHERE candidate_profile_id = %s AND recorded_to IS NULL
                     """,
                     (candidate_profile_id,),
                 ).fetchone()
@@ -279,14 +295,21 @@ class PostgresPeopleRepository:
     def _select_person(
         self, connection: Connection[Any], person_record_id: UUID
     ) -> PersonSnapshot | None:
-        """Read one current person row through the active RLS context."""
+        """Read the latest recorded person-name fact through active RLS."""
 
         row = connection.execute(
             """
-            SELECT person_record_id, display_name, effective_from,
-                   effective_to, recorded_from
-            FROM person_record
-            WHERE person_record_id = %s AND recorded_to IS NULL
+            SELECT p.person_record_id, n.display_name, n.effective_from,
+                   n.effective_to, n.recorded_from
+            FROM person_record AS p
+            JOIN person_name_record AS n
+              ON n.tenant_record_id = p.tenant_record_id
+             AND n.person_record_id = p.person_record_id
+            WHERE p.person_record_id = %s
+              AND p.recorded_to IS NULL
+              AND n.recorded_to IS NULL
+            ORDER BY n.recorded_from DESC, n.person_name_record_id DESC
+            LIMIT 1
             """,
             (person_record_id,),
         ).fetchone()
