@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from uuid import UUID, uuid4
 
 import pytest
@@ -63,7 +64,7 @@ def test_evidence_header_helper_accepts_none_and_rejects_controls() -> None:
         _parse_evidence_header("evidence://record/1\x7f")
 
 
-def test_direct_problem_handler_generates_trace_when_middleware_is_absent() -> None:
+def test_direct_problem_handler_generates_support_when_middleware_is_absent() -> None:
     scope = {
         "type": "http",
         "method": "POST",
@@ -78,9 +79,12 @@ def test_direct_problem_handler_generates_trace_when_middleware_is_absent() -> N
         "http_version": "1.1",
     }
     response = asyncio.run(_too_large_handler(Request(scope), RequestTooLarge()))
-    document = response.body.decode("utf-8")
+    document = json.loads(response.body)
 
     assert response.status_code == 413
     assert response.media_type == "application/problem+json"
-    assert "request_body_too_large" in document
-    assert UUID(response.headers.get("x-request-id", str(uuid4())))
+    assert document["error_code"] == "request_body_too_large"
+    support_reference = UUID(response.headers["x-support-reference"])
+    assert document["support_reference"] == str(support_reference)
+    assert "trace_reference" not in document
+    assert document["next_action"]
