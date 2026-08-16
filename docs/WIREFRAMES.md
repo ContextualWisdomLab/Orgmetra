@@ -62,6 +62,8 @@ Panels:
 - Drift and invariance warnings
 - Policy change recommendations
 
+Every policy change recommendation card must display the immutable supporting evidence/version links, confidence or interval information when scientifically defined, explicit limitations and subgroup caveats, the accountable human reviewer, and the consequence of approval. Recommendations remain drafts until a human chooses one of these visible actions: **Review**, **Request more evidence**, **Approve**, or **Escalate**. Approval requires actor, purpose, reason, evidence versions, and a single-use confirmation reference; the UI never presents an LLM-generated recommendation as an autonomous employment decision.
+
 ## Admin & Integrations
 
 Panels:
