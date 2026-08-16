@@ -11,7 +11,17 @@ from orgmetra_hris_kernel import (
     validate_person_employment_exclusivity,
 )
 
-from .conftest import JORDAN, JORDAN_EMPLOYMENT, RILEY, RILEY_EMPLOYMENT, effective, utc
+from .conftest import (
+    JORDAN,
+    JORDAN_EMPLOYMENT,
+    RILEY,
+    RILEY_EMPLOYMENT,
+    TENANT,
+    effective,
+    utc,
+)
+
+FOREIGN_TENANT = UUID("20000000-0000-7000-8000-000000000101")
 
 
 def test_second_exclusive_job_is_rejected_while_rn_employment_is_open(
@@ -28,9 +38,28 @@ def test_second_exclusive_job_is_rejected_while_rn_employment_is_open(
     with pytest.raises(EmploymentExclusivityError, match="exclusive"):
         validate_person_employment_exclusivity(
             [jordan_active_employment, clinic],
+            tenant_record_id=TENANT,
             person_record_id=JORDAN,
             known_at=utc(2024, 4, 15),
         )
+
+
+def test_foreign_tenant_exclusive_job_does_not_consume_local_slot(
+    jordan_active_employment,
+) -> None:
+    """The same person identifier in another tenant cannot block a local employment."""
+    foreign = replace(
+        jordan_active_employment,
+        tenant_record_id=FOREIGN_TENANT,
+        employment_record_id=RILEY_EMPLOYMENT,
+        employment_record_version_id=UUID("20000000-0000-7000-8000-000000000221"),
+    )
+    validate_person_employment_exclusivity(
+        [jordan_active_employment, foreign],
+        tenant_record_id=TENANT,
+        person_record_id=JORDAN,
+        known_at=utc(2024, 4, 15),
+    )
 
 
 def test_concurrent_second_job_is_accepted_beside_exclusive_rn(
@@ -46,6 +75,7 @@ def test_concurrent_second_job_is_accepted_beside_exclusive_rn(
     )
     validate_person_employment_exclusivity(
         [jordan_active_employment, clinic],
+        tenant_record_id=TENANT,
         person_record_id=JORDAN,
         known_at=utc(2024, 4, 15),
     )
@@ -67,6 +97,7 @@ def test_rehire_after_closed_exclusive_employment_is_accepted(
     )
     validate_person_employment_exclusivity(
         [closed, rehire],
+        tenant_record_id=TENANT,
         person_record_id=JORDAN,
         known_at=utc(2024, 6, 15),
     )
@@ -78,6 +109,7 @@ def test_unknown_concurrency_code_fails_closed(jordan_active_employment) -> None
     with pytest.raises(EmploymentExclusivityError, match="concurrency"):
         validate_person_employment_exclusivity(
             [unknown],
+            tenant_record_id=TENANT,
             person_record_id=JORDAN,
             known_at=utc(2024, 4, 15),
         )
@@ -99,6 +131,7 @@ def test_two_versions_of_one_exclusive_employment_remain_legal(
     )
     validate_person_employment_exclusivity(
         [first, leave],
+        tenant_record_id=TENANT,
         person_record_id=JORDAN,
         known_at=utc(2024, 5, 15),
     )
@@ -114,6 +147,7 @@ def test_exclusivity_ignores_another_person(jordan_active_employment) -> None:
     )
     validate_person_employment_exclusivity(
         [jordan_active_employment, riley],
+        tenant_record_id=TENANT,
         person_record_id=JORDAN,
         known_at=utc(2024, 4, 15),
     )
