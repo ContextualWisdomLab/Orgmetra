@@ -15,6 +15,12 @@ export const REQUIRED_FILES = Object.freeze([
   'CLAUDE.md',
   'ARCHITECTURE.md',
   'CHANGELOG.md',
+  '.gitignore',
+  'LICENSE',
+  'NOTICE',
+  'manifest.json',
+  'package.json',
+  '.github/workflows/foundation-ci.yml',
   'docs/PRD.md',
   'docs/TRD.md',
   'docs/USER_STORIES.md',
@@ -36,7 +42,18 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0003-bitemporal-hris-data-contract.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
-  'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md'
+  'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
+  'database/migrations/0001_foundation_schema.sql',
+  'database/migrations/0002_sealed_evidence_digest.sql',
+  'schemas/openapi.yaml',
+  'scripts/foundation-contract-core.mjs',
+  'scripts/foundation-contract.mjs',
+  'tests/foundation-contract.test.mjs',
+  'tests/openapi-contract.test.mjs',
+  'tests/test_bitemporal_postgres.sh',
+  'tests/test_tenant_isolation_postgres.sh',
+  'tests/test_evidence_sealing_postgres.sh',
+  'tests/validate_repository.py'
 ]);
 
 /** Exact maturity vocabulary accepted by traceability tables. */
