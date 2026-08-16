@@ -71,9 +71,9 @@
     },
     {
       "path": "database/migrations/0003_audit_outbox_persistence.sql",
-      "sha256": "f3e2ee2cf14f829fd99382cc09ed4ee6f296e86a44c6185a688173b837311183",
-      "bytes": 14333,
-      "lines": 401
+      "sha256": "2aa7bbb8220923ec584537c0cd46f0cba2b692d69d431f097b7df6db75235bfc",
+      "bytes": 15417,
+      "lines": 423
     },
     {
       "path": "docs/API_CONTRACT.md",
@@ -239,9 +239,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "1da09a67ae0d81775025975605bbf75463c7cefd59714c0a3ad8c06686284eb1",
-      "bytes": 18988,
-      "lines": 471
+      "sha256": "f51bd4700c32e0eef007ffa8fcae9098ff1eec3b728e7d5c8ca4a6e7bab7481f",
+      "bytes": 19188,
+      "lines": 474
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -263,9 +263,9 @@
     },
     {
       "path": "tests/test_audit_outbox_postgres.sh",
-      "sha256": "4ca33ba2748bfd3af5d4b7ba574db8fab85c95dc105f4209015fba83ac707970",
-      "bytes": 11230,
-      "lines": 295
+      "sha256": "15839e27d5e796d611f8f5f0b973f1f992c203cf9f5af1dad46846e499b8e5d5",
+      "bytes": 12906,
+      "lines": 351
     },
     {
       "path": "tests/test_bitemporal_postgres.sh",
