@@ -16,6 +16,8 @@ from conftest import (
     encode_token,
 )
 
+_READ_SCOPE = "orgmetra.people.read"
+
 
 def _authorizer(config, provider, resolver) -> KeyverseOidcAuthorizer:
     """Create one authorizer for dependency-boundary tests."""
@@ -36,6 +38,7 @@ def test_provider_owned_unavailability_is_preserved(
         asyncio.run(
             authorizer.authorize(
                 encode_token(key_material, oidc_config),
+                _READ_SCOPE,
                 "people_read",
             )
         )
@@ -58,6 +61,7 @@ def test_unexpected_provider_error_is_translated_without_detail(
         asyncio.run(
             authorizer.authorize(
                 encode_token(key_material, oidc_config),
+                _READ_SCOPE,
                 "people_read",
             )
         )
@@ -78,6 +82,7 @@ def test_resolver_owned_unavailability_is_preserved(
         asyncio.run(
             authorizer.authorize(
                 encode_token(key_material, oidc_config),
+                _READ_SCOPE,
                 "people_read",
             )
         )
@@ -99,6 +104,7 @@ def test_unexpected_resolver_error_is_translated_without_identity_detail(
         asyncio.run(
             authorizer.authorize(
                 encode_token(key_material, oidc_config),
+                _READ_SCOPE,
                 "people_read",
             )
         )
@@ -122,6 +128,7 @@ def test_invalid_resolver_result_is_provider_failure(
         asyncio.run(
             authorizer.authorize(
                 encode_token(key_material, oidc_config),
+                _READ_SCOPE,
                 "people_read",
             )
         )
