@@ -141,7 +141,7 @@ if [[ ${reuse_status} -eq 0 ]]; then
     echo "one sealed evidence set was reused by multiple decisions" >&2
     exit 1
 fi
-if [[ "${reuse_output}" != *"unique constraint"* && "${reuse_output}" != *"duplicate key value"* ]]; then
+if [[ "${reuse_output}" != *"evidence set is already sealed by a decision"* ]]; then
     echo "evidence-set reuse failed for an unexpected reason: ${reuse_output}" >&2
     exit 1
 fi
