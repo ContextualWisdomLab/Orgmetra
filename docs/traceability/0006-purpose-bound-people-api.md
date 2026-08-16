@@ -10,6 +10,8 @@
 | Requests are finite | declared and observed byte counting | `RequestBoundaryMiddleware` | direct ASGI framing tests | implemented_on_active_pr |
 | Blocking DB calls do not run on event loop | Starlette threadpool boundary | route handlers | endpoint workflow tests | implemented_on_active_pr |
 | Person/candidate/link/audit operations are stable | explicit v1 routes and operation IDs | `create_app` | OpenAPI contract test | implemented_on_active_pr |
+| FastAPI cannot treat repository context as caller input | runtime annotations plus `Depends` defaults | `app.py` | OpenAPI query-parameter contract and endpoint tests | implemented_on_active_pr |
+| Bearer tokens reject hidden C0 separators | first-space scheme split | `extract_bearer_token` | control-character token test | implemented_on_active_pr |
 | Browser exposure is not accidentally permissive | docs UI disabled, no CORS default | app factory | source and endpoint tests | implemented_on_active_pr |
 | CI is secret-minimal and immutable | read-only permissions and full action SHAs | quality workflow | workflow contract test | implemented_on_active_pr |
 | Public code is explainable and fully exercised | docstring and exact coverage gates | quality workflow | Python 3.12/3.14 jobs | implemented_on_active_pr |
