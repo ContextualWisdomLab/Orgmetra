@@ -42,6 +42,9 @@ jobs:
         run: python -m compileall -q tests
       - name: Validate foundation pack
         run: npm run validate
+      - name: Print exact manifest repair data
+        if: failure()
+        run: python tests/validate_repository.py --print-manifest
       - name: Prove validation is read-only
         run: git diff --exit-code
 
