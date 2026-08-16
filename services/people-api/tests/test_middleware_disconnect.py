@@ -14,6 +14,7 @@ def test_http_disconnect_message_passes_without_body_accounting() -> None:
     """Pass disconnect messages through and still secure the response."""
 
     trace_reference = UUID("0198a412-6000-7000-8000-000000000005")
+    support_reference = UUID("0198a412-6000-7000-8000-000000000105")
     sent: list[Message] = []
 
     async def app(_scope: Scope, receive: Receive, send: Send) -> None:
@@ -47,11 +48,12 @@ def test_http_disconnect_message_passes_without_body_accounting() -> None:
         app,
         maximum_body_bytes=1,
         identifier_factory=lambda: trace_reference,
+        support_identifier_factory=lambda: support_reference,
     )
 
     asyncio.run(middleware(scope, receive, send))
 
     assert sent[0]["status"] == 204
-    assert (b"x-request-id", str(trace_reference).encode("ascii")) in sent[0][
-        "headers"
-    ]
+    headers = sent[0]["headers"]
+    assert (b"x-support-reference", str(support_reference).encode("ascii")) in headers
+    assert not any(name.lower() == b"x-request-id" for name, _value in headers)
