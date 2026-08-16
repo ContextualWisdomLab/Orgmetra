@@ -1,7 +1,14 @@
 -- Add a governed terminal dead-letter boundary for dispatcher work that has
--- exhausted an explicit retry budget. The mutable queue row records only
+-- exhausted a database-owned retry budget. The mutable queue row records only
 -- terminal transport state; immutable escalation evidence is normalized into
 -- its own append-only tenant-scoped record.
+
+ALTER TABLE outbox_delivery_record
+ADD COLUMN maximum_attempt_count integer NOT NULL DEFAULT 5;
+
+ALTER TABLE outbox_delivery_record
+ADD CONSTRAINT outbox_delivery_maximum_attempt_count_check
+CHECK (maximum_attempt_count BETWEEN 1 AND 100);
 
 ALTER TABLE outbox_delivery_record
 DROP CONSTRAINT outbox_delivery_state_code_check;
@@ -42,6 +49,7 @@ CHECK (
     (
         delivery_state_code = 'dead_lettered'
         AND delivery_attempt_count > 0
+        AND delivery_attempt_count >= maximum_attempt_count
         AND lease_owner_reference IS NULL
         AND lease_expires_at IS NULL
         AND last_failure_code IS NOT NULL
@@ -101,6 +109,45 @@ ON outbox_delivery_escalation_record
 USING (tenant_record_id = current_tenant_record_id())
 WITH CHECK (tenant_record_id = current_tenant_record_id());
 
+CREATE FUNCTION validate_outbox_delivery_escalation_binding()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    bound_state_code text;
+    bound_attempt_count integer;
+    bound_failure_code text;
+BEGIN
+    SELECT
+        delivery_record.delivery_state_code,
+        delivery_record.delivery_attempt_count,
+        delivery_record.last_failure_code
+    INTO
+        bound_state_code,
+        bound_attempt_count,
+        bound_failure_code
+    FROM outbox_delivery_record AS delivery_record
+    WHERE delivery_record.tenant_record_id = NEW.tenant_record_id
+      AND delivery_record.outbox_delivery_record_id = NEW.outbox_delivery_record_id;
+
+    IF NOT FOUND
+       OR bound_state_code <> 'dead_lettered'
+       OR bound_attempt_count <> NEW.terminal_attempt_count
+       OR bound_failure_code IS DISTINCT FROM NEW.failure_code THEN
+        RAISE EXCEPTION 'outbox delivery escalation does not match terminal delivery state'
+            USING ERRCODE = '23514';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER outbox_delivery_escalation_binding_guard
+AFTER INSERT ON outbox_delivery_escalation_record
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION validate_outbox_delivery_escalation_binding();
+
 CREATE OR REPLACE FUNCTION protect_outbox_delivery_transition()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -115,8 +162,9 @@ BEGIN
        OR NEW.outbox_delivery_record_id <> OLD.outbox_delivery_record_id
        OR NEW.audit_event_record_id <> OLD.audit_event_record_id
        OR NEW.delivery_target_code <> OLD.delivery_target_code
+       OR NEW.maximum_attempt_count <> OLD.maximum_attempt_count
        OR NEW.recorded_at <> OLD.recorded_at THEN
-        RAISE EXCEPTION 'outbox delivery identity and audit binding are immutable'
+        RAISE EXCEPTION 'outbox delivery identity, audit binding, and retry budget are immutable'
             USING ERRCODE = '55000';
     END IF;
 
@@ -194,12 +242,23 @@ BEGIN
     IF OLD.delivery_state_code = 'leased'
        AND NEW.delivery_state_code = 'dead_lettered' THEN
         IF NEW.delivery_attempt_count <> OLD.delivery_attempt_count
+           OR NEW.delivery_attempt_count < NEW.maximum_attempt_count
            OR NEW.lease_owner_reference IS NOT NULL
            OR NEW.lease_expires_at IS NOT NULL
            OR NEW.delivered_at IS NOT NULL
            OR NEW.available_at <> OLD.available_at
-           OR NEW.last_failure_code IS NULL THEN
-            RAISE EXCEPTION 'dead-letter transition requires cleared lease, stable attempts, and terminal failure evidence'
+           OR NEW.last_failure_code IS NULL
+           OR NOT EXISTS (
+               SELECT 1
+               FROM outbox_delivery_escalation_record AS escalation_record
+               WHERE escalation_record.tenant_record_id = NEW.tenant_record_id
+                 AND escalation_record.outbox_delivery_record_id
+                     = NEW.outbox_delivery_record_id
+                 AND escalation_record.terminal_attempt_count
+                     = NEW.delivery_attempt_count
+                 AND escalation_record.failure_code = NEW.last_failure_code
+           ) THEN
+            RAISE EXCEPTION 'dead-letter transition requires immutable escalation evidence and exhausted stored attempt budget'
                 USING ERRCODE = '55000';
         END IF;
         RETURN NEW;
@@ -216,8 +275,7 @@ CREATE FUNCTION dead_letter_outbox_delivery(
     p_outbox_delivery_escalation_record_id uuid,
     p_lease_owner_reference text,
     p_failure_code text,
-    p_escalation_reference text,
-    p_max_attempt_count integer DEFAULT 5
+    p_escalation_reference text
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -225,6 +283,7 @@ AS $$
 DECLARE
     current_state_code text;
     current_attempt_count integer;
+    current_maximum_attempt_count integer;
     current_lease_owner_reference text;
     current_lease_expires_at timestamptz;
 BEGIN
@@ -258,21 +317,16 @@ BEGIN
             USING ERRCODE = '22023';
     END IF;
 
-    IF p_max_attempt_count IS NULL
-       OR p_max_attempt_count < 1
-       OR p_max_attempt_count > 100 THEN
-        RAISE EXCEPTION 'maximum attempt count must be between 1 and 100'
-            USING ERRCODE = '22023';
-    END IF;
-
     SELECT
         delivery_record.delivery_state_code,
         delivery_record.delivery_attempt_count,
+        delivery_record.maximum_attempt_count,
         delivery_record.lease_owner_reference,
         delivery_record.lease_expires_at
     INTO
         current_state_code,
         current_attempt_count,
+        current_maximum_attempt_count,
         current_lease_owner_reference,
         current_lease_expires_at
     FROM outbox_delivery_record AS delivery_record
@@ -301,8 +355,8 @@ BEGIN
             USING ERRCODE = '55000';
     END IF;
 
-    IF current_attempt_count < p_max_attempt_count THEN
-        RAISE EXCEPTION 'outbox delivery attempt budget is not exhausted'
+    IF current_attempt_count < current_maximum_attempt_count THEN
+        RAISE EXCEPTION 'outbox delivery stored attempt budget is not exhausted'
             USING ERRCODE = '55000';
     END IF;
 
