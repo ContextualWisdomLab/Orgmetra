@@ -59,11 +59,11 @@ REQUIRED = [
     "tests/validate_repository.py",
 ]
 
-UNFINISHED_MARKER_PATTERN = re.compile(
-    r"(?:^|\n)\s*(?:#{1,6}\s+|[-*+]\s+)?"
+UNFINISHED_MARKER_LINE_PATTERN = re.compile(
+    r"^\s*(?:#{1,6}\s+|[-*+]\s+)?"
     r"(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|"
-    r"<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:|\s*$))",
-    flags=re.IGNORECASE | re.MULTILINE,
+    r"<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$",
+    flags=re.IGNORECASE,
 )
 
 
@@ -426,15 +426,12 @@ def _validate_markdown() -> None:
     """Reject explicit unfinished-work markers with exact path/line and malformed fences."""
     for path in ROOT.rglob("*.md"):
         text = path.read_text(encoding="utf-8")
-        marker_match = UNFINISHED_MARKER_PATTERN.search(text)
-        if marker_match:
-            line_number = text.count("\n", 0, marker_match.start()) + 1
-            if marker_match.group(0).startswith("\n"):
-                line_number += 1
-            _fail(
-                "Explicit unfinished-work marker found in "
-                f"{path.relative_to(ROOT)}:{line_number}"
-            )
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            if UNFINISHED_MARKER_LINE_PATTERN.fullmatch(line):
+                _fail(
+                    "Explicit unfinished-work marker found in "
+                    f"{path.relative_to(ROOT)}:{line_number}"
+                )
         if text.count("```") % 2:
             _fail(f"Unbalanced code fence in {path.relative_to(ROOT)}")
 
