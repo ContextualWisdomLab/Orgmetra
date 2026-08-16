@@ -171,6 +171,140 @@ export function validateAdrIndex(rootPath) {
   return errors;
 }
 
+function indentationWidth(line) {
+  return line.length - line.trimStart().length;
+}
+
+function extractYamlBlock(yamlText, exactMarker) {
+  const lines = yamlText.split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => line === exactMarker);
+  if (startIndex < 0) return '';
+  const markerIndent = indentationWidth(exactMarker);
+  const blockLines = [];
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line.trim() && indentationWidth(line) <= markerIndent) break;
+    blockLines.push(line);
+  }
+  return blockLines.join('\n');
+}
+
+function requireWithin(errors, label, blockText, fragment, description) {
+  if (!blockText.includes(fragment)) {
+    errors.push(`${label}: missing ${description}`);
+  }
+}
+
+/**
+ * Validate OpenAPI authorization and command contracts at their actual YAML boundaries.
+ *
+ * This intentionally parses only the indentation-stable subset used by the checked-in
+ * contract. It is deterministic, dependency-free, and rejects a requirement moved to
+ * an unrelated operation or schema instead of treating global substring presence as proof.
+ */
+export function validateOpenApiContract(openapiText) {
+  const errors = [];
+  if (!openapiText.startsWith('openapi: 3.2.0\n')) {
+    errors.push('OpenAPI document: expected version 3.2.0');
+  }
+
+  const operationContracts = [
+    {
+      pathMarker: '  /person-records:',
+      operationId: 'createPersonRecord',
+      scope: 'orgmetra.people.write',
+      requestSchema: 'CreatePersonRecordCommand',
+      extraResponses: []
+    },
+    {
+      pathMarker: '  /job-profiles:',
+      operationId: 'createJobProfile',
+      scope: 'orgmetra.job_architecture.write',
+      requestSchema: 'CreateJobProfileCommand',
+      extraResponses: []
+    },
+    {
+      pathMarker: '  /selection-decisions:',
+      operationId: 'recordSelectionDecision',
+      scope: 'orgmetra.talent_acquisition.write',
+      requestSchema: 'RecordSelectionDecisionCommand',
+      extraResponses: ["        '422':"]
+    }
+  ];
+
+  for (const contract of operationContracts) {
+    const pathBlock = extractYamlBlock(openapiText, contract.pathMarker);
+    if (!pathBlock) {
+      errors.push(`${contract.operationId}: path block is missing`);
+      continue;
+    }
+    requireWithin(errors, contract.operationId, pathBlock, `operationId: ${contract.operationId}`, 'operationId');
+    requireWithin(errors, contract.operationId, pathBlock, `            - ${contract.scope}`, `least-privilege scope ${contract.scope}`);
+    for (const parameterName of ['IdempotencyKey', 'TenantReference', 'ActorReference', 'PurposeCode']) {
+      requireWithin(
+        errors,
+        contract.operationId,
+        pathBlock,
+        `$ref: '#/components/parameters/${parameterName}'`,
+        `required parameter ${parameterName}`
+      );
+    }
+    requireWithin(
+      errors,
+      contract.operationId,
+      pathBlock,
+      `$ref: '#/components/schemas/${contract.requestSchema}'`,
+      `request body binding ${contract.requestSchema}`
+    );
+    for (const responseCode of ["        '201':", "        '400':", "        '401':", "        '403':", "        '409':", ...contract.extraResponses]) {
+      requireWithin(errors, contract.operationId, pathBlock, responseCode, `response ${responseCode.trim()}`);
+    }
+  }
+
+  const jobCommand = extractYamlBlock(openapiText, '    CreateJobProfileCommand:');
+  requireWithin(
+    errors,
+    'CreateJobProfileCommand',
+    jobCommand,
+    '        - evidence_references',
+    'required evidence_references'
+  );
+  requireWithin(errors, 'CreateJobProfileCommand', jobCommand, '          maxItems: 100', 'evidence_references maxItems 100');
+  requireWithin(errors, 'CreateJobProfileCommand', jobCommand, '          uniqueItems: true', 'unique evidence_references');
+
+  const decisionCommand = extractYamlBlock(openapiText, '    RecordSelectionDecisionCommand:');
+  requireWithin(
+    errors,
+    'RecordSelectionDecisionCommand',
+    decisionCommand,
+    '        - evidence_references',
+    'required evidence_references'
+  );
+  requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '        - confirmation_reference', 'human confirmation reference');
+  requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '          maxItems: 100', 'evidence_references maxItems 100');
+  requireWithin(errors, 'RecordSelectionDecisionCommand', decisionCommand, '          uniqueItems: true', 'unique evidence_references');
+
+  const errorSchema = extractYamlBlock(openapiText, '    ErrorResponse:');
+  for (const fieldName of ['error_code', 'message', 'next_action', 'support_reference']) {
+    requireWithin(errors, 'ErrorResponse', errorSchema, `        - ${fieldName}`, `required field ${fieldName}`);
+  }
+  requireWithin(
+    errors,
+    'ErrorResponse',
+    errorSchema,
+    'Opaque random client-safe support identifier.',
+    'opaque support-reference semantics'
+  );
+
+  if (/^\s*(?:-\s+)?trace_id\s*:/m.test(openapiText)) {
+    errors.push('ErrorResponse: internal trace identifiers must not be client-visible');
+  }
+  if (openapiText.includes('keyverse_oidc: []')) {
+    errors.push('OpenAPI document: empty-scope OIDC requirements are forbidden');
+  }
+  return errors;
+}
+
 /** Validate required files, Markdown integrity, traceability, ADRs, and naming. */
 export function validateFoundation(rootPath) {
   const resolvedRoot = resolve(rootPath);
@@ -214,6 +348,11 @@ export function validateFoundation(rootPath) {
         }
       }
     }
+  }
+
+  const openapiPath = join(resolvedRoot, 'schemas/openapi.yaml');
+  if (existsSync(openapiPath)) {
+    errors.push(...validateOpenApiContract(readFileSync(openapiPath, 'utf8')));
   }
 
   errors.push(...validateAdrIndex(resolvedRoot));
