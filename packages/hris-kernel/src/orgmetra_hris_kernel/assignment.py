@@ -13,6 +13,7 @@ from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts
 
 _ONE = Decimal("1.0000")
 _ZERO = Decimal("0")
+_ASSIGNMENT_ELIGIBLE_EMPLOYMENT_STATUSES = frozenset({"active", "leave"})
 
 
 def _ratio_is_valid(allocation_ratio: Decimal) -> bool:
@@ -86,7 +87,10 @@ def validate_assignment_employment_coverage(
     *,
     known_at: datetime,
 ) -> None:
-    """Require the assignment's person and days to match an active employment.
+    """Require the assignment's person and days to match an eligible employment.
+
+    ``active`` and ``leave`` versions remain assignment-eligible; terminal or
+    otherwise non-eligible statuses cannot provide staffing coverage.
 
     Raises:
         EmploymentCoverageError: Link the correct employment or shorten the assignment.
@@ -105,12 +109,13 @@ def validate_assignment_employment_coverage(
         version
         for version in named
         if version.recorded.contains(known_at)
+        and version.employment_status_code in _ASSIGNMENT_ELIGIBLE_EMPLOYMENT_STATUSES
     ]
     if not visible or not _union_covers(
         [version.effective for version in visible],
         assignment.effective,
     ):
         raise EmploymentCoverageError(
-            "Assignment is not covered by an active employment version.",
-            next_action="Shorten the assignment or restore an active employment that covers those days.",
+            "Assignment is not covered by an active or leave employment version.",
+            next_action="Shorten the assignment or restore eligible employment coverage for those days.",
         )
