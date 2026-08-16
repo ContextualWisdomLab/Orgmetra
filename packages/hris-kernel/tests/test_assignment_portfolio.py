@@ -22,10 +22,13 @@ from .conftest import (
     JORDAN_EMPLOYMENT,
     RILEY,
     RILEY_EMPLOYMENT,
+    TENANT,
     effective,
     recorded,
     utc,
 )
+
+FOREIGN_TENANT = UUID("20000000-0000-7000-8000-000000000101")
 
 
 def test_portfolio_accepts_split_icu_and_float_allocations(
@@ -35,6 +38,7 @@ def test_portfolio_accepts_split_icu_and_float_allocations(
     """A 0.8000 / 0.2000 split is a legal multiple-membership assignment."""
     validate_assignment_portfolio(
         [jordan_icu_assignment, jordan_float_assignment],
+        tenant_record_id=TENANT,
         person_record_id=JORDAN,
         employment_record_id=JORDAN_EMPLOYMENT,
         effective_on=date(2024, 5, 1),
@@ -55,6 +59,7 @@ def test_portfolio_rejects_allocation_above_one_for_one_employment(
     with pytest.raises(AssignmentPortfolioError, match="1.0000"):
         validate_assignment_portfolio(
             [jordan_icu_assignment, jordan_float_assignment, extra],
+            tenant_record_id=TENANT,
             person_record_id=JORDAN,
             employment_record_id=JORDAN_EMPLOYMENT,
             effective_on=date(2024, 5, 1),
@@ -78,6 +83,25 @@ def test_portfolio_ignores_another_person_and_another_employment(
     )
     validate_assignment_portfolio(
         [jordan_icu_assignment, riley],
+        tenant_record_id=TENANT,
+        person_record_id=JORDAN,
+        employment_record_id=JORDAN_EMPLOYMENT,
+        effective_on=date(2024, 5, 1),
+        known_at=utc(2024, 5, 1),
+    )
+
+
+def test_portfolio_ignores_same_ids_from_another_tenant(jordan_icu_assignment) -> None:
+    """A foreign tenant cannot consume this tenant's employment allocation budget."""
+    foreign = replace(
+        jordan_icu_assignment,
+        tenant_record_id=FOREIGN_TENANT,
+        assignment_record_id=UUID("20000000-0000-7000-8000-000000000301"),
+        allocation_ratio=Decimal("0.8000"),
+    )
+    validate_assignment_portfolio(
+        [jordan_icu_assignment, foreign],
+        tenant_record_id=TENANT,
         person_record_id=JORDAN,
         employment_record_id=JORDAN_EMPLOYMENT,
         effective_on=date(2024, 5, 1),
@@ -92,6 +116,7 @@ def test_portfolio_rejects_non_positive_or_oversized_ratio(jordan_icu_assignment
     with pytest.raises(AssignmentPortfolioError, match="allocation_ratio"):
         validate_assignment_portfolio(
             [zero],
+            tenant_record_id=TENANT,
             person_record_id=JORDAN,
             employment_record_id=JORDAN_EMPLOYMENT,
             effective_on=date(2024, 5, 1),
@@ -100,6 +125,7 @@ def test_portfolio_rejects_non_positive_or_oversized_ratio(jordan_icu_assignment
     with pytest.raises(AssignmentPortfolioError, match="allocation_ratio"):
         validate_assignment_portfolio(
             [huge],
+            tenant_record_id=TENANT,
             person_record_id=JORDAN,
             employment_record_id=JORDAN_EMPLOYMENT,
             effective_on=date(2024, 5, 1),
@@ -145,6 +171,20 @@ def test_assignment_allows_leave_but_rejects_terminated_employment(
         validate_assignment_employment_coverage(
             jordan_icu_assignment,
             [terminated],
+            known_at=utc(2024, 5, 1),
+        )
+
+
+def test_assignment_rejects_foreign_tenant_employment_coverage(
+    jordan_icu_assignment,
+    jordan_active_employment,
+) -> None:
+    """An employment in another tenant cannot authorize this tenant's assignment."""
+    foreign = replace(jordan_active_employment, tenant_record_id=FOREIGN_TENANT)
+    with pytest.raises(EmploymentCoverageError, match="employment"):
+        validate_assignment_employment_coverage(
+            jordan_icu_assignment,
+            [foreign],
             known_at=utc(2024, 5, 1),
         )
 
