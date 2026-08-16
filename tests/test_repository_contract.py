@@ -63,10 +63,12 @@ class RepositoryContractTests(unittest.TestCase):
             ROOT / "ARCHITECTURE.md",
             ROOT / "README.md",
             ROOT / "docs" / "contracts" / "people-api-v1.md",
+            ROOT / "docs" / "UML_PEOPLE_API.md",
         )
+        stale_branch_pattern = re.compile(r"protected[-\s `]*main", re.IGNORECASE)
         for path in paths:
             text = path.read_text(encoding="utf-8")
-            self.assertNotRegex(text, r"protected[- ]`?main`?", path.as_posix())
+            self.assertNotRegex(text, stale_branch_pattern, path.as_posix())
         readme = (ROOT / "README.md").read_text(encoding="utf-8").lower()
         self.assertNotIn("foundation documentation is proposed in pr #2", readme)
         self.assertIn("foundation baseline is proposed in pr #8", readme)
