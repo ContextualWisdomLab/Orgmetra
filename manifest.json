@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "4e1d55ba9a99500b0e385da555f1ef63b9b6d07c76bb26cf3e6a6854261351ec",
-      "bytes": 3522,
-      "lines": 105
+      "sha256": "cf3dccb723d59700d974a2ced1bc808b121ff04906670d0091f4ccfc31d1af90",
+      "bytes": 3565,
+      "lines": 106
     },
     {
       "path": ".gitignore",
@@ -29,8 +29,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b007d70d3a6c4fa2ca5f623ed59a91e1fc7a6caef4c8e28ca6f436d15c85e73b",
-      "bytes": 6576,
+      "sha256": "dec0d7b693c63ac9d26c3bfd6f2aa6871b07bb8bc836557c71f9fd7182b88c1f",
+      "bytes": 6957,
       "lines": 63
     },
     {
@@ -70,6 +70,12 @@
       "lines": 149
     },
     {
+      "path": "database/migrations/0003_audit_outbox_persistence.sql",
+      "sha256": "f3e2ee2cf14f829fd99382cc09ed4ee6f296e86a44c6185a688173b837311183",
+      "bytes": 14333,
+      "lines": 401
+    },
+    {
       "path": "docs/API_CONTRACT.md",
       "sha256": "29edb2c18cb56b8df42322fcf049447da63a1ec00e16ae3ae58e29f4d97ed5cf",
       "bytes": 2878,
@@ -77,21 +83,21 @@
     },
     {
       "path": "docs/DATA_MODEL.md",
-      "sha256": "b5266757e1d527ea909de0b78107ffc90ea2f0c543503e4d7521662b879916ee",
-      "bytes": 5729,
-      "lines": 59
+      "sha256": "9e23889107e8b0d3763e440497c7bb54517c7860585e3c9f296bd81ae7fa3874",
+      "bytes": 7837,
+      "lines": 71
     },
     {
       "path": "docs/ERD.md",
-      "sha256": "9a4b433b23a6ec100fce87ec3041a25e29b6acde894b44b043f988fbf03514b9",
-      "bytes": 5367,
-      "lines": 59
+      "sha256": "65d1c7fb96b6a92c6bfdf6cbabd271cb23e6152eed953698caa8c7b6131552ef",
+      "bytes": 5935,
+      "lines": 63
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "feeac6cd3aff7d8d478a7c95c67a6ac03f317b179ed41f83e3c70b2a61b851dc",
-      "bytes": 2611,
-      "lines": 44
+      "sha256": "950d9f60fd21dab90589d0bb61c603e9e1471855bdf739143cfe3942628e0d5d",
+      "bytes": 4375,
+      "lines": 55
     },
     {
       "path": "docs/PRD.md",
@@ -101,9 +107,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "f2fb7c438b16485930d1d2cff451f0c6906d72d710237cc807d13ee063f20834",
-      "bytes": 3192,
-      "lines": 51
+      "sha256": "8a0a9f3c0f98aadc2e6796ef87e15dceb71526931024b686eb79189f5081d196",
+      "bytes": 4005,
+      "lines": 54
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -119,20 +125,20 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "8ba3c5c8f9f84f7bf5f80d9513d0e6c0ceebfa0f98dd0756448d173799708746",
-      "bytes": 10105,
-      "lines": 117
+      "sha256": "509dcb8deccc2ffa0ba1e91198f343281c578f365e00a60bb841b6841cf7d769",
+      "bytes": 11251,
+      "lines": 121
     },
     {
       "path": "docs/THREAT_MODEL.md",
-      "sha256": "a82b80fee8ca65be614dc7d2a9de793732f7b65759996953bf08f7e39e2c2382",
-      "bytes": 3027,
+      "sha256": "cc1c6d0e5a1d50bc9d3ed5d126d9e099f5391fb6ded478e5853833f17ff554bf",
+      "bytes": 3926,
       "lines": 21
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "8d76f7756a3ebeaffc328c2aa5bf9da304ab54d58105cc79d8124a10192afb19",
-      "bytes": 5577,
+      "sha256": "4d0b040a17ce235490b7469a9a331dd3abea93642c979c5c1fa2e19668ebbbb3",
+      "bytes": 5597,
       "lines": 31
     },
     {
@@ -190,16 +196,22 @@
       "lines": 30
     },
     {
+      "path": "docs/adr/0006-governed-audit-outbox-envelope.md",
+      "sha256": "81a55c75e4c54efaa0d8de475ca204c2ecf7acd164f5765f23cbc04e86b38a37",
+      "bytes": 5584,
+      "lines": 48
+    },
+    {
       "path": "docs/adr/README.md",
-      "sha256": "72f7a588fd85e77be1ea2babac1887415465f4bf065ab74a73713a69efa78d6e",
-      "bytes": 737,
+      "sha256": "4cb416a8d8ef4f489619d04f263eb6c23c38d1b451c37aa60b93347f1c23a336",
+      "bytes": 762,
       "lines": 10
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
-      "sha256": "9999c85ef98dd3ec8ecb481e93464ac72fbde4dbdea50023c35d5e1ca57b32e8",
-      "bytes": 3079,
-      "lines": 41
+      "sha256": "beec970b430a1c8dd50e21dad17d1ce3b4488c28bef527bdb13f340c50c4c045",
+      "bytes": 3677,
+      "lines": 47
     },
     {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -250,6 +262,12 @@
       "lines": 195
     },
     {
+      "path": "tests/test_audit_outbox_postgres.sh",
+      "sha256": "4ca33ba2748bfd3af5d4b7ba574db8fab85c95dc105f4209015fba83ac707970",
+      "bytes": 11230,
+      "lines": 295
+    },
+    {
       "path": "tests/test_bitemporal_postgres.sh",
       "sha256": "7684b8c2ff52c044c081135515bd5aabbfd00e2daad0d471b0868701af2df6cc",
       "bytes": 8209,
@@ -269,9 +287,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "536d207dd8b9ecc10a258302b115edce88b019d4a5fde206d4814a3f6deb2bfb",
-      "bytes": 20147,
-      "lines": 510
+      "sha256": "c6eba1ebe9429e1ca56181682fa5b5bf6ce661fd3120aa92a34f6e618aff1def",
+      "bytes": 21090,
+      "lines": 525
     }
   ]
 }
