@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -27,9 +27,8 @@ class PeopleRepository(Protocol):
         display_name: str,
         effective_from: date,
         effective_to: date | None = None,
-        recorded_at: datetime | None = None,
     ) -> PersonSnapshot:
-        """Create or return an idempotent person record."""
+        """Create or return a person record with repository-owned knowledge time."""
 
     def get_person(
         self, context: PurposeContext, person_record_id: UUID
