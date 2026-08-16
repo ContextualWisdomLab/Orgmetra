@@ -19,9 +19,9 @@ Material mathematical and psychometric kernels must use bounded CPU multithreadi
 | `people_core` | Person identity anchors, names, employment, assignments, compensation, candidate-worker linkage, and identity references. |
 | `organization_core` | Organization units, reporting relations, legal entities, locations, and positions. |
 | `job_architecture` | Job profiles, tasks, FJA, KSAO, qualification rules, evidence, and SME approvals. |
-| `talent_acquisition` | Requisitions, candidates, evidence packets, interviews, confirmations, and selection decisions. |
+| `talent_acquisition` | Requisitions, candidates, versioned decision-evidence sets, interviews, confirmations, and selection decisions. |
 | `performance_management` | Performance cycles, criterion blueprints, observations, and calibration sessions. |
-| `workforce_validation` | Validity studies, subgroup diagnostics, drift monitoring, selection utility, and scientific adapters. |
+| `workforce_validation` | Validity studies, exact decision/evidence/outcome linkage, subgroup diagnostics, drift monitoring, selection utility, and scientific adapters. |
 | `document_records` | Document metadata, source evidence, and immutable artifact references. |
 | `audit_provenance` | Immutable audit and provenance graph. |
 | `integration_hub` | CWL adapters, inbox/outbox state, and external HRIS migration adapters. |
@@ -34,6 +34,7 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 - Mutating requests require authenticated actor, tenant, purpose, resource, and decision context.
 - Read APIs enforce tenant and field-level authorization.
 - High-impact commands require previewed and recorded reason, confirmation, and exact evidence versions.
+- A finalized high-impact selection command binds one immutable evidence-set version and digest; later evidence membership changes are rejected.
 - High-impact decision APIs return evidence sufficiency and escalation status.
 - Generated server validation must enforce the OpenAPI contract before domain handlers execute.
 
@@ -57,17 +58,22 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 }
 ```
 
-`actor_reference` is required and resolves only inside the authorized tenant. `provenance_reference` is also required and resolves to an immutable audit bundle containing actor, policy decision, confirmation, reason, command digest, and evidence versions. Consumers must verify both fields before treating a high-impact event as accountable.
+`actor_reference` is required and resolves only inside the authorized tenant. `provenance_reference` is also required and resolves to an immutable audit bundle containing actor, policy decision, confirmation, reason, command digest, sealed evidence-set digest and evidence versions. Consumers must verify both fields before treating a high-impact event as accountable.
 
 ## 5. Data model rules
 
 - Stable entity anchors do not contain mutable descriptive attributes.
+- Every authoritative HRIS relation carries an internal `tenant_record_id`; tenant-qualified foreign keys reject cross-tenant relationships before application logic runs.
+- Application roles use forced PostgreSQL row-level security. Missing tenant context returns no tenant rows; tenant context never replaces actor/purpose/resource authorization.
 - Versioned HR facts keep effective time and system-recorded time separately.
-- The database rejects reversed temporal intervals.
-- Model multiple assignments with allocation ratios.
+- The database rejects reversed temporal intervals and contradictory overlapping effective/system coordinates for single-valued version families.
+- Retroactive correction closes the old recorded interval and inserts a replacement; business-column rewrites of protected bitemporal facts are rejected.
+- Model multiple assignments with allocation ratios rather than applying single-valued exclusion semantics to legitimate multiple membership.
 - Model external organization roles as time-varying relations when one entity can be a customer, partner, competitor, or vendor in different contexts.
 - Keep assessment results as external immutable snapshot references unless a later ADR transfers instrument lifecycle ownership.
-- Selection decisions, their evidence references, and candidate-worker links are append-only.
+- Candidate-worker links, selection decisions, evidence-set membership after finalization, and validation-study decision/evidence/outcome links are append-only.
+- Selection decisions seal exactly one `decision_evidence_set` in the same transaction; a sealed set cannot accept new members or be reused by a second decision.
+- Validity studies reference exact selection decisions, sealed evidence sets and criterion observations through normalized link relations so criterion-related validity can be reconstructed without copying specialist-system payloads.
 
 ## 6. Integration adapters
 
@@ -89,4 +95,4 @@ Adapters use bounded timeouts, typed error semantics, tenant validation, idempot
 
 ## 7. Testing requirements
 
-`docs/TEST_STRATEGY.md` is the canonical coverage and execution contract. Every service must satisfy its 100% statement/branch coverage requirement where the pinned toolchain exposes those metrics, document exact commands, and preserve migration, API, event, authorization, temporal, append-only, scientific, adapter-failure, and accessibility evidence. This TRD does not define a weaker duplicate threshold.
+`docs/TEST_STRATEGY.md` is the canonical coverage and execution contract. Every service must satisfy its 100% statement/branch coverage requirement where the pinned toolchain exposes those metrics, document exact commands, and preserve migration, API, event, authorization, temporal, tenant-isolation, evidence-sealing, append-only, scientific, adapter-failure, and accessibility evidence. PostgreSQL contract tests use a `NOBYPASSRLS` application role and cover missing tenant context, cross-tenant references, concurrent bitemporal corrections and post-decision evidence drift. This TRD does not define a weaker duplicate threshold.
