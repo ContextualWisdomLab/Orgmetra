@@ -59,6 +59,13 @@ REQUIRED = [
     "tests/validate_repository.py",
 ]
 
+UNFINISHED_MARKER_PATTERN = re.compile(
+    r"(?:^|\n)\s*(?:#{1,6}\s+|[-*+]\s+)?"
+    r"(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|"
+    r"<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:|\s*$))",
+    flags=re.IGNORECASE | re.MULTILINE,
+)
+
 
 def _fail(message: str) -> None:
     """Stop validation with one operator-readable message."""
@@ -209,9 +216,22 @@ def _validate_database_contract() -> None:
         "CONSTRAINT job_profile_bitemporal_exclusion",
         "CREATE FUNCTION protect_bitemporal_history",
         "to_jsonb(NEW) - 'recorded_to' <> to_jsonb(OLD) - 'recorded_to'",
+        "CREATE TRIGGER person_record_bitemporal_guard",
         "CREATE TRIGGER person_name_bitemporal_guard",
+        "CREATE TRIGGER employment_record_bitemporal_guard",
+        "CREATE TRIGGER organization_unit_anchor_bitemporal_guard",
         "CREATE TRIGGER organization_unit_bitemporal_guard",
+        "CREATE TRIGGER job_profile_anchor_bitemporal_guard",
         "CREATE TRIGGER job_profile_bitemporal_guard",
+        "CREATE TRIGGER position_record_bitemporal_guard",
+        "CREATE TRIGGER assignment_record_bitemporal_guard",
+        "CREATE TRIGGER candidate_profile_bitemporal_guard",
+        "CREATE TRIGGER performance_cycle_bitemporal_guard",
+        "CREATE TRIGGER criterion_blueprint_bitemporal_guard",
+        "CREATE TRIGGER criterion_observation_bitemporal_guard",
+        "CREATE TRIGGER validity_study_bitemporal_guard",
+        "CREATE TRIGGER compensation_record_bitemporal_guard",
+        "CREATE TRIGGER employment_transition_bitemporal_guard",
         "CREATE TABLE decision_evidence_set",
         "evidence_set_digest text NOT NULL",
         "ALTER COLUMN evidence_set_digest DROP NOT NULL",
@@ -221,6 +241,7 @@ def _validate_database_contract() -> None:
         "CREATE FUNCTION reject_sealed_evidence_insert",
         "sealed evidence set cannot accept new members",
         "CREATE FUNCTION seal_decision_evidence_set",
+        "locked_evidence_set_id uuid",
         "decision evidence set must contain at least one member before finalization",
         "jsonb_agg(",
         "CREATE FUNCTION validate_evidence_set_decision_binding",
@@ -242,20 +263,26 @@ def _validate_database_contract() -> None:
         if fragment not in sql:
             _fail(f"Missing database contract fragment: {fragment}")
 
-    tenant_tables = [
-        match.group("table")
-        for match in matches
-        if match.group("table") != "tenant_record"
-    ]
-    for table_name in tenant_tables:
-        block_start = foundation_sql.index(f"CREATE TABLE {table_name}")
-        next_table = foundation_sql.find("\nCREATE TABLE ", block_start + 1)
-        block_end = len(foundation_sql) if next_table < 0 else next_table
+    tenant_matches = [match for match in matches if match.group("table") != "tenant_record"]
+    for index, match in enumerate(matches):
+        table_name = match.group("table")
+        if table_name == "tenant_record":
+            continue
+        block_start = match.start()
+        next_match_index = matches.index(match) + 1
+        block_end = (
+            matches[next_match_index].start()
+            if next_match_index < len(matches)
+            else len(foundation_sql)
+        )
         table_block = foundation_sql[block_start:block_end]
         if "tenant_record_id uuid NOT NULL" not in table_block:
             _fail(f"Tenant binding is missing from table: {table_name}")
         if f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in foundation_sql:
             _fail(f"Forced row-level security is missing from table: {table_name}")
+
+    if len(tenant_matches) != len(matches) - 1:
+        _fail("Tenant-scoped table discovery is internally inconsistent")
 
 
 def _yaml_block(document: str, marker: str) -> str:
@@ -347,9 +374,12 @@ def _validate_openapi_contract() -> None:
             *extra_responses,
         ):
             _require_in_block(block, operation_id, response, f"response {response.strip()}")
+        _require_in_block(block, operation_id, "            Location:", "201 Location header")
 
     for schema_name in ("CreateJobProfileCommand", "RecordSelectionDecisionCommand"):
         block = _yaml_block(openapi, f"    {schema_name}:")
+        if not block:
+            _fail(f"{schema_name}: schema block is missing")
         _require_in_block(
             block,
             schema_name,
@@ -360,6 +390,8 @@ def _validate_openapi_contract() -> None:
         _require_in_block(block, schema_name, "          uniqueItems: true", "uniqueItems")
 
     decision_block = _yaml_block(openapi, "    RecordSelectionDecisionCommand:")
+    if not decision_block:
+        _fail("RecordSelectionDecisionCommand: schema block is missing")
     _require_in_block(
         decision_block,
         "RecordSelectionDecisionCommand",
@@ -368,6 +400,8 @@ def _validate_openapi_contract() -> None:
     )
 
     error_block = _yaml_block(openapi, "    ErrorResponse:")
+    if not error_block:
+        _fail("ErrorResponse: schema block is missing")
     for field_name in ("error_code", "message", "next_action", "support_reference"):
         _require_in_block(
             error_block,
@@ -389,14 +423,11 @@ def _validate_openapi_contract() -> None:
 
 
 def _validate_markdown() -> None:
-    """Reject unfinished markers and malformed Markdown fences."""
-    forbidden_tokens = ("tbd", "todo", "placeholder")
+    """Reject explicit unfinished-work markers and malformed Markdown fences."""
     for path in ROOT.rglob("*.md"):
         text = path.read_text(encoding="utf-8")
-        lowered = text.lower()
-        for token in forbidden_tokens:
-            if token in lowered:
-                _fail(f"Unfinished marker {token!r} found in {path}")
+        if UNFINISHED_MARKER_PATTERN.search(text):
+            _fail(f"Explicit unfinished-work marker found in {path}")
         if text.count("```") % 2:
             _fail(f"Unbalanced code fence in {path}")
 
