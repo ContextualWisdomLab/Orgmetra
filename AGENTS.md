@@ -24,7 +24,7 @@ Build Orgmetra as a commercial-grade, evidence-centered HRIS and HCM platform th
 
 ## Documentation rules
 
-Keep README, PRD, TRD, ARCHITECTURE, DATA_MODEL, ERD, UML, API_CONTRACT, SECURITY, THREAT_MODEL, TEST_STRATEGY, OPERABILITY, TRACEABILITY, ADRs, doctoring references, AGENTS, CLAUDE, and CHANGELOG current with code. Distinguish shipped protected-main truth from active PRs, accepted architecture, planned work, research-only work, superseded work, and out-of-scope work.
+Keep README, PRD, TRD, ARCHITECTURE, DATA_MODEL, ERD, UML, API_CONTRACT, SECURITY, THREAT_MODEL, TEST_STRATEGY, OPERABILITY, TRACEABILITY, ADRs, doctoring references, AGENTS, CLAUDE, and CHANGELOG current with code. Distinguish shipped protected default branch truth from active PRs, accepted architecture, planned work, research-only work, superseded work, and out-of-scope work.
 
 ## Quality rules
 
