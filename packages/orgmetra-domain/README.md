@@ -6,7 +6,8 @@
 
 - Half-open effective-time and system-recorded-time intervals.
 - Durable person anchors separated from effective and system-recorded person-name facts.
-- Separate employment and position records.
+- Separate employment, organization, job, position, and assignment records.
+- Bitemporal organization hierarchy facts and versioned job definitions, kept distinct from positions that instantiate them.
 - Multiple simultaneous assignments with allocation validation.
 - Append-only, idempotent candidate-to-worker linkage.
 - Explicit domain errors for invalid or conflicting operations.
@@ -33,7 +34,7 @@ period = BitemporalPeriod(
 name = PersonNameRecord(uuid4(), person.person_record_id, "Ada Lovelace", period)
 ```
 
-The durable `PersonRecord` never stores mutable descriptive attributes. A name correction appends or supersedes a `PersonNameRecord` version while preserving the same person identity and the historical knowledge timeline.
+The durable `PersonRecord` never stores mutable descriptive attributes. A name correction appends or supersedes a `PersonNameRecord` version while preserving the same person identity and the historical knowledge timeline. `OrganizationUnitRecord` and `JobProfileRecord` similarly carry bitemporal descriptive versions while `PositionRecord` remains the distinct organizational seat linking an organization to a job definition.
 
 ## Quality
 
