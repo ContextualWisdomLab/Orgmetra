@@ -55,6 +55,7 @@ REQUIRED = [
     "database/migrations/0004_outbox_delivery_claim.sql",
     "database/migrations/0005_outbox_delivery_finalization.sql",
     "database/migrations/0006_outbox_delivery_dead_letter.sql",
+    "database/migrations/0007_outbox_retry_exhaustion.sql",
     "schemas/openapi.yaml",
     "scripts/foundation-contract-core.mjs",
     "scripts/foundation-contract.mjs",
@@ -64,6 +65,7 @@ REQUIRED = [
     "tests/test_bitemporal_postgres.sh",
     "tests/test_tenant_isolation_postgres.sh",
     "tests/test_evidence_sealing_postgres.sh",
+    "tests/test_operational_uuid_postgres.sh",
     "tests/test_audit_outbox_postgres.sh",
     "tests/test_outbox_claim_postgres.sh",
     "tests/test_outbox_dead_letter_postgres.sh",
@@ -192,6 +194,9 @@ def _validate_database_contract() -> None:
     dead_letter_sql = (
         ROOT / "database/migrations/0006_outbox_delivery_dead_letter.sql"
     ).read_text(encoding="utf-8")
+    retry_exhaustion_sql = (
+        ROOT / "database/migrations/0007_outbox_retry_exhaustion.sql"
+    ).read_text(encoding="utf-8")
     table_sql = foundation_sql + "\n" + audit_sql + "\n" + dead_letter_sql
     sql = (
         table_sql
@@ -201,6 +206,8 @@ def _validate_database_contract() -> None:
         + claim_sql
         + "\n"
         + finalization_sql
+        + "\n"
+        + retry_exhaustion_sql
     )
 
     table_pattern = re.compile(
@@ -317,6 +324,8 @@ def _validate_database_contract() -> None:
         "CREATE POLICY outbox_delivery_escalation_scope_policy",
         "CREATE FUNCTION dead_letter_outbox_delivery",
         "terminal outbox delivery records are immutable",
+        "outbox delivery stored attempt budget is exhausted and cannot be reclaimed",
+        "outbox delivery stored attempt budget is exhausted and requires terminal dead-lettering",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
