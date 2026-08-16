@@ -269,7 +269,7 @@ def _validate_database_contract() -> None:
         if table_name == "tenant_record":
             continue
         block_start = match.start()
-        next_match_index = matches.index(match) + 1
+        next_match_index = index + 1
         block_end = (
             matches[next_match_index].start()
             if next_match_index < len(matches)
@@ -423,13 +423,20 @@ def _validate_openapi_contract() -> None:
 
 
 def _validate_markdown() -> None:
-    """Reject explicit unfinished-work markers and malformed Markdown fences."""
+    """Reject explicit unfinished-work markers with exact path/line and malformed fences."""
     for path in ROOT.rglob("*.md"):
         text = path.read_text(encoding="utf-8")
-        if UNFINISHED_MARKER_PATTERN.search(text):
-            _fail(f"Explicit unfinished-work marker found in {path}")
+        marker_match = UNFINISHED_MARKER_PATTERN.search(text)
+        if marker_match:
+            line_number = text.count("\n", 0, marker_match.start()) + 1
+            if marker_match.group(0).startswith("\n"):
+                line_number += 1
+            _fail(
+                "Explicit unfinished-work marker found in "
+                f"{path.relative_to(ROOT)}:{line_number}"
+            )
         if text.count("```") % 2:
-            _fail(f"Unbalanced code fence in {path}")
+            _fail(f"Unbalanced code fence in {path.relative_to(ROOT)}")
 
 
 def _validate_license() -> None:
