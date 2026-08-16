@@ -151,6 +151,15 @@ def _validate_database_contract() -> None:
 
     required_fragments = [
         "CREATE TABLE person_name_record",
+        "CREATE TABLE organization_unit_version",
+        "organization_unit_id uuid NOT NULL REFERENCES organization_unit(organization_unit_id)",
+        "parent_organization_unit_id uuid REFERENCES organization_unit(organization_unit_id)",
+        "organization_type_code text NOT NULL",
+        "CONSTRAINT organization_unit_parent_not_self_check",
+        "CREATE TABLE job_profile_version",
+        "job_profile_id uuid NOT NULL REFERENCES job_profile(job_profile_id)",
+        "job_family_code text NOT NULL",
+        "job_version_code text NOT NULL",
         "CREATE TABLE performance_cycle",
         "performance_cycle_id uuid NOT NULL REFERENCES performance_cycle(performance_cycle_id)",
         "CONSTRAINT performance_cycle_effective_period_check",
