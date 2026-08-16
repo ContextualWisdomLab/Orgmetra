@@ -15,7 +15,9 @@ from orgmetra_domain import (
     EmploymentRecord,
     InvalidDomainValueError,
     JobProfileRecord,
+    JobProfileVersionRecord,
     OrganizationUnitRecord,
+    OrganizationUnitVersionRecord,
     PersonNameRecord,
     PersonRecord,
     PositionRecord,
@@ -34,6 +36,8 @@ CANDIDATE_ID = UUID("00000000-0000-7000-8000-000000000008")
 LINK_ID = UUID("00000000-0000-7000-8000-000000000009")
 PERSON_NAME_ID = UUID("00000000-0000-7000-8000-000000000011")
 PARENT_ORG_ID = UUID("00000000-0000-7000-8000-000000000012")
+ORG_VERSION_ID = UUID("00000000-0000-7000-8000-000000000013")
+JOB_VERSION_ID = UUID("00000000-0000-7000-8000-000000000014")
 
 
 def period(
@@ -100,17 +104,52 @@ class RecordValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(InvalidDomainValueError, "employment_status_code"):
             EmploymentRecord(EMPLOYMENT_ID, PERSON_ID, "", period())
 
-    def test_organization_requires_visible_name_and_type(self) -> None:
-        with self.assertRaisesRegex(InvalidDomainValueError, "organization_unit_name"):
-            OrganizationUnitRecord(ORG_ID, " ", "department", period())
-        with self.assertRaisesRegex(InvalidDomainValueError, "organization_type_code"):
-            OrganizationUnitRecord(ORG_ID, "People", " ", period())
+    def test_organization_anchor_has_no_mutable_descriptive_attributes(self) -> None:
+        organization = OrganizationUnitRecord(ORG_ID)
+        self.assertEqual(organization.organization_unit_id, ORG_ID)
+        self.assertFalse(hasattr(organization, "unit_name"))
+        self.assertFalse(hasattr(organization, "period"))
 
-    def test_job_requires_visible_title_and_family(self) -> None:
+    def test_organization_version_requires_visible_name_and_type(self) -> None:
+        with self.assertRaisesRegex(InvalidDomainValueError, "unit_name"):
+            OrganizationUnitVersionRecord(
+                ORG_VERSION_ID, ORG_ID, " ", "department", period()
+            )
+        with self.assertRaisesRegex(InvalidDomainValueError, "organization_type_code"):
+            OrganizationUnitVersionRecord(
+                ORG_VERSION_ID, ORG_ID, "People", " ", period()
+            )
+
+    def test_organization_version_rejects_self_parenting(self) -> None:
+        with self.assertRaisesRegex(InvalidDomainValueError, "parent_organization_unit_id"):
+            OrganizationUnitVersionRecord(
+                ORG_VERSION_ID,
+                ORG_ID,
+                "People",
+                "department",
+                period(),
+                parent_organization_unit_id=ORG_ID,
+            )
+
+    def test_job_anchor_has_no_mutable_descriptive_attributes(self) -> None:
+        job = JobProfileRecord(JOB_ID)
+        self.assertEqual(job.job_profile_id, JOB_ID)
+        self.assertFalse(hasattr(job, "job_title"))
+        self.assertFalse(hasattr(job, "period"))
+
+    def test_job_version_requires_title_family_and_version_code(self) -> None:
         with self.assertRaisesRegex(InvalidDomainValueError, "job_title"):
-            JobProfileRecord(JOB_ID, " ", "engineering", period())
+            JobProfileVersionRecord(
+                JOB_VERSION_ID, JOB_ID, " ", "engineering", "v1", period()
+            )
         with self.assertRaisesRegex(InvalidDomainValueError, "job_family_code"):
-            JobProfileRecord(JOB_ID, "Platform Engineer", " ", period())
+            JobProfileVersionRecord(
+                JOB_VERSION_ID, JOB_ID, "Platform Engineer", " ", "v1", period()
+            )
+        with self.assertRaisesRegex(InvalidDomainValueError, "job_version_code"):
+            JobProfileVersionRecord(
+                JOB_VERSION_ID, JOB_ID, "Platform Engineer", "engineering", " ", period()
+            )
 
     def test_position_requires_status_code(self) -> None:
         with self.assertRaisesRegex(InvalidDomainValueError, "position_status_code"):
@@ -123,15 +162,21 @@ class RecordValidationTests(unittest.TestCase):
         employment = EmploymentRecord(
             EMPLOYMENT_ID, PERSON_ID, "  active  ", period()
         )
-        organization = OrganizationUnitRecord(
+        organization = OrganizationUnitVersionRecord(
+            ORG_VERSION_ID,
             ORG_ID,
             "  AI Platform  ",
             "  department  ",
             period(),
             parent_organization_unit_id=PARENT_ORG_ID,
         )
-        job = JobProfileRecord(
-            JOB_ID, "  Principal AI Product Architect  ", "  product  ", period()
+        job = JobProfileVersionRecord(
+            JOB_VERSION_ID,
+            JOB_ID,
+            "  Principal AI Product Architect  ",
+            "  product  ",
+            "  2026.1  ",
+            period(),
         )
         position = PositionRecord(
             POSITION_ID, ORG_ID, JOB_ID, "  open  ", period()
@@ -139,11 +184,12 @@ class RecordValidationTests(unittest.TestCase):
 
         self.assertEqual(person_name.display_name, "Ada Lovelace")
         self.assertEqual(employment.employment_status_code, "active")
-        self.assertEqual(organization.organization_unit_name, "AI Platform")
+        self.assertEqual(organization.unit_name, "AI Platform")
         self.assertEqual(organization.organization_type_code, "department")
         self.assertEqual(organization.parent_organization_unit_id, PARENT_ORG_ID)
         self.assertEqual(job.job_title, "Principal AI Product Architect")
         self.assertEqual(job.job_family_code, "product")
+        self.assertEqual(job.job_version_code, "2026.1")
         self.assertEqual(position.position_status_code, "open")
 
 
