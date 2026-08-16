@@ -3,6 +3,8 @@
 -- This baseline keeps tables unqualified while the modular deployment assigns
 -- them to the service-owned schemas and roles defined in ARCHITECTURE.md.
 
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
 CREATE TABLE person_record (
     person_record_id uuid PRIMARY KEY,
     recorded_from timestamptz NOT NULL DEFAULT now(),
@@ -22,7 +24,13 @@ CREATE TABLE person_name_record (
     CONSTRAINT person_name_effective_period_check
         CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT person_name_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
+    CONSTRAINT person_name_bitemporal_exclusion
+        EXCLUDE USING gist (
+            person_record_id WITH =,
+            daterange(effective_from, effective_to, '[)') WITH &&,
+            tstzrange(recorded_from, recorded_to, '[)') WITH &&
+        )
 );
 
 CREATE TABLE employment_record (
@@ -62,7 +70,13 @@ CREATE TABLE organization_unit_version (
     CONSTRAINT organization_unit_version_effective_period_check
         CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT organization_unit_version_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
+    CONSTRAINT organization_unit_bitemporal_exclusion
+        EXCLUDE USING gist (
+            organization_unit_id WITH =,
+            daterange(effective_from, effective_to, '[)') WITH &&,
+            tstzrange(recorded_from, recorded_to, '[)') WITH &&
+        )
 );
 
 CREATE TABLE job_profile (
@@ -86,7 +100,13 @@ CREATE TABLE job_profile_version (
     CONSTRAINT job_profile_version_effective_period_check
         CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT job_profile_version_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
+    CONSTRAINT job_profile_bitemporal_exclusion
+        EXCLUDE USING gist (
+            job_profile_id WITH =,
+            daterange(effective_from, effective_to, '[)') WITH &&,
+            tstzrange(recorded_from, recorded_to, '[)') WITH &&
+        )
 );
 
 CREATE TABLE position_record (
@@ -238,6 +258,43 @@ CREATE TABLE employment_transition (
     CONSTRAINT employment_transition_recorded_period_check
         CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
 );
+
+CREATE FUNCTION protect_bitemporal_history()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'bitemporal fact cannot be deleted'
+            USING ERRCODE = '55000';
+    END IF;
+
+    IF OLD.recorded_to IS NOT NULL
+       OR NEW.recorded_to IS NULL
+       OR NEW.recorded_to <= OLD.recorded_from
+       OR to_jsonb(NEW) - 'recorded_to' <> to_jsonb(OLD) - 'recorded_to' THEN
+        RAISE EXCEPTION 'bitemporal correction may only close an open recorded interval'
+            USING ERRCODE = '55000';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER person_name_bitemporal_guard
+BEFORE UPDATE OR DELETE ON person_name_record
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER organization_unit_bitemporal_guard
+BEFORE UPDATE OR DELETE ON organization_unit_version
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER job_profile_bitemporal_guard
+BEFORE UPDATE OR DELETE ON job_profile_version
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
 
 CREATE FUNCTION reject_append_only_mutation()
 RETURNS trigger
