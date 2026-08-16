@@ -57,10 +57,27 @@ def test_package_workflow_is_secret_minimal_and_current() -> None:
 def test_package_workflow_builds_and_smokes_installed_artifacts() -> None:
     workflow_text = _workflow_text()
 
-    assert "python -m build --no-isolation" in workflow_text
+    assert "python -m build --no-isolation integrations/keyverse-auth" in workflow_text
     assert "*.whl" in workflow_text
     assert "*.tar.gz" in workflow_text
     assert "orgmetra_keyverse_auth/py.typed" in workflow_text
     assert "--force-reinstall" in workflow_text
     assert "env -u PYTHONPATH" in workflow_text
     assert "python -m pip check" in workflow_text
+
+
+def test_package_smoke_installs_declared_local_dependency_chain() -> None:
+    """Do not mask declared sibling-package dependencies with source-path imports."""
+
+    workflow_text = _workflow_text()
+    assert (
+        "python -m build --wheel --no-isolation packages/orgmetra-postgres"
+        in workflow_text
+    )
+    assert (
+        "python -m build --wheel --no-isolation services/people-api"
+        in workflow_text
+    )
+    assert "packages/orgmetra-postgres/dist/*.whl" in workflow_text
+    assert "services/people-api/dist/*.whl" in workflow_text
+    assert "integrations/keyverse-auth/dist/*.whl" in workflow_text
