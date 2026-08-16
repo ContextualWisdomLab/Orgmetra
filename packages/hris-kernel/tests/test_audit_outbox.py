@@ -1,4 +1,6 @@
+import json
 from datetime import datetime, timezone
+from hashlib import sha256
 from uuid import UUID
 
 import pytest
@@ -55,6 +57,21 @@ def test_cloud_event_contains_governance_context_without_raw_hr_payload():
     }
     assert len(event.content_digest()) == 64
     assert event.content_digest() == event.content_digest()
+
+
+def test_canonical_json_is_the_exact_persistence_and_digest_byte_contract():
+    """Persistence receives one deterministic JSON byte representation, not a re-encoding guess."""
+    event = _event()
+    canonical = event.canonical_json()
+
+    assert json.loads(canonical) == event.to_cloudevent()
+    assert canonical == json.dumps(
+        event.to_cloudevent(),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    assert sha256(canonical.encode("utf-8")).hexdigest() == event.content_digest()
 
 
 def test_low_impact_event_may_omit_confirmation_and_normalizes_offset_to_utc():
