@@ -38,6 +38,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Tightened CI provenance by documenting the exact setup-node release and rejecting both tracked and untracked validation side effects.
 - Pinned the PostgreSQL 16.14 CI service image to the reviewed Docker Official Image index digest and added a regression that rejects a mutable `postgres:16` service tag.
 - Split employment and position identity from versioned status so corrections no longer mint a new employment or position identifier.
+- Made assignment coverage status-aware: `active` and `leave` remain staffable while `terminated` and other non-eligible employment statuses fail closed.
 
 ### Security
 
