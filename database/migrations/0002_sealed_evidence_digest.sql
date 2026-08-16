@@ -59,9 +59,25 @@ RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 DECLARE
+    locked_evidence_set_id uuid;
     evidence_member_count bigint;
     computed_evidence_digest text;
 BEGIN
+    -- Serialize finalization with evidence membership writes before taking the
+    -- membership snapshot. reject_sealed_evidence_insert() takes the same row
+    -- lock, so a member that began first commits before this digest is computed.
+    SELECT decision_evidence_set_id
+    INTO locked_evidence_set_id
+    FROM decision_evidence_set
+    WHERE tenant_record_id = NEW.tenant_record_id
+      AND decision_evidence_set_id = NEW.decision_evidence_set_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'decision evidence set does not exist in the tenant'
+            USING ERRCODE = '23503';
+    END IF;
+
     SELECT
         count(*),
         encode(
@@ -97,18 +113,8 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    IF EXISTS (
-        SELECT 1
-        FROM decision_evidence_set
-        WHERE tenant_record_id = NEW.tenant_record_id
-          AND decision_evidence_set_id = NEW.decision_evidence_set_id
-    ) THEN
-        RAISE EXCEPTION 'evidence set is already sealed by a decision'
-            USING ERRCODE = '55000';
-    END IF;
-
-    RAISE EXCEPTION 'decision evidence set does not exist in the tenant'
-        USING ERRCODE = '23503';
+    RAISE EXCEPTION 'evidence set is already sealed by a decision'
+        USING ERRCODE = '55000';
 END;
 $$;
 
