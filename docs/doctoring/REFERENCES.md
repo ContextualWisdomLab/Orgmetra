@@ -6,6 +6,8 @@ American Educational Research Association, American Psychological Association, &
 
 American Institute of Certified Public Accountants. (2017). *TSP section 100: 2017 trust services criteria for security, availability, processing integrity, confidentiality, and privacy*. AICPA.
 
+Cloud Native Computing Foundation. (2022). *CloudEvents specification v1.0.2*. https://github.com/cloudevents/spec/tree/ce@v1.0.2
+
 Diez-Roux, A. V. (1998). Bringing context back into epidemiology: Variables and fallacies in multilevel analysis. *American Journal of Public Health, 88*(2), 216–222. https://doi.org/10.2105/AJPH.88.2.216
 
 Equal Employment Opportunity Commission. (1978). *Uniform guidelines on employee selection procedures*. 29 C.F.R. Part 1607.
@@ -17,6 +19,8 @@ International Organization for Standardization. (2023). *ISO 30405:2023 Human re
 International Organization for Standardization. (2025). *ISO 30414:2025 Human resource management — Requirements and recommendations for human capital reporting and disclosure*. ISO.
 
 Jensen, C. S., & Snodgrass, R. T. (1999). Temporal data management. *IEEE Transactions on Knowledge and Data Engineering, 11*(1), 36–44. https://doi.org/10.1109/69.755613
+
+Kent, K., & Souppaya, M. (2006). *Guide to computer security log management* (NIST Special Publication 800-92). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-92
 
 Internet Engineering Task Force. (2024). *Universally Unique IDentifiers (UUIDs)* (RFC 9562). https://www.rfc-editor.org/rfc/rfc9562.html
 
