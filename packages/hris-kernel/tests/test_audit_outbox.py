@@ -103,6 +103,23 @@ def test_event_rejects_noncanonical_or_blank_contract_fields(field_name, bad_val
         _event(**{field_name: bad_value})
 
 
+@pytest.mark.parametrize(
+    ("field_name", "bad_value"),
+    [
+        ("event_id", str(EVENT_ID)),
+        ("tenant_record_id", str(TENANT_ID)),
+        ("occurred_at", "2026-08-17T01:30:00Z"),
+        ("high_impact", 1),
+        ("source_service", None),
+        ("confirmation_reference", 7),
+    ],
+)
+def test_event_rejects_runtime_type_confusion(field_name, bad_value):
+    """Public construction fails closed instead of silently coercing contract types."""
+    with pytest.raises(ValueError, match="must be"):
+        _event(**{field_name: bad_value})
+
+
 def test_event_rejects_naive_occurrence_time():
     """Audit ordering requires an unambiguous system time."""
     with pytest.raises(ValueError, match="timezone-aware"):
@@ -138,6 +155,6 @@ def test_event_rejects_blank_optional_confirmation_reference():
 
 
 def test_event_rejects_nonopaque_optional_confirmation_reference():
-    """Confirmation identifiers cannot smuggle human-readable PII into the envelope."""
+    """Free-text confirmation data cannot enter an opaque-reference field."""
     with pytest.raises(ValueError, match="opaque reference"):
         _event(high_impact=False, confirmation_reference="approved by Ada")
