@@ -56,6 +56,21 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("recorded_from", person_block)
         self.assertIn("recorded_to", person_block)
 
+    def test_stack_governance_tracks_canonical_protected_default_branch(self) -> None:
+        """Prevent active API docs from reviving superseded branch/PR truth."""
+        paths = (
+            ROOT / "AGENTS.md",
+            ROOT / "ARCHITECTURE.md",
+            ROOT / "README.md",
+            ROOT / "docs" / "contracts" / "people-api-v1.md",
+        )
+        for path in paths:
+            text = path.read_text(encoding="utf-8")
+            self.assertNotRegex(text, r"protected[- ]`?main`?", path.as_posix())
+        readme = (ROOT / "README.md").read_text(encoding="utf-8").lower()
+        self.assertNotIn("foundation documentation is proposed in pr #2", readme)
+        self.assertIn("foundation baseline is proposed in pr #8", readme)
+
     def test_package_declares_typed_interface(self) -> None:
         marker = (
             ROOT
