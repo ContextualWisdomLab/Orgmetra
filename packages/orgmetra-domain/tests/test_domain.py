@@ -246,7 +246,10 @@ class AssignmentPortfolioTests(unittest.TestCase):
                 24, PERSON_ID, OTHER_POSITION_ID, "0.4", date(2026, 2, 1), None
             ),
         ]
-        with self.assertRaisesRegex(AllocationExceededError, "1.1"):
+        with self.assertRaisesRegex(
+            AllocationExceededError,
+            "assignment portfolio allocation exceeds allowed maximum",
+        ):
             validate_assignment_portfolio(assignments)
 
     def test_adjacent_periods_do_not_overlap(self) -> None:
