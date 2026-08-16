@@ -11,6 +11,7 @@ import {
   countCodeFences,
   extractMaturityCells,
   extractSection,
+  hasUnfinishedMarker,
   isValidDatabaseObjectName,
   runCli,
   validateAdrIndex,
@@ -113,6 +114,25 @@ test('Markdown helpers count fences and extract bounded sections', () => {
   assert.equal(extractSection(markdown, 'Missing'), '');
 });
 
+test('unfinished marker detection rejects explicit markers but allows ordinary prose', () => {
+  for (const explicitMarker of [
+    '# TODO\n',
+    'TODO: implement this\n',
+    '- [TBD]\n',
+    '{{FIXME}}\n',
+    '<TODO>\n'
+  ]) {
+    assert.equal(hasUnfinishedMarker(explicitMarker), true, explicitMarker);
+  }
+  for (const ordinaryProse of [
+    'The placeholder text was replaced before review.\n',
+    'A todo application can be imported as evidence.\n',
+    'The term TBD appears inside a sentence explaining historical behavior.\n'
+  ]) {
+    assert.equal(hasUnfinishedMarker(ordinaryProse), false, ordinaryProse);
+  }
+});
+
 test('extractMaturityCells ignores non-rows, headers, separators, and empty rows', () => {
   const section = 'Text\n| Item | maturity |\n|---|---|\n||\n| A | planned |\n| B | accepted_architecture |\n| prose | Not_a_value |\n';
   assert.deepEqual(extractMaturityCells(section), ['planned', 'accepted_architecture']);
@@ -189,7 +209,7 @@ test('foundation validator reports every missing artifact', () => {
   }
 });
 
-test('foundation validator reports placeholders, fences, links, and maturities', () => {
+test('foundation validator reports explicit work markers, fences, links, and maturities', () => {
   const root = temporaryDirectory();
   try {
     makeMinimalValidFoundation(root);
@@ -200,10 +220,25 @@ test('foundation validator reports placeholders, fences, links, and maturities',
       '# Trace\n\n## 2. Product traceability matrix\n\n| A | invalid_value |\n\n## 4. CWL integration traceability\n\n| B | invalid_value |\n'
     );
     const errors = validateFoundation(root);
-    assert.ok(errors.some((error) => /placeholder/.test(error)));
+    assert.ok(errors.some((error) => /work marker/.test(error)));
     assert.ok(errors.some((error) => /code fence/.test(error)));
     assert.ok(errors.some((error) => /local link target/.test(error)));
     assert.equal(errors.filter((error) => /invalid maturity value/.test(error)).length, 2);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('foundation validator accepts ordinary prose containing placeholder vocabulary', () => {
+  const root = temporaryDirectory();
+  try {
+    makeMinimalValidFoundation(root);
+    write(
+      root,
+      'README.md',
+      '# Valid\n\nThe placeholder wording was intentionally replaced before this review.\n'
+    );
+    assert.deepEqual(validateFoundation(root), []);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
