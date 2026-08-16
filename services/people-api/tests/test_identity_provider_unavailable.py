@@ -12,11 +12,15 @@ class UnavailableAuthorizer:
     """Fail every authorization attempt at the external identity boundary."""
 
     async def authorize(
-        self, bearer_token: str, required_purpose_code: str
+        self,
+        bearer_token: str,
+        required_scope_code: str,
+        required_purpose_code: str,
     ) -> object:
         """Raise a retryable failure without exposing provider details."""
 
         assert bearer_token == "valid-token"
+        assert required_scope_code == "orgmetra.people.read"
         assert required_purpose_code == "people_read"
         raise IdentityProviderUnavailable(
             "https://identity.internal.example/jwks timed out for tenant-secret"
