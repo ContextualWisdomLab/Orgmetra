@@ -1,4 +1,4 @@
-"""Identity-scoped reconstruction at one effective day and one knowledge cutoff."""
+"""Tenant- and identity-scoped reconstruction at one effective day and knowledge cutoff."""
 
 from __future__ import annotations
 
@@ -15,22 +15,24 @@ FactT = TypeVar("FactT")
 def resolve_bitemporal_facts(
     facts: list[FactT],
     *,
+    tenant_record_id: UUID,
     identity_of: str,
     identity_value: UUID,
     effective_on: date,
     known_at: datetime,
 ) -> list[FactT]:
-    """Return facts for one identity that were true and already known.
+    """Return one tenant's facts for an identity that were true and already known.
 
     Args:
-        facts: Candidate versions or assignments.
+        facts: Candidate versions or assignments, including other tenants.
+        tenant_record_id: Tenant namespace that owns the reconstruction.
         identity_of: The identity field to scope, such as `employment_record_id`.
         identity_value: The durable identifier being reconstructed.
         effective_on: The real-world day under review.
         known_at: The system knowledge cutoff.
 
     Returns:
-        The matching facts. Review this list, then approve, correct, or export.
+        The matching tenant-scoped facts. Review this list, then approve, correct, or export.
     """
     if identity_of not in IDENTITY_FIELDS:
         raise IdentityScopeError(
@@ -39,6 +41,8 @@ def resolve_bitemporal_facts(
         )
     visible: list[FactT] = []
     for fact in facts:
+        if getattr(fact, "tenant_record_id") != tenant_record_id:
+            continue
         if getattr(fact, identity_of) != identity_value:
             continue
         effective = getattr(fact, "effective")
@@ -54,12 +58,13 @@ def resolve_bitemporal_facts(
 def resolve_single_valued_fact(
     facts: list[FactT],
     *,
+    tenant_record_id: UUID,
     identity_of: str,
     identity_value: UUID,
     effective_on: date,
     known_at: datetime,
 ) -> FactT | None:
-    """Return the one visible version of a single-valued fact family.
+    """Return the one visible version of a single-valued tenant-scoped fact family.
 
     Returns:
         The visible version, or `None` when nothing was known yet.
@@ -70,6 +75,7 @@ def resolve_single_valued_fact(
     """
     visible = resolve_bitemporal_facts(
         facts,
+        tenant_record_id=tenant_record_id,
         identity_of=identity_of,
         identity_value=identity_value,
         effective_on=effective_on,
@@ -77,7 +83,7 @@ def resolve_single_valued_fact(
     )
     if len(visible) > 1:
         raise SingleValuedFactError(
-            "One identity resolved to more than one version.",
+            "One tenant-scoped identity resolved to more than one version.",
             next_action="Close the prior recorded interval, then insert exactly one replacement.",
         )
     if not visible:
