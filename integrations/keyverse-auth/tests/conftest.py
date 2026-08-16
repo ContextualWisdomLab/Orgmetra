@@ -130,6 +130,7 @@ def encode_token(
         "iat": now - 5,
         "exp": now + 300,
         "jti": "token-1",
+        "scope": "orgmetra.people.read orgmetra.people.write",
         config.tenant_claim_name: "customer-1",
         config.purposes_claim_name: ["people_read", "people_admin"],
     }
