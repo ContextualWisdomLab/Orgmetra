@@ -25,7 +25,18 @@ class RepositoryContractTests(unittest.TestCase):
         requirements = (ROOT / "requirements" / "ci.txt").read_text(encoding="utf-8")
 
         self.assertIn("coverage==7.13.3", requirements)
-        self.assertGreaterEqual(requirements.count("--hash=sha256:"), 6)
+        self.assertIn("setuptools==84.0.0", requirements)
+        self.assertGreaterEqual(requirements.count("--hash=sha256:"), 7)
+
+    def test_quality_script_proves_installed_wheel_contract(self) -> None:
+        script = (ROOT / "scripts" / "run_domain_quality.sh").read_text(encoding="utf-8")
+
+        self.assertIn("pip wheel", script)
+        self.assertIn("--no-build-isolation", script)
+        self.assertIn("orgmetra_domain/py.typed", script)
+        self.assertIn("pip install --no-deps --target", script)
+        self.assertIn("unset PYTHONPATH", script)
+        self.assertIn("import orgmetra_domain", script)
 
     def test_package_declares_typed_interface(self) -> None:
         marker = (
