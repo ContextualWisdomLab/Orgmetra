@@ -56,9 +56,8 @@ class FakeRepository:
         display_name: str,
         effective_from: date,
         effective_to: date | None = None,
-        recorded_at: datetime | None = None,
     ) -> PersonSnapshot:
-        """Return an immutable person projection."""
+        """Return an immutable person projection with server-owned knowledge time."""
 
         self._before(
             "create_person",
@@ -67,15 +66,13 @@ class FakeRepository:
             display_name,
             effective_from,
             effective_to,
-            recorded_at,
         )
         self.person = PersonSnapshot(
             person_record_id=person_record_id,
             display_name=display_name.strip(),
             effective_from=effective_from,
             effective_to=effective_to,
-            recorded_from=recorded_at
-            or datetime(2026, 8, 15, 9, 0, tzinfo=timezone.utc),
+            recorded_from=datetime(2026, 8, 15, 9, 0, tzinfo=timezone.utc),
         )
         return self.person
 
@@ -146,21 +143,26 @@ class FakeRepository:
 
 
 class FakeAuthorizer:
-    """Authenticate one fixed bearer token and record requested purposes."""
+    """Authenticate one token and record requested scope-purpose pairs."""
 
     def __init__(self, principal: AuthorizedPrincipal) -> None:
         """Store the principal returned for valid test tokens."""
 
         self.principal = principal
-        self.calls: list[tuple[str, str]] = []
+        self.calls: list[tuple[str, str, str]] = []
         self.return_invalid_principal = False
 
     async def authorize(
-        self, bearer_token: str, required_purpose_code: str
+        self,
+        bearer_token: str,
+        required_scope_code: str,
+        required_purpose_code: str,
     ) -> AuthorizedPrincipal:
         """Return the configured principal or fail authentication."""
 
-        self.calls.append((bearer_token, required_purpose_code))
+        self.calls.append(
+            (bearer_token, required_scope_code, required_purpose_code)
+        )
         if bearer_token != "valid-token":
             raise AuthenticationFailed("invalid bearer token")
         if self.return_invalid_principal:
@@ -177,11 +179,19 @@ def repository() -> FakeRepository:
 
 @pytest.fixture
 def authorizer() -> FakeAuthorizer:
-    """Return a principal authorized for every implemented route purpose."""
+    """Return a principal authorized for every implemented route authority."""
 
     principal = AuthorizedPrincipal(
         tenant_reference=UUID("0198a412-6000-7000-8000-000000000001"),
         actor_reference=UUID("0198a412-6000-7000-8000-000000000002"),
+        allowed_scope_codes=frozenset(
+            {
+                "orgmetra.people.write",
+                "orgmetra.people.read",
+                "orgmetra.talent_acquisition.write",
+                "orgmetra.audit.read",
+            }
+        ),
         allowed_purpose_codes=frozenset(
             {"people_admin", "people_read", "talent_acquisition", "audit_review"}
         ),
@@ -194,7 +204,7 @@ def client(
     repository: FakeRepository,
     authorizer: FakeAuthorizer,
 ) -> TestClient:
-    """Return a deterministic client with a fixed trace identifier."""
+    """Return a deterministic client with a fixed internal trace identifier."""
 
     app = create_app(
         repository,
