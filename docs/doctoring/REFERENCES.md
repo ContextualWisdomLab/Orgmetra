@@ -18,15 +18,21 @@ International Organization for Standardization. (2023). *ISO 30405:2023 Human re
 
 International Organization for Standardization. (2025). *ISO 30414:2025 Human resource management — Requirements and recommendations for human capital reporting and disclosure*. ISO.
 
+Internet Engineering Task Force. (2024). *Universally Unique IDentifiers (UUIDs)* (RFC 9562). https://www.rfc-editor.org/rfc/rfc9562.html
+
 Jensen, C. S., & Snodgrass, R. T. (1999). Temporal data management. *IEEE Transactions on Knowledge and Data Engineering, 11*(1), 36–44. https://doi.org/10.1109/69.755613
 
 Kent, K., & Souppaya, M. (2006). *Guide to computer security log management* (NIST Special Publication 800-92). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-92
 
-Internet Engineering Task Force. (2024). *Universally Unique IDentifiers (UUIDs)* (RFC 9562). https://www.rfc-editor.org/rfc/rfc9562.html
-
 OpenAPI Initiative. (2025, September 19). *OpenAPI Specification v3.2.0*. https://spec.openapis.org/oas/v3.2.0.html
 
 OpenID Foundation. (2014, February 25). *OpenID Connect Core 1.0 incorporating errata set 2*. https://openid.net/specs/openid-connect-core-1_0.html
+
+PostgreSQL Global Development Group. (n.d.). *CREATE POLICY: Define a new row-level security policy (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-createpolicy.html
+
+PostgreSQL Global Development Group. (n.d.). *CREATE TRIGGER: Define a new trigger (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-createtrigger.html
+
+PostgreSQL Global Development Group. (n.d.). *SELECT (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-select.html
 
 Robinson, W. S. (1950). Ecological correlations and the behavior of individuals. *American Sociological Review, 15*(3), 351–357. https://doi.org/10.2307/2087176
 
