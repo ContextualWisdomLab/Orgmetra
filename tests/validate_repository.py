@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,7 @@ REQUIRED = [
     "scripts/foundation-contract-core.mjs",
     "scripts/foundation-contract.mjs",
     "tests/foundation-contract.test.mjs",
+    "tests/test_bitemporal_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -66,6 +68,30 @@ def _require_files() -> None:
 def _line_count(data: bytes) -> int:
     """Count text lines using the same split-lines contract as the manifest."""
     return len(data.decode("utf-8").splitlines())
+
+
+def _expected_manifest_document() -> dict[str, Any]:
+    """Build the deterministic manifest expected for the exact checked-out files."""
+    files = []
+    for relative_path in sorted(set(REQUIRED) - {"manifest.json"}):
+        path = ROOT / relative_path
+        if not path.is_file():
+            _fail(f"cannot build manifest; required file is missing: {relative_path}")
+        data = path.read_bytes()
+        files.append(
+            {
+                "path": relative_path,
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "bytes": len(data),
+                "lines": _line_count(data),
+            }
+        )
+    return {
+        "package": "orgmetra-foundation-pack",
+        "version": "0.1.0",
+        "generated_for_branch": "feat/foundation-product-baseline",
+        "files": files,
+    }
 
 
 def _manifest_entries() -> dict[str, dict[str, Any]]:
@@ -99,26 +125,25 @@ def _manifest_entries() -> dict[str, dict[str, Any]]:
 def _validate_manifest() -> None:
     """Compare every manifest digest, byte count, and line count with disk."""
     entries = _manifest_entries()
-    required_entries = set(REQUIRED) - {"manifest.json"}
-    missing_entries = sorted(required_entries - set(entries))
-    if missing_entries:
-        _fail(f"required files missing from manifest: {missing_entries}")
+    expected_document = _expected_manifest_document()
+    expected_entries = {entry["path"]: entry for entry in expected_document["files"]}
+    missing_entries = sorted(set(expected_entries) - set(entries))
+    extra_entries = sorted(set(entries) - set(expected_entries))
+    if missing_entries or extra_entries:
+        _fail(
+            "manifest path set mismatch: "
+            f"missing={missing_entries}, extra={extra_entries}. "
+            "Run `python tests/validate_repository.py --print-manifest` for exact repair data."
+        )
 
-    for relative_path, entry in sorted(entries.items()):
-        path = ROOT / relative_path
-        if not path.is_file():
-            _fail(f"manifest path does not exist as a regular file: {relative_path}")
-        data = path.read_bytes()
-        expected = {
-            "sha256": hashlib.sha256(data).hexdigest(),
-            "bytes": len(data),
-            "lines": _line_count(data),
-        }
-        for field_name, expected_value in expected.items():
-            if entry.get(field_name) != expected_value:
+    for relative_path, expected in expected_entries.items():
+        observed = entries[relative_path]
+        for field_name in ("sha256", "bytes", "lines"):
+            if observed.get(field_name) != expected[field_name]:
                 _fail(
                     f"manifest {field_name} mismatch for {relative_path}: "
-                    f"expected {expected_value!r}, observed {entry.get(field_name)!r}"
+                    f"expected {expected[field_name]!r}, observed {observed.get(field_name)!r}. "
+                    "Run `python tests/validate_repository.py --print-manifest` for exact repair data."
                 )
 
 
@@ -257,8 +282,13 @@ def _validate_license() -> None:
 
 
 def main() -> None:
-    """Run every foundation-pack validation gate."""
+    """Run every foundation-pack validation gate or emit exact manifest repair data."""
     _require_files()
+    if sys.argv[1:] == ["--print-manifest"]:
+        print(json.dumps(_expected_manifest_document(), indent=2, sort_keys=False))
+        return
+    if sys.argv[1:]:
+        _fail(f"Unsupported arguments: {sys.argv[1:]}")
     _validate_manifest()
     _validate_database_contract()
     _validate_openapi_contract()
