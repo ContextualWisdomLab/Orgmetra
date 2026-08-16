@@ -117,9 +117,20 @@ export function countCodeFences(markdownText) {
   return markdownText.split(/\r?\n/).filter((line) => /^\s*```/.test(line)).length;
 }
 
+/** Return the first explicit unfinished-work marker and its one-based line. */
+export function findUnfinishedMarker(markdownText) {
+  const match = UNFINISHED_MARKER_PATTERN.exec(markdownText);
+  if (!match) return null;
+  const lineBoundaryIndex = match.index + (match[0].startsWith('\n') ? 1 : 0);
+  return Object.freeze({
+    line: markdownText.slice(0, lineBoundaryIndex).split(/\r?\n/).length,
+    marker: match[0].trim()
+  });
+}
+
 /** Return whether Markdown contains an explicit unfinished-work marker. */
 export function hasUnfinishedMarker(markdownText) {
-  return UNFINISHED_MARKER_PATTERN.test(markdownText);
+  return findUnfinishedMarker(markdownText) !== null;
 }
 
 /** Return whether a database object is descriptive multiword snake_case. */
@@ -368,7 +379,10 @@ export function validateFoundation(rootPath) {
   for (const filePath of markdownFiles) {
     const text = readFileSync(filePath, 'utf8');
     const displayPath = relative(resolvedRoot, filePath);
-    if (hasUnfinishedMarker(text)) errors.push(`${displayPath}: unresolved work marker`);
+    const unfinishedMarker = findUnfinishedMarker(text);
+    if (unfinishedMarker) {
+      errors.push(`${displayPath}:${unfinishedMarker.line}: unresolved work marker ${unfinishedMarker.marker}`);
+    }
     if (countCodeFences(text) % 2 !== 0) errors.push(`${displayPath}: unbalanced Markdown code fence`);
     errors.push(...validateLocalLinks(filePath, text)
       .map((message) => message.replace(`${filePath}:`, `${displayPath}:`)));
