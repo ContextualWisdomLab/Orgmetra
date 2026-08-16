@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "cf3dccb723d59700d974a2ced1bc808b121ff04906670d0091f4ccfc31d1af90",
-      "bytes": 3565,
-      "lines": 106
+      "sha256": "4378cc7a2f5f6075bcb467d2a49d7740fc0efa2cd8b9d36351e3fbf4d9e11824",
+      "bytes": 3630,
+      "lines": 105
     },
     {
       "path": ".gitignore",
@@ -197,7 +197,7 @@
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
-      "sha256": "9999c85ef98dd3ec8ecb481e93464ac72fbde4dbdea50023c35d5e1ca57b32e8",
+      "sha256": "9999c85ef98dd3ec8ec1a93464ac72fbde4dbdea50023c35d5e1ca57b32e8",
       "bytes": 3079,
       "lines": 41
     },
