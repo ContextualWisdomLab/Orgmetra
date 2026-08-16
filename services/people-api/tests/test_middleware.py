@@ -15,7 +15,7 @@ from orgmetra_people_api.middleware import RequestBoundaryMiddleware
 
 
 TRACE_REFERENCE = UUID("0198a412-6000-7000-8000-000000000004")
-SUPPORT_REFERENCE = UUID("0198a412-6000-7000-8000-000000000104")
+SUPPORT_REFERENCE = "err_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
 
 def _http_scope(headers: list[tuple[bytes, bytes]] | None = None) -> Scope:
@@ -48,7 +48,7 @@ def _middleware(
         app,
         maximum_body_bytes=maximum_body_bytes,
         identifier_factory=lambda: TRACE_REFERENCE,
-        support_identifier_factory=lambda: SUPPORT_REFERENCE,
+        support_reference_factory=lambda: SUPPORT_REFERENCE,
     )
 
 
@@ -126,11 +126,11 @@ def test_declared_length_failures_are_rejected_before_dispatch(
     assert sent[0]["status"] == status_code
     problem = _problem(sent)
     assert problem["error_code"] == error_code
-    assert problem["support_reference"] == str(SUPPORT_REFERENCE)
+    assert problem["support_reference"] == SUPPORT_REFERENCE
     assert problem["next_action"]
     assert "trace_reference" not in problem
     headers_map = dict(sent[0]["headers"])
-    assert headers_map[b"x-support-reference"] == str(SUPPORT_REFERENCE).encode()
+    assert headers_map[b"x-support-reference"] == SUPPORT_REFERENCE.encode()
     assert b"x-request-id" not in headers_map
     assert headers_map[b"content-type"] == b"application/problem+json"
 
@@ -156,7 +156,7 @@ def test_actual_streamed_bytes_cannot_bypass_missing_length() -> None:
     assert sent[0]["status"] == 413
     problem = _problem(sent)
     assert problem["error_code"] == "request_body_too_large"
-    assert problem["support_reference"] == str(SUPPORT_REFERENCE)
+    assert problem["support_reference"] == SUPPORT_REFERENCE
     assert str(TRACE_REFERENCE) not in json.dumps(problem)
 
 
@@ -186,7 +186,7 @@ def test_exact_limit_passes_and_security_headers_are_added_once() -> None:
     assert headers.count((b"cache-control", b"private")) == 1
     assert (b"x-content-type-options", b"nosniff") in headers
     assert (b"referrer-policy", b"no-referrer") in headers
-    assert (b"x-support-reference", str(SUPPORT_REFERENCE).encode()) in headers
+    assert (b"x-support-reference", SUPPORT_REFERENCE.encode()) in headers
     assert not any(name.lower() == b"x-request-id" for name, _value in headers)
 
 
