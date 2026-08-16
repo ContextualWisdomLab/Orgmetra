@@ -42,11 +42,13 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0003-bitemporal-hris-data-contract.md',
   'docs/adr/0004-employment-position-version-and-assignment-binding.md',
   'docs/adr/0005-exclusive-employment-and-staffable-seats.md',
+  'docs/adr/0006-governed-audit-outbox-envelope.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
   'database/migrations/0001_foundation_schema.sql',
   'database/migrations/0002_sealed_evidence_digest.sql',
+  'database/migrations/0003_audit_outbox_persistence.sql',
   'schemas/openapi.yaml',
   'scripts/foundation-contract-core.mjs',
   'scripts/foundation-contract.mjs',
@@ -55,6 +57,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_bitemporal_postgres.sh',
   'tests/test_tenant_isolation_postgres.sh',
   'tests/test_evidence_sealing_postgres.sh',
+  'tests/test_audit_outbox_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -93,8 +96,8 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'analysis_artifact', 'policy_recommendation', 'policy_review_decision',
   'document_record', 'document_version', 'document_segment', 'image_artifact',
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
-  'authorization_decision', 'audit_event', 'data_rights_request',
-  'outbox_event', 'inbox_event', 'integration_delivery'
+  'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
+  'outbox_event', 'outbox_delivery_record', 'inbox_event', 'integration_delivery'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
