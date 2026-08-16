@@ -15,6 +15,7 @@
 - Purpose-bound authorization replaces indiscriminate masking.
 - Sensitive data access is auditable, tenant-scoped, field-scoped, and bounded by an operation-specific Keyverse scope.
 - In-memory historical reconstruction and HRIS decision functions require explicit tenant scope; a caller-supplied collection containing colliding identifiers from another tenant cannot provide coverage, consume capacity, create false employment conflicts, or enter reconstructed history.
+- Durable UUID identity columns reject the RFC 9562 Nil and Max sentinel values at the PostgreSQL boundary; reserved protocol sentinels cannot become tenant, person, employment, organization, job, position, assignment, candidate, decision, evidence, outcome, or transition identities.
 - LLM outputs cannot mutate authoritative facts without human-approved commands.
 - External integrations use explicit adapters and fail closed.
 - Event payloads carry opaque references, not broad PII broadcasts.
