@@ -54,13 +54,17 @@ sequenceDiagram
     participant Gateway
     participant JobArchitecture
     participant TalentAcquisition
+    participant WorkforceValidation
     participant Psychometrics
     participant Audit
 
     Recruiter->>Gateway: Request review(actor, tenant, purpose)
     Gateway->>JobArchitecture: Fetch published job profile and evidence version
     Gateway->>TalentAcquisition: Fetch candidate evidence packet versions
-    Gateway->>Psychometrics: Fetch immutable result snapshot and provenance
+    Gateway->>WorkforceValidation: Fetch immutable result snapshot and provenance
+    WorkforceValidation->>Psychometrics: Fetch immutable result snapshot and provenance
+    Psychometrics-->>WorkforceValidation: Versioned result and provenance
+    WorkforceValidation-->>Gateway: Orgmetra validation snapshot reference
     Gateway-->>Recruiter: Preview target, consequence, reason, and evidence versions
     Recruiter->>Gateway: Confirm(single-use confirmation reference)
     Gateway->>TalentAcquisition: Record(actor, purpose, reason, confirmation, evidence versions, idempotency key)
@@ -70,7 +74,7 @@ sequenceDiagram
     Gateway-->>Recruiter: Recorded result
 ```
 
-Only an authorized human can produce the confirmation. LLM and integration identities can draft evidence but cannot call the record transition with a human confirmation.
+Only an authorized human can produce the confirmation. LLM and integration identities can draft evidence but cannot call the record transition with a human confirmation. Psychometric snapshots are fetched only through `workforce_validation`; the Gateway never bypasses that owning adapter boundary.
 
 ## Employment state model
 
