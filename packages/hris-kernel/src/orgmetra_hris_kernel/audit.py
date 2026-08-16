@@ -63,6 +63,10 @@ class AuditOutboxEvent:
             raise ValueError("event_id must be a UUID.")
         if not isinstance(self.tenant_record_id, UUID):
             raise ValueError("tenant_record_id must be a UUID.")
+        if self.event_id.int == 0:
+            raise ValueError("event_id must not be the reserved nil UUID.")
+        if self.tenant_record_id.int == 0:
+            raise ValueError("tenant_record_id must not be the reserved nil UUID.")
         if not isinstance(self.occurred_at, datetime):
             raise ValueError("occurred_at must be a datetime.")
         if type(self.high_impact) is not bool:
