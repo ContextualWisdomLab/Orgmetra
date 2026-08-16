@@ -101,10 +101,12 @@ def validate_assignment_employment_coverage(
 
     ``active`` and ``leave`` versions remain assignment-eligible; terminal or
     otherwise non-eligible statuses cannot provide staffing coverage. Versions
-    from another tenant are never eligible evidence for this assignment.
+    from another tenant are never eligible evidence for this assignment. Two
+    simultaneously recorded-visible versions may not overlap the assignment's
+    effective interval because contradictory status facts must fail closed.
 
     Raises:
-        EmploymentCoverageError: Link the correct employment or shorten the assignment.
+        EmploymentCoverageError: Link or correct the employment before saving.
     """
     named = [
         version
@@ -117,11 +119,25 @@ def validate_assignment_employment_coverage(
             "Assignment person does not match the named employment.",
             next_action="Select the employment that belongs to this worker, then save.",
         )
-    visible = [
+    assignment_visible = [
         version
         for version in named
         if version.recorded.contains(known_at)
-        and version.employment_status_code in _ASSIGNMENT_ELIGIBLE_EMPLOYMENT_STATUSES
+        and version.effective.overlaps(assignment.effective)
+    ]
+    for index, left in enumerate(assignment_visible):
+        for right in assignment_visible[index + 1 :]:
+            if left.effective.overlaps(right.effective):
+                raise EmploymentCoverageError(
+                    "Assignment intersects contradictory employment versions in this tenant.",
+                    next_action=(
+                        "Close the superseded recorded employment version, then save the assignment again."
+                    ),
+                )
+    visible = [
+        version
+        for version in assignment_visible
+        if version.employment_status_code in _ASSIGNMENT_ELIGIBLE_EMPLOYMENT_STATUSES
     ]
     if not visible or not _union_covers(
         [version.effective for version in visible],
