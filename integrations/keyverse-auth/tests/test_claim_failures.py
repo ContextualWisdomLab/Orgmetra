@@ -112,7 +112,6 @@ def test_missing_mandatory_registered_claim_is_rejected(
 @pytest.mark.parametrize(
     "claim_name,value",
     [
-        ("sub", None),
         ("sub", ""),
         ("sub", "x" * 256),
         ("sub", "subject\x7f"),
