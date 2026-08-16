@@ -4,7 +4,10 @@
 erDiagram
     person_record ||--o{ person_name_record : has_names
     person_record ||--o{ employment_record : has
+    organization_unit ||--o{ organization_unit_version : has_versions
+    organization_unit ||--o{ organization_unit_version : may_parent
     organization_unit ||--o{ position_record : contains
+    job_profile ||--o{ job_profile_version : has_versions
     job_profile ||--o{ position_record : defines
     person_record ||--o{ assignment_record : receives
     position_record ||--o{ assignment_record : assigned_through
@@ -23,6 +26,8 @@ erDiagram
 ```
 
 ## Cardinality decisions
+
+`organization_unit` and `job_profile` are durable anchors. Mutable names, classifications, parent relationships, titles, families, and version codes live in bitemporal version rows. Positions therefore retain stable organization/job references while retroactive corrections append or supersede version facts rather than rewriting identity. An organization version may reference another durable organization as its parent; self-parenting is rejected at the database boundary.
 
 A candidate profile can be linked to at most one worker identity because `candidate_profile_id` is unique in `candidate_worker_link`. A person identity can have multiple candidate-worker links across reapplications or historical candidate profiles, so the person-side cardinality is one-to-many.
 
