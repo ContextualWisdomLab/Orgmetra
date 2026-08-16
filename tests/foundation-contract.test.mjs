@@ -11,6 +11,7 @@ import {
   countCodeFences,
   extractMaturityCells,
   extractSection,
+  findUnfinishedMarker,
   hasUnfinishedMarker,
   isValidDatabaseObjectName,
   runCli,
@@ -133,6 +134,14 @@ test('unfinished marker detection rejects explicit markers but allows ordinary p
   }
 });
 
+test('unfinished marker detection reports the exact one-based line', () => {
+  assert.deepEqual(findUnfinishedMarker('# Valid\n\nTODO: implement this\n'), {
+    line: 3,
+    marker: 'TODO: implement this'
+  });
+  assert.equal(findUnfinishedMarker('The placeholder wording is explanatory.\n'), null);
+});
+
 test('extractMaturityCells ignores non-rows, headers, separators, and empty rows', () => {
   const section = 'Text\n| Item | maturity |\n|---|---|\n||\n| A | planned |\n| B | accepted_architecture |\n| prose | Not_a_value |\n';
   assert.deepEqual(extractMaturityCells(section), ['planned', 'accepted_architecture']);
@@ -209,18 +218,18 @@ test('foundation validator reports every missing artifact', () => {
   }
 });
 
-test('foundation validator reports explicit work markers, fences, links, and maturities', () => {
+test('foundation validator reports explicit work markers with path and line plus other failures', () => {
   const root = temporaryDirectory();
   try {
     makeMinimalValidFoundation(root);
-    write(root, 'README.md', '# TODO\n\n```text\n[missing](not-here.md)\n');
+    write(root, 'README.md', '# Valid\n\nTODO: finish this\n\n```text\n[missing](not-here.md)\n');
     write(
       root,
       'docs/TRACEABILITY.md',
       '# Trace\n\n## 2. Product traceability matrix\n\n| A | invalid_value |\n\n## 4. CWL integration traceability\n\n| B | invalid_value |\n'
     );
     const errors = validateFoundation(root);
-    assert.ok(errors.some((error) => /work marker/.test(error)));
+    assert.ok(errors.some((error) => /README\.md:3: unresolved work marker TODO: finish this/.test(error)));
     assert.ok(errors.some((error) => /code fence/.test(error)));
     assert.ok(errors.some((error) => /local link target/.test(error)));
     assert.equal(errors.filter((error) => /invalid maturity value/.test(error)).length, 2);
