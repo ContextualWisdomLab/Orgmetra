@@ -8,7 +8,8 @@
 - LLM draft outputs
 - Assessment result snapshots
 - PII fields
-- Audit/provenance records
+- Immutable audit evidence
+- Mutable outbox delivery coordination
 
 ## Security principles
 
@@ -17,7 +18,8 @@
 - In-memory historical reconstruction and HRIS decision functions require explicit tenant scope; a caller-supplied collection containing colliding identifiers from another tenant cannot provide coverage, consume capacity, create false employment conflicts, or enter reconstructed history.
 - LLM outputs cannot mutate authoritative facts without human-approved commands.
 - External integrations use explicit adapters and fail closed.
-- Event payloads carry opaque references, not broad PII broadcasts.
+- Event payloads carry opaque references, not broad PII broadcasts. Durable audit persistence enforces an exact top-level event-field allowlist so a caller cannot expand the retained audit payload with employee names, compensation, free-text evidence, or other mutable HR facts.
+- Audit bytes are append-only and database digest-verified; asynchronous retry/lease state is normalized into a separate relation and cannot rewrite the audit fact.
 - Credentials and passkeys remain in Keyverse or external secret managers.
 - Service database roles cannot query another service's application tables.
 - Client error responses expose a random `support_reference`, never an internal trace/span identifier or encoded infrastructure context.
@@ -46,6 +48,7 @@ The same contract applies to selection decisions, compensation changes, terminat
 1. **Review/Preview**: show target, consequences, actor, tenant, purpose, reason, and exact evidence versions.
 2. **Confirm**: obtain an explicit, single-use confirmation reference from an authorized human.
 3. **Record**: append the authoritative decision and evidence references under one idempotency key.
-4. **Audit**: append actor and policy context before emitting the external event.
+4. **Audit**: in the same business transaction, persist `AuditOutboxEvent.canonical_json()` plus its SHA-256 digest through `record_audit_outbox_event(...)`; PostgreSQL revalidates the allowlisted PII-minimized envelope, event/tenant binding, digest, and high-impact confirmation before a pending outbox row is created.
+5. **Deliver**: asynchronous workers may mutate only guarded outbox delivery state. They cannot rewrite immutable audit evidence or infer a successful receipt.
 
 No LLM, integration adapter, or background worker may synthesize the human confirmation or transition a candidate to `Offered` or `Worker` autonomously.
