@@ -57,6 +57,55 @@ if [[ "${verified_digest}" != "t" ]]; then
     exit 1
 fi
 
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE ROLE orgmetra_audit_reader NOLOGIN NOBYPASSRLS;
+GRANT USAGE ON SCHEMA public TO orgmetra_audit_reader;
+GRANT SELECT ON audit_event_record, outbox_delivery_record TO orgmetra_audit_reader;
+SET ROLE orgmetra_audit_reader;
+
+DO $$
+DECLARE
+    audit_visible bigint;
+    outbox_visible bigint;
+BEGIN
+    SELECT count(*) INTO audit_visible FROM audit_event_record;
+    SELECT count(*) INTO outbox_visible FROM outbox_delivery_record;
+    IF audit_visible <> 0 OR outbox_visible <> 0 THEN
+        RAISE EXCEPTION 'missing tenant context exposed audit/outbox rows';
+    END IF;
+END;
+$$;
+
+SET orgmetra.tenant_record_id = '10000000-0000-7000-8000-000000000001';
+DO $$
+DECLARE
+    audit_visible bigint;
+    outbox_visible bigint;
+BEGIN
+    SELECT count(*) INTO audit_visible FROM audit_event_record;
+    SELECT count(*) INTO outbox_visible FROM outbox_delivery_record;
+    IF audit_visible <> 1 OR outbox_visible <> 1 THEN
+        RAISE EXCEPTION 'tenant alpha did not see exactly one audit and one outbox row';
+    END IF;
+END;
+$$;
+
+SET orgmetra.tenant_record_id = '20000000-0000-7000-8000-000000000001';
+DO $$
+DECLARE
+    audit_visible bigint;
+    outbox_visible bigint;
+BEGIN
+    SELECT count(*) INTO audit_visible FROM audit_event_record;
+    SELECT count(*) INTO outbox_visible FROM outbox_delivery_record;
+    IF audit_visible <> 0 OR outbox_visible <> 0 THEN
+        RAISE EXCEPTION 'foreign tenant context exposed tenant-alpha audit/outbox rows';
+    END IF;
+END;
+$$;
+RESET ROLE;
+SQL
+
 set +e
 tampered_digest_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v canonical_event="${canonical_event}" <<'SQL'
@@ -139,6 +188,19 @@ immutable_status=$?
 set -e
 if [[ ${immutable_status} -eq 0 || "${immutable_output}" != *"audit event records are append-only"* ]]; then
     echo "immutable audit evidence accepted an update or failed for the wrong reason: ${immutable_output}" >&2
+    exit 1
+fi
+
+set +e
+immutable_delete_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+DELETE FROM audit_event_record
+WHERE audit_event_record_id = '00000000-0000-4000-8000-000000000041'::uuid;
+SQL
+} 2>&1)"
+immutable_delete_status=$?
+set -e
+if [[ ${immutable_delete_status} -eq 0 || "${immutable_delete_output}" != *"audit event records are append-only"* ]]; then
+    echo "immutable audit evidence accepted a delete or failed for the wrong reason: ${immutable_delete_output}" >&2
     exit 1
 fi
 
