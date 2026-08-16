@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
+from orgmetra_postgres import RepositoryUnavailableError
+
 
 class AuthenticationFailed(RuntimeError):
     """Indicate that caller authentication evidence is absent or invalid."""
@@ -13,6 +15,10 @@ class AuthenticationFailed(RuntimeError):
 
 class AuthorizationDenied(RuntimeError):
     """Indicate that an authenticated principal lacks the required purpose."""
+
+
+class IdentityProviderUnavailable(RepositoryUnavailableError):
+    """Indicate a retryable identity-provider or identity-mapping outage."""
 
 
 @dataclass(frozen=True, slots=True)
