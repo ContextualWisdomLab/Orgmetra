@@ -10,7 +10,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import psycopg
-from psycopg import Connection, IntegrityError, PsycopgError
+from psycopg import Connection, Error as PsycopgError, IntegrityError
 from psycopg.errors import InsufficientPrivilege
 
 from .context import PurposeContext
