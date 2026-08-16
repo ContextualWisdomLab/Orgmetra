@@ -61,4 +61,4 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Notes
 
-- Protected `bootstrap` contains the integrated foundation and hire-to-assignment kernel through merge commit `99bffec05d0732e332cfbcb64f34838395bbd078`; entries above that are introduced by active PRs become shipped truth only after their own protected merge.
+- Protected `bootstrap` contains the integrated foundation and hire-to-assignment kernel through merge commit `99bffec05d0732e332cfbcb64f34838395bbd078`; entries above that introduced by active PRs become shipped truth only after their own protected merge.
