@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Awaitable, Callable
-from typing import Any
 from uuid import UUID, uuid4
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -17,7 +16,7 @@ class _BodyLimitExceeded(RuntimeError):
 
 
 class RequestBoundaryMiddleware:
-    """Enforce a finite request body and attach non-content trace evidence."""
+    """Enforce finite requests while separating operator and client references."""
 
     def __init__(
         self,
@@ -25,14 +24,16 @@ class RequestBoundaryMiddleware:
         *,
         maximum_body_bytes: int = 65_536,
         identifier_factory: IdentifierFactory = uuid4,
+        support_identifier_factory: IdentifierFactory = uuid4,
     ) -> None:
-        """Configure a positive finite byte limit without reading request data."""
+        """Configure a positive byte limit and independent identifier sources."""
 
         if maximum_body_bytes <= 0:
             raise ValueError("maximum_body_bytes must be positive")
         self._app = app
         self._maximum_body_bytes = maximum_body_bytes
         self._identifier_factory = identifier_factory
+        self._support_identifier_factory = support_identifier_factory
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Apply the boundary to HTTP traffic and pass through other protocols."""
@@ -42,8 +43,10 @@ class RequestBoundaryMiddleware:
             return
 
         trace_reference = self._identifier_factory()
+        support_reference = self._support_identifier_factory()
         state = scope.setdefault("state", {})
         state["trace_reference"] = trace_reference
+        state["support_reference"] = support_reference
 
         content_lengths = [
             value
@@ -54,11 +57,12 @@ class RequestBoundaryMiddleware:
             await self._send_problem(
                 scope,
                 send,
-                trace_reference,
+                support_reference,
                 status_code=400,
                 error_code="invalid_content_length",
                 title="Invalid Content-Length",
                 detail="The request contains conflicting Content-Length headers.",
+                next_action="Send exactly one valid Content-Length header and retry.",
             )
             return
         if content_lengths:
@@ -70,22 +74,24 @@ class RequestBoundaryMiddleware:
                 await self._send_problem(
                     scope,
                     send,
-                    trace_reference,
+                    support_reference,
                     status_code=400,
                     error_code="invalid_content_length",
                     title="Invalid Content-Length",
                     detail="Content-Length must be a non-negative ASCII integer.",
+                    next_action="Send a non-negative ASCII Content-Length value and retry.",
                 )
                 return
             if declared_length > self._maximum_body_bytes:
                 await self._send_problem(
                     scope,
                     send,
-                    trace_reference,
+                    support_reference,
                     status_code=413,
                     error_code="request_body_too_large",
                     title="Request body too large",
                     detail="The request body exceeds the configured byte limit.",
+                    next_action="Submit a smaller request body and retry.",
                 )
                 return
 
@@ -104,7 +110,7 @@ class RequestBoundaryMiddleware:
             return message
 
         async def secure_send(message: Message) -> None:
-            """Attach trace and defensive response headers once."""
+            """Attach client-safe support and defensive response headers once."""
 
             nonlocal response_started
             if message["type"] == "http.response.start":
@@ -115,7 +121,7 @@ class RequestBoundaryMiddleware:
                     b"cache-control": b"no-store",
                     b"x-content-type-options": b"nosniff",
                     b"referrer-policy": b"no-referrer",
-                    b"x-request-id": str(trace_reference).encode("ascii"),
+                    b"x-support-reference": str(support_reference).encode("ascii"),
                 }
                 headers.extend(
                     (name, value)
@@ -135,25 +141,27 @@ class RequestBoundaryMiddleware:
             await self._send_problem(
                 scope,
                 send,
-                trace_reference,
+                support_reference,
                 status_code=413,
                 error_code="request_body_too_large",
                 title="Request body too large",
                 detail="The request body exceeds the configured byte limit.",
+                next_action="Submit a smaller request body and retry.",
             )
 
     async def _send_problem(
         self,
         scope: Scope,
         send: Send,
-        trace_reference: UUID,
+        support_reference: UUID,
         *,
         status_code: int,
         error_code: str,
         title: str,
         detail: str,
+        next_action: str,
     ) -> None:
-        """Send a complete problem response before application dispatch."""
+        """Send a pre-dispatch problem without exposing internal trace identity."""
 
         payload = json.dumps(
             {
@@ -163,7 +171,8 @@ class RequestBoundaryMiddleware:
                 "detail": detail,
                 "instance": scope.get("path", "/"),
                 "error_code": error_code,
-                "trace_reference": str(trace_reference),
+                "support_reference": str(support_reference),
+                "next_action": next_action,
             },
             separators=(",", ":"),
         ).encode("utf-8")
@@ -173,7 +182,7 @@ class RequestBoundaryMiddleware:
             (b"cache-control", b"no-store"),
             (b"x-content-type-options", b"nosniff"),
             (b"referrer-policy", b"no-referrer"),
-            (b"x-request-id", str(trace_reference).encode("ascii")),
+            (b"x-support-reference", str(support_reference).encode("ascii")),
         ]
         await send(
             {
