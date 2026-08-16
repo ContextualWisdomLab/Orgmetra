@@ -38,6 +38,10 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("pip install --no-deps --target", script)
         self.assertIn("unset PYTHONPATH", script)
         self.assertIn("import orgmetra_domain", script)
+        docstring_gate = (ROOT / "tests" / "validate_docstrings.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("__post_init__", docstring_gate)
 
     def test_person_anchor_recorded_lifecycle_boundary_is_explicit(self) -> None:
         adr = (

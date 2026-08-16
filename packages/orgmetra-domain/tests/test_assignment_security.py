@@ -27,6 +27,7 @@ def _assignment(assignment_id: int, allocation: str, start: date) -> AssignmentR
             f"00000000-0000-7000-8000-{assignment_id:012d}"
         ),
         person_record_id=PERSON_ID,
+        employment_record_id=UUID("00000000-0000-7000-8000-000000000003"),
         position_record_id=POSITION_ID if assignment_id % 2 else OTHER_POSITION_ID,
         allocation_ratio=Decimal(allocation),
         period=BitemporalPeriod(
@@ -55,7 +56,10 @@ class AssignmentSecurityRegressionTests(unittest.TestCase):
         ]
 
         with self.assertRaises(AllocationExceededError) as captured:
-            validate_assignment_portfolio(assignments)
+            validate_assignment_portfolio(
+                assignments,
+                known_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
+            )
 
         message = str(captured.exception)
         self.assertEqual(

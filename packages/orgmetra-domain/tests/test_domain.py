@@ -13,6 +13,7 @@ from orgmetra_domain import (
     CandidateWorkerRegistry,
     CandidateWorkerRelinkError,
     EmploymentRecord,
+    EmploymentVersionRecord,
     InvalidDomainValueError,
     JobProfileRecord,
     JobProfileVersionRecord,
@@ -21,7 +22,11 @@ from orgmetra_domain import (
     PersonNameRecord,
     PersonRecord,
     PositionRecord,
+    PositionVersionRecord,
+    validate_assignment_employment_coverage,
     validate_assignment_portfolio,
+    validate_assignment_portfolio_history,
+    validate_organization_hierarchy,
 )
 
 
@@ -38,6 +43,9 @@ PERSON_NAME_ID = UUID("00000000-0000-7000-8000-000000000011")
 PARENT_ORG_ID = UUID("00000000-0000-7000-8000-000000000012")
 ORG_VERSION_ID = UUID("00000000-0000-7000-8000-000000000013")
 JOB_VERSION_ID = UUID("00000000-0000-7000-8000-000000000014")
+EMPLOYMENT_VERSION_ID = UUID("00000000-0000-7000-8000-000000000018")
+POSITION_VERSION_ID = UUID("00000000-0000-7000-8000-000000000020")
+KNOWN_AT = datetime(2026, 3, 1, tzinfo=timezone.utc)
 
 
 def period(
@@ -86,6 +94,20 @@ class BitemporalPeriodTests(unittest.TestCase):
         self.assertTrue(value.is_effective_on(date(2099, 1, 1)))
         self.assertTrue(value.was_known_at(datetime(2099, 1, 1, tzinfo=timezone.utc)))
 
+    def test_covers_effective_interval_for_assignment_attachment(self) -> None:
+        open_employment = period()
+        closed_employment = period(effective_to=date(2026, 7, 1))
+        later_start = period(effective_from=date(2026, 2, 1))
+        open_assignment = period()
+        closed_assignment = period(effective_to=date(2026, 6, 1))
+        overflowing = period(effective_to=date(2026, 8, 1))
+
+        self.assertTrue(open_employment.covers_effective_interval(later_start))
+        self.assertTrue(closed_employment.covers_effective_interval(closed_assignment))
+        self.assertFalse(closed_employment.covers_effective_interval(open_assignment))
+        self.assertFalse(closed_employment.covers_effective_interval(overflowing))
+        self.assertFalse(later_start.covers_effective_interval(open_employment))
+
 
 class RecordValidationTests(unittest.TestCase):
     """Verify beginner-visible validation at aggregate construction."""
@@ -100,9 +122,15 @@ class RecordValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(InvalidDomainValueError, "display_name"):
             PersonNameRecord(PERSON_NAME_ID, PERSON_ID, "   ", period())
 
-    def test_employment_requires_status_code(self) -> None:
+    def test_employment_anchor_has_no_mutable_status(self) -> None:
+        employment = EmploymentRecord(EMPLOYMENT_ID, PERSON_ID)
+        self.assertEqual(employment.employment_record_id, EMPLOYMENT_ID)
+        self.assertFalse(hasattr(employment, "employment_status_code"))
+        self.assertFalse(hasattr(employment, "period"))
+
+    def test_employment_version_requires_status_code(self) -> None:
         with self.assertRaisesRegex(InvalidDomainValueError, "employment_status_code"):
-            EmploymentRecord(EMPLOYMENT_ID, PERSON_ID, "", period())
+            EmploymentVersionRecord(EMPLOYMENT_VERSION_ID, EMPLOYMENT_ID, "", period())
 
     def test_organization_anchor_has_no_mutable_descriptive_attributes(self) -> None:
         organization = OrganizationUnitRecord(ORG_ID)
@@ -151,16 +179,22 @@ class RecordValidationTests(unittest.TestCase):
                 JOB_VERSION_ID, JOB_ID, "Platform Engineer", "engineering", " ", period()
             )
 
-    def test_position_requires_status_code(self) -> None:
+    def test_position_anchor_has_no_mutable_status(self) -> None:
+        position = PositionRecord(POSITION_ID, ORG_ID, JOB_ID)
+        self.assertEqual(position.position_record_id, POSITION_ID)
+        self.assertFalse(hasattr(position, "position_status_code"))
+        self.assertFalse(hasattr(position, "period"))
+
+    def test_position_version_requires_status_code(self) -> None:
         with self.assertRaisesRegex(InvalidDomainValueError, "position_status_code"):
-            PositionRecord(POSITION_ID, ORG_ID, JOB_ID, "  ", period())
+            PositionVersionRecord(POSITION_VERSION_ID, POSITION_ID, "  ", period())
 
     def test_valid_versioned_records_normalize_human_readable_values(self) -> None:
         person_name = PersonNameRecord(
             PERSON_NAME_ID, PERSON_ID, "  Ada Lovelace  ", period()
         )
-        employment = EmploymentRecord(
-            EMPLOYMENT_ID, PERSON_ID, "  active  ", period()
+        employment = EmploymentVersionRecord(
+            EMPLOYMENT_VERSION_ID, EMPLOYMENT_ID, "  active  ", period()
         )
         organization = OrganizationUnitVersionRecord(
             ORG_VERSION_ID,
@@ -178,8 +212,8 @@ class RecordValidationTests(unittest.TestCase):
             "  2026.1  ",
             period(),
         )
-        position = PositionRecord(
-            POSITION_ID, ORG_ID, JOB_ID, "  open  ", period()
+        position = PositionVersionRecord(
+            POSITION_VERSION_ID, POSITION_ID, "  open  ", period()
         )
 
         self.assertEqual(person_name.display_name, "Ada Lovelace")
@@ -212,6 +246,7 @@ class AssignmentPortfolioTests(unittest.TestCase):
                 f"00000000-0000-7000-8000-{assignment_id:012d}"
             ),
             person_record_id=person_id,
+            employment_record_id=EMPLOYMENT_ID,
             position_record_id=position_id,
             allocation_ratio=Decimal(allocation),
             period=period(effective_from=start, effective_to=end),
@@ -235,7 +270,7 @@ class AssignmentPortfolioTests(unittest.TestCase):
                 22, PERSON_ID, OTHER_POSITION_ID, "0.4", date(2026, 2, 1), None
             ),
         ]
-        validate_assignment_portfolio(assignments)
+        validate_assignment_portfolio(assignments, known_at=KNOWN_AT)
 
     def test_rejects_overallocated_overlap(self) -> None:
         assignments = [
@@ -250,7 +285,7 @@ class AssignmentPortfolioTests(unittest.TestCase):
             AllocationExceededError,
             "assignment portfolio allocation exceeds allowed maximum",
         ):
-            validate_assignment_portfolio(assignments)
+            validate_assignment_portfolio(assignments, known_at=KNOWN_AT)
 
     def test_adjacent_periods_do_not_overlap(self) -> None:
         assignments = [
@@ -271,7 +306,7 @@ class AssignmentPortfolioTests(unittest.TestCase):
                 None,
             ),
         ]
-        validate_assignment_portfolio(assignments)
+        validate_assignment_portfolio(assignments, known_at=KNOWN_AT)
 
     def test_people_are_evaluated_independently(self) -> None:
         assignments = [
@@ -287,7 +322,116 @@ class AssignmentPortfolioTests(unittest.TestCase):
                 None,
             ),
         ]
-        validate_assignment_portfolio(assignments)
+        validate_assignment_portfolio(assignments, known_at=KNOWN_AT)
+
+    def test_empty_history_is_valid(self) -> None:
+        validate_assignment_portfolio_history(())
+
+    def test_rejects_assignment_when_employment_anchor_is_missing(self) -> None:
+        assignment = self.assignment(
+            28, PERSON_ID, POSITION_ID, "1", date(2026, 1, 1), None
+        )
+        with self.assertRaisesRegex(InvalidDomainValueError, "covering employment"):
+            validate_assignment_employment_coverage(
+                assignment,
+                (),
+                (),
+                known_at=KNOWN_AT,
+            )
+
+    def test_rejects_naive_employment_coverage_knowledge_time(self) -> None:
+        assignment = self.assignment(
+            27, PERSON_ID, POSITION_ID, "1", date(2026, 1, 1), None
+        )
+        with self.assertRaisesRegex(InvalidDomainValueError, "timezone-aware"):
+            validate_assignment_employment_coverage(
+                assignment,
+                (EmploymentRecord(EMPLOYMENT_ID, PERSON_ID),),
+                (
+                    EmploymentVersionRecord(
+                        EMPLOYMENT_VERSION_ID,
+                        EMPLOYMENT_ID,
+                        "active",
+                        period(),
+                    ),
+                ),
+                known_at=datetime(2026, 3, 1),
+            )
+
+    def test_rejects_assignment_when_employment_belongs_to_another_person(self) -> None:
+        assignment = self.assignment(
+            29, PERSON_ID, POSITION_ID, "1", date(2026, 1, 1), None
+        )
+        with self.assertRaisesRegex(InvalidDomainValueError, "covering employment"):
+            validate_assignment_employment_coverage(
+                assignment,
+                (EmploymentRecord(EMPLOYMENT_ID, OTHER_PERSON_ID),),
+                (
+                    EmploymentVersionRecord(
+                        EMPLOYMENT_VERSION_ID,
+                        EMPLOYMENT_ID,
+                        "active",
+                        period(),
+                    ),
+                ),
+                known_at=KNOWN_AT,
+            )
+
+    def test_rejects_assignment_when_employment_interval_does_not_cover(self) -> None:
+        assignment = self.assignment(
+            30, PERSON_ID, POSITION_ID, "1", date(2026, 1, 1), None
+        )
+        with self.assertRaisesRegex(InvalidDomainValueError, "covering employment"):
+            validate_assignment_employment_coverage(
+                assignment,
+                (EmploymentRecord(EMPLOYMENT_ID, PERSON_ID),),
+                (
+                    EmploymentVersionRecord(
+                        EMPLOYMENT_VERSION_ID,
+                        EMPLOYMENT_ID,
+                        "active",
+                        period(effective_to=date(2026, 2, 1)),
+                    ),
+                ),
+                known_at=KNOWN_AT,
+            )
+
+    def test_accepts_rooted_organization_tree(self) -> None:
+        child = OrganizationUnitVersionRecord(
+            ORG_VERSION_ID,
+            ORG_ID,
+            "People",
+            "department",
+            period(),
+            parent_organization_unit_id=PARENT_ORG_ID,
+        )
+        parent = OrganizationUnitVersionRecord(
+            UUID("00000000-0000-7000-8000-000000000021"),
+            PARENT_ORG_ID,
+            "Company",
+            "legal_entity",
+            period(),
+        )
+        validate_organization_hierarchy(
+            (child, parent),
+            effective_on=date(2026, 1, 15),
+            known_at=KNOWN_AT,
+        )
+
+    def test_accepts_child_when_named_parent_is_not_visible(self) -> None:
+        child = OrganizationUnitVersionRecord(
+            ORG_VERSION_ID,
+            ORG_ID,
+            "People",
+            "department",
+            period(),
+            parent_organization_unit_id=PARENT_ORG_ID,
+        )
+        validate_organization_hierarchy(
+            (child,),
+            effective_on=date(2026, 1, 15),
+            known_at=KNOWN_AT,
+        )
 
 
 class CandidateWorkerRegistryTests(unittest.TestCase):
@@ -303,7 +447,7 @@ class CandidateWorkerRegistryTests(unittest.TestCase):
     def test_candidate_cannot_be_relinked_to_different_person(self) -> None:
         registry = CandidateWorkerRegistry()
         registry.register(CandidateWorkerLink(LINK_ID, CANDIDATE_ID, PERSON_ID))
-        with self.assertRaisesRegex(CandidateWorkerRelinkError, str(CANDIDATE_ID)):
+        with self.assertRaises(CandidateWorkerRelinkError) as captured:
             registry.register(
                 CandidateWorkerLink(
                     UUID("00000000-0000-7000-8000-000000000010"),
@@ -311,6 +455,10 @@ class CandidateWorkerRegistryTests(unittest.TestCase):
                     OTHER_PERSON_ID,
                 )
             )
+        message = str(captured.exception)
+        self.assertNotIn(str(CANDIDATE_ID), message)
+        self.assertNotIn(str(PERSON_ID), message)
+        self.assertNotIn(str(OTHER_PERSON_ID), message)
 
     def test_unknown_candidate_returns_none(self) -> None:
         registry = CandidateWorkerRegistry()

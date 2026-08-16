@@ -23,7 +23,10 @@ for path in sorted(SOURCE_ROOT.glob("*.py")):
         if isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
             for child in node.body:
                 if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    if child.name.startswith("_") and child.name != "__init__":
+                    if child.name.startswith("_") and child.name not in {
+                        "__init__",
+                        "__post_init__",
+                    }:
                         continue
                     if not ast.get_docstring(child):
                         missing.append(f"{path}:{child.lineno} {node.name}.{child.name}")

@@ -5,13 +5,13 @@
 ## Current capabilities
 
 - Half-open, non-empty effective-time and system-recorded-time intervals.
-- Deterministic historical resolution at one effective-date and knowledge-time coordinate, failing closed when stored versions are ambiguous.
+- Deterministic historical resolution at one effective-date and knowledge-time coordinate, scoped per identity and failing closed when one identity has two visible versions.
 - Durable person anchors separated from effective and system-recorded person-name facts.
-- Durable organization and job anchors separated from bitemporal descriptive versions.
+- Durable organization, job, employment, and position anchors separated from bitemporal versions.
 - Distinct employment, organization, job, position, and assignment concepts.
-- Bitemporal organization hierarchy facts and versioned job definitions, kept distinct from positions that instantiate them.
-- Multiple simultaneous assignments with allocation validation.
-- Append-only, idempotent candidate-to-worker linkage.
+- Bitemporal organization hierarchy facts, including visible cycle rejection, and versioned job definitions kept distinct from positions that instantiate them.
+- Multiple simultaneous assignments with recorded-time allocation validation, covering employment, and position capacity.
+- Append-only, idempotent candidate-to-worker linkage whose relink error omits identifiers.
 - Explicit domain errors for invalid or conflicting operations.
 
 ## Boundaries
@@ -43,10 +43,11 @@ visible_name = resolve_bitemporal_fact(
     (name,),
     effective_on=date(2026, 1, 15),
     known_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+    identity_of=lambda fact: fact.person_record_id,
 )
 ```
 
-The durable `PersonRecord` never stores mutable descriptive attributes. A name correction appends or supersedes a `PersonNameRecord` version while preserving the same person identity and the historical knowledge timeline. `resolve_bitemporal_fact` returns the sole version visible at a requested business-time/knowledge-time coordinate; it returns `None` when nothing was visible and raises `TemporalAmbiguityError` instead of silently choosing between overlapping versions. `OrganizationUnitRecord` and `JobProfileRecord` follow the same anchor pattern; `OrganizationUnitVersionRecord` and `JobProfileVersionRecord` carry descriptive facts over business and system time. `PositionRecord` therefore references durable organization/job identities rather than one historical description.
+The durable `PersonRecord` never stores mutable descriptive attributes. A name correction appends or supersedes a `PersonNameRecord` version while preserving the same person identity and the historical knowledge timeline. `resolve_bitemporal_fact` returns the sole version visible for one identity at a requested business-time/knowledge-time coordinate; it returns `None` when nothing was visible and raises `TemporalAmbiguityError` instead of silently choosing between overlapping versions. Pass mixed identities to `resolve_bitemporal_facts_by_identity` and review each person separately. `OrganizationUnitRecord`, `JobProfileRecord`, `EmploymentRecord`, and `PositionRecord` follow the same anchor pattern; version records carry descriptive or status facts over business and system time. Assignments name the durable employment so rehire and dual employment stay distinguishable.
 
 ## Quality
 

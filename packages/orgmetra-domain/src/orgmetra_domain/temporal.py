@@ -1,8 +1,10 @@
 """Bitemporal value objects and deterministic historical fact resolution."""
 
+from collections import defaultdict
+from collections.abc import Callable, Hashable, Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Iterable, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
 from .errors import InvalidDomainValueError, TemporalAmbiguityError
 
@@ -54,6 +56,22 @@ class BitemporalPeriod:
             self.recorded_to is None or moment < self.recorded_to
         )
 
+    def covers_effective_interval(self, other: "BitemporalPeriod") -> bool:
+        """Return whether this effective interval contains ``other``'s interval.
+
+        Use this before attaching an assignment to an employment. If the
+        employment interval does not cover the assignment, correct the dates
+        or choose the employment that was in force.
+        """
+
+        if self.effective_from > other.effective_from:
+            return False
+        if self.effective_to is None:
+            return True
+        if other.effective_to is None:
+            return False
+        return other.effective_to <= self.effective_to
+
 
 class _BitemporalFact(Protocol):
     """Structural type for domain facts that expose one bitemporal period."""
@@ -64,29 +82,64 @@ class _BitemporalFact(Protocol):
 _BitemporalFactT = TypeVar("_BitemporalFactT", bound=_BitemporalFact)
 
 
+def resolve_bitemporal_facts_by_identity(
+    facts: Iterable[_BitemporalFactT],
+    *,
+    effective_on: date,
+    known_at: datetime,
+    identity_of: Callable[[_BitemporalFactT], Hashable],
+) -> dict[Hashable, _BitemporalFactT]:
+    """Return the visible fact for each identity at one bitemporal coordinate.
+
+    Fail closed only when **one** identity has two visible versions. Review
+    overlapping versions for that identity and close the superseded recorded
+    interval before querying again.
+    """
+
+    _require_aware(known_at, "known_at")
+    visible_by_identity: dict[Hashable, list[_BitemporalFactT]] = defaultdict(list)
+    for fact in facts:
+        if fact.period.is_effective_on(effective_on) and fact.period.was_known_at(known_at):
+            visible_by_identity[identity_of(fact)].append(fact)
+
+    resolved: dict[Hashable, _BitemporalFactT] = {}
+    for identity, visible_facts in visible_by_identity.items():
+        if len(visible_facts) > 1:
+            raise TemporalAmbiguityError(
+                "multiple versions are visible for one identity at the requested "
+                "bitemporal coordinate; review overlapping versions and close the "
+                "superseded recorded interval"
+            )
+        resolved[identity] = visible_facts[0]
+    return resolved
+
+
 def resolve_bitemporal_fact(
     facts: Iterable[_BitemporalFactT],
     *,
     effective_on: date,
     known_at: datetime,
+    identity_of: Callable[[_BitemporalFactT], Hashable],
 ) -> _BitemporalFactT | None:
-    """Return the sole fact visible at one business-time/knowledge-time coordinate.
+    """Return the sole fact visible for one identity at one coordinate.
 
-    A missing match returns ``None``. More than one visible fact is a data-integrity
-    violation, so the resolver fails closed instead of selecting by collection order.
-    The knowledge-time coordinate must carry an explicit UTC offset.
+    A missing match returns ``None``. Pass ``identity_of`` so two people, jobs,
+    or units are never treated as one ambiguous fact. If the collection spans
+    more than one identity, use ``resolve_bitemporal_facts_by_identity`` and
+    review each identity separately.
     """
 
-    _require_aware(known_at, "known_at")
-    visible_facts = [
-        fact
-        for fact in facts
-        if fact.period.is_effective_on(effective_on) and fact.period.was_known_at(known_at)
-    ]
-    if not visible_facts:
+    resolved = resolve_bitemporal_facts_by_identity(
+        facts,
+        effective_on=effective_on,
+        known_at=known_at,
+        identity_of=identity_of,
+    )
+    if not resolved:
         return None
-    if len(visible_facts) > 1:
-        raise TemporalAmbiguityError(
-            "multiple facts are visible at the requested bitemporal coordinate"
+    if len(resolved) > 1:
+        raise InvalidDomainValueError(
+            "resolve_bitemporal_fact requires facts for one identity; "
+            "use resolve_bitemporal_facts_by_identity to review each identity"
         )
-    return visible_facts[0]
+    return next(iter(resolved.values()))

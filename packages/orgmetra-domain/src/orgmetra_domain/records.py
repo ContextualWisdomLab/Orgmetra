@@ -1,10 +1,12 @@
 """Core HRIS records with stable anchors and separately versioned facts."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date, datetime
 from uuid import UUID
 
-from .errors import InvalidDomainValueError
-from .temporal import BitemporalPeriod
+from .errors import InvalidDomainValueError, OrganizationCycleError
+from .temporal import BitemporalPeriod, resolve_bitemporal_facts_by_identity
 
 
 def _require_non_blank(value: str, field_name: str) -> str:
@@ -46,10 +48,22 @@ class PersonNameRecord:
 
 @dataclass(frozen=True, slots=True)
 class EmploymentRecord:
-    """Represent one effective-dated employment relationship for a person."""
+    """Represent the durable employment relationship without mutable status.
+
+    Status and effective dates live on ``EmploymentVersionRecord`` so a
+    retroactive correction does not look like a second employment.
+    """
 
     employment_record_id: UUID
     person_record_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class EmploymentVersionRecord:
+    """Represent one bitemporal status version of a durable employment."""
+
+    employment_version_id: UUID
+    employment_record_id: UUID
     employment_status_code: str
     period: BitemporalPeriod
 
@@ -139,11 +153,23 @@ class JobProfileVersionRecord:
 
 @dataclass(frozen=True, slots=True)
 class PositionRecord:
-    """Represent an organizational seat that instantiates a durable job profile."""
+    """Represent a durable organizational seat that instantiates a job profile.
+
+    Status and effective dates live on ``PositionVersionRecord`` so a
+    retroactive correction does not look like a new seat.
+    """
 
     position_record_id: UUID
     organization_unit_id: UUID
     job_profile_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class PositionVersionRecord:
+    """Represent one bitemporal status version of a durable position."""
+
+    position_version_id: UUID
+    position_record_id: UUID
     position_status_code: str
     period: BitemporalPeriod
 
@@ -155,3 +181,38 @@ class PositionRecord:
             "position_status_code",
             _require_non_blank(self.position_status_code, "position_status_code"),
         )
+
+
+def validate_organization_hierarchy(
+    versions: Iterable[OrganizationUnitVersionRecord],
+    *,
+    effective_on: date,
+    known_at: datetime,
+) -> None:
+    """Reject a visible parent cycle such as A→B→A.
+
+    Immediate self-parenting is already rejected at construction. Review the
+    parent links and close the superseded recorded interval before saving.
+    """
+
+    visible = resolve_bitemporal_facts_by_identity(
+        versions,
+        effective_on=effective_on,
+        known_at=known_at,
+        identity_of=lambda version: version.organization_unit_id,
+    )
+    parents = {
+        unit_id: version.parent_organization_unit_id
+        for unit_id, version in visible.items()
+    }
+    for start in parents:
+        seen: set[UUID] = set()
+        current: UUID | None = start
+        while current is not None:
+            if current in seen:
+                raise OrganizationCycleError(
+                    "organization hierarchy contains a cycle; review parent links "
+                    "and close the superseded recorded interval"
+                )
+            seen.add(current)
+            current = parents.get(current)

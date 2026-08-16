@@ -24,6 +24,8 @@ def name_record(
     display_name: str,
     recorded_from: datetime,
     recorded_to: datetime | None = None,
+    effective_from: date = date(2026, 1, 1),
+    effective_to: date | None = None,
 ) -> PersonNameRecord:
     """Build one versioned name fact for historical-query tests."""
 
@@ -32,12 +34,18 @@ def name_record(
         person_record_id=PERSON_ID,
         display_name=display_name,
         period=BitemporalPeriod(
-            effective_from=date(2026, 1, 1),
-            effective_to=None,
+            effective_from=effective_from,
+            effective_to=effective_to,
             recorded_from=recorded_from,
             recorded_to=recorded_to,
         ),
     )
+
+
+def _person_id(fact: PersonNameRecord) -> UUID:
+    """Return the durable person identity for a name fact."""
+
+    return fact.person_record_id
 
 
 class BitemporalResolutionTests(unittest.TestCase):
@@ -61,11 +69,13 @@ class BitemporalResolutionTests(unittest.TestCase):
             history,
             effective_on=date(2026, 1, 15),
             known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            identity_of=_person_id,
         )
         known_in_february = resolve_bitemporal_fact(
             history,
             effective_on=date(2026, 1, 15),
             known_at=datetime(2026, 2, 2, tzinfo=timezone.utc),
+            identity_of=_person_id,
         )
 
         self.assertEqual(known_in_january, original)
@@ -82,6 +92,7 @@ class BitemporalResolutionTests(unittest.TestCase):
             (value,),
             effective_on=date(2025, 12, 31),
             known_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
+            identity_of=_person_id,
         )
 
         self.assertIsNone(resolved)
@@ -92,6 +103,7 @@ class BitemporalResolutionTests(unittest.TestCase):
                 (),
                 effective_on=date(2026, 1, 1),
                 known_at=datetime(2026, 1, 2),
+                identity_of=_person_id,
             )
 
     def test_fails_closed_when_two_facts_are_simultaneously_visible(self) -> None:
@@ -106,11 +118,12 @@ class BitemporalResolutionTests(unittest.TestCase):
             datetime(2026, 1, 3, tzinfo=timezone.utc),
         )
 
-        with self.assertRaisesRegex(TemporalAmbiguityError, "multiple facts"):
+        with self.assertRaisesRegex(TemporalAmbiguityError, "close the superseded"):
             resolve_bitemporal_fact(
                 (first, second),
                 effective_on=date(2026, 1, 15),
                 known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+                identity_of=_person_id,
             )
 
 

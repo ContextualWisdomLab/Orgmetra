@@ -17,5 +17,13 @@ class AllocationExceededError(OrgmetraDomainError):
     """Raised when a person's overlapping assignment allocation exceeds one."""
 
 
+class PositionAssignmentConflictError(OrgmetraDomainError):
+    """Raised when a position's overlapping assignment allocation exceeds one."""
+
+
+class OrganizationCycleError(OrgmetraDomainError):
+    """Raised when visible organization parents form a cycle."""
+
+
 class CandidateWorkerRelinkError(OrgmetraDomainError):
     """Raised when an append-only candidate link targets a different person."""
