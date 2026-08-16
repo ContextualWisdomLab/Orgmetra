@@ -26,12 +26,15 @@
 | `validity_study_decision_link` | Append-only study-to-selection-decision relationship. |
 | `validity_study_evidence_set_link` | Append-only study-to-versioned-evidence relationship. |
 | `validity_study_outcome_link` | Append-only study-to-criterion-observation relationship. |
+| `audit_outbox_record` | Append-only, tenant-scoped copy of the exact PII-minimized canonical event bytes plus their SHA-256 digest, committed atomically with the owning Orgmetra mutation. |
 
 ## Tenant integrity
 
 Every owned HRIS fact stores `tenant_record_id`. Parent identities expose tenant-qualified unique keys and child relations use composite `(tenant_record_id, resource_id)` foreign keys. This prevents a row from referencing an otherwise valid resource owned by a different tenant. Forced PostgreSQL row-level security independently filters each tenant-scoped table from `orgmetra.tenant_record_id`; absence of transaction/request tenant context exposes no tenant rows to the application role.
 
 Tenant context is authority supplied by the authenticated application boundary. It is not accepted as sufficient authorization by itself: actor, purpose, operation scope, resource, field sensitivity, legal basis, retention and audit policy remain separate decisions.
+
+`audit_outbox_record` also carries `tenant_record_id`, forces the same row-level-security contract, and validates that the canonical event's `orgmetratenant` extension equals the owning row's tenant. This makes a cross-tenant envelope mismatch a database rejection rather than a downstream consumer problem.
 
 ## Bitemporal fields
 
@@ -53,6 +56,14 @@ Assignments remain a legitimately multiple-membership fact. Each assignment must
 Evidence membership is constructed in `selection_decision_evidence` while its `decision_evidence_set` is open. An open set has no caller-supplied content digest. Finalizing `selection_decision` requires at least one versioned evidence member, canonicalizes the members by `(evidence_reference, evidence_version_code)`, computes SHA-256 inside PostgreSQL, and atomically stores that digest while binding `sealed_selection_decision_id`. Database triggers reject later evidence inserts, second-decision reuse, arbitrary post-seal mutation, and a sealed-set pointer that does not resolve back to the decision that consumed that exact set. This makes the stored digest evidence about database-observed membership at finalization rather than an unverified client assertion.
 
 Validation-study link tables preserve the exact decisions, evidence sets and criterion observations included in a study. External specialist results remain references through published contracts; Orgmetra does not reach into a specialist service's application tables.
+
+## Transactional audit evidence
+
+`AuditOutboxEvent.canonical_json()` produces one exact compact UTF-8 CloudEvent representation. The owning service inserts that text and `content_digest()` into `audit_outbox_record` inside the same database transaction as its business mutation. PostgreSQL parses the text as JSON, checks the CloudEvents identity fields, checks the tenant extension against `tenant_record_id`, requires the governance fields used for accountability, independently re-hashes the exact UTF-8 text with SHA-256, and rejects a high-impact event without `orgmetraconfirmation`.
+
+Committed outbox evidence is append-only: `UPDATE` and `DELETE` are rejected. Delivery status is intentionally not stored in this immutable relation. Dispatcher leases, retries, receipts, and dead-letter state belong to a later operational relation so transport progress cannot rewrite the audit evidence itself.
+
+The envelope contains opaque resource/actor/confirmation references and result classification rather than names, compensation, assessment prose, or other mutable HR payload. Authoritative PII remains in its owning normalized relation and is dereferenced only under purpose-bound authorization.
 
 ## PII policy
 
