@@ -4,6 +4,7 @@
 
 - Monorepo with explicit service boundaries.
 - PostgreSQL for the HRIS system of record, physically shareable only through service-owned schemas and database roles.
+- PostgreSQL deployments must permit the `btree_gist` extension for temporal exclusion constraints and `pgcrypto` for database-owned SHA-256 evidence sealing; managed PostgreSQL offerings must be checked for both extensions before deployment.
 - OpenAPI 3.2.0 for HTTP APIs.
 - AsyncAPI/CloudEvents-style event envelopes for asynchronous integration.
 - JSON Schema Draft 2020-12 for payload validation.
