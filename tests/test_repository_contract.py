@@ -1,5 +1,6 @@
 """Repository-level supply-chain and CI contract tests for Orgmetra."""
 
+import json
 from pathlib import Path
 import re
 import unittest
@@ -72,6 +73,24 @@ class RepositoryContractTests(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8").lower()
         self.assertNotIn("foundation documentation is proposed in pr #2", readme)
         self.assertIn("foundation baseline is proposed in pr #8", readme)
+
+    def test_integrity_manifest_describes_the_current_people_api_stack(self) -> None:
+        """Keep buyer-facing integrity metadata attached to the active dependency chain."""
+        manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
+        paths = {entry["path"] for entry in manifest["files"]}
+
+        self.assertEqual(manifest["base_pr"], 8)
+        self.assertEqual(manifest["generated_for_branch"], "feat/people-api")
+        self.assertTrue(
+            {
+                "packages/orgmetra-domain/src/orgmetra_domain/temporal.py",
+                "packages/orgmetra-postgres/src/orgmetra_postgres/repository.py",
+                "services/people-api/src/orgmetra_people_api/app.py",
+                "docs/contracts/people-api-v1.md",
+                "docs/UML_PEOPLE_API.md",
+                "tests/test_repository_contract.py",
+            }.issubset(paths)
+        )
 
     def test_package_declares_typed_interface(self) -> None:
         marker = (
