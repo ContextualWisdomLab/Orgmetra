@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted baseline.
+Status: Accepted
 
 ## Context
 
@@ -15,7 +15,7 @@ Orgmetra distinguishes:
 - **entity anchors**, such as `person_record`, whose immutable identifier is system-versioned and whose mutable attributes are not stored on the anchor; and
 - **versioned HRIS facts**, such as `person_name_record`, employment, organization, job, position, assignment, criterion, and compensation records.
 
-Every versioned HRIS fact keeps effective time separate from system-recorded time. The database rejects reversed effective or recorded intervals. Analytical views apply an explicit knowledge cutoff so facts recorded later cannot leak into an earlier decision reconstruction.
+Every versioned HRIS fact keeps effective time separate from system-recorded time. Intervals are non-empty and half-open: an end value, when present, must be strictly later than its start. Analytical views apply an explicit knowledge cutoff so facts recorded later cannot leak into an earlier decision reconstruction. Single-valued fact families must also guarantee that one effective-time plus knowledge-time coordinate resolves to at most one version; legitimate multiple-membership facts such as assignments use their relationship-specific allocation rules instead of that exclusion policy.
 
 High-impact decisions and their evidence are immutable event records rather than mutable bitemporal facts. Corrections create a new attributable decision or evidence record; they do not rewrite the prior record.
 
