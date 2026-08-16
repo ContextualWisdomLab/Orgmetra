@@ -43,6 +43,7 @@ def _union_covers(intervals: list[DateInterval], target: DateInterval) -> bool:
 def validate_assignment_portfolio(
     assignments: list[AssignmentFact],
     *,
+    tenant_record_id: UUID,
     person_record_id: UUID,
     employment_record_id: UUID,
     effective_on: date,
@@ -51,7 +52,8 @@ def validate_assignment_portfolio(
     """Reject invalid ratios or a visible allocation total above 1.0000.
 
     Args:
-        assignments: Candidate assignment facts, including other people.
+        assignments: Candidate assignment facts, including other tenants and people.
+        tenant_record_id: Tenant namespace whose employment allocation is reviewed.
         person_record_id: Worker whose portfolio is being saved.
         employment_record_id: Employment that owns the allocations.
         effective_on: The day whose split is being reviewed.
@@ -63,7 +65,8 @@ def validate_assignment_portfolio(
     scoped = [
         fact
         for fact in assignments
-        if fact.person_record_id == person_record_id
+        if fact.tenant_record_id == tenant_record_id
+        and fact.person_record_id == person_record_id
         and fact.employment_record_id == employment_record_id
     ]
     for fact in scoped:
@@ -93,10 +96,11 @@ def validate_assignment_employment_coverage(
     *,
     known_at: datetime,
 ) -> None:
-    """Require the assignment's person and days to match an eligible employment.
+    """Require the assignment's tenant, person, and days to match eligible employment.
 
     ``active`` and ``leave`` versions remain assignment-eligible; terminal or
-    otherwise non-eligible statuses cannot provide staffing coverage.
+    otherwise non-eligible statuses cannot provide staffing coverage. Versions
+    from another tenant are never eligible evidence for this assignment.
 
     Raises:
         EmploymentCoverageError: Link the correct employment or shorten the assignment.
@@ -104,7 +108,8 @@ def validate_assignment_employment_coverage(
     named = [
         version
         for version in employment_versions
-        if version.employment_record_id == assignment.employment_record_id
+        if version.tenant_record_id == assignment.tenant_record_id
+        and version.employment_record_id == assignment.employment_record_id
     ]
     if any(version.person_record_id != assignment.person_record_id for version in named):
         raise EmploymentCoverageError(
@@ -122,8 +127,8 @@ def validate_assignment_employment_coverage(
         assignment.effective,
     ):
         raise EmploymentCoverageError(
-            "Assignment is not covered by an active or leave employment version.",
-            next_action="Shorten the assignment or restore eligible employment coverage for those days.",
+            "Assignment is not covered by an active or leave employment version in this tenant.",
+            next_action="Link this tenant's employment or restore eligible coverage for those days.",
         )
 
 
@@ -133,10 +138,11 @@ def validate_assignment_position_coverage(
     *,
     known_at: datetime,
 ) -> None:
-    """Require every assignment day to land on a staffable position version.
+    """Require every assignment day to land on a staffable position in its tenant.
 
     ``active`` and ``open`` seats remain staffable. ``closed``, ``frozen``, and
-    ``abolished`` seats cannot receive new or continuing allocations.
+    ``abolished`` seats cannot receive new or continuing allocations. A matching
+    position identifier in another tenant never supplies local staffing coverage.
 
     Raises:
         PositionCoverageError: Choose an open seat or shorten the assignment.
@@ -144,7 +150,8 @@ def validate_assignment_position_coverage(
     named = [
         version
         for version in position_versions
-        if version.position_record_id == assignment.position_record_id
+        if version.tenant_record_id == assignment.tenant_record_id
+        and version.position_record_id == assignment.position_record_id
     ]
     visible = [
         version
@@ -157,22 +164,24 @@ def validate_assignment_position_coverage(
         assignment.effective,
     ):
         raise PositionCoverageError(
-            "Assignment is not covered by an active or open position version.",
-            next_action="Choose a staffable seat or shorten the assignment to days the seat is open.",
+            "Assignment is not covered by an active or open position version in this tenant.",
+            next_action="Choose this tenant's staffable seat or shorten the assignment to open days.",
         )
 
 
 def validate_position_seat_capacity(
     assignments: list[AssignmentFact],
     *,
+    tenant_record_id: UUID,
     position_record_id: UUID,
     effective_on: date,
     known_at: datetime,
 ) -> None:
-    """Reject a seat whose visible allocations exceed 1.0000 on one day.
+    """Reject a tenant seat whose visible allocations exceed 1.0000 on one day.
 
     Args:
-        assignments: Candidate assignment facts, including other positions.
+        assignments: Candidate assignment facts, including other tenants and positions.
+        tenant_record_id: Tenant namespace whose position capacity is reviewed.
         position_record_id: Seat whose FTE capacity is being reviewed.
         effective_on: The day whose split is being reviewed.
         known_at: The knowledge cutoff used for the review.
@@ -180,7 +189,12 @@ def validate_position_seat_capacity(
     Raises:
         PositionSeatError: Reduce one allocation so the seat total is at most 1.0000.
     """
-    scoped = [fact for fact in assignments if fact.position_record_id == position_record_id]
+    scoped = [
+        fact
+        for fact in assignments
+        if fact.tenant_record_id == tenant_record_id
+        and fact.position_record_id == position_record_id
+    ]
     visible = resolve_bitemporal_facts(
         scoped,
         identity_of="position_record_id",
@@ -216,7 +230,7 @@ def validate_assignment_write(
     *,
     known_at: datetime,
 ) -> None:
-    """Reject an assignment that fails employment, position, portfolio, or seat rules.
+    """Reject an assignment that fails tenant-scoped employment, position, or FTE rules.
 
     Review the failure, correct the overlapping job or seat, then save again.
     """
@@ -233,6 +247,7 @@ def validate_assignment_write(
     for probe_day in _allocation_probe_days(assignments, assignment.effective):
         validate_assignment_portfolio(
             assignments,
+            tenant_record_id=assignment.tenant_record_id,
             person_record_id=assignment.person_record_id,
             employment_record_id=assignment.employment_record_id,
             effective_on=probe_day,
@@ -240,6 +255,7 @@ def validate_assignment_write(
         )
         validate_position_seat_capacity(
             assignments,
+            tenant_record_id=assignment.tenant_record_id,
             position_record_id=assignment.position_record_id,
             effective_on=probe_day,
             known_at=known_at,
