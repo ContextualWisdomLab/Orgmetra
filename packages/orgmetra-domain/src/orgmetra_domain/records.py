@@ -64,6 +64,63 @@ class EmploymentRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class OrganizationUnitRecord:
+    """Represent one bitemporal version of an organizational unit.
+
+    The stable ``organization_unit_id`` can be reused by successive versions
+    while name, type, parent relationship, and bitemporal period describe the
+    fact that was effective in the business and known by Orgmetra at that time.
+    """
+
+    organization_unit_id: UUID
+    organization_unit_name: str
+    organization_type_code: str
+    period: BitemporalPeriod
+    parent_organization_unit_id: UUID | None = None
+
+    def __post_init__(self) -> None:
+        """Normalize and validate organization display and classification values."""
+
+        object.__setattr__(
+            self,
+            "organization_unit_name",
+            _require_non_blank(self.organization_unit_name, "organization_unit_name"),
+        )
+        object.__setattr__(
+            self,
+            "organization_type_code",
+            _require_non_blank(self.organization_type_code, "organization_type_code"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class JobProfileRecord:
+    """Represent one bitemporal version of an enterprise job definition.
+
+    Jobs describe work independently of organizational seats. Positions refer
+    to the stable ``job_profile_id`` while title and family remain correctable
+    through effective-time and system-recorded-time versions.
+    """
+
+    job_profile_id: UUID
+    job_title: str
+    job_family_code: str
+    period: BitemporalPeriod
+
+    def __post_init__(self) -> None:
+        """Normalize and validate the job title and family classification."""
+
+        object.__setattr__(
+            self, "job_title", _require_non_blank(self.job_title, "job_title")
+        )
+        object.__setattr__(
+            self,
+            "job_family_code",
+            _require_non_blank(self.job_family_code, "job_family_code"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class PositionRecord:
     """Represent an organizational seat that instantiates a versioned job profile."""
 
