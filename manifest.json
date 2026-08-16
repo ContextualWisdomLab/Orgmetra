@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "baca95a32f014c9948a1d78bc7bf90de839316a8acc15f2a9a4c13acb701077b",
-      "bytes": 5361,
-      "lines": 57
+      "sha256": "cd2c6f43f5a907e9bef08b2fe35c1fe99d4eeebef2e116798c52364d347b0d92",
+      "bytes": 5938,
+      "lines": 61
     },
     {
       "path": "CLAUDE.md",
@@ -53,15 +53,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "0984399be3aaf0a6b8c4c5e4be73b9abdaeb879c01f103a7156342a20fd1ff63",
-      "bytes": 3426,
+      "sha256": "136b08e69ac73ea01659b18c7a162bef1930742e1429ee179b25313a431c4698",
+      "bytes": 3482,
       "lines": 81
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
-      "sha256": "6198670346032459245ab23eac3329f7a0112a7f1882e9e0aaef96a88515f2b3",
-      "bytes": 38552,
-      "lines": 913
+      "sha256": "ce2ae52fc66b2f99597ea5285df82c66f90caa46174fef4930d68a8b6177d0dd",
+      "bytes": 38747,
+      "lines": 916
     },
     {
       "path": "database/migrations/0002_sealed_evidence_digest.sql",
@@ -71,20 +71,20 @@
     },
     {
       "path": "docs/API_CONTRACT.md",
-      "sha256": "d1fdfd4ea3e280bc3c6b9195cb38a64bdc92fbb3b0a1b4625ac286e270683285",
-      "bytes": 2663,
-      "lines": 71
+      "sha256": "29edb2c18cb56b8df42322fcf049447da63a1ec00e16ae3ae58e29f4d97ed5cf",
+      "bytes": 2878,
+      "lines": 73
     },
     {
       "path": "docs/DATA_MODEL.md",
-      "sha256": "6258277b1185b157e4cfffba09613901e1d2d1f896ac37ef591a28573906d352",
-      "bytes": 5484,
+      "sha256": "b5266757e1d527ea909de0b78107ffc90ea2f0c543503e4d7521662b879916ee",
+      "bytes": 5729,
       "lines": 59
     },
     {
       "path": "docs/ERD.md",
-      "sha256": "33682c2dd249902a618352626406884ba1e7ee5dbfb82c4be6d1b2952e3c01c2",
-      "bytes": 5176,
+      "sha256": "9a4b433b23a6ec100fce87ec3041a25e29b6acde894b44b043f988fbf03514b9",
+      "bytes": 5367,
       "lines": 59
     },
     {
@@ -113,8 +113,8 @@
     },
     {
       "path": "docs/STORYBOOK.md",
-      "sha256": "7cb727459a888b799c74545c0a6f6e680f3c128a234af4ea0288f5c25413cf65",
-      "bytes": 1334,
+      "sha256": "82f79029b3c2b7a45393bad5ba8fabe61014d4b6149c7d4e73f70ba447f885e9",
+      "bytes": 1389,
       "lines": 50
     },
     {
@@ -131,33 +131,33 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "8e3998231f03e545d62524aed676a88cf635e752a7c873db4722719a5bc0a68a",
-      "bytes": 4672,
-      "lines": 29
+      "sha256": "c9163d641a2ba99fc7e28325cc2357adb2fa8bd8771cd8c71e20a64eb1bb624a",
+      "bytes": 5010,
+      "lines": 30
     },
     {
       "path": "docs/TRD.md",
-      "sha256": "6b9856efb3d2d5b451b65b878ab9b43c0b0ff09d8883874cc855fd5198588464",
-      "bytes": 8825,
-      "lines": 99
+      "sha256": "23697d88a4882698e1a2782b7da3f2ccd0d3cd2d6d1bffe89b6597dc16851077",
+      "bytes": 9064,
+      "lines": 101
     },
     {
       "path": "docs/UML.md",
-      "sha256": "d44cf2212d33eb0c6a4284703d55d114e72bc7baed2c95ce8a3b8739b8d2836c",
-      "bytes": 3847,
-      "lines": 90
+      "sha256": "fa4dc4caf95f033d2896c89793f21e6d81a034e490416ede7c4346b2a7b0abeb",
+      "bytes": 5213,
+      "lines": 120
     },
     {
       "path": "docs/USER_STORIES.md",
-      "sha256": "ad7cd6487991dcca6f8be82372e8b4b74beb8ad75033fcad708b7da10edde71d",
-      "bytes": 2181,
-      "lines": 34
+      "sha256": "5535b39d8c71a36c81f78e2d6dbd90a2d32e6541790f0d28f6dd4baf3ea7b45f",
+      "bytes": 2670,
+      "lines": 37
     },
     {
       "path": "docs/WIREFRAMES.md",
-      "sha256": "aeba88a495ef2332ee7450fa171b1e6c9e24ff9e28646b4c07576e1fb66074b1",
-      "bytes": 1841,
-      "lines": 75
+      "sha256": "b03aa6419aeaf5d42a5698c4d43a434c1633b7ac6fd0b0bd0cda979077adc56e",
+      "bytes": 2005,
+      "lines": 77
     },
     {
       "path": "docs/adr/0001-orgmetra-authoritative-hris-record.md",
@@ -184,16 +184,22 @@
       "lines": 26
     },
     {
+      "path": "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
+      "sha256": "a01ade272ecc05666e6319d9597006f0a5282696ec0c1380e867023770d98fe9",
+      "bytes": 1895,
+      "lines": 30
+    },
+    {
       "path": "docs/adr/README.md",
-      "sha256": "52ea56c54cf65c12d0620c494e253095f5e6b1348a158b67f13dc853e51fa396",
-      "bytes": 495,
-      "lines": 8
+      "sha256": "41b15d664c009cdee97cbc792c46a68e54f9ca9f7d11fd8dabccda78e7db63c9",
+      "bytes": 610,
+      "lines": 9
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
-      "sha256": "3e743b5aeab08eecb0a308df34b971ab2de0c99a8d4b7518ab58631ae3100583",
-      "bytes": 2475,
-      "lines": 33
+      "sha256": "b6e963f51d7f5b1a8dc1144d508399770b6d4b9e27e69bd1c7a380ac4051bb0c",
+      "bytes": 2749,
+      "lines": 37
     },
     {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -215,15 +221,15 @@
     },
     {
       "path": "schemas/openapi.yaml",
-      "sha256": "5024f6aee929c923ef62e77d8750fe76918489228d92cc0bc1b72a7316ca1eb1",
-      "bytes": 10942,
-      "lines": 373
+      "sha256": "3e4e5d3f896a874eb152fe7252672cd576e993c0755fb33ec303d5dc4a317f01",
+      "bytes": 18988,
+      "lines": 644
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "0ca09c270d21ec3ffdf69ea8cd682cd555b23f4bf4b52f8071ca7d898587b5f8",
-      "bytes": 17460,
-      "lines": 433
+      "sha256": "1da09a67ae0d81775025975605bbf75463c7cefd59714c0a3ad8c06686284eb1",
+      "bytes": 18988,
+      "lines": 471
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -239,9 +245,9 @@
     },
     {
       "path": "tests/openapi-contract.test.mjs",
-      "sha256": "fbb960002fdf36bd5de73bb7c21823241bbc55f83160db579dc70e07784a978f",
-      "bytes": 5118,
-      "lines": 150
+      "sha256": "80c1610ef1c189fa325e55389501e0e51531ddf61ee335bb94d9cb3aa55a9fdc",
+      "bytes": 6438,
+      "lines": 195
     },
     {
       "path": "tests/test_bitemporal_postgres.sh",
@@ -263,9 +269,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "c44473b07d4d08778d9f66cf372c9ce9f7f07de162b0bb2bd1813f8ad33189b0",
-      "bytes": 19099,
-      "lines": 475
+      "sha256": "536d207dd8b9ecc10a258302b115edce88b019d4a5fde206d4814a3f6deb2bfb",
+      "bytes": 20147,
+      "lines": 510
     }
   ]
 }
