@@ -56,12 +56,12 @@ writer_pid=$!
 writer_ready=false
 for _ in $(seq 1 80); do
     writer_state="$(psql "${DATABASE_URL}" -Atqc "
-        SELECT state
+        SELECT count(*)
         FROM pg_stat_activity
         WHERE application_name = 'orgmetra_bitemporal_writer'
-        LIMIT 1;
+          AND wait_event = 'PgSleep';
     ")"
-    if [[ "${writer_state}" == "active" ]]; then
+    if [[ "${writer_state}" == "1" ]]; then
         writer_ready=true
         break
     fi
