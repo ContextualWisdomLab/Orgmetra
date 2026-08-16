@@ -1,12 +1,13 @@
 # ERD
 
-For readability, the diagram renders representative `tenant_record` scoping edges rather than repeating the same edge for every tenant-owned relation. The authoritative tenant-isolation contract is `docs/DATA_MODEL.md`: **every owned HRIS fact** stores `tenant_record_id`, every cross-table reference is tenant-qualified, and forced row-level security applies independently to every tenant-scoped table. This omission is visual only; it does not weaken the relational or authorization contract for employment, candidate, evidence, decision, validation-link, compensation, or transition entities.
+For readability, the diagram renders representative `tenant_record` scoping edges rather than repeating the same edge for every tenant-owned relation. The authoritative tenant-isolation contract is `docs/DATA_MODEL.md`: **every owned HRIS fact** stores `tenant_record_id`, every cross-table reference is tenant-qualified, and forced row-level security applies independently to every tenant-scoped table. This omission is visual only; it does not weaken the relational or authorization contract for employment, candidate, evidence, decision, validation-link, compensation, transition, or audit-outbox entities.
 
 ```mermaid
 erDiagram
     tenant_record ||--o{ person_record : scopes
     tenant_record ||--o{ organization_unit : scopes
     tenant_record ||--o{ job_profile : scopes
+    tenant_record ||--o{ audit_outbox_record : scopes
     person_record ||--o{ person_name_record : has_names
     person_record ||--o{ employment_record : has
     employment_record ||--o{ employment_record_version : has_versions
@@ -53,6 +54,8 @@ Each criterion observation belongs to one effective-dated performance cycle so r
 A high-impact selection decision seals exactly one versioned `decision_evidence_set`. Evidence members are inserted while the set is open; the decision records the set reference and atomically changes that set to sealed. After sealing, neither new evidence members nor a second decision may reuse that evidence set. This prevents post-decision evidence drift while retaining normalized, version-addressable evidence.
 
 A `validity_study` connects the criterion blueprint to the exact selection decisions, sealed evidence sets, and criterion observations used as outcomes through append-only link relations. This makes predictor/decision-policy evidence and observed outcomes reconstructable without copying specialist-system payloads into Orgmetra.
+
+`audit_outbox_record` is intentionally not linked by a foreign key to every possible HRIS target. Its CloudEvents subject is an opaque resource reference, because one append-only event relation spans independently extractable bounded contexts. The row is still tenant-qualified, its event identifier is unique inside a tenant, PostgreSQL verifies that the envelope tenant and event id match the relational owner columns, and both UPDATE and DELETE are rejected. This avoids a polymorphic cross-table foreign-key anti-pattern while keeping audit evidence scoped and queryable.
 
 ## Naming contract
 
