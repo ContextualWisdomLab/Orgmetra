@@ -46,18 +46,39 @@ def test_problem_responses_do_not_include_sensitive_exception_fields() -> None:
         '"display_name"',
         '"assessment_response"',
         '"compensation_amount"',
+        "trace_reference",
+        "x-request-id",
     }
     for field_name in forbidden_problem_fields:
-        assert field_name not in source
+        assert field_name not in source.casefold()
     assert "application/problem+json" in source
-    assert "trace_reference" in source
+    assert "support_reference" in source
+    assert "next_action" in source
 
 
-def test_route_purposes_are_server_selected_constants() -> None:
+def test_route_scopes_and_purposes_are_server_selected_constants() -> None:
     source = (PACKAGE_ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert 'RequiredPurpose("people_admin")' in source
-    assert 'RequiredPurpose("people_read")' in source
-    assert 'RequiredPurpose("talent_acquisition")' in source
-    assert 'RequiredPurpose("audit_review")' in source
+    assert 'RequiredPurpose("orgmetra.people.write", "people_admin")' in source
+    assert 'RequiredPurpose("orgmetra.people.read", "people_read")' in source
+    assert '"orgmetra.talent_acquisition.write",\n        "talent_acquisition"' in source
+    assert 'RequiredPurpose("orgmetra.audit.read", "audit_review")' in source
     assert "X-Purpose" not in source
+    assert "X-Decision-Reference" not in source
+    assert "X-Evidence-Reference" not in source
+
+
+def test_person_command_cannot_accept_system_recorded_time() -> None:
+    app_source = (PACKAGE_ROOT / "app.py").read_text(encoding="utf-8")
+    schema_source = (PACKAGE_ROOT / "schemas.py").read_text(encoding="utf-8")
+    repository_source = (PACKAGE_ROOT / "repository.py").read_text(encoding="utf-8")
+
+    assert "payload.recorded_at" not in app_source
+    person_schema = schema_source.split("class PersonCreateRequest", 1)[1].split(
+        "class PersonResponse", 1
+    )[0]
+    person_port = repository_source.split("def create_person", 1)[1].split(
+        "def get_person", 1
+    )[0]
+    assert "recorded_at" not in person_schema
+    assert "recorded_at" not in person_port

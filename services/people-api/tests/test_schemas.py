@@ -18,38 +18,35 @@ from orgmetra_people_api.schemas import (
 )
 
 
-def test_person_request_normalizes_text_and_accepts_aware_time() -> None:
+def test_person_request_normalizes_text_without_system_time_authority() -> None:
     request = PersonCreateRequest(
         person_record_id=uuid4(),
         display_name="  Employee Name  ",
         effective_from=date(2026, 8, 15),
         effective_to=date(2026, 8, 16),
-        recorded_at=datetime(2026, 8, 15, 9, 0, tzinfo=timezone.utc),
     )
 
     assert request.display_name == "Employee Name"
-    assert request.recorded_at is not None
-    assert request.recorded_at.utcoffset() is not None
+    assert not hasattr(request, "recorded_at")
 
 
-def test_person_request_accepts_omitted_recorded_and_effective_end() -> None:
+def test_person_request_accepts_open_effective_end() -> None:
     request = PersonCreateRequest(
         person_record_id=uuid4(),
         display_name="Employee Name",
         effective_from=date(2026, 8, 15),
     )
 
-    assert request.recorded_at is None
     assert request.effective_to is None
 
 
-def test_person_request_rejects_naive_recorded_time() -> None:
-    with pytest.raises(ValidationError, match="timezone offset"):
+def test_person_request_rejects_caller_recorded_time_as_unknown_field() -> None:
+    with pytest.raises(ValidationError, match="recorded_at"):
         PersonCreateRequest(
             person_record_id=uuid4(),
             display_name="Employee Name",
             effective_from=date(2026, 8, 15),
-            recorded_at=datetime(2026, 8, 15, 9, 0),
+            recorded_at=datetime(2026, 8, 15, 9, 0, tzinfo=timezone.utc),  # type: ignore[call-arg]
         )
 
 
@@ -71,7 +68,7 @@ def test_models_forbid_unknown_fields() -> None:
     with pytest.raises(ValidationError, match="extra_forbidden"):
         CandidateWorkerLinkCreateRequest(
             person_record_id=uuid4(),
-            unexpected_value="not allowed",
+            unexpected_value="not allowed",  # type: ignore[call-arg]
         )
 
 

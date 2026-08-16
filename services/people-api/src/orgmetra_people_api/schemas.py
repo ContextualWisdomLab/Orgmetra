@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ApiModel(BaseModel):
@@ -27,16 +27,6 @@ class PersonCreateRequest(ApiModel):
     display_name: str = Field(min_length=1, max_length=300)
     effective_from: date
     effective_to: date | None = None
-    recorded_at: datetime | None = None
-
-    @field_validator("recorded_at")
-    @classmethod
-    def validate_recorded_at(cls, value: datetime | None) -> datetime | None:
-        """Require an explicit timezone for supplied recorded time."""
-
-        if value is not None and value.utcoffset() is None:
-            raise ValueError("recorded_at must include a timezone offset")
-        return value
 
     @model_validator(mode="after")
     def validate_effective_period(self) -> PersonCreateRequest:

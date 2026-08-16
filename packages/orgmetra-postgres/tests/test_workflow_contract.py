@@ -33,6 +33,14 @@ def test_third_party_actions_are_immutably_pinned() -> None:
         assert re.fullmatch(r"[0-9a-f]{40}", revision)
 
 
+def test_checkout_is_bound_to_exact_pull_request_head() -> None:
+    """Prevent GitHub's synthetic merge ref from masquerading as head evidence."""
+
+    workflow_text = _workflow_text()
+
+    assert "ref: ${{ github.event.pull_request.head.sha || github.sha }}" in workflow_text
+
+
 def test_workflow_has_minimal_permissions_and_no_model_credentials() -> None:
     workflow_text = _workflow_text()
 

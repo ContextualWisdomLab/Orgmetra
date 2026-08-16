@@ -3,28 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-from uuid import UUID, uuid4
+import json
+import re
+from uuid import uuid4
 
 import pytest
 from starlette.requests import Request
 
-from orgmetra_people_api.app import (
-    _parse_evidence_header,
-    _parse_uuid_header,
-    create_app,
-)
-from orgmetra_people_api.problems import (
-    RequestTooLarge,
-    _too_large_handler,
-)
+from orgmetra_people_api.app import _parse_uuid_header, create_app
+from orgmetra_people_api.problems import RequestTooLarge, _too_large_handler
 
 from conftest import FakeAuthorizer, FakeRepository
 
 
 def test_app_factory_rejects_missing_repository_port() -> None:
-    authorizer = FakeAuthorizer(
-        principal=_principal(),
-    )
+    authorizer = FakeAuthorizer(principal=_principal())
 
     with pytest.raises(TypeError, match="PeopleRepository"):
         create_app(object(), authorizer)  # type: ignore[arg-type]
@@ -43,6 +36,7 @@ def _principal():
     return AuthorizedPrincipal(
         tenant_reference=uuid4(),
         actor_reference=uuid4(),
+        allowed_scope_codes=frozenset({"orgmetra.people.read"}),
         allowed_purpose_codes=frozenset({"people_read"}),
     )
 
@@ -56,14 +50,7 @@ def test_uuid_header_helper_returns_defaults_and_rejects_non_string() -> None:
         _parse_uuid_header(object(), "X-Test", default=None)  # type: ignore[arg-type]
 
 
-def test_evidence_header_helper_accepts_none_and_rejects_controls() -> None:
-    assert _parse_evidence_header(None) is None
-    assert _parse_evidence_header(" evidence://record/1 ") == "evidence://record/1"
-    with pytest.raises(Exception, match="metadata"):
-        _parse_evidence_header("evidence://record/1\x7f")
-
-
-def test_direct_problem_handler_generates_trace_when_middleware_is_absent() -> None:
+def test_direct_problem_handler_generates_support_when_middleware_is_absent() -> None:
     scope = {
         "type": "http",
         "method": "POST",
@@ -78,9 +65,13 @@ def test_direct_problem_handler_generates_trace_when_middleware_is_absent() -> N
         "http_version": "1.1",
     }
     response = asyncio.run(_too_large_handler(Request(scope), RequestTooLarge()))
-    document = response.body.decode("utf-8")
+    document = json.loads(response.body)
 
     assert response.status_code == 413
     assert response.media_type == "application/problem+json"
-    assert "request_body_too_large" in document
-    assert UUID(response.headers.get("x-request-id", str(uuid4())))
+    assert document["error_code"] == "request_body_too_large"
+    support_reference = response.headers["x-support-reference"]
+    assert re.fullmatch(r"err_[A-Za-z0-9_-]{20,80}", support_reference)
+    assert document["support_reference"] == support_reference
+    assert "trace_reference" not in document
+    assert document["next_action"]

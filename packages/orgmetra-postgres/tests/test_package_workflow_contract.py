@@ -33,6 +33,15 @@ def test_package_actions_are_immutably_pinned() -> None:
         assert re.fullmatch(r"[0-9a-f]{40}", revision)
 
 
+def test_package_checkout_is_bound_to_exact_pull_request_head() -> None:
+    """Ensure package evidence is generated from the PR head, not a merge ref."""
+
+    assert (
+        "ref: ${{ github.event.pull_request.head.sha || github.sha }}"
+        in _workflow_text()
+    )
+
+
 def test_package_workflow_is_secret_minimal_and_current() -> None:
     workflow_text = _workflow_text()
 

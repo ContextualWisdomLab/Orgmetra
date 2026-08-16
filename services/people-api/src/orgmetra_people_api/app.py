@@ -18,14 +18,11 @@ from .auth import (
     AuthenticationFailed,
     TokenAuthorizer,
     ensure_purpose_authorized,
+    ensure_scope_authorized,
     extract_bearer_token,
 )
 from .middleware import RequestBoundaryMiddleware
-from .problems import (
-    InvalidRequestMetadata,
-    ResourceNotFound,
-    register_exception_handlers,
-)
+from .problems import InvalidRequestMetadata, ResourceNotFound, register_exception_handlers
 from .repository import PeopleRepository
 from .schemas import (
     AuditEventListResponse,
@@ -44,11 +41,12 @@ _BEARER_SCHEME = HTTPBearer(auto_error=False, scheme_name="KeyverseBearer")
 
 
 class RequiredPurpose:
-    """Resolve one authenticated, server-selected purpose for a request."""
+    """Resolve one authenticated route scope and business purpose."""
 
-    def __init__(self, purpose_code: str) -> None:
-        """Store one route-owned purpose code."""
+    def __init__(self, scope_code: str, purpose_code: str) -> None:
+        """Store route-owned capability and purpose codes."""
 
+        self._scope_code = scope_code
         self._purpose_code = purpose_code
 
     async def __call__(
@@ -62,25 +60,22 @@ class RequiredPurpose:
             str | None,
             Header(alias="X-Correlation-Id"),
         ] = None,
-        decision_header: Annotated[
-            str | None,
-            Header(alias="X-Decision-Reference"),
-        ] = None,
-        evidence_header: Annotated[
-            str | None,
-            Header(alias="X-Evidence-Reference"),
-        ] = None,
     ) -> PurposeContext:
-        """Authenticate, authorize, and return immutable repository context."""
+        """Authenticate, authorize two dimensions, and return repository context."""
 
         authorization_value = None
         if credentials is not None:
             authorization_value = f"{credentials.scheme} {credentials.credentials}"
         bearer_token = extract_bearer_token(authorization_value)
         authorizer: TokenAuthorizer = request.app.state.token_authorizer
-        principal = await authorizer.authorize(bearer_token, self._purpose_code)
+        principal = await authorizer.authorize(
+            bearer_token,
+            self._scope_code,
+            self._purpose_code,
+        )
         if not isinstance(principal, AuthorizedPrincipal):
             raise AuthenticationFailed("authorizer returned an invalid principal")
+        ensure_scope_authorized(principal, self._scope_code)
         ensure_purpose_authorized(principal, self._purpose_code)
 
         trace_reference: UUID = request.state.trace_reference
@@ -89,20 +84,14 @@ class RequiredPurpose:
             "X-Correlation-Id",
             default=trace_reference,
         )
-        decision_reference = _parse_uuid_header(
-            decision_header,
-            "X-Decision-Reference",
-            default=None,
-        )
-        evidence_reference = _parse_evidence_header(evidence_header)
         try:
             return PurposeContext(
                 tenant_reference=principal.tenant_reference,
                 actor_reference=principal.actor_reference,
                 purpose_code=self._purpose_code,
                 correlation_reference=correlation_reference,
-                decision_reference=decision_reference,
-                evidence_reference=evidence_reference,
+                decision_reference=None,
+                evidence_reference=None,
             )
         except ValueError as error:
             raise InvalidRequestMetadata from error
@@ -142,10 +131,13 @@ def create_app(
     )
     register_exception_handlers(app)
 
-    people_admin = RequiredPurpose("people_admin")
-    people_read = RequiredPurpose("people_read")
-    talent_acquisition = RequiredPurpose("talent_acquisition")
-    audit_review = RequiredPurpose("audit_review")
+    people_admin = RequiredPurpose("orgmetra.people.write", "people_admin")
+    people_read = RequiredPurpose("orgmetra.people.read", "people_read")
+    talent_acquisition = RequiredPurpose(
+        "orgmetra.talent_acquisition.write",
+        "talent_acquisition",
+    )
+    audit_review = RequiredPurpose("orgmetra.audit.read", "audit_review")
 
     @app.get(
         "/health",
@@ -179,7 +171,6 @@ def create_app(
                 display_name=payload.display_name,
                 effective_from=payload.effective_from,
                 effective_to=payload.effective_to,
-                recorded_at=payload.recorded_at,
             )
         )
         return PersonResponse.model_validate(snapshot)
@@ -297,16 +288,3 @@ def _parse_uuid_header(
         return UUID(value.strip())
     except (AttributeError, ValueError) as error:
         raise InvalidRequestMetadata(f"{header_name} is invalid") from error
-
-
-def _parse_evidence_header(value: str | None) -> str | None:
-    """Normalize a bounded printable evidence reference."""
-
-    if value is None:
-        return None
-    normalized = value.strip()
-    if not normalized or len(normalized) > 512:
-        raise InvalidRequestMetadata("X-Evidence-Reference is invalid")
-    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in normalized):
-        raise InvalidRequestMetadata("X-Evidence-Reference is invalid")
-    return normalized

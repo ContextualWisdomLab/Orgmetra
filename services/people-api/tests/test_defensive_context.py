@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 import orgmetra_people_api.app as app_module
 from orgmetra_people_api import create_app
 
-from conftest import AUTHORIZATION if False else FakeAuthorizer, FakeRepository
+from conftest import FakeAuthorizer, FakeRepository
 
 
 AUTHORIZATION_HEADER = {"Authorization": "Bearer valid-token"}
@@ -27,6 +27,7 @@ def test_context_construction_failure_becomes_safe_metadata_problem(
         AuthorizedPrincipal(
             tenant_reference=uuid4(),
             actor_reference=uuid4(),
+            allowed_scope_codes=frozenset({"orgmetra.people.read"}),
             allowed_purpose_codes=frozenset({"people_read"}),
         )
     )

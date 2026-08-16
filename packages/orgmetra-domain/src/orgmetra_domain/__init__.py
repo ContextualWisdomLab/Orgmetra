@@ -8,7 +8,16 @@ from .errors import (
     InvalidDomainValueError,
     OrgmetraDomainError,
 )
-from .records import EmploymentRecord, PersonRecord, PositionRecord
+from .records import (
+    EmploymentRecord,
+    JobProfileRecord,
+    JobProfileVersionRecord,
+    OrganizationUnitRecord,
+    OrganizationUnitVersionRecord,
+    PersonNameRecord,
+    PersonRecord,
+    PositionRecord,
+)
 from .temporal import BitemporalPeriod
 
 __all__ = [
@@ -20,7 +29,12 @@ __all__ = [
     "CandidateWorkerRelinkError",
     "EmploymentRecord",
     "InvalidDomainValueError",
+    "JobProfileRecord",
+    "JobProfileVersionRecord",
+    "OrganizationUnitRecord",
+    "OrganizationUnitVersionRecord",
     "OrgmetraDomainError",
+    "PersonNameRecord",
     "PersonRecord",
     "PositionRecord",
     "validate_assignment_portfolio",

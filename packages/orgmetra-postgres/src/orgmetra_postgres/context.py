@@ -3,7 +3,42 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from string import ascii_lowercase, digits
 from uuid import UUID
+
+_ALLOWED_CODE_CHARACTERS = frozenset(ascii_lowercase + digits + "_")
+
+
+def _normalize_purpose_code(value: str) -> str:
+    """Return one bounded lower-case ASCII purpose code or fail closed."""
+
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("purpose_code must contain a non-whitespace value")
+    if len(normalized) > 64:
+        raise ValueError("purpose_code must not exceed 64 characters")
+    if not all(character in _ALLOWED_CODE_CHARACTERS for character in normalized):
+        raise ValueError(
+            "purpose_code must use lower-case ASCII letters, digits, and underscores"
+        )
+    return normalized
+
+
+def _normalize_evidence_reference(value: str) -> str:
+    """Return one bounded printable-ASCII evidence reference or fail closed."""
+
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("evidence_reference must be omitted or contain a value")
+    if len(normalized) > 512:
+        raise ValueError("evidence_reference must not exceed 512 characters")
+    if not normalized.isascii() or any(
+        ord(character) < 0x21 or ord(character) > 0x7E for character in normalized
+    ):
+        raise ValueError(
+            "evidence_reference must use printable ASCII characters without whitespace"
+        )
+    return normalized
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,23 +59,16 @@ class PurposeContext:
     evidence_reference: str | None = None
 
     def __post_init__(self) -> None:
-        """Reject empty or unbounded text before a database connection opens."""
+        """Reject unsafe metadata before a database connection opens."""
 
-        normalized_purpose = self.purpose_code.strip()
-        if not normalized_purpose:
-            raise ValueError("purpose_code must contain a non-whitespace value")
-        if len(normalized_purpose) > 128:
-            raise ValueError("purpose_code must not exceed 128 characters")
-        object.__setattr__(self, "purpose_code", normalized_purpose)
-
+        object.__setattr__(
+            self,
+            "purpose_code",
+            _normalize_purpose_code(self.purpose_code),
+        )
         if self.evidence_reference is not None:
-            normalized_evidence = self.evidence_reference.strip()
-            if not normalized_evidence:
-                raise ValueError(
-                    "evidence_reference must be omitted or contain a value"
-                )
-            if len(normalized_evidence) > 512:
-                raise ValueError(
-                    "evidence_reference must not exceed 512 characters"
-                )
-            object.__setattr__(self, "evidence_reference", normalized_evidence)
+            object.__setattr__(
+                self,
+                "evidence_reference",
+                _normalize_evidence_reference(self.evidence_reference),
+            )

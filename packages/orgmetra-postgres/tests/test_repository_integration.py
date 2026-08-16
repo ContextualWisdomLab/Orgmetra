@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -100,29 +100,36 @@ def test_tenant_person_audit_and_rls_round_trip(application_dsn: str) -> None:
         repository.create_tenant(context_a, "Renamed Without Revision")
 
     person_id = uuid4()
-    recorded_at = datetime(2026, 8, 15, 8, 30, tzinfo=timezone.utc)
+    effective_from = date(1990, 1, 1)
+    with psycopg.connect(application_dsn) as connection:
+        database_clock_before = connection.execute(
+            "SELECT clock_timestamp()"
+        ).fetchone()[0]
     created = repository.create_person(
         context_a,
         person_record_id=person_id,
         display_name="  Seongho Bae  ",
-        effective_from=date(2026, 8, 15),
-        recorded_at=recorded_at,
+        effective_from=effective_from,
     )
+    with psycopg.connect(application_dsn) as connection:
+        database_clock_after = connection.execute(
+            "SELECT clock_timestamp()"
+        ).fetchone()[0]
     assert created.display_name == "Seongho Bae"
-    assert created.recorded_from == recorded_at
+    assert created.effective_from == effective_from
+    assert database_clock_before <= created.recorded_from <= database_clock_after
     assert repository.create_person(
         context_a,
         person_record_id=person_id,
         display_name="Seongho Bae",
-        effective_from=date(2026, 8, 15),
-        recorded_at=recorded_at,
+        effective_from=effective_from,
     ) == created
     with pytest.raises(RepositoryConflictError, match="different data"):
         repository.create_person(
             context_a,
             person_record_id=person_id,
             display_name="Different Person",
-            effective_from=date(2026, 8, 15),
+            effective_from=effective_from,
         )
 
     assert repository.get_person(context_a, person_id) == created

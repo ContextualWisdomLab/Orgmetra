@@ -27,6 +27,32 @@ ALTER TABLE person_record
     ALTER COLUMN tenant_record_id SET NOT NULL,
     ADD CONSTRAINT person_tenant_identity_key
     UNIQUE (tenant_record_id, person_record_id);
+
+-- A person is a durable identity anchor. Mutable names are separately versioned
+-- so business-time corrections never rewrite identity or knowledge history.
+ALTER TABLE person_record DROP COLUMN display_name;
+CREATE TABLE person_name_record (
+    person_name_record_id uuid PRIMARY KEY,
+    tenant_record_id uuid NOT NULL,
+    person_record_id uuid NOT NULL,
+    display_name text NOT NULL CHECK (length(btrim(display_name)) BETWEEN 1 AND 300),
+    effective_from date NOT NULL,
+    effective_to date,
+    recorded_from timestamptz NOT NULL DEFAULT now(),
+    recorded_to timestamptz,
+    CONSTRAINT person_name_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
+    CONSTRAINT person_name_tenant_foreign_key
+        FOREIGN KEY (tenant_record_id) REFERENCES tenant_record (tenant_record_id),
+    CONSTRAINT person_name_tenant_identity_key
+        UNIQUE (tenant_record_id, person_name_record_id),
+    CONSTRAINT person_name_person_tenant_foreign_key
+        FOREIGN KEY (tenant_record_id, person_record_id)
+        REFERENCES person_record (tenant_record_id, person_record_id)
+);
+CREATE INDEX person_name_effective_time_index
+    ON person_name_record (tenant_record_id, person_record_id, effective_from, recorded_from);
+
 ALTER TABLE employment_record
     ADD CONSTRAINT employment_tenant_foreign_key
     FOREIGN KEY (tenant_record_id) REFERENCES tenant_record (tenant_record_id),
@@ -191,6 +217,7 @@ BEGIN
     FOREACH protected_table IN ARRAY ARRAY[
         'tenant_record',
         'person_record',
+        'person_name_record',
         'employment_record',
         'organization_unit',
         'job_profile',
