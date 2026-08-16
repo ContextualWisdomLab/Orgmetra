@@ -50,8 +50,8 @@ seed_delivery \
     "00000000-0000-4000-8000-000000000072" \
     "integration_hub"
 
-# RED regression: a lease that is already expired is not an actionable claim and
-# must never enter the durable leased state, even through a direct table write.
+# A lease that is already expired is not an actionable claim and must never
+# enter the durable leased state, even through a direct table write.
 set +e
 past_lease_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_id="${TENANT_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
@@ -133,8 +133,7 @@ fi
 # A crashed dispatcher must not strand a leased row forever. Claim a dedicated
 # delivery with a one-second lease, allow it to expire, and require the next
 # dispatcher to atomically reclaim the same row with a new attempt and explicit
-# lease-expiry failure evidence. The current implementation selects pending rows
-# only, so this is the regression that must turn RED before the recovery repair.
+# lease-expiry failure evidence.
 seed_delivery \
     "00000000-0000-4000-8000-000000000063" \
     "00000000-0000-4000-8000-000000000073" \
@@ -163,8 +162,7 @@ fi
 sleep 1.2
 
 # SQL three-valued logic must not let a direct takeover omit the recovery
-# failure classification. A NULL comparison with <> evaluates UNKNOWN, so the
-# transition guard must use null-safe distinctness for required evidence.
+# failure classification.
 set +e
 missing_recovery_evidence_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" <<'SQL'
@@ -281,4 +279,163 @@ if [[ ${invalid_duration_status} -eq 0 || "${invalid_duration_output}" != *"leas
     exit 1
 fi
 
-echo "PostgreSQL atomic outbox claim and expired-lease recovery contract passed"
+# RED: a dispatcher lease must be a capability, not merely descriptive metadata.
+# Only the current live owner may complete or release its claimed row. A stale or
+# foreign worker must not be able to acknowledge another worker's delivery.
+seed_delivery \
+    "00000000-0000-4000-8000-000000000064" \
+    "00000000-0000-4000-8000-000000000074" \
+    "completion_channel"
+
+psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL' >/dev/null
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT outbox_delivery_record_id
+FROM claim_outbox_delivery(
+    :'tenant_id'::uuid,
+    'completion_channel',
+    'dispatcher_worker:completion-owner',
+    300
+);
+SQL
+
+set +e
+foreign_completion_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_id="${TENANT_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT complete_outbox_delivery(
+    :'tenant_id'::uuid,
+    '00000000-0000-4000-8000-000000000074'::uuid,
+    'dispatcher_worker:foreign-worker'
+);
+SQL
+} 2>&1)"
+foreign_completion_status=$?
+set -e
+if [[ ${foreign_completion_status} -eq 0 || "${foreign_completion_output}" != *"outbox lease is not owned by caller"* ]]; then
+    echo "foreign dispatcher completed another worker's lease or failed for the wrong reason: ${foreign_completion_output}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_id="${TENANT_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT complete_outbox_delivery(
+    :'tenant_id'::uuid,
+    '00000000-0000-4000-8000-000000000074'::uuid,
+    'dispatcher_worker:completion-owner'
+);
+SQL
+
+completion_state="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT
+    delivery_state_code || '|'
+    || (lease_owner_reference IS NULL)::text || '|'
+    || (lease_expires_at IS NULL)::text || '|'
+    || (delivered_at IS NOT NULL)::text
+FROM outbox_delivery_record
+WHERE outbox_delivery_record_id = '00000000-0000-4000-8000-000000000074'::uuid;
+SQL
+)"
+if [[ "${completion_state}" != "delivered|true|true|true" ]]; then
+    echo "owner completion did not produce terminal delivery state: ${completion_state}" >&2
+    exit 1
+fi
+
+seed_delivery \
+    "00000000-0000-4000-8000-000000000065" \
+    "00000000-0000-4000-8000-000000000075" \
+    "retry_channel"
+
+psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL' >/dev/null
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT outbox_delivery_record_id
+FROM claim_outbox_delivery(
+    :'tenant_id'::uuid,
+    'retry_channel',
+    'dispatcher_worker:retry-owner',
+    300
+);
+SQL
+
+set +e
+foreign_retry_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_id="${TENANT_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT retry_outbox_delivery(
+    :'tenant_id'::uuid,
+    '00000000-0000-4000-8000-000000000075'::uuid,
+    'dispatcher_worker:foreign-worker',
+    'remote_timeout',
+    60
+);
+SQL
+} 2>&1)"
+foreign_retry_status=$?
+set -e
+if [[ ${foreign_retry_status} -eq 0 || "${foreign_retry_output}" != *"outbox lease is not owned by caller"* ]]; then
+    echo "foreign dispatcher released another worker's lease or failed for the wrong reason: ${foreign_retry_output}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_id="${TENANT_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT retry_outbox_delivery(
+    :'tenant_id'::uuid,
+    '00000000-0000-4000-8000-000000000075'::uuid,
+    'dispatcher_worker:retry-owner',
+    'remote_timeout',
+    60
+);
+SQL
+
+retry_state="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT
+    delivery_state_code || '|'
+    || delivery_attempt_count::text || '|'
+    || (lease_owner_reference IS NULL)::text || '|'
+    || (lease_expires_at IS NULL)::text || '|'
+    || last_failure_code || '|'
+    || (available_at > transaction_timestamp())::text
+FROM outbox_delivery_record
+WHERE outbox_delivery_record_id = '00000000-0000-4000-8000-000000000075'::uuid;
+SQL
+)"
+if [[ "${retry_state}" != "pending|1|true|true|remote_timeout|true" ]]; then
+    echo "owner retry did not clear lease and schedule bounded retry: ${retry_state}" >&2
+    exit 1
+fi
+
+seed_delivery \
+    "00000000-0000-4000-8000-000000000066" \
+    "00000000-0000-4000-8000-000000000076" \
+    "stale_owner_channel"
+
+psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL' >/dev/null
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT outbox_delivery_record_id
+FROM claim_outbox_delivery(
+    :'tenant_id'::uuid,
+    'stale_owner_channel',
+    'dispatcher_worker:stale-owner',
+    1
+);
+SQL
+sleep 1.2
+
+set +e
+stale_completion_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_id="${TENANT_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT complete_outbox_delivery(
+    :'tenant_id'::uuid,
+    '00000000-0000-4000-8000-000000000076'::uuid,
+    'dispatcher_worker:stale-owner'
+);
+SQL
+} 2>&1)"
+stale_completion_status=$?
+set -e
+if [[ ${stale_completion_status} -eq 0 || "${stale_completion_output}" != *"outbox lease is expired and must be reclaimed"* ]]; then
+    echo "stale dispatcher completed an expired lease or failed for the wrong reason: ${stale_completion_output}" >&2
+    exit 1
+fi
+
+echo "PostgreSQL atomic outbox claim, recovery, owner completion, and retry contract passed"
