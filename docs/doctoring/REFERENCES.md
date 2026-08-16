@@ -2,15 +2,27 @@
 
 American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association.
 
+American Institute of Certified Public Accountants. (2017). *TSP section 100: 2017 trust services criteria for security, availability, processing integrity, confidentiality, and privacy*. AICPA.
+
+Diez-Roux, A. V. (1998). Bringing context back into epidemiology: Variables and fallacies in multilevel analysis. *American Journal of Public Health, 88*(2), 216–222. https://doi.org/10.2105/AJPH.88.2.216
+
 Equal Employment Opportunity Commission. (1978). *Uniform guidelines on employee selection procedures*. 29 C.F.R. Part 1607.
 
+International Organization for Standardization. (2023). *ISO 30405:2023 Human resource management — Guidelines on recruitment*. ISO.
+
 International Organization for Standardization. (2025). *ISO 30414:2025 Human resource management — Requirements and recommendations for human capital reporting and disclosure*. ISO.
+
+Jensen, C. S., & Snodgrass, R. T. (1999). Temporal data management. *IEEE Transactions on Knowledge and Data Engineering, 11*(1), 36–44. https://doi.org/10.1109/69.755613
 
 Internet Engineering Task Force. (2024). *Universally Unique IDentifiers (UUIDs)* (RFC 9562). https://www.rfc-editor.org/rfc/rfc9562.html
 
 OpenAPI Initiative. (2025, September 19). *OpenAPI Specification v3.2.0*. https://spec.openapis.org/oas/v3.2.0.html
 
 OpenID Foundation. (2014, February 25). *OpenID Connect Core 1.0 incorporating errata set 2*. https://openid.net/specs/openid-connect-core-1_0.html
+
+Robinson, W. S. (1950). Ecological correlations and the behavior of individuals. *American Sociological Review, 15*(3), 351–357. https://doi.org/10.2307/2087176
+
+Snodgrass, R. T. (1999). *Developing time-oriented database applications in SQL*. Morgan Kaufmann.
 
 Society for Industrial and Organizational Psychology. (2018). *Principles for the validation and use of personnel selection procedures* (5th ed.). SIOP.
 

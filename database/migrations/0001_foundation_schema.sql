@@ -51,20 +51,42 @@ CREATE TABLE employment_record (
     tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
     employment_record_id uuid PRIMARY KEY,
     person_record_id uuid NOT NULL,
-    employment_status_code text NOT NULL,
-    effective_from date NOT NULL,
-    effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT employment_person_tenant_fk
         FOREIGN KEY (tenant_record_id, person_record_id)
         REFERENCES person_record(tenant_record_id, person_record_id),
-    CONSTRAINT employment_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT employment_recorded_period_check
         CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
     CONSTRAINT employment_record_tenant_identity_unique
-        UNIQUE (tenant_record_id, employment_record_id)
+        UNIQUE (tenant_record_id, employment_record_id),
+    CONSTRAINT employment_record_tenant_person_unique
+        UNIQUE (tenant_record_id, employment_record_id, person_record_id)
+);
+
+CREATE TABLE employment_record_version (
+    tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
+    employment_record_version_id uuid PRIMARY KEY,
+    employment_record_id uuid NOT NULL,
+    employment_status_code text NOT NULL,
+    effective_from date NOT NULL,
+    effective_to date,
+    recorded_from timestamptz NOT NULL DEFAULT now(),
+    recorded_to timestamptz,
+    CONSTRAINT employment_version_record_tenant_fk
+        FOREIGN KEY (tenant_record_id, employment_record_id)
+        REFERENCES employment_record(tenant_record_id, employment_record_id),
+    CONSTRAINT employment_version_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
+    CONSTRAINT employment_version_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
+    CONSTRAINT employment_record_bitemporal_exclusion
+        EXCLUDE USING gist (
+            tenant_record_id WITH =,
+            employment_record_id WITH =,
+            daterange(effective_from, effective_to, '[)') WITH &&,
+            tstzrange(recorded_from, recorded_to, '[)') WITH &&
+        )
 );
 
 CREATE TABLE organization_unit (
@@ -153,9 +175,6 @@ CREATE TABLE position_record (
     position_record_id uuid PRIMARY KEY,
     organization_unit_id uuid NOT NULL,
     job_profile_id uuid NOT NULL,
-    position_status_code text NOT NULL,
-    effective_from date NOT NULL,
-    effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
     CONSTRAINT position_organization_tenant_fk
@@ -164,17 +183,41 @@ CREATE TABLE position_record (
     CONSTRAINT position_job_profile_tenant_fk
         FOREIGN KEY (tenant_record_id, job_profile_id)
         REFERENCES job_profile(tenant_record_id, job_profile_id),
-    CONSTRAINT position_record_effective_period_check
-        CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT position_record_recorded_period_check
         CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
     CONSTRAINT position_record_tenant_identity_unique
         UNIQUE (tenant_record_id, position_record_id)
 );
 
+CREATE TABLE position_record_version (
+    tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
+    position_record_version_id uuid PRIMARY KEY,
+    position_record_id uuid NOT NULL,
+    position_status_code text NOT NULL,
+    effective_from date NOT NULL,
+    effective_to date,
+    recorded_from timestamptz NOT NULL DEFAULT now(),
+    recorded_to timestamptz,
+    CONSTRAINT position_version_record_tenant_fk
+        FOREIGN KEY (tenant_record_id, position_record_id)
+        REFERENCES position_record(tenant_record_id, position_record_id),
+    CONSTRAINT position_version_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
+    CONSTRAINT position_version_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
+    CONSTRAINT position_record_bitemporal_exclusion
+        EXCLUDE USING gist (
+            tenant_record_id WITH =,
+            position_record_id WITH =,
+            daterange(effective_from, effective_to, '[)') WITH &&,
+            tstzrange(recorded_from, recorded_to, '[)') WITH &&
+        )
+);
+
 CREATE TABLE assignment_record (
     tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
     assignment_record_id uuid PRIMARY KEY,
+    employment_record_id uuid NOT NULL,
     person_record_id uuid NOT NULL,
     position_record_id uuid NOT NULL,
     allocation_ratio numeric(5,4) NOT NULL
@@ -184,16 +227,18 @@ CREATE TABLE assignment_record (
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
     recorded_to timestamptz,
-    CONSTRAINT assignment_person_tenant_fk
-        FOREIGN KEY (tenant_record_id, person_record_id)
-        REFERENCES person_record(tenant_record_id, person_record_id),
+    CONSTRAINT assignment_employment_person_tenant_fk
+        FOREIGN KEY (tenant_record_id, employment_record_id, person_record_id)
+        REFERENCES employment_record(tenant_record_id, employment_record_id, person_record_id),
     CONSTRAINT assignment_position_tenant_fk
         FOREIGN KEY (tenant_record_id, position_record_id)
         REFERENCES position_record(tenant_record_id, position_record_id),
     CONSTRAINT assignment_record_effective_period_check
         CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT assignment_record_recorded_period_check
-        CHECK (recorded_to IS NULL OR recorded_to > recorded_from)
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
+    CONSTRAINT assignment_record_tenant_identity_unique
+        UNIQUE (tenant_record_id, assignment_record_id)
 );
 
 CREATE TABLE candidate_profile (
@@ -489,6 +534,11 @@ BEFORE UPDATE OR DELETE ON employment_record
 FOR EACH ROW
 EXECUTE FUNCTION protect_bitemporal_history();
 
+CREATE TRIGGER employment_record_version_bitemporal_guard
+BEFORE UPDATE OR DELETE ON employment_record_version
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
 CREATE TRIGGER organization_unit_anchor_bitemporal_guard
 BEFORE UPDATE OR DELETE ON organization_unit
 FOR EACH ROW
@@ -511,6 +561,11 @@ EXECUTE FUNCTION protect_bitemporal_history();
 
 CREATE TRIGGER position_record_bitemporal_guard
 BEFORE UPDATE OR DELETE ON position_record
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER position_record_version_bitemporal_guard
+BEFORE UPDATE OR DELETE ON position_record_version
 FOR EACH ROW
 EXECUTE FUNCTION protect_bitemporal_history();
 
@@ -725,6 +780,12 @@ CREATE POLICY employment_record_scope_policy ON employment_record
 USING (tenant_record_id = current_tenant_record_id())
 WITH CHECK (tenant_record_id = current_tenant_record_id());
 
+ALTER TABLE employment_record_version ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employment_record_version FORCE ROW LEVEL SECURITY;
+CREATE POLICY employment_version_scope_policy ON employment_record_version
+USING (tenant_record_id = current_tenant_record_id())
+WITH CHECK (tenant_record_id = current_tenant_record_id());
+
 ALTER TABLE organization_unit ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_unit FORCE ROW LEVEL SECURITY;
 CREATE POLICY organization_unit_scope_policy ON organization_unit
@@ -752,6 +813,12 @@ WITH CHECK (tenant_record_id = current_tenant_record_id());
 ALTER TABLE position_record ENABLE ROW LEVEL SECURITY;
 ALTER TABLE position_record FORCE ROW LEVEL SECURITY;
 CREATE POLICY position_record_scope_policy ON position_record
+USING (tenant_record_id = current_tenant_record_id())
+WITH CHECK (tenant_record_id = current_tenant_record_id());
+
+ALTER TABLE position_record_version ENABLE ROW LEVEL SECURITY;
+ALTER TABLE position_record_version FORCE ROW LEVEL SECURITY;
+CREATE POLICY position_version_scope_policy ON position_record_version
 USING (tenant_record_id = current_tenant_record_id())
 WITH CHECK (tenant_record_id = current_tenant_record_id());
 

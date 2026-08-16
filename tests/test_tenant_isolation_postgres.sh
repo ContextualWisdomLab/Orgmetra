@@ -24,13 +24,20 @@ INSERT INTO person_name_record (
     'Ada Lovelace', DATE '2026-01-01', TIMESTAMPTZ '2026-01-02 00:00:00+00'
 );
 INSERT INTO employment_record (
-    tenant_record_id, employment_record_id, person_record_id,
-    employment_status_code, effective_from
+    tenant_record_id, employment_record_id, person_record_id
 ) VALUES (
     '10000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-000000000003',
-    '00000000-0000-7000-8000-000000000001',
-    'active', DATE '2026-01-01'
+    '00000000-0000-7000-8000-000000000001'
+);
+INSERT INTO employment_record_version (
+    tenant_record_id, employment_record_version_id, employment_record_id,
+    employment_status_code, effective_from, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000031',
+    '00000000-0000-7000-8000-000000000003',
+    'active', DATE '2026-01-01', TIMESTAMPTZ '2026-01-02 00:00:00+00'
 );
 INSERT INTO organization_unit (tenant_record_id, organization_unit_id)
 VALUES (
@@ -62,21 +69,29 @@ INSERT INTO job_profile_version (
     TIMESTAMPTZ '2026-01-02 00:00:00+00'
 );
 INSERT INTO position_record (
-    tenant_record_id, position_record_id, organization_unit_id, job_profile_id,
-    position_status_code, effective_from
+    tenant_record_id, position_record_id, organization_unit_id, job_profile_id
 ) VALUES (
     '10000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-000000000008',
     '00000000-0000-7000-8000-000000000004',
-    '00000000-0000-7000-8000-000000000006',
-    'active', DATE '2026-01-01'
+    '00000000-0000-7000-8000-000000000006'
+);
+INSERT INTO position_record_version (
+    tenant_record_id, position_record_version_id, position_record_id,
+    position_status_code, effective_from, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000032',
+    '00000000-0000-7000-8000-000000000008',
+    'active', DATE '2026-01-01', TIMESTAMPTZ '2026-01-02 00:00:00+00'
 );
 INSERT INTO assignment_record (
-    tenant_record_id, assignment_record_id, person_record_id, position_record_id,
-    allocation_ratio, effective_from
+    tenant_record_id, assignment_record_id, employment_record_id, person_record_id,
+    position_record_id, allocation_ratio, effective_from
 ) VALUES (
     '10000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-000000000009',
+    '00000000-0000-7000-8000-000000000003',
     '00000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-000000000008', 1.0, DATE '2026-01-01'
 );
@@ -202,13 +217,11 @@ SQL
 set +e
 cross_tenant_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO employment_record (
-    tenant_record_id, employment_record_id, person_record_id,
-    employment_status_code, effective_from
+    tenant_record_id, employment_record_id, person_record_id
 ) VALUES (
     '20000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-000000000030',
-    '00000000-0000-7000-8000-000000000001',
-    'active', DATE '2026-01-01'
+    '00000000-0000-7000-8000-000000000001'
 );
 SQL
 } 2>&1)"
@@ -285,8 +298,9 @@ DECLARE
 BEGIN
     FOREACH table_name IN ARRAY ARRAY[
         'tenant_record', 'person_record', 'person_name_record', 'employment_record',
-        'organization_unit', 'organization_unit_version', 'job_profile',
-        'job_profile_version', 'position_record', 'assignment_record',
+        'employment_record_version', 'organization_unit', 'organization_unit_version',
+        'job_profile', 'job_profile_version', 'position_record',
+        'position_record_version', 'assignment_record',
         'candidate_profile', 'candidate_worker_link', 'performance_cycle',
         'criterion_blueprint', 'criterion_observation', 'decision_evidence_set',
         'selection_decision_evidence', 'selection_decision', 'validity_study',
@@ -311,8 +325,9 @@ DECLARE
 BEGIN
     FOREACH table_name IN ARRAY ARRAY[
         'tenant_record', 'person_record', 'person_name_record', 'employment_record',
-        'organization_unit', 'organization_unit_version', 'job_profile',
-        'job_profile_version', 'position_record', 'assignment_record',
+        'employment_record_version', 'organization_unit', 'organization_unit_version',
+        'job_profile', 'job_profile_version', 'position_record',
+        'position_record_version', 'assignment_record',
         'candidate_profile', 'candidate_worker_link', 'performance_cycle',
         'criterion_blueprint', 'criterion_observation', 'decision_evidence_set',
         'selection_decision_evidence', 'selection_decision', 'validity_study',
@@ -348,8 +363,9 @@ BEGIN
 
     FOREACH table_name IN ARRAY ARRAY[
         'person_record', 'person_name_record', 'employment_record',
-        'organization_unit', 'organization_unit_version', 'job_profile',
-        'job_profile_version', 'position_record', 'assignment_record',
+        'employment_record_version', 'organization_unit', 'organization_unit_version',
+        'job_profile', 'job_profile_version', 'position_record',
+        'position_record_version', 'assignment_record',
         'candidate_profile', 'candidate_worker_link', 'performance_cycle',
         'criterion_blueprint', 'criterion_observation', 'decision_evidence_set',
         'selection_decision_evidence', 'selection_decision', 'validity_study',

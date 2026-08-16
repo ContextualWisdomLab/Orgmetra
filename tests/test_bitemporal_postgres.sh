@@ -16,13 +16,20 @@ VALUES (
     '00000000-0000-7000-8000-000000000001'
 );
 INSERT INTO employment_record (
-    tenant_record_id, employment_record_id, person_record_id,
-    employment_status_code, effective_from
+    tenant_record_id, employment_record_id, person_record_id
 ) VALUES (
     '10000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-000000000002',
-    '00000000-0000-7000-8000-000000000001',
-    'active', DATE '2026-01-01'
+    '00000000-0000-7000-8000-000000000001'
+);
+INSERT INTO employment_record_version (
+    tenant_record_id, employment_record_version_id, employment_record_id,
+    employment_status_code, effective_from, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000021',
+    '00000000-0000-7000-8000-000000000002',
+    'active', DATE '2026-01-01', TIMESTAMPTZ '2026-01-02 00:00:00+00'
 );
 INSERT INTO organization_unit (tenant_record_id, organization_unit_id)
 VALUES (
@@ -159,9 +166,9 @@ fi
 
 set +e
 employment_mutation_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
-UPDATE employment_record SET employment_status_code = 'terminated'
+UPDATE employment_record_version SET employment_status_code = 'terminated'
 WHERE tenant_record_id = '${TENANT_ID}'::uuid
-  AND employment_record_id = '00000000-0000-7000-8000-000000000002';
+  AND employment_record_version_id = '00000000-0000-7000-8000-000000000021';
 "; } 2>&1)"
 employment_mutation_status=$?
 set -e
@@ -195,5 +202,29 @@ INSERT INTO job_profile_version (
     TIMESTAMPTZ '2026-01-02 00:00:00+00'
 );
 SQL
+
+set +e
+overlap_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO employment_record_version (
+    tenant_record_id, employment_record_version_id, employment_record_id,
+    employment_status_code, effective_from, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000022',
+    '00000000-0000-7000-8000-000000000002',
+    'leave', DATE '2026-01-01', TIMESTAMPTZ '2026-01-03 00:00:00+00'
+);
+SQL
+} 2>&1)"
+overlap_status=$?
+set -e
+if [[ ${overlap_status} -eq 0 ]]; then
+    echo "overlapping employment versions unexpectedly succeeded" >&2
+    exit 1
+fi
+if [[ "${overlap_output}" != *"employment_record_bitemporal_exclusion"* ]]; then
+    echo "employment overlap failed for an unexpected reason: ${overlap_output}" >&2
+    exit 1
+fi
 
 echo "PostgreSQL bitemporal concurrency contract passed"

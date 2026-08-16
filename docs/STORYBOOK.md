@@ -1,7 +1,10 @@
 # Storybook Contract
 
+Design tokens live in `packages/design-tokens/` and map to the Figma file at https://www.figma.com/design/xu1ZK1zmtFcDep95R8oE9O. Repeating HR actions use one token each: approve, review, correct, request-evidence, compare, export, and escalate. Storybook stories must consume those tokens instead of one-off colors.
+
 ## Component inventory
 
+- `HrActionButton` (tokenized approve/review/correct/request-evidence/compare/export/escalate)
 - `Button`
 - `LinkButton`
 - `TextField`

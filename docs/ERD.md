@@ -9,11 +9,14 @@ erDiagram
     tenant_record ||--o{ job_profile : scopes
     person_record ||--o{ person_name_record : has_names
     person_record ||--o{ employment_record : has
+    employment_record ||--o{ employment_record_version : has_versions
     organization_unit ||--o{ organization_unit_version : has_versions
     organization_unit_version }o--o| organization_unit : may_parent
     organization_unit ||--o{ position_record : contains
     job_profile ||--o{ job_profile_version : has_versions
     job_profile ||--o{ position_record : defines
+    position_record ||--o{ position_record_version : has_versions
+    employment_record ||--o{ assignment_record : covers
     person_record ||--o{ assignment_record : receives
     position_record ||--o{ assignment_record : assigned_through
     candidate_profile ||--o| candidate_worker_link : may_become
@@ -39,7 +42,7 @@ erDiagram
 
 ## Cardinality decisions
 
-`organization_unit` and `job_profile` are durable anchors. Mutable names, classifications, parent relationships, titles, families, and version codes live in bitemporal version rows. Positions therefore retain stable organization/job references while retroactive corrections append or supersede version facts rather than rewriting identity. An organization version may reference another durable organization as its parent; self-parenting is rejected at the database boundary.
+`organization_unit`, `job_profile`, `employment_record`, and `position_record` are durable anchors. Mutable names, classifications, parent relationships, titles, families, version codes, and employment or position status live in bitemporal version rows. Positions retain stable organization/job references while retroactive corrections append or supersede version facts rather than rewriting identity. An organization version may reference another durable organization as its parent; self-parenting is rejected at the database boundary. An assignment names the employment that covers it, so a person cannot be assigned through another worker's employment.
 
 Every owned HRIS fact carries `tenant_record_id`. Relationships that cross table boundaries use tenant-qualified foreign keys, and row-level security independently filters every tenant-scoped relation. The tenant column is therefore both a referential-integrity boundary and a runtime isolation boundary, not a caller-supplied business attribute.
 

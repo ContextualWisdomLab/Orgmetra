@@ -6,13 +6,15 @@
 |---|---|
 | `tenant_record` | Durable customer/tenant isolation anchor used by referential integrity and row-level security. |
 | `person_record` | Durable person entity inside Orgmetra, not an authentication subject. |
-| `employment_record` | Employment relationship for a person. |
+| `employment_record` | Durable employment identity for a person. |
+| `employment_record_version` | Bitemporal employment status and effective period. |
 | `organization_unit` | Durable organizational identity referenced by positions and hierarchy facts. |
 | `organization_unit_version` | Bitemporal organizational name, type, and parent relationship for an organization unit. |
 | `job_profile` | Durable job identity referenced by positions, criteria, and decisions. |
 | `job_profile_version` | Bitemporal title, family, and version definition for a job profile. |
-| `position_record` | A seat in an organization that instantiates a job profile. |
-| `assignment_record` | A person's allocation to a position over time. |
+| `position_record` | Durable seat identity that keeps stable organization and job references. |
+| `position_record_version` | Bitemporal position status and effective period. |
+| `assignment_record` | A person's allocation to a position through one employment. |
 | `candidate_profile` | Applicant/candidate record before hire. |
 | `candidate_worker_link` | Append-only linkage from candidate to worker after hiring. |
 | `criterion_blueprint` | Job-related performance criterion definition. |
@@ -42,9 +44,9 @@ Effective-dated fact tables use:
 
 Intervals are half-open and non-empty: an end value, when present, must be strictly later than its start. `effective_*` describes real-world validity. `recorded_*` describes when Orgmetra knew the fact.
 
-Durable anchors such as `organization_unit` and `job_profile` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version` and `job_profile_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
+Durable anchors such as `organization_unit`, `job_profile`, `employment_record`, and `position_record` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version`, `job_profile_version`, `employment_record_version`, and `position_record_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
 
-Assignments remain a legitimately multiple-membership fact and therefore use allocation rules rather than the single-valued exclusion policy.
+Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Allocation totals for one employment are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion.
 
 ## High-impact decision evidence
 

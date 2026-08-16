@@ -47,6 +47,11 @@ jobs:
         run: python -m compileall -q tests
       - name: Validate foundation pack
         run: npm run validate
+      - name: Prove HRIS kernel
+        run: |
+          python -m pip install -e 'packages/hris-kernel[test]' 'packages/keyverse-adapter[test]'
+          python -m pytest packages/hris-kernel/tests
+          python -m pytest packages/keyverse-adapter/tests
       - name: Print exact manifest repair data
         if: failure()
         run: python tests/validate_repository.py --print-manifest

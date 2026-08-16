@@ -1,0 +1,20 @@
+:root {
+  --orgmetra-action-approve: #0b6e4f;
+  --orgmetra-action-review: #1d4e89;
+  --orgmetra-action-correct: #9a3412;
+  --orgmetra-action-request-evidence: #6b21a8;
+  --orgmetra-action-compare: #0f766e;
+  --orgmetra-action-export: #334155;
+  --orgmetra-action-escalate: #b45309;
+  --orgmetra-surface-page: #f8fafc;
+  --orgmetra-text-primary: #0f172a;
+  --orgmetra-text-muted: #475569;
+  --orgmetra-danger: #b91c1c;
+  --orgmetra-space-xs: 4px;
+  --orgmetra-space-sm: 8px;
+  --orgmetra-space-md: 16px;
+  --orgmetra-space-lg: 24px;
+  --orgmetra-space-xl: 40px;
+  --orgmetra-radius-sm: 4px;
+  --orgmetra-radius-md: 8px;
+}

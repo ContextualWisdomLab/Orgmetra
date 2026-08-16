@@ -6,6 +6,12 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Added
 
+- `orgmetra_hris_kernel` 0.3.0 with identity-scoped bitemporal resolution, assignment-employment coverage, allocation-portfolio checks, and a Memorial Hospital RN correction case at 100% statement and branch coverage.
+- `employment_record_version` and `position_record_version` so employment and position identity stay stable across retroactive corrections.
+- `assignment_record.employment_record_id` bound to the same person as the covering employment.
+- `orgmetra_keyverse_adapter` that binds an opaque Keyverse subject to a person and rejects passwords, passkeys, and tokens.
+- Design tokens for the repeating HR actions: approve, review, correct, request evidence, compare, export, and escalate.
+- ADR 0004 for employment/position versions and assignment-employment binding.
 - Foundation product baseline for Orgmetra as an evidence-centered HRIS/HCM.
 - CWL federated integration boundary map.
 - Bitemporal HRIS data contract with stable identity anchors and versioned person-name facts.
@@ -31,6 +37,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Protected every current relation with recorded-system-time columns against in-place business mutation or deletion; corrections may only close an open recorded interval before a replacement fact is inserted.
 - Tightened CI provenance by documenting the exact setup-node release and rejecting both tracked and untracked validation side effects.
 - Pinned the PostgreSQL 16.14 CI service image to the reviewed Docker Official Image index digest and added a regression that rejects a mutable `postgres:16` service tag.
+- Split employment and position identity from versioned status so corrections no longer mint a new employment or position identifier.
 
 ### Security
 

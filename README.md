@@ -78,4 +78,4 @@ Job evidence
 
 ## Status
 
-Foundation phase. The protected default branch contains the minimal repository bootstrap; this product baseline is proposed through a reviewed pull request and must not be treated as shipped behavior before merge.
+Foundation plus the first executable employment-truth kernel. The protected default branch still contains only bootstrap; review `orgmetra_hris_kernel` reconstructions, correct overlapping versions, and keep current-head gates green before treating this as shipped behavior.
