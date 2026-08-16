@@ -77,6 +77,12 @@ test('canonical foundation passes validation', () => {
   assert.deepEqual(validateFoundation(resolve('.')), []);
 });
 
+test('governance docs name the protected default branch rather than stale main', () => {
+  const agents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
+  assert.doesNotMatch(agents, /protected[- ](?:`)?main(?:`)?/i);
+  assert.match(agents, /protected default branch/i);
+});
+
 test('Python and Node require the identical foundation artifact set', () => {
   assert.deepEqual([...REQUIRED_FILES].sort(), pythonRequiredFiles().sort());
 });
