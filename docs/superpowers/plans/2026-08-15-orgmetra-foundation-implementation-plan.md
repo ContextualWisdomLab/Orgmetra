@@ -208,7 +208,7 @@ docs/operations/
 
 1. Add local Compose with PostgreSQL and core/gateway/workspace.
 2. Add non-root/read-only/restricted container contract tests.
-3. Add provider-neutral Kubernetes reference with default-deny network policy, probes, resources, disruption/rollout settings, and digest placeholders.
+3. Add provider-neutral Kubernetes reference with default-deny network policy, probes, resources, disruption/rollout settings, and digest pins that must be resolved and verified before release.
 4. Add backup/restore scripts and real CI rehearsal.
 5. Add migration/deploy dry-run and rollback/recovery runbook.
 6. Generate SBOM, provenance, signatures/hashes, and reproducible package evidence.
