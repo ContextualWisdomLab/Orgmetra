@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from string import ascii_lowercase, digits
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from orgmetra_postgres import RepositoryUnavailableError
+
+_PURPOSE_CHARACTERS = frozenset(ascii_lowercase + digits + "_")
+_SCOPE_CHARACTERS = frozenset(ascii_lowercase + digits + "_.:")
 
 
 class AuthenticationFailed(RuntimeError):
@@ -14,7 +18,7 @@ class AuthenticationFailed(RuntimeError):
 
 
 class AuthorizationDenied(RuntimeError):
-    """Indicate that an authenticated principal lacks the required purpose."""
+    """Indicate that an authenticated principal lacks required authority."""
 
 
 class IdentityProviderUnavailable(RepositoryUnavailableError):
@@ -23,29 +27,43 @@ class IdentityProviderUnavailable(RepositoryUnavailableError):
 
 @dataclass(frozen=True, slots=True)
 class AuthorizedPrincipal:
-    """Represent an authenticated actor within one authorized tenant boundary."""
+    """Represent an actor with independent capability scopes and HR purposes."""
 
     tenant_reference: UUID
     actor_reference: UUID
+    allowed_scope_codes: frozenset[str]
     allowed_purpose_codes: frozenset[str]
 
     def __post_init__(self) -> None:
-        """Require at least one bounded machine-readable purpose code."""
+        """Require bounded machine-readable scope and purpose grants."""
 
+        if not self.allowed_scope_codes:
+            raise ValueError("allowed_scope_codes must not be empty")
         if not self.allowed_purpose_codes:
             raise ValueError("allowed_purpose_codes must not be empty")
-        normalized_codes = frozenset(
-            _normalize_purpose_code(code) for code in self.allowed_purpose_codes
+        object.__setattr__(
+            self,
+            "allowed_scope_codes",
+            frozenset(_normalize_scope_code(code) for code in self.allowed_scope_codes),
         )
-        object.__setattr__(self, "allowed_purpose_codes", normalized_codes)
+        object.__setattr__(
+            self,
+            "allowed_purpose_codes",
+            frozenset(
+                _normalize_purpose_code(code) for code in self.allowed_purpose_codes
+            ),
+        )
 
 
 @runtime_checkable
 class TokenAuthorizer(Protocol):
-    """Validate a bearer token and authorize one server-selected purpose."""
+    """Validate a token and authorize server-selected scope and purpose."""
 
     async def authorize(
-        self, bearer_token: str, required_purpose_code: str
+        self,
+        bearer_token: str,
+        required_scope_code: str,
+        required_purpose_code: str,
     ) -> AuthorizedPrincipal:
         """Return one principal or raise a stable authentication exception."""
 
@@ -66,10 +84,20 @@ def extract_bearer_token(authorization_header: str | None) -> str:
     return token
 
 
+def ensure_scope_authorized(
+    principal: AuthorizedPrincipal, required_scope_code: str
+) -> None:
+    """Fail closed when the token lacks the route's operation capability."""
+
+    normalized_scope = _normalize_scope_code(required_scope_code)
+    if normalized_scope not in principal.allowed_scope_codes:
+        raise AuthorizationDenied("required scope is not authorized")
+
+
 def ensure_purpose_authorized(
     principal: AuthorizedPrincipal, required_purpose_code: str
 ) -> None:
-    """Fail closed when an authorizer returns an insufficient principal."""
+    """Fail closed when the actor lacks the route's lawful business purpose."""
 
     normalized_purpose = _normalize_purpose_code(required_purpose_code)
     if normalized_purpose not in principal.allowed_purpose_codes:
@@ -80,14 +108,23 @@ def _normalize_purpose_code(value: str) -> str:
     """Normalize one lower-case ASCII purpose code."""
 
     normalized = value.strip()
-    if not normalized or len(normalized) > 128:
-        raise ValueError("purpose code must contain at most 128 characters")
-    if not all(
-        character.isascii()
-        and (character.islower() or character.isdigit() or character == "_")
-        for character in normalized
-    ):
+    if not normalized or len(normalized) > 64:
+        raise ValueError("purpose code must contain at most 64 characters")
+    if not all(character in _PURPOSE_CHARACTERS for character in normalized):
         raise ValueError(
             "purpose code must use lower-case ASCII letters, digits, and underscores"
+        )
+    return normalized
+
+
+def _normalize_scope_code(value: str) -> str:
+    """Normalize one bounded lower-case ASCII operation scope."""
+
+    normalized = value.strip()
+    if not normalized or len(normalized) > 128:
+        raise ValueError("scope code must contain at most 128 characters")
+    if not all(character in _SCOPE_CHARACTERS for character in normalized):
+        raise ValueError(
+            "scope code must use lower-case ASCII letters, digits, dots, colons, and underscores"
         )
     return normalized
