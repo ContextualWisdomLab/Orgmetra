@@ -10,19 +10,23 @@ The current foundation pack is executable documentation. Its validation command 
 npm run validate
 ```
 
-The command must fail on a missing required artifact, manifest mismatch, invalid database name, reversed temporal interval contract, missing append-only guard, incomplete high-risk OpenAPI context, empty OpenID Connect scope requirement, internal trace identifier in a client error schema, unbalanced Markdown fence, or incomplete Apache-2.0 license.
+The command runs Python repository-integrity validation, the dependency-free Node foundation validator, Node regression tests, and mutation-style OpenAPI operation-contract tests. It must fail on a missing required artifact, manifest mismatch, invalid database name, missing tenant/evidence/temporal DDL contract, incomplete high-risk OpenAPI operation context, empty OpenID Connect scope requirement, internal trace identifier in a client error schema, unbalanced Markdown fence, or incomplete Apache-2.0 license.
 
 ## Foundation test matrix
 
 | Evidence | Execution command |
 |---|---|
-| Required artifacts, manifest SHA-256/byte/line integrity, package metadata, Markdown, license, and database naming | `npm run validate` |
-| PostgreSQL DDL, period constraints, append-only triggers, and 3NF relationships | `postgresql-test-container --migration database/migrations/0001_foundation_schema.sql` once the implementation harness lands |
-| OpenAPI 3.2 authentication, non-empty operation scopes, mutation headers, request schemas, evidence requirements, and client-safe error references | `openapi-contract-test schemas/openapi.yaml` once the generated server harness lands |
+| Required artifacts, manifest SHA-256/byte/line integrity, package metadata, Markdown, license, database naming, tenant/evidence DDL fragments | `npm run validate` |
+| Structural OpenAPI 3.2 operation ownership: exact scopes, mutation headers, request-schema binding, evidence requirements, human confirmation, and client-safe error fields | `node --test tests/openapi-contract.test.mjs` (also included in `npm run validate`) |
+| Bitemporal non-overlap, concurrent conflicting version insert, retroactive correction, and in-place rewrite rejection | `bash tests/test_bitemporal_postgres.sh` against PostgreSQL 16 in Foundation CI |
+| Cross-tenant composite-FK rejection, missing-context fail-closed RLS, and tenant-visible row isolation over every current HRIS table | `bash tests/test_tenant_isolation_postgres.sh` against PostgreSQL 16 in Foundation CI |
+| Decision evidence set sealing, post-decision evidence-insert rejection, and evidence-set single-use enforcement | `bash tests/test_evidence_sealing_postgres.sh` against PostgreSQL 16 in Foundation CI |
 | Tenant/actor/purpose authorization matrix and negative high-impact commands | service-specific unit and integration test commands recorded in each service package |
 | AsyncAPI/CloudEvents envelope compatibility | provider and consumer contract test commands recorded beside the versioned event schema |
 | External adapter timeout, malformed response, tenant mismatch, and unavailable-state handling | fake-server tests in each adapter package |
 | Role-workspace keyboard, focus, exact-value, permission-denied, and confirmation states | Storybook interaction/a11y tests plus browser E2E for the owning workspace |
+
+The PostgreSQL scripts apply the exact checked-in migration to a fresh database. The tenant-isolation test switches to an unprivileged `NOLOGIN NOBYPASSRLS` reader before asserting RLS behavior, so table-owner/superuser bypass cannot manufacture a passing tenant boundary. The CI matrix runs all three database contracts independently, and a cancelled, skipped, queued, or predecessor-head matrix result is not database evidence for the current head.
 
 Future service packages must publish their exact test, statement-coverage, branch-coverage, docstring, typecheck, and build commands in the package manifest and CI log.
 
@@ -35,8 +39,12 @@ Required negative and provenance tests include:
 - missing or insufficient Keyverse scope, actor, tenant, purpose, reason, confirmation, evidence reference, or evidence version fails closed;
 - a reused confirmation or idempotency key cannot bind to different command content;
 - previewed evidence versions must equal recorded evidence versions;
+- finalizing a selection decision seals exactly one versioned evidence set in the same transaction;
+- a sealed evidence set rejects later membership changes and cannot be reused by another decision;
 - record and audit append either complete together or leave no authoritative decision;
-- a cross-tenant read or mutation is denied and produces a bounded audit event;
+- a cross-tenant foreign-key reference is rejected even when the referenced identifier exists in another tenant;
+- an application role with missing tenant context sees no tenant-owned rows;
+- a cross-tenant read or mutation is denied and produces a bounded audit event once the audit service slice lands;
 - a purpose header cannot enlarge a token's operation scope; and
 - client errors contain an actionable `next_action` and random `support_reference` but no internal trace/span identifier, topology, tenant identifier, or PII.
 
