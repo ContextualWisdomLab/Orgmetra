@@ -40,6 +40,7 @@ def test_every_protected_table_has_forced_row_level_security() -> None:
     protected_tables = {
         "tenant_record",
         "person_record",
+        "person_name_record",
         "employment_record",
         "organization_unit",
         "job_profile",
@@ -67,6 +68,21 @@ def test_every_protected_table_has_forced_row_level_security() -> None:
     assert "ENABLE ROW LEVEL SECURITY" in migration_text
     assert "FORCE ROW LEVEL SECURITY" in migration_text
     assert "WITH CHECK" in migration_text
+
+
+def test_person_name_is_versioned_outside_durable_person_anchor() -> None:
+    """Keep mutable names bitemporal instead of rewriting person identity."""
+
+    migration_text = _migration_text()
+
+    assert "CREATE TABLE person_name_record" in migration_text
+    assert "ALTER TABLE person_record DROP COLUMN display_name" in migration_text
+    assert "person_name_record_id uuid PRIMARY KEY" in migration_text
+    assert "effective_from date NOT NULL" in migration_text
+    assert "effective_to date" in migration_text
+    assert "recorded_from timestamptz NOT NULL DEFAULT now()" in migration_text
+    assert "recorded_to timestamptz" in migration_text
+    assert "person_name_person_tenant_foreign_key" in migration_text
 
 
 def test_migration_contains_no_blanket_masking_or_unbounded_public_grants() -> None:

@@ -37,13 +37,19 @@ def test_context_normalizes_bounded_text() -> None:
     assert isinstance(context.tenant_reference, UUID)
 
 
-@pytest.mark.parametrize("value", ["", "   ", "x" * 129])
+@pytest.mark.parametrize(
+    "value",
+    ["", "   ", "x" * 65, "HR_Admin", "hr-admin", "café", "hr\nadmin"],
+)
 def test_context_rejects_invalid_purpose(value: str) -> None:
     with pytest.raises(ValueError, match="purpose_code"):
         _context(purpose_code=value)
 
 
-@pytest.mark.parametrize("value", ["", "   ", "x" * 513])
+@pytest.mark.parametrize(
+    "value",
+    ["", "   ", "x" * 513, "evidence://사례/1", "evidence://case/\n1", "bad\x7fref"],
+)
 def test_context_rejects_invalid_evidence_reference(value: str) -> None:
     with pytest.raises(ValueError, match="evidence_reference"):
         _context(evidence_reference=value)
