@@ -22,6 +22,7 @@ _EVENT_TYPE_PATTERN = re.compile(r"^orgmetra(?:\.[a-z][a-z0-9_]*){2,}$")
 _OPAQUE_REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _VERSION_CODE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+_MAX_UUID_INT = (1 << 128) - 1
 _REQUIRED_TEXT_FIELDS = (
     "resource_reference",
     "actor_reference",
@@ -40,7 +41,8 @@ class AuditOutboxEvent:
     High-impact employment decisions require ``confirmation_reference``. The
     emitted CloudEvent intentionally excludes mutable HR payload fields so the
     audit/outbox record can be retained and shared without becoming a shadow
-    system of record for names, compensation, or other necessary PII.
+    system of record for names, compensation, or other necessary PII. Reserved
+    Nil and Max UUID sentinels are rejected before persistence.
     """
 
     event_id: UUID
@@ -67,6 +69,10 @@ class AuditOutboxEvent:
             raise ValueError("event_id must not be the reserved nil UUID.")
         if self.tenant_record_id.int == 0:
             raise ValueError("tenant_record_id must not be the reserved nil UUID.")
+        if self.event_id.int == _MAX_UUID_INT:
+            raise ValueError("event_id must not be the reserved max UUID.")
+        if self.tenant_record_id.int == _MAX_UUID_INT:
+            raise ValueError("tenant_record_id must not be the reserved max UUID.")
         if not isinstance(self.occurred_at, datetime):
             raise ValueError("occurred_at must be a datetime.")
         if type(self.high_impact) is not bool:
