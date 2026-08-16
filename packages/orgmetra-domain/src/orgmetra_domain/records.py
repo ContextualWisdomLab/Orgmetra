@@ -1,4 +1,4 @@
-"""Core HRIS records that preserve distinct person, employment, and position facts."""
+"""Core HRIS records with stable anchors and separately versioned facts."""
 
 from dataclasses import dataclass
 from uuid import UUID
@@ -18,8 +18,20 @@ def _require_non_blank(value: str, field_name: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class PersonRecord:
-    """Represent a durable HR person independently from login credentials."""
+    """Represent the durable HR person anchor without mutable attributes.
 
+    Names and other descriptive facts are intentionally stored in versioned
+    records so retroactive corrections never rewrite the durable identity.
+    """
+
+    person_record_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class PersonNameRecord:
+    """Represent one effective and system-recorded version of a person's name."""
+
+    person_name_record_id: UUID
     person_record_id: UUID
     display_name: str
     period: BitemporalPeriod
