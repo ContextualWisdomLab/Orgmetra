@@ -1,9 +1,10 @@
-"""Bitemporal value objects for effective and system-recorded time."""
+"""Bitemporal value objects and deterministic historical fact resolution."""
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Iterable, Protocol, TypeVar
 
-from .errors import InvalidDomainValueError
+from .errors import InvalidDomainValueError, TemporalAmbiguityError
 
 
 def _require_aware(value: datetime, field_name: str) -> None:
@@ -52,3 +53,40 @@ class BitemporalPeriod:
         return self.recorded_from <= moment and (
             self.recorded_to is None or moment < self.recorded_to
         )
+
+
+class _BitemporalFact(Protocol):
+    """Structural type for domain facts that expose one bitemporal period."""
+
+    period: BitemporalPeriod
+
+
+_BitemporalFactT = TypeVar("_BitemporalFactT", bound=_BitemporalFact)
+
+
+def resolve_bitemporal_fact(
+    facts: Iterable[_BitemporalFactT],
+    *,
+    effective_on: date,
+    known_at: datetime,
+) -> _BitemporalFactT | None:
+    """Return the sole fact visible at one business-time/knowledge-time coordinate.
+
+    A missing match returns ``None``. More than one visible fact is a data-integrity
+    violation, so the resolver fails closed instead of selecting by collection order.
+    The knowledge-time coordinate must carry an explicit UTC offset.
+    """
+
+    _require_aware(known_at, "known_at")
+    visible_facts = [
+        fact
+        for fact in facts
+        if fact.period.is_effective_on(effective_on) and fact.period.was_known_at(known_at)
+    ]
+    if not visible_facts:
+        return None
+    if len(visible_facts) > 1:
+        raise TemporalAmbiguityError(
+            "multiple facts are visible at the requested bitemporal coordinate"
+        )
+    return visible_facts[0]
