@@ -36,6 +36,12 @@ paths:
       responses:
         '201':
           description: Created
+          headers:
+            Location:
+              description: Canonical URI for the created person record.
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
@@ -112,6 +118,12 @@ paths:
       responses:
         '201':
           description: Recorded
+          headers:
+            Location:
+              description: Canonical URI for the recorded selection decision.
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
