@@ -26,6 +26,8 @@
 | `validity_study_decision_link` | Append-only study-to-selection-decision relationship. |
 | `validity_study_evidence_set_link` | Append-only study-to-versioned-evidence relationship. |
 | `validity_study_outcome_link` | Append-only study-to-criterion-observation relationship. |
+| `audit_event_record` | Append-only, tenant-scoped canonical audit envelope bytes plus database-verified SHA-256 digest. |
+| `outbox_delivery_record` | Mutable asynchronous delivery coordination for one immutable audit event and delivery target. |
 
 ## Tenant integrity
 
@@ -54,6 +56,16 @@ Evidence membership is constructed in `selection_decision_evidence` while its `d
 
 Validation-study link tables preserve the exact decisions, evidence sets and criterion observations included in a study. External specialist results remain references through published contracts; Orgmetra does not reach into a specialist service's application tables.
 
+## Audit and outbox normalization
+
+`audit_event_record` and `outbox_delivery_record` are deliberately separate relations. The audit relation stores the immutable, PII-minimized canonical CloudEvents representation and its SHA-256 digest. The database allowlists the event shape, verifies event and tenant identifiers, requires accountable human confirmation when `data.high_impact` is true, and recomputes the digest over the exact stored UTF-8 text before accepting the row.
+
+`outbox_delivery_record` stores only delivery coordination: target, state, attempt count, availability, lease metadata, bounded failure code, and terminal delivery time. It references the immutable audit event through a tenant-qualified foreign key. A unique tenant/event/target key prevents duplicate delivery work for the same target. The guarded lifecycle is `pending -> leased -> delivered`, with `leased -> pending` available for a recorded retry. Audit facts cannot be updated or deleted; terminal delivered rows cannot be rewritten. This separation prevents retry mechanics from becoming mutable audit history and avoids repeating the event payload per delivery target.
+
+`record_audit_outbox_event(...)` inserts both rows in one statement. It is called by the owning service inside the same PostgreSQL transaction as the authoritative business mutation. If the outbox insert fails, the audit insert from that statement rolls back; if a later business-transaction statement fails, the transaction owner must roll back the entire mutation/audit/outbox unit.
+
+Dispatcher row claiming, bounded backoff, lease-expiry recovery, retention/export, and external delivery receipts are not yet represented as production-complete behavior on the stacked branch.
+
 ## PII policy
 
-PII is not globally masked. Instead, every sensitive read is evaluated against tenant, actor, role, purpose, resource, field sensitivity, legal basis, retention, and audit policy.
+PII is not globally masked. Instead, every sensitive read is evaluated against tenant, actor, role, purpose, resource, field sensitivity, legal basis, retention, and audit policy. Audit envelopes store opaque references and governance codes instead of duplicating mutable employee or candidate payloads.
