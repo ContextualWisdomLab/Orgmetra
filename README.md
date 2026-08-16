@@ -79,8 +79,9 @@ Job evidence
 ## Implementation slices
 
 - `packages/orgmetra-domain`: bitemporal people, employment, position, assignment, and candidate-worker invariants.
-- `.github/workflows/quality.yml`: pinned Python 3.11-3.14 quality matrix with an aggregate required check.
+- `packages/orgmetra-postgres`: tenant-isolated purpose-bound PostgreSQL persistence.
+- `services/people-api`: purpose-bound customer-facing People API boundary.
 
 ## Status
 
-The foundation documentation is proposed in PR #2. The bitemporal domain kernel is proposed in a stacked implementation PR and is not protected default-branch truth until both PRs merge in dependency order.
+The foundation baseline is proposed in PR #8 against the protected default `bootstrap` branch. PR #3 provides the bitemporal domain kernel, PR #5 provides persistence, and this People API is PR #6. These stacked slices are not protected default-branch truth until their dependencies merge in order and each retargeted exact head satisfies fresh review and required checks.
