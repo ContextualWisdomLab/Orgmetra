@@ -36,5 +36,17 @@ class EmploymentCoverageError(KernelError):
     """An assignment is not covered by the named employment or person."""
 
 
+class EmploymentExclusivityError(KernelError):
+    """Two exclusive employments overlap for one person, or concurrency is unknown."""
+
+
+class PositionCoverageError(KernelError):
+    """An assignment is not covered by a staffable position version."""
+
+
+class PositionSeatError(KernelError):
+    """Visible allocations for one position exceed 1.0000."""
+
+
 class CorrectionError(KernelError):
     """A recorded interval cannot be closed in the requested way."""

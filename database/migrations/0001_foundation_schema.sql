@@ -69,6 +69,9 @@ CREATE TABLE employment_record_version (
     employment_record_version_id uuid PRIMARY KEY,
     employment_record_id uuid NOT NULL,
     employment_status_code text NOT NULL,
+    employment_concurrency_code text NOT NULL DEFAULT 'exclusive'
+        CONSTRAINT employment_concurrency_code_check
+        CHECK (employment_concurrency_code IN ('exclusive', 'concurrent')),
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),

@@ -16,6 +16,7 @@ IDENTITY_FIELDS = frozenset(
         "position_record_id",
         "assignment_record_id",
         "employment_record_version_id",
+        "position_record_version_id",
     }
 )
 
@@ -29,6 +30,19 @@ class EmploymentVersion:
     employment_record_version_id: UUID
     person_record_id: UUID
     employment_status_code: str
+    effective: DateInterval
+    recorded: RecordedInterval
+    employment_concurrency_code: str = "exclusive"
+
+
+@dataclass(frozen=True, slots=True)
+class PositionVersion:
+    """One recorded version of a durable position seat."""
+
+    tenant_record_id: UUID
+    position_record_id: UUID
+    position_record_version_id: UUID
+    position_status_code: str
     effective: DateInterval
     recorded: RecordedInterval
 

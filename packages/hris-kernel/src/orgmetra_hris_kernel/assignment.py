@@ -6,14 +6,20 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from orgmetra_hris_kernel.errors import AssignmentPortfolioError, EmploymentCoverageError
-from orgmetra_hris_kernel.facts import AssignmentFact, EmploymentVersion
+from orgmetra_hris_kernel.errors import (
+    AssignmentPortfolioError,
+    EmploymentCoverageError,
+    PositionCoverageError,
+    PositionSeatError,
+)
+from orgmetra_hris_kernel.facts import AssignmentFact, EmploymentVersion, PositionVersion
 from orgmetra_hris_kernel.intervals import DateInterval
 from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts
 
 _ONE = Decimal("1.0000")
 _ZERO = Decimal("0")
 _ASSIGNMENT_ELIGIBLE_EMPLOYMENT_STATUSES = frozenset({"active", "leave"})
+_STAFFABLE_POSITION_STATUSES = frozenset({"active", "open"})
 
 
 def _ratio_is_valid(allocation_ratio: Decimal) -> bool:
@@ -118,4 +124,123 @@ def validate_assignment_employment_coverage(
         raise EmploymentCoverageError(
             "Assignment is not covered by an active or leave employment version.",
             next_action="Shorten the assignment or restore eligible employment coverage for those days.",
+        )
+
+
+def validate_assignment_position_coverage(
+    assignment: AssignmentFact,
+    position_versions: list[PositionVersion],
+    *,
+    known_at: datetime,
+) -> None:
+    """Require every assignment day to land on a staffable position version.
+
+    ``active`` and ``open`` seats remain staffable. ``closed``, ``frozen``, and
+    ``abolished`` seats cannot receive new or continuing allocations.
+
+    Raises:
+        PositionCoverageError: Choose an open seat or shorten the assignment.
+    """
+    named = [
+        version
+        for version in position_versions
+        if version.position_record_id == assignment.position_record_id
+    ]
+    visible = [
+        version
+        for version in named
+        if version.recorded.contains(known_at)
+        and version.position_status_code in _STAFFABLE_POSITION_STATUSES
+    ]
+    if not visible or not _union_covers(
+        [version.effective for version in visible],
+        assignment.effective,
+    ):
+        raise PositionCoverageError(
+            "Assignment is not covered by an active or open position version.",
+            next_action="Choose a staffable seat or shorten the assignment to days the seat is open.",
+        )
+
+
+def validate_position_seat_capacity(
+    assignments: list[AssignmentFact],
+    *,
+    position_record_id: UUID,
+    effective_on: date,
+    known_at: datetime,
+) -> None:
+    """Reject a seat whose visible allocations exceed 1.0000 on one day.
+
+    Args:
+        assignments: Candidate assignment facts, including other positions.
+        position_record_id: Seat whose FTE capacity is being reviewed.
+        effective_on: The day whose split is being reviewed.
+        known_at: The knowledge cutoff used for the review.
+
+    Raises:
+        PositionSeatError: Reduce one allocation so the seat total is at most 1.0000.
+    """
+    scoped = [fact for fact in assignments if fact.position_record_id == position_record_id]
+    visible = resolve_bitemporal_facts(
+        scoped,
+        identity_of="position_record_id",
+        identity_value=position_record_id,
+        effective_on=effective_on,
+        known_at=known_at,
+    )
+    total = sum((fact.allocation_ratio for fact in visible), start=_ZERO)
+    if total > _ONE:
+        raise PositionSeatError(
+            "Visible allocations for one position exceed 1.0000.",
+            next_action="Reduce one assignment so the seat total is at most 1.0000.",
+        )
+
+
+def _allocation_probe_days(
+    assignments: list[AssignmentFact],
+    target: DateInterval,
+) -> list[date]:
+    """Return start days that can change the visible allocation mix."""
+    probe_days = {target.start}
+    for fact in assignments:
+        if fact.effective.overlaps(target) and target.contains(fact.effective.start):
+            probe_days.add(fact.effective.start)
+    return sorted(probe_days)
+
+
+def validate_assignment_write(
+    assignment: AssignmentFact,
+    assignments: list[AssignmentFact],
+    employment_versions: list[EmploymentVersion],
+    position_versions: list[PositionVersion],
+    *,
+    known_at: datetime,
+) -> None:
+    """Reject an assignment that fails employment, position, portfolio, or seat rules.
+
+    Review the failure, correct the overlapping job or seat, then save again.
+    """
+    validate_assignment_employment_coverage(
+        assignment,
+        employment_versions,
+        known_at=known_at,
+    )
+    validate_assignment_position_coverage(
+        assignment,
+        position_versions,
+        known_at=known_at,
+    )
+    for probe_day in _allocation_probe_days(assignments, assignment.effective):
+        validate_assignment_portfolio(
+            assignments,
+            person_record_id=assignment.person_record_id,
+            employment_record_id=assignment.employment_record_id,
+            effective_on=probe_day,
+            known_at=known_at,
+        )
+        validate_position_seat_capacity(
+            assignments,
+            position_record_id=assignment.position_record_id,
+            effective_on=probe_day,
+            known_at=known_at,
         )
