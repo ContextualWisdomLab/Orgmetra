@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -30,8 +30,20 @@ function write(root, relativePath, content = '# Valid\n') {
   return filePath;
 }
 
+function pythonRequiredFiles() {
+  const source = readFileSync(new URL('./validate_repository.py', import.meta.url), 'utf8');
+  const match = source.match(/REQUIRED = \[(.*?)\]\n\n/s);
+  assert.ok(match, 'Python REQUIRED list was not found');
+  return [...match[1].matchAll(/^\s+"([^"]+)",$/gm)].map((item) => item[1]);
+}
+
 function makeMinimalValidFoundation(root) {
   for (const filePath of REQUIRED_FILES) write(root, filePath);
+  write(
+    root,
+    'schemas/openapi.yaml',
+    readFileSync(new URL('../schemas/openapi.yaml', import.meta.url), 'utf8')
+  );
   write(
     root,
     'docs/TRACEABILITY.md',
@@ -61,6 +73,10 @@ function memoryStream() {
 
 test('canonical foundation passes validation', () => {
   assert.deepEqual(validateFoundation(resolve('.')), []);
+});
+
+test('Python and Node require the identical foundation artifact set', () => {
+  assert.deepEqual([...REQUIRED_FILES].sort(), pythonRequiredFiles().sort());
 });
 
 test('required constants are frozen and use accepted values', () => {
