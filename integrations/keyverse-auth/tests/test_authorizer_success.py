@@ -27,10 +27,19 @@ def test_valid_token_resolves_orgmetra_principal(
     )
     token = encode_token(key_material, oidc_config)
 
-    principal = asyncio.run(authorizer.authorize(token, " people_read "))
+    principal = asyncio.run(
+        authorizer.authorize(
+            token,
+            " orgmetra.people.read ",
+            " people_read ",
+        )
+    )
 
     assert principal.tenant_reference == identity_resolver.references.tenant_reference
     assert principal.actor_reference == identity_resolver.references.actor_reference
+    assert principal.allowed_scope_codes == frozenset(
+        {"orgmetra.people.read", "orgmetra.people.write"}
+    )
     assert principal.allowed_purpose_codes == frozenset(
         {"people_read", "people_admin"}
     )
@@ -60,6 +69,9 @@ def test_header_type_is_case_insensitive_and_optional_jwk_metadata_defaults(
         header_overrides={"typ": "AT+JWT"},
     )
 
-    principal = asyncio.run(authorizer.authorize(token, "people_admin"))
+    principal = asyncio.run(
+        authorizer.authorize(token, "orgmetra.people.write", "people_admin")
+    )
 
+    assert "orgmetra.people.write" in principal.allowed_scope_codes
     assert "people_admin" in principal.allowed_purpose_codes
