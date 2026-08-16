@@ -47,6 +47,20 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    IF EXISTS (
+        SELECT 1
+        FROM jsonb_object_keys(parsed_envelope) AS envelope_keys(key_name)
+        WHERE key_name NOT IN (
+            'specversion', 'id', 'source', 'type', 'subject', 'time',
+            'datacontenttype', 'orgmetratenant', 'orgmetraactor',
+            'orgmetrapurpose', 'orgmetrareason', 'orgmetraevidence',
+            'orgmetraconfirmation', 'data'
+        )
+    ) THEN
+        RAISE EXCEPTION 'audit outbox envelope contains non-contract payload fields'
+            USING ERRCODE = '23514';
+    END IF;
+
     IF parsed_envelope ->> 'specversion' IS DISTINCT FROM '1.0'
        OR parsed_envelope ->> 'datacontenttype' IS DISTINCT FROM 'application/json'
        OR parsed_envelope ->> 'id' IS DISTINCT FROM NEW.event_id::text THEN
@@ -75,6 +89,15 @@ BEGIN
        OR jsonb_typeof(parsed_envelope #> '{data,high_impact}') IS DISTINCT FROM 'boolean'
        OR NULLIF(btrim(parsed_envelope #>> '{data,result_code}'), '') IS NULL THEN
         RAISE EXCEPTION 'audit outbox envelope has invalid governed result data'
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM jsonb_object_keys(parsed_envelope -> 'data') AS data_keys(key_name)
+        WHERE key_name NOT IN ('high_impact', 'result_code')
+    ) THEN
+        RAISE EXCEPTION 'audit outbox envelope contains non-contract payload fields'
             USING ERRCODE = '23514';
     END IF;
 
