@@ -24,8 +24,11 @@
 - `audit_event_record` is immutable evidence. Operations may inspect it but never repair delivery by rewriting its canonical bytes or digest.
 - `outbox_delivery_record` is transport state. A dispatcher may only move `pending -> leased -> delivered`, or return `leased -> pending` with a bounded failure code and cleared lease metadata for retry.
 - A delivered row is terminal. Redelivery for a new target requires a new target-scoped outbox row; it does not reopen historical delivery state.
-- This stacked slice does not yet implement production dispatcher claiming, bounded exponential backoff, lease-expiry recovery, dead-letter/escalation policy, or external delivery receipts. Those controls are release blockers for claiming reliable asynchronous audit delivery.
-- A production dispatcher must claim work with concurrency-safe row locking and prove crash/restart behavior so two workers cannot both own the same pending delivery and an expired lease is recoverable without losing or mutating the underlying audit fact.
+- `claim_outbox_delivery(...)` is the only branch-local dispatcher claim contract. It requires the requested tenant to equal the active `orgmetra.tenant_record_id`, a two-or-more-word delivery target, a namespaced opaque worker reference, and a lease duration from 1 through 3600 seconds.
+- Claims select only due `pending` rows in deterministic availability/record/id order and use PostgreSQL `FOR UPDATE ... SKIP LOCKED` before the guarded update. A successful claim increments the attempt count once, records the worker, creates a strictly future lease, and returns the immutable canonical event plus digest needed for delivery without copying HR payload fields into mutable transport state.
+- A live `leased` row is not claimable. Direct attempts to create an already-expired lease fail closed at the transition trigger rather than creating immediately orphaned work.
+- This stacked slice does not yet implement bounded retry/backoff scheduling, lease-expiry recovery, dead-letter/escalation policy, or external delivery receipts. Those controls remain release blockers for claiming reliable asynchronous audit delivery.
+- Recovery work must preserve single ownership: an expired lease may be returned to `pending` only through a tested owner-aware recovery contract, without losing or mutating the underlying audit fact.
 
 ### Other dependencies
 
