@@ -34,7 +34,7 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 - Mutating requests require authenticated actor, tenant, purpose, resource, and decision context.
 - Read APIs enforce tenant and field-level authorization.
 - High-impact commands require previewed and recorded reason, confirmation, and exact evidence versions.
-- A finalized high-impact selection command binds one immutable evidence-set version and digest; later evidence membership changes are rejected.
+- A finalized high-impact selection command binds one immutable evidence-set version and a database-computed SHA-256 digest over canonical sorted evidence membership; later evidence membership changes are rejected.
 - High-impact decision APIs return evidence sufficiency and escalation status.
 - Generated server validation must enforce the OpenAPI contract before domain handlers execute.
 
@@ -72,7 +72,7 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 - Model external organization roles as time-varying relations when one entity can be a customer, partner, competitor, or vendor in different contexts.
 - Keep assessment results as external immutable snapshot references unless a later ADR transfers instrument lifecycle ownership.
 - Candidate-worker links, selection decisions, evidence-set membership after finalization, and validation-study decision/evidence/outcome links are append-only.
-- Selection decisions seal exactly one `decision_evidence_set` in the same transaction; a sealed set cannot accept new members or be reused by a second decision.
+- An open `decision_evidence_set` carries no caller-supplied digest. Selection finalization requires at least one member, computes the canonical SHA-256 digest inside PostgreSQL, and seals exactly one set in the same transaction; a sealed set cannot accept new members, be reused by a second decision, or point to a different consuming decision.
 - Validity studies reference exact selection decisions, sealed evidence sets and criterion observations through normalized link relations so criterion-related validity can be reconstructed without copying specialist-system payloads.
 
 ## 6. Integration adapters
@@ -95,4 +95,4 @@ Adapters use bounded timeouts, typed error semantics, tenant validation, idempot
 
 ## 7. Testing requirements
 
-`docs/TEST_STRATEGY.md` is the canonical coverage and execution contract. Every service must satisfy its 100% statement/branch coverage requirement where the pinned toolchain exposes those metrics, document exact commands, and preserve migration, API, event, authorization, temporal, tenant-isolation, evidence-sealing, append-only, scientific, adapter-failure, and accessibility evidence. PostgreSQL contract tests use a `NOBYPASSRLS` application role and cover missing tenant context, cross-tenant references, concurrent bitemporal corrections and post-decision evidence drift. This TRD does not define a weaker duplicate threshold.
+`docs/TEST_STRATEGY.md` is the canonical coverage and execution contract. Every service must satisfy its 100% statement/branch coverage requirement where the pinned toolchain exposes those metrics, document exact commands, and preserve migration, API, event, authorization, temporal, tenant-isolation, evidence-sealing, append-only, scientific, adapter-failure, and accessibility evidence. PostgreSQL contract tests use a `NOBYPASSRLS` application role and cover missing tenant context, cross-tenant references, concurrent bitemporal corrections, database-owned evidence digest computation, empty-evidence rejection, and post-decision evidence drift. This TRD does not define a weaker duplicate threshold.
