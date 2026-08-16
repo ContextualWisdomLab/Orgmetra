@@ -11,6 +11,8 @@ __pycache__/
 .coverage
 htmlcov/
 .venv/
+*.egg-info/
+build/
 
 # Node and web tooling
 node_modules/

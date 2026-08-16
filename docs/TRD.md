@@ -92,9 +92,11 @@ The stacked bitemporal domain slice implements these P0 contracts as a pure Pyth
 
 - half-open effective and recorded intervals;
 - timezone-aware system timestamps;
-- distinct person, employment, and position records;
-- multiple simultaneous assignments with total allocation no greater than one per person;
-- append-only candidate-worker linkage;
+- identity-scoped historical resolution;
+- distinct person, employment, and position records with versioned status facts;
+- multiple simultaneous assignments with recorded-time allocation no greater than one per person and per position;
+- covering employment on every assignment;
+- append-only candidate-worker linkage without identifier leakage;
 - a PEP 561 typed-package marker;
 - Python 3.11-3.14 CI, exact 100% production statement/branch coverage, and public docstring validation.
 

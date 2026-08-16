@@ -39,6 +39,41 @@ sequenceDiagram
     TalentAcquisition->>Audit: Append decision provenance
 ```
 
+## Domain kernel class sketch
+
+```mermaid
+classDiagram
+    class PersonRecord {
+        +UUID person_record_id
+    }
+    class PersonNameRecord {
+        +UUID person_record_id
+        +BitemporalPeriod period
+    }
+    class EmploymentRecord {
+        +UUID employment_record_id
+        +UUID person_record_id
+    }
+    class EmploymentVersionRecord {
+        +UUID employment_record_id
+        +BitemporalPeriod period
+    }
+    class AssignmentRecord {
+        +UUID person_record_id
+        +UUID employment_record_id
+        +UUID position_record_id
+        +Decimal allocation_ratio
+        +BitemporalPeriod period
+    }
+    PersonRecord --> PersonNameRecord
+    PersonRecord --> EmploymentRecord
+    EmploymentRecord --> EmploymentVersionRecord
+    EmploymentRecord --> AssignmentRecord
+    PersonRecord --> AssignmentRecord
+```
+
+HR next action: correct a fact by closing the superseded recorded interval, then query as-of the knowledge time you need to defend.
+
 ## Employment state model
 
 ```mermaid

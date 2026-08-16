@@ -34,15 +34,28 @@ Required evidence for any Orgmetra-owned mathematical compute:
 
 ## Active domain-kernel test evidence
 
-The stacked implementation runs 17 behavioral domain tests plus three repository-contract tests. It proves:
+The stacked implementation runs the `orgmetra-domain` unittest suite plus repository-contract tests. After the recorded-time and identity-scope repair it proves:
 
 - reversed and ambiguous bitemporal intervals fail closed;
-- half-open boundaries behave correctly;
+- half-open boundaries hide a row at exact `recorded_to`;
+- a `+09:00` knowledge time matches the equivalent UTC recorded instant;
+- a legal name change is effective-dated, not only retroactively corrected;
+- mixed identities resolve per person instead of raising one tenant-wide ambiguity;
 - valid values normalize without silently accepting blanks;
+- employment and position anchors carry no mutable status;
 - multiple assignments can sum to one but cannot exceed one during overlap;
+- a closed recorded assignment interval does not inflate current FTE;
+- the A/A'/B retroactive correction triple is accepted as-of the correction instant;
+- assignment ratios that cannot persist as `numeric(5,4)` fail closed;
+- an assignment must name a covering employment for the same person;
+- concurrent employments keep assignments on the named relationship;
+- job-share at 0.5 + 0.5 is accepted and two full assignments to one position are rejected;
 - adjacent assignments do not overlap;
 - people are validated independently;
+- a visible organization cycle A→B→A fails closed;
 - candidate-worker registration is idempotent and cannot relink a candidate to a different person;
+- relink and allocation errors omit UUIDs, dates, and ratios;
+- `__post_init__` public methods require beginner-readable docstrings;
 - owned production statement and branch coverage are exactly 100%;
-- public modules, classes, and functions have docstrings;
-- CI actions are commit-pinned and dependencies are hash-locked.
+- CI actions are commit-pinned and dependencies are hash-locked;
+- the quality script builds the wheel, checks `py.typed`, and smoke-imports the installed artifact.
