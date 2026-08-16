@@ -22,13 +22,13 @@
 
 - An accepted business mutation that requires audit evidence must call `record_audit_outbox_event(...)` inside the same PostgreSQL transaction as the authoritative write. A failure to append the audit/outbox pair is a business-transaction failure, not a warning-only condition.
 - `audit_event_record` is immutable evidence. Operations may inspect it but never repair delivery by rewriting its canonical bytes or digest.
-- `outbox_delivery_record` is transport state. A dispatcher may only move `pending -> leased -> delivered`, or return `leased -> pending` with a bounded failure code and cleared lease metadata for retry.
+- `outbox_delivery_record` is transport state. A dispatcher may move `pending -> leased -> delivered`, return `leased -> pending` with a bounded failure code and cleared lease metadata for retry, or atomically replace an expired `leased` ownership grant with a new `leased` grant. Delivery identity and audit binding never change.
 - A delivered row is terminal. Redelivery for a new target requires a new target-scoped outbox row; it does not reopen historical delivery state.
 - `claim_outbox_delivery(...)` is the only branch-local dispatcher claim contract. It requires the requested tenant to equal the active `orgmetra.tenant_record_id`, a two-or-more-word delivery target, a namespaced opaque worker reference, and a lease duration from 1 through 3600 seconds.
-- Claims select only due `pending` rows in deterministic availability/record/id order and use PostgreSQL `FOR UPDATE ... SKIP LOCKED` before the guarded update. A successful claim increments the attempt count once, records the worker, creates a strictly future lease, and returns the immutable canonical event plus digest needed for delivery without copying HR payload fields into mutable transport state.
-- A live `leased` row is not claimable. Direct attempts to create an already-expired lease fail closed at the transition trigger rather than creating immediately orphaned work.
-- This stacked slice does not yet implement bounded retry/backoff scheduling, lease-expiry recovery, dead-letter/escalation policy, or external delivery receipts. Those controls remain release blockers for claiming reliable asynchronous audit delivery.
-- Recovery work must preserve single ownership: an expired lease may be returned to `pending` only through a tested owner-aware recovery contract, without losing or mutating the underlying audit fact.
+- Claims select due `pending` rows and expired `leased` rows in deterministic availability/record/id order and use PostgreSQL `FOR UPDATE ... SKIP LOCKED` before the guarded update. A successful new claim increments the attempt count once, records the worker, creates a strictly future lease, and returns the immutable canonical event plus digest needed for delivery without copying HR payload fields into mutable transport state.
+- A live `leased` row is never claimable. Direct attempts to create an already-expired lease fail closed. When a valid lease later expires, the next claim may atomically take it over, increments the attempt count again, and records `last_failure_code = 'lease_expired'` so worker loss is observable rather than silently stranding work.
+- This stacked slice does not yet implement bounded retry/backoff scheduling, dead-letter/escalation policy, owner-aware delivery completion/retry functions, or external delivery receipts. Those controls remain release blockers for claiming reliable asynchronous audit delivery.
+- Completion and retry work must preserve single ownership: a live lease may only be completed or released by an owner-aware tested contract, while expired ownership is recoverable without losing or mutating the underlying audit fact.
 
 ### Other dependencies
 
