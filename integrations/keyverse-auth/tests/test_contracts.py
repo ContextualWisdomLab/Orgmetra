@@ -21,7 +21,7 @@ def test_config_normalizes_valid_values() -> None:
         audience="  orgmetra-api  ",
         tenant_claim_name=" tenant_claim ",
         purposes_claim_name=" purpose_claim ",
-        allowed_algorithms=("RS256", "ES256"),
+        allowed_algorithms=(" RS256 ", "ES256"),
         required_token_type=" at+jwt ",
         maximum_token_lifetime_seconds=600,
         clock_skew_seconds=0,
@@ -44,6 +44,7 @@ def test_config_normalizes_valid_values() -> None:
         "https://user:password@identity.example.test",
         "https://identity.example.test?query=yes",
         "https://identity.example.test#fragment",
+        "https://identity.example.test\x1f",
     ],
 )
 def test_config_rejects_invalid_issuer(issuer: str) -> None:
@@ -68,6 +69,7 @@ def test_config_rejects_invalid_audience(audience: str) -> None:
         ("tenant_claim_name", "tenant-claim"),
         ("tenant_claim_name", "café"),
         ("tenant_claim_name", "x" * 65),
+        ("tenant_claim_name", "tenant_claim\x1f"),
         ("purposes_claim_name", "Purpose"),
     ],
 )
@@ -83,7 +85,7 @@ def test_config_rejects_invalid_claim_names(field_name: str, value: str) -> None
 
 @pytest.mark.parametrize(
     "algorithms",
-    [(), ("RS256", "RS256"), ("HS256",), ("RS512",)],
+    [(), ("RS256", "RS256"), ("HS256",), ("RS512",), ("RS256\x1f",)],
 )
 def test_config_rejects_empty_duplicate_or_unsupported_algorithms(
     algorithms: tuple[str, ...],
