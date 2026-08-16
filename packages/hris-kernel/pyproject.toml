@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "orgmetra-hris-kernel"
 version = "0.4.0"
-description = "Identity-scoped bitemporal employment-truth kernel for Orgmetra."
+description = "Tenant- and identity-scoped bitemporal employment-truth kernel for Orgmetra."
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "ContextualWisdomLab" }]
