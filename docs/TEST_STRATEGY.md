@@ -10,7 +10,7 @@ The current foundation pack is executable documentation. Its validation command 
 npm run validate
 ```
 
-The command must fail on a missing required artifact, manifest mismatch, invalid database name, reversed temporal interval contract, missing append-only guard, incomplete high-risk OpenAPI context, unbalanced Markdown fence, or incomplete Apache-2.0 license.
+The command must fail on a missing required artifact, manifest mismatch, invalid database name, reversed temporal interval contract, missing append-only guard, incomplete high-risk OpenAPI context, empty OpenID Connect scope requirement, internal trace identifier in a client error schema, unbalanced Markdown fence, or incomplete Apache-2.0 license.
 
 ## Foundation test matrix
 
@@ -18,7 +18,7 @@ The command must fail on a missing required artifact, manifest mismatch, invalid
 |---|---|
 | Required artifacts, manifest SHA-256/byte/line integrity, package metadata, Markdown, license, and database naming | `npm run validate` |
 | PostgreSQL DDL, period constraints, append-only triggers, and 3NF relationships | `postgresql-test-container --migration database/migrations/0001_foundation_schema.sql` once the implementation harness lands |
-| OpenAPI 3.2 authentication, mutation headers, request schemas, and evidence requirements | `openapi-contract-test schemas/openapi.yaml` once the generated server harness lands |
+| OpenAPI 3.2 authentication, non-empty operation scopes, mutation headers, request schemas, evidence requirements, and client-safe error references | `openapi-contract-test schemas/openapi.yaml` once the generated server harness lands |
 | Tenant/actor/purpose authorization matrix and negative high-impact commands | service-specific unit and integration test commands recorded in each service package |
 | AsyncAPI/CloudEvents envelope compatibility | provider and consumer contract test commands recorded beside the versioned event schema |
 | External adapter timeout, malformed response, tenant mismatch, and unavailable-state handling | fake-server tests in each adapter package |
@@ -32,11 +32,13 @@ Required negative and provenance tests include:
 
 - an LLM or orchestration credential cannot create a selection-decision record;
 - an LLM or integration adapter cannot transition `Candidate` to `Offered` or `Offered` to `Worker`;
-- missing actor, tenant, purpose, reason, confirmation, evidence reference, or evidence version fails closed;
+- missing or insufficient Keyverse scope, actor, tenant, purpose, reason, confirmation, evidence reference, or evidence version fails closed;
 - a reused confirmation or idempotency key cannot bind to different command content;
 - previewed evidence versions must equal recorded evidence versions;
 - record and audit append either complete together or leave no authoritative decision;
-- a cross-tenant read or mutation is denied and produces a bounded audit event.
+- a cross-tenant read or mutation is denied and produces a bounded audit event;
+- a purpose header cannot enlarge a token's operation scope; and
+- client errors contain an actionable `next_action` and random `support_reference` but no internal trace/span identifier, topology, tenant identifier, or PII.
 
 ## External psychometric contracts
 

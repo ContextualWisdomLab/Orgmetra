@@ -13,12 +13,13 @@
 ## Security principles
 
 - Purpose-bound authorization replaces indiscriminate masking.
-- Sensitive data access is auditable, tenant-scoped, and field-scoped.
+- Sensitive data access is auditable, tenant-scoped, field-scoped, and bounded by an operation-specific Keyverse scope.
 - LLM outputs cannot mutate authoritative facts without human-approved commands.
 - External integrations use explicit adapters and fail closed.
 - Event payloads carry opaque references, not broad PII broadcasts.
 - Credentials and passkeys remain in Keyverse or external secret managers.
 - Service database roles cannot query another service's application tables.
+- Client error responses expose a random `support_reference`, never an internal trace/span identifier or encoded infrastructure context.
 
 ## Mutation security contract
 
@@ -29,10 +30,13 @@ Every mutating HTTP operation and its server-side command handler must require a
 - `X-Actor-Reference`;
 - `X-Purpose-Code`;
 - an authenticated Keyverse principal bound to the actor and tenant;
+- the operation-specific least-privilege Keyverse scope declared in OpenAPI;
 - resource-scoped authorization; and
 - a versioned audit/provenance correlation reference.
 
-High-risk commands additionally require a non-empty decision reason, explicit confirmation reference, and at least one immutable evidence reference with a version. The OpenAPI contract is executable input to generated gateway and server validation; an implementation that accepts a request outside that contract fails CI.
+High-risk commands additionally require a non-empty decision reason, explicit confirmation reference, and at least one immutable evidence reference with a version. A caller-controlled purpose header cannot substitute for a missing token scope. The OpenAPI contract is executable input to generated gateway and server validation; an implementation that accepts a request outside that contract fails CI.
+
+Internal traces remain in restricted telemetry. Customer-facing failures return a bounded `error_code`, actionable `message`, `next_action`, and random `support_reference`; the support lookup is access-controlled and retention-bound.
 
 The same contract applies to selection decisions, compensation changes, terminations, promotions, job-profile publication, validation-study policy changes, data exports, and identity deprovisioning. Draft creation may use a narrower permission, but publication or authoritative state transition may not reuse draft-only authorization.
 

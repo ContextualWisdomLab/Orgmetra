@@ -184,10 +184,22 @@ def _validate_openapi_contract() -> None:
         "confirmation_reference",
         "evidence_references:",
         "minItems: 1",
+        "- orgmetra.people.write",
+        "- orgmetra.job_architecture.write",
+        "- orgmetra.talent_acquisition.write",
+        "next_action:",
+        "support_reference:",
+        "Opaque random client-safe support identifier.",
     ]
     for fragment in required_fragments:
         if fragment not in openapi:
             _fail(f"Missing OpenAPI contract fragment: {fragment}")
+
+    if "keyverse_oidc: []" in openapi:
+        _fail("OpenID Connect security requirements must declare a least-privilege scope")
+
+    if re.search(r"(?m)^\s*(?:-\s+)?trace_id\s*:", openapi):
+        _fail("Client error schemas must not expose internal trace identifiers")
 
     if re.search(r"(?m)^ {8,}-\s+name:\s+(?:people-core|job-architecture|talent-acquisition)\s*$", openapi):
         _fail("Operation tags must be string values, not tag objects")

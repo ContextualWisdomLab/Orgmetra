@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "272d49ab34fdfcb59e382a2f80ba7fd48d980f7f37cbd47691c5325dfce0978c",
-      "bytes": 1846,
-      "lines": 35
+      "sha256": "af0c7720b7c63a2bc7b37ec2ca0568520e793e60e50507228445f7e422436c3b",
+      "bytes": 2108,
+      "lines": 37
     },
     {
       "path": "CLAUDE.md",
@@ -65,9 +65,9 @@
     },
     {
       "path": "docs/API_CONTRACT.md",
-      "sha256": "96876957a3b655b01b533f39353485631fb84b539fc5a939cd5068699957f6d2",
-      "bytes": 1924,
-      "lines": 61
+      "sha256": "d1fdfd4ea3e280bc3c6b9195cb38a64bdc92fbb3b0a1b4625ac286e270683285",
+      "bytes": 2663,
+      "lines": 71
     },
     {
       "path": "docs/DATA_MODEL.md",
@@ -95,9 +95,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "abfbbb2088565d4dc85a9f0b1f8e5f479f8147e2d28c07d2a6fbbcdca0bfe9b9",
-      "bytes": 2325,
-      "lines": 46
+      "sha256": "e74573e0b54990e3a2600bcab5c9551a2bbecbc717730e487f66284541387c80",
+      "bytes": 2903,
+      "lines": 50
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -113,9 +113,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "713d52db50bb11c0da72929845efdbc34ec4cd3bc724a249ef5706b340b0c8a0",
-      "bytes": 6614,
-      "lines": 103
+      "sha256": "c8af237e849e0535f2595872246a44f1b252d1c064e4464023464e5f7121cb41",
+      "bytes": 7020,
+      "lines": 105
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -125,9 +125,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "f05114bdee055d1c75ab05a400272c8824d0fee29502a20751ea3c46eda5a543",
-      "bytes": 924,
-      "lines": 10
+      "sha256": "cd9745fe3f23639b7f5f8e81b482e382412a8ca6c7a00ee5e7be34f1a996f5d2",
+      "bytes": 1215,
+      "lines": 12
     },
     {
       "path": "docs/TRD.md",
@@ -191,15 +191,15 @@
     },
     {
       "path": "schemas/openapi.yaml",
-      "sha256": "024c467fd0aa199710b1ce5d8a37f5eec151b27dbe6a99bcf81a122111318c11",
-      "bytes": 8283,
-      "lines": 290
+      "sha256": "7268a41ef17debb3c5b57dc3c0ceb15de91f8b5c8409da61cea52faa4dcc55bf",
+      "bytes": 9137,
+      "lines": 309
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "123df6ba068b4d8d57ebdf0e1288d900dd3cf2b88a91dc6d179fa8f191325d6a",
-      "bytes": 8335,
-      "lines": 231
+      "sha256": "e069d3dd0ef2d109622835eee942cb8f0ce027b5d71b704c4f5d61ee1907007d",
+      "bytes": 8847,
+      "lines": 243
     }
   ]
 }

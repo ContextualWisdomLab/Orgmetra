@@ -5,8 +5,6 @@ info:
   summary: Evidence-centered HRIS foundation API
 servers:
   - url: https://api.orgmetra.example/v1
-security:
-  - keyverse_oidc: []
 tags:
   - name: people-core
     description: People identity and employment commands.
@@ -21,6 +19,9 @@ paths:
       summary: Create a person identity anchor and initial effective name
       tags:
         - people-core
+      security:
+        - keyverse_oidc:
+            - orgmetra.people.write
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TenantReference'
@@ -49,6 +50,9 @@ paths:
       summary: Create an evidence-backed draft job profile
       tags:
         - job-architecture
+      security:
+        - keyverse_oidc:
+            - orgmetra.job_architecture.write
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TenantReference'
@@ -77,6 +81,9 @@ paths:
       summary: Record a human-confirmed, evidence-backed selection decision
       tags:
         - talent-acquisition
+      security:
+        - keyverse_oidc:
+            - orgmetra.talent_acquisition.write
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TenantReference'
@@ -105,6 +112,7 @@ components:
   securitySchemes:
     keyverse_oidc:
       type: openIdConnect
+      description: Keyverse access token with the operation's declared least-privilege scope.
       openIdConnectUrl: https://identity.orgmetra.example/.well-known/openid-configuration
   parameters:
     IdempotencyKey:
@@ -249,14 +257,25 @@ components:
       required:
         - error_code
         - message
-        - trace_id
+        - next_action
+        - support_reference
       properties:
         error_code:
           type: string
+          pattern: '^[a-z][a-z0-9_]{2,63}$'
         message:
           type: string
-        trace_id:
+          minLength: 1
+          maxLength: 1000
+        next_action:
           type: string
+          minLength: 1
+          maxLength: 1000
+          description: Safe action the caller can take to resolve or escalate the failure.
+        support_reference:
+          type: string
+          pattern: '^err_[A-Za-z0-9_-]{20,80}$'
+          description: Opaque random client-safe support identifier. It must not encode internal trace or span identifiers, topology, timestamps, tenant identifiers, or PII.
   responses:
     InvalidCommand:
       description: Request failed generated schema or domain validation.

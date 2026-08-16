@@ -6,7 +6,17 @@ Orgmetra APIs use OpenAPI 3.2.0. Major versions are path-scoped under `/v1` unti
 
 ## Authentication
 
-Every operation requires a Keyverse OpenID Connect bearer token. The gateway verifies issuer, audience, signature, expiration, subject, tenant binding, and actor binding before generated request validation reaches a domain handler.
+Every operation requires a Keyverse OpenID Connect bearer token. The gateway verifies issuer, audience, signature, expiration, subject, tenant binding, actor binding, and the operation-specific least-privilege scope before generated request validation reaches a domain handler.
+
+The baseline scope contract is:
+
+| Operation family | Required scope |
+|---|---|
+| People mutations | `orgmetra.people.write` |
+| Job-architecture mutations | `orgmetra.job_architecture.write` |
+| Talent-acquisition mutations | `orgmetra.talent_acquisition.write` |
+
+Scopes are coarse API capabilities. `X-Purpose-Code` remains the finer business-purpose input and cannot enlarge a token's scope or authorize itself.
 
 ## Command requirements
 
@@ -53,9 +63,9 @@ The baseline OpenAPI contract includes representative person, job-profile, and s
 {
   "error_code": "evidence_required",
   "message": "This decision requires at least one versioned evidence reference.",
-  "trace_id": "opaque_trace_reference",
-  "details": {
-    "missing_fields": ["evidence_references"]
-  }
+  "next_action": "Attach an approved evidence version and retry with a new idempotency key.",
+  "support_reference": "err_N7fx9z2TkQm4Wa8cR1pL6v"
 }
 ```
+
+`support_reference` is a randomly generated client-safe lookup key. It maps to restricted internal telemetry but never encodes or exposes an internal trace/span identifier, topology, timestamp, tenant identifier, credential, or PII.

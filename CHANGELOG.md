@@ -19,6 +19,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Canonicalized service identifiers as two-or-more-word `snake_case` across architecture, deployment, ACL, metrics, and client contracts.
 - Separated fast-mlsirm, TEPP, and Psychometrics Commons into immutable external scientific contracts.
 - Defined 100% owned production statement and branch coverage as a CI gate where the pinned toolchain exposes those metrics.
+- Made every baseline OpenAPI mutation declare its own least-privilege Keyverse scope while retaining finer purpose-bound authorization.
 
 ### Security
 
@@ -29,6 +30,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Database guards for reversed temporal intervals and append-only candidate-worker, selection-decision, and decision-evidence records.
 - Keyverse outage policy that blocks PII and high-risk actions when current authorization cannot be verified.
 - Cross-tenant threat, denial evidence, and negative authorization test contracts.
+- Replaced client-visible internal trace identifiers with random support references and actionable next-step error guidance.
 
 ### Notes
 
