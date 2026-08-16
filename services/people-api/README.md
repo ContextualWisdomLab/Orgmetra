@@ -18,9 +18,10 @@ without accepting tenant identity from an untrusted header.
 
 The host supplies a `TokenAuthorizer` implementation. The authorizer validates
 the bearer token and returns opaque tenant and actor references only after the
-required route purpose is authorized. Route handlers construct the immutable
-`PurposeContext`; clients cannot choose a tenant or purpose with arbitrary
-headers.
+required route scope and purpose are both authorized. Route handlers construct
+the immutable `PurposeContext` through runtime FastAPI dependencies; clients
+cannot choose a tenant, purpose, repository, or request object with query
+fields or arbitrary headers.
 
 The package has no default production authorizer, no static-token fallback and
 no environment-variable composition. A deployment must compose an approved

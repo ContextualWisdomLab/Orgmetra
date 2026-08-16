@@ -14,6 +14,8 @@ customer certification.
 | Request schemas reject unknown fields and values | FastAPI/Pydantic request validation | `schemas.py` and non-echo tests |
 | Server selects purpose, not caller headers | NIST least privilege and access enforcement controls | `RequiredPurpose` and static source contract |
 | Authorized PII remains usable under controls | NIST privacy/access/audit control families | purpose-bound context, RLS adapter and reference-only audit |
+| Route dependencies stay server-owned at runtime | FastAPI dependency injection with runtime annotations | `app.py` `Depends` defaults and OpenAPI parameter contract |
+| Bearer tokens reject hidden C0 separators | RFC 6750 printable token syntax | first-space split in `extract_bearer_token` |
 
 ## APA 7 references
 
@@ -32,6 +34,9 @@ Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
 Nottingham, M., Wilde, E., & Dalal, S. (2023). *Problem details for HTTP APIs*
 (RFC 9457). Internet Engineering Task Force.
 https://doi.org/10.17487/RFC9457
+
+Ramírez, S. (2026). *FastAPI documentation: Dependencies in path operation
+functions*. FastAPI. https://fastapi.tiangolo.com/tutorial/dependencies/
 
 Ramírez, S. (2026). *FastAPI documentation: Security and dependencies*.
 FastAPI. https://fastapi.tiangolo.com/tutorial/security/

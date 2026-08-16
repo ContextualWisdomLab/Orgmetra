@@ -4,6 +4,8 @@
 | --- | --- | --- | --- | --- |
 | Caller cannot select tenant | tenant comes only from `TokenAuthorizer` | `RequiredPurpose` | endpoint context assertion and source contract | implemented_on_active_pr |
 | Caller cannot select purpose | fixed route dependencies | `RequiredPurpose("...")` | static purpose contract | implemented_on_active_pr |
+| Callers cannot supply repository context as query input | runtime annotations and `Depends` defaults | `app.py` `get_people_repository` | OpenAPI parameter and source contracts | implemented_on_active_pr |
+| Hidden C0 characters cannot hide inside bearer tokens | first ASCII-space split | `extract_bearer_token` | non-ASCII/C0 token tests | implemented_on_active_pr |
 | Missing/invalid token fails before data access | fail-closed bearer extraction | `auth.py`, `app.py` | authentication endpoint tests | implemented_on_active_pr |
 | Insufficient purpose returns 403 | defensive allowed-purpose check | `ensure_purpose_authorized` | insufficient-principal test | implemented_on_active_pr |
 | HR content is not echoed in errors | fixed RFC 9457 problems | `problems.py` | validation/repository/unexpected error tests | implemented_on_active_pr |

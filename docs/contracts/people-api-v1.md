@@ -20,6 +20,8 @@ purpose, decision, or evidence authority.
 - Error media type: `application/problem+json`
 - Authentication: HTTP Bearer through the injected authorizer
 - Authorization: route-owned operation scope plus route-owned business purpose
+- Server-owned dependencies: `PurposeContext` and the repository port are
+  injected at runtime; they are not OpenAPI query, path, or header fields
 - Public record identifiers: UUID strings
 - Maximum request body: 65,536 bytes by default
 - Unknown request fields: rejected

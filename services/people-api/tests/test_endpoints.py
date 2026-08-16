@@ -73,6 +73,14 @@ def test_openapi_exposes_stable_operations_and_bearer_scheme(client: TestClient)
         "type": "http",
         "scheme": "bearer",
     }
+    for path_item in document["paths"].values():
+        for operation in path_item.values():
+            for parameter in operation.get("parameters", []):
+                assert parameter["name"] not in {
+                    "context",
+                    "request",
+                    "repository_port",
+                }
     assert client.get("/docs").status_code == 404
     assert client.get("/redoc").status_code == 404
 
@@ -204,8 +212,8 @@ def test_absent_person_returns_uniform_not_found(client: TestClient) -> None:
     "headers",
     [
         {},
-        {"Authorization": "Basic credential"},
-        {"Authorization": "Bearer invalid-token"},
+        {"Authorization": "Basic leaked-basic-secret"},
+        {"Authorization": "Bearer leaked-invalid-token"},
     ],
 )
 def test_authentication_failures_are_fixed_and_non_leaking(
@@ -217,8 +225,8 @@ def test_authentication_failures_are_fixed_and_non_leaking(
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
     assert response.json()["error_code"] == "authentication_failed"
-    assert "invalid-token" not in response.text
-    assert "credential" not in response.text
+    assert "leaked-invalid-token" not in response.text
+    assert "leaked-basic-secret" not in response.text
 
 
 def test_authorizer_cannot_return_an_insufficient_principal(

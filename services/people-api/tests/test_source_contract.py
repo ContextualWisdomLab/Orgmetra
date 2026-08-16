@@ -68,6 +68,16 @@ def test_route_scopes_and_purposes_are_server_selected_constants() -> None:
     assert "X-Evidence-Reference" not in source
 
 
+def test_route_dependencies_stay_server_owned_at_runtime() -> None:
+    source = (PACKAGE_ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert "from __future__ import annotations" not in source
+    assert "context: PurposeContext = Depends(" in source
+    assert "repository_port: PeopleRepository = Depends(get_people_repository)" in source
+    assert "Annotated[PurposeContext" not in source
+    assert "request.app.state.repository" not in source.split("async def create_person", 1)[1]
+
+
 def test_person_command_cannot_accept_system_recorded_time() -> None:
     app_source = (PACKAGE_ROOT / "app.py").read_text(encoding="utf-8")
     schema_source = (PACKAGE_ROOT / "schemas.py").read_text(encoding="utf-8")

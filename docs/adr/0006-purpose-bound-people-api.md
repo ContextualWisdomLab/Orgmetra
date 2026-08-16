@@ -38,7 +38,12 @@ these contracts:
    problem documents with a random `err_...` support reference and actionable
    `next_action`;
 10. internal trace references never appear in response headers or problem bodies;
-11. Swagger and ReDoc UI remain disabled in the pre-GA service.
+11. Swagger and ReDoc UI remain disabled in the pre-GA service;
+12. People API route modules keep runtime annotations and `Depends` defaults so
+    FastAPI cannot treat `PurposeContext`, `Request`, or the repository port as
+    caller query fields. `from __future__ import annotations` is forbidden in
+    `app.py` because postponed annotations made those server-owned objects look
+    like request input under FastAPI 0.116.
 
 ## Alternatives considered
 

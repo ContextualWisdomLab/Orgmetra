@@ -20,6 +20,12 @@ All notable changes to Orgmetra will be documented in this file.
 
 - Organization and job mutable descriptions now live in version records rather than durable identity anchors, preserving normalized history and stable position references.
 - Effective and system-recorded intervals are non-empty half-open periods; equal start/end bounds are rejected.
+- People API route handlers now inject `PurposeContext` and the repository through runtime `Depends` defaults so callers cannot supply those objects as query fields.
+
+### Fixed
+
+- People API Quality no longer fails with HTTP 422 on every protected route when FastAPI 0.116 interprets postponed annotations as query parameters.
+- Bearer token parsing now splits only on the first ASCII space so C0 separators such as `\\x1f` remain visible and are rejected.
 
 ### Security
 
