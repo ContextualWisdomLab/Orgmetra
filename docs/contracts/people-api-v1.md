@@ -3,8 +3,8 @@
 ## Status
 
 This contract describes behavior implemented on the active People API PR. It is
-not protected-main or release truth until the dependency stack merges and fresh
-integrated checks and independent review pass.
+not protected default-branch or release truth until the dependency stack merges
+and the retargeted exact head passes fresh integrated checks and applicable review.
 
 ## Customer action before integration
 

@@ -72,6 +72,6 @@ sequenceDiagram
     end
 ```
 
-The diagrams are design authority for this active PR only. They become protected-
-main truth only after the full dependency stack merges with fresh checks and
-review.
+The diagrams are design authority for this active PR only. They become protected
+default-branch truth only after the full dependency stack merges in order and the
+retargeted exact head passes fresh required checks and applicable review.

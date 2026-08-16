@@ -61,8 +61,8 @@ Access is tenant, actor, purpose, resource, and lifetime scoped. High-impact dec
 
 ## Active implementation slice: bitemporal domain kernel
 
-`packages/orgmetra-domain` implements framework-independent invariants for effective/system time, distinct HRIS records, multiple assignments, and candidate-worker continuity. It has no persistence or transport dependency and can be embedded by future services. This section describes active-PR work until merged into protected `main`.
+`packages/orgmetra-domain` implements framework-independent invariants for effective/system time, distinct HRIS records, multiple assignments, and candidate-worker continuity. It has no persistence or transport dependency and can be embedded by future services. This section describes active-PR work until merged into the protected default branch.
 
 ## Active implementation slice: purpose-bound People API
 
-`services/people-api` is an independently importable FastAPI factory. Hosts inject `TokenAuthorizer` and `PeopleRepository`. Protected routes select both an OAuth operation scope and a finer HR purpose in server code. `PurposeContext` and the repository port are runtime `Depends` values, not caller query fields. This section describes active-PR work until merged into protected `main`.
+`services/people-api` is an independently importable FastAPI factory. Hosts inject `TokenAuthorizer` and `PeopleRepository`. Protected routes select both an OAuth operation scope and a finer HR purpose in server code. `PurposeContext` and the repository port are runtime `Depends` values, not caller query fields. This section describes active-PR work until merged into the protected default branch.

@@ -1,5 +1,6 @@
 """Repository-level supply-chain and CI contract tests for Orgmetra."""
 
+import json
 from pathlib import Path
 import re
 import unittest
@@ -55,6 +56,41 @@ class RepositoryContractTests(unittest.TestCase):
         )[0]
         self.assertIn("recorded_from", person_block)
         self.assertIn("recorded_to", person_block)
+
+    def test_stack_governance_tracks_canonical_protected_default_branch(self) -> None:
+        """Prevent active API docs from reviving superseded branch/PR truth."""
+        paths = (
+            ROOT / "AGENTS.md",
+            ROOT / "ARCHITECTURE.md",
+            ROOT / "README.md",
+            ROOT / "docs" / "contracts" / "people-api-v1.md",
+            ROOT / "docs" / "UML_PEOPLE_API.md",
+        )
+        stale_branch_pattern = re.compile(r"protected[-\s `]*main", re.IGNORECASE)
+        for path in paths:
+            text = path.read_text(encoding="utf-8")
+            self.assertNotRegex(text, stale_branch_pattern, path.as_posix())
+        readme = (ROOT / "README.md").read_text(encoding="utf-8").lower()
+        self.assertNotIn("foundation documentation is proposed in pr #2", readme)
+        self.assertIn("foundation baseline is proposed in pr #8", readme)
+
+    def test_integrity_manifest_describes_the_current_people_api_stack(self) -> None:
+        """Keep buyer-facing integrity metadata attached to the active dependency chain."""
+        manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
+        paths = {entry["path"] for entry in manifest["files"]}
+
+        self.assertEqual(manifest["base_pr"], 8)
+        self.assertEqual(manifest["generated_for_branch"], "feat/people-api")
+        self.assertTrue(
+            {
+                "packages/orgmetra-domain/src/orgmetra_domain/temporal.py",
+                "packages/orgmetra-postgres/src/orgmetra_postgres/repository.py",
+                "services/people-api/src/orgmetra_people_api/app.py",
+                "docs/contracts/people-api-v1.md",
+                "docs/UML_PEOPLE_API.md",
+                "tests/test_repository_contract.py",
+            }.issubset(paths)
+        )
 
     def test_package_declares_typed_interface(self) -> None:
         marker = (
