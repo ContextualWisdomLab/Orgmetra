@@ -6,6 +6,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Added
 
+- Bitemporal tenant-scoped organization hierarchy validation that rejects visible indirect parent cycles and reuses single-valued recorded-time reconstruction before graph traversal.
 - `orgmetra_hris_kernel` 0.4.0 with exclusive-versus-concurrent employment, staffable position coverage, exclusive-seat capacity, and `validate_assignment_write` at 100% statement and branch coverage.
 - `POST /v1/employment-records`, `POST /v1/position-records`, and `POST /v1/assignment-records` with the same Keyverse mutation context, confirmation, and versioned evidence composition as other high-impact commands.
 - `employment_record_version.employment_concurrency_code` constrained to `exclusive` or `concurrent`.
@@ -43,6 +44,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Pinned the PostgreSQL 16.14 CI service image to the reviewed Docker Official Image index digest and added a regression that rejects a mutable `postgres:16` service tag.
 - Split employment and position identity from versioned status so corrections no longer mint a new employment or position identifier.
 - Made assignment coverage status-aware: `active` and `leave` remain staffable while `terminated` and other non-eligible employment statuses fail closed.
+- Made organization hierarchy reconstruction fail closed on a cycle at the requested tenant, effective day, and knowledge cutoff while ignoring future-recorded and foreign-tenant facts.
 
 ### Security
 
@@ -52,11 +54,11 @@ All notable changes to Orgmetra will be documented in this file.
 - Service-owned database schemas and roles inside the initially shared physical PostgreSQL cluster.
 - Database guards for reversed or zero-length temporal intervals and append-only candidate-worker, selection-decision, decision-evidence, and validation-study linkage records.
 - Database-level rejection of cross-tenant references, post-decision evidence insertion, caller-supplied open-set evidence digests, empty decision evidence, sealed evidence-set reuse, and RFC 9562 Nil/Max UUID sentinels across foundation identity columns.
-- Bitemporal reconstruction plus assignment, position-seat, and employment-exclusivity kernel decisions are tenant-scoped so foreign-tenant identifiers cannot leak historical facts, provide coverage, consume capacity, or create false conflicts.
+- Bitemporal reconstruction plus assignment, position-seat, employment-exclusivity, and organization-hierarchy kernel decisions are tenant-scoped so foreign-tenant identifiers cannot leak historical facts, provide coverage, consume capacity, or create false structural conflicts.
 - Keyverse outage policy that blocks PII and high-risk actions when current authorization cannot be verified.
 - Cross-tenant threat, denial evidence, and negative authorization test contracts.
 - Replaced client-visible internal trace identifiers with random support references and actionable next-step error guidance.
 
 ### Notes
 
-- The protected default branch contains only the minimal bootstrap commit. This baseline is proposed through `feat/foundation-product-baseline` and becomes shipped truth only after review and merge.
+- Protected `bootstrap` contains the integrated foundation and hire-to-assignment kernel through merge commit `99bffec05d0732e332cfbcb64f34838395bbd078`; entries above that are introduced by active PRs become shipped truth only after their own protected merge.
