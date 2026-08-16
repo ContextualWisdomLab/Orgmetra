@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f0af6c4dfa6d85a8e53d790595aff36a3361aed0c39711f11c70945e9b738a71",
-      "bytes": 7448,
-      "lines": 63
+      "sha256": "c5cef6dc2d0973acf6449a8baddaf43e07a935e52938f932a16b23536dfe89ee",
+      "bytes": 7877,
+      "lines": 64
     },
     {
       "path": "CLAUDE.md",
@@ -101,8 +101,8 @@
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "0e4844620b6809db646b21de2db51b08dd55c3c6743522bc3f439cab91564369",
-      "bytes": 5168,
+      "sha256": "009cbdb77bfd7affd8260e6e0fc307b63ec4d3dfc64fac6dc448b8abead7f2fc",
+      "bytes": 5539,
       "lines": 58
     },
     {
@@ -131,8 +131,8 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "4a308e1624efb44975d5a9998b779093ee126db6c1676de967a7cad44a80d941",
-      "bytes": 12195,
+      "sha256": "b9d60e72e0b983bbcd733165ab810a05c9f3d96a2e33a84d4e319a13f4aace40",
+      "bytes": 12560,
       "lines": 124
     },
     {
@@ -143,8 +143,8 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "50419030882e1b3298f067df109ae077c4f026f3ff57d59387606acbe9369e7e",
-      "bytes": 6236,
+      "sha256": "2b286396c4de658abdb01b047d09602fc560444e4271c4a09464bdad968cb603",
+      "bytes": 6406,
       "lines": 33
     },
     {
@@ -203,9 +203,9 @@
     },
     {
       "path": "docs/adr/0006-governed-audit-outbox-envelope.md",
-      "sha256": "d2e198e4ebfc9e32154c359a82060540ace33188e674361bfb0a61a9b0daaf68",
-      "bytes": 7148,
-      "lines": 51
+      "sha256": "ef01d9cb2428de66d6c0c0350f9d1972bfc40f380acd269747655ea174307d0b",
+      "bytes": 8371,
+      "lines": 55
     },
     {
       "path": "docs/adr/README.md",
