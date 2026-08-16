@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date
 from string import ascii_lowercase, digits
 from typing import Any
 from uuid import UUID, uuid4
@@ -93,9 +93,8 @@ class PostgresPeopleRepository:
         display_name: str,
         effective_from: date,
         effective_to: date | None = None,
-        recorded_at: datetime | None = None,
     ) -> PersonSnapshot:
-        """Create one person record idempotently within the caller's tenant."""
+        """Create one person record using database-owned knowledge time."""
 
         normalized_name = _normalize_text(display_name, "display_name", 300)
         _validate_effective_period(effective_from, effective_to)
@@ -105,7 +104,7 @@ class PostgresPeopleRepository:
                 INSERT INTO person_record (
                     tenant_record_id, person_record_id, display_name,
                     effective_from, effective_to, recorded_from, recorded_to
-                ) VALUES (%s, %s, %s, %s, %s, COALESCE(%s, now()), NULL)
+                ) VALUES (%s, %s, %s, %s, %s, now(), NULL)
                 ON CONFLICT (person_record_id) DO NOTHING
                 RETURNING person_record_id, display_name, effective_from,
                           effective_to, recorded_from
@@ -116,7 +115,6 @@ class PostgresPeopleRepository:
                     normalized_name,
                     effective_from,
                     effective_to,
-                    recorded_at,
                 ),
             ).fetchone()
             if row is None:
