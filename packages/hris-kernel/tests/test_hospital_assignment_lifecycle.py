@@ -86,6 +86,7 @@ def test_june_correction_changes_may_history_only_after_it_is_recorded(
 
     known_in_june = resolve_bitemporal_facts(
         history,
+        tenant_record_id=TENANT,
         identity_of="person_record_id",
         identity_value=JORDAN,
         effective_on=date(2024, 5, 1),
@@ -98,6 +99,7 @@ def test_june_correction_changes_may_history_only_after_it_is_recorded(
 
     known_in_july = resolve_bitemporal_facts(
         history,
+        tenant_record_id=TENANT,
         identity_of="person_record_id",
         identity_value=JORDAN,
         effective_on=date(2024, 5, 1),
