@@ -4,6 +4,7 @@ set -euo pipefail
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation_schema.sql
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evidence_digest.sql
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
@@ -120,10 +121,10 @@ INSERT INTO criterion_observation (
 );
 INSERT INTO decision_evidence_set (
     tenant_record_id, decision_evidence_set_id, evidence_set_version_code,
-    digest_algorithm_code, evidence_set_digest
+    digest_algorithm_code
 ) VALUES (
     '10000000-0000-7000-8000-000000000001',
-    '00000000-0000-7000-8000-000000000015', 'v1', 'sha256', repeat('b', 64)
+    '00000000-0000-7000-8000-000000000015', 'v1', 'sha256'
 );
 INSERT INTO selection_decision_evidence (
     tenant_record_id, selection_decision_evidence_id, decision_evidence_set_id,
@@ -219,6 +220,55 @@ if [[ ${cross_tenant_status} -eq 0 ]]; then
 fi
 if [[ "${cross_tenant_output}" != *"foreign key constraint"* ]]; then
     echo "cross-tenant write failed for an unexpected reason: ${cross_tenant_output}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE ROLE orgmetra_tenant_writer NOLOGIN NOBYPASSRLS;
+GRANT USAGE ON SCHEMA public TO orgmetra_tenant_writer;
+GRANT INSERT ON person_record TO orgmetra_tenant_writer;
+SQL
+
+set +e
+missing_context_write_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE orgmetra_tenant_writer;
+INSERT INTO person_record (tenant_record_id, person_record_id)
+VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000040'
+);
+SQL
+} 2>&1)"
+missing_context_write_status=$?
+set -e
+if [[ ${missing_context_write_status} -eq 0 ]]; then
+    echo "NOBYPASSRLS writer inserted without tenant context" >&2
+    exit 1
+fi
+if [[ "${missing_context_write_output}" != *"row-level security policy"* ]]; then
+    echo "missing-context write failed for an unexpected reason: ${missing_context_write_output}" >&2
+    exit 1
+fi
+
+set +e
+cross_context_write_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE orgmetra_tenant_writer;
+SET orgmetra.tenant_record_id = '10000000-0000-7000-8000-000000000001';
+INSERT INTO person_record (tenant_record_id, person_record_id)
+VALUES (
+    '20000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000041'
+);
+SQL
+} 2>&1)"
+cross_context_write_status=$?
+set -e
+if [[ ${cross_context_write_status} -eq 0 ]]; then
+    echo "NOBYPASSRLS writer inserted a different tenant under tenant-alpha context" >&2
+    exit 1
+fi
+if [[ "${cross_context_write_output}" != *"row-level security policy"* ]]; then
+    echo "cross-context write failed for an unexpected reason: ${cross_context_write_output}" >&2
     exit 1
 fi
 
