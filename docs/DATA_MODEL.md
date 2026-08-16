@@ -7,7 +7,7 @@
 | `tenant_record` | Durable customer/tenant isolation anchor used by referential integrity and row-level security. |
 | `person_record` | Durable person entity inside Orgmetra, not an authentication subject. |
 | `employment_record` | Durable employment identity for a person. |
-| `employment_record_version` | Bitemporal employment status and effective period. |
+| `employment_record_version` | Bitemporal employment status, exclusive-or-concurrent code, and effective period. |
 | `organization_unit` | Durable organizational identity referenced by positions and hierarchy facts. |
 | `organization_unit_version` | Bitemporal organizational name, type, and parent relationship for an organization unit. |
 | `job_profile` | Durable job identity referenced by positions, criteria, and decisions. |
@@ -46,7 +46,7 @@ Intervals are half-open and non-empty: an end value, when present, must be stric
 
 Durable anchors such as `organization_unit`, `job_profile`, `employment_record`, and `position_record` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version`, `job_profile_version`, `employment_record_version`, and `position_record_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
 
-Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Allocation totals for one employment are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion.
+Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
 
 ## High-impact decision evidence
 

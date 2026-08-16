@@ -19,7 +19,7 @@ Design tokens live in `packages/design-tokens/` and map to the Figma file at htt
 - `OrgTreeNode`
 - `PersonSummary`
 - `PositionCard`
-- `AssignmentSplit`
+- `AssignmentSplit` (show exclusive-job and seat-over-1.0000 next actions)
 - `DecisionRecord`
 - `ValidationMetric`
 - `ExactValueTable`

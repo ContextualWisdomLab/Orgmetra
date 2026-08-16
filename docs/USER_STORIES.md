@@ -5,6 +5,9 @@
 - As an HRIS administrator, I need people, employment, positions, and assignments to be separate so that organization changes do not corrupt historical records.
 - As an HRIS administrator, I need effective time and system-recorded time so that audits can reconstruct what was true and what was known at a decision point.
 - As an HRIS administrator, I need field-level access controls so that authorized HR work can use necessary PII without exposing it broadly.
+- As an HR operations owner, I need to record employment, open a seat, and assign a worker through the same confirmed command path so that hire-to-assignment is reviewable.
+- As an HR operations owner, I need a second job marked concurrent, or the prior exclusive period closed, so that one person is not silently double-employed.
+- As an HR operations owner, I need a closed or frozen seat to reject later assignment days so that I can correct the roster instead of overbooking the unit.
 
 ## Job analyst
 

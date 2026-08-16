@@ -46,6 +46,8 @@ The server rejects a reused idempotency key when its method, resource, tenant, a
 POST /v1/person-records
 GET  /v1/person-records/{person_record_id}
 POST /v1/employment-records
+POST /v1/position-records
+POST /v1/assignment-records
 POST /v1/job-profiles
 POST /v1/job-profiles/{job_profile_id}/publish
 POST /v1/candidate-profiles
@@ -55,7 +57,7 @@ POST /v1/criterion-observations
 POST /v1/validity-studies
 ```
 
-The baseline OpenAPI contract includes representative person, job-profile, and selection-decision commands. Every additional mutation must reuse the same parameter components and high-risk schema composition rather than define weaker local fields.
+The baseline OpenAPI contract includes person, employment, position, assignment, job-profile, and selection-decision commands. Every additional mutation must reuse the same parameter components and high-risk schema composition rather than define weaker local fields. Employment and assignment writes fail closed when exclusive jobs overlap, a seat is not staffable, or visible seat allocations exceed 1.0000.
 
 ## Error shape
 

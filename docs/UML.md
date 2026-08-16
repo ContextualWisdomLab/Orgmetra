@@ -88,3 +88,33 @@ stateDiagram-v2
     Worker --> FormerWorker: human_confirmed_employment_terminated
     FormerWorker --> RehireCandidate: rehire_requested
 ```
+
+A second employment that overlaps an exclusive period is rejected unless it is marked `concurrent`. Rehire after a closed exclusive period returns to Worker through a new `employment_record`.
+
+## Hire-to-assignment sequence
+
+```mermaid
+sequenceDiagram
+    actor HROps
+    participant Gateway
+    participant PeopleCore
+    participant JobArchitecture
+    participant Kernel
+    participant Audit
+
+    HROps->>Gateway: Create employment(actor, tenant, purpose, confirmation, evidence)
+    Gateway->>PeopleCore: Validate exclusive-or-concurrent overlap
+    PeopleCore->>Kernel: validate_person_employment_exclusivity
+    Kernel-->>PeopleCore: Accept or next-action error
+    PeopleCore-->>Gateway: employment_record Location
+    HROps->>Gateway: Create position(actor, tenant, purpose, confirmation, evidence)
+    Gateway->>JobArchitecture: Bind organization and job
+    JobArchitecture-->>Gateway: position_record Location
+    HROps->>Gateway: Create assignment(actor, tenant, purpose, confirmation, evidence)
+    Gateway->>PeopleCore: validate_assignment_write
+    PeopleCore->>Kernel: employment, position, portfolio, and seat checks
+    Kernel-->>PeopleCore: Accept or next-action error
+    PeopleCore->>Audit: Append assignment provenance
+    PeopleCore-->>Gateway: assignment_record Location
+    Gateway-->>HROps: Review the roster, then approve or correct
+```

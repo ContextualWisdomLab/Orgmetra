@@ -70,6 +70,8 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 - The database rejects reversed temporal intervals and contradictory overlapping effective/system coordinates for single-valued version families.
 - Retroactive correction closes the old recorded interval and inserts a replacement; business-column rewrites of protected bitemporal facts are rejected.
 - Model multiple assignments with allocation ratios rather than applying single-valued exclusion semantics to legitimate multiple membership.
+- Exclusive employments for one person cannot overlap; a second overlapping job must be marked `concurrent`.
+- Assignment days must land on an `active` or `open` position version, and visible allocations for one seat cannot exceed 1.0000.
 - Model external organization roles as time-varying relations when one entity can be a customer, partner, competitor, or vendor in different contexts.
 - Keep assessment results as external immutable snapshot references unless a later ADR transfers instrument lifecycle ownership.
 - Candidate-worker links, selection decisions, evidence-set membership after finalization, and validation-study decision/evidence/outcome links are append-only.

@@ -1,5 +1,7 @@
 # References
 
+Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434
+
 American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association.
 
 American Institute of Certified Public Accountants. (2017). *TSP section 100: 2017 trust services criteria for security, availability, processing integrity, confidentiality, and privacy*. AICPA.
@@ -7,6 +9,8 @@ American Institute of Certified Public Accountants. (2017). *TSP section 100: 20
 Diez-Roux, A. V. (1998). Bringing context back into epidemiology: Variables and fallacies in multilevel analysis. *American Journal of Public Health, 88*(2), 216–222. https://doi.org/10.2105/AJPH.88.2.216
 
 Equal Employment Opportunity Commission. (1978). *Uniform guidelines on employee selection procedures*. 29 C.F.R. Part 1607.
+
+International Organization for Standardization. (2022). *ISO 30400:2022 Human resource management — Vocabulary*. ISO.
 
 International Organization for Standardization. (2023). *ISO 30405:2023 Human resource management — Guidelines on recruitment*. ISO.
 

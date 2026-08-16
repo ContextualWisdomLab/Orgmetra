@@ -6,6 +6,10 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Added
 
+- `orgmetra_hris_kernel` 0.4.0 with exclusive-versus-concurrent employment, staffable position coverage, exclusive-seat capacity, and `validate_assignment_write` at 100% statement and branch coverage.
+- `POST /v1/employment-records`, `POST /v1/position-records`, and `POST /v1/assignment-records` with the same Keyverse mutation context, confirmation, and versioned evidence composition as other high-impact commands.
+- `employment_record_version.employment_concurrency_code` constrained to `exclusive` or `concurrent`.
+- ADR 0005 for exclusive employment and staffable seats.
 - `orgmetra_hris_kernel` 0.3.0 with identity-scoped bitemporal resolution, assignment-employment coverage, allocation-portfolio checks, and a Memorial Hospital RN correction case at 100% statement and branch coverage.
 - `employment_record_version` and `position_record_version` so employment and position identity stay stable across retroactive corrections.
 - `assignment_record.employment_record_id` bound to the same person as the covering employment.

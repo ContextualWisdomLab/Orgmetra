@@ -48,6 +48,8 @@ Panels:
 - Person summary
 - Employment history
 - Position and assignment history
+- Exclusive-versus-concurrent employment badge with the next action when a second job overlaps
+- Seat-capacity warning when visible allocations would exceed 1.0000
 - Manager and organization timeline
 - Performance criteria and observations
 
