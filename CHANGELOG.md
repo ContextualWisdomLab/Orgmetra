@@ -7,6 +7,7 @@ All notable changes to Orgmetra will be documented in this file.
 ### Added
 
 - Independently importable `orgmetra-domain` package for bitemporal HRIS invariants.
+- Bitemporal organization-unit and job-profile records so organization, job, position, and assignment remain distinct HRIS concepts.
 - Multiple-membership assignment allocation validation with half-open effective intervals.
 - Append-only, idempotent candidate-to-worker linkage.
 - Hash-locked Python 3.11-3.14 quality workflow with exact 100% production statement/branch coverage and public docstring checks.
