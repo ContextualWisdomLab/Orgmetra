@@ -47,6 +47,7 @@ REQUIRED = [
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
     "database/migrations/0001_foundation_schema.sql",
+    "database/migrations/0002_sealed_evidence_digest.sql",
     "schemas/openapi.yaml",
     "scripts/foundation-contract-core.mjs",
     "scripts/foundation-contract.mjs",
@@ -155,9 +156,13 @@ def _validate_manifest() -> None:
 
 def _validate_database_contract() -> None:
     """Validate naming, temporal, tenant, evidence-sealing, and append-only DDL contracts."""
-    sql = (ROOT / "database/migrations/0001_foundation_schema.sql").read_text(
+    foundation_sql = (ROOT / "database/migrations/0001_foundation_schema.sql").read_text(
         encoding="utf-8"
     )
+    evidence_sql = (ROOT / "database/migrations/0002_sealed_evidence_digest.sql").read_text(
+        encoding="utf-8"
+    )
+    sql = foundation_sql + "\n" + evidence_sql
 
     table_pattern = re.compile(
         r"\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
@@ -165,7 +170,7 @@ def _validate_database_contract() -> None:
         r"(?P<table>[a-z_][a-z0-9_]*)",
         flags=re.IGNORECASE,
     )
-    matches = list(table_pattern.finditer(sql))
+    matches = list(table_pattern.finditer(foundation_sql))
     if not matches:
         _fail("No CREATE TABLE statement found")
 
@@ -186,6 +191,7 @@ def _validate_database_contract() -> None:
 
     required_fragments = [
         "CREATE EXTENSION IF NOT EXISTS btree_gist",
+        "CREATE EXTENSION IF NOT EXISTS pgcrypto",
         "CREATE TABLE tenant_record",
         "tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id)",
         "CREATE TABLE person_name_record",
@@ -208,11 +214,17 @@ def _validate_database_contract() -> None:
         "CREATE TRIGGER job_profile_bitemporal_guard",
         "CREATE TABLE decision_evidence_set",
         "evidence_set_digest text NOT NULL",
+        "ALTER COLUMN evidence_set_digest DROP NOT NULL",
+        "CONSTRAINT decision_evidence_seal_state_check",
         "CONSTRAINT selection_decision_evidence_set_unique",
         "CREATE FUNCTION protect_evidence_set_seal",
         "CREATE FUNCTION reject_sealed_evidence_insert",
         "sealed evidence set cannot accept new members",
         "CREATE FUNCTION seal_decision_evidence_set",
+        "decision evidence set must contain at least one member before finalization",
+        "jsonb_agg(",
+        "CREATE FUNCTION validate_evidence_set_decision_binding",
+        "CREATE CONSTRAINT TRIGGER decision_evidence_set_binding_guard",
         "CREATE TRIGGER selection_decision_seal_evidence_guard",
         "CREATE TABLE validity_study_decision_link",
         "CREATE TABLE validity_study_outcome_link",
@@ -236,13 +248,13 @@ def _validate_database_contract() -> None:
         if match.group("table") != "tenant_record"
     ]
     for table_name in tenant_tables:
-        block_start = sql.index(f"CREATE TABLE {table_name}")
-        next_table = sql.find("\nCREATE TABLE ", block_start + 1)
-        block_end = len(sql) if next_table < 0 else next_table
-        table_block = sql[block_start:block_end]
+        block_start = foundation_sql.index(f"CREATE TABLE {table_name}")
+        next_table = foundation_sql.find("\nCREATE TABLE ", block_start + 1)
+        block_end = len(foundation_sql) if next_table < 0 else next_table
+        table_block = foundation_sql[block_start:block_end]
         if "tenant_record_id uuid NOT NULL" not in table_block:
             _fail(f"Tenant binding is missing from table: {table_name}")
-        if f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in sql:
+        if f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in foundation_sql:
             _fail(f"Forced row-level security is missing from table: {table_name}")
 
 
