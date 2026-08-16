@@ -101,9 +101,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "e74573e0b54990e3a2600bcab5c9551a2bbecbc717730e487f66284541387c80",
-      "bytes": 2903,
-      "lines": 50
+      "sha256": "f2fb7c438b16485930d1d2cff451f0c6906d72d710237cc807d13ee063f20834",
+      "bytes": 3192,
+      "lines": 51
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -131,8 +131,8 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "c9163d641a2ba99fc7e28325cc2357adb2fa8bd8771cd8c71e20a64eb1bb624a",
-      "bytes": 5010,
+      "sha256": "bfd6d265bd5c859a74e6187aafc0e2f23050d8676f3773dadc751f80aac5a3d7",
+      "bytes": 5177,
       "lines": 30
     },
     {
