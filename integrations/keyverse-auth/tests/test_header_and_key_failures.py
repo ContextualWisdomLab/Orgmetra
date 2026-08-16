@@ -16,6 +16,8 @@ from conftest import (
     encode_token,
 )
 
+_READ_SCOPE = "orgmetra.people.read"
+
 
 def _authorizer(config, provider, resolver) -> KeyverseOidcAuthorizer:
     """Create one authorizer for focused hostile-input tests."""
@@ -45,7 +47,9 @@ def test_compact_token_surface_rejects_malformed_values(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="bearer token"):
-        asyncio.run(authorizer.authorize(token, "people_read"))  # type: ignore[arg-type]
+        asyncio.run(
+            authorizer.authorize(token, _READ_SCOPE, "people_read")  # type: ignore[arg-type]
+        )
 
 
 def test_invalid_compact_header_is_rejected(
@@ -56,7 +60,11 @@ def test_invalid_compact_header_is_rejected(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="header"):
-        asyncio.run(authorizer.authorize("not-json.payload.signature", "people_read"))
+        asyncio.run(
+            authorizer.authorize(
+                "not-json.payload.signature", _READ_SCOPE, "people_read"
+            )
+        )
 
 
 @pytest.mark.parametrize(
@@ -87,7 +95,7 @@ def test_required_header_fields_are_strict(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match=error_fragment):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 def test_symmetric_algorithm_is_rejected_before_key_selection(
@@ -105,7 +113,7 @@ def test_symmetric_algorithm_is_rejected_before_key_selection(
     authorizer = _authorizer(oidc_config, jwks_provider, identity_resolver)
 
     with pytest.raises(AuthenticationFailed, match="algorithm"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 @pytest.mark.parametrize(
@@ -130,7 +138,7 @@ def test_invalid_jwk_set_is_provider_unavailable(
     token = encode_token(key_material, oidc_config)
 
     with pytest.raises(IdentityProviderUnavailable, match="key set"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 @pytest.mark.parametrize(
@@ -154,7 +162,7 @@ def test_unaccepted_signing_key_is_authentication_failure(
     token = encode_token(key_material, oidc_config)
 
     with pytest.raises(AuthenticationFailed, match="signing key"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 def test_duplicate_matching_key_is_provider_failure(
@@ -169,7 +177,7 @@ def test_duplicate_matching_key_is_provider_failure(
     token = encode_token(key_material, oidc_config)
 
     with pytest.raises(IdentityProviderUnavailable, match="ambiguous"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 def test_malformed_matching_jwk_is_provider_failure(
@@ -195,7 +203,7 @@ def test_malformed_matching_jwk_is_provider_failure(
     token = encode_token(key_material, oidc_config)
 
     with pytest.raises(IdentityProviderUnavailable, match="signing key"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
 
 
 def test_jwk_derived_algorithm_must_match_header(
@@ -218,4 +226,4 @@ def test_jwk_derived_algorithm_must_match_header(
     )
 
     with pytest.raises(AuthenticationFailed, match="algorithm does not match"):
-        asyncio.run(authorizer.authorize(token, "people_read"))
+        asyncio.run(authorizer.authorize(token, _READ_SCOPE, "people_read"))
