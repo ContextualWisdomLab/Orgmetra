@@ -154,13 +154,10 @@ class KeyverseOidcAuthorizer:
 
 
 def _compact_token(value: str) -> str:
-    """Normalize a compact JWT while rejecting hidden/control characters."""
+    """Normalize optional edge spaces and validate one compact ASCII JWT."""
 
     if not isinstance(value, str):
         raise AuthenticationFailed("bearer token is invalid")
-    if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
-        if character_is_not_surrounding_space(value):
-            raise AuthenticationFailed("bearer token is invalid")
     token = value.strip(" ")
     if not token or len(token) > 8_192 or token.count(".") != 2:
         raise AuthenticationFailed("bearer token is invalid")
@@ -171,21 +168,6 @@ def _compact_token(value: str) -> str:
     ):
         raise AuthenticationFailed("bearer token is invalid")
     return token
-
-
-def character_is_not_surrounding_space(value: str) -> bool:
-    """Return whether an invalid compact-token character is more than edge space."""
-
-    stripped = value.strip(" ")
-    if not stripped:
-        return True
-    leading = len(value) - len(value.lstrip(" "))
-    trailing = len(value) - len(value.rstrip(" "))
-    interior_end = len(value) - trailing if trailing else len(value)
-    return any(
-        ord(character) < 0x21 or ord(character) > 0x7E
-        for character in value[leading:interior_end]
-    )
 
 
 def _unverified_header(token: str) -> Mapping[str, object]:
