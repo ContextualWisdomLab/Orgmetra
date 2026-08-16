@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -16,16 +15,13 @@ from orgmetra_postgres import (
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 
-from .auth import (
-    AuthenticationFailed,
-    AuthorizationDenied,
-    IdentityProviderUnavailable,
-)
+from .auth import AuthenticationFailed, AuthorizationDenied, IdentityProviderUnavailable
+from .support import new_support_reference
 
 _SAFE_HTTP_RESPONSE_HEADERS = frozenset({"www-authenticate", "retry-after"})
 _NEXT_ACTIONS = {
     "authentication_failed": "Obtain a valid bearer credential and retry.",
-    "purpose_not_authorized": "Request the required purpose grant before retrying.",
+    "authorization_denied": "Request the required operation scope and business-purpose grant before retrying.",
     "repository_access_denied": "Verify the authorized tenant and repository policy before retrying.",
     "immutable_identity_conflict": "Use the existing identity facts or submit the correct versioned change.",
     "repository_unavailable": "Retry after the indicated interval; contact support if the problem persists.",
@@ -59,7 +55,7 @@ class ProblemDetail(BaseModel):
     detail: str = Field(min_length=1, max_length=500)
     instance: str = Field(min_length=1, max_length=2048)
     error_code: str = Field(min_length=1, max_length=128)
-    support_reference: UUID
+    support_reference: str = Field(pattern=r"^err_[A-Za-z0-9_-]{20,80}$")
     next_action: str = Field(min_length=1, max_length=500)
     invalid_fields: tuple[ValidationIssue, ...] | None = None
 
@@ -114,14 +110,14 @@ async def _authentication_handler(
 async def _authorization_handler(
     request: Request, _error: AuthorizationDenied
 ) -> JSONResponse:
-    """Return a fixed purpose-authorization denial."""
+    """Return a fixed denial without disclosing which authority was absent."""
 
     return _response(
         request,
         status_code=403,
-        error_code="purpose_not_authorized",
-        title="Purpose not authorized",
-        detail="The authenticated principal is not authorized for this purpose.",
+        error_code="authorization_denied",
+        title="Authorization denied",
+        detail="The authenticated principal is not authorized for this operation.",
     )
 
 
@@ -291,7 +287,11 @@ def _response(
 ) -> JSONResponse:
     """Build one canonical problem response with a client-safe support reference."""
 
-    support_reference = getattr(request.state, "support_reference", uuid4())
+    support_reference = getattr(
+        request.state,
+        "support_reference",
+        new_support_reference(),
+    )
     document = ProblemDetail(
         type=f"urn:orgmetra:problem:{error_code}",
         title=title,
@@ -308,7 +308,7 @@ def _response(
     )
     response_headers = {
         "Cache-Control": "no-store",
-        "X-Support-Reference": str(support_reference),
+        "X-Support-Reference": support_reference,
     }
     if headers is not None:
         response_headers.update(headers)
