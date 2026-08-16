@@ -113,8 +113,9 @@ FROM decision_evidence_set
 WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'::uuid
   AND decision_evidence_set_id = '00000000-0000-7000-8000-000000000023'::uuid;
 ")"
-if [[ ! "${sealed_digest}" =~ ^[0-9a-f]{64}$ ]]; then
-    echo "database did not persist a SHA-256 evidence digest: ${sealed_digest}" >&2
+expected_digest='6cf35d78ec8084c6b3d278c4d1cd49414ac081ffdbae5137cd7cc7426a486f7d'
+if [[ "${sealed_digest}" != "${expected_digest}" ]]; then
+    echo "database digest differs from independently precomputed canonical SHA-256: ${sealed_digest}" >&2
     exit 1
 fi
 
@@ -257,6 +258,112 @@ if [[ ${empty_status} -eq 0 ]]; then
 fi
 if [[ "${empty_output}" != *"decision evidence set must contain at least one member before finalization"* ]]; then
     echo "empty evidence set failed for an unexpected reason: ${empty_output}" >&2
+    exit 1
+fi
+
+# Regression for a write that starts before finalization: evidence membership and
+# digest finalization must serialize on the evidence-set row. The second member
+# holds that row lock while uncommitted; sealing must wait, then digest both rows.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO decision_evidence_set (
+    tenant_record_id, decision_evidence_set_id, evidence_set_version_code, digest_algorithm_code
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000030',
+    'concurrency-v1',
+    'sha256'
+);
+INSERT INTO selection_decision_evidence (
+    tenant_record_id, selection_decision_evidence_id, decision_evidence_set_id,
+    evidence_reference, evidence_version_code
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000031',
+    '00000000-0000-7000-8000-000000000030',
+    'evidence://concurrency/initial',
+    '2026-08-16'
+);
+SQL
+
+PGAPPNAME=orgmetra_evidence_member_writer psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL' &
+BEGIN;
+INSERT INTO selection_decision_evidence (
+    tenant_record_id, selection_decision_evidence_id, decision_evidence_set_id,
+    evidence_reference, evidence_version_code
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000032',
+    '00000000-0000-7000-8000-000000000030',
+    'evidence://concurrency/racing',
+    '2026-08-16'
+);
+SELECT pg_sleep(2);
+COMMIT;
+SQL
+member_writer_pid=$!
+
+member_lock_ready=false
+for _ in $(seq 1 80); do
+    sleeping_count="$(psql "${DATABASE_URL}" -Atqc "
+        SELECT count(*)
+        FROM pg_stat_activity
+        WHERE application_name = 'orgmetra_evidence_member_writer'
+          AND wait_event = 'PgSleep';
+    ")"
+    if [[ "${sleeping_count}" == "1" ]]; then
+        member_lock_ready=true
+        break
+    fi
+    sleep 0.05
+done
+if [[ "${member_lock_ready}" != "true" ]]; then
+    set +e
+    wait "${member_writer_pid}"
+    member_writer_status=$?
+    set -e
+    echo "evidence member writer never reached its lock-holding barrier; exit_status=${member_writer_status}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+SET statement_timeout = '5s';
+INSERT INTO selection_decision (
+    tenant_record_id, selection_decision_id, candidate_profile_id, job_profile_id,
+    decision_evidence_set_id, actor_reference, purpose_code, decision_code,
+    decision_reason, confirmation_reference, decided_at
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000033',
+    '00000000-0000-7000-8000-000000000021',
+    '00000000-0000-7000-8000-000000000022',
+    '00000000-0000-7000-8000-000000000030',
+    'actor://hr/10',
+    'selection_review',
+    'advance',
+    'Human reviewer confirmed both concurrently committed evidence members.',
+    'confirmation://workflow/102',
+    TIMESTAMPTZ '2026-08-16 10:03:00+00'
+);
+SQL
+
+set +e
+wait "${member_writer_pid}"
+member_writer_status=$?
+set -e
+if [[ ${member_writer_status} -ne 0 ]]; then
+    echo "evidence member writer failed unexpectedly with status ${member_writer_status}" >&2
+    exit 1
+fi
+
+concurrent_digest="$(psql "${DATABASE_URL}" -Atqc "
+SELECT evidence_set_digest
+FROM decision_evidence_set
+WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'::uuid
+  AND decision_evidence_set_id = '00000000-0000-7000-8000-000000000030'::uuid;
+")"
+expected_concurrent_digest='248b30a2b907eeb407cc1439409f0db19db21dc498665ab720dcc1140bf53f51'
+if [[ "${concurrent_digest}" != "${expected_concurrent_digest}" ]]; then
+    echo "concurrent evidence finalization omitted or changed a committed member: ${concurrent_digest}" >&2
     exit 1
 fi
 
