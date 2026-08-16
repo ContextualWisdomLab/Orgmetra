@@ -26,6 +26,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 - People API Quality no longer fails with HTTP 422 on every protected route when FastAPI 0.116 interprets postponed annotations as query parameters.
 - Bearer token parsing now splits only on the first ASCII space so C0 separators such as `\\x1f` remain visible and are rejected.
+- People API CI now pins the same Python 3.14-compatible Pydantic lock as Keyverse authorization and includes `certifi` so `pip check` can close the httpx dependency set.
 
 ### Security
 
