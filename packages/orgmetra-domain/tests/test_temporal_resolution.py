@@ -6,6 +6,7 @@ from uuid import UUID
 
 from orgmetra_domain import (
     BitemporalPeriod,
+    InvalidDomainValueError,
     PersonNameRecord,
     TemporalAmbiguityError,
     resolve_bitemporal_fact,
@@ -86,7 +87,7 @@ class BitemporalResolutionTests(unittest.TestCase):
         self.assertIsNone(resolved)
 
     def test_rejects_naive_knowledge_time(self) -> None:
-        with self.assertRaisesRegex(TemporalAmbiguityError.__mro__[1], "timezone-aware"):
+        with self.assertRaisesRegex(InvalidDomainValueError, "timezone-aware"):
             resolve_bitemporal_fact(
                 (),
                 effective_on=date(2026, 1, 1),
