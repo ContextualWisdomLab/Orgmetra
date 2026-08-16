@@ -77,6 +77,7 @@ def validate_assignment_portfolio(
             )
     visible = resolve_bitemporal_facts(
         scoped,
+        tenant_record_id=tenant_record_id,
         identity_of="employment_record_id",
         identity_value=employment_record_id,
         effective_on=effective_on,
@@ -197,6 +198,7 @@ def validate_position_seat_capacity(
     ]
     visible = resolve_bitemporal_facts(
         scoped,
+        tenant_record_id=tenant_record_id,
         identity_of="position_record_id",
         identity_value=position_record_id,
         effective_on=effective_on,
