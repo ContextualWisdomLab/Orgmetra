@@ -17,7 +17,11 @@ import json
 import re
 from uuid import UUID
 
-_SOURCE_SERVICE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+_SOURCE_SERVICE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
+_EVENT_TYPE_PATTERN = re.compile(r"^orgmetra(?:\.[a-z][a-z0-9_]*){2,}$")
+_OPAQUE_REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
+_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+_VERSION_CODE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 _REQUIRED_TEXT_FIELDS = (
     "resource_reference",
     "actor_reference",
@@ -59,15 +63,26 @@ class AuditOutboxEvent:
         if self.occurred_at.utcoffset() is None:
             raise ValueError("occurred_at must resolve to a UTC offset.")
         if _SOURCE_SERVICE_PATTERN.fullmatch(self.source_service) is None:
-            raise ValueError("source_service must be lower snake_case.")
-        if not self.event_type.startswith("orgmetra."):
-            raise ValueError("event_type must use the orgmetra.* namespace.")
+            raise ValueError("source_service must contain two or more lower snake_case words.")
+        if _EVENT_TYPE_PATTERN.fullmatch(self.event_type) is None:
+            raise ValueError("event_type must use a canonical lower-case orgmetra.<context>.<event> namespace.")
         for field_name in _REQUIRED_TEXT_FIELDS:
             value = getattr(self, field_name)
             if not value.strip():
                 raise ValueError(f"{field_name} must not be blank.")
-        if self.confirmation_reference is not None and not self.confirmation_reference.strip():
-            raise ValueError("confirmation_reference must not be blank when supplied.")
+        for field_name in ("resource_reference", "actor_reference"):
+            if _OPAQUE_REFERENCE_PATTERN.fullmatch(getattr(self, field_name)) is None:
+                raise ValueError(f"{field_name} must be a namespaced opaque reference.")
+        for field_name in ("purpose_code", "reason_code", "result_code"):
+            if _CODE_PATTERN.fullmatch(getattr(self, field_name)) is None:
+                raise ValueError(f"{field_name} must be lower snake_case code data.")
+        if _VERSION_CODE_PATTERN.fullmatch(self.evidence_version_code) is None:
+            raise ValueError("evidence_version_code must be a whitespace-free version token.")
+        if self.confirmation_reference is not None:
+            if not self.confirmation_reference.strip():
+                raise ValueError("confirmation_reference must not be blank when supplied.")
+            if _OPAQUE_REFERENCE_PATTERN.fullmatch(self.confirmation_reference) is None:
+                raise ValueError("confirmation_reference must be a namespaced opaque reference.")
         if self.high_impact and self.confirmation_reference is None:
             raise ValueError("high-impact events require confirmation_reference.")
 
