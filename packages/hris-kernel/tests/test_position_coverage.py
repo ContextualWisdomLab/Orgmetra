@@ -28,6 +28,8 @@ from .conftest import (
     utc,
 )
 
+FOREIGN_TENANT = UUID("20000000-0000-7000-8000-000000000101")
+
 
 def _open_icu() -> PositionVersion:
     """Return the open Memorial ICU RN seat."""
@@ -55,6 +57,17 @@ def test_assignment_requires_an_open_or_active_position(
         validate_assignment_position_coverage(
             jordan_icu_assignment,
             [closed],
+            known_at=utc(2024, 5, 1),
+        )
+
+
+def test_assignment_rejects_foreign_tenant_position_coverage(jordan_icu_assignment) -> None:
+    """A position in another tenant cannot make this tenant's assignment staffable."""
+    foreign = replace(_open_icu(), tenant_record_id=FOREIGN_TENANT)
+    with pytest.raises(PositionCoverageError, match="position"):
+        validate_assignment_position_coverage(
+            jordan_icu_assignment,
+            [foreign],
             known_at=utc(2024, 5, 1),
         )
 
@@ -95,10 +108,30 @@ def test_riley_cannot_take_a_full_icu_seat_already_held_by_jordan(
     with pytest.raises(PositionSeatError, match="1.0000"):
         validate_position_seat_capacity(
             [jordan_icu_assignment, riley],
+            tenant_record_id=TENANT,
             position_record_id=ICU_POSITION,
             effective_on=date(2024, 4, 15),
             known_at=utc(2024, 4, 15),
         )
+
+
+def test_foreign_tenant_assignment_does_not_consume_local_seat_capacity(
+    jordan_icu_assignment,
+) -> None:
+    """A foreign tenant cannot consume the local tenant's ICU position capacity."""
+    foreign = replace(
+        jordan_icu_assignment,
+        tenant_record_id=FOREIGN_TENANT,
+        assignment_record_id=UUID("20000000-0000-7000-8000-000000000308"),
+        allocation_ratio=Decimal("1.0000"),
+    )
+    validate_position_seat_capacity(
+        [jordan_icu_assignment, foreign],
+        tenant_record_id=TENANT,
+        position_record_id=ICU_POSITION,
+        effective_on=date(2024, 5, 1),
+        known_at=utc(2024, 5, 1),
+    )
 
 
 def test_open_status_is_staffable_and_unrelated_seats_are_ignored(
@@ -126,6 +159,7 @@ def test_float_allocation_does_not_consume_icu_seat_capacity(
     """Jordan's 0.2000 float row is not part of the ICU 1.0000 budget."""
     validate_position_seat_capacity(
         [jordan_icu_assignment, jordan_float_assignment],
+        tenant_record_id=TENANT,
         position_record_id=ICU_POSITION,
         effective_on=date(2024, 5, 1),
         known_at=utc(2024, 5, 1),
@@ -146,6 +180,7 @@ def test_riley_may_take_the_remaining_icu_allocation(
     )
     validate_position_seat_capacity(
         [jordan_icu_assignment, riley],
+        tenant_record_id=TENANT,
         position_record_id=ICU_POSITION,
         effective_on=date(2024, 4, 15),
         known_at=utc(2024, 4, 15),
