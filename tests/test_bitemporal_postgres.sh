@@ -15,6 +15,15 @@ VALUES (
     '10000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-000000000001'
 );
+INSERT INTO employment_record (
+    tenant_record_id, employment_record_id, person_record_id,
+    employment_status_code, effective_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000002',
+    '00000000-0000-7000-8000-000000000001',
+    'active', DATE '2026-01-01'
+);
 INSERT INTO organization_unit (tenant_record_id, organization_unit_id)
 VALUES (
     '10000000-0000-7000-8000-000000000001',
@@ -27,7 +36,7 @@ VALUES (
 );
 SQL
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL' &
+PGAPPNAME=orgmetra_bitemporal_writer psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL' &
 BEGIN;
 INSERT INTO organization_unit_version (
     tenant_record_id, organization_unit_version_id, organization_unit_id, unit_name,
@@ -43,7 +52,29 @@ SELECT pg_sleep(2);
 COMMIT;
 SQL
 writer_pid=$!
-sleep 0.5
+
+writer_ready=false
+for _ in $(seq 1 80); do
+    writer_state="$(psql "${DATABASE_URL}" -Atqc "
+        SELECT state
+        FROM pg_stat_activity
+        WHERE application_name = 'orgmetra_bitemporal_writer'
+        LIMIT 1;
+    ")"
+    if [[ "${writer_state}" == "active" ]]; then
+        writer_ready=true
+        break
+    fi
+    sleep 0.05
+done
+if [[ "${writer_ready}" != "true" ]]; then
+    set +e
+    wait "${writer_pid}"
+    writer_status=$?
+    set -e
+    echo "concurrent writer never became observable; exit_status=${writer_status}" >&2
+    exit 1
+fi
 
 set +e
 conflict_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
@@ -61,9 +92,14 @@ INSERT INTO organization_unit_version (
 SQL
 } 2>&1)"
 conflict_status=$?
-set -e
 wait "${writer_pid}"
+writer_status=$?
+set -e
 
+if [[ ${writer_status} -ne 0 ]]; then
+    echo "concurrent fixture writer failed unexpectedly with status ${writer_status}" >&2
+    exit 1
+fi
 if [[ ${conflict_status} -eq 0 ]]; then
     echo "overlapping concurrent bitemporal version unexpectedly succeeded" >&2
     exit 1
@@ -118,6 +154,23 @@ if [[ ${mutation_status} -eq 0 ]]; then
 fi
 if [[ "${mutation_output}" != *"bitemporal correction may only close an open recorded interval"* ]]; then
     echo "business mutation failed for an unexpected reason: ${mutation_output}" >&2
+    exit 1
+fi
+
+set +e
+employment_mutation_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
+UPDATE employment_record SET employment_status_code = 'terminated'
+WHERE tenant_record_id = '${TENANT_ID}'::uuid
+  AND employment_record_id = '00000000-0000-7000-8000-000000000002';
+"; } 2>&1)"
+employment_mutation_status=$?
+set -e
+if [[ ${employment_mutation_status} -eq 0 ]]; then
+    echo "employment bitemporal business mutation unexpectedly succeeded" >&2
+    exit 1
+fi
+if [[ "${employment_mutation_output}" != *"bitemporal correction may only close an open recorded interval"* ]]; then
+    echo "employment mutation failed for an unexpected reason: ${employment_mutation_output}" >&2
     exit 1
 fi
 
