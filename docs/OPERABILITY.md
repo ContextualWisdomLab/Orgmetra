@@ -18,6 +18,15 @@
 - Every denied or deferred action records an `authorization_verification_unavailable` audit event with tenant, actor, purpose, resource, policy-snapshot time, and correlation reference.
 - Recovery requires a fresh Keyverse verification before a session regains PII or mutation capability; queued revocation and deprovisioning commands are reconciled before normal provisioning resumes.
 
+### Audit/outbox persistence
+
+- An accepted business mutation that requires audit evidence must call `record_audit_outbox_event(...)` inside the same PostgreSQL transaction as the authoritative write. A failure to append the audit/outbox pair is a business-transaction failure, not a warning-only condition.
+- `audit_event_record` is immutable evidence. Operations may inspect it but never repair delivery by rewriting its canonical bytes or digest.
+- `outbox_delivery_record` is transport state. A dispatcher may only move `pending -> leased -> delivered`, or return `leased -> pending` with a bounded failure code and cleared lease metadata for retry.
+- A delivered row is terminal. Redelivery for a new target requires a new target-scoped outbox row; it does not reopen historical delivery state.
+- This stacked slice does not yet implement production dispatcher claiming, bounded exponential backoff, lease-expiry recovery, dead-letter/escalation policy, or external delivery receipts. Those controls are release blockers for claiming reliable asynchronous audit delivery.
+- A production dispatcher must claim work with concurrency-safe row locking and prove crash/restart behavior so two workers cannot both own the same pending delivery and an expired lease is recoverable without losing or mutating the underlying audit fact.
+
 ### Other dependencies
 
 - Psychometrics Commons unavailable: assessment-result fetches show an unavailable state, not invented scores.
@@ -28,15 +37,17 @@
 ## Backups
 
 - HRIS PostgreSQL requires encrypted backups, point-in-time recovery, and restore rehearsals.
-- Audit/provenance records require immutability and tamper evidence.
+- Audit/provenance records require immutability and tamper evidence; restored audit rows must recompute to their stored SHA-256 digests before they are treated as review evidence.
+- Outbox delivery state must be restored together with the corresponding audit records. Recovery may retry non-terminal work but must not mutate a terminal delivered record or invent a successful delivery receipt.
 - Object-store artifacts require tenant-scoped retention and deletion policy.
-- Restored data is not serviceable until tenant isolation, temporal interval, append-only trigger, evidence-reference, and manifest integrity checks pass.
+- Restored data is not serviceable until tenant isolation, temporal interval, append-only trigger, evidence-reference, audit-envelope digest, outbox-state, and manifest integrity checks pass.
 
 ## Incident classes
 
 - authorization verification or revocation failure
 - cross-tenant access attempt
-- evidence integrity failure
+- evidence or audit-envelope integrity failure
+- outbox lease/retry or delivery-state corruption
 - integration outage
 - bitemporal corruption
 - LLM draft hallucination detected
