@@ -4,9 +4,10 @@
 
 ## Current capabilities
 
-- Half-open effective-time and system-recorded-time intervals.
+- Half-open, non-empty effective-time and system-recorded-time intervals.
 - Durable person anchors separated from effective and system-recorded person-name facts.
-- Separate employment, organization, job, position, and assignment records.
+- Durable organization and job anchors separated from bitemporal descriptive versions.
+- Distinct employment, organization, job, position, and assignment concepts.
 - Bitemporal organization hierarchy facts and versioned job definitions, kept distinct from positions that instantiate them.
 - Multiple simultaneous assignments with allocation validation.
 - Append-only, idempotent candidate-to-worker linkage.
@@ -34,7 +35,7 @@ period = BitemporalPeriod(
 name = PersonNameRecord(uuid4(), person.person_record_id, "Ada Lovelace", period)
 ```
 
-The durable `PersonRecord` never stores mutable descriptive attributes. A name correction appends or supersedes a `PersonNameRecord` version while preserving the same person identity and the historical knowledge timeline. `OrganizationUnitRecord` and `JobProfileRecord` similarly carry bitemporal descriptive versions while `PositionRecord` remains the distinct organizational seat linking an organization to a job definition.
+The durable `PersonRecord` never stores mutable descriptive attributes. A name correction appends or supersedes a `PersonNameRecord` version while preserving the same person identity and the historical knowledge timeline. `OrganizationUnitRecord` and `JobProfileRecord` follow the same anchor pattern; `OrganizationUnitVersionRecord` and `JobProfileVersionRecord` carry descriptive facts over business and system time. `PositionRecord` therefore references durable organization/job identities rather than one historical description.
 
 ## Quality
 
