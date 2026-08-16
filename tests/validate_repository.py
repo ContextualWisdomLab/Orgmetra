@@ -45,11 +45,13 @@ REQUIRED = [
     "docs/adr/0003-bitemporal-hris-data-contract.md",
     "docs/adr/0004-employment-position-version-and-assignment-binding.md",
     "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
+    "docs/adr/0006-governed-audit-outbox-envelope.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
     "database/migrations/0001_foundation_schema.sql",
     "database/migrations/0002_sealed_evidence_digest.sql",
+    "database/migrations/0003_audit_outbox_persistence.sql",
     "schemas/openapi.yaml",
     "scripts/foundation-contract-core.mjs",
     "scripts/foundation-contract.mjs",
@@ -58,6 +60,7 @@ REQUIRED = [
     "tests/test_bitemporal_postgres.sh",
     "tests/test_tenant_isolation_postgres.sh",
     "tests/test_evidence_sealing_postgres.sh",
+    "tests/test_audit_outbox_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -164,14 +167,18 @@ def _validate_manifest() -> None:
 
 
 def _validate_database_contract() -> None:
-    """Validate naming, temporal, tenant, evidence-sealing, and append-only DDL contracts."""
+    """Validate naming, temporal, tenant, audit, evidence, and append-only DDL contracts."""
     foundation_sql = (ROOT / "database/migrations/0001_foundation_schema.sql").read_text(
         encoding="utf-8"
     )
     evidence_sql = (ROOT / "database/migrations/0002_sealed_evidence_digest.sql").read_text(
         encoding="utf-8"
     )
-    sql = foundation_sql + "\n" + evidence_sql
+    audit_sql = (ROOT / "database/migrations/0003_audit_outbox_persistence.sql").read_text(
+        encoding="utf-8"
+    )
+    table_sql = foundation_sql + "\n" + audit_sql
+    sql = table_sql + "\n" + evidence_sql
 
     table_pattern = re.compile(
         r"\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
@@ -179,7 +186,7 @@ def _validate_database_contract() -> None:
         r"(?P<table>[a-z_][a-z0-9_]*)",
         flags=re.IGNORECASE,
     )
-    matches = list(table_pattern.finditer(foundation_sql))
+    matches = list(table_pattern.finditer(table_sql))
     if not matches:
         _fail("No CREATE TABLE statement found")
 
@@ -268,6 +275,18 @@ def _validate_database_contract() -> None:
         "CREATE TRIGGER candidate_worker_link_append_only_guard",
         "CREATE TRIGGER selection_decision_append_only_guard",
         "CREATE TRIGGER selection_decision_evidence_append_only_guard",
+        "CREATE FUNCTION validate_audit_event_envelope",
+        "CREATE TABLE audit_event_record",
+        "CREATE TABLE outbox_delivery_record",
+        "digest(convert_to(p_canonical_event_json, 'UTF8'), 'sha256')",
+        "CREATE TRIGGER audit_event_record_append_only_guard",
+        "audit event records are append-only",
+        "CREATE FUNCTION protect_outbox_delivery_transition",
+        "outbox delivery must transition pending -> leased before completion",
+        "delivered outbox records are immutable",
+        "CREATE FUNCTION record_audit_outbox_event",
+        "CREATE POLICY audit_event_record_scope_policy",
+        "CREATE POLICY outbox_delivery_record_scope_policy",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
@@ -280,15 +299,11 @@ def _validate_database_contract() -> None:
             continue
         block_start = match.start()
         next_match_index = index + 1
-        block_end = (
-            matches[next_match_index].start()
-            if next_match_index < len(matches)
-            else len(foundation_sql)
-        )
-        table_block = foundation_sql[block_start:block_end]
+        block_end = matches[next_match_index].start() if next_match_index < len(matches) else len(table_sql)
+        table_block = table_sql[block_start:block_end]
         if "tenant_record_id uuid NOT NULL" not in table_block:
             _fail(f"Tenant binding is missing from table: {table_name}")
-        if f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in foundation_sql:
+        if f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in sql:
             _fail(f"Forced row-level security is missing from table: {table_name}")
 
     if len(tenant_matches) != len(matches) - 1:
