@@ -20,6 +20,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Purpose-bound PII access contract.
 - LLM output constrained to draft evidence.
 - No direct cross-service database access.
+- Reject malformed, duplicate, or non-verification JWK `key_ops` declarations before constructing a signing key.
 
 ### Notes
 
