@@ -21,7 +21,8 @@
 |---|---|---|---|---|---|
 | Keyverse identity and authorization | API Gateway / purpose-bound authorization | Published OIDC/API contract | tenant, actor, purpose, scope, denial audit | ADR-0002 | accepted_architecture |
 | naruon communication and calendar | Integration Hub | Published API/event adapter | idempotency, delivery audit, no direct table access | ADR-0002 | planned |
-| Psychometrics Commons / fast-mlsirm | Workforce Validation | Immutable result/provenance contract | model/version/provenance snapshot; no duplicated kernel | ADR-0002 | accepted_architecture |
+| Psychometrics Commons @ `cc5850a0d1eacbbf16d03075534fce460a8286e6` | Workforce Validation | Immutable response/result snapshot contract | pinned revision, model/version/provenance snapshot, immutable result linkage, no direct application-table access | ADR-0002 | accepted_architecture |
+| fast-mlsirm @ `fb67ced09d8ee00542c05d56374537a9a7239751` | Workforce Validation | Published `orgmetra.fast_mlsirm.v1` result contract; direct calls only from approved offline validation worker | pinned revision, contract identifier, backend/result provenance, CPU/GPU parity evidence where material, no duplicated kernel | ADR-0002 | accepted_architecture |
 | TEPP temporal evidence | Workforce Validation | Published package/API contract | temporal provenance and version binding | ADR-0002 | planned |
 | MHTML ETL Gateway / mightyETL | Governed Migration | Published ETL contract | lineage, idempotency, reconciliation, rollback | ADR-0002 | planned |
 | Semantic Data Portal / OriginWeave / LineageWeave | Evidence and lineage adapters | Published API/event contracts | provenance, tenant ACL, retention, export controls | ADR-0002 | planned |
