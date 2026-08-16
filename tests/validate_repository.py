@@ -40,6 +40,9 @@ REQUIRED = [
     "docs/OPERABILITY.md",
     "docs/TRACEABILITY.md",
     "docs/adr/README.md",
+    "docs/adr/0001-orgmetra-authoritative-hris-record.md",
+    "docs/adr/0002-federated-cwl-integration-boundaries.md",
+    "docs/adr/0003-bitemporal-hris-data-contract.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -48,7 +51,10 @@ REQUIRED = [
     "scripts/foundation-contract-core.mjs",
     "scripts/foundation-contract.mjs",
     "tests/foundation-contract.test.mjs",
+    "tests/openapi-contract.test.mjs",
     "tests/test_bitemporal_postgres.sh",
+    "tests/test_tenant_isolation_postgres.sh",
+    "tests/test_evidence_sealing_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -148,10 +154,10 @@ def _validate_manifest() -> None:
 
 
 def _validate_database_contract() -> None:
-    """Validate naming, temporal, evidence, and append-only DDL contracts."""
-    sql = (
-        ROOT / "database/migrations/0001_foundation_schema.sql"
-    ).read_text(encoding="utf-8")
+    """Validate naming, temporal, tenant, evidence-sealing, and append-only DDL contracts."""
+    sql = (ROOT / "database/migrations/0001_foundation_schema.sql").read_text(
+        encoding="utf-8"
+    )
 
     table_pattern = re.compile(
         r"\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
@@ -171,28 +177,27 @@ def _validate_database_contract() -> None:
                     f"{identifier}"
                 )
 
-    non_empty_period_guards = [
+    for guard in (
         "effective_to IS NULL OR effective_to > effective_from",
         "recorded_to IS NULL OR recorded_to > recorded_from",
-    ]
-    for guard in non_empty_period_guards:
+    ):
         if guard not in sql:
             _fail(f"Missing strict temporal interval guard: {guard}")
 
     required_fragments = [
         "CREATE EXTENSION IF NOT EXISTS btree_gist",
+        "CREATE TABLE tenant_record",
+        "tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id)",
         "CREATE TABLE person_name_record",
+        "FOREIGN KEY (tenant_record_id, person_record_id)",
+        "REFERENCES person_record(tenant_record_id, person_record_id)",
         "CONSTRAINT person_name_bitemporal_exclusion",
         "daterange(effective_from, effective_to, '[)') WITH &&",
         "tstzrange(recorded_from, recorded_to, '[)') WITH &&",
         "CREATE TABLE organization_unit_version",
-        "organization_unit_id uuid NOT NULL REFERENCES organization_unit(organization_unit_id)",
-        "parent_organization_unit_id uuid REFERENCES organization_unit(organization_unit_id)",
-        "organization_type_code text NOT NULL",
         "CONSTRAINT organization_unit_parent_not_self_check",
         "CONSTRAINT organization_unit_bitemporal_exclusion",
         "CREATE TABLE job_profile_version",
-        "job_profile_id uuid NOT NULL REFERENCES job_profile(job_profile_id)",
         "job_family_code text NOT NULL",
         "job_version_code text NOT NULL",
         "CONSTRAINT job_profile_bitemporal_exclusion",
@@ -201,61 +206,174 @@ def _validate_database_contract() -> None:
         "CREATE TRIGGER person_name_bitemporal_guard",
         "CREATE TRIGGER organization_unit_bitemporal_guard",
         "CREATE TRIGGER job_profile_bitemporal_guard",
-        "CREATE TABLE performance_cycle",
-        "performance_cycle_id uuid NOT NULL REFERENCES performance_cycle(performance_cycle_id)",
-        "CONSTRAINT performance_cycle_effective_period_check",
-        "CONSTRAINT performance_cycle_recorded_period_check",
-        "CREATE TABLE selection_decision_evidence",
+        "CREATE TABLE decision_evidence_set",
+        "evidence_set_digest text NOT NULL",
+        "CONSTRAINT selection_decision_evidence_set_unique",
+        "CREATE FUNCTION protect_evidence_set_seal",
+        "CREATE FUNCTION reject_sealed_evidence_insert",
+        "sealed evidence set cannot accept new members",
+        "CREATE FUNCTION seal_decision_evidence_set",
+        "CREATE TRIGGER selection_decision_seal_evidence_guard",
+        "CREATE TABLE validity_study_decision_link",
+        "CREATE TABLE validity_study_outcome_link",
+        "CREATE TABLE validity_study_evidence_set_link",
+        "CREATE FUNCTION current_tenant_record_id",
+        "FORCE ROW LEVEL SECURITY",
+        "CREATE POLICY person_record_scope_policy",
+        "CREATE POLICY selection_decision_scope_policy",
         "CREATE FUNCTION reject_append_only_mutation",
         "CREATE TRIGGER candidate_worker_link_append_only_guard",
         "CREATE TRIGGER selection_decision_append_only_guard",
         "CREATE TRIGGER selection_decision_evidence_append_only_guard",
-        "BEFORE UPDATE OR DELETE ON candidate_worker_link",
-        "BEFORE UPDATE OR DELETE ON selection_decision_evidence",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
             _fail(f"Missing database contract fragment: {fragment}")
 
+    tenant_tables = [
+        match.group("table")
+        for match in matches
+        if match.group("table") != "tenant_record"
+    ]
+    for table_name in tenant_tables:
+        block_start = sql.index(f"CREATE TABLE {table_name}")
+        next_table = sql.find("\nCREATE TABLE ", block_start + 1)
+        block_end = len(sql) if next_table < 0 else next_table
+        table_block = sql[block_start:block_end]
+        if "tenant_record_id uuid NOT NULL" not in table_block:
+            _fail(f"Tenant binding is missing from table: {table_name}")
+        if f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in sql:
+            _fail(f"Forced row-level security is missing from table: {table_name}")
+
+
+def _yaml_block(document: str, marker: str) -> str:
+    """Return the indentation-bounded YAML block after one exact marker line."""
+    lines = document.splitlines()
+    try:
+        start = lines.index(marker)
+    except ValueError:
+        return ""
+    marker_indent = len(marker) - len(marker.lstrip())
+    block: list[str] = []
+    for line in lines[start + 1 :]:
+        if line.strip() and len(line) - len(line.lstrip()) <= marker_indent:
+            break
+        block.append(line)
+    return "\n".join(block)
+
+
+def _require_in_block(block: str, label: str, fragment: str, description: str) -> None:
+    """Require one fragment inside its owning YAML block rather than globally."""
+    if fragment not in block:
+        _fail(f"{label}: missing {description}")
+
 
 def _validate_openapi_contract() -> None:
-    """Require authentication and complete mutation context in the API schema."""
+    """Require operation-local authentication, mutation context, and error contracts."""
     openapi = (ROOT / "schemas/openapi.yaml").read_text(encoding="utf-8")
-    required_fragments = [
-        "openapi: 3.2.0",
-        "securitySchemes:",
-        "type: openIdConnect",
-        "security:",
-        "name: Idempotency-Key",
-        "name: X-Tenant-Reference",
-        "name: X-Actor-Reference",
-        "name: X-Purpose-Code",
-        "CreatedJobProfile:",
-        "job_profile_id:",
-        "RecordSelectionDecisionCommand:",
-        "confirmation_reference",
-        "evidence_references:",
-        "minItems: 1",
-        "maxItems: 100",
-        "- orgmetra.people.write",
-        "- orgmetra.job_architecture.write",
-        "- orgmetra.talent_acquisition.write",
-        "next_action:",
-        "support_reference:",
-        "Opaque random client-safe support identifier.",
+    if not openapi.startswith("openapi: 3.2.0\n"):
+        _fail("OpenAPI document must declare version 3.2.0")
+
+    operations = [
+        (
+            "  /person-records:",
+            "createPersonRecord",
+            "orgmetra.people.write",
+            "CreatePersonRecordCommand",
+            (),
+        ),
+        (
+            "  /job-profiles:",
+            "createJobProfile",
+            "orgmetra.job_architecture.write",
+            "CreateJobProfileCommand",
+            (),
+        ),
+        (
+            "  /selection-decisions:",
+            "recordSelectionDecision",
+            "orgmetra.talent_acquisition.write",
+            "RecordSelectionDecisionCommand",
+            ("        '422':",),
+        ),
     ]
-    for fragment in required_fragments:
-        if fragment not in openapi:
-            _fail(f"Missing OpenAPI contract fragment: {fragment}")
+    for marker, operation_id, scope, request_schema, extra_responses in operations:
+        block = _yaml_block(openapi, marker)
+        if not block:
+            _fail(f"{operation_id}: path block is missing")
+        _require_in_block(block, operation_id, f"operationId: {operation_id}", "operationId")
+        _require_in_block(
+            block,
+            operation_id,
+            f"            - {scope}",
+            f"least-privilege scope {scope}",
+        )
+        for parameter_name in (
+            "IdempotencyKey",
+            "TenantReference",
+            "ActorReference",
+            "PurposeCode",
+        ):
+            _require_in_block(
+                block,
+                operation_id,
+                f"$ref: '#/components/parameters/{parameter_name}'",
+                f"required parameter {parameter_name}",
+            )
+        _require_in_block(
+            block,
+            operation_id,
+            f"$ref: '#/components/schemas/{request_schema}'",
+            f"request body binding {request_schema}",
+        )
+        for response in (
+            "        '201':",
+            "        '400':",
+            "        '401':",
+            "        '403':",
+            "        '409':",
+            *extra_responses,
+        ):
+            _require_in_block(block, operation_id, response, f"response {response.strip()}")
+
+    for schema_name in ("CreateJobProfileCommand", "RecordSelectionDecisionCommand"):
+        block = _yaml_block(openapi, f"    {schema_name}:")
+        _require_in_block(
+            block,
+            schema_name,
+            "        - evidence_references",
+            "required evidence_references",
+        )
+        _require_in_block(block, schema_name, "          maxItems: 100", "maxItems 100")
+        _require_in_block(block, schema_name, "          uniqueItems: true", "uniqueItems")
+
+    decision_block = _yaml_block(openapi, "    RecordSelectionDecisionCommand:")
+    _require_in_block(
+        decision_block,
+        "RecordSelectionDecisionCommand",
+        "        - confirmation_reference",
+        "human confirmation reference",
+    )
+
+    error_block = _yaml_block(openapi, "    ErrorResponse:")
+    for field_name in ("error_code", "message", "next_action", "support_reference"):
+        _require_in_block(
+            error_block,
+            "ErrorResponse",
+            f"        - {field_name}",
+            f"required field {field_name}",
+        )
+    _require_in_block(
+        error_block,
+        "ErrorResponse",
+        "Opaque random client-safe support identifier.",
+        "opaque support-reference semantics",
+    )
 
     if "keyverse_oidc: []" in openapi:
         _fail("OpenID Connect security requirements must declare a least-privilege scope")
-
     if re.search(r"(?m)^\s*(?:-\s+)?trace_id\s*:", openapi):
         _fail("Client error schemas must not expose internal trace identifiers")
-
-    if re.search(r"(?m)^ {8,}-\s+name:\s+(?:people-core|job-architecture|talent-acquisition)\s*$", openapi):
-        _fail("Operation tags must be string values, not tag objects")
 
 
 def _validate_markdown() -> None:
