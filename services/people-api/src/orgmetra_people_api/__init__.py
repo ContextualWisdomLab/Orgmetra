@@ -8,6 +8,7 @@ from .auth import (
     IdentityProviderUnavailable,
     TokenAuthorizer,
     ensure_purpose_authorized,
+    ensure_scope_authorized,
     extract_bearer_token,
 )
 from .repository import PeopleRepository
@@ -22,5 +23,6 @@ __all__ = [
     "TokenAuthorizer",
     "create_app",
     "ensure_purpose_authorized",
+    "ensure_scope_authorized",
     "extract_bearer_token",
 ]
