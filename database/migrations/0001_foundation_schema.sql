@@ -8,9 +8,7 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 CREATE TABLE tenant_record (
     tenant_record_id uuid PRIMARY KEY,
     tenant_reference text NOT NULL UNIQUE,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT tenant_record_tenant_identity_unique
-        UNIQUE (tenant_record_id, tenant_record_id)
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE person_record (
@@ -476,8 +474,23 @@ BEGIN
 END;
 $$;
 
+CREATE TRIGGER person_record_bitemporal_guard
+BEFORE UPDATE OR DELETE ON person_record
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
 CREATE TRIGGER person_name_bitemporal_guard
 BEFORE UPDATE OR DELETE ON person_name_record
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER employment_record_bitemporal_guard
+BEFORE UPDATE OR DELETE ON employment_record
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER organization_unit_anchor_bitemporal_guard
+BEFORE UPDATE OR DELETE ON organization_unit
 FOR EACH ROW
 EXECUTE FUNCTION protect_bitemporal_history();
 
@@ -486,8 +499,58 @@ BEFORE UPDATE OR DELETE ON organization_unit_version
 FOR EACH ROW
 EXECUTE FUNCTION protect_bitemporal_history();
 
+CREATE TRIGGER job_profile_anchor_bitemporal_guard
+BEFORE UPDATE OR DELETE ON job_profile
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
 CREATE TRIGGER job_profile_bitemporal_guard
 BEFORE UPDATE OR DELETE ON job_profile_version
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER position_record_bitemporal_guard
+BEFORE UPDATE OR DELETE ON position_record
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER assignment_record_bitemporal_guard
+BEFORE UPDATE OR DELETE ON assignment_record
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER candidate_profile_bitemporal_guard
+BEFORE UPDATE OR DELETE ON candidate_profile
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER performance_cycle_bitemporal_guard
+BEFORE UPDATE OR DELETE ON performance_cycle
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER criterion_blueprint_bitemporal_guard
+BEFORE UPDATE OR DELETE ON criterion_blueprint
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER criterion_observation_bitemporal_guard
+BEFORE UPDATE OR DELETE ON criterion_observation
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER validity_study_bitemporal_guard
+BEFORE UPDATE OR DELETE ON validity_study
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER compensation_record_bitemporal_guard
+BEFORE UPDATE OR DELETE ON compensation_record
+FOR EACH ROW
+EXECUTE FUNCTION protect_bitemporal_history();
+
+CREATE TRIGGER employment_transition_bitemporal_guard
+BEFORE UPDATE OR DELETE ON employment_transition
 FOR EACH ROW
 EXECUTE FUNCTION protect_bitemporal_history();
 
