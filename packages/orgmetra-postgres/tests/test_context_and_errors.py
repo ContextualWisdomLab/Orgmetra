@@ -71,6 +71,21 @@ def test_repository_translates_connection_failure() -> None:
         repository.get_person(_context(), uuid4())
 
 
+def test_repository_translates_base_psycopg_error() -> None:
+    """Translate the documented Psycopg root ``Error`` without import aliases."""
+
+    def failed_connection(*_args: object, **_kwargs: object) -> object:
+        raise psycopg.Error("generic database failure")
+
+    repository = PostgresPeopleRepository(
+        "postgresql://example.invalid/orgmetra",
+        connect_factory=failed_connection,  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(RepositoryUnavailableError, match="could not complete"):
+        repository.get_person(_context(), uuid4())
+
+
 def test_repository_translates_authorization_failure() -> None:
     def denied_connection(*_args: object, **_kwargs: object) -> object:
         raise InsufficientPrivilege("database role denied")
