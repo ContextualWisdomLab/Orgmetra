@@ -9,6 +9,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Foundation product baseline for Orgmetra as an evidence-centered HRIS/HCM.
 - CWL federated integration boundary map.
 - Bitemporal HRIS data contract with stable identity anchors and versioned person-name facts.
+- Durable organization/job anchors with normalized bitemporal organization hierarchy and job-definition version records.
 - Core ERD, UML, PRD, TRD, user stories, storyboard, wireframes, Storybook inventory, security, test, and operability baseline.
 - Effective-dated performance-cycle records linked to criterion observations.
 - Versioned selection-decision evidence records and complete mutation-context OpenAPI schemas.
@@ -20,6 +21,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Separated fast-mlsirm, TEPP, and Psychometrics Commons into immutable external scientific contracts.
 - Defined 100% owned production statement and branch coverage as a CI gate where the pinned toolchain exposes those metrics.
 - Made every baseline OpenAPI mutation declare its own least-privilege Keyverse scope while retaining finer purpose-bound authorization.
+- Enforced non-empty half-open effective/system intervals in the database to match the domain contract.
 
 ### Security
 
@@ -27,7 +29,7 @@ All notable changes to Orgmetra will be documented in this file.
 - LLM output constrained to draft evidence.
 - No direct cross-service application-table access.
 - Service-owned database schemas and roles inside the initially shared physical PostgreSQL cluster.
-- Database guards for reversed temporal intervals and append-only candidate-worker, selection-decision, and decision-evidence records.
+- Database guards for reversed or zero-length temporal intervals and append-only candidate-worker, selection-decision, and decision-evidence records.
 - Keyverse outage policy that blocks PII and high-risk actions when current authorization cannot be verified.
 - Cross-tenant threat, denial evidence, and negative authorization test contracts.
 - Replaced client-visible internal trace identifiers with random support references and actionable next-step error guidance.
