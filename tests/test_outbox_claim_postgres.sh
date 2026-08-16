@@ -162,6 +162,29 @@ fi
 
 sleep 1.2
 
+# SQL three-valued logic must not let a direct takeover omit the recovery
+# failure classification. A NULL comparison with <> evaluates UNKNOWN, so the
+# transition guard must use null-safe distinctness for required evidence.
+set +e
+missing_recovery_evidence_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v tenant_id="${TENANT_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+UPDATE outbox_delivery_record
+SET delivery_state_code = 'leased',
+    delivery_attempt_count = delivery_attempt_count + 1,
+    lease_owner_reference = 'dispatcher_worker:null-evidence',
+    lease_expires_at = transaction_timestamp() + interval '300 seconds',
+    last_failure_code = NULL
+WHERE outbox_delivery_record_id = '00000000-0000-4000-8000-000000000073'::uuid;
+SQL
+} 2>&1)"
+missing_recovery_evidence_status=$?
+set -e
+if [[ ${missing_recovery_evidence_status} -eq 0 || "${missing_recovery_evidence_output}" != *"expired lease takeover requires"* ]]; then
+    echo "expired lease takeover accepted missing recovery evidence or failed for the wrong reason: ${missing_recovery_evidence_output}" >&2
+    exit 1
+fi
+
 recovered_claim="$(psql "${DATABASE_URL}" -Atq \
     -v tenant_id="${TENANT_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
