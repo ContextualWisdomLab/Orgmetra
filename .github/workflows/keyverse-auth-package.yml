@@ -53,6 +53,10 @@ jobs:
           --no-deps
           -r requirements/keyverse-auth-ci.txt
           -r requirements/keyverse-auth-package-ci.txt
+      - name: Build declared local dependency wheels
+        run: |
+          python -m build --wheel --no-isolation packages/orgmetra-postgres
+          python -m build --wheel --no-isolation services/people-api
       - name: Build wheel and source distribution without network isolation
         run: python -m build --no-isolation integrations/keyverse-auth
       - name: Inspect package contents
@@ -79,9 +83,12 @@ jobs:
           if len(sdists) != 1:
               raise SystemExit(f"expected one source distribution, found {len(sdists)}")
           PY
-      - name: Install the wheel and smoke test outside the source tree
+      - name: Install local dependency chain and smoke test outside the source tree
         run: |
-          python -m pip install --no-deps --force-reinstall integrations/keyverse-auth/dist/*.whl
+          python -m pip install --no-deps --force-reinstall \
+            packages/orgmetra-postgres/dist/*.whl \
+            services/people-api/dist/*.whl \
+            integrations/keyverse-auth/dist/*.whl
           cd "$(mktemp -d)"
           env -u PYTHONPATH python - <<'PY'
           from orgmetra_keyverse_auth import KeyverseOidcAuthorizer, KeyverseOidcConfig
