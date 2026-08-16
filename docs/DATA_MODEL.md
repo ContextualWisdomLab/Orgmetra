@@ -28,6 +28,7 @@
 | `validity_study_outcome_link` | Append-only study-to-criterion-observation relationship. |
 | `audit_event_record` | Append-only, tenant-scoped canonical audit envelope bytes plus database-verified SHA-256 digest. |
 | `outbox_delivery_record` | Mutable asynchronous delivery coordination for one immutable audit event and delivery target. |
+| `outbox_delivery_escalation_record` | Append-only terminal-failure evidence for one dead-lettered delivery, including failure classification, terminal attempt count, and opaque escalation reference. |
 
 ## Tenant integrity
 
@@ -58,14 +59,18 @@ Validation-study link tables preserve the exact decisions, evidence sets and cri
 
 ## Audit and outbox normalization
 
-`audit_event_record` and `outbox_delivery_record` are deliberately separate relations. The audit relation stores the immutable, PII-minimized canonical CloudEvents representation and its SHA-256 digest. The database allowlists the event shape, verifies event and tenant identifiers, requires accountable human confirmation when `data.high_impact` is true, and recomputes the digest over the exact stored UTF-8 text before accepting the row.
+`audit_event_record`, `outbox_delivery_record`, and `outbox_delivery_escalation_record` are deliberately separate relations. The audit relation stores the immutable, PII-minimized canonical CloudEvents representation and its SHA-256 digest. The database allowlists the event shape, verifies event and tenant identifiers, requires accountable human confirmation when `data.high_impact` is true, and recomputes the digest over the exact stored UTF-8 text before accepting the row.
 
-`outbox_delivery_record` stores only delivery coordination: target, state, attempt count, availability, lease metadata, bounded failure code, and terminal delivery time. It references the immutable audit event through a tenant-qualified foreign key. A unique tenant/event/target key prevents duplicate delivery work for the same target. The guarded lifecycle is `pending -> leased -> delivered`, with `leased -> pending` available for a recorded retry. Audit facts cannot be updated or deleted; terminal delivered rows cannot be rewritten. This separation prevents retry mechanics from becoming mutable audit history and avoids repeating the event payload per delivery target.
+`outbox_delivery_record` stores only delivery coordination: target, state, attempt count, availability, lease metadata, bounded failure code, and terminal delivery time. It references the immutable audit event through a tenant-qualified foreign key. A unique tenant/event/target key prevents duplicate delivery work for the same target. The guarded lifecycle is `pending -> leased -> delivered`, with `leased -> pending` available for a recorded retry, `leased -> leased` allowed only for expired-lease takeover, and `leased -> dead_lettered` allowed only through the governed terminal path after the explicit retry budget has been exhausted. Delivered and dead-lettered rows are terminal. This separation prevents retry mechanics from becoming mutable audit history and avoids repeating the event payload per delivery target.
 
-`record_audit_outbox_event(...)` inserts both rows in one statement. It is called by the owning service inside the same PostgreSQL transaction as the authoritative business mutation. If the outbox insert fails, the audit insert from that statement rolls back; if a later business-transaction statement fails, the transaction owner must roll back the entire mutation/audit/outbox unit.
+`outbox_delivery_escalation_record` is normalized terminal evidence rather than another queue. Exactly one escalation row may bind to one tenant/delivery pair. It captures an operational UUID, lower `snake_case` terminal failure code, namespaced opaque escalation reference, durable terminal attempt count, and recorded time. The row is append-only and forced through the same tenant RLS contract. It does not duplicate canonical event bytes or mutable HR payloads.
 
-Dispatcher row claiming, bounded backoff, lease-expiry recovery, retention/export, and external delivery receipts are not yet represented as production-complete behavior on the stacked branch.
+`record_audit_outbox_event(...)` inserts the audit and delivery rows in one statement. It is called by the owning service inside the same PostgreSQL transaction as the authoritative business mutation. If the outbox insert fails, the audit insert from that statement rolls back; if a later business-transaction statement fails, the transaction owner must roll back the entire mutation/audit/outbox unit.
+
+`claim_outbox_delivery(...)` claims due work with deterministic `FOR UPDATE ... SKIP LOCKED`, bounded future leases, and explicit expired-lease recovery evidence. `complete_outbox_delivery(...)` and `retry_outbox_delivery(...)` require the exact owner of a still-live lease. `dead_letter_outbox_delivery(...)` uses that same capability boundary and additionally requires the durable attempt count to meet a caller-supplied maximum from 1 through 100 before it atomically writes the escalation row and terminally removes the delivery from normal dispatch.
+
+Exponential/backoff policy selection, retention/export, and external delivery receipts are not yet represented as production-complete behavior on the stacked branch.
 
 ## PII policy
 
-PII is not globally masked. Instead, every sensitive read is evaluated against tenant, actor, role, purpose, resource, field sensitivity, legal basis, retention, and audit policy. Audit envelopes store opaque references and governance codes instead of duplicating mutable employee or candidate payloads.
+PII is not globally masked. Instead, every sensitive read is evaluated against tenant, actor, role, purpose, resource, field sensitivity, legal basis, retention, and audit policy. Audit envelopes and escalation evidence store opaque references and governance codes instead of duplicating mutable employee or candidate payloads.
