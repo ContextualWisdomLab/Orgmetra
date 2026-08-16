@@ -8,9 +8,7 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evi
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0003_audit_outbox_persistence.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0004_outbox_delivery_claim.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0005_outbox_delivery_finalization.sql
-if [[ -f database/migrations/0006_outbox_delivery_dead_letter.sql ]]; then
-    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0006_outbox_delivery_dead_letter.sql
-fi
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0006_outbox_delivery_dead_letter.sql
 
 TENANT_ID="10000000-0000-7000-8000-000000000001"
 EVENT_ID="00000000-0000-4000-8000-000000000081"
@@ -36,9 +34,23 @@ SELECT record_audit_outbox_event(
 );
 SQL
 
+# Retry exhaustion is a durable delivery policy, not a dispatcher-controlled
+# function argument. A stale seven-argument function would let a worker choose
+# 1 and immediately discard first-attempt work.
+legacy_budget_signature="$(psql "${DATABASE_URL}" -Atq <<'SQL'
+SELECT to_regprocedure(
+    'dead_letter_outbox_delivery(uuid,uuid,uuid,text,text,text,integer)'
+) IS NOT NULL;
+SQL
+)"
+if [[ "${legacy_budget_signature}" != "f" ]]; then
+    echo "dispatcher-controlled dead-letter budget signature is still callable" >&2
+    exit 1
+fi
+
 first_claim="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
-SELECT delivery_attempt_count::text || '|' || lease_owner_reference
+SELECT delivery_attempt_count::text || '|' || maximum_attempt_count::text || '|' || lease_owner_reference
 FROM claim_outbox_delivery(
     :'tenant_id'::uuid,
     'payroll_gateway',
@@ -47,12 +59,32 @@ FROM claim_outbox_delivery(
 );
 SQL
 )"
-if [[ "${first_claim}" != "1|dispatcher_worker:dead-letter-owner" ]]; then
-    echo "dead-letter fixture was not leased on its first attempt: ${first_claim}" >&2
+if [[ "${first_claim}" != "1|5|dispatcher_worker:dead-letter-owner" ]]; then
+    echo "dead-letter fixture did not expose the durable retry budget on first claim: ${first_claim}" >&2
     exit 1
 fi
 
-# A live worker cannot discard work before the configured attempt budget has
+# Direct table DML cannot skip the governed terminal path even when it can
+# otherwise satisfy the terminal row shape.
+set +e
+direct_dead_letter_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_id="${TENANT_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+UPDATE outbox_delivery_record
+SET delivery_state_code = 'dead_lettered',
+    lease_owner_reference = NULL,
+    lease_expires_at = NULL,
+    last_failure_code = 'direct_discard'
+WHERE outbox_delivery_record_id = '00000000-0000-4000-8000-000000000091'::uuid;
+SQL
+} 2>&1)"
+direct_dead_letter_status=$?
+set -e
+if [[ ${direct_dead_letter_status} -eq 0 || "${direct_dead_letter_output}" != *"dead-letter transition requires immutable escalation evidence and exhausted stored attempt budget"* ]]; then
+    echo "direct DML bypassed governed dead-lettering or failed for the wrong reason: ${direct_dead_letter_output}" >&2
+    exit 1
+fi
+
+# A live worker cannot discard work before the database-owned attempt budget has
 # actually been consumed.
 set +e
 premature_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
@@ -66,19 +98,19 @@ SELECT dead_letter_outbox_delivery(
     :'escalation_id'::uuid,
     'dispatcher_worker:dead-letter-owner',
     'remote_contract_rejected',
-    'incident_case:INC-2026-0001',
-    2
+    'incident_case:INC-2026-0001'
 );
 SQL
 } 2>&1)"
 premature_status=$?
 set -e
-if [[ ${premature_status} -eq 0 || "${premature_output}" != *"outbox delivery attempt budget is not exhausted"* ]]; then
-    echo "delivery was dead-lettered before retry budget exhaustion or failed for the wrong reason: ${premature_output}" >&2
+if [[ ${premature_status} -eq 0 || "${premature_output}" != *"outbox delivery stored attempt budget is not exhausted"* ]]; then
+    echo "delivery was dead-lettered before stored retry-budget exhaustion or failed for the wrong reason: ${premature_output}" >&2
     exit 1
 fi
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_id="${TENANT_ID}" -v delivery_id="${DELIVERY_ID}" <<'SQL'
+for expected_attempt in 2 3 4 5; do
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_id="${TENANT_ID}" -v delivery_id="${DELIVERY_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
 SELECT retry_outbox_delivery(
     :'tenant_id'::uuid,
@@ -88,11 +120,11 @@ SELECT retry_outbox_delivery(
     1
 );
 SQL
-sleep 1.2
+    sleep 1.2
 
-second_claim="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
+    claimed_attempt="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
-SELECT delivery_attempt_count::text || '|' || lease_owner_reference
+SELECT delivery_attempt_count::text || '|' || maximum_attempt_count::text || '|' || lease_owner_reference
 FROM claim_outbox_delivery(
     :'tenant_id'::uuid,
     'payroll_gateway',
@@ -101,13 +133,14 @@ FROM claim_outbox_delivery(
 );
 SQL
 )"
-if [[ "${second_claim}" != "2|dispatcher_worker:dead-letter-owner" ]]; then
-    echo "dead-letter fixture did not reach its second owned attempt: ${second_claim}" >&2
-    exit 1
-fi
+    if [[ "${claimed_attempt}" != "${expected_attempt}|5|dispatcher_worker:dead-letter-owner" ]]; then
+        echo "dead-letter fixture did not reach durable attempt ${expected_attempt}: ${claimed_attempt}" >&2
+        exit 1
+    fi
+done
 
-# Lease ownership remains a capability boundary even after the retry budget is
-# exhausted.
+# Lease ownership remains a capability boundary even after the durable retry
+# budget is exhausted.
 set +e
 foreign_owner_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
@@ -120,8 +153,7 @@ SELECT dead_letter_outbox_delivery(
     :'escalation_id'::uuid,
     'dispatcher_worker:foreign-worker',
     'remote_contract_rejected',
-    'incident_case:INC-2026-0001',
-    2
+    'incident_case:INC-2026-0001'
 );
 SQL
 } 2>&1)"
@@ -143,8 +175,7 @@ SELECT dead_letter_outbox_delivery(
     :'escalation_id'::uuid,
     'dispatcher_worker:dead-letter-owner',
     'remote_contract_rejected',
-    'incident_case:INC-2026-0001',
-    2
+    'incident_case:INC-2026-0001'
 );
 SQL
 
@@ -153,6 +184,7 @@ SET orgmetra.tenant_record_id = :'tenant_id';
 SELECT
     delivery_state_code || '|'
     || delivery_attempt_count::text || '|'
+    || maximum_attempt_count::text || '|'
     || (lease_owner_reference IS NULL)::text || '|'
     || (lease_expires_at IS NULL)::text || '|'
     || last_failure_code || '|'
@@ -161,8 +193,8 @@ FROM outbox_delivery_record
 WHERE outbox_delivery_record_id = :'delivery_id'::uuid;
 SQL
 )"
-if [[ "${dead_letter_state}" != "dead_lettered|2|true|true|remote_contract_rejected|true" ]]; then
-    echo "dead-letter transition did not preserve terminal failure state: ${dead_letter_state}" >&2
+if [[ "${dead_letter_state}" != "dead_lettered|5|5|true|true|remote_contract_rejected|true" ]]; then
+    echo "dead-letter transition did not preserve terminal failure state and stored budget: ${dead_letter_state}" >&2
     exit 1
 fi
 
@@ -182,7 +214,7 @@ FROM outbox_delivery_escalation_record
 WHERE outbox_delivery_record_id = :'delivery_id'::uuid;
 SQL
 )"
-if [[ "${escalation_state}" != "${ESCALATION_ID}|${DELIVERY_ID}|2|remote_contract_rejected|incident_case:INC-2026-0001|true" ]]; then
+if [[ "${escalation_state}" != "${ESCALATION_ID}|${DELIVERY_ID}|5|remote_contract_rejected|incident_case:INC-2026-0001|true" ]]; then
     echo "immutable escalation evidence was not recorded correctly: ${escalation_state}" >&2
     exit 1
 fi
@@ -204,8 +236,8 @@ if [[ -n "${terminal_claim}" ]]; then
     exit 1
 fi
 
-# Escalation evidence itself is append-only and therefore suitable for
-# acquisition/SOC-2 evidence trails without claiming certification.
+# Escalation evidence itself is append-only and its deferred binding proves it
+# still describes the terminal queue row.
 set +e
 mutation_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
@@ -223,4 +255,54 @@ if [[ ${mutation_status} -eq 0 || "${mutation_output}" != *"outbox delivery esca
     exit 1
 fi
 
-echo "PostgreSQL outbox dead-letter and immutable escalation contract passed"
+# An immutable escalation record cannot be fabricated for a delivery that has
+# not reached terminal dead-letter state.
+SECOND_EVENT_ID="00000000-0000-4000-8000-000000000082"
+SECOND_DELIVERY_ID="00000000-0000-4000-8000-000000000092"
+SECOND_ESCALATION_ID="00000000-0000-4000-8000-0000000000a2"
+second_event="${canonical_event/00000000-0000-4000-8000-000000000081/${SECOND_EVENT_ID}}"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v tenant_id="${TENANT_ID}" \
+    -v event_id="${SECOND_EVENT_ID}" \
+    -v delivery_id="${SECOND_DELIVERY_ID}" \
+    -v payload="${second_event}" <<'SQL'
+SELECT record_audit_outbox_event(
+    :'tenant_id'::uuid,
+    :'event_id'::uuid,
+    :'delivery_id'::uuid,
+    :'payload',
+    encode(digest(convert_to(:'payload', 'UTF8'), 'sha256'), 'hex'),
+    'payroll_gateway'
+);
+SQL
+set +e
+fabricated_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v tenant_id="${TENANT_ID}" \
+    -v delivery_id="${SECOND_DELIVERY_ID}" \
+    -v escalation_id="${SECOND_ESCALATION_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+INSERT INTO outbox_delivery_escalation_record (
+    tenant_record_id,
+    outbox_delivery_escalation_record_id,
+    outbox_delivery_record_id,
+    failure_code,
+    escalation_reference,
+    terminal_attempt_count
+) VALUES (
+    :'tenant_id'::uuid,
+    :'escalation_id'::uuid,
+    :'delivery_id'::uuid,
+    'fabricated_failure',
+    'incident_case:INC-2026-FAKE',
+    1
+);
+SQL
+} 2>&1)"
+fabricated_status=$?
+set -e
+if [[ ${fabricated_status} -eq 0 || "${fabricated_output}" != *"outbox delivery escalation does not match terminal delivery state"* ]]; then
+    echo "nonterminal escalation evidence was fabricated or failed for the wrong reason: ${fabricated_output}" >&2
+    exit 1
+fi
+
+echo "PostgreSQL governed outbox dead-letter, stored retry budget, and immutable escalation contract passed"
