@@ -84,7 +84,7 @@ BEGIN
            OR NEW.lease_expires_at <= transaction_timestamp()
            OR NEW.delivered_at IS NOT NULL
            OR NEW.available_at <> OLD.available_at
-           OR NEW.last_failure_code <> 'lease_expired' THEN
+           OR NEW.last_failure_code IS DISTINCT FROM 'lease_expired' THEN
             RAISE EXCEPTION 'expired lease takeover requires a new future lease, one attempt increment, and lease-expired evidence'
                 USING ERRCODE = '55000';
         END IF;
