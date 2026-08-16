@@ -141,13 +141,13 @@ def _validate_database_contract() -> None:
                     f"{identifier}"
                 )
 
-    reversed_period_guards = [
-        "effective_to IS NULL OR effective_to >= effective_from",
-        "recorded_to IS NULL OR recorded_to >= recorded_from",
+    non_empty_period_guards = [
+        "effective_to IS NULL OR effective_to > effective_from",
+        "recorded_to IS NULL OR recorded_to > recorded_from",
     ]
-    for guard in reversed_period_guards:
+    for guard in non_empty_period_guards:
         if guard not in sql:
-            _fail(f"Missing temporal interval guard: {guard}")
+            _fail(f"Missing strict temporal interval guard: {guard}")
 
     required_fragments = [
         "CREATE TABLE person_name_record",
