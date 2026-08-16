@@ -160,6 +160,30 @@ set -e
     exit 1
 }
 
+PII_EVENT_ID='00000000-0000-7000-8000-000000000112'
+pii_event="${canonical_event//${EVENT_ID}/${PII_EVENT_ID}}"
+pii_event="${pii_event/\{\"data\"/\{\"display_name\":\"Ada Lovelace\",\"data\"}"
+pii_digest="$(printf '%s' "${pii_event}" | sha256sum | awk '{print $1}')"
+set +e
+pii_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v event_envelope="${pii_event}" -v event_digest="${pii_digest}" <<SQL 2>&1
+INSERT INTO audit_outbox_record (
+    tenant_record_id, audit_outbox_record_id, event_id, event_envelope_text,
+    digest_algorithm_code, event_content_digest
+) VALUES (
+    '${TENANT_ID}', '00000000-0000-7000-8000-000000000111', '${PII_EVENT_ID}',
+    :'event_envelope', 'sha256', :'event_digest'
+);
+SQL
+)"
+pii_status=$?
+set -e
+[[ ${pii_status} -ne 0 ]] || { echo "audit envelope accepted non-contract PII payload" >&2; exit 1; }
+[[ "${pii_output}" == *"audit outbox envelope contains non-contract payload fields"* ]] || {
+    echo "non-contract PII failed unexpectedly: ${pii_output}" >&2
+    exit 1
+}
+
 rls_state="$(psql "${DATABASE_URL}" -Atqc "
 SELECT relrowsecurity::text || ':' || relforcerowsecurity::text
 FROM pg_class WHERE oid = 'audit_outbox_record'::regclass;
