@@ -46,11 +46,14 @@ def test_problem_responses_do_not_include_sensitive_exception_fields() -> None:
         '"display_name"',
         '"assessment_response"',
         '"compensation_amount"',
+        "trace_reference",
+        "x-request-id",
     }
     for field_name in forbidden_problem_fields:
-        assert field_name not in source
+        assert field_name not in source.casefold()
     assert "application/problem+json" in source
-    assert "trace_reference" in source
+    assert "support_reference" in source
+    assert "next_action" in source
 
 
 def test_route_purposes_are_server_selected_constants() -> None:
