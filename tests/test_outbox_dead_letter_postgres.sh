@@ -50,13 +50,23 @@ fi
 
 first_claim="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
-SELECT delivery_attempt_count::text || '|' || maximum_attempt_count::text || '|' || lease_owner_reference
-FROM claim_outbox_delivery(
-    :'tenant_id'::uuid,
-    'payroll_gateway',
-    'dispatcher_worker:dead-letter-owner',
-    300
-);
+WITH claimed_delivery AS (
+    SELECT *
+    FROM claim_outbox_delivery(
+        :'tenant_id'::uuid,
+        'payroll_gateway',
+        'dispatcher_worker:dead-letter-owner',
+        300
+    )
+)
+SELECT
+    claimed_record.delivery_attempt_count::text || '|'
+    || delivery_record.maximum_attempt_count::text || '|'
+    || claimed_record.lease_owner_reference
+FROM claimed_delivery AS claimed_record
+JOIN outbox_delivery_record AS delivery_record
+  ON delivery_record.outbox_delivery_record_id
+     = claimed_record.outbox_delivery_record_id;
 SQL
 )"
 if [[ "${first_claim}" != "1|5|dispatcher_worker:dead-letter-owner" ]]; then
@@ -124,13 +134,23 @@ SQL
 
     claimed_attempt="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
-SELECT delivery_attempt_count::text || '|' || maximum_attempt_count::text || '|' || lease_owner_reference
-FROM claim_outbox_delivery(
-    :'tenant_id'::uuid,
-    'payroll_gateway',
-    'dispatcher_worker:dead-letter-owner',
-    300
-);
+WITH claimed_delivery AS (
+    SELECT *
+    FROM claim_outbox_delivery(
+        :'tenant_id'::uuid,
+        'payroll_gateway',
+        'dispatcher_worker:dead-letter-owner',
+        300
+    )
+)
+SELECT
+    claimed_record.delivery_attempt_count::text || '|'
+    || delivery_record.maximum_attempt_count::text || '|'
+    || claimed_record.lease_owner_reference
+FROM claimed_delivery AS claimed_record
+JOIN outbox_delivery_record AS delivery_record
+  ON delivery_record.outbox_delivery_record_id
+     = claimed_record.outbox_delivery_record_id;
 SQL
 )"
     if [[ "${claimed_attempt}" != "${expected_attempt}|5|dispatcher_worker:dead-letter-owner" ]]; then
