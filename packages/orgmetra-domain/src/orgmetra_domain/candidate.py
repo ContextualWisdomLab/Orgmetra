@@ -36,8 +36,7 @@ class CandidateWorkerRegistry:
             return link
         if existing.person_record_id != link.person_record_id:
             raise CandidateWorkerRelinkError(
-                f"candidate {link.candidate_profile_id} is already linked to "
-                f"person {existing.person_record_id}"
+                "candidate worker link conflicts with an existing immutable linkage"
             )
         return existing
 

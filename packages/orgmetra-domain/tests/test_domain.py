@@ -300,10 +300,11 @@ class CandidateWorkerRegistryTests(unittest.TestCase):
         self.assertIs(registry.register(link), link)
         self.assertEqual(registry.get(CANDIDATE_ID), link)
 
-    def test_candidate_cannot_be_relinked_to_different_person(self) -> None:
+    def test_candidate_cannot_be_relinked_to_different_person_without_identifier_leakage(self) -> None:
         registry = CandidateWorkerRegistry()
         registry.register(CandidateWorkerLink(LINK_ID, CANDIDATE_ID, PERSON_ID))
-        with self.assertRaisesRegex(CandidateWorkerRelinkError, str(CANDIDATE_ID)):
+
+        with self.assertRaises(CandidateWorkerRelinkError) as captured:
             registry.register(
                 CandidateWorkerLink(
                     UUID("00000000-0000-7000-8000-000000000010"),
@@ -311,6 +312,14 @@ class CandidateWorkerRegistryTests(unittest.TestCase):
                     OTHER_PERSON_ID,
                 )
             )
+
+        message = str(captured.exception)
+        self.assertEqual(
+            message,
+            "candidate worker link conflicts with an existing immutable linkage",
+        )
+        for sensitive_identifier in (CANDIDATE_ID, PERSON_ID, OTHER_PERSON_ID):
+            self.assertNotIn(str(sensitive_identifier), message)
 
     def test_unknown_candidate_returns_none(self) -> None:
         registry = CandidateWorkerRegistry()

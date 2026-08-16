@@ -27,6 +27,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Purpose-bound PII access contract.
 - LLM output constrained to draft evidence.
 - No direct cross-service database access.
+- Candidate-to-worker relink failures now return a bounded adapter-safe message with no candidate or person identifiers.
 
 ### Notes
 
