@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "4866f372defd49c2fcd20c97e23182c466484a302648e12f9b7aa4940a1753f3",
-      "bytes": 3916,
-      "lines": 113
+      "sha256": "17946eac84cea9752b52749d4f3978dc62d32a95aaf85f316d9bd7dcb9b24a99",
+      "bytes": 3964,
+      "lines": 114
     },
     {
       "path": ".gitignore",
@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1beef0a86c85032a8414a4102961ab20816399bd62f844fa9117e019c5d26538",
-      "bytes": 8175,
-      "lines": 64
+      "sha256": "16643a5e7be2b5e94627dbec693921c4fd57659793d04d16f52e48e98ee31c05",
+      "bytes": 8859,
+      "lines": 65
     },
     {
       "path": "CLAUDE.md",
@@ -95,9 +95,9 @@
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "ffc657cbe2e6915db909bac706300c402ba1b48c8e1d55f53c035d13350d53e4",
-      "bytes": 6020,
-      "lines": 60
+      "sha256": "622dc9f22a4c6aa16af07af7c27001d34c33dc311578b8ea519db346d1676a94",
+      "bytes": 7200,
+      "lines": 64
     },
     {
       "path": "docs/PRD.md",
@@ -197,9 +197,9 @@
     },
     {
       "path": "docs/adr/0006-governed-audit-outbox-envelope.md",
-      "sha256": "02f3566aba9fcdaeb706961af0160324cf3f4fc612d3dbfdd2e618230aca4df6",
-      "bytes": 9655,
-      "lines": 58
+      "sha256": "0f841a7ce49069f6cf480b7ab54d730ee1ff962dc059323de4031e8e27f900ef",
+      "bytes": 12049,
+      "lines": 63
     },
     {
       "path": "docs/adr/README.md",
