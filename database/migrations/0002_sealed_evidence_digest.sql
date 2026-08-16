@@ -2,8 +2,61 @@
 -- Open evidence sets do not carry a caller-supplied digest. Finalization computes
 -- SHA-256 over the sorted versioned evidence members in the same transaction
 -- that records the accountable selection decision.
+--
+-- This integrity companion migration also rejects the RFC 9562 Nil and Max UUID
+-- sentinel values from every foundation UUID identity column. Those sentinels
+-- are reserved protocol values, not durable HRIS identities.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE FUNCTION is_operational_uuid(p_identifier uuid)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+STRICT
+PARALLEL SAFE
+AS $$
+    SELECT p_identifier <> '00000000-0000-0000-0000-000000000000'::uuid
+       AND p_identifier <> 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid
+$$;
+
+DO $$
+DECLARE
+    identity_column record;
+    identity_constraint_name text;
+BEGIN
+    FOR identity_column IN
+        SELECT
+            namespace.nspname AS schema_name,
+            relation.relname AS table_name,
+            attribute.attname AS column_name
+        FROM pg_class relation
+        JOIN pg_namespace namespace
+          ON namespace.oid = relation.relnamespace
+        JOIN pg_attribute attribute
+          ON attribute.attrelid = relation.oid
+        WHERE namespace.nspname = current_schema()
+          AND relation.relkind = 'r'
+          AND attribute.attnum > 0
+          AND NOT attribute.attisdropped
+          AND attribute.atttypid = 'uuid'::regtype
+          AND attribute.attname LIKE '%\_id' ESCAPE '\'
+        ORDER BY relation.relname, attribute.attname
+    LOOP
+        identity_constraint_name := format(
+            'operational_uuid_%s_check',
+            substr(md5(identity_column.table_name || '.' || identity_column.column_name), 1, 16)
+        );
+        EXECUTE format(
+            'ALTER TABLE %I.%I ADD CONSTRAINT %I CHECK (is_operational_uuid(%I))',
+            identity_column.schema_name,
+            identity_column.table_name,
+            identity_constraint_name,
+            identity_column.column_name
+        );
+    END LOOP;
+END;
+$$;
 
 ALTER TABLE decision_evidence_set
     ALTER COLUMN evidence_set_digest DROP NOT NULL;
