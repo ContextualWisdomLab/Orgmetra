@@ -15,6 +15,8 @@ from orgmetra_keyverse_auth.authorizer import (
     _numeric_date,
     _purpose_code,
     _purpose_collection,
+    _scope_code,
+    _scope_collection,
     _unverified_header,
 )
 from orgmetra_people_api import AuthenticationFailed
@@ -133,3 +135,41 @@ def test_purpose_code_rejects_invalid_values(value: object) -> None:
 
 def test_purpose_code_normalizes_valid_ascii_code() -> None:
     assert _purpose_code(" people_read ") == "people_read"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [None, b"orgmetra.people.read", "", "x" * 8193, "orgmetra.people.read  orgmetra.people.write", " ".join(f"orgmetra.people.scope{index}" for index in range(65))],
+)
+def test_scope_collection_rejects_invalid_shape_or_size(value: object) -> None:
+    """Reject non-string, empty, oversized, empty-token, and oversized sets."""
+
+    with pytest.raises(AuthenticationFailed, match="scope claim"):
+        _scope_collection({"scope": value})
+
+
+def test_scope_collection_rejects_duplicates_and_accepts_valid_set() -> None:
+    """Require unique scope tokens while preserving the validated grant set."""
+
+    with pytest.raises(AuthenticationFailed, match="duplicates"):
+        _scope_collection({"scope": "orgmetra.people.read orgmetra.people.read"})
+    assert _scope_collection(
+        {"scope": "orgmetra.people.read orgmetra.people.write"}
+    ) == frozenset({"orgmetra.people.read", "orgmetra.people.write"})
+
+
+@pytest.mark.parametrize(
+    "value",
+    [None, 1, "", "x" * 129, "UPPER", "café", "orgmetra/people/read"],
+)
+def test_scope_code_rejects_invalid_values(value: object) -> None:
+    """Reject route or token scopes outside the bounded API vocabulary."""
+
+    with pytest.raises(AuthenticationFailed, match="scope code"):
+        _scope_code(value)
+
+
+def test_scope_code_normalizes_valid_ascii_code() -> None:
+    """Normalize harmless surrounding whitespace on a reviewed scope code."""
+
+    assert _scope_code(" orgmetra.people.read ") == "orgmetra.people.read"
