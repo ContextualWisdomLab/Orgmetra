@@ -2,7 +2,9 @@
 -- evidence. PostgreSQL row locking is the concurrency primitive: eligible queue
 -- rows are selected in deterministic order and locked with SKIP LOCKED so
 -- independent consumers can claim distinct work without convoying on a live
--- claim. All caller-supplied identity/context values fail closed before DML.
+-- claim. Expired leases are eligible for atomic takeover so a crashed worker
+-- cannot strand delivery indefinitely. All caller-supplied identity/context
+-- values fail closed before DML.
 
 CREATE INDEX outbox_delivery_claim_candidate_idx
 ON outbox_delivery_record (
@@ -13,6 +15,16 @@ ON outbox_delivery_record (
     outbox_delivery_record_id
 )
 WHERE delivery_state_code = 'pending';
+
+CREATE INDEX outbox_delivery_expired_lease_idx
+ON outbox_delivery_record (
+    tenant_record_id,
+    delivery_target_code,
+    lease_expires_at,
+    recorded_at,
+    outbox_delivery_record_id
+)
+WHERE delivery_state_code = 'leased';
 
 CREATE OR REPLACE FUNCTION protect_outbox_delivery_transition()
 RETURNS trigger
@@ -55,6 +67,25 @@ BEGIN
            OR NEW.available_at <> OLD.available_at
            OR NEW.last_failure_code IS DISTINCT FROM OLD.last_failure_code THEN
             RAISE EXCEPTION 'leasing an outbox delivery may only set lease metadata and increment attempt count once'
+                USING ERRCODE = '55000';
+        END IF;
+        RETURN NEW;
+    END IF;
+
+    IF OLD.delivery_state_code = 'leased' AND NEW.delivery_state_code = 'leased' THEN
+        IF OLD.lease_expires_at IS NULL
+           OR OLD.lease_expires_at > transaction_timestamp() THEN
+            RAISE EXCEPTION 'live outbox lease cannot be replaced'
+                USING ERRCODE = '55000';
+        END IF;
+        IF NEW.delivery_attempt_count <> OLD.delivery_attempt_count + 1
+           OR NEW.lease_owner_reference IS NULL
+           OR NEW.lease_expires_at IS NULL
+           OR NEW.lease_expires_at <= transaction_timestamp()
+           OR NEW.delivered_at IS NOT NULL
+           OR NEW.available_at <> OLD.available_at
+           OR NEW.last_failure_code <> 'lease_expired' THEN
+            RAISE EXCEPTION 'expired lease takeover requires a new future lease, one attempt increment, and lease-expired evidence'
                 USING ERRCODE = '55000';
         END IF;
         RETURN NEW;
@@ -144,8 +175,17 @@ BEGIN
         FROM outbox_delivery_record AS delivery_record
         WHERE delivery_record.tenant_record_id = p_tenant_record_id
           AND delivery_record.delivery_target_code = p_delivery_target_code
-          AND delivery_record.delivery_state_code = 'pending'
-          AND delivery_record.available_at <= transaction_timestamp()
+          AND (
+              (
+                  delivery_record.delivery_state_code = 'pending'
+                  AND delivery_record.available_at <= transaction_timestamp()
+              )
+              OR
+              (
+                  delivery_record.delivery_state_code = 'leased'
+                  AND delivery_record.lease_expires_at <= transaction_timestamp()
+              )
+          )
         ORDER BY
             delivery_record.available_at,
             delivery_record.recorded_at,
@@ -159,7 +199,12 @@ BEGIN
             delivery_attempt_count = delivery_record.delivery_attempt_count + 1,
             lease_owner_reference = p_lease_owner_reference,
             lease_expires_at = transaction_timestamp()
-                + make_interval(secs => p_lease_duration_seconds)
+                + make_interval(secs => p_lease_duration_seconds),
+            last_failure_code = CASE
+                WHEN delivery_record.delivery_state_code = 'leased'
+                    THEN 'lease_expired'
+                ELSE delivery_record.last_failure_code
+            END
         FROM candidate_delivery AS candidate_record
         WHERE delivery_record.outbox_delivery_record_id
               = candidate_record.outbox_delivery_record_id
