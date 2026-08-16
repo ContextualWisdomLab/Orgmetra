@@ -42,7 +42,7 @@ Effective-dated fact tables use:
 
 Intervals are half-open and non-empty: an end value, when present, must be strictly later than its start. `effective_*` describes real-world validity. `recorded_*` describes when Orgmetra knew the fact.
 
-Durable anchors such as `organization_unit` and `job_profile` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version` and `job_profile_version`. Single-valued bitemporal version families reject overlapping effective/system coordinates, so one `effective_at` plus `known_at` coordinate cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
+Durable anchors such as `organization_unit` and `job_profile` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version` and `job_profile_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
 
 Assignments remain a legitimately multiple-membership fact and therefore use allocation rules rather than the single-valued exclusion policy.
 
