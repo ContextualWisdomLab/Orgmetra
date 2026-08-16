@@ -21,6 +21,8 @@ All notable changes to Orgmetra will be documented in this file.
 
 - Organization and job mutable descriptions now live in version records rather than durable identity anchors, preserving normalized history and stable position references.
 - Effective and system-recorded intervals are non-empty half-open periods; equal start/end bounds are rejected.
+- Assignment portfolio validation now requires an explicit timezone-aware knowledge time and excludes superseded recorded versions before calculating FTE overlap.
+- Historical fact resolution now scopes visibility and ambiguity to one caller-selected durable identity instead of conflating simultaneously visible facts from different people or entities.
 
 ### Security
 

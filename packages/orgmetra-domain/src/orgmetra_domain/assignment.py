@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Iterable
 from uuid import UUID
@@ -34,19 +34,28 @@ class AssignmentRecord:
             )
 
 
-def validate_assignment_portfolio(assignments: Iterable[AssignmentRecord]) -> None:
+def validate_assignment_portfolio(
+    assignments: Iterable[AssignmentRecord], *, known_at: datetime
+) -> None:
     """Reject overlapping assignments whose total allocation exceeds one.
 
     Effective intervals are treated as half-open. Therefore, an assignment
     ending on a date does not overlap another assignment starting that date.
-    People are evaluated independently so multiple-membership modeling remains
-    explicit rather than being collapsed into one primary assignment. The
-    raised error is deliberately generic so adapters can expose it without
-    leaking a person identifier, schedule date, or exact allocation ratio.
+    Only versions visible at the explicit system-time coordinate participate,
+    so superseded historical rows do not inflate current allocation. People are
+    evaluated independently so multiple-membership modeling remains explicit
+    rather than being collapsed into one primary assignment. The raised error
+    is deliberately generic so adapters can expose it without leaking a person
+    identifier, schedule date, or exact allocation ratio.
     """
+
+    if known_at.tzinfo is None or known_at.utcoffset() is None:
+        raise InvalidDomainValueError("known_at must be timezone-aware")
 
     events_by_person: dict[UUID, list[tuple[date, int, Decimal]]] = defaultdict(list)
     for assignment in assignments:
+        if not assignment.period.was_known_at(known_at):
+            continue
         events_by_person[assignment.person_record_id].append(
             (assignment.period.effective_from, 1, assignment.allocation_ratio)
         )

@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Iterable, Protocol, TypeVar
+from typing import Callable, Iterable, Protocol, TypeVar
 
 from .errors import InvalidDomainValueError, TemporalAmbiguityError
 
@@ -62,26 +62,34 @@ class _BitemporalFact(Protocol):
 
 
 _BitemporalFactT = TypeVar("_BitemporalFactT", bound=_BitemporalFact)
+_IdentityT = TypeVar("_IdentityT")
 
 
 def resolve_bitemporal_fact(
     facts: Iterable[_BitemporalFactT],
     *,
+    identity_of: Callable[[_BitemporalFactT], _IdentityT],
+    identity: _IdentityT,
     effective_on: date,
     known_at: datetime,
 ) -> _BitemporalFactT | None:
-    """Return the sole fact visible at one business-time/knowledge-time coordinate.
+    """Return the sole fact for one identity at a bitemporal coordinate.
 
-    A missing match returns ``None``. More than one visible fact is a data-integrity
-    violation, so the resolver fails closed instead of selecting by collection order.
-    The knowledge-time coordinate must carry an explicit UTC offset.
+    ``identity_of`` extracts the durable entity identity from each fact and
+    ``identity`` selects the entity being queried. A missing match returns
+    ``None``. More than one visible version of that same identity is a
+    data-integrity violation, so the resolver fails closed instead of selecting
+    by collection order. Facts for other identities are ignored. The
+    knowledge-time coordinate must carry an explicit UTC offset.
     """
 
     _require_aware(known_at, "known_at")
     visible_facts = [
         fact
         for fact in facts
-        if fact.period.is_effective_on(effective_on) and fact.period.was_known_at(known_at)
+        if identity_of(fact) == identity
+        and fact.period.is_effective_on(effective_on)
+        and fact.period.was_known_at(known_at)
     ]
     if not visible_facts:
         return None

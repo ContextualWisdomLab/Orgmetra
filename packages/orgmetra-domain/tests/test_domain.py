@@ -38,6 +38,7 @@ PERSON_NAME_ID = UUID("00000000-0000-7000-8000-000000000011")
 PARENT_ORG_ID = UUID("00000000-0000-7000-8000-000000000012")
 ORG_VERSION_ID = UUID("00000000-0000-7000-8000-000000000013")
 JOB_VERSION_ID = UUID("00000000-0000-7000-8000-000000000014")
+KNOWN_AT = datetime(2026, 4, 1, tzinfo=timezone.utc)
 
 
 def period(
@@ -235,7 +236,7 @@ class AssignmentPortfolioTests(unittest.TestCase):
                 22, PERSON_ID, OTHER_POSITION_ID, "0.4", date(2026, 2, 1), None
             ),
         ]
-        validate_assignment_portfolio(assignments)
+        validate_assignment_portfolio(assignments, known_at=KNOWN_AT)
 
     def test_rejects_overallocated_overlap(self) -> None:
         assignments = [
@@ -250,7 +251,7 @@ class AssignmentPortfolioTests(unittest.TestCase):
             AllocationExceededError,
             "assignment portfolio allocation exceeds allowed maximum",
         ):
-            validate_assignment_portfolio(assignments)
+            validate_assignment_portfolio(assignments, known_at=KNOWN_AT)
 
     def test_adjacent_periods_do_not_overlap(self) -> None:
         assignments = [
@@ -271,7 +272,7 @@ class AssignmentPortfolioTests(unittest.TestCase):
                 None,
             ),
         ]
-        validate_assignment_portfolio(assignments)
+        validate_assignment_portfolio(assignments, known_at=KNOWN_AT)
 
     def test_people_are_evaluated_independently(self) -> None:
         assignments = [
@@ -287,7 +288,7 @@ class AssignmentPortfolioTests(unittest.TestCase):
                 None,
             ),
         ]
-        validate_assignment_portfolio(assignments)
+        validate_assignment_portfolio(assignments, known_at=KNOWN_AT)
 
 
 class CandidateWorkerRegistryTests(unittest.TestCase):
