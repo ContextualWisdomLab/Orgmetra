@@ -7,6 +7,7 @@ All notable changes to Orgmetra will be documented in this file.
 ### Added
 
 - Independently importable `orgmetra-domain` package for bitemporal HRIS invariants.
+- Deterministic business-time/knowledge-time historical fact resolution that fails closed on ambiguous overlapping versions.
 - Durable organization-unit and job-profile anchors with separate bitemporal version records so Organization, Job, Position, and Assignment remain distinct HRIS concepts.
 - Multiple-membership assignment allocation validation with half-open effective intervals.
 - Append-only, idempotent candidate-to-worker linkage.
@@ -29,4 +30,4 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Notes
 
-- The protected default branch contains only the minimal bootstrap commit. This baseline is proposed through `feat/foundation-product-baseline` and becomes shipped truth only after review and merge.
+- The protected default branch contains only the minimal bootstrap commit. PR #8 is the canonical foundation baseline; this domain slice remains stacked behind it and becomes shipped truth only after dependency-ordered review, fresh exact-head checks, and merge.
