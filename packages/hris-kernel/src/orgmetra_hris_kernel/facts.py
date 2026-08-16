@@ -1,4 +1,4 @@
-"""Immutable employment, position, and assignment facts."""
+"""Immutable employment, organization, position, and assignment facts."""
 
 from __future__ import annotations
 
@@ -13,9 +13,11 @@ IDENTITY_FIELDS = frozenset(
         "tenant_record_id",
         "employment_record_id",
         "person_record_id",
+        "organization_unit_id",
         "position_record_id",
         "assignment_record_id",
         "employment_record_version_id",
+        "organization_unit_version_id",
         "position_record_version_id",
     }
 )
@@ -33,6 +35,18 @@ class EmploymentVersion:
     effective: DateInterval
     recorded: RecordedInterval
     employment_concurrency_code: str = "exclusive"
+
+
+@dataclass(frozen=True, slots=True)
+class OrganizationUnitVersion:
+    """One recorded parent-link version of a durable organization unit."""
+
+    tenant_record_id: UUID
+    organization_unit_id: UUID
+    organization_unit_version_id: UUID
+    parent_organization_unit_id: UUID | None
+    effective: DateInterval
+    recorded: RecordedInterval
 
 
 @dataclass(frozen=True, slots=True)
