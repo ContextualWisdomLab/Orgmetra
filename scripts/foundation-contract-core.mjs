@@ -93,7 +93,7 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'outbox_event', 'inbox_event', 'integration_delivery'
 ]);
 
-const UNFINISHED_MARKER_PATTERN = /(?:^|\n)\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:|\s*$))/im;
+const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
 const ADR_STATUS_PATTERN = /^\|\s*\[\d{4}\]\(([^)]+)\)\s*\|.*\|\s*(Proposed|Accepted|Superseded|Rejected)\s*\|$/;
 const LOCAL_LINK_PATTERN = /\[[^\]]+\]\((?!https?:\/\/|mailto:|#)([^)]+)\)/g;
 
@@ -119,13 +119,15 @@ export function countCodeFences(markdownText) {
 
 /** Return the first explicit unfinished-work marker and its one-based line. */
 export function findUnfinishedMarker(markdownText) {
-  const match = UNFINISHED_MARKER_PATTERN.exec(markdownText);
-  if (!match) return null;
-  const lineBoundaryIndex = match.index + (match[0].startsWith('\n') ? 1 : 0);
-  return Object.freeze({
-    line: markdownText.slice(0, lineBoundaryIndex).split(/\r?\n/).length,
-    marker: match[0].trim()
-  });
+  const lines = markdownText.split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!UNFINISHED_MARKER_LINE_PATTERN.test(lines[index])) continue;
+    return Object.freeze({
+      line: index + 1,
+      marker: lines[index].trim()
+    });
+  }
+  return null;
 }
 
 /** Return whether Markdown contains an explicit unfinished-work marker. */
