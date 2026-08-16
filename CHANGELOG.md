@@ -52,7 +52,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Service-owned database schemas and roles inside the initially shared physical PostgreSQL cluster.
 - Database guards for reversed or zero-length temporal intervals and append-only candidate-worker, selection-decision, decision-evidence, and validation-study linkage records.
 - Database-level rejection of cross-tenant references, post-decision evidence insertion, caller-supplied open-set evidence digests, empty decision evidence, and sealed evidence-set reuse.
-- Assignment, position-seat, and employment-exclusivity kernel decisions are tenant-scoped so foreign-tenant identifiers cannot provide coverage, consume capacity, or create false conflicts.
+- Bitemporal reconstruction plus assignment, position-seat, and employment-exclusivity kernel decisions are tenant-scoped so foreign-tenant identifiers cannot leak historical facts, provide coverage, consume capacity, or create false conflicts.
 - Keyverse outage policy that blocks PII and high-risk actions when current authorization cannot be verified.
 - Cross-tenant threat, denial evidence, and negative authorization test contracts.
 - Replaced client-visible internal trace identifiers with random support references and actionable next-step error guidance.
