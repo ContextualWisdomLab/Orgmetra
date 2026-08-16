@@ -3,7 +3,7 @@
 | Requirement | Architecture | Data object | Test family | ADR |
 |---|---|---|---|---|
 | Separate person/employment/organization/job/position/assignment | Core bounded contexts + `orgmetra-domain` active PR | `person_record`, `employment_record`, `organization_unit`, `job_profile`, `position_record`, `assignment_record` | `test_domain.py` record and assignment tests | ADR-0001 |
-| Bitemporal organization hierarchy and job definitions | People Core + `OrganizationUnitRecord` / `JobProfileRecord` active PR | `organization_unit`, `job_profile` | `RecordValidationTests` | ADR-0001, ADR-0003 |
+| Durable organization/job identity with bitemporal descriptive history | People Core + `OrganizationUnitRecord` / `OrganizationUnitVersionRecord` / `JobProfileRecord` / `JobProfileVersionRecord` active PR | `organization_unit`, `organization_unit_version`, `job_profile`, `job_profile_version` | `RecordValidationTests` | ADR-0001, ADR-0003 |
 | Federated CWL integration | Integration Hub | `external_reference` conceptual | adapter contract tests | ADR-0002 |
 | Effective/system time | Bitemporal HRIS + `BitemporalPeriod` active PR | `effective_from`, `recorded_from` | `BitemporalPeriodTests` | ADR-0003 |
 | Candidate-worker continuity | People Core + `CandidateWorkerRegistry` active PR | `candidate_worker_link` | `CandidateWorkerRegistryTests` | ADR-0001 |
