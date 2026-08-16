@@ -30,6 +30,7 @@ _REQUIRED_TEXT_FIELDS = (
     "evidence_version_code",
     "result_code",
 )
+_ALL_REQUIRED_TEXT_FIELDS = ("source_service", "event_type", *_REQUIRED_TEXT_FIELDS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +59,19 @@ class AuditOutboxEvent:
 
     def __post_init__(self) -> None:
         """Reject envelopes that cannot provide accountable, portable audit evidence."""
+        if not isinstance(self.event_id, UUID):
+            raise ValueError("event_id must be a UUID.")
+        if not isinstance(self.tenant_record_id, UUID):
+            raise ValueError("tenant_record_id must be a UUID.")
+        if not isinstance(self.occurred_at, datetime):
+            raise ValueError("occurred_at must be a datetime.")
+        if type(self.high_impact) is not bool:
+            raise ValueError("high_impact must be a boolean.")
+        for field_name in _ALL_REQUIRED_TEXT_FIELDS:
+            if not isinstance(getattr(self, field_name), str):
+                raise ValueError(f"{field_name} must be a string.")
+        if self.confirmation_reference is not None and not isinstance(self.confirmation_reference, str):
+            raise ValueError("confirmation_reference must be a string when supplied.")
         if self.occurred_at.tzinfo is None:
             raise ValueError("occurred_at must be timezone-aware.")
         if self.occurred_at.utcoffset() is None:
