@@ -40,6 +40,10 @@ class EmploymentExclusivityError(KernelError):
     """Two exclusive employments overlap for one person, or concurrency is unknown."""
 
 
+class OrganizationHierarchyError(KernelError):
+    """Visible parent links form a cycle inside one tenant's organization hierarchy."""
+
+
 class PositionCoverageError(KernelError):
     """An assignment is not covered by a staffable position version."""
 
