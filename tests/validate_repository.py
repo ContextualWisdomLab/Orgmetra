@@ -309,8 +309,11 @@ def _validate_database_contract() -> None:
         "outbox delivery stored attempt budget is exhausted and requires terminal dead-lettering",
         "CREATE TRIGGER audit_event_record_truncate_guard",
         "CREATE TRIGGER outbox_delivery_record_truncate_guard",
-        "CREATE INDEX outbox_delivery_due_work_index",
+        "CREATE INDEX CONCURRENTLY outbox_delivery_due_work_index",
         "CREATE FUNCTION public.operator_dead_letter_expired_outbox_delivery",
+        "CREATE ROLE orgmetra_outbox_recovery_owner",
+        "CREATE ROLE orgmetra_outbox_operator",
+        "SECURITY DEFINER",
         "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
     ]
     for fragment in required_fragments:
