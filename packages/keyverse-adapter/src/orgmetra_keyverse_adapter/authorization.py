@@ -133,15 +133,18 @@ class PurposeBoundAccessRequest:
 
     ``actor_tenant_record_id`` comes from the authenticated identity binding,
     ``tenant_record_id`` is the active Orgmetra request context, and
-    ``resource_tenant_record_id`` comes from the target record identity. All
-    three must match the policy tenant. Only field names are carried here; field
-    values remain behind the authoritative data boundary until access is allowed.
+    ``resource_tenant_record_id`` comes from the target record identity. The
+    opaque ``resource_reference`` identifies that exact target for audit
+    correlation without copying its PII. All tenant identifiers must match the
+    policy tenant. Only field names are carried here; field values remain behind
+    the authoritative data boundary until access is allowed.
     """
 
     tenant_record_id: UUID
     actor_tenant_record_id: UUID
     resource_tenant_record_id: UUID
     actor_reference: str
+    resource_reference: str
     purpose_code: str
     operation_code: str
     resource_kind: str
@@ -149,11 +152,12 @@ class PurposeBoundAccessRequest:
     granted_scope_codes: frozenset[str]
 
     def __post_init__(self) -> None:
-        """Reject untrusted identity, tenant, purpose, field, or scope attributes."""
+        """Reject untrusted identity, target, tenant, purpose, field, or scope attributes."""
         _validate_uuid("tenant_record_id", self.tenant_record_id)
         _validate_uuid("actor_tenant_record_id", self.actor_tenant_record_id)
         _validate_uuid("resource_tenant_record_id", self.resource_tenant_record_id)
         _validate_reference("actor_reference", self.actor_reference)
+        _validate_reference("resource_reference", self.resource_reference)
         _validate_code("purpose_code", self.purpose_code)
         _validate_code("operation_code", self.operation_code)
         _validate_resource_kind(self.resource_kind)
@@ -168,6 +172,7 @@ class AuthorizationDecision:
     allowed: bool
     tenant_record_id: UUID
     actor_reference: str
+    resource_reference: str
     policy_version_code: str
     purpose_code: str
     operation_code: str
@@ -207,6 +212,7 @@ def _decision(
         allowed=allowed,
         tenant_record_id=request.tenant_record_id,
         actor_reference=request.actor_reference,
+        resource_reference=request.resource_reference,
         policy_version_code=policy.policy_version_code,
         purpose_code=request.purpose_code,
         operation_code=request.operation_code,
