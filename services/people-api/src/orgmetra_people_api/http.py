@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import date
 import json
 import re
-from typing import Any, Awaitable, Callable, Mapping, Sequence
+from typing import Awaitable, Callable, Mapping, Sequence
 from urllib.parse import parse_qsl
 from uuid import UUID
 
@@ -111,7 +111,7 @@ class PeopleAsgiApp:
             return
 
         try:
-            request = _parse_worker_request(scope)
+            request = _parse_worker_request(path, scope.get("query_string", b""))
         except _InvalidHttpRequest:
             await _send_json(
                 send,
@@ -203,14 +203,11 @@ class PeopleAsgiApp:
 def _looks_like_people_route(path: str) -> bool:
     """Recognize only the versioned People route shape before parsing identifiers."""
     parts = path.strip("/").split("/")
-    return len(parts) == 6 and tuple(parts[:2]) == _ROUTE_PREFIX and parts[3] == "people"
+    return len(parts) == 5 and tuple(parts[:2]) == _ROUTE_PREFIX and parts[3] == "people"
 
 
-def _parse_worker_request(scope: Mapping[str, object]) -> _ParsedWorkerRequest:
+def _parse_worker_request(path: str, raw_query: object) -> _ParsedWorkerRequest:
     """Validate all caller-controlled path/query values before authentication."""
-    path = scope.get("path")
-    if not isinstance(path, str):
-        raise _InvalidHttpRequest("path is required")
     parts = path.strip("/").split("/")
     try:
         tenant_record_id = UUID(parts[2])
@@ -220,7 +217,6 @@ def _parse_worker_request(scope: Mapping[str, object]) -> _ParsedWorkerRequest:
     if tenant_record_id.int in (0, _MAX_UUID_INT) or person_record_id.int in (0, _MAX_UUID_INT):
         raise _InvalidHttpRequest("route IDs must be operational UUIDs")
 
-    raw_query = scope.get("query_string", b"")
     if not isinstance(raw_query, bytes):
         raise _InvalidHttpRequest("query_string must be bytes")
     try:
@@ -247,7 +243,7 @@ def _parse_worker_request(scope: Mapping[str, object]) -> _ParsedWorkerRequest:
         raise _InvalidHttpRequest("purpose must be a lower snake_case code")
 
     raw_fields = query["fields"].split(",")
-    if not raw_fields or any(_FIELD_PATTERN.fullmatch(field) is None for field in raw_fields):
+    if any(_FIELD_PATTERN.fullmatch(field) is None for field in raw_fields):
         raise _InvalidHttpRequest("fields must be explicit lower snake_case names")
     if len(set(raw_fields)) != len(raw_fields):
         raise _InvalidHttpRequest("fields must not repeat")
