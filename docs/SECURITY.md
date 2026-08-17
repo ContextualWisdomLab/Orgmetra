@@ -29,6 +29,16 @@
 - Service database roles cannot query another service's application tables.
 - Client error responses expose a random `support_reference`, never an internal trace/span identifier or encoded infrastructure context.
 
+## Purpose-bound PII authorization
+
+Orgmetra evaluates PII access before protected field values leave the authoritative HR boundary. Keyverse supplies authenticated identity and scope attributes through its published contract; Orgmetra owns the HR authorization policy and decision.
+
+Every `PurposeBoundAccessRequest` must bind the active request tenant, authenticated actor tenant, target resource tenant, opaque actor reference, resource kind, purpose, operation, requested field names, and authenticated scope set. The matching `PurposeBoundAccessPolicy` binds one tenant and immutable policy version to exactly one resource kind, purpose, operation, required Orgmetra scope, and permitted field set. There is no wildcard policy form.
+
+Evaluation fails closed unless request, actor, resource, and policy tenants all agree; resource, purpose, and operation exactly match; the required operation-specific scope is present; and requested fields are a non-empty subset of permitted fields. UUID sentinels, malformed opaque references, wildcard-like codes, malformed scopes, empty sets, and mutable field/scope collections are rejected before evaluation. A valid purpose header cannot compensate for a missing scope or foreign resource tenant.
+
+Authorization evidence contains only governance metadata and field names, never protected values. A denial returns a stable reason code and next safe action. An allow decision returns only the exact requested field subset, not every field the policy could permit. These rules implement the Orgmetra side of the NIST SP 800-162 ABAC shape and attribute-integrity principles from NIST SP 800-205; ADR 0008 records the boundary.
+
 ## Mutation security contract
 
 Every mutating HTTP operation and its server-side command handler must require and validate:
