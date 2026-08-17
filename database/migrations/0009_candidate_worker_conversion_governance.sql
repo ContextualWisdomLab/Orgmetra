@@ -24,7 +24,7 @@ END;
 $$;
 
 CREATE TRIGGER candidate_worker_link_legacy_insert_guard
-BEFORE INSERT ON public.candidate_worker_link
+BEFORE INSERT ON candidate_worker_link
 FOR EACH ROW
 EXECUTE FUNCTION public.reject_legacy_candidate_worker_link_insert();
 
@@ -245,12 +245,12 @@ END;
 $$;
 
 CREATE TRIGGER candidate_conversion_governance_guard
-BEFORE INSERT OR UPDATE ON public.candidate_worker_conversion_record
+BEFORE INSERT OR UPDATE ON candidate_worker_conversion_record
 FOR EACH ROW
 EXECUTE FUNCTION public.validate_candidate_worker_conversion();
 
 CREATE TRIGGER candidate_conversion_bitemporal_guard
-BEFORE UPDATE OR DELETE ON public.candidate_worker_conversion_record
+BEFORE UPDATE OR DELETE ON candidate_worker_conversion_record
 FOR EACH ROW
 EXECUTE FUNCTION public.protect_bitemporal_history();
 
@@ -266,15 +266,15 @@ END;
 $$;
 
 CREATE TRIGGER candidate_worker_conversion_truncate_guard
-BEFORE TRUNCATE ON public.candidate_worker_conversion_record
+BEFORE TRUNCATE ON candidate_worker_conversion_record
 FOR EACH STATEMENT
 EXECUTE FUNCTION public.reject_candidate_worker_conversion_truncate();
 
-REVOKE TRUNCATE ON public.candidate_worker_conversion_record FROM PUBLIC;
+REVOKE TRUNCATE ON candidate_worker_conversion_record FROM PUBLIC;
 
-ALTER TABLE public.candidate_worker_conversion_record ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.candidate_worker_conversion_record FORCE ROW LEVEL SECURITY;
-CREATE POLICY candidate_conversion_scope_policy ON public.candidate_worker_conversion_record
+ALTER TABLE candidate_worker_conversion_record ENABLE ROW LEVEL SECURITY;
+ALTER TABLE candidate_worker_conversion_record FORCE ROW LEVEL SECURITY;
+CREATE POLICY candidate_conversion_scope_policy ON candidate_worker_conversion_record
 USING (tenant_record_id = public.current_tenant_record_id())
 WITH CHECK (tenant_record_id = public.current_tenant_record_id());
 
