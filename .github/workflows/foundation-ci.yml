@@ -3,6 +3,7 @@ name: Foundation CI
 on:
   pull_request:
     branches:
+      - develop
       - bootstrap
       - develop
       - main
