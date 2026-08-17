@@ -63,7 +63,7 @@ jobs:
       - name: Print exact manifest repair data
         if: failure()
         run: python tests/validate_repository.py --print-manifest
-      - name: Prove Foundation CI is read-only
+      - name: Prove validation is read-only
         run: |
           git diff --exit-code
           test -z "$(git status --porcelain)"
