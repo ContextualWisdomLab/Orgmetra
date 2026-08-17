@@ -51,7 +51,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Security
 
-- Purpose-bound PII access contract.
+- Purpose-bound PII authorization now fails closed across active tenant, authenticated actor tenant, resource tenant, resource kind, purpose, operation, operation-specific Keyverse scope, and requested-field subset; malformed/wildcard-like attributes, mutable field/scope collections, reserved UUID sentinels, and cross-tenant confused-deputy contexts are rejected before protected values are returned. Authorization evidence contains governance metadata and field names only, with stable denial reasons and actionable next steps rather than PII.
 - LLM output constrained to draft evidence.
 - No direct cross-service application-table access.
 - Service-owned database schemas and roles inside the initially shared physical PostgreSQL cluster.
@@ -67,4 +67,4 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Notes
 
-- Protected `bootstrap` includes the integrated foundation, hire-to-assignment and employment-status recovery, and bitemporal organization-hierarchy validation through merge commit `29f636e9158082eb21251288745654316e74f15c`; the governed audit/outbox entries above remain active-PR truth until this branch passes fresh protected-base gates and merges.
+- Protected `bootstrap` includes the integrated foundation, governed audit/outbox persistence, hire-to-assignment and employment-status recovery, bitemporal organization-hierarchy validation, and governed job-analysis evidence through merge commit `67537a3061580dc299a0852c1ddf7babfb0d96e3`; candidate-to-worker conversion, worker-bound validity cases, and purpose-bound PII authorization remain active-PR truth until their exact protected-base gates pass and they merge.
