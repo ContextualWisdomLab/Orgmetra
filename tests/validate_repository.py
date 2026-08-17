@@ -59,6 +59,7 @@ REQUIRED = [
     "database/migrations/0007_outbox_retry_exhaustion.sql",
     "database/migrations/0008_audit_outbox_review_hardening.sql",
     "database/migrations/0009_candidate_worker_conversion_governance.sql",
+    "database/migrations/0012_job_analysis_evidence_governance.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -76,6 +77,7 @@ REQUIRED = [
     "tests/test_outbox_dead_letter_postgres.sh",
     "tests/test_audit_outbox_hardening_postgres.sh",
     "tests/test_candidate_worker_conversion_postgres.sh",
+    "tests/test_job_analysis_governance_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -318,6 +320,23 @@ def _validate_database_contract() -> None:
         "CREATE ROLE orgmetra_outbox_operator",
         "SECURITY DEFINER",
         "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
+        "CREATE TABLE source_record",
+        "CREATE TABLE source_version",
+        "CREATE TABLE job_analysis_case",
+        "CREATE TABLE job_analysis_source_link",
+        "CREATE TABLE task_statement",
+        "CREATE TABLE task_rating",
+        "CREATE TABLE fja_function",
+        "CREATE TABLE task_fja_link",
+        "CREATE TABLE ksao_requirement",
+        "CREATE TABLE task_ksao_link",
+        "CREATE TABLE job_analysis_approval_record",
+        "CREATE FUNCTION calculate_job_analysis_content_sha256",
+        "CREATE FUNCTION seal_job_analysis_case",
+        "FOR UPDATE OF analysis_case",
+        "approved job analysis cannot include LLM draft evidence",
+        "CREATE TRIGGER task_statement_truncate_guard",
+        "CREATE POLICY job_analysis_case_scope_policy",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
