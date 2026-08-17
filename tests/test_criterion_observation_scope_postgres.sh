@@ -43,6 +43,32 @@ INSERT INTO employment_record (
     TIMESTAMPTZ '2026-01-01 00:00:00+00'
 );
 
+INSERT INTO employment_record_version (
+    tenant_record_id, employment_record_version_id, employment_record_id,
+    employment_status_code, employment_concurrency_code,
+    effective_from, effective_to, recorded_from
+) VALUES
+(
+    '10000000-0000-7000-8000-000000000101',
+    '10000000-0000-7000-8000-000000000116',
+    '10000000-0000-7000-8000-000000000103',
+    'active',
+    'exclusive',
+    DATE '2026-01-01',
+    DATE '2026-11-01',
+    TIMESTAMPTZ '2026-01-01 00:00:00+00'
+),
+(
+    '10000000-0000-7000-8000-000000000101',
+    '10000000-0000-7000-8000-000000000117',
+    '10000000-0000-7000-8000-000000000103',
+    'terminated',
+    'exclusive',
+    DATE '2026-11-01',
+    NULL,
+    TIMESTAMPTZ '2026-01-01 00:00:00+00'
+);
+
 INSERT INTO organization_unit (
     tenant_record_id, organization_unit_id, recorded_from
 ) VALUES (
@@ -73,6 +99,38 @@ INSERT INTO position_record (
     '10000000-0000-7000-8000-000000000107',
     '10000000-0000-7000-8000-000000000104',
     '10000000-0000-7000-8000-000000000105',
+    TIMESTAMPTZ '2026-01-01 00:00:00+00'
+);
+
+INSERT INTO position_record_version (
+    tenant_record_id, position_record_version_id, position_record_id,
+    position_status_code, effective_from, effective_to, recorded_from
+) VALUES
+(
+    '10000000-0000-7000-8000-000000000101',
+    '10000000-0000-7000-8000-000000000121',
+    '10000000-0000-7000-8000-000000000107',
+    'active',
+    DATE '2026-01-01',
+    DATE '2026-10-01',
+    TIMESTAMPTZ '2026-01-01 00:00:00+00'
+),
+(
+    '10000000-0000-7000-8000-000000000101',
+    '10000000-0000-7000-8000-000000000122',
+    '10000000-0000-7000-8000-000000000107',
+    'frozen',
+    DATE '2026-10-01',
+    DATE '2026-11-15',
+    TIMESTAMPTZ '2026-01-01 00:00:00+00'
+),
+(
+    '10000000-0000-7000-8000-000000000101',
+    '10000000-0000-7000-8000-000000000123',
+    '10000000-0000-7000-8000-000000000107',
+    'active',
+    DATE '2026-11-15',
+    NULL,
     TIMESTAMPTZ '2026-01-01 00:00:00+00'
 );
 
@@ -216,6 +274,64 @@ if [[ ${outside_cycle_status} -eq 0 ]]; then
 fi
 if [[ "${outside_cycle_output}" != *"criterion observation is outside the performance cycle effective period"* ]]; then
     echo "out-of-cycle criterion observation failed for an unexpected reason: ${outside_cycle_output}" >&2
+    exit 1
+fi
+
+set +e
+frozen_position_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO criterion_observation (
+    tenant_record_id, criterion_observation_id, criterion_blueprint_id,
+    performance_cycle_id, person_record_id, observed_value,
+    observed_at, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000101',
+    '10000000-0000-7000-8000-000000000124',
+    '10000000-0000-7000-8000-000000000110',
+    '10000000-0000-7000-8000-000000000109',
+    '10000000-0000-7000-8000-000000000102',
+    4.1,
+    TIMESTAMPTZ '2026-10-15 12:00:00+00',
+    TIMESTAMPTZ '2026-10-16 09:00:00+00'
+);
+SQL
+} 2>&1)"
+frozen_position_status=$?
+set -e
+if [[ ${frozen_position_status} -eq 0 ]]; then
+    echo "criterion observation accepted a worker assignment whose position was not staffable" >&2
+    exit 1
+fi
+if [[ "${frozen_position_output}" != *"criterion observation lacks an assignment with eligible employment and staffable position coverage"* ]]; then
+    echo "non-staffable-position criterion observation failed for an unexpected reason: ${frozen_position_output}" >&2
+    exit 1
+fi
+
+set +e
+terminated_employment_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO criterion_observation (
+    tenant_record_id, criterion_observation_id, criterion_blueprint_id,
+    performance_cycle_id, person_record_id, observed_value,
+    observed_at, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000101',
+    '10000000-0000-7000-8000-000000000125',
+    '10000000-0000-7000-8000-000000000110',
+    '10000000-0000-7000-8000-000000000109',
+    '10000000-0000-7000-8000-000000000102',
+    3.9,
+    TIMESTAMPTZ '2026-11-20 12:00:00+00',
+    TIMESTAMPTZ '2026-11-21 09:00:00+00'
+);
+SQL
+} 2>&1)"
+terminated_employment_status=$?
+set -e
+if [[ ${terminated_employment_status} -eq 0 ]]; then
+    echo "criterion observation accepted a worker assignment after employment termination" >&2
+    exit 1
+fi
+if [[ "${terminated_employment_output}" != *"criterion observation lacks an assignment with eligible employment and staffable position coverage"* ]]; then
+    echo "terminated-employment criterion observation failed for an unexpected reason: ${terminated_employment_output}" >&2
     exit 1
 fi
 
