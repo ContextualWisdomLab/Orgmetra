@@ -3,7 +3,8 @@
 -- The original candidate_worker_link is intentionally retained for historical
 -- compatibility, but new writes are closed. New conversions must bind a
 -- candidate to the resulting person and employment through a sealed,
--- human-confirmed hire decision while preserving effective and recorded time.
+-- human-confirmed hire decision and an immutable high-impact audit/outbox event
+-- while preserving effective and recorded time.
 
 CREATE FUNCTION reject_legacy_candidate_worker_link_insert()
 RETURNS trigger
@@ -27,6 +28,7 @@ CREATE TABLE candidate_worker_conversion_record (
     person_record_id uuid NOT NULL,
     employment_record_id uuid NOT NULL,
     selection_decision_id uuid NOT NULL,
+    audit_event_record_id uuid NOT NULL,
     effective_from date NOT NULL,
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT now(),
@@ -45,12 +47,17 @@ CREATE TABLE candidate_worker_conversion_record (
     CONSTRAINT candidate_conversion_decision_tenant_fk
         FOREIGN KEY (tenant_record_id, selection_decision_id)
         REFERENCES selection_decision(tenant_record_id, selection_decision_id),
+    CONSTRAINT candidate_conversion_audit_tenant_fk
+        FOREIGN KEY (tenant_record_id, audit_event_record_id)
+        REFERENCES audit_event_record(tenant_record_id, audit_event_record_id),
     CONSTRAINT candidate_conversion_effective_period_check
         CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT candidate_conversion_recorded_period_check
         CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
     CONSTRAINT candidate_conversion_tenant_identity_unique
         UNIQUE (tenant_record_id, candidate_worker_conversion_record_id),
+    CONSTRAINT candidate_conversion_audit_identity_unique
+        UNIQUE (tenant_record_id, audit_event_record_id),
     CONSTRAINT candidate_conversion_bitemporal_exclusion
         EXCLUDE USING gist (
             tenant_record_id WITH =,
@@ -77,6 +84,8 @@ DECLARE
     evidence_sealed_at timestamptz;
     evidence_sealed_decision_id uuid;
     evidence_member_count bigint;
+    audit_event_envelope jsonb;
+    audit_event_time timestamptz;
 BEGIN
     SELECT
         decision.candidate_profile_id,
@@ -157,6 +166,46 @@ BEGIN
 
     IF NEW.effective_from < decided_at_value::date THEN
         RAISE EXCEPTION 'candidate conversion cannot become effective before the hire decision date'
+            USING ERRCODE = '23514';
+    END IF;
+
+    SELECT canonical_event_json::jsonb
+    INTO audit_event_envelope
+    FROM audit_event_record
+    WHERE tenant_record_id = NEW.tenant_record_id
+      AND audit_event_record_id = NEW.audit_event_record_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'candidate conversion requires a tenant-local immutable audit event'
+            USING ERRCODE = '23503';
+    END IF;
+
+    audit_event_time := (audit_event_envelope ->> 'time')::timestamptz;
+
+    IF audit_event_envelope ->> 'type' <> 'orgmetra.candidate.worker_converted'
+       OR audit_event_envelope ->> 'subject'
+          <> 'candidate_worker_conversion_record:' || NEW.candidate_worker_conversion_record_id::text
+       OR audit_event_envelope ->> 'orgmetraactor' <> actor_reference_value
+       OR audit_event_envelope ->> 'orgmetrapurpose' <> purpose_code_value
+       OR audit_event_envelope ->> 'orgmetrareason' <> 'candidate_hire_confirmed'
+       OR audit_event_envelope ->> 'orgmetraevidence'
+          <> 'decision_evidence_set:' || evidence_set_id::text
+       OR audit_event_envelope ->> 'orgmetraconfirmation' <> confirmation_reference_value
+       OR (audit_event_envelope #>> '{data,high_impact}')::boolean IS NOT TRUE
+       OR audit_event_envelope #>> '{data,result_code}' <> 'worker_created'
+       OR audit_event_time < decided_at_value
+       OR audit_event_time > NEW.recorded_from THEN
+        RAISE EXCEPTION 'candidate conversion audit envelope does not bind exact hire provenance'
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM outbox_delivery_record
+        WHERE tenant_record_id = NEW.tenant_record_id
+          AND audit_event_record_id = NEW.audit_event_record_id
+    ) THEN
+        RAISE EXCEPTION 'candidate conversion audit event requires transactional outbox delivery evidence'
             USING ERRCODE = '23514';
     END IF;
 
