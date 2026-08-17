@@ -265,11 +265,11 @@ fi
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO decision_evidence_set (
     tenant_record_id, decision_evidence_set_id, evidence_set_version_code,
-    digest_algorithm_code, evidence_set_digest, created_at
+    digest_algorithm_code, created_at
 ) VALUES (
     '10000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-000000000040',
-    'hire-evidence-v1', 'sha256', repeat('a', 64),
+    'hire-evidence-v1', 'sha256',
     TIMESTAMPTZ '2026-03-02 00:00:00+00'
 );
 INSERT INTO selection_decision_evidence (
@@ -355,11 +355,11 @@ fi
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO decision_evidence_set (
     tenant_record_id, decision_evidence_set_id, evidence_set_version_code,
-    digest_algorithm_code, evidence_set_digest, created_at
+    digest_algorithm_code, created_at
 ) VALUES (
     '10000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-000000000050',
-    'reject-evidence-v1', 'sha256', repeat('b', 64),
+    'reject-evidence-v1', 'sha256',
     TIMESTAMPTZ '2026-03-03 00:00:00+00'
 );
 INSERT INTO selection_decision_evidence (
