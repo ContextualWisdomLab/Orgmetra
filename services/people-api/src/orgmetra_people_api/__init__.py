@@ -7,6 +7,7 @@ from orgmetra_people_api.auth import (
     extract_bearer_token,
 )
 from orgmetra_people_api.authorization import authorize_resource_fields
+from orgmetra_people_api.http import PeopleAsgiApp
 from orgmetra_people_api.people import (
     AuthorizedWorkerPeopleView,
     PeopleReadPort,
@@ -21,6 +22,7 @@ __all__ = [
     "AuthenticatedPrincipal",
     "AuthenticationFailed",
     "AuthorizedWorkerPeopleView",
+    "PeopleAsgiApp",
     "PeopleReadPort",
     "PeopleRecordIntegrityError",
     "PeopleRecordNotFound",
