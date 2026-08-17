@@ -20,3 +20,20 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 orgmetra_people_api = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+  "--cov=orgmetra_people_api",
+  "--cov-branch",
+  "--cov-report=term-missing",
+  "--cov-fail-under=100",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["orgmetra_people_api"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
