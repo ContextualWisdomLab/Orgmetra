@@ -8,13 +8,15 @@ const REQUIRED_EXECUTION_FILES = Object.freeze([
   'database/migrations/0005_outbox_delivery_finalization.sql',
   'database/migrations/0006_outbox_delivery_dead_letter.sql',
   'database/migrations/0007_outbox_retry_exhaustion.sql',
+  'database/migrations/0008_candidate_worker_conversion_governance.sql',
   'tests/test_bitemporal_postgres.sh',
   'tests/test_tenant_isolation_postgres.sh',
   'tests/test_evidence_sealing_postgres.sh',
   'tests/test_operational_uuid_postgres.sh',
   'tests/test_audit_outbox_postgres.sh',
   'tests/test_outbox_claim_postgres.sh',
-  'tests/test_outbox_dead_letter_postgres.sh'
+  'tests/test_outbox_dead_letter_postgres.sh',
+  'tests/test_candidate_worker_conversion_postgres.sh'
 ]);
 
 function pythonRequiredFiles() {
