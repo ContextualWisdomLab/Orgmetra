@@ -7,6 +7,11 @@
 
 BEGIN;
 
+-- The public schema is PostgreSQL infrastructure rather than an Orgmetra-owned
+-- database object. Pin migration-time resolution explicitly while keeping
+-- application-owned object names descriptive two-or-more-word snake_case.
+SET LOCAL search_path = public, pg_catalog;
+
 CREATE FUNCTION public.reject_legacy_candidate_worker_link_insert()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -23,7 +28,7 @@ BEFORE INSERT ON public.candidate_worker_link
 FOR EACH ROW
 EXECUTE FUNCTION public.reject_legacy_candidate_worker_link_insert();
 
-CREATE TABLE public.candidate_worker_conversion_record (
+CREATE TABLE candidate_worker_conversion_record (
     tenant_record_id uuid NOT NULL REFERENCES public.tenant_record(tenant_record_id),
     candidate_worker_conversion_record_id uuid PRIMARY KEY,
     candidate_profile_id uuid NOT NULL,
