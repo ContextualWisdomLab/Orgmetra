@@ -15,7 +15,15 @@ CREATE TABLE source_record (
     CONSTRAINT source_record_operational_id_check
         CHECK (is_operational_uuid(source_record_id)),
     CONSTRAINT source_record_type_code_check
-        CHECK (source_type_code COLLATE "C" ~ '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$'),
+        CHECK (
+            source_type_code IN (
+                'web_authoritative',
+                'internal_document',
+                'sme_evidence',
+                'occupational_database',
+                'llm_draft'
+            )
+        ),
     CONSTRAINT source_record_locator_check
         CHECK (length(source_locator) BETWEEN 1 AND 2048 AND source_locator !~ '[[:cntrl:]]'),
     CONSTRAINT source_record_web_https_check
@@ -487,6 +495,17 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
+    PERFORM 1
+    FROM public.job_analysis_case AS analysis_case
+    WHERE analysis_case.tenant_record_id = NEW.tenant_record_id
+      AND analysis_case.job_analysis_case_id = NEW.job_analysis_case_id
+    FOR SHARE OF analysis_case;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'job analysis case does not exist in the tenant'
+            USING ERRCODE = '23503';
+    END IF;
+
     IF public.job_analysis_case_is_approved(
         NEW.tenant_record_id,
         NEW.job_analysis_case_id
@@ -516,6 +535,12 @@ BEGIN
         RAISE EXCEPTION 'job analysis task does not exist in the tenant'
             USING ERRCODE = '23503';
     END IF;
+
+    PERFORM 1
+    FROM public.job_analysis_case AS analysis_case
+    WHERE analysis_case.tenant_record_id = NEW.tenant_record_id
+      AND analysis_case.job_analysis_case_id = owning_case_id
+    FOR SHARE OF analysis_case;
 
     IF public.job_analysis_case_is_approved(NEW.tenant_record_id, owning_case_id) THEN
         RAISE EXCEPTION 'approved job analysis case is sealed'
@@ -555,6 +580,13 @@ BEGIN
         RAISE EXCEPTION 'task and FJA function must belong to the same job analysis case'
             USING ERRCODE = '23514';
     END IF;
+
+    PERFORM 1
+    FROM public.job_analysis_case AS analysis_case
+    WHERE analysis_case.tenant_record_id = NEW.tenant_record_id
+      AND analysis_case.job_analysis_case_id = task_case_id
+    FOR SHARE OF analysis_case;
+
     IF public.job_analysis_case_is_approved(NEW.tenant_record_id, task_case_id) THEN
         RAISE EXCEPTION 'approved job analysis case is sealed'
             USING ERRCODE = '55000';
@@ -592,6 +624,13 @@ BEGIN
         RAISE EXCEPTION 'task and KSAO requirement must belong to the same job analysis case'
             USING ERRCODE = '23514';
     END IF;
+
+    PERFORM 1
+    FROM public.job_analysis_case AS analysis_case
+    WHERE analysis_case.tenant_record_id = NEW.tenant_record_id
+      AND analysis_case.job_analysis_case_id = task_case_id
+    FOR SHARE OF analysis_case;
+
     IF public.job_analysis_case_is_approved(NEW.tenant_record_id, task_case_id) THEN
         RAISE EXCEPTION 'approved job analysis case is sealed'
             USING ERRCODE = '55000';
@@ -613,12 +652,16 @@ BEGIN
             USING ERRCODE = '22023';
     END IF;
 
+    -- The case row is the serialization boundary for evidence mutation versus
+    -- approval. Content inserts take FOR SHARE; approval takes FOR UPDATE. An
+    -- insert that started first must commit before the digest is observed, and
+    -- an insert that starts after approval waits and then sees the sealed row.
     SELECT analysis_case.recorded_at
     INTO analysis_recorded_at
     FROM public.job_analysis_case AS analysis_case
     WHERE analysis_case.tenant_record_id = NEW.tenant_record_id
       AND analysis_case.job_analysis_case_id = NEW.job_analysis_case_id
-    FOR SHARE OF analysis_case;
+    FOR UPDATE OF analysis_case;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'job analysis case does not exist in the tenant'
@@ -635,6 +678,22 @@ BEGIN
           AND source_link.job_analysis_case_id = NEW.job_analysis_case_id
     ) THEN
         RAISE EXCEPTION 'job analysis approval requires at least one linked source version'
+            USING ERRCODE = '23514';
+    END IF;
+    IF EXISTS (
+        SELECT 1
+        FROM public.job_analysis_source_link AS source_link
+        JOIN public.source_version AS source_snapshot
+          ON source_snapshot.tenant_record_id = source_link.tenant_record_id
+         AND source_snapshot.source_version_id = source_link.source_version_id
+        JOIN public.source_record AS source_header
+          ON source_header.tenant_record_id = source_snapshot.tenant_record_id
+         AND source_header.source_record_id = source_snapshot.source_record_id
+        WHERE source_link.tenant_record_id = NEW.tenant_record_id
+          AND source_link.job_analysis_case_id = NEW.job_analysis_case_id
+          AND source_header.source_type_code = 'llm_draft'
+    ) THEN
+        RAISE EXCEPTION 'approved job analysis cannot include LLM draft evidence'
             USING ERRCODE = '23514';
     END IF;
     IF NOT EXISTS (
