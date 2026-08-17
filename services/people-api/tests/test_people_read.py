@@ -113,6 +113,37 @@ class WorkerPeopleReadTests(unittest.TestCase):
         )
         self.assertEqual(port.calls, [(TENANT, PERSON, EFFECTIVE_ON)])
 
+    def test_can_return_authorized_candidate_and_employment_lineage_ids(self) -> None:
+        port = FakePeopleReadPort(worker_record())
+        policy = PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="lineage-v1",
+            resource_kind="person_record",
+            purpose_code="people_read",
+            operation_code="read_record",
+            required_scope_code="orgmetra.people.read",
+            permitted_fields=frozenset({"candidate_profile_id", "employment_record_id"}),
+        )
+
+        view = read_worker_people_record(
+            principal=self.principal,
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            effective_on=EFFECTIVE_ON,
+            purpose_code="people_read",
+            requested_fields=frozenset({"candidate_profile_id", "employment_record_id"}),
+            policy=policy,
+            read_port=port,
+        )
+
+        self.assertEqual(
+            view.field_values,
+            (
+                ("candidate_profile_id", str(CANDIDATE)),
+                ("employment_record_id", str(EMPLOYMENT)),
+            ),
+        )
+
     def test_denied_field_never_reaches_people_repository(self) -> None:
         port = FakePeopleReadPort(worker_record())
 
@@ -129,6 +160,30 @@ class WorkerPeopleReadTests(unittest.TestCase):
             )
 
         self.assertEqual(port.calls, [])
+
+    def test_policy_schema_drift_fails_closed_after_authorization(self) -> None:
+        port = FakePeopleReadPort(worker_record())
+        drifted_policy = PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="drifted-v1",
+            resource_kind="person_record",
+            purpose_code="people_read",
+            operation_code="read_record",
+            required_scope_code="orgmetra.people.read",
+            permitted_fields=frozenset({"future_sensitive_field"}),
+        )
+
+        with self.assertRaisesRegex(PeopleRecordIntegrityError, "unsupported worker field"):
+            read_worker_people_record(
+                principal=self.principal,
+                tenant_record_id=TENANT,
+                person_record_id=PERSON,
+                effective_on=EFFECTIVE_ON,
+                purpose_code="people_read",
+                requested_fields=frozenset({"future_sensitive_field"}),
+                policy=drifted_policy,
+                read_port=port,
+            )
 
     def test_missing_worker_is_reported_without_exposing_persistence_details(self) -> None:
         port = FakePeopleReadPort(None)
@@ -164,37 +219,49 @@ class WorkerPeopleReadTests(unittest.TestCase):
                         read_port=port,
                     )
 
+    def test_invalid_request_shape_fails_before_repository_access(self) -> None:
+        port = FakePeopleReadPort(worker_record())
+        for field_name, value in (
+            ("tenant_record_id", UUID(int=0)),
+            ("person_record_id", UUID(int=(1 << 128) - 1)),
+            ("effective_on", "2026-08-17"),
+        ):
+            kwargs = {
+                "principal": self.principal,
+                "tenant_record_id": TENANT,
+                "person_record_id": PERSON,
+                "effective_on": EFFECTIVE_ON,
+                "purpose_code": "people_read",
+                "requested_fields": frozenset({"display_name"}),
+                "policy": self.policy,
+                "read_port": port,
+            }
+            kwargs[field_name] = value
+            with self.subTest(field_name=field_name), self.assertRaises(ValueError):
+                read_worker_people_record(**kwargs)
+        self.assertEqual(port.calls, [])
+
     def test_worker_record_rejects_reserved_identity_and_blank_business_values(self) -> None:
-        with self.assertRaisesRegex(ValueError, "operational UUID"):
-            WorkerPeopleRecord(
-                tenant_record_id=UUID(int=0),
-                candidate_worker_conversion_record_id=CONVERSION,
-                candidate_profile_id=CANDIDATE,
-                person_record_id=PERSON,
-                employment_record_id=EMPLOYMENT,
-                display_name="Ada Lovelace",
-                employment_status_code="active",
-            )
-        with self.assertRaisesRegex(ValueError, "display_name"):
-            WorkerPeopleRecord(
-                tenant_record_id=TENANT,
-                candidate_worker_conversion_record_id=CONVERSION,
-                candidate_profile_id=CANDIDATE,
-                person_record_id=PERSON,
-                employment_record_id=EMPLOYMENT,
-                display_name="   ",
-                employment_status_code="active",
-            )
-        with self.assertRaisesRegex(ValueError, "employment_status_code"):
-            WorkerPeopleRecord(
-                tenant_record_id=TENANT,
-                candidate_worker_conversion_record_id=CONVERSION,
-                candidate_profile_id=CANDIDATE,
-                person_record_id=PERSON,
-                employment_record_id=EMPLOYMENT,
-                display_name="Ada Lovelace",
-                employment_status_code="Active Employment",
-            )
+        cases = (
+            {"tenant_record_id": UUID(int=0)},
+            {"candidate_profile_id": "candidate-1"},
+            {"display_name": "   "},
+            {"display_name": 42},
+            {"employment_status_code": "Active Employment"},
+            {"employment_status_code": 42},
+        )
+        defaults = {
+            "tenant_record_id": TENANT,
+            "candidate_worker_conversion_record_id": CONVERSION,
+            "candidate_profile_id": CANDIDATE,
+            "person_record_id": PERSON,
+            "employment_record_id": EMPLOYMENT,
+            "display_name": "Ada Lovelace",
+            "employment_status_code": "active",
+        }
+        for override in cases:
+            with self.subTest(override=override), self.assertRaises(ValueError):
+                WorkerPeopleRecord(**(defaults | override))
 
 
 if __name__ == "__main__":
