@@ -31,7 +31,13 @@ def _source(retrieved_at: datetime) -> EvidenceSource:
     )
 
 
-def _snapshot_with_sources(*, task_source, ksao_source, fja_source) -> JobAnalysisSnapshot:
+def _snapshot_with_sources(
+    *,
+    task_source,
+    ksao_source,
+    fja_source,
+    reviewed_at=RECORDED_AT - timedelta(minutes=1),
+) -> JobAnalysisSnapshot:
     return JobAnalysisSnapshot(
         analysis_record_id=ANALYSIS_ID,
         tenant_record_id=TENANT_ID,
@@ -80,7 +86,7 @@ def _snapshot_with_sources(*, task_source, ksao_source, fja_source) -> JobAnalys
             source=fja_source,
         ),
         reviewed_by_reference="keyverse_subject:01JIOPSYCH",
-        reviewed_at=RECORDED_AT - timedelta(minutes=1),
+        reviewed_at=reviewed_at,
     )
 
 
@@ -95,12 +101,24 @@ def test_snapshot_rejects_evidence_retrieved_after_its_recorded_instant(future_l
         _snapshot_with_sources(**sources)
 
 
+def test_validated_snapshot_rejects_evidence_retrieved_after_human_review():
+    source = _source(RECORDED_AT - timedelta(seconds=30))
+
+    with pytest.raises(ValueError, match="reviewed_at must not be earlier than evidence retrieval"):
+        _snapshot_with_sources(
+            task_source=source,
+            ksao_source=source,
+            fja_source=source,
+        )
+
+
 def test_snapshot_accepts_evidence_retrieved_exactly_at_recorded_instant():
     source = _source(RECORDED_AT)
     snapshot = _snapshot_with_sources(
         task_source=source,
         ksao_source=source,
         fja_source=source,
+        reviewed_at=RECORDED_AT,
     )
 
     assert snapshot.recorded_at == RECORDED_AT
