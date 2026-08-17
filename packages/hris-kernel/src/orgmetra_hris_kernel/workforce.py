@@ -49,6 +49,25 @@ class WorkforceCompositionSnapshot:
     unassigned_person_count: int
     employment_status_counts: tuple[tuple[str, int], ...]
 
+    def __post_init__(self) -> None:
+        """Reject non-canonical direct evidence before it can be hashed or exported."""
+        if self.known_at.tzinfo is None:
+            raise IntervalError(
+                "Workforce snapshot knowledge cutoff must be timezone-aware.",
+                next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+            )
+        status_codes = tuple(status for status, _count in self.employment_status_counts)
+        if len(status_codes) != len(set(status_codes)):
+            raise SingleValuedFactError(
+                "Workforce snapshot contains a duplicate status code.",
+                next_action="Aggregate each employment status once, then rebuild the snapshot.",
+            )
+        if status_codes != tuple(sorted(status_codes)):
+            raise SingleValuedFactError(
+                "Workforce snapshot status codes must use canonical status order.",
+                next_action="Sort employment status counts by status code, then rebuild the snapshot.",
+            )
+
     def canonical_json(self) -> str:
         """Return deterministic aggregate evidence suitable for audit correlation."""
         payload = {
