@@ -1,6 +1,6 @@
 # ERD
 
-For readability, the diagram renders representative `tenant_record` scoping edges rather than repeating the same edge for every tenant-owned relation. The authoritative tenant-isolation contract is `docs/DATA_MODEL.md`: **every owned HRIS fact** stores `tenant_record_id`, every cross-table reference is tenant-qualified, and forced row-level security applies independently to every tenant-scoped table. This omission is visual only; it does not weaken the relational or authorization contract for employment, candidate, evidence, decision, validation-link, compensation, transition, audit, outbox, or outbox-escalation entities.
+For readability, the diagram renders representative `tenant_record` scoping edges rather than repeating the same edge for every tenant-owned relation. The authoritative tenant-isolation contract is `docs/DATA_MODEL.md`: **every owned HRIS fact** stores `tenant_record_id`, every cross-table reference is tenant-qualified, and forced row-level security applies independently to every tenant-scoped table. This omission is visual only; it does not weaken the relational or authorization contract for employment, candidate, conversion, evidence, decision, validation-link, compensation, transition, audit, outbox, or outbox-escalation entities.
 
 ```mermaid
 erDiagram
@@ -21,8 +21,12 @@ erDiagram
     employment_record ||--o{ assignment_record : covers
     person_record ||--o{ assignment_record : receives
     position_record ||--o{ assignment_record : assigned_through
-    candidate_profile ||--o| candidate_worker_link : may_become
-    person_record ||--o{ candidate_worker_link : links_worker
+    candidate_profile ||--o| candidate_worker_link : legacy_link
+    person_record ||--o{ candidate_worker_link : legacy_worker
+    candidate_profile ||--o{ candidate_worker_conversion_record : converts_through
+    person_record ||--o{ candidate_worker_conversion_record : becomes_worker
+    employment_record ||--o{ candidate_worker_conversion_record : creates_employment_lineage
+    selection_decision ||--o{ candidate_worker_conversion_record : authorizes
     job_profile ||--o{ criterion_blueprint : requires
     performance_cycle ||--o{ criterion_observation : schedules
     criterion_blueprint ||--o{ criterion_observation : produces
@@ -50,7 +54,7 @@ erDiagram
 
 Every owned HRIS fact carries `tenant_record_id`. Relationships that cross table boundaries use tenant-qualified foreign keys, and row-level security independently filters every tenant-scoped relation. The tenant column is therefore both a referential-integrity boundary and a runtime isolation boundary, not a caller-supplied business attribute.
 
-A candidate profile can be linked to at most one worker identity within its tenant. A person identity can have multiple candidate-worker links across reapplications or historical candidate profiles, so the person-side cardinality is one-to-many.
+`candidate_worker_link` is a legacy compatibility relation: historical cardinality remains one candidate to at most one legacy worker link, but migration 0008 rejects new inserts. New worker creation uses `candidate_worker_conversion_record`. A candidate may have multiple recorded conversion versions across system time, but bitemporal exclusion permits at most one simultaneously visible conversion for overlapping business time. Each conversion references exactly one resulting person, one employment belonging to that person, and one selection decision for the same candidate. That decision must be a human-confirmed `hire` backed by a sealed versioned evidence set. Replacements therefore preserve historical lineage rather than mutating one opaque candidate/person edge.
 
 Each criterion observation belongs to one effective-dated performance cycle so reporting periods remain reconstructable across effective and system time.
 
