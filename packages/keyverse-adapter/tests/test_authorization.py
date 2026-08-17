@@ -51,7 +51,7 @@ def test_exact_tenant_purpose_scope_and_field_subset_is_authorized() -> None:
 
 
 @pytest.mark.parametrize(
-    ("request", "reason_code", "next_action"),
+    ("access_request", "reason_code", "next_action"),
     [
         (
             replace(REQUEST, resource_tenant_record_id=OTHER_TENANT),
@@ -91,12 +91,12 @@ def test_exact_tenant_purpose_scope_and_field_subset_is_authorized() -> None:
     ],
 )
 def test_fail_closed_decisions_explain_the_next_safe_action(
-    request: PurposeBoundAccessRequest,
+    access_request: PurposeBoundAccessRequest,
     reason_code: str,
     next_action: str,
 ) -> None:
     """Deny mismatched ABAC attributes without silently widening access."""
-    decision = evaluate_purpose_bound_access(request=request, policy=POLICY)
+    decision = evaluate_purpose_bound_access(request=access_request, policy=POLICY)
 
     assert decision.allowed is False
     assert decision.authorized_fields == frozenset()
@@ -104,7 +104,7 @@ def test_fail_closed_decisions_explain_the_next_safe_action(
     assert decision.next_action == next_action
 
     with pytest.raises(AuthorizationDeniedError) as caught:
-        require_purpose_bound_access(request=request, policy=POLICY)
+        require_purpose_bound_access(request=access_request, policy=POLICY)
     assert caught.value.reason_code == reason_code
     assert caught.value.next_action == next_action
     assert caught.value.decision == decision
