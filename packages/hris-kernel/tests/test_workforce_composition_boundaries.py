@@ -6,7 +6,15 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
-from orgmetra_hris_kernel import AssignmentFact, DateInterval, EmploymentVersion, RecordedInterval
+import pytest
+
+from orgmetra_hris_kernel import (
+    AssignmentFact,
+    DateInterval,
+    EmploymentExclusivityError,
+    EmploymentVersion,
+    RecordedInterval,
+)
 from orgmetra_hris_kernel.workforce import build_workforce_composition_snapshot
 
 
@@ -45,6 +53,25 @@ def test_snapshot_excludes_future_business_and_late_recorded_facts() -> None:
     assert snapshot.employment_count == 1
     assert snapshot.staffed_assignment_count == 1
     assert snapshot.staffed_fte == Decimal("0.7500")
+
+
+def test_snapshot_rejects_overlapping_exclusive_employments() -> None:
+    """An impossible exclusive portfolio must not be normalized into plausible headcount."""
+    known = RecordedInterval(datetime(2026, 1, 1, tzinfo=timezone.utc))
+    effective = DateInterval(date(2026, 1, 1))
+    employments = [
+        EmploymentVersion(_id(1), _id(101), _id(1001), _id(11), "active", effective, known),
+        EmploymentVersion(_id(1), _id(102), _id(1002), _id(11), "active", effective, known),
+    ]
+
+    with pytest.raises(EmploymentExclusivityError, match="exclusive employments overlap"):
+        build_workforce_composition_snapshot(
+            employments,
+            [],
+            tenant_record_id=_id(1),
+            effective_on=date(2026, 1, 15),
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+        )
 
 
 def test_empty_snapshot_has_deterministic_empty_status_evidence() -> None:
