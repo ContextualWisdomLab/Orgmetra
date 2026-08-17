@@ -12,4 +12,8 @@ The service exposes a governed hire-to-employment read contract. `read_worker_pe
 
 The People API quality workflow is part of this contract and must run for pull requests to every supported protected/default integration branch, including `develop`. Its service tests enforce 100% owned statement and branch coverage and include regression coverage for the workflow dispatch boundary and HTTP security/transport behavior.
 
-The remaining customer-path work on this same canonical branch is the accepted-mutation path that persists authoritative HRIS facts and governed audit/outbox evidence atomically. The superseded persistence model must not be restored, and the service must not use direct cross-service application-table SQL.
+`HireAcceptanceAsgiApp` exposes confirmed-hire materialization as `POST /v1/tenants/{tenant_record_id}/candidate-worker-conversions?purpose=candidate_hire`. The route authorizes the exact sealed selection decision, then `PostgresHireAcceptancePort` persists Person, Employment, `candidate_worker_conversion_record`, and `record_audit_outbox_event` in one tenant-bound transaction. The legacy `candidate_worker_link` write path is not used.
+
+`PeopleMutationAsgiApp` exposes the governed People mutation API as `POST /v1/employment-records`, `POST /v1/position-records`, and `POST /v1/assignment-records`. Each command requires an idempotency key, tenant/actor/purpose headers, human confirmation, and versioned evidence. Employment and assignment writes require an existing `candidate_worker_conversion_record` and reuse `orgmetra_hris_kernel` exclusivity and assignment-coverage checks before `PostgresPeopleMutationPort` inserts the authoritative fact and calls `record_audit_outbox_event` in the same transaction. Successful responses contain only opaque record identifiers.
+
+The superseded persistence model must not be restored, and the service must not use direct cross-service application-table SQL.

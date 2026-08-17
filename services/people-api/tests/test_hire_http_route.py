@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date
 import json
 import unittest
 from uuid import UUID
 
-from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
+from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
@@ -207,11 +206,22 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         bad_cases = (
             {"path": "/v1/unknown"},
             {"path": f"/v1/tenants/{UUID(int=0)}/candidate-worker-conversions"},
+            {"path": "/v1/tenants/not-a-uuid/candidate-worker-conversions"},
+            {"query": 17},
+            {"query": b"\xff"},
             {"query": b"purpose=candidate_hire&purpose=other"},
             {"query": b"purpose=CandidateHire"},
             {"query": b"extra=value&purpose=candidate_hire"},
             {"headers": [(b"authorization", b"Bearer opaque-token")]},
             {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type", b"text/plain")]},
+            {"headers": {b"content-type": b"application/json"}},
+            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type",)]},
+            {
+                "headers": [
+                    (b"authorization", b"Bearer opaque-token"),
+                    ("content-type", "application/json"),
+                ]
+            },
             {"body": b"{"},
             {"body": b"[]"},
             {"body": request_body(unexpected="field")},
@@ -220,6 +230,7 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             {"body": b'{"candidate_profile_id":"x","candidate_profile_id":"y"}'},
             {"body": b"\xff"},
             {"body": b""},
+            {"body": b"x" * 65537},
             {"more_body": True},
         )
         for case in bad_cases:
@@ -302,6 +313,44 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual((status, payload["error"]), expected)
                 self.assertNotIn("secret", json.dumps(payload))
                 self.assertNotIn("password", json.dumps(payload))
+
+    async def test_missing_or_non_bytes_request_body_fails_before_authentication(self) -> None:
+        authenticator = FakeAuthenticator(self.principal)
+        port = RecordingHirePort()
+        app = self._app(authenticator=authenticator, mutation_port=port)
+
+        async def receive_disconnect() -> dict[str, object]:
+            return {"type": "http.disconnect"}
+
+        async def receive_text_body() -> dict[str, object]:
+            return {"type": "http.request", "body": "{}", "more_body": False}
+
+        async def send(message: dict[str, object]) -> None:
+            del message
+
+        for receive in (receive_disconnect, receive_text_body):
+            messages: list[dict[str, object]] = []
+
+            async def capture(message: dict[str, object]) -> None:
+                messages.append(message)
+
+            await app(
+                {
+                    "type": "http",
+                    "method": "POST",
+                    "path": ROUTE,
+                    "query_string": QUERY,
+                    "headers": [
+                        (b"authorization", b"Bearer opaque-token"),
+                        (b"content-type", b"application/json"),
+                    ],
+                },
+                receive,
+                capture,
+            )
+            self.assertEqual(int(messages[0]["status"]), 400)
+        self.assertEqual(authenticator.tokens, [])
+        self.assertEqual(port.calls, [])
 
     async def test_non_http_scope_is_rejected_as_programming_error(self) -> None:
         app = self._app()

@@ -1,0 +1,458 @@
+"""Dependency-light ASGI routes for governed People employment, position, and assignment writes."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+from typing import Callable, Mapping
+from uuid import UUID, uuid4
+
+from orgmetra_hris_kernel import KernelError
+from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
+
+from orgmetra_people_api.auth import AuthenticationFailed, TokenAuthenticator, extract_bearer_token
+from orgmetra_people_api.hire_http import (
+    _InvalidHttpRequest,
+    _PayloadTooLarge,
+    _UnsupportedMediaType,
+    _read_json_object,
+    _require_json_content_type,
+)
+from orgmetra_people_api.http import AsgiReceive, AsgiSend, _authorization_header, _send_json
+from orgmetra_people_api.mutations import (
+    AssignmentMutationCommand,
+    EmploymentMutationCommand,
+    PeopleMutationIntegrityError,
+    PeopleMutationNotFound,
+    PeopleMutationPort,
+    PositionMutationCommand,
+    create_assignment_record,
+    create_employment_record,
+    create_position_record,
+    parse_allocation_ratio,
+)
+
+_MAX_UUID_INT = (1 << 128) - 1
+_IDEMPOTENCY_MIN = 16
+_IDEMPOTENCY_MAX = 200
+_EMPLOYMENT_BODY_KEYS = frozenset(
+    {
+        "person_record_id",
+        "employment_status_code",
+        "employment_concurrency_code",
+        "effective_from",
+        "decision_reason",
+        "confirmation_reference",
+        "evidence_references",
+    }
+)
+_POSITION_BODY_KEYS = frozenset(
+    {
+        "organization_unit_id",
+        "job_profile_id",
+        "position_status_code",
+        "effective_from",
+        "decision_reason",
+        "confirmation_reference",
+        "evidence_references",
+    }
+)
+_ASSIGNMENT_BODY_KEYS = frozenset(
+    {
+        "employment_record_id",
+        "person_record_id",
+        "position_record_id",
+        "allocation_ratio",
+        "effective_from",
+        "decision_reason",
+        "confirmation_reference",
+        "evidence_references",
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _MutationHeaders:
+    """Validated non-secret command headers required by the OpenAPI contract."""
+
+    tenant_record_id: UUID
+    actor_reference: str
+    purpose_code: str
+    idempotency_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class PeopleMutationAsgiApp:
+    """Expose the three governed People mutation routes through one ASGI app.
+
+    Supported routes::
+
+        POST /v1/employment-records
+        POST /v1/position-records
+        POST /v1/assignment-records
+
+    High-impact confirmation, versioned evidence, tenant/actor/purpose headers,
+    and an idempotency key are required. Successful responses contain only the
+    created opaque record identifier.
+    """
+
+    authenticator: TokenAuthenticator
+    employment_policy: PurposeBoundAccessPolicy
+    position_policy: PurposeBoundAccessPolicy
+    assignment_policy: PurposeBoundAccessPolicy
+    mutation_port: PeopleMutationPort
+    id_factory: Callable[[], UUID] = uuid4
+
+    def __post_init__(self) -> None:
+        """Reject incomplete dependency injection before serving mutations."""
+        if not isinstance(self.authenticator, TokenAuthenticator):
+            raise TypeError("authenticator must implement TokenAuthenticator")
+        if not isinstance(self.employment_policy, PurposeBoundAccessPolicy):
+            raise TypeError("employment_policy must be a PurposeBoundAccessPolicy")
+        if not isinstance(self.position_policy, PurposeBoundAccessPolicy):
+            raise TypeError("position_policy must be a PurposeBoundAccessPolicy")
+        if not isinstance(self.assignment_policy, PurposeBoundAccessPolicy):
+            raise TypeError("assignment_policy must be a PurposeBoundAccessPolicy")
+        if not isinstance(self.mutation_port, PeopleMutationPort):
+            raise TypeError("mutation_port must implement PeopleMutationPort")
+        if not callable(self.id_factory):
+            raise TypeError("id_factory must be callable")
+
+    async def __call__(self, scope: Mapping[str, object], receive: AsgiReceive, send: AsgiSend) -> None:
+        """Serve one People mutation without exposing bearer tokens or backend secrets."""
+        if scope.get("type") != "http":
+            raise ValueError("PeopleMutationAsgiApp accepts only HTTP ASGI scopes")
+
+        method = scope.get("method")
+        if method != "POST":
+            await _send_json(
+                send,
+                status=405,
+                payload={
+                    "error": "method_not_allowed",
+                    "message": "Use POST for governed People mutation routes.",
+                },
+                extra_headers=((b"allow", b"POST"),),
+            )
+            return
+
+        path = scope.get("path")
+        route = _mutation_route(path)
+        if route is None:
+            await _send_json(
+                send,
+                status=404,
+                payload={
+                    "error": "route_not_found",
+                    "message": "Use /v1/employment-records, /v1/position-records, or /v1/assignment-records.",
+                },
+            )
+            return
+
+        try:
+            headers = _parse_command_headers(scope)
+            _require_json_content_type(scope)
+            payload = await _read_json_object(receive)
+            command = _command_for_route(route, headers.tenant_record_id, payload, self.id_factory)
+        except _PayloadTooLarge:
+            await _send_json(
+                send,
+                status=413,
+                payload={
+                    "error": "payload_too_large",
+                    "message": "Send one bounded JSON mutation command and retry.",
+                },
+            )
+            return
+        except _UnsupportedMediaType:
+            await _send_json(
+                send,
+                status=415,
+                payload={
+                    "error": "unsupported_media_type",
+                    "message": "Send application/json and retry.",
+                },
+            )
+            return
+        except (_InvalidHttpRequest, ValueError, TypeError):
+            await _send_json(
+                send,
+                status=400,
+                payload={
+                    "error": "invalid_request",
+                    "message": "Correct the tenant, actor, purpose, confirmation, evidence, and command fields, then retry.",
+                },
+            )
+            return
+
+        try:
+            bearer_token = extract_bearer_token(_authorization_header(scope))
+            principal = await self.authenticator.authenticate(bearer_token)
+        except AuthenticationFailed:
+            await _send_json(
+                send,
+                status=401,
+                payload={
+                    "error": "authentication_required",
+                    "message": "Provide one valid Bearer credential and retry.",
+                },
+                extra_headers=((b"www-authenticate", b"Bearer"),),
+            )
+            return
+
+        if (
+            principal.tenant_record_id != headers.tenant_record_id
+            or principal.actor_reference != headers.actor_reference
+        ):
+            await _send_json(
+                send,
+                status=403,
+                payload={
+                    "error": "access_denied",
+                    "message": "Use the tenant and actor bound to the authenticated credential.",
+                },
+            )
+            return
+
+        try:
+            created_id, location = _dispatch_mutation(
+                route=route,
+                principal=principal,
+                command=command,
+                purpose_code=headers.purpose_code,
+                app=self,
+            )
+        except AuthorizationDeniedError:
+            await _send_json(
+                send,
+                status=403,
+                payload={
+                    "error": "access_denied",
+                    "message": "Request a purpose and scope authorized for this exact People mutation.",
+                },
+            )
+            return
+        except PeopleMutationNotFound:
+            await _send_json(
+                send,
+                status=404,
+                payload={
+                    "error": "record_not_found",
+                    "message": "Verify the parent organization, job, or worker references, then retry.",
+                },
+            )
+            return
+        except (PeopleMutationIntegrityError, KernelError):
+            await _send_json(
+                send,
+                status=409,
+                payload={
+                    "error": "mutation_integrity_conflict",
+                    "message": "The record cannot be saved safely; review overlapping employment, seat capacity, or conversion evidence.",
+                },
+            )
+            return
+        except Exception:  # noqa: BLE001 - HTTP boundary must fail closed without leaking backend details.
+            await _send_json(
+                send,
+                status=500,
+                payload={
+                    "error": "internal_error",
+                    "message": "Retry later or contact an Orgmetra operator with non-sensitive request metadata; never include the bearer token.",
+                },
+            )
+            return
+
+        await _send_json(
+            send,
+            status=201,
+            payload=created_id,
+            extra_headers=((b"location", location.encode("ascii")),),
+        )
+
+
+def _mutation_route(path: object) -> str | None:
+    """Return the canonical mutation leaf or None when the path is not owned here."""
+    if not isinstance(path, str):
+        return None
+    parts = path.strip("/").split("/")
+    if len(parts) != 2 or parts[0] != "v1":
+        return None
+    if parts[1] in {"employment-records", "position-records", "assignment-records"}:
+        return parts[1]
+    return None
+
+
+def _parse_command_headers(scope: Mapping[str, object]) -> _MutationHeaders:
+    """Validate OpenAPI command headers before authentication."""
+    raw_headers = scope.get("headers", ())
+    if not isinstance(raw_headers, (list, tuple)):
+        raise _InvalidHttpRequest("command headers are invalid")
+    values: dict[str, str] = {}
+    for header in raw_headers:
+        if not isinstance(header, (list, tuple)) or len(header) != 2:
+            raise _InvalidHttpRequest("command headers are invalid")
+        name, value = header
+        if not isinstance(name, bytes) or not isinstance(value, bytes):
+            raise _InvalidHttpRequest("command headers are invalid")
+        key = name.lower().decode("ascii")
+        if key in {
+            "idempotency-key",
+            "x-tenant-reference",
+            "x-actor-reference",
+            "x-purpose-code",
+        }:
+            if key in values:
+                raise _InvalidHttpRequest("duplicate command header")
+            try:
+                values[key] = value.decode("ascii")
+            except UnicodeDecodeError as error:
+                raise _InvalidHttpRequest("command headers must be ASCII") from error
+    required = {
+        "idempotency-key",
+        "x-tenant-reference",
+        "x-actor-reference",
+        "x-purpose-code",
+    }
+    if frozenset(values) < required:
+        raise _InvalidHttpRequest("command headers are incomplete")
+    idempotency_key = values["idempotency-key"]
+    if not (_IDEMPOTENCY_MIN <= len(idempotency_key) <= _IDEMPOTENCY_MAX) or any(
+        ord(character) < 0x21 or ord(character) > 0x7E for character in idempotency_key
+    ):
+        raise _InvalidHttpRequest("Idempotency-Key is invalid")
+    try:
+        tenant_record_id = UUID(values["x-tenant-reference"])
+    except ValueError as error:
+        raise _InvalidHttpRequest("X-Tenant-Reference must be a UUID") from error
+    if tenant_record_id.int in (0, _MAX_UUID_INT):
+        raise _InvalidHttpRequest("X-Tenant-Reference must be an operational UUID")
+    return _MutationHeaders(
+        tenant_record_id=tenant_record_id,
+        actor_reference=values["x-actor-reference"],
+        purpose_code=values["x-purpose-code"],
+        idempotency_key=idempotency_key,
+    )
+
+
+def _evidence_version(payload: Mapping[str, object]) -> str:
+    """Require one versioned evidence reference from the high-impact command body."""
+    raw_evidence = payload.get("evidence_references")
+    if not isinstance(raw_evidence, list) or not raw_evidence:
+        raise _InvalidHttpRequest("evidence_references are required")
+    first = raw_evidence[0]
+    if not isinstance(first, dict) or "evidence_version_code" not in first:
+        raise _InvalidHttpRequest("evidence_references must include evidence_version_code")
+    version = first["evidence_version_code"]
+    if not isinstance(version, str):
+        raise _InvalidHttpRequest("evidence_version_code must be a string")
+    return version
+
+
+def _require_reason(payload: Mapping[str, object]) -> None:
+    """Reject blank high-impact decision reasons without persisting the free text."""
+    reason = payload.get("decision_reason")
+    if not isinstance(reason, str) or not reason.strip():
+        raise _InvalidHttpRequest("decision_reason is required")
+
+
+def _command_for_route(
+    route: str,
+    tenant_record_id: UUID,
+    payload: Mapping[str, object],
+    id_factory: Callable[[], UUID],
+) -> EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand:
+    """Map one OpenAPI command body onto the matching application command."""
+    _require_reason(payload)
+    evidence_version_code = _evidence_version(payload)
+    confirmation_reference = payload.get("confirmation_reference")
+    if route == "employment-records":
+        if frozenset(payload) != _EMPLOYMENT_BODY_KEYS:
+            raise _InvalidHttpRequest("employment command fields are incomplete or unsupported")
+        return EmploymentMutationCommand(
+            tenant_record_id=tenant_record_id,
+            person_record_id=UUID(str(payload["person_record_id"])),
+            employment_record_id=id_factory(),
+            employment_record_version_id=id_factory(),
+            audit_event_record_id=id_factory(),
+            outbox_delivery_record_id=id_factory(),
+            employment_status_code=str(payload["employment_status_code"]),
+            employment_concurrency_code=str(payload["employment_concurrency_code"]),
+            effective_from=date.fromisoformat(str(payload["effective_from"])),
+            confirmation_reference=str(confirmation_reference),
+            evidence_version_code=evidence_version_code,
+        )
+    if route == "position-records":
+        if frozenset(payload) != _POSITION_BODY_KEYS:
+            raise _InvalidHttpRequest("position command fields are incomplete or unsupported")
+        return PositionMutationCommand(
+            tenant_record_id=tenant_record_id,
+            organization_unit_id=UUID(str(payload["organization_unit_id"])),
+            job_profile_id=UUID(str(payload["job_profile_id"])),
+            position_record_id=id_factory(),
+            position_record_version_id=id_factory(),
+            audit_event_record_id=id_factory(),
+            outbox_delivery_record_id=id_factory(),
+            position_status_code=str(payload["position_status_code"]),
+            effective_from=date.fromisoformat(str(payload["effective_from"])),
+            confirmation_reference=str(confirmation_reference),
+            evidence_version_code=evidence_version_code,
+        )
+    if frozenset(payload) != _ASSIGNMENT_BODY_KEYS:
+        raise _InvalidHttpRequest("assignment command fields are incomplete or unsupported")
+    return AssignmentMutationCommand(
+        tenant_record_id=tenant_record_id,
+        employment_record_id=UUID(str(payload["employment_record_id"])),
+        person_record_id=UUID(str(payload["person_record_id"])),
+        position_record_id=UUID(str(payload["position_record_id"])),
+        assignment_record_id=id_factory(),
+        audit_event_record_id=id_factory(),
+        outbox_delivery_record_id=id_factory(),
+        allocation_ratio=parse_allocation_ratio(payload["allocation_ratio"]),
+        effective_from=date.fromisoformat(str(payload["effective_from"])),
+        confirmation_reference=str(confirmation_reference),
+        evidence_version_code=evidence_version_code,
+    )
+
+
+def _dispatch_mutation(
+    *,
+    route: str,
+    principal: object,
+    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
+    purpose_code: str,
+    app: PeopleMutationAsgiApp,
+) -> tuple[dict[str, str], str]:
+    """Invoke the authorized application function for the matched route."""
+    if route == "employment-records":
+        assert isinstance(command, EmploymentMutationCommand)
+        result = create_employment_record(
+            principal=principal,  # type: ignore[arg-type]
+            command=command,
+            purpose_code=purpose_code,
+            policy=app.employment_policy,
+            mutation_port=app.mutation_port,
+        )
+        created = str(result.employment_record_id)
+        return {"employment_record_id": created}, f"/v1/employment-records/{created}"
+    if route == "position-records":
+        assert isinstance(command, PositionMutationCommand)
+        result = create_position_record(
+            principal=principal,  # type: ignore[arg-type]
+            command=command,
+            purpose_code=purpose_code,
+            policy=app.position_policy,
+            mutation_port=app.mutation_port,
+        )
+        created = str(result.position_record_id)
+        return {"position_record_id": created}, f"/v1/position-records/{created}"
+    assert isinstance(command, AssignmentMutationCommand)
+    result = create_assignment_record(
+        principal=principal,  # type: ignore[arg-type]
+        command=command,
+        purpose_code=purpose_code,
+        policy=app.assignment_policy,
+        mutation_port=app.mutation_port,
+    )
+    created = str(result.assignment_record_id)
+    return {"assignment_record_id": created}, f"/v1/assignment-records/{created}"
