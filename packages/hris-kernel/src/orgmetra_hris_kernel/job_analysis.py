@@ -329,6 +329,7 @@ class JobAnalysisSnapshot:
 
         task_id_set = set(task_ids)
         ksao_id_set = set(ksao_ids)
+        link_pairs: set[tuple[UUID, UUID]] = set()
         for link in self.task_ksao_links:
             if not isinstance(link, TaskKSAOLink):
                 raise ValueError("task_ksao_links must contain TaskKSAOLink values")
@@ -336,6 +337,10 @@ class JobAnalysisSnapshot:
                 raise ValueError("task_ksao_links contains an unknown task_record_id")
             if link.ksao_record_id not in ksao_id_set:
                 raise ValueError("task_ksao_links contains an unknown ksao_record_id")
+            link_pair = (link.task_record_id, link.ksao_record_id)
+            if link_pair in link_pairs:
+                raise ValueError("task_ksao_links must not duplicate a task and KSAO pair")
+            link_pairs.add(link_pair)
 
         review_pair_present = (
             self.reviewed_by_reference is not None,
