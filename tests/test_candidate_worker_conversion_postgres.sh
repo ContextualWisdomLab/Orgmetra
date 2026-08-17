@@ -16,6 +16,20 @@ for migration in \
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
+set +e
+truncate_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
+    'TRUNCATE TABLE candidate_worker_conversion_record;' ; } 2>&1)"
+truncate_status=$?
+set -e
+if [[ ${truncate_status} -eq 0 ]]; then
+    echo "candidate-worker conversion history was truncatable" >&2
+    exit 1
+fi
+if [[ "${truncate_output}" != *"candidate worker conversion history cannot be truncated"* ]]; then
+    echo "conversion TRUNCATE failed for an unexpected reason: ${truncate_output}" >&2
+    exit 1
+fi
+
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
 VALUES ('10000000-0000-7000-8000-000000000001', 'tenant_alpha');
