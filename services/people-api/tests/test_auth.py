@@ -32,11 +32,16 @@ class BearerBoundaryTests(unittest.TestCase):
 class PrincipalBoundaryTests(unittest.TestCase):
     """Keep authenticated identity/scope facts narrow and immutable."""
 
-    def test_rejects_reserved_tenant_bad_actor_and_wildcard_scope(self) -> None:
+    def test_rejects_malformed_identity_and_scope_shapes(self) -> None:
         cases = (
+            {"tenant_record_id": "tenant-1", "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({"orgmetra.people.read"})},
             {"tenant_record_id": UUID(int=0), "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({"orgmetra.people.read"})},
+            {"tenant_record_id": UUID(int=(1 << 128) - 1), "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({"orgmetra.people.read"})},
             {"tenant_record_id": TENANT, "actor_reference": "actor with pii", "granted_scope_codes": frozenset({"orgmetra.people.read"})},
+            {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": set({"orgmetra.people.read"})},
+            {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset()},
             {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({"orgmetra.*"})},
+            {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({1})},
         )
         for values in cases:
             with self.subTest(values=values), self.assertRaises(ValueError):
