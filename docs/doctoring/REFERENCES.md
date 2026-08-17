@@ -24,6 +24,8 @@ Jensen, C. S., & Snodgrass, R. T. (1999). Temporal data management. *IEEE Transa
 
 Kent, K., & Souppaya, M. (2006). *Guide to computer security log management* (NIST Special Publication 800-92). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-92
 
+National Center for O*NET Development. (2026). *O*NET 30.3 Database*. Retrieved August 17, 2026, from https://www.onetcenter.org/database.html
+
 OpenAPI Initiative. (2025, September 19). *OpenAPI Specification v3.2.0*. https://spec.openapis.org/oas/v3.2.0.html
 
 OpenID Foundation. (2014, February 25). *OpenID Connect Core 1.0 incorporating errata set 2*. https://openid.net/specs/openid-connect-core-1_0.html
@@ -52,7 +54,9 @@ Snodgrass, R. T. (1999). *Developing time-oriented database applications in SQL*
 
 Society for Industrial and Organizational Psychology. (2018). *Principles for the validation and use of personnel selection procedures* (5th ed.). SIOP.
 
-U.S. Office of Personnel Management. (n.d.). *Assessment and selection: Job analysis*. https://www.opm.gov/policy-data-oversight/assessment-and-selection/
+U.S. Department of Labor, Office of Administrative Law Judges. (1991). *Dictionary of Occupational Titles (4th ed., rev. 1991), Appendix B: Explanation of Data, People, and Things*. https://www.dol.gov/agencies/oalj/PUBLIC/DOT/REFERENCES/DOTAPPB
+
+U.S. Office of Personnel Management. (n.d.). *Job analysis*. Retrieved August 17, 2026, from https://www.opm.gov/policy-data-oversight/assessment-and-selection/job-analysis/
 
 World Wide Web Consortium. (2013). *PROV-O: The PROV ontology*. https://www.w3.org/TR/prov-o/
 
