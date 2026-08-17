@@ -77,7 +77,11 @@ def test_exact_tenant_purpose_scope_and_field_subset_is_authorized() -> None:
             "Use the operation authorized by this policy or obtain a narrower policy for the requested action.",
         ),
         (
-            replace(REQUEST, resource_kind="employment_record"),
+            replace(
+                REQUEST,
+                resource_kind="employment_record",
+                resource_reference="employment_record:emp_01J5EXACTTARGET",
+            ),
             "resource_not_allowed",
             "Resolve the policy for the requested resource kind before retrying.",
         ),
