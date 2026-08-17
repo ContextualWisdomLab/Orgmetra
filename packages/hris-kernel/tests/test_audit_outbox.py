@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from uuid import UUID
 
@@ -76,16 +76,23 @@ def test_canonical_json_is_the_exact_persistence_and_digest_byte_contract():
 
 
 def test_low_impact_event_may_omit_confirmation_and_normalizes_offset_to_utc():
-    """Routine events remain auditable without manufacturing human confirmation."""
+    """Routine events normalize a non-UTC source timestamp without inventing confirmation."""
     event = _event(
         high_impact=False,
         confirmation_reference=None,
-        occurred_at=datetime(2026, 8, 17, 10, 30, tzinfo=timezone.utc),
+        occurred_at=datetime(
+            2026,
+            8,
+            17,
+            10,
+            30,
+            tzinfo=timezone(timedelta(hours=9)),
+        ),
     )
 
     envelope = event.to_cloudevent()
     assert "orgmetraconfirmation" not in envelope
-    assert envelope["time"] == "2026-08-17T10:30:00Z"
+    assert envelope["time"] == "2026-08-17T01:30:00Z"
 
 
 def test_high_impact_event_requires_human_confirmation_reference():
