@@ -9,3 +9,4 @@
 | [0005](0005-exclusive-employment-and-staffable-seats.md) | Exclusive employment and staffable seats | Accepted |
 | [0006](0006-governed-audit-outbox-envelope.md) | Governed audit/outbox envelope and durable persistence | Accepted on stacked implementation branch |
 | [0007](0007-governed-job-analysis-evidence.md) | Governed job-analysis evidence snapshots | Accepted on stacked implementation branch |
+| [0008](0008-purpose-bound-pii-authorization.md) | Purpose-bound PII authorization | Accepted on active implementation branch |
