@@ -46,8 +46,8 @@ if [[ ${outbox_truncate_status} -eq 0 || "${outbox_truncate_output}" != *"cannot
 fi
 
 # Boundary functions must resolve project objects through a trusted fixed path,
-# not the caller's search_path. This is checked on representative read/write
-# boundaries plus the immutable envelope validator.
+# not the caller's search_path. Include the privileged operator recovery
+# function so its SECURITY DEFINER boundary cannot silently lose this pin.
 search_path_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
 SELECT count(*)
 FROM pg_catalog.pg_proc AS procedure_record
@@ -56,13 +56,61 @@ WHERE procedure_record.oid IN (
     'public.record_audit_outbox_event(uuid,uuid,uuid,text,text,text)'::regprocedure,
     'public.claim_outbox_delivery(uuid,text,text,integer)'::regprocedure,
     'public.retry_outbox_delivery(uuid,uuid,text,text,integer)'::regprocedure,
-    'public.dead_letter_outbox_delivery(uuid,uuid,uuid,text,text,text)'::regprocedure
+    'public.dead_letter_outbox_delivery(uuid,uuid,uuid,text,text,text)'::regprocedure,
+    'public.operator_dead_letter_expired_outbox_delivery(uuid,uuid,uuid,text,text)'::regprocedure
 )
 AND procedure_record.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[];
 SQL
 )"
-if [[ "${search_path_contract}" != "5" ]]; then
-    echo "not every audit/outbox boundary pins the trusted search_path: ${search_path_contract}/5" >&2
+if [[ "${search_path_contract}" != "6" ]]; then
+    echo "not every audit/outbox boundary pins the trusted search_path: ${search_path_contract}/6" >&2
+    exit 1
+fi
+
+# The operator capability must be usable without giving the externally
+# assignable role direct transport-table mutation rights. The separate function
+# owner is non-login, non-superuser, and cannot bypass tenant RLS.
+role_hardening_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT count(*)
+FROM pg_catalog.pg_roles AS role_record
+WHERE role_record.rolname IN (
+    'orgmetra_outbox_recovery_owner',
+    'orgmetra_outbox_operator'
+)
+  AND role_record.rolcanlogin IS FALSE
+  AND role_record.rolsuper IS FALSE
+  AND role_record.rolcreatedb IS FALSE
+  AND role_record.rolcreaterole IS FALSE
+  AND role_record.rolreplication IS FALSE
+  AND role_record.rolbypassrls IS FALSE;
+SQL
+)"
+if [[ "${role_hardening_contract}" != "2" ]]; then
+    echo "outbox recovery roles are not hardened NOLOGIN/NOBYPASSRLS capabilities: ${role_hardening_contract}/2" >&2
+    exit 1
+fi
+
+operator_acl_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT
+    pg_catalog.has_function_privilege(
+        'orgmetra_outbox_operator',
+        'public.operator_dead_letter_expired_outbox_delivery(uuid,uuid,uuid,text,text)',
+        'EXECUTE'
+    )::text || '|'
+    || pg_catalog.has_table_privilege(
+        'orgmetra_outbox_operator',
+        'public.outbox_delivery_record',
+        'UPDATE'
+    )::text || '|'
+    || pg_catalog.has_table_privilege(
+        'orgmetra_outbox_operator',
+        'public.outbox_delivery_escalation_record',
+        'INSERT'
+    )::text;
+SQL
+)"
+if [[ "${operator_acl_contract}" != "true|false|false" ]]; then
+    echo "operator capability must expose recovery EXECUTE without direct outbox DML: ${operator_acl_contract}" >&2
     exit 1
 fi
 
@@ -139,10 +187,35 @@ SQL
 
 sleep 1.2
 
+# Even after expiry, the externally assignable operator role must not be able to
+# emulate the recovery function by mutating transport state directly.
+set +e
+operator_direct_dml_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v tenant_id="${TENANT_ID}" \
+    -v delivery_id="${EXHAUSTED_DELIVERY_ID}" <<'SQL'
+SET ROLE orgmetra_outbox_operator;
+SET orgmetra.tenant_record_id = :'tenant_id';
+UPDATE public.outbox_delivery_record
+SET last_failure_code = 'direct_operator_mutation'
+WHERE tenant_record_id = :'tenant_id'::uuid
+  AND outbox_delivery_record_id = :'delivery_id'::uuid;
+SQL
+} 2>&1)"
+operator_direct_dml_status=$?
+set -e
+if [[ ${operator_direct_dml_status} -eq 0 || "${operator_direct_dml_output}" != *"permission denied"* ]]; then
+    echo "operator capability unexpectedly permits direct outbox DML: ${operator_direct_dml_output}" >&2
+    exit 1
+fi
+
+# Execute the governed recovery as the purpose-bound capability role. The
+# function's NOLOGIN owner performs only its explicitly granted transport DML,
+# while FORCE RLS and the tenant-context check remain active.
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
     -v delivery_id="${EXHAUSTED_DELIVERY_ID}" \
     -v escalation_id="${ESCALATION_ID}" <<'SQL'
+SET ROLE orgmetra_outbox_operator;
 SET orgmetra.tenant_record_id = :'tenant_id';
 SELECT public.operator_dead_letter_expired_outbox_delivery(
     :'tenant_id'::uuid,
@@ -151,6 +224,7 @@ SELECT public.operator_dead_letter_expired_outbox_delivery(
     'operations_actor:queue-recovery-01',
     'lease_owner_lost'
 );
+RESET ROLE;
 SQL
 
 recovered_state="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq \
