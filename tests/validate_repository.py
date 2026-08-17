@@ -57,6 +57,7 @@ REQUIRED = [
     "database/migrations/0006_outbox_delivery_dead_letter.sql",
     "database/migrations/0007_outbox_retry_exhaustion.sql",
     "database/migrations/0008_audit_outbox_review_hardening.sql",
+    "database/migrations/0009_candidate_worker_conversion_governance.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -73,6 +74,7 @@ REQUIRED = [
     "tests/test_outbox_claim_postgres.sh",
     "tests/test_outbox_dead_letter_postgres.sh",
     "tests/test_audit_outbox_hardening_postgres.sh",
+    "tests/test_candidate_worker_conversion_postgres.sh",
     "tests/validate_repository.py",
 ]
 
