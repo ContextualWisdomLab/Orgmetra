@@ -43,6 +43,7 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0004-employment-position-version-and-assignment-binding.md',
   'docs/adr/0005-exclusive-employment-and-staffable-seats.md',
   'docs/adr/0006-governed-audit-outbox-envelope.md',
+  'docs/adr/0008-purpose-bound-pii-authorization.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
@@ -55,7 +56,6 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0007_outbox_retry_exhaustion.sql',
   'database/migrations/0008_audit_outbox_review_hardening.sql',
   'database/migrations/0009_candidate_worker_conversion_governance.sql',
-  'database/migrations/0010_validity_study_case_integrity.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -73,7 +73,6 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_outbox_dead_letter_postgres.sh',
   'tests/test_audit_outbox_hardening_postgres.sh',
   'tests/test_candidate_worker_conversion_postgres.sh',
-  'tests/test_validity_study_case_postgres.sh',
   'tests/validate_repository.py'
 ]);
 

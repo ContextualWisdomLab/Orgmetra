@@ -6,11 +6,17 @@ American Educational Research Association, American Psychological Association, &
 
 American Institute of Certified Public Accountants. (2017). *TSP section 100: 2017 trust services criteria for security, availability, processing integrity, confidentiality, and privacy*. AICPA.
 
+Boeckl, K., & Lefkovitz, N. (2020). *NIST Privacy Framework: A tool for improving privacy through enterprise risk management, Version 1.0* (NIST Cybersecurity White Paper). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.CSWP.01162020
+
 Cloud Native Computing Foundation. (2022). *CloudEvents specification v1.0.2*. https://github.com/cloudevents/spec/tree/ce@v1.0.2
 
 Diez-Roux, A. V. (1998). Bringing context back into epidemiology: Variables and fallacies in multilevel analysis. *American Journal of Public Health, 88*(2), 216–222. https://doi.org/10.2105/AJPH.88.2.216
 
 Equal Employment Opportunity Commission. (1978). *Uniform guidelines on employee selection procedures*. 29 C.F.R. Part 1607.
+
+Hu, V. C., Ferraiolo, D. F., & Kuhn, D. R. (2019). *Attribute considerations for access control systems* (NIST Special Publication 800-205). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-205
+
+Hu, V. C., Ferraiolo, D. F., Kuhn, D. R., Schnitzer, A., Sandlin, K., Miller, R., & Scarfone, K. A. (2019). *Guide to attribute based access control (ABAC) definition and considerations* (NIST Special Publication 800-162). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-162
 
 International Organization for Standardization. (2022). *ISO 30400:2022 Human resource management — Vocabulary*. ISO.
 
@@ -40,13 +46,13 @@ PostgreSQL Global Development Group. (n.d.). *CREATE ROLE: Define a new database
 
 PostgreSQL Global Development Group. (n.d.). *CREATE TRIGGER: Define a new trigger (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-createtrigger.html
 
+PostgreSQL Global Development Group. (n.d.). *Date/time functions and operators (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/functions-datetime.html
+
 PostgreSQL Global Development Group. (n.d.). *Privileges (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/ddl-priv.html
 
 PostgreSQL Global Development Group. (n.d.). *Row security policies (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/ddl-rowsecurity.html
 
 PostgreSQL Global Development Group. (n.d.). *SELECT (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-select.html
-
-PostgreSQL Global Development Group. (n.d.). *Date/time functions and operators (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/functions-datetime.html
 
 Robinson, W. S. (1950). Ecological correlations and the behavior of individuals. *American Sociological Review, 15*(3), 351–357. https://doi.org/10.2307/2087176
 
