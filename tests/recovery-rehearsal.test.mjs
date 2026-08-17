@@ -36,7 +36,6 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
   for (const requiredPath of [workflowPath, rehearsalPath, traceabilityPath]) {
     assert.equal(existsSync(requiredPath), true, `${requiredPath} must exist`);
   }
-  verifyRecoveryProvenance();
 
   const workflow = readFileSync(workflowPath, 'utf8');
   const rehearsal = readFileSync(rehearsalPath, 'utf8');
@@ -48,6 +47,7 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     'ref: ${{ github.event.pull_request.head.sha || github.sha }}',
     'postgres:',
     'POSTGRES_DB: postgres',
+    'POSTGRES_CLIENT_CONTAINER: ${{ job.services.postgres.id }}',
     'bash .github/scripts/restore-rehearsal-postgres.sh',
     'python tests/validate_repository.py',
     'npm run validate',
@@ -57,6 +57,7 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
   }
 
   for (const fragment of [
+    'docker exec',
     'pg_dump',
     '--format=custom',
     'pg_restore',
@@ -72,4 +73,5 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
   assert.ok(traceability.includes('Protected-main truth'), 'traceability must distinguish protected-main truth');
   assert.ok(traceability.includes('exact restored database'), 'traceability must bind evidence to the restored database');
   assert.ok(traceability.includes('No certification claim'), 'traceability must avoid unsupported certification claims');
+  verifyRecoveryProvenance();
 });
