@@ -14,11 +14,12 @@ NIST SP 800-162 defines attribute-based access control as evaluating subject, ob
 
 Orgmetra will enforce purpose-bound PII authorization inside `orgmetra_keyverse_adapter` before protected field values leave the authoritative HR boundary.
 
-`PurposeBoundAccessRequest` carries only authorization attributes: active tenant, authenticated actor tenant, resource tenant, opaque actor reference, opaque target-resource reference, purpose, requested operation, resource kind, requested field names, and granted operation scopes. The opaque target reference is mandatory so authorization evidence can be correlated to the exact Orgmetra record without retaining that record's protected field values. `PurposeBoundAccessPolicy` is Orgmetra-owned and binds one tenant to one policy version, resource kind, purpose, operation, required Keyverse-derived scope, and immutable permitted field set.
+`PurposeBoundAccessRequest` carries only authorization attributes: active tenant, authenticated actor tenant, resource tenant, opaque actor reference, opaque target-resource reference, purpose, requested operation, resource kind, requested field names, and granted operation scopes. The opaque target reference is mandatory so authorization evidence can be correlated to the exact Orgmetra record without retaining that record's protected field values. Its namespace must exactly equal the declared `resource_kind`, preventing a decision for one HR resource type from preserving audit evidence that identifies another type. `PurposeBoundAccessPolicy` is Orgmetra-owned and binds one tenant to one policy version, resource kind, purpose, operation, required Keyverse-derived scope, and immutable permitted field set.
 
 Evaluation fails closed unless all of the following hold:
 
 - request, authenticated actor, target resource, and policy resolve to the same tenant;
+- the opaque target-reference namespace exactly matches the request's resource kind;
 - resource kind, purpose, and operation exactly match the policy;
 - the authenticated principal carries the policy's explicit operation-specific Orgmetra scope;
 - requested fields are a non-empty subset of the policy's permitted fields;
@@ -34,6 +35,7 @@ The adapter does not store passwords, passkeys, bearer tokens, or raw credential
 
 - Necessary HR PII remains usable for legitimate work while access is narrowed by tenant, resource, purpose, operation, scope, and field.
 - Cross-tenant confused-deputy paths fail before resource details are disclosed.
+- A target reference cannot be relabeled as another HR resource kind while remaining valid audit evidence.
 - A purpose header or broad identity token cannot silently widen field access.
 - PII-minimized decisions can be bound into the governed audit/outbox envelope with exact target correlation and without duplicating protected field values.
 - The integration remains modular: Keyverse authenticates and publishes identity attributes/scopes; Orgmetra owns HR authorization policy and decisions.
@@ -46,7 +48,7 @@ The adapter does not store passwords, passkeys, bearer tokens, or raw credential
 
 ## Verification
 
-The executable authorization matrix proves same-tenant binding, exact opaque target correlation, resource/purpose/operation matching, operation-specific scope, exact field minimization, fail-closed malformed and mutable attributes, reserved UUID rejection, PII-minimized decisions, actionable denial metadata, and exception behavior. The owned `orgmetra_keyverse_adapter` production surface is required to maintain exact 100% statement and branch coverage where the pinned CI toolchain exposes those metrics.
+The executable authorization matrix proves same-tenant binding, exact opaque target correlation, exact target-namespace/resource-kind binding, resource/purpose/operation matching, operation-specific scope, exact field minimization, fail-closed malformed and mutable attributes, reserved UUID rejection, PII-minimized decisions, actionable denial metadata, and exception behavior. The owned `orgmetra_keyverse_adapter` production surface is required to maintain exact 100% statement and branch coverage where the pinned CI toolchain exposes those metrics.
 
 ## References
 
