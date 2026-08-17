@@ -23,7 +23,7 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     'POSTGRES_DB: postgres',
     'bash tests/test_restore_rehearsal_postgres.sh',
     'python tests/validate_repository.py',
-    'npm test',
+    'npm run validate',
     'git diff --exit-code'
   ]) {
     assert.ok(workflow.includes(fragment), `recovery workflow must contain ${fragment}`);
