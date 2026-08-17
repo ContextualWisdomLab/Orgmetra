@@ -67,10 +67,17 @@ def _validate_scope(field_name: str, value: object) -> None:
         raise ValueError(f"{field_name} must be an explicit orgmetra.<context>.<operation> scope.")
 
 
-def _validate_reference(field_name: str, value: object) -> None:
-    """Require a namespaced opaque reference suitable for audit correlation."""
+def _validate_reference(
+    field_name: str,
+    value: object,
+    *,
+    expected_namespace: str | None = None,
+) -> None:
+    """Require an opaque audit reference and optionally bind it to one resource kind."""
     if not isinstance(value, str) or _REFERENCE_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be a namespaced opaque reference.")
+    if expected_namespace is not None and value.partition(":")[0] != expected_namespace:
+        raise ValueError(f"{field_name} namespace must match resource_kind.")
 
 
 def _validate_version(value: object) -> None:
@@ -157,10 +164,14 @@ class PurposeBoundAccessRequest:
         _validate_uuid("actor_tenant_record_id", self.actor_tenant_record_id)
         _validate_uuid("resource_tenant_record_id", self.resource_tenant_record_id)
         _validate_reference("actor_reference", self.actor_reference)
-        _validate_reference("resource_reference", self.resource_reference)
+        _validate_resource_kind(self.resource_kind)
+        _validate_reference(
+            "resource_reference",
+            self.resource_reference,
+            expected_namespace=self.resource_kind,
+        )
         _validate_code("purpose_code", self.purpose_code)
         _validate_code("operation_code", self.operation_code)
-        _validate_resource_kind(self.resource_kind)
         _validate_field_set("requested_fields", self.requested_fields)
         _validate_scope_set(self.granted_scope_codes)
 
