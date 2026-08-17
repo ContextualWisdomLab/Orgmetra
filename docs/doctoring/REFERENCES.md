@@ -34,9 +34,7 @@ PostgreSQL Global Development Group. (n.d.). *CREATE TRIGGER: Define a new trigg
 
 PostgreSQL Global Development Group. (n.d.). *SELECT (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-select.html
 
-PostgreSQL Global Development Group. (n.d.). *Date/time functions and operators (PostgreSQL 18 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/18/functions-datetime.html
-
-PostgreSQL Global Development Group. (n.d.). *SELECT (PostgreSQL 18 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/18/sql-select.html
+PostgreSQL Global Development Group. (n.d.). *Date/time functions and operators (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/functions-datetime.html
 
 Robinson, W. S. (1950). Ecological correlations and the behavior of individuals. *American Sociological Review, 15*(3), 351–357. https://doi.org/10.2307/2087176
 
