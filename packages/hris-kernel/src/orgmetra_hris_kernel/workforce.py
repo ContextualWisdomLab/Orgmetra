@@ -194,9 +194,6 @@ def build_workforce_composition_snapshot(
         known_at=known_at,
     )
 
-    employment_by_id = {
-        version.employment_record_id: version for version in visible_employments
-    }
     portfolio_keys: set[tuple[UUID, UUID]] = set()
     staffed_people: set[UUID] = set()
     staffed_fte = _ZERO_FTE
@@ -208,9 +205,6 @@ def build_workforce_composition_snapshot(
             employment_versions,
             known_at=known_at,
         )
-        employment = employment_by_id.get(assignment.employment_record_id)
-        if employment is None:
-            continue
         portfolio_keys.add((assignment.person_record_id, assignment.employment_record_id))
         staffed_people.add(assignment.person_record_id)
         staffed_fte += assignment.allocation_ratio
