@@ -45,6 +45,29 @@ jobs:
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
+      - name: Print recovery provenance repair data
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          paths = [
+              '.github/workflows/recovery-rehearsal-quality.yml',
+              'docs/traceability/restore-rehearsal.md',
+              'tests/recovery-rehearsal.test.mjs',
+              'tests/test_restore_rehearsal_postgres.sh',
+          ]
+          files = []
+          for path_text in paths:
+              data = Path(path_text).read_bytes()
+              files.append({
+                  'path': path_text,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+                  'bytes': len(data),
+                  'lines': len(data.decode('utf-8').splitlines()),
+              })
+          print(json.dumps({'package': 'orgmetra-recovery-rehearsal', 'version': '0.1.0', 'files': files}, separators=(',', ':')))
+          PY
       - name: Run recovery evidence contract
         run: node --test tests/recovery-rehearsal.test.mjs
       - name: Validate repository contracts
