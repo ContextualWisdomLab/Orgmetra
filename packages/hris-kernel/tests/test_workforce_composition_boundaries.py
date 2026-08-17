@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, tzinfo
 from decimal import Decimal
 from uuid import UUID
 
@@ -20,6 +20,14 @@ from orgmetra_hris_kernel.workforce import (
     WorkforceCompositionSnapshot,
     build_workforce_composition_snapshot,
 )
+
+
+class _UnknownOffsetTimezone(tzinfo):
+    """Timezone marker whose UTC offset is intentionally indeterminate."""
+
+    def utcoffset(self, value: datetime | None) -> None:
+        """Return no offset so the datetime is not a usable absolute instant."""
+        return None
 
 
 def _id(value: int) -> UUID:
@@ -50,6 +58,12 @@ def test_direct_snapshot_rejects_timezone_naive_knowledge_cutoff() -> None:
     """Direct evidence construction must not depend on the host's local timezone."""
     with pytest.raises(IntervalError, match="timezone-aware"):
         _direct_snapshot(known_at=datetime(2026, 1, 20))
+
+
+def test_direct_snapshot_rejects_unknown_offset_knowledge_cutoff() -> None:
+    """A tzinfo marker without an offset is not a reproducible absolute instant."""
+    with pytest.raises(IntervalError, match="timezone-aware"):
+        _direct_snapshot(known_at=datetime(2026, 1, 20, tzinfo=_UnknownOffsetTimezone()))
 
 
 def test_direct_snapshot_rejects_noncanonical_status_order() -> None:
