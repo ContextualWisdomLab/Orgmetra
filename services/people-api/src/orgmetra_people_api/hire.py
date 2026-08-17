@@ -25,6 +25,14 @@ _MAX_DISPLAY_NAME_LENGTH = 512
 _HIRE_MUTATION_FIELDS = frozenset({"candidate_worker_conversion"})
 
 
+class HireDecisionNotFound(LookupError):
+    """Indicate that no exact confirmed decision can authorize the hire mutation."""
+
+
+class HireDecisionIntegrityError(RuntimeError):
+    """Indicate that decision provenance cannot safely materialize worker truth."""
+
+
 def _validate_operational_uuid(field_name: str, value: object) -> None:
     """Require a real UUID outside Orgmetra's reserved protocol sentinels."""
     if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
