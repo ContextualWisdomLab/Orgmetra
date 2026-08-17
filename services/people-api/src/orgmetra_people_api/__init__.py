@@ -1,28 +1,17 @@
-"""Public API for the purpose-bound Orgmetra people service."""
+"""Request-edge contracts for the Orgmetra People API."""
 
-from .app import RequiredPurpose, create_app
-from .auth import (
+from orgmetra_people_api.auth import (
+    AuthenticatedPrincipal,
     AuthenticationFailed,
-    AuthorizationDenied,
-    AuthorizedPrincipal,
-    IdentityProviderUnavailable,
-    TokenAuthorizer,
-    ensure_purpose_authorized,
-    ensure_scope_authorized,
+    TokenAuthenticator,
     extract_bearer_token,
 )
-from .repository import PeopleRepository
+from orgmetra_people_api.authorization import authorize_resource_fields
 
 __all__ = [
+    "AuthenticatedPrincipal",
     "AuthenticationFailed",
-    "AuthorizationDenied",
-    "AuthorizedPrincipal",
-    "IdentityProviderUnavailable",
-    "PeopleRepository",
-    "RequiredPurpose",
-    "TokenAuthorizer",
-    "create_app",
-    "ensure_purpose_authorized",
-    "ensure_scope_authorized",
+    "TokenAuthenticator",
+    "authorize_resource_fields",
     "extract_bearer_token",
 ]

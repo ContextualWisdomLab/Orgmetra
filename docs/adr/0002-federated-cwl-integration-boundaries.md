@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted baseline.
+Status: Accepted
 
 ## Context
 

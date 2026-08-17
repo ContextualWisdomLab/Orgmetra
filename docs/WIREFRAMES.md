@@ -48,6 +48,8 @@ Panels:
 - Person summary
 - Employment history
 - Position and assignment history
+- Exclusive-versus-concurrent employment badge with the next action when a second job overlaps
+- Seat-capacity warning when visible allocations would exceed 1.0000
 - Manager and organization timeline
 - Performance criteria and observations
 
@@ -61,6 +63,8 @@ Panels:
 - Subgroup diagnostics
 - Drift and invariance warnings
 - Policy change recommendations
+
+Every policy change recommendation card must display the immutable supporting evidence/version links, confidence or interval information when scientifically defined, explicit limitations and subgroup caveats, the accountable human reviewer, and the consequence of approval. Recommendations remain drafts until a human chooses one of these visible actions: **Review**, **Request more evidence**, **Approve**, or **Escalate**. Approval requires actor, purpose, reason, evidence versions, and a single-use confirmation reference; the UI never presents an LLM-generated recommendation as an autonomous employment decision.
 
 ## Admin & Integrations
 

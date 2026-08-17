@@ -1,116 +1,127 @@
-"""Unit tests for the people API authentication boundary."""
+"""Executable contracts for People API authentication and delegated authorization."""
 
 from __future__ import annotations
 
-from uuid import uuid4
+import asyncio
+import unittest
+from uuid import UUID
 
-import pytest
+from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
+from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed, authorize_resource_fields, extract_bearer_token
 
-from orgmetra_people_api import (
-    AuthenticationFailed,
-    AuthorizationDenied,
-    AuthorizedPrincipal,
-    ensure_purpose_authorized,
-    ensure_scope_authorized,
-    extract_bearer_token,
-)
+TENANT = UUID("0198a412-6000-7000-8000-000000000001")
+OTHER_TENANT = UUID("0198a412-6000-7000-8000-000000000002")
 
 
-def _principal(
-    *purposes: str,
-    scopes: tuple[str, ...] = ("orgmetra.people.read",),
-) -> AuthorizedPrincipal:
-    """Create one principal for two-dimensional authorization tests."""
+class BearerBoundaryTests(unittest.TestCase):
+    """Prove that malformed token syntax never reaches an injected authenticator."""
 
-    return AuthorizedPrincipal(
-        tenant_reference=uuid4(),
-        actor_reference=uuid4(),
-        allowed_scope_codes=frozenset(scopes),
-        allowed_purpose_codes=frozenset(purposes),
-    )
+    def test_accepts_case_insensitive_bearer_scheme(self) -> None:
+        self.assertEqual(extract_bearer_token("bEaReR safe-token_123"), "safe-token_123")
 
+    def test_rejects_absent_wrong_or_ambiguous_scheme(self) -> None:
+        for header in (None, "", "Basic token", "Bearer", "Bearer one two"):
+            with self.subTest(header=header), self.assertRaises(AuthenticationFailed):
+                extract_bearer_token(header)
 
-def test_principal_normalizes_valid_authority_codes() -> None:
-    principal = _principal(
-        " people_read ",
-        "audit_review",
-        scopes=(" orgmetra.people.read ", "orgmetra.audit.read"),
-    )
-
-    assert principal.allowed_purpose_codes == frozenset(
-        {"people_read", "audit_review"}
-    )
-    assert principal.allowed_scope_codes == frozenset(
-        {"orgmetra.people.read", "orgmetra.audit.read"}
-    )
+    def test_rejects_hidden_control_non_ascii_and_unbounded_tokens(self) -> None:
+        for token in ("bad\x1ftoken", "tökén", "x" * 8193):
+            with self.subTest(token_length=len(token)), self.assertRaises(AuthenticationFailed):
+                extract_bearer_token(f"Bearer {token}")
 
 
-def test_principal_rejects_empty_purpose_collection() -> None:
-    with pytest.raises(ValueError, match="allowed_purpose_codes"):
-        _principal()
+class PrincipalBoundaryTests(unittest.TestCase):
+    """Keep authenticated identity/scope facts narrow and immutable."""
+
+    def test_rejects_reserved_tenant_bad_actor_and_wildcard_scope(self) -> None:
+        cases = (
+            {"tenant_record_id": UUID(int=0), "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({"orgmetra.people.read"})},
+            {"tenant_record_id": TENANT, "actor_reference": "actor with pii", "granted_scope_codes": frozenset({"orgmetra.people.read"})},
+            {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({"orgmetra.*"})},
+        )
+        for values in cases:
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                AuthenticatedPrincipal(**values)
+
+    def test_principal_contains_no_purpose_grant(self) -> None:
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({"orgmetra.people.read"}),
+        )
+        self.assertFalse(hasattr(principal, "allowed_purpose_codes"))
 
 
-def test_principal_rejects_empty_scope_collection() -> None:
-    with pytest.raises(ValueError, match="allowed_scope_codes"):
-        _principal("people_read", scopes=())
+class DelegatedAuthorizationTests(unittest.TestCase):
+    """Prove the service delegates exact-target PII policy decisions."""
+
+    def setUp(self) -> None:
+        self.principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({"orgmetra.people.read"}),
+        )
+        self.policy = PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="v1",
+            resource_kind="person_record",
+            purpose_code="people_read",
+            operation_code="read_record",
+            required_scope_code="orgmetra.people.read",
+            permitted_fields=frozenset({"display_name"}),
+        )
+
+    def test_allows_only_exact_authorized_target_and_field(self) -> None:
+        decision = authorize_resource_fields(
+            principal=self.principal,
+            tenant_record_id=TENANT,
+            resource_tenant_record_id=TENANT,
+            resource_reference="person_record:0198a412600070008000000000000010",
+            purpose_code="people_read",
+            operation_code="read_record",
+            resource_kind="person_record",
+            requested_fields=frozenset({"display_name"}),
+            policy=self.policy,
+        )
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.resource_reference, "person_record:0198a412600070008000000000000010")
+        self.assertEqual(decision.authorized_fields, frozenset({"display_name"}))
+
+    def test_denies_cross_tenant_resource_before_field_release(self) -> None:
+        with self.assertRaises(AuthorizationDeniedError) as caught:
+            authorize_resource_fields(
+                principal=self.principal,
+                tenant_record_id=TENANT,
+                resource_tenant_record_id=OTHER_TENANT,
+                resource_reference="person_record:0198a412600070008000000000000010",
+                purpose_code="people_read",
+                operation_code="read_record",
+                resource_kind="person_record",
+                requested_fields=frozenset({"display_name"}),
+                policy=self.policy,
+            )
+        self.assertEqual(caught.exception.reason_code, "tenant_scope_mismatch")
+
+    def test_denies_when_operation_scope_is_missing_even_with_valid_purpose(self) -> None:
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({"orgmetra.audit.read"}),
+        )
+        with self.assertRaises(AuthorizationDeniedError) as caught:
+            authorize_resource_fields(
+                principal=principal,
+                tenant_record_id=TENANT,
+                resource_tenant_record_id=TENANT,
+                resource_reference="person_record:0198a412600070008000000000000010",
+                purpose_code="people_read",
+                operation_code="read_record",
+                resource_kind="person_record",
+                requested_fields=frozenset({"display_name"}),
+                policy=self.policy,
+            )
+        self.assertEqual(caught.exception.reason_code, "required_scope_missing")
 
 
-@pytest.mark.parametrize(
-    "purpose_code",
-    ["", " ", "UPPER", "people-read", "café", "x" * 65],
-)
-def test_principal_rejects_invalid_purpose_codes(purpose_code: str) -> None:
-    with pytest.raises(ValueError, match="purpose code"):
-        _principal(purpose_code)
-
-
-@pytest.mark.parametrize(
-    "scope_code",
-    ["", " ", "UPPER", "orgmetra/people/read", "café", "x" * 129],
-)
-def test_principal_rejects_invalid_scope_codes(scope_code: str) -> None:
-    with pytest.raises(ValueError, match="scope code"):
-        _principal("people_read", scopes=(scope_code,))
-
-
-def test_extract_bearer_token_accepts_case_insensitive_scheme() -> None:
-    assert extract_bearer_token("bEaReR safe-token_123") == "safe-token_123"
-
-
-@pytest.mark.parametrize(
-    "header",
-    [None, "", "Basic token", "Bearer", "Bearer one two"],
-)
-def test_extract_bearer_token_rejects_missing_or_malformed_header(
-    header: str | None,
-) -> None:
-    with pytest.raises(AuthenticationFailed):
-        extract_bearer_token(header)
-
-
-@pytest.mark.parametrize(
-    "token",
-    ["x" * 8193, "bad\x1ftoken", "tökén"],
-)
-def test_extract_bearer_token_rejects_unbounded_or_non_ascii_token(token: str) -> None:
-    with pytest.raises(AuthenticationFailed, match="token"):
-        extract_bearer_token(f"Bearer {token}")
-
-
-def test_ensure_scope_and_purpose_accept_independent_grants() -> None:
-    principal = _principal(
-        "people_read",
-        scopes=("orgmetra.people.read",),
-    )
-    ensure_scope_authorized(principal, " orgmetra.people.read ")
-    ensure_purpose_authorized(principal, " people_read ")
-
-
-def test_ensure_purpose_authorized_rejects_missing_purpose() -> None:
-    with pytest.raises(AuthorizationDenied, match="purpose"):
-        ensure_purpose_authorized(_principal("people_read"), "people_admin")
-
-
-def test_ensure_scope_authorized_rejects_missing_scope() -> None:
-    with pytest.raises(AuthorizationDenied, match="scope"):
-        ensure_scope_authorized(_principal("people_read"), "orgmetra.people.write")
+if __name__ == "__main__":
+    unittest.main()

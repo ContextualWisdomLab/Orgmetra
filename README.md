@@ -76,12 +76,6 @@ Job evidence
 - `docs/adr/README.md`
 - `docs/doctoring/REFERENCES.md`
 
-## Implementation slices
-
-- `packages/orgmetra-domain`: bitemporal people, employment, position, assignment, and candidate-worker invariants.
-- `packages/orgmetra-postgres`: tenant-isolated purpose-bound PostgreSQL persistence.
-- `services/people-api`: purpose-bound customer-facing People API boundary for person, candidate, hire-link, and employment operations.
-
 ## Status
 
-The foundation baseline is proposed in PR #8 against the protected default `bootstrap` branch. PR #3 provides the bitemporal domain kernel, PR #5 provides persistence, and this People API is PR #6. These stacked slices are not protected default-branch truth until their dependencies merge in order and each retargeted exact head satisfies fresh review and required checks.
+Foundation plus the employment-truth kernel through exclusive jobs, staffable seats, and hire-to-assignment commands. The protected default branch still contains only bootstrap; review `orgmetra_hris_kernel` reconstructions, correct overlapping versions, and keep current-head gates green before treating this as shipped behavior.

@@ -5,26 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "orgmetra-people-api"
 version = "0.1.0"
-description = "Purpose-bound FastAPI surface for Orgmetra people and talent records."
+description = "Purpose-bound customer API boundary for authoritative Orgmetra HR records."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "ContextualWisdomLab" }]
-dependencies = [
-  "fastapi>=0.116,<1",
-  "orgmetra-postgres==0.1.0",
-  "pydantic>=2.11,<3",
-]
-classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
-  "Framework :: FastAPI",
-  "License :: OSI Approved :: Apache Software License",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
-]
+dependencies = ["orgmetra-keyverse-adapter==0.1.0"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

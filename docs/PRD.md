@@ -44,7 +44,7 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 - People, employment, organization, job, position, assignment models.
 - Bitemporal effective/system time for HR facts.
 - Candidate-worker linkage.
-- Criterion blueprint and criterion observation models.
+- Performance cycle, criterion blueprint, and criterion observation models.
 - Selection decision records.
 - Validity study registry.
 - Audit/provenance contract.
@@ -84,7 +84,7 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 | FR-003 | The system shall link candidates to workers append-only after hiring. |
 | FR-004 | The system shall store job analysis versions, task inventories, FJA profiles, KSAO profiles, and qualification rules. |
 | FR-005 | The system shall store selection decisions with evidence references and decision actor. |
-| FR-006 | The system shall store performance criterion blueprints and criterion observations. |
+| FR-006 | The system shall store effective-dated performance cycles, criterion blueprints, and criterion observations linked to exactly one cycle. |
 | FR-007 | The system shall register validation studies and link them to predictors, criteria, samples, and decision policy versions. |
 | FR-008 | The system shall support purpose-bound access rather than global PII masking. |
 | FR-009 | The system shall integrate CWL services only through versioned APIs, events, packages, or adapters. |
@@ -105,6 +105,7 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 - Percentage of hiring decisions with complete evidence lineage.
 - Percentage of candidate-worker links with preserved provenance.
 - Criterion blueprint coverage by job family.
+- Criterion observations assigned to a valid effective-dated performance cycle.
 - Validity studies with predictor/criterion version linkage.
 - Access decisions with purpose, actor, and resource evidence.
 - Migration records reconciled without untraceable rows.

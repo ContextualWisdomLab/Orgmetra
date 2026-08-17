@@ -5,47 +5,640 @@ info:
   summary: Evidence-centered HRIS foundation API
 servers:
   - url: https://api.orgmetra.example/v1
+tags:
+  - name: people-core
+    description: People identity and employment commands.
+  - name: job-architecture
+    description: Evidence-backed job architecture commands.
+  - name: talent-acquisition
+    description: Candidate and accountable selection commands.
 paths:
   /person-records:
     post:
       operationId: createPersonRecord
-      summary: Create a person record
+      summary: Create a person identity anchor and initial effective name
       tags:
-        - name: people-core
+        - people-core
+      security:
+        - keyverse_oidc:
+            - orgmetra.people.write
       parameters:
-        - name: Idempotency-Key
-          in: header
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TenantReference'
+        - $ref: '#/components/parameters/ActorReference'
+        - $ref: '#/components/parameters/PurposeCode'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [display_name]
-              properties:
-                display_name:
-                  type: string
+              $ref: '#/components/schemas/CreatePersonRecordCommand'
       responses:
         '201':
           description: Created
+          headers:
+            Location:
+              description: Canonical URI for the created person record.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedPersonRecord'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
   /job-profiles:
     post:
       operationId: createJobProfile
-      summary: Create a draft job profile
+      summary: Create an evidence-backed draft job profile
       tags:
-        - name: job-architecture
+        - job-architecture
+      security:
+        - keyverse_oidc:
+            - orgmetra.job_architecture.write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TenantReference'
+        - $ref: '#/components/parameters/ActorReference'
+        - $ref: '#/components/parameters/PurposeCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobProfileCommand'
       responses:
         '201':
           description: Created
+          headers:
+            Location:
+              description: Canonical URI for the created job profile.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedJobProfile'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
   /selection-decisions:
     post:
       operationId: recordSelectionDecision
-      summary: Record an evidence-backed selection decision
+      summary: Record a human-confirmed, evidence-backed selection decision
       tags:
-        - name: talent-acquisition
+        - talent-acquisition
+      security:
+        - keyverse_oidc:
+            - orgmetra.talent_acquisition.write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TenantReference'
+        - $ref: '#/components/parameters/ActorReference'
+        - $ref: '#/components/parameters/PurposeCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordSelectionDecisionCommand'
+      responses:
+        '201':
+          description: Recorded
+          headers:
+            Location:
+              description: Canonical URI for the recorded selection decision.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordedSelectionDecision'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/InsufficientEvidence'
+  /employment-records:
+    post:
+      operationId: createEmploymentRecord
+      summary: Create an employment identity and its first status version
+      tags:
+        - people-core
+      security:
+        - keyverse_oidc:
+            - orgmetra.people.write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TenantReference'
+        - $ref: '#/components/parameters/ActorReference'
+        - $ref: '#/components/parameters/PurposeCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmploymentRecordCommand'
       responses:
         '201':
           description: Created
+          headers:
+            Location:
+              description: Canonical URI for the created employment record.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedEmploymentRecord'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /position-records:
+    post:
+      operationId: createPositionRecord
+      summary: Create a position seat bound to one organization and job
+      tags:
+        - job-architecture
+      security:
+        - keyverse_oidc:
+            - orgmetra.job_architecture.write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TenantReference'
+        - $ref: '#/components/parameters/ActorReference'
+        - $ref: '#/components/parameters/PurposeCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePositionRecordCommand'
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: Canonical URI for the created position record.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedPositionRecord'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+  /assignment-records:
+    post:
+      operationId: createAssignmentRecord
+      summary: Assign a worker through one employment to a staffable seat
+      tags:
+        - people-core
+      security:
+        - keyverse_oidc:
+            - orgmetra.people.write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TenantReference'
+        - $ref: '#/components/parameters/ActorReference'
+        - $ref: '#/components/parameters/PurposeCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssignmentRecordCommand'
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: Canonical URI for the created assignment record.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedAssignmentRecord'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+components:
+  securitySchemes:
+    keyverse_oidc:
+      type: openIdConnect
+      description: Keyverse access token with the operation's declared least-privilege scope.
+      openIdConnectUrl: https://identity.orgmetra.example/.well-known/openid-configuration
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Binds one actor, tenant, purpose, resource, and command digest.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 200
+    TenantReference:
+      name: X-Tenant-Reference
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+    ActorReference:
+      name: X-Actor-Reference
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
+    PurposeCode:
+      name: X-Purpose-Code
+      in: header
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9_]{2,63}$'
+  schemas:
+    EvidenceReference:
+      type: object
+      additionalProperties: false
+      required:
+        - evidence_reference
+        - evidence_version_code
+      properties:
+        evidence_reference:
+          type: string
+          minLength: 1
+          maxLength: 500
+        evidence_version_code:
+          type: string
+          minLength: 1
+          maxLength: 200
+    CreatePersonRecordCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - display_name
+        - effective_from
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 300
+        effective_from:
+          type: string
+          format: date
+    CreatedPersonRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - person_record_id
+      properties:
+        person_record_id:
+          type: string
+          format: uuid
+    CreateJobProfileCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - job_title
+        - job_family_code
+        - job_version_code
+        - effective_from
+        - decision_reason
+        - confirmation_reference
+        - evidence_references
+      properties:
+        job_title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        job_family_code:
+          type: string
+          minLength: 1
+          maxLength: 100
+        job_version_code:
+          type: string
+          minLength: 1
+          maxLength: 100
+        effective_from:
+          type: string
+          format: date
+        decision_reason:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        confirmation_reference:
+          type: string
+          minLength: 1
+          maxLength: 300
+        evidence_references:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+    CreatedJobProfile:
+      type: object
+      additionalProperties: false
+      required:
+        - job_profile_id
+      properties:
+        job_profile_id:
+          type: string
+          format: uuid
+    RecordSelectionDecisionCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - candidate_profile_id
+        - job_profile_id
+        - decision_code
+        - decision_reason
+        - confirmation_reference
+        - decided_at
+        - evidence_references
+      properties:
+        candidate_profile_id:
+          type: string
+          format: uuid
+        job_profile_id:
+          type: string
+          format: uuid
+        decision_code:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{2,63}$'
+        decision_reason:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        confirmation_reference:
+          type: string
+          minLength: 1
+          maxLength: 300
+        decided_at:
+          type: string
+          format: date-time
+        evidence_references:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+    RecordedSelectionDecision:
+      type: object
+      additionalProperties: false
+      required:
+        - selection_decision_id
+      properties:
+        selection_decision_id:
+          type: string
+          format: uuid
+    CreateEmploymentRecordCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - person_record_id
+        - employment_status_code
+        - employment_concurrency_code
+        - effective_from
+        - decision_reason
+        - confirmation_reference
+        - evidence_references
+      properties:
+        person_record_id:
+          type: string
+          format: uuid
+        employment_status_code:
+          type: string
+          pattern: '^(active|leave|terminated)$'
+        employment_concurrency_code:
+          type: string
+          pattern: '^(exclusive|concurrent)$'
+        effective_from:
+          type: string
+          format: date
+        decision_reason:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        confirmation_reference:
+          type: string
+          minLength: 1
+          maxLength: 300
+        evidence_references:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+    CreatedEmploymentRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - employment_record_id
+      properties:
+        employment_record_id:
+          type: string
+          format: uuid
+    CreatePositionRecordCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - organization_unit_id
+        - job_profile_id
+        - position_status_code
+        - effective_from
+        - decision_reason
+        - confirmation_reference
+        - evidence_references
+      properties:
+        organization_unit_id:
+          type: string
+          format: uuid
+        job_profile_id:
+          type: string
+          format: uuid
+        position_status_code:
+          type: string
+          pattern: '^(active|open|closed|frozen|abolished)$'
+        effective_from:
+          type: string
+          format: date
+        decision_reason:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        confirmation_reference:
+          type: string
+          minLength: 1
+          maxLength: 300
+        evidence_references:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+    CreatedPositionRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - position_record_id
+      properties:
+        position_record_id:
+          type: string
+          format: uuid
+    CreateAssignmentRecordCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - employment_record_id
+        - person_record_id
+        - position_record_id
+        - allocation_ratio
+        - effective_from
+        - decision_reason
+        - confirmation_reference
+        - evidence_references
+      properties:
+        employment_record_id:
+          type: string
+          format: uuid
+        person_record_id:
+          type: string
+          format: uuid
+        position_record_id:
+          type: string
+          format: uuid
+        allocation_ratio:
+          type: string
+          pattern: '^(0\.[0-9]{4}|1\.0000)$'
+        effective_from:
+          type: string
+          format: date
+        decision_reason:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        confirmation_reference:
+          type: string
+          minLength: 1
+          maxLength: 300
+        evidence_references:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+    CreatedAssignmentRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - assignment_record_id
+      properties:
+        assignment_record_id:
+          type: string
+          format: uuid
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error_code
+        - message
+        - next_action
+        - support_reference
+      properties:
+        error_code:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{2,63}$'
+        message:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        next_action:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Safe action the caller can take to resolve or escalate the failure.
+        support_reference:
+          type: string
+          pattern: '^err_[A-Za-z0-9_-]{20,80}$'
+          description: Opaque random client-safe support identifier. It must not encode internal trace or span identifiers, topology, timestamps, tenant identifiers, or PII.
+  responses:
+    InvalidCommand:
+      description: Request failed generated schema or domain validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthenticated:
+      description: Keyverse authentication is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Actor, tenant, purpose, or resource authorization failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    IdempotencyConflict:
+      description: The idempotency key is already bound to different command content.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InsufficientEvidence:
+      description: The high-impact command lacks sufficient versioned evidence.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
