@@ -227,4 +227,38 @@ if [[ "${overlap_output}" != *"employment_record_bitemporal_exclusion"* ]]; then
     exit 1
 fi
 
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO candidate_profile (
+    tenant_record_id, candidate_profile_id, application_status_code, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000031',
+    'offer', TIMESTAMPTZ '2026-03-01 00:00:00+00'
+);
+SQL
+
+set +e
+candidate_link_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO candidate_worker_link (
+    tenant_record_id, candidate_worker_link_id, candidate_profile_id, person_record_id, linked_at
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000032',
+    '00000000-0000-7000-8000-000000000031',
+    '00000000-0000-7000-8000-000000000001',
+    TIMESTAMPTZ '2026-03-02 00:00:00+00'
+);
+SQL
+} 2>&1)"
+candidate_link_status=$?
+set -e
+if [[ ${candidate_link_status} -eq 0 ]]; then
+    echo "ungoverned candidate-to-worker link unexpectedly succeeded" >&2
+    exit 1
+fi
+if [[ "${candidate_link_output}" != *"candidate_worker_link is legacy-only"* ]]; then
+    echo "candidate link failed for an unexpected reason: ${candidate_link_output}" >&2
+    exit 1
+fi
+
 echo "PostgreSQL bitemporal concurrency contract passed"
