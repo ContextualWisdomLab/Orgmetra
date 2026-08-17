@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${POSTGRES_ADMIN_URL:=postgresql://orgmetra:orgmetra@localhost:5432/postgres}"
-: "${POSTGRES_CLIENT_CONTAINER:?POSTGRES_CLIENT_CONTAINER is required}"
+: "${POSTGRES_SOURCE_ADMIN_URL:=postgresql://orgmetra:orgmetra@localhost:5432/postgres}"
+: "${POSTGRES_RESTORE_ADMIN_URL:=postgresql://orgmetra:orgmetra@localhost:5433/postgres}"
+: "${POSTGRES_SOURCE_CONTAINER:?POSTGRES_SOURCE_CONTAINER is required}"
+: "${POSTGRES_RESTORE_CONTAINER:?POSTGRES_RESTORE_CONTAINER is required}"
+
+if [[ "${POSTGRES_SOURCE_ADMIN_URL}" == "${POSTGRES_RESTORE_ADMIN_URL}" \
+   || "${POSTGRES_SOURCE_CONTAINER}" == "${POSTGRES_RESTORE_CONTAINER}" ]]; then
+    echo "source and restore PostgreSQL endpoints must differ" >&2
+    exit 1
+fi
 
 SOURCE_DATABASE_NAME="orgmetra_recovery_source"
 RESTORE_DATABASE_NAME="orgmetra_recovery_target"
-SOURCE_DATABASE_URL="${POSTGRES_ADMIN_URL%/postgres}/${SOURCE_DATABASE_NAME}"
-RESTORE_DATABASE_URL="${POSTGRES_ADMIN_URL%/postgres}/${RESTORE_DATABASE_NAME}"
+SOURCE_DATABASE_URL="${POSTGRES_SOURCE_ADMIN_URL%/postgres}/${SOURCE_DATABASE_NAME}"
+RESTORE_DATABASE_URL="${POSTGRES_RESTORE_ADMIN_URL%/postgres}/${RESTORE_DATABASE_NAME}"
 DUMP_PATH="$(mktemp -t orgmetra-recovery-XXXXXX.dump)"
 TENANT_ID="10000000-0000-7000-8000-000000000001"
 PERSON_ID="00000000-0000-7000-8000-000000000101"
@@ -15,21 +23,34 @@ NAME_ID="00000000-0000-7000-8000-000000000102"
 AUDIT_ID="00000000-0000-7000-8000-000000000103"
 OUTBOX_ID="00000000-0000-7000-8000-000000000104"
 
+drop_recovery_roles() {
+    local admin_url="$1"
+    psql "${admin_url}" -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
+DROP ROLE IF EXISTS orgmetra_outbox_operator;
+DROP ROLE IF EXISTS orgmetra_outbox_recovery_owner;
+SQL
+}
+
 cleanup() {
     rm -f "${DUMP_PATH}"
-    psql "${POSTGRES_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
+    psql "${POSTGRES_RESTORE_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
         "DROP DATABASE IF EXISTS ${RESTORE_DATABASE_NAME} WITH (FORCE);" >/dev/null || true
-    psql "${POSTGRES_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
+    drop_recovery_roles "${POSTGRES_RESTORE_ADMIN_URL}" || true
+    psql "${POSTGRES_SOURCE_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
         "DROP DATABASE IF EXISTS ${SOURCE_DATABASE_NAME} WITH (FORCE);" >/dev/null || true
+    drop_recovery_roles "${POSTGRES_SOURCE_ADMIN_URL}" || true
 }
 trap cleanup EXIT
 
-psql "${POSTGRES_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
-    "DROP DATABASE IF EXISTS ${RESTORE_DATABASE_NAME} WITH (FORCE);" >/dev/null
-psql "${POSTGRES_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
+psql "${POSTGRES_SOURCE_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
     "DROP DATABASE IF EXISTS ${SOURCE_DATABASE_NAME} WITH (FORCE);" >/dev/null
-psql "${POSTGRES_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
+drop_recovery_roles "${POSTGRES_SOURCE_ADMIN_URL}"
+psql "${POSTGRES_SOURCE_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
     "CREATE DATABASE ${SOURCE_DATABASE_NAME};" >/dev/null
+
+psql "${POSTGRES_RESTORE_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
+    "DROP DATABASE IF EXISTS ${RESTORE_DATABASE_NAME} WITH (FORCE);" >/dev/null
+drop_recovery_roles "${POSTGRES_RESTORE_ADMIN_URL}"
 
 for migration in \
     database/migrations/0001_foundation_schema.sql \
@@ -87,12 +108,23 @@ SELECT record_audit_outbox_event(
 );
 SQL
 
-docker exec "${POSTGRES_CLIENT_CONTAINER}" \
-    pg_dump --format=custom "${SOURCE_DATABASE_URL}" > "${DUMP_PATH}"
-psql "${POSTGRES_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
+docker exec "${POSTGRES_SOURCE_CONTAINER}" \
+    pg_dump -U orgmetra -d "${SOURCE_DATABASE_NAME}" --format=custom > "${DUMP_PATH}"
+
+# pg_dump is database-scoped and intentionally does not include cluster-global
+# roles. A clean replacement cluster must recreate the two least-privilege
+# recovery principals before restoring database object ownership and ACLs.
+psql "${POSTGRES_RESTORE_ADMIN_URL}" -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
+CREATE ROLE orgmetra_outbox_recovery_owner
+    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+CREATE ROLE orgmetra_outbox_operator
+    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+SQL
+psql "${POSTGRES_RESTORE_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
     "CREATE DATABASE ${RESTORE_DATABASE_NAME};" >/dev/null
-docker exec -i "${POSTGRES_CLIENT_CONTAINER}" \
-    pg_restore --exit-on-error --dbname="${RESTORE_DATABASE_URL}" < "${DUMP_PATH}" >/dev/null
+docker exec -i "${POSTGRES_RESTORE_CONTAINER}" \
+    pg_restore -U orgmetra --exit-on-error --dbname="${RESTORE_DATABASE_NAME}" \
+    < "${DUMP_PATH}" >/dev/null
 
 bitemporal_count="$(PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" \
     psql "${RESTORE_DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
@@ -187,4 +219,4 @@ if [[ "${recovery_owner_count}" != "1" ]]; then
     exit 1
 fi
 
-printf '%s\n' "PostgreSQL restore rehearsal passed for exact restored database ${RESTORE_DATABASE_NAME}."
+printf '%s\n' "PostgreSQL restore rehearsal passed for exact restored database ${RESTORE_DATABASE_NAME} on a separate PostgreSQL cluster."

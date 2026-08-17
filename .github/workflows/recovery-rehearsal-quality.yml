@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
-      postgres:
+      source_postgres:
         image: postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
         env:
           POSTGRES_USER: orgmetra
@@ -30,6 +30,19 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      restore_postgres:
+        image: postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: postgres
+        ports:
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U orgmetra -d postgres"
           --health-interval 5s
@@ -74,10 +87,12 @@ jobs:
         run: |
           python tests/validate_repository.py
           npm run validate
-      - name: Exercise real dump and restore
+      - name: Exercise real cross-cluster dump and restore
         env:
-          POSTGRES_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5432/postgres
-          POSTGRES_CLIENT_CONTAINER: ${{ job.services.postgres.id }}
+          POSTGRES_SOURCE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5432/postgres
+          POSTGRES_RESTORE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5433/postgres
+          POSTGRES_SOURCE_CONTAINER: ${{ job.services.source_postgres.id }}
+          POSTGRES_RESTORE_CONTAINER: ${{ job.services.restore_postgres.id }}
         run: bash .github/scripts/restore-rehearsal-postgres.sh
       - name: Prove clean checkout
         run: git diff --exit-code
