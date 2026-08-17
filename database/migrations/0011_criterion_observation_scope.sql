@@ -90,6 +90,68 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    -- A stale assignment anchor must not make a terminated employment or a
+    -- closed/frozen/abolished seat look like valid performance context. Reuse
+    -- the same status semantics as the HRIS assignment kernel and require one
+    -- *single* matching assignment to have both eligible employment and a
+    -- staffable position at the observation coordinate.
+    IF NOT EXISTS (
+        SELECT 1
+        FROM assignment_record AS assignment
+        JOIN position_record AS position
+          ON position.tenant_record_id = assignment.tenant_record_id
+         AND position.position_record_id = assignment.position_record_id
+        JOIN employment_record_version AS employment_version
+          ON employment_version.tenant_record_id = assignment.tenant_record_id
+         AND employment_version.employment_record_id = assignment.employment_record_id
+        JOIN position_record_version AS position_version
+          ON position_version.tenant_record_id = assignment.tenant_record_id
+         AND position_version.position_record_id = assignment.position_record_id
+        WHERE assignment.tenant_record_id = NEW.tenant_record_id
+          AND assignment.person_record_id = NEW.person_record_id
+          AND position.job_profile_id = criterion_job_profile_id
+          AND assignment.effective_from <= observation_effective_date
+          AND (
+              assignment.effective_to IS NULL
+              OR observation_effective_date < assignment.effective_to
+          )
+          AND assignment.recorded_from <= statement_timestamp()
+          AND (
+              assignment.recorded_to IS NULL
+              OR statement_timestamp() < assignment.recorded_to
+          )
+          AND position.recorded_from <= statement_timestamp()
+          AND (
+              position.recorded_to IS NULL
+              OR statement_timestamp() < position.recorded_to
+          )
+          AND employment_version.employment_status_code IN ('active', 'leave')
+          AND employment_version.effective_from <= observation_effective_date
+          AND (
+              employment_version.effective_to IS NULL
+              OR observation_effective_date < employment_version.effective_to
+          )
+          AND employment_version.recorded_from <= statement_timestamp()
+          AND (
+              employment_version.recorded_to IS NULL
+              OR statement_timestamp() < employment_version.recorded_to
+          )
+          AND position_version.position_status_code IN ('active', 'open')
+          AND position_version.effective_from <= observation_effective_date
+          AND (
+              position_version.effective_to IS NULL
+              OR observation_effective_date < position_version.effective_to
+          )
+          AND position_version.recorded_from <= statement_timestamp()
+          AND (
+              position_version.recorded_to IS NULL
+              OR statement_timestamp() < position_version.recorded_to
+          )
+    ) THEN
+        RAISE EXCEPTION 'criterion observation lacks an assignment with eligible employment and staffable position coverage'
+            USING ERRCODE = '23514';
+    END IF;
+
     RETURN NEW;
 END;
 $$;
