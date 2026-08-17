@@ -199,3 +199,9 @@ def test_request_rejects_malformed_target_reference() -> None:
     """Fail closed when the target cannot be correlated to one opaque Orgmetra record."""
     with pytest.raises(ValueError):
         replace(REQUEST, resource_reference="person-record")
+
+
+def test_request_rejects_target_reference_namespace_mismatch() -> None:
+    """Reject an opaque target whose namespace does not identify the declared resource kind."""
+    with pytest.raises(ValueError, match="resource_reference namespace must match resource_kind"):
+        replace(REQUEST, resource_reference="employment_record:emp_01J5WRONGTARGET")
