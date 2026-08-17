@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - bootstrap
+      - develop
       - main
     paths:
       - "services/people-api/**"
