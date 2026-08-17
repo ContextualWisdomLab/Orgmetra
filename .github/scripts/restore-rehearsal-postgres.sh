@@ -167,7 +167,7 @@ if [[ ${truncate_status} -eq 0 ]]; then
     echo "restored audit history was truncatable" >&2
     exit 1
 fi
-if [[ "${truncate_output}" != *"audit event records cannot be truncated"* ]]; then
+if [[ "${truncate_output}" != *"audit event records are append-only"* ]]; then
     echo "restored audit TRUNCATE failed for an unexpected reason: ${truncate_output}" >&2
     exit 1
 fi
