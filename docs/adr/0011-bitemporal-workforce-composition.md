@@ -15,8 +15,9 @@ ISO 30414:2025, the second edition of the international human-capital reporting 
 Orgmetra will expose a pure `WorkforceCompositionSnapshot` derived from authoritative HRIS facts at an explicit `(tenant_record_id, effective_on, known_at)` coordinate.
 
 - `active` and `leave` employments are reportable because they are the same statuses allowed to carry assignments in the protected HRIS kernel.
-- Headcount is the number of distinct people with reportable visible employment. Concurrent employments therefore do not double-count one person.
+- Headcount is the number of distinct people with reportable visible employment. Valid concurrent employments therefore do not double-count one person.
 - Employment count preserves the number of visible reportable employment relationships.
+- Before aggregation, the snapshot reuses the HRIS employment-concurrency invariant at the report coordinate. Two overlapping `exclusive` employments or an unknown concurrency code fail closed instead of being normalized into plausible headcount.
 - Staffed assignment count and staffed FTE are computed from visible assignments after reusing the existing assignment-to-employment coverage and allocation-portfolio integrity rules.
 - Unassigned-person count surfaces a buyer-actionable staffing gap without serializing row-level worker identity.
 - Status counts are aggregate employment evidence, sorted deterministically.
@@ -31,7 +32,8 @@ Orgmetra will expose a pure `WorkforceCompositionSnapshot` derived from authorit
 
 - Buyers can reconstruct workforce composition for both business time and knowledge time instead of receiving an ahistorical current-row count.
 - Concurrent employment is represented without inflating person headcount, while employment and FTE measures retain portfolio shape.
-- Existing HRIS integrity rules remain the single source of truth for assignment validity.
+- Invalid exclusive-employment overlap remains a visible data-integrity failure rather than silently becoming a report.
+- Existing HRIS integrity rules remain the single source of truth for employment concurrency and assignment validity.
 - Aggregate serialization minimizes PII and avoids a shadow worker database.
 - Deterministic evidence can be bound to governed audit/report delivery later.
 
@@ -43,7 +45,7 @@ Orgmetra will expose a pure `WorkforceCompositionSnapshot` derived from authorit
 
 ## Verification
 
-`packages/hris-kernel/tests/test_workforce_composition.py` requires tenant isolation, concurrent-employment person deduplication, active/leave composition, terminated exclusion, FTE and unassigned-person reporting, deterministic canonical evidence, historical recorded-time reconstruction, duplicate-version rejection, assignment-person integrity, allocation-integrity reuse, and timezone-aware knowledge cutoffs. `.github/workflows/workforce-intelligence-quality.yml` checks out the exact candidate SHA and runs the complete HRIS kernel with the package's 100% statement and branch coverage threshold.
+`packages/hris-kernel/tests/test_workforce_composition.py` and `packages/hris-kernel/tests/test_workforce_composition_boundaries.py` require tenant isolation, concurrent-employment person deduplication, active/leave composition, terminated exclusion, future-effective and late-recorded exclusion, FTE and unassigned-person reporting, deterministic canonical evidence, historical recorded-time reconstruction, duplicate-version rejection, overlapping-exclusive-employment rejection, assignment-person integrity, allocation-integrity reuse, and timezone-aware knowledge cutoffs. `.github/workflows/workforce-intelligence-quality.yml` checks out the exact candidate SHA and runs the complete HRIS kernel with the package's 100% statement and branch coverage threshold.
 
 ## References
 
