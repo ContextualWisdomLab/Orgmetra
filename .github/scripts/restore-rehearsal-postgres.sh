@@ -160,7 +160,7 @@ fi
 set +e
 truncate_output="$(PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" \
     psql "${RESTORE_DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
-    "TRUNCATE TABLE audit_event_record;" 2>&1)"
+    "TRUNCATE TABLE audit_event_record CASCADE;" 2>&1)"
 truncate_status=$?
 set -e
 if [[ ${truncate_status} -eq 0 ]]; then
