@@ -24,6 +24,12 @@ Jensen, C. S., & Snodgrass, R. T. (1999). Temporal data management. *IEEE Transa
 
 Kent, K., & Souppaya, M. (2006). *Guide to computer security log management* (NIST Special Publication 800-92). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-92
 
+Boeckl, K., & Lefkovitz, N. (2020). *NIST Privacy Framework: A tool for improving privacy through enterprise risk management, Version 1.0* (NIST Cybersecurity White Paper). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.CSWP.01162020
+
+Hu, V. C., Ferraiolo, D. F., Kuhn, D. R., Schnitzer, A., Sandlin, K., Miller, R., & Scarfone, K. A. (2019). *Guide to attribute based access control (ABAC) definition and considerations* (NIST Special Publication 800-162). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-162
+
+Hu, V. C., Ferraiolo, D. F., & Kuhn, D. R. (2019). *Attribute considerations for access control systems* (NIST Special Publication 800-205). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-205
+
 National Center for O*NET Development. (2026). *O*NET 30.3 Database*. Retrieved August 17, 2026, from https://www.onetcenter.org/database.html
 
 OpenAPI Initiative. (2025, September 19). *OpenAPI Specification v3.2.0*. https://spec.openapis.org/oas/v3.2.0.html
