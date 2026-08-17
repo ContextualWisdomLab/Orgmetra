@@ -13,7 +13,6 @@ from orgmetra_migration_adapter import (
     MIGHTY_ETL_REVISION,
     MIGRATION_CONTRACT_VERSION,
     ContractViolation,
-    MigrationHandoffEnvelope,
     MigrationHandoffInput,
     build_migration_handoff,
 )
