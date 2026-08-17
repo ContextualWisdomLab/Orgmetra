@@ -1,0 +1,3 @@
+-- Review-hardening migration placeholder.
+-- The paired PostgreSQL contract is committed before the repair so the
+-- vulnerable 0001-0007 state is exercised as RED evidence.
