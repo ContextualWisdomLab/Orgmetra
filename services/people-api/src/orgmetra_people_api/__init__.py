@@ -1,4 +1,4 @@
-"""Request-edge contracts for the Orgmetra People API."""
+"""Request-edge and governed read contracts for the Orgmetra People API."""
 
 from orgmetra_people_api.auth import (
     AuthenticatedPrincipal,
@@ -7,11 +7,25 @@ from orgmetra_people_api.auth import (
     extract_bearer_token,
 )
 from orgmetra_people_api.authorization import authorize_resource_fields
+from orgmetra_people_api.people import (
+    AuthorizedWorkerPeopleView,
+    PeopleReadPort,
+    PeopleRecordIntegrityError,
+    PeopleRecordNotFound,
+    WorkerPeopleRecord,
+    read_worker_people_record,
+)
 
 __all__ = [
     "AuthenticatedPrincipal",
     "AuthenticationFailed",
+    "AuthorizedWorkerPeopleView",
+    "PeopleReadPort",
+    "PeopleRecordIntegrityError",
+    "PeopleRecordNotFound",
     "TokenAuthenticator",
+    "WorkerPeopleRecord",
     "authorize_resource_fields",
     "extract_bearer_token",
+    "read_worker_people_record",
 ]
