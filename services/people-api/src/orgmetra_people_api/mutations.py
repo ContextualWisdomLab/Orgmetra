@@ -3,8 +3,9 @@
 Each command authorizes an exact resource kind before crossing the mutation port.
 The port owns one tenant-scoped transaction that persists the authoritative HRIS
 fact together with ``record_audit_outbox_event``. Employment and assignment
-writes require an existing ``candidate_worker_conversion_record`` and never
-write the legacy ``candidate_worker_link`` relation.
+writes require a current ``candidate_worker_conversion_record``
+(``recorded_to IS NULL``) and never write the legacy
+``candidate_worker_link`` relation.
 """
 
 from __future__ import annotations

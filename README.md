@@ -78,4 +78,4 @@ Job evidence
 
 ## Status
 
-Foundation plus the employment-truth kernel through exclusive jobs, staffable seats, and hire-to-assignment commands. The protected default branch still contains only bootstrap; review `orgmetra_hris_kernel` reconstructions, correct overlapping versions, and keep current-head gates green before treating this as shipped behavior.
+Protected `develop` includes the employment-truth kernel, governed candidate-to-worker conversion, purpose-bound PII authorization, and the GET-only People API. People mutation writes on this branch remain active-PR truth until they merge. Review `orgmetra_hris_kernel` reconstructions, correct overlapping versions, and keep current-head gates green before treating unmerged work as shipped behavior.
