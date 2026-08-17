@@ -15,12 +15,59 @@ from orgmetra_hris_kernel import (
     EmploymentVersion,
     RecordedInterval,
 )
-from orgmetra_hris_kernel.workforce import build_workforce_composition_snapshot
+from orgmetra_hris_kernel.errors import IntervalError, SingleValuedFactError
+from orgmetra_hris_kernel.workforce import (
+    WorkforceCompositionSnapshot,
+    build_workforce_composition_snapshot,
+)
 
 
 def _id(value: int) -> UUID:
     """Return a stable opaque UUID fixture."""
     return UUID(int=value)
+
+
+def _direct_snapshot(
+    *,
+    known_at: datetime,
+    employment_status_counts: tuple[tuple[str, int], ...] = (("active", 1),),
+) -> WorkforceCompositionSnapshot:
+    """Build a direct public snapshot fixture without using the aggregate builder."""
+    return WorkforceCompositionSnapshot(
+        tenant_record_id=_id(1),
+        effective_on=date(2026, 1, 15),
+        known_at=known_at,
+        person_headcount=1,
+        employment_count=1,
+        staffed_assignment_count=0,
+        staffed_fte=Decimal("0.0000"),
+        unassigned_person_count=1,
+        employment_status_counts=employment_status_counts,
+    )
+
+
+def test_direct_snapshot_rejects_timezone_naive_knowledge_cutoff() -> None:
+    """Direct evidence construction must not depend on the host's local timezone."""
+    with pytest.raises(IntervalError, match="timezone-aware"):
+        _direct_snapshot(known_at=datetime(2026, 1, 20))
+
+
+def test_direct_snapshot_rejects_noncanonical_status_order() -> None:
+    """Equivalent aggregates cannot produce different evidence because tuple order drifted."""
+    with pytest.raises(SingleValuedFactError, match="canonical status order"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_status_counts=(("leave", 1), ("active", 1)),
+        )
+
+
+def test_direct_snapshot_rejects_duplicate_status_codes() -> None:
+    """One employment status may appear only once in canonical aggregate evidence."""
+    with pytest.raises(SingleValuedFactError, match="duplicate status"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_status_counts=(("active", 1), ("active", 1)),
+        )
 
 
 def test_snapshot_excludes_future_business_and_late_recorded_facts() -> None:
