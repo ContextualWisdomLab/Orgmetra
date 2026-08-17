@@ -15,7 +15,7 @@
 ## Security principles
 
 - Purpose-bound authorization replaces indiscriminate masking.
-- Sensitive data access is auditable, tenant-scoped, field-scoped, and bounded by an operation-specific Keyverse scope.
+- Sensitive data access is auditable, tenant-scoped, exact-target-correlated, field-scoped, and bounded by an operation-specific Keyverse scope.
 - In-memory historical reconstruction and HRIS decision functions require explicit tenant scope; a caller-supplied collection containing colliding identifiers from another tenant cannot provide coverage, consume capacity, create false employment conflicts, or enter reconstructed history.
 - Durable UUID identity columns reject the RFC 9562 Nil and Max sentinel values at the PostgreSQL boundary; reserved protocol sentinels cannot become tenant, person, employment, organization, job, position, assignment, candidate, decision, evidence, outcome, transition, audit-event, outbox-delivery, or outbox-escalation identities.
 - LLM outputs cannot mutate authoritative facts without human-approved commands.
@@ -33,11 +33,11 @@
 
 Orgmetra evaluates PII access before protected field values leave the authoritative HR boundary. Keyverse supplies authenticated identity and scope attributes through its published contract; Orgmetra owns the HR authorization policy and decision.
 
-Every `PurposeBoundAccessRequest` must bind the active request tenant, authenticated actor tenant, target resource tenant, opaque actor reference, resource kind, purpose, operation, requested field names, and authenticated scope set. The matching `PurposeBoundAccessPolicy` binds one tenant and immutable policy version to exactly one resource kind, purpose, operation, required Orgmetra scope, and permitted field set. There is no wildcard policy form.
+Every `PurposeBoundAccessRequest` must bind the active request tenant, authenticated actor tenant, target resource tenant, opaque actor reference, opaque target-resource reference, resource kind, purpose, operation, requested field names, and authenticated scope set. The target reference must identify the exact Orgmetra record with an opaque namespaced value suitable for audit correlation; it must not encode protected HR field values. The matching `PurposeBoundAccessPolicy` binds one tenant and immutable policy version to exactly one resource kind, purpose, operation, required Orgmetra scope, and permitted field set. There is no wildcard policy form.
 
-Evaluation fails closed unless request, actor, resource, and policy tenants all agree; resource, purpose, and operation exactly match; the required operation-specific scope is present; and requested fields are a non-empty subset of permitted fields. UUID sentinels, malformed opaque references, wildcard-like codes, malformed scopes, empty sets, and mutable field/scope collections are rejected before evaluation. A valid purpose header cannot compensate for a missing scope or foreign resource tenant.
+Evaluation fails closed unless request, actor, resource, and policy tenants all agree; resource, purpose, and operation exactly match; the required operation-specific scope is present; and requested fields are a non-empty subset of permitted fields. UUID sentinels, malformed opaque actor or target references, wildcard-like codes, malformed scopes, empty sets, and mutable field/scope collections are rejected before evaluation. A valid purpose header cannot compensate for a missing scope or foreign resource tenant.
 
-Authorization evidence contains only governance metadata and field names, never protected values. A denial returns a stable reason code and next safe action. An allow decision returns only the exact requested field subset, not every field the policy could permit. These rules implement the Orgmetra side of the NIST SP 800-162 ABAC shape and attribute-integrity principles from NIST SP 800-205; ADR 0008 records the boundary.
+Authorization evidence contains only governance metadata, including the opaque actor and exact target-resource references, plus field names, never protected values. A denial returns a stable reason code and next safe action. An allow decision returns only the exact requested field subset, not every field the policy could permit. Both allow and denial evidence preserve the exact target reference so immutable audit correlation cannot collapse distinct person or employment records into one resource-kind-level event. These rules implement the Orgmetra side of the NIST SP 800-162 ABAC shape and attribute-integrity principles from NIST SP 800-205; ADR 0008 records the boundary.
 
 ## Mutation security contract
 
