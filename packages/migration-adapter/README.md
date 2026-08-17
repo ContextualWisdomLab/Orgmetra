@@ -41,4 +41,6 @@ print(handoff.next_action)
 
 The adapter intentionally pins the exact reviewed MHTML ETL Gateway and mightyETL revisions. A dependency revision change fails closed until Orgmetra revalidates the published contract and updates the pin in a reviewed change.
 
+`handoff.execution_mode == "bounded_atomic_batch"` is a **requested/contracted mode for the subsequent mightyETL execution boundary**. It is not an observed result and must never be treated as proof that any write occurred or that an executed migration completed atomically. Atomic completion requires separate execution-outcome evidence from the owner boundary plus reconciliation.
+
 A successful handoff is **not** migration success. The next action is to submit the approved batch through the configured mightyETL integration boundary and reconcile the outcome before marking the migration complete.
