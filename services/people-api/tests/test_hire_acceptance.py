@@ -84,6 +84,14 @@ class RecordingHirePort:
         )
 
 
+class InvalidResultHirePort:
+    """Satisfy the protocol while returning a malformed implementation result."""
+
+    def accept_hire(self, *, command: HireAcceptanceCommand, authorization: object) -> object:
+        del command, authorization
+        return object()
+
+
 class HireAcceptanceTests(unittest.TestCase):
     """Prove exact-target authorization happens before any authoritative write."""
 
@@ -136,12 +144,24 @@ class HireAcceptanceTests(unittest.TestCase):
     def test_command_rejects_bad_business_values(self) -> None:
         invalid_values = (
             {"effective_from": "2026-08-18"},
+            {"display_name": 17},
             {"display_name": "   "},
+            {"display_name": "A" * 513},
+            {"display_name": "Ada\nLovelace"},
+            {"employment_status_code": 17},
             {"employment_status_code": "Active Worker"},
         )
         for overrides in invalid_values:
             with self.subTest(overrides=overrides), self.assertRaises(ValueError):
                 command(**overrides)
+
+    def test_result_rejects_reserved_identifiers(self) -> None:
+        with self.assertRaises(ValueError):
+            HireAcceptanceResult(
+                person_record_id=UUID(int=0),
+                employment_record_id=EMPLOYMENT,
+                candidate_worker_conversion_record_id=CONVERSION,
+            )
 
     def test_service_rejects_mismatched_tenant_before_port_call(self) -> None:
         port = RecordingHirePort()
@@ -162,6 +182,16 @@ class HireAcceptanceTests(unittest.TestCase):
 
         self.assertEqual(port.calls, [])
 
+    def test_service_requires_typed_command(self) -> None:
+        with self.assertRaisesRegex(TypeError, "command must be a HireAcceptanceCommand"):
+            accept_confirmed_hire(
+                principal=PRINCIPAL,
+                command=object(),  # type: ignore[arg-type]
+                purpose_code="candidate_hire",
+                policy=policy(),
+                mutation_port=RecordingHirePort(),
+            )
+
     def test_mutation_port_must_implement_protocol(self) -> None:
         with self.assertRaisesRegex(TypeError, "mutation_port must implement HireAcceptancePort"):
             accept_confirmed_hire(
@@ -170,6 +200,16 @@ class HireAcceptanceTests(unittest.TestCase):
                 purpose_code="candidate_hire",
                 policy=policy(),
                 mutation_port=object(),  # type: ignore[arg-type]
+            )
+
+    def test_mutation_port_must_return_typed_result(self) -> None:
+        with self.assertRaisesRegex(TypeError, "mutation_port must return HireAcceptanceResult"):
+            accept_confirmed_hire(
+                principal=PRINCIPAL,
+                command=command(),
+                purpose_code="candidate_hire",
+                policy=policy(),
+                mutation_port=InvalidResultHirePort(),  # type: ignore[arg-type]
             )
 
 
