@@ -6,6 +6,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Added
 
+- Normalized predictive-validity case lineage via `validity_study_case_record`: each new study case atomically binds one selection decision, that decision's exact sealed evidence set, the governed candidate-to-worker conversion, and one criterion observation for the same converted worker and study criterion. Migration 0010 closes new writes through the three legacy independent validity-study link tables while retaining them for historical reads; the normalized case is append-only, TRUNCATE-protected, forced through tenant RLS, and rejects mismatched Job, criterion, worker, evidence set, conversion, or system-recorded-time coordinates. `test_validity_study_case_postgres.sh` proves the failure cases and one complete governed case end to end.
 - Bitemporal tenant-scoped organization hierarchy validation that rejects visible indirect parent cycles and reuses single-valued recorded-time reconstruction before graph traversal.
 - Stacked governed job-analysis evidence contract via `JobAnalysisSnapshot`, `TaskEvidence`, `KSAORequirement`, `TaskKSAOLink`, `FunctionalJobAnalysisProfile`, and `EvidenceSource`: tenant/Job-scoped observable tasks, explicit Task-to-KSAO linkage, importance/difficulty/proficiency ratings, source/version/retrieval/SHA-256 provenance, deterministic canonical snapshot bytes, current O*NET evidence support, and historical DOT Data/People/Things compatibility. Validated snapshots require accountable human review and complete non-LLM evidence; LLM-origin material remains `analysis_draft`, and the snapshot is evidence input rather than a hiring, promotion, termination, compensation, or other high-impact employment decision.
 - Stacked governed audit/outbox slice via `AuditOutboxEvent`, `audit_event_record`, `outbox_delivery_record`, and `outbox_delivery_escalation_record`: CloudEvents 1.0-compatible PII-minimized metadata, exact canonical JSON bytes, database-verified SHA-256 digests, mandatory human confirmation for high-impact events, immutable audit evidence, tenant RLS, atomic audit/outbox insertion, guarded pending/leased/delivered/dead-lettered delivery state, tenant-safe `claim_outbox_delivery(...)` with deterministic due-work ordering, `FOR UPDATE ... SKIP LOCKED`, opaque worker identity, bounded future leases, immutable envelope return, and atomic takeover of genuinely expired leases only while retry attempts remain; owner-bound `complete_outbox_delivery(...)` and `retry_outbox_delivery(...)`; database-budget-governed `dead_letter_outbox_delivery(...)`; and a separately privileged `operator_dead_letter_expired_outbox_delivery(...)` recovery path for an exhausted final lease whose recorded worker identity is permanently unavailable. `maximum_attempt_count` is persisted on the delivery row, defaults to 5, is constrained to 1 through 100, and cannot be lowered by a dispatcher during finalization. Migration 0007 prevents retry or expired-lease takeover from creating attempt N+1; migration 0008 adds TRUNCATE guards, trusted function search paths, a concurrently built due-work partial index, session-independent immutable envelope validation, and operator recovery backed by separate NOLOGIN/NOBYPASSRLS owner/capability roles so the externally assignable operator role can invoke recovery without receiving direct transport-table read/write rights. Migration 0008 also rejects pre-existing reserved recovery-role names before project DDL, atomically contains the temporary schema-creation privilege used for function ownership handoff, and forces deferred escalation binding while the narrow SECURITY DEFINER owner is still active. Exponential/backoff policy selection, policy-specific producer configuration, and external delivery receipts remain subsequent work.
@@ -33,6 +34,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- New predictive-validity membership must use one normalized worker-level case; the three independent validity-study decision/evidence/outcome link relations are historical read surfaces only and can no longer accept new rows.
 - Canonicalized service identifiers as two-or-more-word `snake_case` across architecture, deployment, ACL, metrics, and client contracts.
 - Separated fast-mlsirm, TEPP, and Psychometrics Commons into immutable external scientific contracts.
 - Defined 100% owned production statement and branch coverage as a CI gate where the pinned toolchain exposes those metrics.
@@ -51,6 +53,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Security
 
+- Predictive-validity cases fail closed when selection evidence, Job scope, study criterion, converted worker, or system-recorded visibility does not match; the normalized case relation is tenant-qualified, append-only, TRUNCATE-protected, and forced through row-level security.
 - Purpose-bound PII access contract.
 - LLM output constrained to draft evidence.
 - No direct cross-service application-table access.
@@ -67,4 +70,4 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Notes
 
-- Protected `bootstrap` includes the integrated foundation, hire-to-assignment and employment-status recovery, and bitemporal organization-hierarchy validation through merge commit `29f636e9158082eb21251288745654316e74f15c`; the governed audit/outbox entries above remain active-PR truth until this branch passes fresh protected-base gates and merges.
+- Protected `bootstrap` includes the integrated foundation, hire-to-assignment and employment-status recovery, and bitemporal organization-hierarchy validation through merge commit `29f636e9158082eb21251288745654316e74f15c`; governed candidate-to-worker conversion and validity-study case integrity remain active stacked-PR truth until their exact protected-base gates pass and they merge in dependency order.
