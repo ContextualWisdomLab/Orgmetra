@@ -3,9 +3,7 @@ set -euo pipefail
 
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
 
-# Apply the exact migration set present on this candidate branch. The RED
-# baseline does not contain the job-analysis migration, so the first governed
-# source insert below fails until production support exists.
+# Apply the exact migration set present on this candidate branch.
 for migration in database/migrations/*.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
@@ -203,8 +201,7 @@ END;
 $$;
 SQL
 
-# Once approved, the analysis snapshot is sealed: appending another task would
-# alter what the approval meant and must fail closed.
+# Once approved, the analysis snapshot is sealed.
 set +e
 sealed_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO task_statement (
@@ -231,8 +228,8 @@ if [[ "${sealed_output}" != *"approved job analysis case is sealed"* ]]; then
     exit 1
 fi
 
-# A second case with evidence and a task but no task↔FJA or task↔KSAO links
-# must not be approvable.
+# A second case with evidence and a task but no Task↔FJA or Task↔KSAO links
+# must not be approvable. Caller-supplied approval digests fail even earlier.
 tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO job_analysis_case (
     tenant_record_id, job_analysis_case_id, job_profile_id,
@@ -275,13 +272,38 @@ INSERT INTO task_statement (
 SQL
 
 set +e
+caller_digest_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO job_analysis_approval_record (
+    tenant_record_id, job_analysis_approval_record_id, job_analysis_case_id,
+    approver_reference, approval_reason, evidence_version_code,
+    analysis_content_sha256, approved_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000218',
+    '20000000-0000-7000-8000-000000000215',
+    'sme_panel:job_architecture_review_002',
+    'Caller-controlled digests must never seal an analysis.',
+    'approval_v1',
+    repeat('b', 64),
+    TIMESTAMPTZ '2026-08-17 16:14:00+00'
+);
+SQL
+} 2>&1)"
+caller_digest_status=$?
+set -e
+if [[ ${caller_digest_status} -eq 0 || "${caller_digest_output}" != *"job analysis approval digest is database-owned"* ]]; then
+    echo "caller-controlled approval digest was not rejected: ${caller_digest_output}" >&2
+    exit 1
+fi
+
+set +e
 incomplete_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO job_analysis_approval_record (
     tenant_record_id, job_analysis_approval_record_id, job_analysis_case_id,
     approver_reference, approval_reason, evidence_version_code, approved_at
 ) VALUES (
     '20000000-0000-7000-8000-000000000201',
-    '20000000-0000-7000-8000-000000000218',
+    '20000000-0000-7000-8000-000000000219',
     '20000000-0000-7000-8000-000000000215',
     'sme_panel:job_architecture_review_002',
     'Incomplete evidence must be rejected.',
@@ -301,8 +323,86 @@ if [[ "${incomplete_output}" != *"job analysis approval requires every task to l
     exit 1
 fi
 
-# Tenant-qualified foreign keys must reject a source version from another
-# tenant even when all UUIDs are individually valid.
+# LLM-origin material may be stored as untrusted draft evidence, but a case
+# containing it cannot cross the accountable human approval boundary.
+tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO source_record (
+    tenant_record_id, source_record_id, source_type_code,
+    source_locator, source_title, publisher_name, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000220',
+    'llm_draft',
+    'model://contextual-orchestrator/job-analysis/draft-001',
+    'Untrusted model draft',
+    'Contextual orchestrator adapter',
+    TIMESTAMPTZ '2026-08-17 16:15:00+00'
+);
+INSERT INTO source_version (
+    tenant_record_id, source_version_id, source_record_id,
+    source_version_code, source_content_sha256, captured_at, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000221',
+    '20000000-0000-7000-8000-000000000220',
+    'draft_v1',
+    repeat('c', 64),
+    TIMESTAMPTZ '2026-08-17 16:15:00+00',
+    TIMESTAMPTZ '2026-08-17 16:15:01+00'
+);
+INSERT INTO job_analysis_case (
+    tenant_record_id, job_analysis_case_id, job_profile_id,
+    analysis_version_code, analysis_method_code, analyst_reference,
+    effective_from, effective_to, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000222',
+    '20000000-0000-7000-8000-000000000202',
+    'analysis_llm_draft',
+    'functional_job_analysis',
+    'analyst:job_architecture_001',
+    DATE '2026-08-01',
+    NULL,
+    TIMESTAMPTZ '2026-08-17 16:16:00+00'
+);
+INSERT INTO job_analysis_source_link (
+    tenant_record_id, job_analysis_source_link_id, job_analysis_case_id,
+    source_version_id, evidence_role_code, source_span_reference, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000223',
+    '20000000-0000-7000-8000-000000000222',
+    '20000000-0000-7000-8000-000000000221',
+    'task_basis',
+    'draft:generated-task-language',
+    TIMESTAMPTZ '2026-08-17 16:17:00+00'
+);
+SQL
+
+set +e
+llm_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO job_analysis_approval_record (
+    tenant_record_id, job_analysis_approval_record_id, job_analysis_case_id,
+    approver_reference, approval_reason, evidence_version_code, approved_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000224',
+    '20000000-0000-7000-8000-000000000222',
+    'sme_panel:job_architecture_review_003',
+    'A model draft cannot be promoted into approved evidence.',
+    'approval_v1',
+    TIMESTAMPTZ '2026-08-17 16:18:00+00'
+);
+SQL
+} 2>&1)"
+llm_status=$?
+set -e
+if [[ ${llm_status} -eq 0 || "${llm_output}" != *"approved job analysis cannot include LLM draft evidence"* ]]; then
+    echo "LLM draft evidence crossed the approval boundary: ${llm_output}" >&2
+    exit 1
+fi
+
+# Tenant-qualified foreign keys reject cross-tenant evidence relationships.
 set +e
 cross_tenant_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO job_analysis_source_link (
@@ -315,7 +415,7 @@ INSERT INTO job_analysis_source_link (
     '20000000-0000-7000-8000-000000000204',
     'task_basis',
     'section:cross-tenant',
-    TIMESTAMPTZ '2026-08-17 16:15:00+00'
+    TIMESTAMPTZ '2026-08-17 16:19:00+00'
 );
 SQL
 } 2>&1)"
@@ -323,6 +423,173 @@ cross_tenant_status=$?
 set -e
 if [[ ${cross_tenant_status} -eq 0 ]]; then
     echo "job analysis source linkage crossed a tenant boundary" >&2
+    exit 1
+fi
+
+# Build one additional complete case for a deterministic approval-vs-evidence
+# race. The approval transaction signals only after its BEFORE trigger has
+# acquired the case serialization lock. A concurrent content insert must then
+# wait for approval and fail sealed; without the case lock it would commit
+# content that was absent from the approval digest.
+tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO job_analysis_case (
+    tenant_record_id, job_analysis_case_id, job_profile_id,
+    analysis_version_code, analysis_method_code, analyst_reference,
+    effective_from, effective_to, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000225',
+    '20000000-0000-7000-8000-000000000202',
+    'analysis_concurrency_v1',
+    'functional_job_analysis',
+    'analyst:job_architecture_001',
+    DATE '2026-08-01',
+    NULL,
+    TIMESTAMPTZ '2026-08-17 16:20:00+00'
+);
+INSERT INTO job_analysis_source_link (
+    tenant_record_id, job_analysis_source_link_id, job_analysis_case_id,
+    source_version_id, evidence_role_code, source_span_reference, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000226',
+    '20000000-0000-7000-8000-000000000225',
+    '20000000-0000-7000-8000-000000000204',
+    'task_basis',
+    'section:job-analysis-overview',
+    TIMESTAMPTZ '2026-08-17 16:21:00+00'
+);
+INSERT INTO task_statement (
+    tenant_record_id, task_statement_id, job_analysis_case_id,
+    task_sequence_number, task_text, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000227',
+    '20000000-0000-7000-8000-000000000225',
+    1,
+    'Review job evidence before approving the governed job-analysis version.',
+    TIMESTAMPTZ '2026-08-17 16:22:00+00'
+);
+INSERT INTO task_rating (
+    tenant_record_id, task_rating_id, task_statement_id,
+    rating_dimension_code, rating_value, scale_minimum_value,
+    scale_maximum_value, rater_group_code, sample_size_count, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000228',
+    '20000000-0000-7000-8000-000000000227',
+    'criticality', 4.0, 1.0, 5.0, 'subject_matter_experts', 8,
+    TIMESTAMPTZ '2026-08-17 16:23:00+00'
+);
+INSERT INTO fja_function (
+    tenant_record_id, fja_function_id, job_analysis_case_id,
+    function_dimension_code, function_level_value,
+    methodology_version_code, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000229',
+    '20000000-0000-7000-8000-000000000225',
+    'reasoning', 4.0, 'fja_v1',
+    TIMESTAMPTZ '2026-08-17 16:24:00+00'
+);
+INSERT INTO task_fja_link (
+    tenant_record_id, task_fja_link_id, task_statement_id,
+    fja_function_id, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000230',
+    '20000000-0000-7000-8000-000000000227',
+    '20000000-0000-7000-8000-000000000229',
+    TIMESTAMPTZ '2026-08-17 16:25:00+00'
+);
+INSERT INTO ksao_requirement (
+    tenant_record_id, ksao_requirement_id, job_analysis_case_id,
+    ksao_type_code, requirement_text, required_at_entry, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000231',
+    '20000000-0000-7000-8000-000000000225',
+    'ability',
+    'Ability to evaluate conflicting evidence before a governed approval.',
+    true,
+    TIMESTAMPTZ '2026-08-17 16:26:00+00'
+);
+INSERT INTO task_ksao_link (
+    tenant_record_id, task_ksao_link_id, task_statement_id,
+    ksao_requirement_id, linkage_strength_value, linkage_method_code,
+    recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000232',
+    '20000000-0000-7000-8000-000000000227',
+    '20000000-0000-7000-8000-000000000231',
+    4.0, 'sme_rating',
+    TIMESTAMPTZ '2026-08-17 16:27:00+00'
+);
+SQL
+
+approval_marker="${RUNNER_TEMP:-/tmp}/orgmetra-job-analysis-approval-locked"
+approval_log="${RUNNER_TEMP:-/tmp}/orgmetra-job-analysis-approval.log"
+rm -f "${approval_marker}" "${approval_log}"
+(
+    tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 >"${approval_log}" 2>&1 <<SQL
+BEGIN;
+INSERT INTO job_analysis_approval_record (
+    tenant_record_id, job_analysis_approval_record_id, job_analysis_case_id,
+    approver_reference, approval_reason, evidence_version_code, approved_at
+) VALUES (
+    '${TENANT_ID}',
+    '20000000-0000-7000-8000-000000000233',
+    '20000000-0000-7000-8000-000000000225',
+    'sme_panel:job_architecture_review_004',
+    'The complete evidence set is approved under a serialized snapshot.',
+    'approval_v1',
+    TIMESTAMPTZ '2026-08-17 16:28:00+00'
+);
+\! touch '${approval_marker}'
+SELECT pg_sleep(2);
+COMMIT;
+SQL
+) &
+approval_pid=$!
+
+for _ in $(seq 1 200); do
+    [[ -f "${approval_marker}" ]] && break
+    sleep 0.02
+done
+if [[ ! -f "${approval_marker}" ]]; then
+    echo "approval race did not reach the serialization boundary" >&2
+    kill "${approval_pid}" 2>/dev/null || true
+    wait "${approval_pid}" 2>/dev/null || true
+    cat "${approval_log}" >&2 || true
+    exit 1
+fi
+
+set +e
+race_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO task_statement (
+    tenant_record_id, task_statement_id, job_analysis_case_id,
+    task_sequence_number, task_text, recorded_at
+) VALUES (
+    '20000000-0000-7000-8000-000000000201',
+    '20000000-0000-7000-8000-000000000234',
+    '20000000-0000-7000-8000-000000000225',
+    2,
+    'Concurrent evidence must not appear after the approval digest is fixed.',
+    TIMESTAMPTZ '2026-08-17 16:29:00+00'
+);
+SQL
+} 2>&1)"
+race_status=$?
+set -e
+
+if ! wait "${approval_pid}"; then
+    echo "approval transaction failed during concurrency regression" >&2
+    cat "${approval_log}" >&2 || true
+    exit 1
+fi
+if [[ ${race_status} -eq 0 || "${race_output}" != *"approved job analysis case is sealed"* ]]; then
+    echo "concurrent evidence escaped the serialized approval boundary: ${race_output}" >&2
     exit 1
 fi
 
@@ -353,7 +620,7 @@ if [[ ${truncate_status} -eq 0 || "${truncate_output}" != *"job analysis evidenc
     exit 1
 fi
 
-# RLS must expose only the bound tenant to a NOBYPASSRLS application role.
+# RLS exposes only the bound tenant to a NOBYPASSRLS application role.
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
 BEGIN
