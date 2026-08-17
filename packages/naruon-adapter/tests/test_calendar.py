@@ -99,6 +99,13 @@ def test_requires_explicit_human_confirmation() -> None:
         build_calendar_intent(context(human_confirmed=False))
 
 
+@pytest.mark.parametrize("truthy_non_boolean", [1, "false", "confirmed"])
+def test_rejects_truthy_non_boolean_human_confirmation(truthy_non_boolean: object) -> None:
+    """Only the bool singleton True can satisfy high-impact confirmation evidence."""
+    with pytest.raises(ContractViolation, match="human confirmation"):
+        build_calendar_intent(context(human_confirmed=truthy_non_boolean))
+
+
 def test_rejects_unknown_action_kind() -> None:
     with pytest.raises(ContractViolation, match="action kind"):
         build_calendar_intent(context(action_kind="unknown"))
