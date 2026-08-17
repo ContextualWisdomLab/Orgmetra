@@ -23,12 +23,19 @@ from orgmetra_hris_kernel.errors import (
     IdentityScopeError,
     IntervalError,
     KernelError,
+    OrganizationHierarchyError,
     PositionCoverageError,
     PositionSeatError,
     SingleValuedFactError,
 )
-from orgmetra_hris_kernel.facts import AssignmentFact, EmploymentVersion, PositionVersion
+from orgmetra_hris_kernel.facts import (
+    AssignmentFact,
+    EmploymentVersion,
+    OrganizationUnitVersion,
+    PositionVersion,
+)
 from orgmetra_hris_kernel.intervals import DateInterval, RecordedInterval
+from orgmetra_hris_kernel.organization import validate_organization_hierarchy
 from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts, resolve_single_valued_fact
 
 __all__ = [
@@ -43,6 +50,8 @@ __all__ = [
     "IdentityScopeError",
     "IntervalError",
     "KernelError",
+    "OrganizationHierarchyError",
+    "OrganizationUnitVersion",
     "PositionCoverageError",
     "PositionSeatError",
     "PositionVersion",
@@ -55,6 +64,7 @@ __all__ = [
     "validate_assignment_portfolio",
     "validate_assignment_position_coverage",
     "validate_assignment_write",
+    "validate_organization_hierarchy",
     "validate_person_employment_exclusivity",
     "validate_position_seat_capacity",
 ]

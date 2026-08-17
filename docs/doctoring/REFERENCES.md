@@ -28,15 +28,23 @@ OpenAPI Initiative. (2025, September 19). *OpenAPI Specification v3.2.0*. https:
 
 OpenID Foundation. (2014, February 25). *OpenID Connect Core 1.0 incorporating errata set 2*. https://openid.net/specs/openid-connect-core-1_0.html
 
+PostgreSQL Global Development Group. (n.d.). *CREATE FUNCTION: Define a new function (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-createfunction.html
+
+PostgreSQL Global Development Group. (n.d.). *CREATE INDEX: Define a new index (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-createindex.html
+
 PostgreSQL Global Development Group. (n.d.). *CREATE POLICY: Define a new row-level security policy (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-createpolicy.html
+
+PostgreSQL Global Development Group. (n.d.). *CREATE ROLE: Define a new database role (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-createrole.html
 
 PostgreSQL Global Development Group. (n.d.). *CREATE TRIGGER: Define a new trigger (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-createtrigger.html
 
+PostgreSQL Global Development Group. (n.d.). *Privileges (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/ddl-priv.html
+
+PostgreSQL Global Development Group. (n.d.). *Row security policies (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/ddl-rowsecurity.html
+
 PostgreSQL Global Development Group. (n.d.). *SELECT (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/sql-select.html
 
-PostgreSQL Global Development Group. (n.d.). *Date/time functions and operators (PostgreSQL 18 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/18/functions-datetime.html
-
-PostgreSQL Global Development Group. (n.d.). *SELECT (PostgreSQL 18 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/18/sql-select.html
+PostgreSQL Global Development Group. (n.d.). *Date/time functions and operators (PostgreSQL 16 documentation)*. Retrieved August 17, 2026, from https://www.postgresql.org/docs/16/functions-datetime.html
 
 Robinson, W. S. (1950). Ecological correlations and the behavior of individuals. *American Sociological Review, 15*(3), 351–357. https://doi.org/10.2307/2087176
 

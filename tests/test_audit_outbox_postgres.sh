@@ -7,15 +7,20 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evidence_digest.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0003_audit_outbox_persistence.sql
 
+TENANT_ID="10000000-0000-7000-8000-000000000001"
+tenant_psql() {
+    PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" command psql "$@"
+}
+
 canonical_event='{"data":{"high_impact":true,"result_code":"recorded"},"datacontenttype":"application/json","id":"00000000-0000-4000-8000-000000000041","orgmetraactor":"keyverse_subject:01JACTOROPAQUE","orgmetraconfirmation":"confirmation:01JCONFIRMOPAQUE","orgmetraevidence":"employment-offer:v3","orgmetrapurpose":"workforce_administration","orgmetrareason":"hire_completion","orgmetratenant":"10000000-0000-7000-8000-000000000001","source":"urn:orgmetra:people_core","specversion":"1.0","subject":"assignment_record:01JTESTOPAQUE","time":"2026-08-17T01:30:00Z","type":"orgmetra.people.assignment.recorded"}'
 canonical_digest='a44386b624f932e320b1f94c4ff56df93fac1b0e27906124f8058a6846dad9a1'
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
 VALUES ('10000000-0000-7000-8000-000000000001', 'tenant_alpha');
 SQL
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v canonical_event="${canonical_event}" \
     -v canonical_digest="${canonical_digest}" <<'SQL'
 SELECT record_audit_outbox_event(
@@ -28,13 +33,13 @@ SELECT record_audit_outbox_event(
 );
 SQL
 
-audit_count="$(psql "${DATABASE_URL}" -Atqc "
+audit_count="$(tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT count(*)
 FROM audit_event_record
 WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'::uuid
   AND audit_event_record_id = '00000000-0000-4000-8000-000000000041'::uuid;
 ")"
-outbox_count="$(psql "${DATABASE_URL}" -Atqc "
+outbox_count="$(tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT count(*)
 FROM outbox_delivery_record
 WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'::uuid
@@ -47,7 +52,7 @@ if [[ "${audit_count}" != "1" || "${outbox_count}" != "1" ]]; then
     exit 1
 fi
 
-verified_digest="$(psql "${DATABASE_URL}" -Atqc "
+verified_digest="$(tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT encode(digest(convert_to(canonical_event_json, 'UTF8'), 'sha256'), 'hex') = event_envelope_digest
 FROM audit_event_record
 WHERE audit_event_record_id = '00000000-0000-4000-8000-000000000041'::uuid;
@@ -57,7 +62,7 @@ if [[ "${verified_digest}" != "t" ]]; then
     exit 1
 fi
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 CREATE ROLE orgmetra_audit_reader NOLOGIN NOBYPASSRLS;
 GRANT USAGE ON SCHEMA public TO orgmetra_audit_reader;
 GRANT SELECT ON audit_event_record, outbox_delivery_record TO orgmetra_audit_reader;
@@ -68,6 +73,7 @@ DECLARE
     audit_visible bigint;
     outbox_visible bigint;
 BEGIN
+    PERFORM set_config('orgmetra.tenant_record_id', '', false);
     SELECT count(*) INTO audit_visible FROM audit_event_record;
     SELECT count(*) INTO outbox_visible FROM outbox_delivery_record;
     IF audit_visible <> 0 OR outbox_visible <> 0 THEN
@@ -107,7 +113,7 @@ RESET ROLE;
 SQL
 
 set +e
-tampered_digest_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+tampered_digest_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v canonical_event="${canonical_event}" <<'SQL'
 SELECT record_audit_outbox_event(
     '10000000-0000-7000-8000-000000000001'::uuid,
@@ -127,7 +133,7 @@ if [[ ${tampered_digest_status} -eq 0 || "${tampered_digest_output}" != *"audit 
 fi
 
 set +e
-pii_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v canonical_event="${canonical_event}" <<'SQL'
+pii_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v canonical_event="${canonical_event}" <<'SQL'
 WITH unsafe_payload AS (
     SELECT jsonb_set(
         replace(:'canonical_event', '000000000041', '000000000043')::jsonb,
@@ -155,7 +161,7 @@ if [[ ${pii_status} -eq 0 || "${pii_output}" != *"audit event envelope failed da
 fi
 
 set +e
-missing_confirmation_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v canonical_event="${canonical_event}" <<'SQL'
+missing_confirmation_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v canonical_event="${canonical_event}" <<'SQL'
 WITH unsafe_payload AS (
     SELECT (replace(:'canonical_event', '000000000041', '000000000044')::jsonb - 'orgmetraconfirmation')::text AS payload
 )
@@ -178,7 +184,7 @@ if [[ ${missing_confirmation_status} -eq 0 || "${missing_confirmation_output}" !
 fi
 
 set +e
-immutable_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+immutable_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 UPDATE audit_event_record
 SET event_envelope_digest = repeat('f', 64)
 WHERE audit_event_record_id = '00000000-0000-4000-8000-000000000041'::uuid;
@@ -192,7 +198,7 @@ if [[ ${immutable_status} -eq 0 || "${immutable_output}" != *"audit event record
 fi
 
 set +e
-immutable_delete_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+immutable_delete_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 DELETE FROM audit_event_record
 WHERE audit_event_record_id = '00000000-0000-4000-8000-000000000041'::uuid;
 SQL
@@ -205,7 +211,7 @@ if [[ ${immutable_delete_status} -eq 0 || "${immutable_delete_output}" != *"audi
 fi
 
 set +e
-invalid_transition_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+invalid_transition_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 UPDATE outbox_delivery_record
 SET delivery_state_code = 'delivered',
     delivered_at = now()
@@ -219,7 +225,7 @@ if [[ ${invalid_transition_status} -eq 0 || "${invalid_transition_output}" != *"
     exit 1
 fi
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 UPDATE outbox_delivery_record
 SET delivery_state_code = 'leased',
     delivery_attempt_count = delivery_attempt_count + 1,
@@ -236,7 +242,7 @@ SET delivery_state_code = 'delivered',
 WHERE outbox_delivery_record_id = '00000000-0000-4000-8000-000000000051'::uuid;
 SQL
 
-delivered_state="$(psql "${DATABASE_URL}" -Atqc "
+delivered_state="$(tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT delivery_state_code || ':' || delivery_attempt_count::text || ':' || (delivered_at IS NOT NULL)::text
 FROM outbox_delivery_record
 WHERE outbox_delivery_record_id = '00000000-0000-4000-8000-000000000051'::uuid;
@@ -247,7 +253,7 @@ if [[ "${delivered_state}" != "delivered:1:true" ]]; then
 fi
 
 set +e
-delivered_mutation_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+delivered_mutation_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 UPDATE outbox_delivery_record
 SET last_failure_code = 'late_mutation'
 WHERE outbox_delivery_record_id = '00000000-0000-4000-8000-000000000051'::uuid;
@@ -261,7 +267,7 @@ if [[ ${delivered_mutation_status} -eq 0 || "${delivered_mutation_output}" != *"
 fi
 
 set +e
-atomicity_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v canonical_event="${canonical_event}" <<'SQL'
+atomicity_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v canonical_event="${canonical_event}" <<'SQL'
 WITH next_payload AS (
     SELECT replace(:'canonical_event', '000000000041', '000000000045') AS payload
 )
@@ -278,11 +284,11 @@ SQL
 } 2>&1)"
 atomicity_status=$?
 set -e
-if [[ ${atomicity_status} -eq 0 ]]; then
-    echo "duplicate outbox identity unexpectedly succeeded" >&2
+if [[ ${atomicity_status} -eq 0 || "${atomicity_output}" != *"outbox_delivery_record_pkey"* ]]; then
+    echo "duplicate outbox identity did not fail at the expected primary-key boundary: ${atomicity_output}" >&2
     exit 1
 fi
-rolled_back_audit_count="$(psql "${DATABASE_URL}" -Atqc "
+rolled_back_audit_count="$(tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT count(*)
 FROM audit_event_record
 WHERE audit_event_record_id = '00000000-0000-4000-8000-000000000045'::uuid;
@@ -304,7 +310,7 @@ assert_reserved_uuid_rejected() {
     payload="${canonical_event/00000000-0000-4000-8000-000000000041/${event_id}}"
 
     set +e
-    output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
         -v event_id="${event_id}" \
         -v delivery_id="${delivery_id}" \
         -v payload="${payload}" <<'SQL'

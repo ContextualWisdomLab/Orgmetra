@@ -16,8 +16,7 @@
 | `position_record_version` | Bitemporal position status and effective period. |
 | `assignment_record` | A person's allocation to a position through one employment. |
 | `candidate_profile` | Applicant/candidate record before hire. |
-| `candidate_worker_link` | Legacy append-only candidate/person linkage retained for historical compatibility; new inserts are closed by migration 0008. |
-| `candidate_worker_conversion_record` | Governed bitemporal conversion from candidate to person/employment through one sealed, human-confirmed hire decision. |
+| `candidate_worker_link` | Append-only linkage from candidate to worker after hiring. |
 | `criterion_blueprint` | Job-related performance criterion definition. |
 | `criterion_observation` | Observed criterion result. |
 | `decision_evidence_set` | Versioned evidence-set header whose database-computed digest and membership are sealed by one accountable selection decision. |
@@ -52,14 +51,6 @@ Durable anchors such as `organization_unit`, `job_profile`, `employment_record`,
 
 Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
 
-## Candidate-to-worker conversion
-
-`candidate_worker_conversion_record` is the authoritative conversion lineage fact on active PR #24. It keeps Candidate, Person, and Employment separate: the row references the candidate profile, the resulting person, the exact employment, and the selection decision that authorized conversion. A composite employment/person foreign key prevents a conversion from naming an employment owned by another person.
-
-The conversion validation trigger requires a tenant-local decision for the same candidate with `decision_code = 'hire'`, non-empty actor/purpose/reason/human-confirmation provenance, and a versioned evidence set sealed by that exact decision with at least one evidence member. The conversion cannot be recorded before the decision or become business-effective before the decision date. Overlapping effective/system intervals for one candidate fail closed. Corrections close `recorded_to` and insert a replacement fact; business fields cannot be silently rewritten or deleted.
-
-`candidate_worker_link` remains only as a historical compatibility relation. Migration 0008 rejects all new inserts instead of fabricating missing employment, decision, confirmation, or evidence provenance for old rows. A future governed migration may convert a legacy row only when genuine source evidence establishes those facts.
-
 ## High-impact decision evidence
 
 Evidence membership is constructed in `selection_decision_evidence` while its `decision_evidence_set` is open. An open set has no caller-supplied content digest. Finalizing `selection_decision` requires at least one versioned evidence member, canonicalizes the members by `(evidence_reference, evidence_version_code)`, computes SHA-256 inside PostgreSQL, and atomically stores that digest while binding `sealed_selection_decision_id`. Database triggers reject later evidence inserts, second-decision reuse, arbitrary post-seal mutation, and a sealed-set pointer that does not resolve back to the decision that consumed that exact set. This makes the stored digest evidence about database-observed membership at finalization rather than an unverified client assertion.
@@ -82,4 +73,4 @@ Exponential/backoff policy selection, policy-specific producer configuration, au
 
 ## PII policy
 
-PII is not globally masked. Instead, every sensitive read is evaluated against tenant, actor, role, purpose, resource, field sensitivity, legal basis, retention, and audit policy. Candidate conversion stores only opaque identifiers and governance links; names and assessment payloads remain in their authoritative facts. Audit envelopes and escalation evidence likewise store opaque references and governance codes instead of duplicating mutable employee or candidate payloads.
+PII is not globally masked. Instead, every sensitive read is evaluated against tenant, actor, role, purpose, resource, field sensitivity, legal basis, retention, and audit policy. Audit envelopes and escalation evidence store opaque references and governance codes instead of duplicating mutable employee or candidate payloads.

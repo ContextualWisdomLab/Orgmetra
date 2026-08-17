@@ -8,4 +8,3 @@
 | [0004](0004-employment-position-version-and-assignment-binding.md) | Employment and position versions bind assignments | Accepted |
 | [0005](0005-exclusive-employment-and-staffable-seats.md) | Exclusive employment and staffable seats | Accepted |
 | [0006](0006-governed-audit-outbox-envelope.md) | Governed audit/outbox envelope and durable persistence | Accepted on stacked implementation branch |
-| [0007](0007-candidate-worker-conversion-governance.md) | Govern candidate-to-worker conversion lineage | Accepted on active PR #24; not protected-main truth |

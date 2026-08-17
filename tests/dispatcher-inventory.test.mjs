@@ -1,23 +1,19 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import { REQUIRED_FILES } from '../scripts/foundation-contract-core.mjs';
 
-const REQUIRED_EXECUTION_FILES = Object.freeze([
-  'database/migrations/0004_outbox_delivery_claim.sql',
-  'database/migrations/0005_outbox_delivery_finalization.sql',
-  'database/migrations/0006_outbox_delivery_dead_letter.sql',
-  'database/migrations/0007_outbox_retry_exhaustion.sql',
-  'database/migrations/0008_candidate_worker_conversion_governance.sql',
-  'tests/test_bitemporal_postgres.sh',
-  'tests/test_tenant_isolation_postgres.sh',
-  'tests/test_evidence_sealing_postgres.sh',
-  'tests/test_operational_uuid_postgres.sh',
-  'tests/test_audit_outbox_postgres.sh',
-  'tests/test_outbox_claim_postgres.sh',
-  'tests/test_outbox_dead_letter_postgres.sh',
-  'tests/test_candidate_worker_conversion_postgres.sh'
-]);
+function discoveredExecutionFiles() {
+  const migrations = readdirSync(new URL('../database/migrations/', import.meta.url))
+    .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name))
+    .sort()
+    .map((name) => `database/migrations/${name}`);
+  const postgresContracts = readdirSync(new URL('./', import.meta.url))
+    .filter((name) => /^test_[a-z0-9_]+_postgres\.sh$/.test(name))
+    .sort()
+    .map((name) => `tests/${name}`);
+  return Object.freeze([...migrations, ...postgresContracts]);
+}
 
 function pythonRequiredFiles() {
   const source = readFileSync(new URL('./validate_repository.py', import.meta.url), 'utf8');
@@ -26,10 +22,12 @@ function pythonRequiredFiles() {
   return new Set([...match[1].matchAll(/^\s+"([^"]+)",$/gm)].map((item) => item[1]));
 }
 
-test('database migrations and executable PostgreSQL contracts are provenance-required', () => {
+test('every migration and executable PostgreSQL contract is provenance-required', () => {
   const nodeRequired = new Set(REQUIRED_FILES);
   const pythonRequired = pythonRequiredFiles();
-  for (const filePath of REQUIRED_EXECUTION_FILES) {
+  const executionFiles = discoveredExecutionFiles();
+  assert.ok(executionFiles.length > 0, 'execution inventory discovery returned no files');
+  for (const filePath of executionFiles) {
     assert.equal(nodeRequired.has(filePath), true, `Node inventory omitted ${filePath}`);
     assert.equal(pythonRequired.has(filePath), true, `Python inventory omitted ${filePath}`);
   }
