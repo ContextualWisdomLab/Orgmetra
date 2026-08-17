@@ -151,12 +151,12 @@ BEGIN
     END IF;
 
     BEGIN
-        event_year := pg_catalog.substring(event_time_text FROM 1 FOR 4)::integer;
-        event_month := pg_catalog.substring(event_time_text FROM 6 FOR 2)::integer;
-        event_day := pg_catalog.substring(event_time_text FROM 9 FOR 2)::integer;
-        event_hour := pg_catalog.substring(event_time_text FROM 12 FOR 2)::integer;
-        event_minute := pg_catalog.substring(event_time_text FROM 15 FOR 2)::integer;
-        event_second := pg_catalog.substring(event_time_text FROM 18 FOR 2)::integer;
+        event_year := pg_catalog.substr(event_time_text, 1, 4)::integer;
+        event_month := pg_catalog.substr(event_time_text, 6, 2)::integer;
+        event_day := pg_catalog.substr(event_time_text, 9, 2)::integer;
+        event_hour := pg_catalog.substr(event_time_text, 12, 2)::integer;
+        event_minute := pg_catalog.substr(event_time_text, 15, 2)::integer;
+        event_second := pg_catalog.substr(event_time_text, 18, 2)::integer;
         PERFORM pg_catalog.make_date(event_year, event_month, event_day);
     EXCEPTION
         WHEN others THEN
