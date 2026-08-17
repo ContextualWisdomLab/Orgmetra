@@ -58,7 +58,7 @@ INSERT INTO criterion_blueprint (
 INSERT INTO criterion_observation (
     tenant_record_id, criterion_observation_id, criterion_blueprint_id,
     performance_cycle_id, person_record_id, observed_value,
-    observed_at, recorded_from
+    observed_at, recorded_from, recorded_to
 ) VALUES
 (
     '10000000-0000-7000-8000-000000000001',
@@ -67,7 +67,8 @@ INSERT INTO criterion_observation (
     '00000000-0000-7000-8000-000000000091',
     '00000000-0000-7000-8000-000000000001',
     4.4, TIMESTAMPTZ '2026-11-01 12:00:00+00',
-    TIMESTAMPTZ '2026-11-02 09:00:00+00'
+    TIMESTAMPTZ '2026-11-02 09:00:00+00',
+    NULL
 ),
 (
     '10000000-0000-7000-8000-000000000001',
@@ -76,7 +77,8 @@ INSERT INTO criterion_observation (
     '00000000-0000-7000-8000-000000000091',
     '00000000-0000-7000-8000-000000000001',
     0.9, TIMESTAMPTZ '2026-11-01 12:00:00+00',
-    TIMESTAMPTZ '2026-11-02 09:00:00+00'
+    TIMESTAMPTZ '2026-11-02 09:00:00+00',
+    NULL
 ),
 (
     '10000000-0000-7000-8000-000000000001',
@@ -85,7 +87,18 @@ INSERT INTO criterion_observation (
     '00000000-0000-7000-8000-000000000091',
     '00000000-0000-7000-8000-000000000002',
     4.8, TIMESTAMPTZ '2026-11-01 12:00:00+00',
-    TIMESTAMPTZ '2026-11-02 09:00:00+00'
+    TIMESTAMPTZ '2026-11-02 09:00:00+00',
+    NULL
+),
+(
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-0000000000b4',
+    '00000000-0000-7000-8000-0000000000a1',
+    '00000000-0000-7000-8000-000000000091',
+    '00000000-0000-7000-8000-000000000001',
+    4.1, TIMESTAMPTZ '2026-11-01 12:00:00+00',
+    TIMESTAMPTZ '2026-11-02 09:00:00+00',
+    TIMESTAMPTZ '2026-11-02 18:00:00+00'
 );
 
 INSERT INTO validity_study (
@@ -144,6 +157,9 @@ assert_rejected "validity-study case outcome uses a different criterion" \
 
 assert_rejected "validity-study case outcome belongs to a different worker" \
   "INSERT INTO validity_study_case_record (tenant_record_id, validity_study_case_record_id, validity_study_id, selection_decision_id, decision_evidence_set_id, criterion_observation_id, candidate_worker_conversion_record_id, linked_at) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000e3', '00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-000000000041', '00000000-0000-7000-8000-0000000000b3', '00000000-0000-7000-8000-000000000082', TIMESTAMPTZ '2026-11-03 01:00:00+00');"
+
+assert_rejected "validity-study case may use only evidence visible at linked_at" \
+  "INSERT INTO validity_study_case_record (tenant_record_id, validity_study_case_record_id, validity_study_id, selection_decision_id, decision_evidence_set_id, criterion_observation_id, candidate_worker_conversion_record_id, linked_at) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000e5', '00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-000000000041', '00000000-0000-7000-8000-0000000000b4', '00000000-0000-7000-8000-000000000082', TIMESTAMPTZ '2026-11-03 01:00:00+00');"
 
 tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO validity_study_case_record (

@@ -92,6 +92,7 @@ DECLARE
     outcome_criterion_id uuid;
     outcome_person_id uuid;
     outcome_recorded_from timestamptz;
+    outcome_recorded_to timestamptz;
     conversion_candidate_id uuid;
     conversion_person_id uuid;
     conversion_decision_id uuid;
@@ -171,11 +172,13 @@ BEGIN
     SELECT
         observation.criterion_blueprint_id,
         observation.person_record_id,
-        observation.recorded_from
+        observation.recorded_from,
+        observation.recorded_to
     INTO
         outcome_criterion_id,
         outcome_person_id,
-        outcome_recorded_from
+        outcome_recorded_from,
+        outcome_recorded_to
     FROM public.criterion_observation AS observation
     WHERE observation.tenant_record_id = NEW.tenant_record_id
       AND observation.criterion_observation_id = NEW.criterion_observation_id;
@@ -226,6 +229,10 @@ BEGIN
     IF NEW.linked_at < decision_recorded_at
        OR NEW.linked_at < evidence_sealed_at
        OR NEW.linked_at < outcome_recorded_from
+       OR (
+            outcome_recorded_to IS NOT NULL
+            AND NEW.linked_at >= outcome_recorded_to
+       )
        OR NEW.linked_at < conversion_recorded_from
        OR (
             conversion_recorded_to IS NOT NULL
