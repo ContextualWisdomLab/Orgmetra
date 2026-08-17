@@ -19,6 +19,7 @@ from orgmetra_hris_kernel.assignment import (
     validate_assignment_employment_coverage,
     validate_assignment_portfolio,
 )
+from orgmetra_hris_kernel.employment import validate_person_employment_exclusivity
 from orgmetra_hris_kernel.errors import IntervalError, SingleValuedFactError
 from orgmetra_hris_kernel.facts import AssignmentFact, EmploymentVersion
 from orgmetra_hris_kernel.resolution import resolve_single_valued_fact
@@ -138,6 +139,32 @@ def _visible_assignments(
     return visible
 
 
+def _validate_visible_employment_portfolios(
+    employment_versions: list[EmploymentVersion],
+    *,
+    tenant_record_id: UUID,
+    effective_on: date,
+    known_at: datetime,
+) -> None:
+    """Reject invalid concurrency for people represented at this report coordinate."""
+    coordinate_versions = [
+        version
+        for version in employment_versions
+        if version.tenant_record_id == tenant_record_id
+        and version.effective.contains(effective_on)
+        and version.recorded.contains(known_at)
+    ]
+    for person_record_id in sorted(
+        {version.person_record_id for version in coordinate_versions}, key=str
+    ):
+        validate_person_employment_exclusivity(
+            coordinate_versions,
+            tenant_record_id=tenant_record_id,
+            person_record_id=person_record_id,
+            known_at=known_at,
+        )
+
+
 def build_workforce_composition_snapshot(
     employment_versions: list[EmploymentVersion],
     assignments: list[AssignmentFact],
@@ -150,13 +177,14 @@ def build_workforce_composition_snapshot(
 
     ``active`` and ``leave`` are reportable because they are the same statuses
     permitted to carry active assignments in the HRIS kernel. Headcount counts
-    distinct people, so concurrent employments never double-count a worker;
+    distinct people, so valid concurrent employments never double-count a worker;
     employment count and staffed FTE deliberately retain the portfolio shape.
 
-    The function fails closed when source truth is contradictory or an assignment
-    violates the existing employment-coverage/allocation rules. Correct the
-    authoritative HRIS facts first, then rebuild the snapshot rather than
-    publishing a metric from inconsistent source data.
+    The function fails closed when source truth is contradictory, a worker has
+    an impossible exclusive-employment portfolio, or an assignment violates the
+    existing employment-coverage/allocation rules. Correct the authoritative
+    HRIS facts first, then rebuild the snapshot rather than publishing a metric
+    from inconsistent source data.
 
     Args:
         employment_versions: Bitemporal employment facts, including other tenants.
@@ -172,6 +200,8 @@ def build_workforce_composition_snapshot(
         IntervalError: ``known_at`` is timezone-naive.
         SingleValuedFactError: One employment or assignment has contradictory
             visible versions.
+        EmploymentExclusivityError: A worker has malformed or overlapping
+            exclusive employment at the report coordinate.
         EmploymentCoverageError: Existing assignment integrity rejects a worker link.
         AssignmentPortfolioError: Existing allocation integrity rejects visible FTE.
     """
@@ -181,6 +211,12 @@ def build_workforce_composition_snapshot(
             next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
         )
 
+    _validate_visible_employment_portfolios(
+        employment_versions,
+        tenant_record_id=tenant_record_id,
+        effective_on=effective_on,
+        known_at=known_at,
+    )
     visible_employments = _visible_employments(
         employment_versions,
         tenant_record_id=tenant_record_id,
@@ -221,9 +257,7 @@ def build_workforce_composition_snapshot(
         )
 
     workforce_people = {version.person_record_id for version in visible_employments}
-    status_counts = Counter(
-        version.employment_status_code for version in visible_employments
-    )
+    status_counts = Counter(version.employment_status_code for version in visible_employments)
     return WorkforceCompositionSnapshot(
         tenant_record_id=tenant_record_id,
         effective_on=effective_on,
