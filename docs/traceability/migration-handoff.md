@@ -12,7 +12,10 @@ Active-PR only. This evidence does not describe protected-`develop` product trut
 | Keep the handoff bounded | mightyETL reviewed bounded-atomic-batch contract; ADR 0012 | `MAXIMUM_BATCH_RECORDS = 1000`; positive non-boolean record count | zero/bool/over-bound regressions |
 | Restrict import targets to authoritative HRIS core | Orgmetra core model; ADR 0001; ADR 0012 | allowlist for `person_record`, `employment_record`, `organization_unit`, `job_profile`, `position_record`, `assignment_record` | all-core-family success plus unsupported/duplicate target rejection |
 | Prevent raw-value/credential shadow stores | MHTML value-free contract; ADR 0012 | package input/output has no raw header, source value, credential, connection or SQL field | serialized-envelope non-disclosure regression and public API review |
-| Make pre-write evidence reproducible | W3C PROV-DM design traceability; ADR 0012 | sorted target codes, canonical JSON, SHA-256 digest | reversed-order equivalence and exact digest stability |
+| Make pre-write evidence reproducible | W3C PROV-DM design traceability; ADR 0012 | sorted target codes, canonical JSON, SHA-256 digest | reversed-order equivalence plus exact `hashlib.sha256(canonical_json)` assertion |
+| Keep requested execution semantics separate from observed outcomes | mightyETL owner contract; ADR 0012 | `execution_mode="bounded_atomic_batch"` records only the requested/contracted subsequent execution mode; it is not proof of writes, completion, or observed atomicity | direct-constructor canonical-mode rejection plus documentation contract |
 | Do not confuse handoff with migration completion | ADR 0012 | `requires_reconciliation=True` plus actionable `next_action` | direct-constructor bypass rejection and deterministic handoff regression |
 | Preserve dedicated-writer ownership | ADR 0002; ADR 0012 | no MHTML/mightyETL source mutation, no network call, no cross-service SQL | package dependency surface and code review |
 | Keep owned behavior fully covered | Orgmetra quality policy | exact-head migration quality workflow | 100% statement and branch coverage gate |
+
+A consumer MUST obtain separate execution-outcome evidence from the configured owner boundary and reconcile it before asserting migration completion or atomic execution. The pre-write envelope alone is never completion evidence.
