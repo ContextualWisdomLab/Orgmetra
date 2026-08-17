@@ -1,0 +1,59 @@
+name: Recovery Rehearsal Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+  push:
+    branches:
+      - feat/restore-rehearsal-evidence
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recovery-rehearsal-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  restore-rehearsal:
+    name: PostgreSQL restore rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
+      - name: Run RED recovery contract
+        run: node --test tests/recovery-rehearsal.test.mjs
+      - name: Validate repository contracts
+        run: |
+          python tests/validate_repository.py
+          npm test
+      - name: Exercise real dump and restore
+        env:
+          POSTGRES_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5432/postgres
+        run: bash tests/test_restore_rehearsal_postgres.sh
+      - name: Prove clean checkout
+        run: git diff --exit-code
