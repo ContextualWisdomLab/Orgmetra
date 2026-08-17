@@ -2,6 +2,31 @@
 -- the existing outbox state machine. This migration intentionally hardens the
 -- already-published 0003-0007 contracts instead of bypassing them.
 
+-- Recovery-role names are security boundaries. Reusing an existing cluster
+-- role could retain memberships or object ACLs that ALTER ROLE does not erase.
+-- Fail before changing any project object so a collision cannot leave partial
+-- migration state behind.
+DO $orgmetra_role_preflight$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles
+        WHERE rolname IN (
+            'orgmetra_outbox_recovery_owner',
+            'orgmetra_outbox_operator'
+        )
+    ) THEN
+        RAISE EXCEPTION 'pre-existing outbox recovery role is not accepted'
+            USING ERRCODE = '42710';
+    END IF;
+END;
+$orgmetra_role_preflight$;
+
+-- Everything before the online index build is atomic. The index itself must be
+-- outside an explicit transaction because PostgreSQL forbids CONCURRENTLY in a
+-- transaction block.
+BEGIN;
+
 -- Project objects currently live in public. Make that schema trusted before
 -- pinning function search paths so caller-controlled schemas cannot shadow
 -- tenant helpers, tables, or pgcrypto functions.
@@ -239,9 +264,10 @@ EXECUTE FUNCTION public.reject_outbox_delivery_truncate();
 -- revoke as defense-in-depth documentation of the immutable-history boundary.
 REVOKE TRUNCATE ON public.audit_event_record, public.outbox_delivery_record FROM PUBLIC;
 
+COMMIT;
+
 -- Claim scans are latency-sensitive and accumulate with durable audit history.
--- This migration is intentionally autocommit/non-transactional at this step so
--- established deployments can build the index without blocking queue writers.
+-- Established deployments build this index without blocking queue writers.
 CREATE INDEX CONCURRENTLY outbox_delivery_due_work_index
     ON public.outbox_delivery_record (
         tenant_record_id,
@@ -249,6 +275,11 @@ CREATE INDEX CONCURRENTLY outbox_delivery_due_work_index
         outbox_delivery_record_id
     )
     WHERE delivery_state_code IN ('pending', 'leased');
+
+-- Role creation, privilege grants, temporary schema CREATE, ownership transfer,
+-- SECURITY DEFINER elevation, cleanup, and final EXECUTE grant are one atomic
+-- unit. An interruption cannot strand the temporary schema-creation privilege.
+BEGIN;
 
 -- When the final-attempt worker disappears permanently, only an explicit
 -- operator path may terminate the expired lease. It records immutable
@@ -356,6 +387,13 @@ BEGIN
         last_failure_code = p_failure_code
     WHERE delivery_record.tenant_record_id = p_tenant_record_id
       AND delivery_record.outbox_delivery_record_id = p_outbox_delivery_record_id;
+
+    -- The escalation-binding constraint trigger is initially deferred. Force
+    -- this function's pending evidence check while SECURITY DEFINER privileges
+    -- are still active, then restore the transaction's deferred mode so the
+    -- caller does not need direct SELECT privileges on transport tables.
+    SET CONSTRAINTS public.outbox_delivery_escalation_binding_guard IMMEDIATE;
+    SET CONSTRAINTS public.outbox_delivery_escalation_binding_guard DEFERRED;
 END;
 $$;
 
@@ -366,34 +404,11 @@ REVOKE ALL ON FUNCTION public.operator_dead_letter_expired_outbox_delivery(
 ) FROM PUBLIC;
 
 -- Separate the externally assignable operator capability from the non-login
--- function owner. The recovery owner receives only the transport-table rights
--- needed by this function and never BYPASSRLS; callers receive EXECUTE only,
--- so they cannot emulate recovery through direct table DML.
-DO $orgmetra_role_bootstrap$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_roles
-        WHERE rolname = 'orgmetra_outbox_recovery_owner'
-    ) THEN
-        CREATE ROLE orgmetra_outbox_recovery_owner
-            NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-    END IF;
-
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_roles
-        WHERE rolname = 'orgmetra_outbox_operator'
-    ) THEN
-        CREATE ROLE orgmetra_outbox_operator
-            NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-    END IF;
-END;
-$orgmetra_role_bootstrap$;
-
-ALTER ROLE orgmetra_outbox_recovery_owner
+-- function owner. Any pre-existing role name was rejected before project DDL,
+-- so these fresh roles cannot inherit undisclosed memberships or object ACLs.
+CREATE ROLE orgmetra_outbox_recovery_owner
     NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
-ALTER ROLE orgmetra_outbox_operator
+CREATE ROLE orgmetra_outbox_operator
     NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 
 GRANT USAGE ON SCHEMA public TO orgmetra_outbox_recovery_owner, orgmetra_outbox_operator;
@@ -416,15 +431,18 @@ GRANT EXECUTE ON FUNCTION public.validate_outbox_delivery_escalation_binding()
     TO orgmetra_outbox_recovery_owner;
 
 -- ALTER FUNCTION OWNER requires CREATE on the containing schema for the target
--- owner. Grant it only for the ownership handoff, then remove it immediately.
+-- owner. Grant it only inside this transaction for the ownership handoff, then
+-- revoke it before the transaction can commit.
 GRANT CREATE ON SCHEMA public TO orgmetra_outbox_recovery_owner;
 ALTER FUNCTION public.operator_dead_letter_expired_outbox_delivery(
     uuid, uuid, uuid, text, text
 ) OWNER TO orgmetra_outbox_recovery_owner;
-REVOKE CREATE ON SCHEMA public FROM orgmetra_outbox_recovery_owner;
 ALTER FUNCTION public.operator_dead_letter_expired_outbox_delivery(
     uuid, uuid, uuid, text, text
 ) SECURITY DEFINER;
+REVOKE CREATE ON SCHEMA public FROM orgmetra_outbox_recovery_owner;
 GRANT EXECUTE ON FUNCTION public.operator_dead_letter_expired_outbox_delivery(
     uuid, uuid, uuid, text, text
 ) TO orgmetra_outbox_operator;
+
+COMMIT;
