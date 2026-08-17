@@ -348,6 +348,8 @@ class JobAnalysisSnapshot:
             reviewed_at = _validate_aware_datetime(self.reviewed_at, "reviewed_at")
             if reviewed_at > recorded_at:
                 raise ValueError("reviewed_at must not be later than recorded_at")
+            if any(source.retrieved_at > reviewed_at for source in sources):
+                raise ValueError("reviewed_at must not be earlier than evidence retrieval")
 
         if self.status_code == "analysis_validated":
             if self.reviewed_by_reference is None:
