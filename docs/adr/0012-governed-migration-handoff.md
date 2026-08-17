@@ -28,8 +28,10 @@ The envelope:
 - canonicalizes target object codes and emits deterministic UTF-8 JSON plus SHA-256 evidence;
 - limits one handoff to at most 1,000 records, matching the reviewed conservative mightyETL default batch bound rather than silently assuming a larger deployment-specific limit;
 - contains no raw source header, source value, human-readable PII, provider credential, connection string, SQL, or cross-service database access;
-- labels itself `value_free` and `bounded_atomic_batch`;
+- labels itself `value_free` and records `execution_mode="bounded_atomic_batch"` only as the requested/contracted mode for the subsequent mightyETL execution boundary, never as an observed result or evidence that an atomic migration completed;
 - always sets `requires_reconciliation=true` and supplies a customer-facing next action that requires reconciliation before completion can be claimed.
+
+Consumers MUST NOT interpret `execution_mode="bounded_atomic_batch"` as completion evidence. Completion and atomicity are established only by outcome evidence returned from the subsequent owner execution boundary and reconciled into Orgmetra's governed audit path.
 
 This slice does not authenticate an operator, authorize access to the underlying source file, execute mightyETL, retry a batch, persist migration state, write HRIS rows, or declare a migration complete. Those are separate application and operator boundaries. A later execution slice must consume the exact owner contracts and bind the resulting outcome into Orgmetra's immutable audit/outbox evidence without duplicating foreign runtime behavior.
 
@@ -42,6 +44,7 @@ This slice does not authenticate an operator, authorize access to the underlying
 - PII and raw source values stay out of the handoff evidence.
 - The envelope is deterministic and can be correlated with immutable Orgmetra audit evidence without copying source content.
 - Buyers receive an explicit next action rather than a misleading success state.
+- Requested execution semantics remain distinct from observed execution outcomes, preventing a pre-write envelope from being misused as proof of migration completion.
 
 ### Costs and limitations
 
@@ -51,6 +54,6 @@ This slice does not authenticate an operator, authorize access to the underlying
 
 ## Verification
 
-`packages/migration-adapter/tests/test_handoff.py` requires exact 100% owned statement and branch coverage. It covers deterministic canonicalization, all supported HRIS object families, malformed or reserved tenant IDs, malformed governance references/codes, non-boolean human confirmation, digest/proposal errors, bounded-record enforcement, duplicate/unsupported targets, dependency-revision drift, direct-constructor invariant bypass attempts, immutability, and safe failure messages.
+`packages/migration-adapter/tests/test_handoff.py` requires exact 100% owned statement and branch coverage. It covers deterministic canonicalization, exact SHA-256 derivation from canonical JSON, all supported HRIS object families, malformed or reserved tenant IDs, malformed governance references/codes, non-boolean human confirmation, digest/proposal errors, bounded-record enforcement, duplicate/unsupported targets, dependency-revision drift, direct-constructor invariant bypass attempts, immutability, and safe failure messages.
 
 `.github/workflows/migration-adapter-quality.yml` checks out the exact candidate SHA, installs the repository's reviewed hashed Python test toolchain, compiles the package, runs the full package test suite with 100% statement/branch thresholds, and requires a clean checkout.
