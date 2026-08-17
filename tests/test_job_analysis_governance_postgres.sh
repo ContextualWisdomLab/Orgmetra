@@ -46,7 +46,7 @@ INSERT INTO source_record (
     'https://www.opm.gov/policy-data-oversight/assessment-and-selection/job-analysis/',
     'Job analysis',
     'U.S. Office of Personnel Management',
-    TIMESTAMPTZ '2026-08-18 00:00:00+00'
+    TIMESTAMPTZ '2026-08-17 16:00:00+00'
 );
 
 INSERT INTO source_version (
@@ -58,8 +58,8 @@ INSERT INTO source_version (
     '20000000-0000-7000-8000-000000000203',
     'retrieved_2026_08_18',
     repeat('a', 64),
-    TIMESTAMPTZ '2026-08-18 00:00:00+00',
-    TIMESTAMPTZ '2026-08-18 00:00:01+00'
+    TIMESTAMPTZ '2026-08-17 16:00:00+00',
+    TIMESTAMPTZ '2026-08-17 16:00:01+00'
 );
 
 INSERT INTO job_analysis_case (
@@ -75,7 +75,7 @@ INSERT INTO job_analysis_case (
     'analyst:job_architecture_001',
     DATE '2026-08-01',
     NULL,
-    TIMESTAMPTZ '2026-08-18 00:01:00+00'
+    TIMESTAMPTZ '2026-08-17 16:01:00+00'
 );
 
 INSERT INTO job_analysis_source_link (
@@ -88,7 +88,7 @@ INSERT INTO job_analysis_source_link (
     '20000000-0000-7000-8000-000000000204',
     'task_basis',
     'section:job-analysis-overview',
-    TIMESTAMPTZ '2026-08-18 00:02:00+00'
+    TIMESTAMPTZ '2026-08-17 16:02:00+00'
 );
 
 INSERT INTO task_statement (
@@ -100,7 +100,7 @@ INSERT INTO task_statement (
     '20000000-0000-7000-8000-000000000205',
     1,
     'Evaluate governed employment evidence against the approved decision policy.',
-    TIMESTAMPTZ '2026-08-18 00:03:00+00'
+    TIMESTAMPTZ '2026-08-17 16:03:00+00'
 );
 
 INSERT INTO task_rating (
@@ -117,7 +117,7 @@ INSERT INTO task_rating (
     5.0,
     'subject_matter_experts',
     12,
-    TIMESTAMPTZ '2026-08-18 00:04:00+00'
+    TIMESTAMPTZ '2026-08-17 16:04:00+00'
 );
 
 INSERT INTO fja_function (
@@ -131,7 +131,7 @@ INSERT INTO fja_function (
     'data',
     5.0,
     'fja_v1',
-    TIMESTAMPTZ '2026-08-18 00:05:00+00'
+    TIMESTAMPTZ '2026-08-17 16:05:00+00'
 );
 
 INSERT INTO task_fja_link (
@@ -142,7 +142,7 @@ INSERT INTO task_fja_link (
     '20000000-0000-7000-8000-000000000210',
     '20000000-0000-7000-8000-000000000207',
     '20000000-0000-7000-8000-000000000209',
-    TIMESTAMPTZ '2026-08-18 00:06:00+00'
+    TIMESTAMPTZ '2026-08-17 16:06:00+00'
 );
 
 INSERT INTO ksao_requirement (
@@ -156,7 +156,7 @@ INSERT INTO ksao_requirement (
     'knowledge',
     'Knowledge of evidence-governance and employment decision controls.',
     true,
-    TIMESTAMPTZ '2026-08-18 00:07:00+00'
+    TIMESTAMPTZ '2026-08-17 16:07:00+00'
 );
 
 INSERT INTO task_ksao_link (
@@ -170,7 +170,7 @@ INSERT INTO task_ksao_link (
     '20000000-0000-7000-8000-000000000211',
     4.0,
     'sme_rating',
-    TIMESTAMPTZ '2026-08-18 00:08:00+00'
+    TIMESTAMPTZ '2026-08-17 16:08:00+00'
 );
 
 INSERT INTO job_analysis_approval_record (
@@ -183,7 +183,7 @@ INSERT INTO job_analysis_approval_record (
     'sme_panel:job_architecture_review_001',
     'Tasks, FJA functions, KSAOs, ratings, and authoritative source evidence were reviewed.',
     'approval_v1',
-    TIMESTAMPTZ '2026-08-18 00:09:00+00'
+    TIMESTAMPTZ '2026-08-17 16:09:00+00'
 );
 
 DO $$
@@ -216,7 +216,7 @@ INSERT INTO task_statement (
     '20000000-0000-7000-8000-000000000205',
     2,
     'This task must not be appended after approval.',
-    TIMESTAMPTZ '2026-08-18 00:10:00+00'
+    TIMESTAMPTZ '2026-08-17 16:10:00+00'
 );
 SQL
 } 2>&1)"
@@ -247,7 +247,7 @@ INSERT INTO job_analysis_case (
     'analyst:job_architecture_001',
     DATE '2026-08-01',
     NULL,
-    TIMESTAMPTZ '2026-08-18 00:11:00+00'
+    TIMESTAMPTZ '2026-08-17 16:11:00+00'
 );
 INSERT INTO job_analysis_source_link (
     tenant_record_id, job_analysis_source_link_id, job_analysis_case_id,
@@ -259,7 +259,7 @@ INSERT INTO job_analysis_source_link (
     '20000000-0000-7000-8000-000000000204',
     'task_basis',
     'section:job-analysis-overview',
-    TIMESTAMPTZ '2026-08-18 00:12:00+00'
+    TIMESTAMPTZ '2026-08-17 16:12:00+00'
 );
 INSERT INTO task_statement (
     tenant_record_id, task_statement_id, job_analysis_case_id,
@@ -270,7 +270,7 @@ INSERT INTO task_statement (
     '20000000-0000-7000-8000-000000000215',
     1,
     'Incomplete task without linked FJA or KSAO evidence.',
-    TIMESTAMPTZ '2026-08-18 00:13:00+00'
+    TIMESTAMPTZ '2026-08-17 16:13:00+00'
 );
 SQL
 
@@ -286,7 +286,7 @@ INSERT INTO job_analysis_approval_record (
     'sme_panel:job_architecture_review_002',
     'Incomplete evidence must be rejected.',
     'approval_v1',
-    TIMESTAMPTZ '2026-08-18 00:14:00+00'
+    TIMESTAMPTZ '2026-08-17 16:14:00+00'
 );
 SQL
 } 2>&1)"
@@ -315,7 +315,7 @@ INSERT INTO job_analysis_source_link (
     '20000000-0000-7000-8000-000000000204',
     'task_basis',
     'section:cross-tenant',
-    TIMESTAMPTZ '2026-08-18 00:15:00+00'
+    TIMESTAMPTZ '2026-08-17 16:15:00+00'
 );
 SQL
 } 2>&1)"
