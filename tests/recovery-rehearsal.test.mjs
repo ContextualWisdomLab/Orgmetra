@@ -65,6 +65,7 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     'audit/outbox binding did not survive restore',
     'bitemporal person name did not survive restore',
     'restored audit event was mutable',
+    'TRUNCATE TABLE audit_event_record CASCADE;',
     'restored audit history was truncatable'
   ]) {
     assert.ok(rehearsal.includes(fragment), `restore rehearsal must contain ${fragment}`);
