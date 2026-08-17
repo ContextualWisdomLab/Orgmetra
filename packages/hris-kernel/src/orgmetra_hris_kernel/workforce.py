@@ -18,6 +18,7 @@ from uuid import UUID
 from orgmetra_hris_kernel.assignment import (
     validate_assignment_employment_coverage,
     validate_assignment_portfolio,
+    validate_position_seat_capacity,
 )
 from orgmetra_hris_kernel.employment import validate_person_employment_exclusivity
 from orgmetra_hris_kernel.errors import IntervalError, SingleValuedFactError
@@ -181,10 +182,10 @@ def build_workforce_composition_snapshot(
     employment count and staffed FTE deliberately retain the portfolio shape.
 
     The function fails closed when source truth is contradictory, a worker has
-    an impossible exclusive-employment portfolio, or an assignment violates the
-    existing employment-coverage/allocation rules. Correct the authoritative
-    HRIS facts first, then rebuild the snapshot rather than publishing a metric
-    from inconsistent source data.
+    an impossible exclusive-employment portfolio, one position seat is overfilled,
+    or an assignment violates the existing employment-coverage/allocation rules.
+    Correct the authoritative HRIS facts first, then rebuild the snapshot rather
+    than publishing a metric from inconsistent source data.
 
     Args:
         employment_versions: Bitemporal employment facts, including other tenants.
@@ -204,6 +205,7 @@ def build_workforce_composition_snapshot(
             exclusive employment at the report coordinate.
         EmploymentCoverageError: Existing assignment integrity rejects a worker link.
         AssignmentPortfolioError: Existing allocation integrity rejects visible FTE.
+        PositionSeatError: Existing position-capacity integrity rejects visible FTE.
     """
     if known_at.tzinfo is None:
         raise IntervalError(
@@ -231,6 +233,7 @@ def build_workforce_composition_snapshot(
     )
 
     portfolio_keys: set[tuple[UUID, UUID]] = set()
+    position_record_ids: set[UUID] = set()
     staffed_people: set[UUID] = set()
     staffed_fte = _ZERO_FTE
     staffed_assignment_count = 0
@@ -242,6 +245,7 @@ def build_workforce_composition_snapshot(
             known_at=known_at,
         )
         portfolio_keys.add((assignment.person_record_id, assignment.employment_record_id))
+        position_record_ids.add(assignment.position_record_id)
         staffed_people.add(assignment.person_record_id)
         staffed_fte += assignment.allocation_ratio
         staffed_assignment_count += 1
@@ -252,6 +256,14 @@ def build_workforce_composition_snapshot(
             tenant_record_id=tenant_record_id,
             person_record_id=person_record_id,
             employment_record_id=employment_record_id,
+            effective_on=effective_on,
+            known_at=known_at,
+        )
+    for position_record_id in position_record_ids:
+        validate_position_seat_capacity(
+            visible_assignments,
+            tenant_record_id=tenant_record_id,
+            position_record_id=position_record_id,
             effective_on=effective_on,
             known_at=known_at,
         )
