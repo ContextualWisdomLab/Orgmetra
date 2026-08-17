@@ -69,4 +69,4 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Notes
 
-- Protected `develop` at `d531ba0fbb0d1cb70dbaa6b5c6b0431e59cc4c22` includes the governed candidate-to-worker conversion and purpose-bound PII authorization contracts; normalized worker-bound validity-study case integrity remains active-PR truth until this exact reconciled branch passes fresh protected-base gates and merges.
+- Protected `develop` at `f815feedcb0bac264d9814b2932338c512276110` includes governed candidate-to-worker conversion, purpose-bound PII authorization, and the GET-only People API; normalized worker-bound validity-study case integrity remains active-PR truth until this exact reconciled branch passes fresh protected-base gates and merges.
