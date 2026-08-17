@@ -325,9 +325,6 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         async def receive_text_body() -> dict[str, object]:
             return {"type": "http.request", "body": "{}", "more_body": False}
 
-        async def send(message: dict[str, object]) -> None:
-            del message
-
         for receive in (receive_disconnect, receive_text_body):
             messages: list[dict[str, object]] = []
 

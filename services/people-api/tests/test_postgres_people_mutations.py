@@ -9,7 +9,7 @@ import json
 import unittest
 from uuid import UUID
 
-from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessPolicy
+from orgmetra_keyverse_adapter import AuthorizationDecision
 from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.mutations import (
     PeopleMutationIntegrityError,
