@@ -46,7 +46,10 @@ REQUIRED = [
     "docs/adr/0004-employment-position-version-and-assignment-binding.md",
     "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
     "docs/adr/0006-governed-audit-outbox-envelope.md",
+    "docs/adr/0007-candidate-worker-conversion-governance.md",
     "docs/doctoring/REFERENCES.md",
+    "docs/doctoring/CANDIDATE_WORKER_CONVERSION_REFERENCES.md",
+    "docs/traceability/0007-candidate-worker-conversion-governance.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
     "database/migrations/0001_foundation_schema.sql",
@@ -56,6 +59,7 @@ REQUIRED = [
     "database/migrations/0005_outbox_delivery_finalization.sql",
     "database/migrations/0006_outbox_delivery_dead_letter.sql",
     "database/migrations/0007_outbox_retry_exhaustion.sql",
+    "database/migrations/0008_candidate_worker_conversion_governance.sql",
     "schemas/openapi.yaml",
     "scripts/foundation-contract-core.mjs",
     "scripts/foundation-contract.mjs",
@@ -69,6 +73,7 @@ REQUIRED = [
     "tests/test_audit_outbox_postgres.sh",
     "tests/test_outbox_claim_postgres.sh",
     "tests/test_outbox_dead_letter_postgres.sh",
+    "tests/test_candidate_worker_conversion_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -197,7 +202,18 @@ def _validate_database_contract() -> None:
     retry_exhaustion_sql = (
         ROOT / "database/migrations/0007_outbox_retry_exhaustion.sql"
     ).read_text(encoding="utf-8")
-    table_sql = foundation_sql + "\n" + audit_sql + "\n" + dead_letter_sql
+    candidate_conversion_sql = (
+        ROOT / "database/migrations/0008_candidate_worker_conversion_governance.sql"
+    ).read_text(encoding="utf-8")
+    table_sql = (
+        foundation_sql
+        + "\n"
+        + audit_sql
+        + "\n"
+        + dead_letter_sql
+        + "\n"
+        + candidate_conversion_sql
+    )
     sql = (
         table_sql
         + "\n"
@@ -326,6 +342,15 @@ def _validate_database_contract() -> None:
         "terminal outbox delivery records are immutable",
         "outbox delivery stored attempt budget is exhausted and cannot be reclaimed",
         "outbox delivery stored attempt budget is exhausted and requires terminal dead-lettering",
+        "CREATE TABLE candidate_worker_conversion_record",
+        "CONSTRAINT candidate_conversion_employment_person_tenant_fk",
+        "CONSTRAINT candidate_conversion_audit_tenant_fk",
+        "CONSTRAINT candidate_conversion_knowledge_exclusion",
+        "CREATE FUNCTION validate_candidate_worker_conversion",
+        "candidate_worker_link is legacy-only",
+        "candidate conversion requires a hire selection decision",
+        "candidate conversion audit envelope does not bind exact hire provenance",
+        "CREATE POLICY candidate_conversion_scope_policy",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
