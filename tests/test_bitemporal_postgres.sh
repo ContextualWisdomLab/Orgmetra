@@ -6,6 +6,7 @@ TENANT_ID='10000000-0000-7000-8000-000000000001'
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation_schema.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evidence_digest.sql
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0008_candidate_worker_conversion_governance.sql
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
@@ -261,4 +262,194 @@ if [[ "${candidate_link_output}" != *"candidate_worker_link is legacy-only"* ]];
     exit 1
 fi
 
-echo "PostgreSQL bitemporal concurrency contract passed"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO decision_evidence_set (
+    tenant_record_id, decision_evidence_set_id, evidence_set_version_code,
+    digest_algorithm_code, evidence_set_digest, created_at
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000040',
+    'hire-evidence-v1', 'sha256', repeat('a', 64),
+    TIMESTAMPTZ '2026-03-02 00:00:00+00'
+);
+INSERT INTO selection_decision_evidence (
+    tenant_record_id, selection_decision_evidence_id, decision_evidence_set_id,
+    evidence_reference, evidence_version_code, recorded_at
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000041',
+    '00000000-0000-7000-8000-000000000040',
+    'assessment:scorecard-42', 'scorecard-v3',
+    TIMESTAMPTZ '2026-03-02 00:10:00+00'
+);
+INSERT INTO selection_decision (
+    tenant_record_id, selection_decision_id, candidate_profile_id, job_profile_id,
+    decision_evidence_set_id, actor_reference, purpose_code, decision_code,
+    decision_reason, confirmation_reference, decided_at, recorded_at
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000042',
+    '00000000-0000-7000-8000-000000000031',
+    '00000000-0000-7000-8000-000000000007',
+    '00000000-0000-7000-8000-000000000040',
+    'actor:recruiter-17', 'candidate_hire', 'hire',
+    'approved_after_structured_review', 'confirmation:panel-2026-03-02',
+    TIMESTAMPTZ '2026-03-02 01:00:00+00',
+    TIMESTAMPTZ '2026-03-02 01:05:00+00'
+);
+INSERT INTO candidate_worker_conversion_record (
+    tenant_record_id, candidate_worker_conversion_record_id, candidate_profile_id,
+    person_record_id, employment_record_id, selection_decision_id,
+    effective_from, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000043',
+    '00000000-0000-7000-8000-000000000031',
+    '00000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000002',
+    '00000000-0000-7000-8000-000000000042',
+    DATE '2026-03-10', TIMESTAMPTZ '2026-03-02 02:00:00+00'
+);
+SQL
+
+conversion_count="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*) FROM candidate_worker_conversion_record
+WHERE tenant_record_id = '${TENANT_ID}'::uuid
+  AND candidate_profile_id = '00000000-0000-7000-8000-000000000031'
+  AND daterange(effective_from, effective_to, '[)') @> DATE '2026-03-10'
+  AND tstzrange(recorded_from, recorded_to, '[)') @> TIMESTAMPTZ '2026-03-03 00:00:00+00';
+")"
+if [[ "${conversion_count}" != "1" ]]; then
+    echo "expected one governed candidate conversion fact, got ${conversion_count}" >&2
+    exit 1
+fi
+
+set +e
+overlapping_conversion_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO candidate_worker_conversion_record (
+    tenant_record_id, candidate_worker_conversion_record_id, candidate_profile_id,
+    person_record_id, employment_record_id, selection_decision_id,
+    effective_from, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000044',
+    '00000000-0000-7000-8000-000000000031',
+    '00000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000002',
+    '00000000-0000-7000-8000-000000000042',
+    DATE '2026-03-10', TIMESTAMPTZ '2026-03-03 00:00:00+00'
+);
+SQL
+} 2>&1)"
+overlapping_conversion_status=$?
+set -e
+if [[ ${overlapping_conversion_status} -eq 0 ]]; then
+    echo "overlapping candidate conversion unexpectedly succeeded" >&2
+    exit 1
+fi
+if [[ "${overlapping_conversion_output}" != *"candidate_conversion_bitemporal_exclusion"* ]]; then
+    echo "candidate conversion overlap failed for an unexpected reason: ${overlapping_conversion_output}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO decision_evidence_set (
+    tenant_record_id, decision_evidence_set_id, evidence_set_version_code,
+    digest_algorithm_code, evidence_set_digest, created_at
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000050',
+    'reject-evidence-v1', 'sha256', repeat('b', 64),
+    TIMESTAMPTZ '2026-03-03 00:00:00+00'
+);
+INSERT INTO selection_decision_evidence (
+    tenant_record_id, selection_decision_evidence_id, decision_evidence_set_id,
+    evidence_reference, evidence_version_code, recorded_at
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000051',
+    '00000000-0000-7000-8000-000000000050',
+    'assessment:scorecard-43', 'scorecard-v3',
+    TIMESTAMPTZ '2026-03-03 00:10:00+00'
+);
+INSERT INTO selection_decision (
+    tenant_record_id, selection_decision_id, candidate_profile_id, job_profile_id,
+    decision_evidence_set_id, actor_reference, purpose_code, decision_code,
+    decision_reason, confirmation_reference, decided_at, recorded_at
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000052',
+    '00000000-0000-7000-8000-000000000031',
+    '00000000-0000-7000-8000-000000000007',
+    '00000000-0000-7000-8000-000000000050',
+    'actor:recruiter-18', 'candidate_hire', 'reject',
+    'did_not_meet_threshold', 'confirmation:panel-2026-03-03',
+    TIMESTAMPTZ '2026-03-03 01:00:00+00',
+    TIMESTAMPTZ '2026-03-03 01:05:00+00'
+);
+SQL
+
+set +e
+reject_conversion_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO candidate_worker_conversion_record (
+    tenant_record_id, candidate_worker_conversion_record_id, candidate_profile_id,
+    person_record_id, employment_record_id, selection_decision_id,
+    effective_from, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000053',
+    '00000000-0000-7000-8000-000000000031',
+    '00000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000002',
+    '00000000-0000-7000-8000-000000000052',
+    DATE '2026-03-10', TIMESTAMPTZ '2026-03-03 02:00:00+00'
+);
+SQL
+} 2>&1)"
+reject_conversion_status=$?
+set -e
+if [[ ${reject_conversion_status} -eq 0 ]]; then
+    echo "non-hire candidate conversion unexpectedly succeeded" >&2
+    exit 1
+fi
+if [[ "${reject_conversion_output}" != *"candidate conversion requires a hire selection decision"* ]]; then
+    echo "non-hire conversion failed for an unexpected reason: ${reject_conversion_output}" >&2
+    exit 1
+fi
+
+set +e
+conversion_mutation_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
+UPDATE candidate_worker_conversion_record
+SET effective_to = DATE '2026-04-01'
+WHERE tenant_record_id = '${TENANT_ID}'::uuid
+  AND candidate_worker_conversion_record_id = '00000000-0000-7000-8000-000000000043';
+"; } 2>&1)"
+conversion_mutation_status=$?
+set -e
+if [[ ${conversion_mutation_status} -eq 0 ]]; then
+    echo "in-place candidate conversion mutation unexpectedly succeeded" >&2
+    exit 1
+fi
+if [[ "${conversion_mutation_output}" != *"bitemporal correction may only close an open recorded interval"* ]]; then
+    echo "candidate conversion mutation failed for an unexpected reason: ${conversion_mutation_output}" >&2
+    exit 1
+fi
+
+rls_state="$(psql "${DATABASE_URL}" -Atqc "
+SELECT relrowsecurity::int || ':' || relforcerowsecurity::int
+FROM pg_class
+WHERE oid = 'candidate_worker_conversion_record'::regclass;
+")"
+if [[ "${rls_state}" != "1:1" ]]; then
+    echo "candidate conversion relation must enforce and force tenant RLS, got ${rls_state}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+UPDATE candidate_worker_conversion_record
+SET recorded_to = TIMESTAMPTZ '2026-04-01 00:00:00+00'
+WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'
+  AND candidate_worker_conversion_record_id = '00000000-0000-7000-8000-000000000043';
+SQL
+
+echo "PostgreSQL bitemporal concurrency and candidate conversion contract passed"
