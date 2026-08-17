@@ -35,10 +35,7 @@ SELECT record_audit_outbox_event(
 );
 SQL
 
-# Retry exhaustion is a durable delivery policy, not a dispatcher-controlled
-# function argument. A stale seven-argument function would let a worker choose
-# 1 and immediately discard first-attempt work.
-legacy_budget_signature="$(psql "${DATABASE_URL}" -Atq <<'SQL'
+legacy_budget_signature="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
 SELECT to_regprocedure(
     'dead_letter_outbox_delivery(uuid,uuid,uuid,text,text,text,integer)'
 ) IS NOT NULL;
@@ -49,7 +46,7 @@ if [[ "${legacy_budget_signature}" != "f" ]]; then
     exit 1
 fi
 
-first_claim="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
+first_claim="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
 WITH claimed_delivery AS (
     SELECT *
@@ -75,8 +72,6 @@ if [[ "${first_claim}" != "1|5|dispatcher_worker:dead-letter-owner" ]]; then
     exit 1
 fi
 
-# Direct table DML cannot skip the governed terminal path even when it can
-# otherwise satisfy the terminal row shape.
 set +e
 direct_dead_letter_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_id="${TENANT_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
@@ -95,8 +90,6 @@ if [[ ${direct_dead_letter_status} -eq 0 || "${direct_dead_letter_output}" != *"
     exit 1
 fi
 
-# A live worker cannot discard work before the database-owned attempt budget has
-# actually been consumed.
 set +e
 premature_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
@@ -138,7 +131,7 @@ SQL
         lease_duration_seconds=5
     fi
 
-    claimed_attempt="$(psql "${DATABASE_URL}" -Atq \
+    claimed_attempt="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq \
         -v tenant_id="${TENANT_ID}" \
         -v lease_duration_seconds="${lease_duration_seconds}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
@@ -167,8 +160,6 @@ SQL
     fi
 done
 
-# Once the database-owned attempt budget is exhausted, a dispatcher cannot put
-# the row back into the pending queue and create an unbounded sixth attempt.
 set +e
 exhausted_retry_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
@@ -190,11 +181,8 @@ if [[ ${exhausted_retry_status} -eq 0 || "${exhausted_retry_output}" != *"outbox
     exit 1
 fi
 
-# A crashed final-attempt worker must not create attempt six after lease expiry.
-# The exact recorded owner may still terminalize exhausted work so the queue
-# cannot strand a permanently leased row when the final worker dies.
 sleep 5.2
-exhausted_reclaim="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
+exhausted_reclaim="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
 SELECT outbox_delivery_record_id::text
 FROM claim_outbox_delivery(
@@ -210,7 +198,7 @@ if [[ -n "${exhausted_reclaim}" ]]; then
     exit 1
 fi
 
-exhausted_state="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" -v delivery_id="${DELIVERY_ID}" <<'SQL'
+exhausted_state="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq -v tenant_id="${TENANT_ID}" -v delivery_id="${DELIVERY_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
 SELECT
     delivery_state_code || '|'
@@ -227,8 +215,6 @@ if [[ "${exhausted_state}" != "leased|5|5|dispatcher_worker:dead-letter-owner|tr
     exit 1
 fi
 
-# Lease ownership remains a capability boundary even after the durable retry
-# budget is exhausted, including an expired final lease.
 set +e
 foreign_owner_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
@@ -267,7 +253,7 @@ SELECT dead_letter_outbox_delivery(
 );
 SQL
 
-dead_letter_state="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" -v delivery_id="${DELIVERY_ID}" <<'SQL'
+dead_letter_state="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq -v tenant_id="${TENANT_ID}" -v delivery_id="${DELIVERY_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
 SELECT
     delivery_state_code || '|'
@@ -286,7 +272,7 @@ if [[ "${dead_letter_state}" != "dead_lettered|5|5|true|true|remote_contract_rej
     exit 1
 fi
 
-escalation_state="$(psql "${DATABASE_URL}" -Atq \
+escalation_state="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq \
     -v tenant_id="${TENANT_ID}" \
     -v delivery_id="${DELIVERY_ID}" \
     -v escalation_id="${ESCALATION_ID}" <<'SQL'
@@ -307,8 +293,7 @@ if [[ "${escalation_state}" != "${ESCALATION_ID}|${DELIVERY_ID}|5|remote_contrac
     exit 1
 fi
 
-# Dead-lettered work is terminal: normal dispatch cannot reclaim it.
-terminal_claim="$(psql "${DATABASE_URL}" -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
+terminal_claim="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq -v tenant_id="${TENANT_ID}" <<'SQL'
 SET orgmetra.tenant_record_id = :'tenant_id';
 SELECT outbox_delivery_record_id::text
 FROM claim_outbox_delivery(
@@ -324,8 +309,6 @@ if [[ -n "${terminal_claim}" ]]; then
     exit 1
 fi
 
-# Escalation evidence itself is append-only and its deferred binding proves it
-# still describes the terminal queue row.
 set +e
 mutation_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_id="${TENANT_ID}" \
@@ -343,8 +326,6 @@ if [[ ${mutation_status} -eq 0 || "${mutation_output}" != *"outbox delivery esca
     exit 1
 fi
 
-# An immutable escalation record cannot be fabricated for a delivery that has
-# not reached terminal dead-letter state.
 SECOND_EVENT_ID="00000000-0000-4000-8000-000000000082"
 SECOND_DELIVERY_ID="00000000-0000-4000-8000-000000000092"
 SECOND_ESCALATION_ID="00000000-0000-4000-8000-0000000000a2"
