@@ -102,7 +102,7 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             "method": method,
             "path": path or f"/v1/tenants/{TENANT}/people/{PERSON}",
             "query_string": query,
-            "headers": headers or [(b"authorization", b"Bearer opaque-token")],
+            "headers": headers if headers is not None else [(b"authorization", b"Bearer opaque-token")],
         }
         messages: list[dict[str, object]] = []
 
