@@ -249,6 +249,24 @@ BEFORE UPDATE OR DELETE ON public.candidate_worker_conversion_record
 FOR EACH ROW
 EXECUTE FUNCTION public.protect_bitemporal_history();
 
+CREATE FUNCTION public.reject_candidate_worker_conversion_truncate()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+BEGIN
+    RAISE EXCEPTION 'candidate worker conversion history cannot be truncated'
+        USING ERRCODE = '55000';
+END;
+$$;
+
+CREATE TRIGGER candidate_worker_conversion_truncate_guard
+BEFORE TRUNCATE ON public.candidate_worker_conversion_record
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.reject_candidate_worker_conversion_truncate();
+
+REVOKE TRUNCATE ON public.candidate_worker_conversion_record FROM PUBLIC;
+
 ALTER TABLE public.candidate_worker_conversion_record ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.candidate_worker_conversion_record FORCE ROW LEVEL SECURITY;
 CREATE POLICY candidate_conversion_scope_policy ON public.candidate_worker_conversion_record
