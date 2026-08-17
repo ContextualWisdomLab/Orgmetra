@@ -1,0 +1,91 @@
+name: Job Analysis Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - '.github/workflows/job-analysis-quality.yml'
+      - 'database/migrations/**'
+      - 'docs/**'
+      - 'manifest.json'
+      - 'scripts/foundation-contract-core.mjs'
+      - 'tests/test_job_analysis_governance_postgres.sh'
+      - 'tests/validate_repository.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: job-analysis-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository_contract:
+    name: Job analysis repository contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+          check-latest: false
+      - name: Set up Node.js LTS
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          check-latest: false
+      - name: Validate repository contracts
+        run: npm run validate
+      - name: Prove validation is read-only
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+  postgres_contract:
+    name: Job analysis PostgreSQL contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: orgmetra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d orgmetra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Run governed job-analysis regression
+        run: bash tests/test_job_analysis_governance_postgres.sh
+      - name: Prove test is read-only
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
