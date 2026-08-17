@@ -10,8 +10,19 @@
 | `employment_record_version` | Bitemporal employment status, exclusive-or-concurrent code, and effective period. |
 | `organization_unit` | Durable organizational identity referenced by positions and hierarchy facts. |
 | `organization_unit_version` | Bitemporal organizational name, type, and parent relationship for an organization unit. |
-| `job_profile` | Durable job identity referenced by positions, criteria, and decisions. |
+| `job_profile` | Durable job identity referenced by positions, criteria, decisions, and job-analysis cases. |
 | `job_profile_version` | Bitemporal title, family, and version definition for a job profile. |
+| `source_record` | Durable governed source identity for job-analysis evidence, including authoritative web, internal, SME, occupational-database, and explicitly untrusted LLM-draft sources. |
+| `source_version` | Immutable captured version of one source with capture time and SHA-256 content digest. |
+| `job_analysis_case` | One effective-dated, system-recorded analysis version for one Job. |
+| `job_analysis_source_link` | Exact source-version/span membership for one job-analysis case. |
+| `task_statement` | Observable task statement owned by one job-analysis case. |
+| `task_rating` | Method-attributable task rating with dimension, scale bounds, rater group, and sample size. |
+| `fja_function` | Functional Job Analysis work-content dimension/value for one analysis case and method version. |
+| `task_fja_link` | Explicit task-to-FJA linkage within one analysis case. |
+| `ksao_requirement` | Knowledge, Skill, Ability, or Other Characteristic requirement for one analysis case. |
+| `task_ksao_link` | Explicit task-to-KSAO linkage strength and method. |
+| `job_analysis_approval_record` | Accountable human approval and database-owned SHA-256 digest sealing the exact analysis evidence snapshot. |
 | `position_record` | Durable seat identity that keeps stable organization and job references. |
 | `position_record_version` | Bitemporal position status and effective period. |
 | `assignment_record` | A person's allocation to a position through one employment. |
@@ -50,6 +61,18 @@ Intervals are half-open and non-empty: an end value, when present, must be stric
 Durable anchors such as `organization_unit`, `job_profile`, `employment_record`, and `position_record` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version`, `job_profile_version`, `employment_record_version`, and `position_record_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
 
 Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
+
+## Job-analysis evidence normalization
+
+A `job_analysis_case` is an immutable versioned analysis of one `job_profile`; it is deliberately separate from a Position or Assignment. The case stores the business-effective interval and system-recorded time. Corrections create a new `analysis_version_code` rather than altering an approved historical case.
+
+Source provenance is normalized into durable `source_record` and immutable `source_version` rows. The latter carries a captured-at timestamp and exact SHA-256 content digest. `job_analysis_source_link` binds the exact source version and a bounded source-span reference to the case. `web_authoritative` sources require HTTPS locators. `llm_draft` is a first-class source type only so draft provenance can be preserved; any case containing such a source is fail-closed at approval and cannot become approved job-analysis evidence.
+
+Task evidence is normalized rather than embedded in free-form JSON. `task_statement` records the observable work statement. `task_rating` stores its rating dimension, observed value, scale minimum/maximum, rater group, and sample size. `fja_function` stores method-versioned Functional Job Analysis dimensions, while `task_fja_link` makes the task relationship explicit. `ksao_requirement` stores Knowledge, Skill, Ability, and Other Characteristic requirements; `task_ksao_link` records the linkage strength and method. Tenant-qualified foreign keys plus trigger checks prevent cross-tenant or cross-analysis linkage.
+
+`job_analysis_approval_record` is the human authority boundary. Approval requires at least one exact source version and one task; every task must have importance or criticality evidence plus FJA and KSAO linkage; every KSAO must link a task. The caller cannot supply the approval digest. PostgreSQL serializes evidence mutation against approval on the `job_analysis_case` row, deterministically canonicalizes the exact source/task/rating/FJA/KSAO/link membership, computes SHA-256 itself, and stores that digest on approval. Evidence insertion takes a shared row lock while approval takes an update lock, so concurrent evidence cannot commit outside the digest after the case is approved.
+
+Approved job-analysis content is append-only and sealed. UPDATE/DELETE triggers reject in-place mutation, statement-level TRUNCATE triggers protect the evidence relations, and post-approval child inserts fail closed. A later correction therefore creates a new analysis case/version with new evidence and approval rather than rewriting the old decision basis.
 
 ## High-impact decision evidence
 
