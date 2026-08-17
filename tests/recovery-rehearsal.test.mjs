@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const workflowPath = '.github/workflows/recovery-rehearsal-quality.yml';
-const rehearsalPath = 'tests/test_restore_rehearsal_postgres.sh';
+const rehearsalPath = '.github/scripts/restore-rehearsal-postgres.sh';
 const traceabilityPath = 'docs/traceability/restore-rehearsal.md';
 const provenancePath = 'recovery-manifest.json';
 const provenanceFiles = Object.freeze([
@@ -48,7 +48,7 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     'ref: ${{ github.event.pull_request.head.sha || github.sha }}',
     'postgres:',
     'POSTGRES_DB: postgres',
-    'bash tests/test_restore_rehearsal_postgres.sh',
+    'bash .github/scripts/restore-rehearsal-postgres.sh',
     'python tests/validate_repository.py',
     'npm run validate',
     'git diff --exit-code'
