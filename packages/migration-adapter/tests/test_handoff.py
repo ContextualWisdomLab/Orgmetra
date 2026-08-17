@@ -13,6 +13,7 @@ from orgmetra_migration_adapter import (
     MIGHTY_ETL_REVISION,
     MIGRATION_CONTRACT_VERSION,
     ContractViolation,
+    MigrationHandoffEnvelope,
     MigrationHandoffInput,
     build_migration_handoff,
 )
@@ -63,6 +64,7 @@ def test_builds_deterministic_value_free_handoff() -> None:
     assert first.target_object_codes == ("employment_record", "person_record")
     assert first.privacy_mode == "value_free"
     assert first.execution_mode == "bounded_atomic_batch"
+    assert first.human_confirmed is True
     assert first.requires_reconciliation is True
     assert "reconcile" in first.next_action
     assert first.digest_sha256() == second.digest_sha256()
@@ -123,6 +125,10 @@ def test_builds_deterministic_value_free_handoff() -> None:
         ({"source_size_bytes": 0}, "source size must be a positive integer"),
         (
             {"schema_proposal_id": "schema_" + "d" * 32},
+            "schema proposal identifier is malformed",
+        ),
+        (
+            {"schema_proposal_id": None},
             "schema proposal identifier is malformed",
         ),
         (
@@ -190,7 +196,43 @@ def test_handoff_fails_closed_on_invalid_or_stale_evidence(
         ),
         (
             {"target_object_codes": ("person_record", "person_record")},
-            "migration target objects must be sorted and unique",
+            "migration target objects must be unique",
+        ),
+        ({"tenant_record_id": "not-a-uuid"}, "tenant record identifier is malformed"),
+        (
+            {"migration_batch_reference": "migration batch 1"},
+            "migration batch reference is malformed",
+        ),
+        ({"actor_reference": "actor with spaces"}, "actor reference is malformed"),
+        ({"approval_reference": "approval with spaces"}, "approval reference is malformed"),
+        ({"purpose_code": "workforce_reporting"}, "migration purpose must be hris_data_migration"),
+        ({"reason_code": "cutover reason"}, "reason code is malformed"),
+        ({"human_confirmed": False}, "migration handoff requires explicit human confirmation"),
+        ({"human_confirmed": 1}, "migration handoff requires explicit human confirmation"),
+        ({"source_sha256": "A" * 64}, "source digest must be lowercase SHA-256"),
+        ({"source_size_bytes": 0}, "source size must be a positive integer"),
+        (
+            {"schema_proposal_id": "schema_" + "d" * 32},
+            "schema proposal identifier is malformed",
+        ),
+        ({"table_fingerprint_sha256": "short"}, "table fingerprint must be lowercase SHA-256"),
+        ({"mapping_digest_sha256": "short"}, "mapping digest must be lowercase SHA-256"),
+        ({"record_count": 0}, "record count must be a positive integer"),
+        (
+            {"record_count": MAXIMUM_BATCH_RECORDS + 1},
+            "migration batch exceeds the reviewed record bound",
+        ),
+        (
+            {"target_object_codes": ("payroll_record",)},
+            "migration target object is outside the HRIS core",
+        ),
+        (
+            {"mhtml_contract_revision": "0" * 40},
+            "MHTML ETL Gateway contract revision requires revalidation",
+        ),
+        (
+            {"mightyetl_contract_revision": "0" * 40},
+            "mightyETL contract revision requires revalidation",
         ),
         (
             {"privacy_mode": "raw_values"},
@@ -210,7 +252,11 @@ def test_handoff_fails_closed_on_invalid_or_stale_evidence(
         ),
         (
             {"next_action": ""},
-            "migration envelope must provide a next action",
+            "migration envelope next action is noncanonical",
+        ),
+        (
+            {"next_action": "Mark the migration complete."},
+            "migration envelope next action is noncanonical",
         ),
     ],
 )

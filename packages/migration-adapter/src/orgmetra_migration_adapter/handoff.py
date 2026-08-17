@@ -19,6 +19,10 @@ MHTML_ETL_GATEWAY_REVISION: Final = "779254927abb1e7cee80fd949907ccd03f9fc7be"
 MIGHTY_ETL_REVISION: Final = "ba8911f50ed20a39927a0d51c0cf20f9b7c91820"
 MIGRATION_CONTRACT_VERSION: Final = "orgmetra.migration_handoff.v1"
 MAXIMUM_BATCH_RECORDS: Final = 1000
+_MIGRATION_NEXT_ACTION: Final = (
+    "Submit this approved bounded batch through the configured mightyETL adapter, "
+    "then reconcile its outcome before marking the migration complete."
+)
 
 _ALLOWED_TARGET_OBJECT_CODES: Final = frozenset(
     {
@@ -80,6 +84,7 @@ class MigrationHandoffEnvelope:
     approval_reference: str
     purpose_code: str
     reason_code: str
+    human_confirmed: bool
     source_sha256: str
     source_size_bytes: int
     schema_proposal_id: str
@@ -98,7 +103,25 @@ class MigrationHandoffEnvelope:
         """Reject direct construction that would produce noncanonical evidence."""
         if self.contract_version != MIGRATION_CONTRACT_VERSION:
             raise ContractViolation("migration envelope contract version is unsupported")
-        if self.target_object_codes != tuple(sorted(set(self.target_object_codes))):
+        canonical_targets = _validate_migration_evidence(
+            tenant_record_id=self.tenant_record_id,
+            migration_batch_reference=self.migration_batch_reference,
+            actor_reference=self.actor_reference,
+            approval_reference=self.approval_reference,
+            purpose_code=self.purpose_code,
+            reason_code=self.reason_code,
+            human_confirmed=self.human_confirmed,
+            source_sha256=self.source_sha256,
+            source_size_bytes=self.source_size_bytes,
+            schema_proposal_id=self.schema_proposal_id,
+            table_fingerprint_sha256=self.table_fingerprint_sha256,
+            mapping_digest_sha256=self.mapping_digest_sha256,
+            record_count=self.record_count,
+            target_object_codes=self.target_object_codes,
+            mhtml_contract_revision=self.mhtml_contract_revision,
+            mightyetl_contract_revision=self.mightyetl_contract_revision,
+        )
+        if self.target_object_codes != canonical_targets:
             raise ContractViolation("migration target objects must be sorted and unique")
         if self.privacy_mode != "value_free":
             raise ContractViolation("migration envelope privacy mode must remain value_free")
@@ -106,8 +129,8 @@ class MigrationHandoffEnvelope:
             raise ContractViolation("migration envelope execution mode is unsupported")
         if self.requires_reconciliation is not True:
             raise ContractViolation("migration completion requires explicit reconciliation")
-        if not self.next_action:
-            raise ContractViolation("migration envelope must provide a next action")
+        if self.next_action != _MIGRATION_NEXT_ACTION:
+            raise ContractViolation("migration envelope next action is noncanonical")
 
     def to_dict(self) -> dict[str, object]:
         """Return the deterministic JSON-ready representation."""
@@ -138,31 +161,7 @@ def build_migration_handoff(
         ContractViolation: Any governance, identity, provenance, dependency
             revision, or bounded-batch invariant is not satisfied.
     """
-    _require_operational_uuid(evidence.tenant_record_id)
-    _require_reference(evidence.migration_batch_reference, "migration batch reference")
-    _require_reference(evidence.actor_reference, "actor reference")
-    _require_reference(evidence.approval_reference, "approval reference")
-    _require_code(evidence.purpose_code, "purpose code")
-    if evidence.purpose_code != "hris_data_migration":
-        raise ContractViolation("migration purpose must be hris_data_migration")
-    _require_code(evidence.reason_code, "reason code")
-    if evidence.human_confirmed is not True:
-        raise ContractViolation("migration handoff requires explicit human confirmation")
-    _require_sha256(evidence.source_sha256, "source digest")
-    _require_positive_int(evidence.source_size_bytes, "source size")
-    if not _SCHEMA_PROPOSAL_PATTERN.fullmatch(evidence.schema_proposal_id):
-        raise ContractViolation("schema proposal identifier is malformed")
-    _require_sha256(evidence.table_fingerprint_sha256, "table fingerprint")
-    _require_sha256(evidence.mapping_digest_sha256, "mapping digest")
-    _require_positive_int(evidence.record_count, "record count")
-    if evidence.record_count > MAXIMUM_BATCH_RECORDS:
-        raise ContractViolation("migration batch exceeds the reviewed record bound")
     target_object_codes = _canonical_target_objects(evidence.target_object_codes)
-    if evidence.mhtml_contract_revision != MHTML_ETL_GATEWAY_REVISION:
-        raise ContractViolation("MHTML ETL Gateway contract revision requires revalidation")
-    if evidence.mightyetl_contract_revision != MIGHTY_ETL_REVISION:
-        raise ContractViolation("mightyETL contract revision requires revalidation")
-
     return MigrationHandoffEnvelope(
         contract_version=MIGRATION_CONTRACT_VERSION,
         tenant_record_id=evidence.tenant_record_id,
@@ -171,6 +170,7 @@ def build_migration_handoff(
         approval_reference=evidence.approval_reference,
         purpose_code=evidence.purpose_code,
         reason_code=evidence.reason_code,
+        human_confirmed=evidence.human_confirmed,
         source_sha256=evidence.source_sha256,
         source_size_bytes=evidence.source_size_bytes,
         schema_proposal_id=evidence.schema_proposal_id,
@@ -183,11 +183,54 @@ def build_migration_handoff(
         privacy_mode="value_free",
         execution_mode="bounded_atomic_batch",
         requires_reconciliation=True,
-        next_action=(
-            "Submit this approved bounded batch through the configured mightyETL "
-            "adapter, then reconcile its outcome before marking the migration complete."
-        ),
+        next_action=_MIGRATION_NEXT_ACTION,
     )
+
+
+def _validate_migration_evidence(
+    *,
+    tenant_record_id: str,
+    migration_batch_reference: str,
+    actor_reference: str,
+    approval_reference: str,
+    purpose_code: str,
+    reason_code: str,
+    human_confirmed: bool,
+    source_sha256: str,
+    source_size_bytes: int,
+    schema_proposal_id: str,
+    table_fingerprint_sha256: str,
+    mapping_digest_sha256: str,
+    record_count: int,
+    target_object_codes: tuple[str, ...],
+    mhtml_contract_revision: str,
+    mightyetl_contract_revision: str,
+) -> tuple[str, ...]:
+    """Validate every trust-bearing field and return canonical HRIS targets."""
+    _require_operational_uuid(tenant_record_id)
+    _require_reference(migration_batch_reference, "migration batch reference")
+    _require_reference(actor_reference, "actor reference")
+    _require_reference(approval_reference, "approval reference")
+    _require_code(purpose_code, "purpose code")
+    if purpose_code != "hris_data_migration":
+        raise ContractViolation("migration purpose must be hris_data_migration")
+    _require_code(reason_code, "reason code")
+    if human_confirmed is not True:
+        raise ContractViolation("migration handoff requires explicit human confirmation")
+    _require_sha256(source_sha256, "source digest")
+    _require_positive_int(source_size_bytes, "source size")
+    _require_schema_proposal_id(schema_proposal_id)
+    _require_sha256(table_fingerprint_sha256, "table fingerprint")
+    _require_sha256(mapping_digest_sha256, "mapping digest")
+    _require_positive_int(record_count, "record count")
+    if record_count > MAXIMUM_BATCH_RECORDS:
+        raise ContractViolation("migration batch exceeds the reviewed record bound")
+    canonical_targets = _canonical_target_objects(target_object_codes)
+    if mhtml_contract_revision != MHTML_ETL_GATEWAY_REVISION:
+        raise ContractViolation("MHTML ETL Gateway contract revision requires revalidation")
+    if mightyetl_contract_revision != MIGHTY_ETL_REVISION:
+        raise ContractViolation("mightyETL contract revision requires revalidation")
+    return canonical_targets
 
 
 def _require_operational_uuid(value: str) -> None:
@@ -207,6 +250,11 @@ def _require_reference(value: str, label: str) -> None:
 def _require_code(value: str, label: str) -> None:
     if not isinstance(value, str) or not _CODE_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} is malformed")
+
+
+def _require_schema_proposal_id(value: str) -> None:
+    if not isinstance(value, str) or not _SCHEMA_PROPOSAL_PATTERN.fullmatch(value):
+        raise ContractViolation("schema proposal identifier is malformed")
 
 
 def _require_sha256(value: str, label: str) -> None:
