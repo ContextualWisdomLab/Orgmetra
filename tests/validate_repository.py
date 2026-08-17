@@ -58,6 +58,7 @@ REQUIRED = [
     "database/migrations/0007_outbox_retry_exhaustion.sql",
     "database/migrations/0008_audit_outbox_review_hardening.sql",
     "database/migrations/0009_candidate_worker_conversion_governance.sql",
+    "database/migrations/0010_validity_study_case_integrity.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -75,6 +76,7 @@ REQUIRED = [
     "tests/test_outbox_dead_letter_postgres.sh",
     "tests/test_audit_outbox_hardening_postgres.sh",
     "tests/test_candidate_worker_conversion_postgres.sh",
+    "tests/test_validity_study_case_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -280,6 +282,11 @@ def _validate_database_contract() -> None:
         "CREATE TABLE validity_study_decision_link",
         "CREATE TABLE validity_study_outcome_link",
         "CREATE TABLE validity_study_evidence_set_link",
+        "CREATE TABLE validity_study_case_record",
+        "CREATE FUNCTION public.validate_validity_study_case",
+        "CREATE FUNCTION public.reject_legacy_validity_study_link_insert",
+        "CREATE TRIGGER validity_study_case_truncate_guard",
+        "CREATE POLICY validity_study_case_scope_policy",
         "CREATE FUNCTION current_tenant_record_id",
         "FORCE ROW LEVEL SECURITY",
         "CREATE POLICY person_record_scope_policy",
