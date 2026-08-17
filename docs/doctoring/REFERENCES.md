@@ -18,6 +18,8 @@ Hu, V. C., Ferraiolo, D. F., & Kuhn, D. R. (2019). *Attribute considerations for
 
 Hu, V. C., Ferraiolo, D. F., Kuhn, D. R., Schnitzer, A., Sandlin, K., Miller, R., & Scarfone, K. A. (2019). *Guide to attribute based access control (ABAC) definition and considerations* (NIST Special Publication 800-162). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-162
 
+Hysong, S. J., Best, R. G., & Moore, F. I. (2007). Are we under-utilizing the talents of primary care personnel? A job analytic examination. *Implementation Science, 2*, Article 10. https://doi.org/10.1186/1748-5908-2-10
+
 International Organization for Standardization. (2022). *ISO 30400:2022 Human resource management — Vocabulary*. ISO.
 
 International Organization for Standardization. (2023). *ISO 30405:2023 Human resource management — Guidelines on recruitment*. ISO.
@@ -62,7 +64,7 @@ Society for Industrial and Organizational Psychology. (2018). *Principles for th
 
 U.S. Department of Labor, Office of Administrative Law Judges. (1991). *Dictionary of Occupational Titles (4th ed., rev. 1991), Appendix B: Explanation of Data, People, and Things*. https://www.dol.gov/agencies/oalj/PUBLIC/DOT/REFERENCES/DOTAPPB
 
-U.S. Office of Personnel Management. (n.d.). *Job analysis*. Retrieved August 17, 2026, from https://www.opm.gov/policy-data-oversight/assessment-and-selection/job-analysis/
+U.S. Office of Personnel Management. (n.d.). *Job analysis*. Retrieved August 18, 2026, from https://www.opm.gov/policy-data-oversight/assessment-and-selection/job-analysis/
 
 World Wide Web Consortium. (2013). *PROV-O: The PROV ontology*. https://www.w3.org/TR/prov-o/
 
