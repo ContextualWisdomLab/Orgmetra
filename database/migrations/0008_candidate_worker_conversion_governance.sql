@@ -58,11 +58,10 @@ CREATE TABLE candidate_worker_conversion_record (
         UNIQUE (tenant_record_id, candidate_worker_conversion_record_id),
     CONSTRAINT candidate_conversion_audit_identity_unique
         UNIQUE (tenant_record_id, audit_event_record_id),
-    CONSTRAINT candidate_conversion_bitemporal_exclusion
+    CONSTRAINT candidate_conversion_knowledge_exclusion
         EXCLUDE USING gist (
             tenant_record_id WITH =,
             candidate_profile_id WITH =,
-            daterange(effective_from, effective_to, '[)') WITH &&,
             tstzrange(recorded_from, recorded_to, '[)') WITH &&
         )
 );
@@ -86,6 +85,10 @@ DECLARE
     evidence_member_count bigint;
     audit_event_envelope jsonb;
     audit_event_time timestamptz;
+    is_correction boolean;
+    expected_event_type text;
+    expected_reason_code text;
+    expected_result_code text;
 BEGIN
     SELECT
         decision.candidate_profile_id,
@@ -169,6 +172,27 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    SELECT EXISTS (
+        SELECT 1
+        FROM candidate_worker_conversion_record
+        WHERE tenant_record_id = NEW.tenant_record_id
+          AND candidate_profile_id = NEW.candidate_profile_id
+          AND candidate_worker_conversion_record_id
+              <> NEW.candidate_worker_conversion_record_id
+          AND recorded_to IS NOT NULL
+    )
+    INTO is_correction;
+
+    IF is_correction THEN
+        expected_event_type := 'orgmetra.candidate.worker_conversion_corrected';
+        expected_reason_code := 'candidate_conversion_corrected';
+        expected_result_code := 'worker_conversion_corrected';
+    ELSE
+        expected_event_type := 'orgmetra.candidate.worker_converted';
+        expected_reason_code := 'candidate_hire_confirmed';
+        expected_result_code := 'worker_created';
+    END IF;
+
     SELECT canonical_event_json::jsonb
     INTO audit_event_envelope
     FROM audit_event_record
@@ -182,17 +206,17 @@ BEGIN
 
     audit_event_time := (audit_event_envelope ->> 'time')::timestamptz;
 
-    IF audit_event_envelope ->> 'type' <> 'orgmetra.candidate.worker_converted'
+    IF audit_event_envelope ->> 'type' <> expected_event_type
        OR audit_event_envelope ->> 'subject'
           <> 'candidate_worker_conversion_record:' || NEW.candidate_worker_conversion_record_id::text
        OR audit_event_envelope ->> 'orgmetraactor' <> actor_reference_value
        OR audit_event_envelope ->> 'orgmetrapurpose' <> purpose_code_value
-       OR audit_event_envelope ->> 'orgmetrareason' <> 'candidate_hire_confirmed'
+       OR audit_event_envelope ->> 'orgmetrareason' <> expected_reason_code
        OR audit_event_envelope ->> 'orgmetraevidence'
           <> 'decision_evidence_set:' || evidence_set_id::text
        OR audit_event_envelope ->> 'orgmetraconfirmation' <> confirmation_reference_value
        OR (audit_event_envelope #>> '{data,high_impact}')::boolean IS NOT TRUE
-       OR audit_event_envelope #>> '{data,result_code}' <> 'worker_created'
+       OR audit_event_envelope #>> '{data,result_code}' <> expected_result_code
        OR audit_event_time < decided_at_value
        OR audit_event_time > NEW.recorded_from THEN
         RAISE EXCEPTION 'candidate conversion audit envelope does not bind exact hire provenance'
