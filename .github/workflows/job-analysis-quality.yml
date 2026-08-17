@@ -47,7 +47,15 @@ jobs:
           node-version: '24'
           check-latest: false
       - name: Validate repository contracts
-        run: npm run validate
+        run: |
+          set +e
+          npm run validate
+          validation_status=$?
+          set -e
+          if [[ ${validation_status} -ne 0 ]]; then
+            python3 tests/validate_repository.py --print-manifest
+            exit "${validation_status}"
+          fi
       - name: Prove validation is read-only
         run: |
           git diff --exit-code
