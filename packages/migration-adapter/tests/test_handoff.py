@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError, fields, replace
+import hashlib
 import json
 
 import pytest
@@ -13,6 +14,7 @@ from orgmetra_migration_adapter import (
     MIGHTY_ETL_REVISION,
     MIGRATION_CONTRACT_VERSION,
     ContractViolation,
+    MigrationHandoffEnvelope,
     MigrationHandoffInput,
     build_migration_handoff,
 )
@@ -66,7 +68,11 @@ def test_builds_deterministic_value_free_handoff() -> None:
     assert first.human_confirmed is True
     assert first.requires_reconciliation is True
     assert "reconcile" in first.next_action
-    assert first.digest_sha256() == second.digest_sha256()
+    expected_digest = hashlib.sha256(
+        first.canonical_json().encode("utf-8")
+    ).hexdigest()
+    assert first.digest_sha256() == expected_digest
+    assert second.digest_sha256() == expected_digest
     assert len(first.digest_sha256()) == 64
 
     payload = json.loads(first.canonical_json())
@@ -282,6 +288,14 @@ def test_direct_envelope_construction_rejects_noncanonical_evidence(
     envelope = build_migration_handoff(valid_input())
     with pytest.raises(ContractViolation, match=message):
         replace(envelope, **changes)
+
+    direct_values = {
+        field.name: getattr(envelope, field.name)
+        for field in fields(MigrationHandoffEnvelope)
+    }
+    direct_values.update(changes)
+    with pytest.raises(ContractViolation, match=message):
+        MigrationHandoffEnvelope(**direct_values)  # type: ignore[arg-type]
 
 
 def test_evidence_objects_are_immutable() -> None:
