@@ -45,12 +45,12 @@ jobs:
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
-      - name: Run RED recovery contract
+      - name: Run recovery evidence contract
         run: node --test tests/recovery-rehearsal.test.mjs
       - name: Validate repository contracts
         run: |
           python tests/validate_repository.py
-          npm test
+          npm run validate
       - name: Exercise real dump and restore
         env:
           POSTGRES_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5432/postgres
