@@ -56,6 +56,7 @@ SELECT
 FROM public.candidate_worker_conversion_record AS conversion
 WHERE conversion.tenant_record_id = %s
   AND conversion.person_record_id = %s
+  AND conversion.recorded_to IS NULL
 LIMIT 2
 """.strip()
 

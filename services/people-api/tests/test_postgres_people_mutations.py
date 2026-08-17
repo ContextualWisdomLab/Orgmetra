@@ -198,6 +198,10 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self.assertEqual(result.employment_record_id, EMPLOYMENT)
         sql_text = "\n".join(sql for sql, _parameters in cursor.executions)
         self.assertIn("public.candidate_worker_conversion_record", sql_text)
+        conversion_sql = next(
+            sql for sql, _parameters in cursor.executions if "candidate_worker_conversion_record" in sql
+        )
+        self.assertIn("conversion.recorded_to IS NULL", conversion_sql)
         self.assertIn("public.employment_record", sql_text)
         self.assertIn("employment_concurrency_code", sql_text)
         self.assertIn("public.record_audit_outbox_event", sql_text)
@@ -254,6 +258,10 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self.assertEqual(result.assignment_record_id, ASSIGNMENT)
         sql_text = "\n".join(sql for sql, _parameters in cursor.executions)
         self.assertIn("public.candidate_worker_conversion_record", sql_text)
+        conversion_sql = next(
+            sql for sql, _parameters in cursor.executions if "candidate_worker_conversion_record" in sql
+        )
+        self.assertIn("conversion.recorded_to IS NULL", conversion_sql)
         self.assertIn("public.assignment_record", sql_text)
         self.assertIn("public.record_audit_outbox_event", sql_text)
         self.assertNotIn("candidate_worker_link", sql_text)
