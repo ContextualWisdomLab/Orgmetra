@@ -235,10 +235,14 @@ BEFORE TRUNCATE ON public.outbox_delivery_record
 FOR EACH STATEMENT
 EXECUTE FUNCTION public.reject_outbox_delivery_truncate();
 
+-- PostgreSQL does not grant TRUNCATE to PUBLIC by default. Keep the explicit
+-- revoke as defense-in-depth documentation of the immutable-history boundary.
 REVOKE TRUNCATE ON public.audit_event_record, public.outbox_delivery_record FROM PUBLIC;
 
 -- Claim scans are latency-sensitive and accumulate with durable audit history.
-CREATE INDEX outbox_delivery_due_work_index
+-- This migration is intentionally autocommit/non-transactional at this step so
+-- established deployments can build the index without blocking queue writers.
+CREATE INDEX CONCURRENTLY outbox_delivery_due_work_index
     ON public.outbox_delivery_record (
         tenant_record_id,
         available_at,
@@ -355,6 +359,72 @@ BEGIN
 END;
 $$;
 
+-- Default function EXECUTE is granted to PUBLIC by PostgreSQL, so revoke it
+-- before elevating the operator recovery boundary to SECURITY DEFINER.
 REVOKE ALL ON FUNCTION public.operator_dead_letter_expired_outbox_delivery(
     uuid, uuid, uuid, text, text
 ) FROM PUBLIC;
+
+-- Separate the externally assignable operator capability from the non-login
+-- function owner. The recovery owner receives only the transport-table rights
+-- needed by this function and never BYPASSRLS; callers receive EXECUTE only,
+-- so they cannot emulate recovery through direct table DML.
+DO $orgmetra_role_bootstrap$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles
+        WHERE rolname = 'orgmetra_outbox_recovery_owner'
+    ) THEN
+        CREATE ROLE orgmetra_outbox_recovery_owner
+            NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles
+        WHERE rolname = 'orgmetra_outbox_operator'
+    ) THEN
+        CREATE ROLE orgmetra_outbox_operator
+            NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+    END IF;
+END;
+$orgmetra_role_bootstrap$;
+
+ALTER ROLE orgmetra_outbox_recovery_owner
+    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE orgmetra_outbox_operator
+    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+
+GRANT USAGE ON SCHEMA public TO orgmetra_outbox_recovery_owner, orgmetra_outbox_operator;
+GRANT SELECT ON public.outbox_delivery_record TO orgmetra_outbox_recovery_owner;
+GRANT UPDATE (
+    delivery_state_code,
+    lease_owner_reference,
+    lease_expires_at,
+    last_failure_code
+) ON public.outbox_delivery_record TO orgmetra_outbox_recovery_owner;
+GRANT SELECT, INSERT ON public.outbox_delivery_escalation_record
+    TO orgmetra_outbox_recovery_owner;
+GRANT EXECUTE ON FUNCTION public.is_operational_uuid(uuid)
+    TO orgmetra_outbox_recovery_owner;
+GRANT EXECUTE ON FUNCTION public.current_tenant_record_id()
+    TO orgmetra_outbox_recovery_owner;
+GRANT EXECUTE ON FUNCTION public.protect_outbox_delivery_transition()
+    TO orgmetra_outbox_recovery_owner;
+GRANT EXECUTE ON FUNCTION public.validate_outbox_delivery_escalation_binding()
+    TO orgmetra_outbox_recovery_owner;
+
+-- ALTER FUNCTION OWNER requires CREATE on the containing schema for the target
+-- owner. Grant it only for the ownership handoff, then remove it immediately.
+GRANT CREATE ON SCHEMA public TO orgmetra_outbox_recovery_owner;
+ALTER FUNCTION public.operator_dead_letter_expired_outbox_delivery(
+    uuid, uuid, uuid, text, text
+) OWNER TO orgmetra_outbox_recovery_owner;
+REVOKE CREATE ON SCHEMA public FROM orgmetra_outbox_recovery_owner;
+ALTER FUNCTION public.operator_dead_letter_expired_outbox_delivery(
+    uuid, uuid, uuid, text, text
+) SECURITY DEFINER;
+GRANT EXECUTE ON FUNCTION public.operator_dead_letter_expired_outbox_delivery(
+    uuid, uuid, uuid, text, text
+) TO orgmetra_outbox_operator;
