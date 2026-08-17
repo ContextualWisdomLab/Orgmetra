@@ -15,6 +15,7 @@ from orgmetra_people_api.people import (
     WorkerPeopleRecord,
     read_worker_people_record,
 )
+from orgmetra_people_api.postgres import PostgresPeopleReadPort
 
 __all__ = [
     "AuthenticatedPrincipal",
@@ -23,6 +24,7 @@ __all__ = [
     "PeopleReadPort",
     "PeopleRecordIntegrityError",
     "PeopleRecordNotFound",
+    "PostgresPeopleReadPort",
     "TokenAuthenticator",
     "WorkerPeopleRecord",
     "authorize_resource_fields",
