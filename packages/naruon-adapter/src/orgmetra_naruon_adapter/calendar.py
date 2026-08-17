@@ -140,7 +140,7 @@ def _validate_context(context: CalendarIntentContext) -> tuple[str, str | None]:
     _require_code(context.purpose_code, "purpose_code")
     _require_code(context.reason_code, "reason_code")
     _require_token(context.evidence_version, "evidence_version")
-    if not context.human_confirmed:
+    if context.human_confirmed is not True:
         raise ContractViolation("calendar intent requires explicit human confirmation")
     summary = _ACTION_SUMMARIES.get(context.action_kind)
     if summary is None:
