@@ -56,6 +56,9 @@ REQUIRED = [
     "database/migrations/0005_outbox_delivery_finalization.sql",
     "database/migrations/0006_outbox_delivery_dead_letter.sql",
     "database/migrations/0007_outbox_retry_exhaustion.sql",
+    "database/migrations/0008_audit_outbox_review_hardening.sql",
+    "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
+    "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
     "scripts/foundation-contract-core.mjs",
     "scripts/foundation-contract.mjs",
@@ -69,6 +72,7 @@ REQUIRED = [
     "tests/test_audit_outbox_postgres.sh",
     "tests/test_outbox_claim_postgres.sh",
     "tests/test_outbox_dead_letter_postgres.sh",
+    "tests/test_audit_outbox_hardening_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -98,7 +102,7 @@ def _line_count(data: bytes) -> int:
 
 
 def _expected_manifest_document() -> dict[str, Any]:
-    """Build the deterministic manifest expected for the exact checked-out files."""
+    """Build deterministic provenance for the exact active branch artifact set."""
     files = []
     for relative_path in sorted(set(REQUIRED) - {"manifest.json"}):
         path = ROOT / relative_path
@@ -116,7 +120,7 @@ def _expected_manifest_document() -> dict[str, Any]:
     return {
         "package": "orgmetra-foundation-pack",
         "version": "0.1.0",
-        "generated_for_branch": "feat/foundation-product-baseline",
+        "generated_for_branch": "feat/audit-outbox-envelope",
         "files": files,
     }
 
@@ -130,6 +134,11 @@ def _manifest_entries() -> dict[str, dict[str, Any]]:
 
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         _fail("manifest.json must contain a files array")
+    if manifest.get("generated_for_branch") != "feat/audit-outbox-envelope":
+        _fail(
+            "manifest generated_for_branch must identify the active generation branch "
+            "feat/audit-outbox-envelope"
+        )
 
     entries: dict[str, dict[str, Any]] = {}
     for raw_entry in manifest["files"]:
@@ -176,39 +185,11 @@ def _validate_manifest() -> None:
 
 def _validate_database_contract() -> None:
     """Validate naming, temporal, tenant, audit, evidence, and append-only DDL contracts."""
-    foundation_sql = (ROOT / "database/migrations/0001_foundation_schema.sql").read_text(
-        encoding="utf-8"
-    )
-    evidence_sql = (ROOT / "database/migrations/0002_sealed_evidence_digest.sql").read_text(
-        encoding="utf-8"
-    )
-    audit_sql = (ROOT / "database/migrations/0003_audit_outbox_persistence.sql").read_text(
-        encoding="utf-8"
-    )
-    claim_sql = (ROOT / "database/migrations/0004_outbox_delivery_claim.sql").read_text(
-        encoding="utf-8"
-    )
-    finalization_sql = (
-        ROOT / "database/migrations/0005_outbox_delivery_finalization.sql"
-    ).read_text(encoding="utf-8")
-    dead_letter_sql = (
-        ROOT / "database/migrations/0006_outbox_delivery_dead_letter.sql"
-    ).read_text(encoding="utf-8")
-    retry_exhaustion_sql = (
-        ROOT / "database/migrations/0007_outbox_retry_exhaustion.sql"
-    ).read_text(encoding="utf-8")
-    table_sql = foundation_sql + "\n" + audit_sql + "\n" + dead_letter_sql
-    sql = (
-        table_sql
-        + "\n"
-        + evidence_sql
-        + "\n"
-        + claim_sql
-        + "\n"
-        + finalization_sql
-        + "\n"
-        + retry_exhaustion_sql
-    )
+    migration_paths = sorted((ROOT / "database/migrations").glob("*.sql"))
+    if not migration_paths:
+        _fail("No database migrations found")
+    sql = "\n".join(path.read_text(encoding="utf-8") for path in migration_paths)
+    table_sql = sql
 
     table_pattern = re.compile(
         r"\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
@@ -326,6 +307,11 @@ def _validate_database_contract() -> None:
         "terminal outbox delivery records are immutable",
         "outbox delivery stored attempt budget is exhausted and cannot be reclaimed",
         "outbox delivery stored attempt budget is exhausted and requires terminal dead-lettering",
+        "CREATE TRIGGER audit_event_record_truncate_guard",
+        "CREATE TRIGGER outbox_delivery_record_truncate_guard",
+        "CREATE INDEX outbox_delivery_due_work_index",
+        "CREATE FUNCTION public.operator_dead_letter_expired_outbox_delivery",
+        "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
