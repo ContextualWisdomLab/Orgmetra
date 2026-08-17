@@ -7,6 +7,7 @@ requirements_path="${repository_root}/.github/requirements/foundation-test.txt"
 
 expected_install="python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt"
 expected_pythonpath="PYTHONPATH: packages/hris-kernel/src:packages/keyverse-adapter/src"
+expected_default_pr_target=$'  pull_request:\n    branches:\n      - develop\n'
 
 if ! grep -Fq -- "${expected_install}" "${workflow_path}"; then
   printf 'Foundation CI must install only the hash-locked test toolchain.\n' >&2
@@ -20,6 +21,11 @@ fi
 
 if ! grep -Fq -- "${expected_pythonpath}" "${workflow_path}"; then
   printf 'Foundation CI must import repository-local packages directly from their src trees.\n' >&2
+  exit 1
+fi
+
+if ! grep -Fq -- "${expected_default_pr_target}" "${workflow_path}"; then
+  printf 'Foundation CI must run for pull requests targeting the repository default branch develop.\n' >&2
   exit 1
 fi
 
