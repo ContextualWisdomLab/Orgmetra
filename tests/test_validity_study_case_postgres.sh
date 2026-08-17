@@ -3,6 +3,24 @@ set -euo pipefail
 
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
 
+# These are test-only cluster-global reader roles. A recreated test database can
+# leave the roles behind in the same PostgreSQL cluster, so remove any stale
+# fixture roles before rebuilding the candidate/conversion fixture.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orgmetra_candidate_conversion_reader') THEN
+        EXECUTE 'DROP OWNED BY orgmetra_candidate_conversion_reader';
+        EXECUTE 'DROP ROLE orgmetra_candidate_conversion_reader';
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orgmetra_validity_case_reader') THEN
+        EXECUTE 'DROP OWNED BY orgmetra_validity_case_reader';
+        EXECUTE 'DROP ROLE orgmetra_validity_case_reader';
+    END IF;
+END;
+$$;
+SQL
+
 # Reuse the exact candidate->worker governed fixture so criterion outcomes can be
 # bound to a real human-confirmed hire and its current bitemporal conversion.
 bash tests/test_candidate_worker_conversion_postgres.sh
@@ -21,6 +39,14 @@ INSERT INTO person_record (
     '10000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-000000000002',
     TIMESTAMPTZ '2026-08-20 00:00:00+00'
+);
+
+INSERT INTO job_profile (
+    tenant_record_id, job_profile_id, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000022',
+    TIMESTAMPTZ '2026-08-17 04:40:00+00'
 );
 
 INSERT INTO performance_cycle (
@@ -52,6 +78,13 @@ INSERT INTO criterion_blueprint (
     '00000000-0000-7000-8000-0000000000a2',
     '00000000-0000-7000-8000-000000000021',
     'training_completion', 'criterion_v1',
+    DATE '2026-10-01', TIMESTAMPTZ '2026-10-01 00:00:00+00'
+),
+(
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-0000000000a3',
+    '00000000-0000-7000-8000-000000000022',
+    'supervisor_performance', 'criterion_v1',
     DATE '2026-10-01', TIMESTAMPTZ '2026-10-01 00:00:00+00'
 );
 
@@ -104,11 +137,24 @@ INSERT INTO criterion_observation (
 INSERT INTO validity_study (
     tenant_record_id, validity_study_id, criterion_blueprint_id,
     study_status_code, recorded_from
-) VALUES (
+) VALUES
+(
     '10000000-0000-7000-8000-000000000001',
     '00000000-0000-7000-8000-0000000000c1',
     '00000000-0000-7000-8000-0000000000a1',
     'study_draft', TIMESTAMPTZ '2026-11-03 00:00:00+00'
+),
+(
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-0000000000c2',
+    '00000000-0000-7000-8000-0000000000a3',
+    'study_draft', TIMESTAMPTZ '2026-11-03 00:00:00+00'
+),
+(
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-0000000000c4',
+    '00000000-0000-7000-8000-0000000000a1',
+    'study_draft', TIMESTAMPTZ '2026-11-03 02:00:00+00'
 );
 
 INSERT INTO decision_evidence_set (
@@ -152,6 +198,12 @@ assert_rejected "legacy validity-study links are read-only" \
 assert_rejected "validity-study case requires the selection decision's exact evidence set" \
   "INSERT INTO validity_study_case_record (tenant_record_id, validity_study_case_record_id, validity_study_id, selection_decision_id, decision_evidence_set_id, criterion_observation_id, candidate_worker_conversion_record_id, linked_at) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000e1', '00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-0000000000d1', '00000000-0000-7000-8000-0000000000b1', '00000000-0000-7000-8000-000000000082', TIMESTAMPTZ '2026-11-03 01:00:00+00');"
 
+assert_rejected "validity-study case decision belongs to a different Job" \
+  "INSERT INTO validity_study_case_record (tenant_record_id, validity_study_case_record_id, validity_study_id, selection_decision_id, decision_evidence_set_id, criterion_observation_id, candidate_worker_conversion_record_id, linked_at) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000e6', '00000000-0000-7000-8000-0000000000c2', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-000000000041', '00000000-0000-7000-8000-0000000000b1', '00000000-0000-7000-8000-000000000082', TIMESTAMPTZ '2026-11-03 01:00:00+00');"
+
+assert_rejected "validity-study case must bind a study version visible at linked_at" \
+  "INSERT INTO validity_study_case_record (tenant_record_id, validity_study_case_record_id, validity_study_id, selection_decision_id, decision_evidence_set_id, criterion_observation_id, candidate_worker_conversion_record_id, linked_at) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000e7', '00000000-0000-7000-8000-0000000000c4', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-000000000041', '00000000-0000-7000-8000-0000000000b1', '00000000-0000-7000-8000-000000000082', TIMESTAMPTZ '2026-11-03 01:00:00+00');"
+
 assert_rejected "validity-study case outcome uses a different criterion" \
   "INSERT INTO validity_study_case_record (tenant_record_id, validity_study_case_record_id, validity_study_id, selection_decision_id, decision_evidence_set_id, criterion_observation_id, candidate_worker_conversion_record_id, linked_at) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000e2', '00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-000000000041', '00000000-0000-7000-8000-0000000000b2', '00000000-0000-7000-8000-000000000082', TIMESTAMPTZ '2026-11-03 01:00:00+00');"
 
@@ -161,6 +213,9 @@ assert_rejected "validity-study case outcome belongs to a different worker" \
 assert_rejected "validity-study case may use only evidence visible at linked_at" \
   "INSERT INTO validity_study_case_record (tenant_record_id, validity_study_case_record_id, validity_study_id, selection_decision_id, decision_evidence_set_id, criterion_observation_id, candidate_worker_conversion_record_id, linked_at) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000e5', '00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-000000000041', '00000000-0000-7000-8000-0000000000b4', '00000000-0000-7000-8000-000000000082', TIMESTAMPTZ '2026-11-03 01:00:00+00');"
 
+# Upstream evidence sealing and candidate-worker conversion tests own invalid
+# unsealed evidence and candidate/decision-mismatched conversion construction.
+# This case contract consumes only rows admitted by those governed boundaries.
 tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO validity_study_case_record (
     tenant_record_id, validity_study_case_record_id, validity_study_id,
@@ -191,6 +246,8 @@ fi
 
 assert_rejected "append-only relation cannot be updated or deleted" \
   "UPDATE validity_study_case_record SET linked_at = TIMESTAMPTZ '2026-11-03 02:00:00+00' WHERE validity_study_case_record_id = '00000000-0000-7000-8000-0000000000e4';"
+assert_rejected "append-only relation cannot be updated or deleted" \
+  "DELETE FROM validity_study_case_record WHERE validity_study_case_record_id = '00000000-0000-7000-8000-0000000000e4';"
 assert_rejected "validity-study case history cannot be truncated" \
   "TRUNCATE TABLE validity_study_case_record;"
 
