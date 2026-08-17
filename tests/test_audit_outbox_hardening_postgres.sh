@@ -3,9 +3,50 @@ set -euo pipefail
 
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
 
-for migration in database/migrations/000{1..8}_*.sql; do
+# Apply the owner-independent foundation first. Migration 0008 owns privileged
+# recovery roles, so prove it fails closed before changing any project object
+# when either reserved role name already exists. Reusing a pre-existing role can
+# retain inherited memberships or ACLs that ALTER ROLE does not remove.
+for migration in database/migrations/000{1..7}_*.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE ROLE orgmetra_outbox_operator NOLOGIN;
+SQL
+
+set +e
+preexisting_role_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -f database/migrations/0008_audit_outbox_review_hardening.sql; } 2>&1)"
+preexisting_role_status=$?
+set -e
+if [[ ${preexisting_role_status} -eq 0 \
+      || "${preexisting_role_output}" != *"pre-existing outbox recovery role is not accepted"* ]]; then
+    echo "migration 0008 did not fail closed on a pre-existing recovery role: ${preexisting_role_output}" >&2
+    exit 1
+fi
+
+# A fail-closed preflight must run before 0008 mutates project objects. If an
+# index or operator function already exists here, the collision check was too
+# late and the migration left partial state behind.
+partial_state_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT
+    (pg_catalog.to_regclass('public.outbox_delivery_due_work_index') IS NOT NULL)::integer
+    + (pg_catalog.to_regprocedure(
+        'public.operator_dead_letter_expired_outbox_delivery(uuid,uuid,uuid,text,text)'
+      ) IS NOT NULL)::integer;
+SQL
+)"
+if [[ "${partial_state_count}" != "0" ]]; then
+    echo "role-collision preflight left partial migration 0008 state: ${partial_state_count}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+DROP ROLE orgmetra_outbox_operator;
+SQL
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -f database/migrations/0008_audit_outbox_review_hardening.sql
 
 TENANT_ID="10000000-0000-7000-8000-000000000001"
 EVENT_ID="00000000-0000-4000-8000-0000000000b1"
@@ -68,8 +109,8 @@ if [[ "${search_path_contract}" != "6" ]]; then
 fi
 
 # The operator capability must be usable without giving the externally
-# assignable role direct transport-table mutation rights. The separate function
-# owner is non-login, non-superuser, and cannot bypass tenant RLS.
+# assignable role direct transport-table mutation rights. Both service-owned
+# roles must be isolated from pre-existing membership graphs.
 role_hardening_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
 SELECT count(*)
 FROM pg_catalog.pg_roles AS role_record
@@ -90,12 +131,49 @@ if [[ "${role_hardening_contract}" != "2" ]]; then
     exit 1
 fi
 
+role_membership_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+WITH recovery_roles AS (
+    SELECT oid
+    FROM pg_catalog.pg_roles
+    WHERE rolname IN ('orgmetra_outbox_recovery_owner', 'orgmetra_outbox_operator')
+)
+SELECT count(*)
+FROM pg_catalog.pg_auth_members AS membership_record
+WHERE membership_record.roleid IN (SELECT oid FROM recovery_roles)
+   OR membership_record.member IN (SELECT oid FROM recovery_roles);
+SQL
+)"
+if [[ "${role_membership_count}" != "0" ]]; then
+    echo "outbox recovery roles unexpectedly participate in role membership edges: ${role_membership_count}" >&2
+    exit 1
+fi
+
+schema_create_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT
+    pg_catalog.has_schema_privilege(
+        'orgmetra_outbox_recovery_owner', 'public', 'CREATE'
+    )::text || '|'
+    || pg_catalog.has_schema_privilege(
+        'orgmetra_outbox_operator', 'public', 'CREATE'
+    )::text;
+SQL
+)"
+if [[ "${schema_create_contract}" != "false|false" ]]; then
+    echo "temporary public-schema CREATE capability was not fully revoked: ${schema_create_contract}" >&2
+    exit 1
+fi
+
 operator_acl_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
 SELECT
     pg_catalog.has_function_privilege(
         'orgmetra_outbox_operator',
         'public.operator_dead_letter_expired_outbox_delivery(uuid,uuid,uuid,text,text)',
         'EXECUTE'
+    )::text || '|'
+    || pg_catalog.has_table_privilege(
+        'orgmetra_outbox_operator',
+        'public.outbox_delivery_record',
+        'SELECT'
     )::text || '|'
     || pg_catalog.has_table_privilege(
         'orgmetra_outbox_operator',
@@ -109,8 +187,8 @@ SELECT
     )::text;
 SQL
 )"
-if [[ "${operator_acl_contract}" != "true|false|false" ]]; then
-    echo "operator capability must expose recovery EXECUTE without direct outbox DML: ${operator_acl_contract}" >&2
+if [[ "${operator_acl_contract}" != "true|false|false|false" ]]; then
+    echo "operator capability must expose recovery EXECUTE without direct outbox read/write DML: ${operator_acl_contract}" >&2
     exit 1
 fi
 
