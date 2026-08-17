@@ -26,6 +26,9 @@
 | `validity_study_decision_link` | Append-only study-to-selection-decision relationship. |
 | `validity_study_evidence_set_link` | Append-only study-to-versioned-evidence relationship. |
 | `validity_study_outcome_link` | Append-only study-to-criterion-observation relationship. |
+| `audit_event_record` | Append-only, tenant-scoped canonical audit envelope bytes plus database-verified SHA-256 digest. |
+| `outbox_delivery_record` | Mutable asynchronous delivery coordination for one immutable audit event and delivery target, including immutable database-owned retry budget. |
+| `outbox_delivery_escalation_record` | Append-only terminal-failure evidence for one dead-lettered delivery, including failure classification, terminal attempt count, and opaque escalation reference. |
 
 ## Tenant integrity
 
@@ -54,6 +57,20 @@ Evidence membership is constructed in `selection_decision_evidence` while its `d
 
 Validation-study link tables preserve the exact decisions, evidence sets and criterion observations included in a study. External specialist results remain references through published contracts; Orgmetra does not reach into a specialist service's application tables.
 
+## Audit and outbox normalization
+
+`audit_event_record`, `outbox_delivery_record`, and `outbox_delivery_escalation_record` are deliberately separate relations. The audit relation stores the immutable, PII-minimized canonical CloudEvents representation and its SHA-256 digest. The database allowlists the event shape, verifies event and tenant identifiers, requires accountable human confirmation when `data.high_impact` is true, and recomputes the digest over the exact stored UTF-8 text before accepting the row.
+
+`outbox_delivery_record` stores only delivery coordination: target, state, attempt count, immutable `maximum_attempt_count`, availability, lease metadata, bounded failure code, and terminal delivery time. Migration 0006 gives existing/new deliveries a default maximum of 5 and constrains the persisted budget to 1 through 100; the transition guard prevents changing it later. It references the immutable audit event through a tenant-qualified foreign key. A unique tenant/event/target key prevents duplicate delivery work for the same target. The guarded lifecycle is `pending -> leased -> delivered`, with `leased -> pending` available for a recorded retry while attempts remain, `leased -> leased` allowed only for expired-lease takeover while attempts remain, and `leased -> dead_lettered` allowed only after the stored retry budget is exhausted and matching escalation evidence exists. Delivered and dead-lettered rows are terminal. Once `delivery_attempt_count` reaches `maximum_attempt_count`, retry and claim cannot create attempt N+1; an expired final lease remains associated with its recorded stable worker reference for terminalization. This separation prevents retry mechanics from becoming mutable audit history and avoids repeating the event payload per delivery target.
+
+`outbox_delivery_escalation_record` is normalized terminal evidence rather than another queue. Exactly one escalation row may bind to one tenant/delivery pair. It captures an operational UUID, lower `snake_case` terminal failure code, namespaced opaque escalation reference, durable terminal attempt count, and recorded time. The row is append-only and forced through the same tenant RLS contract. A deferred binding constraint rejects the row unless its referenced delivery commits as matching terminal `dead_lettered` state with the same attempt count and failure code. It does not duplicate canonical event bytes or mutable HR payloads.
+
+`record_audit_outbox_event(...)` inserts the audit and delivery rows in one statement. It is called by the owning service inside the same PostgreSQL transaction as the authoritative business mutation. If the outbox insert fails, the audit insert from that statement rolls back; if a later business-transaction statement fails, the transaction owner must roll back the entire mutation/audit/outbox unit.
+
+`claim_outbox_delivery(...)` claims due work with deterministic `FOR UPDATE ... SKIP LOCKED`, bounded future leases, and explicit expired-lease recovery evidence only while the stored attempt budget remains. `complete_outbox_delivery(...)` requires the exact owner of a still-live lease. `retry_outbox_delivery(...)` has the same live-owner requirement and also rejects exhausted work. `dead_letter_outbox_delivery(...)` reads, rather than accepts from the dispatcher, the immutable `maximum_attempt_count` before it atomically writes escalation evidence and terminally removes the delivery from normal dispatch. Before exhaustion an expired owner must reclaim normally; after exhaustion only the exact recorded worker reference may close its expired final lease, which avoids both attempt N+1 and foreign-worker takeover. The transition guard independently requires the same exhausted-budget and escalation-binding invariants so structurally valid direct table DML cannot omit them.
+
+Exponential/backoff policy selection, policy-specific producer configuration, audited operator takeover for a permanently lost final-worker identity, retention/export, and external delivery receipts are not yet represented as production-complete behavior on the stacked branch.
+
 ## PII policy
 
-PII is not globally masked. Instead, every sensitive read is evaluated against tenant, actor, role, purpose, resource, field sensitivity, legal basis, retention, and audit policy.
+PII is not globally masked. Instead, every sensitive read is evaluated against tenant, actor, role, purpose, resource, field sensitivity, legal basis, retention, and audit policy. Audit envelopes and escalation evidence store opaque references and governance codes instead of duplicating mutable employee or candidate payloads.

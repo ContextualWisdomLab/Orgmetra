@@ -5,10 +5,12 @@ on:
     branches:
       - bootstrap
       - main
+      - feat/foundation-product-baseline
   push:
     branches:
       - bootstrap
       - main
+      - feat/audit-outbox-envelope
   workflow_dispatch:
 
 permissions:
@@ -77,6 +79,10 @@ jobs:
           - test_tenant_isolation_postgres.sh
           - test_evidence_sealing_postgres.sh
           - test_operational_uuid_postgres.sh
+          - test_audit_outbox_postgres.sh
+          - test_outbox_claim_postgres.sh
+          - test_outbox_dead_letter_postgres.sh
+          - test_audit_outbox_hardening_postgres.sh
     services:
       postgres:
         image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20

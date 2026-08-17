@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
+
+# Apply the owner-independent foundation first. Migration 0008 owns privileged
+# recovery roles, so prove it fails closed before changing any project object
+# when either reserved role name already exists. Reusing a pre-existing role can
+# retain inherited memberships or ACLs that ALTER ROLE does not remove.
+for migration in database/migrations/000{1..7}_*.sql; do
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
+done
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE ROLE orgmetra_outbox_operator NOLOGIN;
+SQL
+
+set +e
+preexisting_role_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -f database/migrations/0008_audit_outbox_review_hardening.sql; } 2>&1)"
+preexisting_role_status=$?
+set -e
+if [[ ${preexisting_role_status} -eq 0 \
+      || "${preexisting_role_output}" != *"pre-existing outbox recovery role is not accepted"* ]]; then
+    echo "migration 0008 did not fail closed on a pre-existing recovery role: ${preexisting_role_output}" >&2
+    exit 1
+fi
+
+# A fail-closed preflight must run before 0008 mutates project objects. If an
+# index or operator function already exists here, the collision check was too
+# late and the migration left partial state behind.
+partial_state_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT
+    (pg_catalog.to_regclass('public.outbox_delivery_due_work_index') IS NOT NULL)::integer
+    + (pg_catalog.to_regprocedure(
+        'public.operator_dead_letter_expired_outbox_delivery(uuid,uuid,uuid,text,text)'
+      ) IS NOT NULL)::integer;
+SQL
+)"
+if [[ "${partial_state_count}" != "0" ]]; then
+    echo "role-collision preflight left partial migration 0008 state: ${partial_state_count}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+DROP ROLE orgmetra_outbox_operator;
+SQL
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -f database/migrations/0008_audit_outbox_review_hardening.sql
+
+TENANT_ID="10000000-0000-7000-8000-000000000001"
+EVENT_ID="00000000-0000-4000-8000-0000000000b1"
+INITIAL_DELIVERY_ID="00000000-0000-4000-8000-0000000000b2"
+EXHAUSTED_DELIVERY_ID="00000000-0000-4000-8000-0000000000b3"
+ESCALATION_ID="00000000-0000-4000-8000-0000000000b4"
+canonical_event='{"data":{"high_impact":false,"result_code":"recorded"},"datacontenttype":"application/json","id":"00000000-0000-4000-8000-0000000000b1","orgmetraactor":"keyverse_subject:01JACTOROPAQUE","orgmetraevidence":"employment-offer:v3","orgmetrapurpose":"workforce_administration","orgmetrareason":"hire_completion","orgmetratenant":"10000000-0000-7000-8000-000000000001","source":"urn:orgmetra:people_core","specversion":"1.0","subject":"assignment_record:01JTESTOPAQUE","time":"2026-08-17T03:00:00Z","type":"orgmetra.people.assignment.recorded"}'
+
+# Immutable evidence and mutable delivery state must both reject TRUNCATE. The
+# probes use CASCADE so PostgreSQL reaches the statement triggers instead of
+# stopping first at dependent foreign-key prechecks. The transactions are
+# intentionally left uncommitted so a vulnerable implementation cannot destroy
+# later fixtures during the RED run.
+set +e
+audit_truncate_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+TRUNCATE public.audit_event_record CASCADE;
+SQL
+} 2>&1)"
+audit_truncate_status=$?
+set -e
+if [[ ${audit_truncate_status} -eq 0 || "${audit_truncate_output}" != *"append-only"* ]]; then
+    echo "audit evidence TRUNCATE was not rejected by the append-only boundary: ${audit_truncate_output}" >&2
+    exit 1
+fi
+
+set +e
+outbox_truncate_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+TRUNCATE public.outbox_delivery_record CASCADE;
+SQL
+} 2>&1)"
+outbox_truncate_status=$?
+set -e
+if [[ ${outbox_truncate_status} -eq 0 || "${outbox_truncate_output}" != *"cannot be truncated"* ]]; then
+    echo "outbox TRUNCATE was not rejected by the governed state boundary: ${outbox_truncate_output}" >&2
+    exit 1
+fi
+
+# Boundary functions must resolve project objects through a trusted fixed path,
+# not the caller's search_path. Include the privileged operator recovery
+# function so its SECURITY DEFINER boundary cannot silently lose this pin.
+search_path_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT count(*)
+FROM pg_catalog.pg_proc AS procedure_record
+WHERE procedure_record.oid IN (
+    'public.validate_audit_event_envelope(text,uuid,uuid,text)'::regprocedure,
+    'public.record_audit_outbox_event(uuid,uuid,uuid,text,text,text)'::regprocedure,
+    'public.claim_outbox_delivery(uuid,text,text,integer)'::regprocedure,
+    'public.retry_outbox_delivery(uuid,uuid,text,text,integer)'::regprocedure,
+    'public.dead_letter_outbox_delivery(uuid,uuid,uuid,text,text,text)'::regprocedure,
+    'public.operator_dead_letter_expired_outbox_delivery(uuid,uuid,uuid,text,text)'::regprocedure
+)
+AND procedure_record.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[];
+SQL
+)"
+if [[ "${search_path_contract}" != "6" ]]; then
+    echo "not every audit/outbox boundary pins the trusted search_path: ${search_path_contract}/6" >&2
+    exit 1
+fi
+
+# The operator capability must be usable without giving the externally
+# assignable role direct transport-table mutation rights. Both service-owned
+# roles must be isolated from pre-existing membership graphs.
+role_hardening_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT count(*)
+FROM pg_catalog.pg_roles AS role_record
+WHERE role_record.rolname IN (
+    'orgmetra_outbox_recovery_owner',
+    'orgmetra_outbox_operator'
+)
+  AND role_record.rolcanlogin IS FALSE
+  AND role_record.rolsuper IS FALSE
+  AND role_record.rolcreatedb IS FALSE
+  AND role_record.rolcreaterole IS FALSE
+  AND role_record.rolreplication IS FALSE
+  AND role_record.rolbypassrls IS FALSE;
+SQL
+)"
+if [[ "${role_hardening_contract}" != "2" ]]; then
+    echo "outbox recovery roles are not hardened NOLOGIN/NOBYPASSRLS capabilities: ${role_hardening_contract}/2" >&2
+    exit 1
+fi
+
+role_membership_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+WITH recovery_roles AS (
+    SELECT oid
+    FROM pg_catalog.pg_roles
+    WHERE rolname IN ('orgmetra_outbox_recovery_owner', 'orgmetra_outbox_operator')
+)
+SELECT count(*)
+FROM pg_catalog.pg_auth_members AS membership_record
+WHERE membership_record.roleid IN (SELECT oid FROM recovery_roles)
+   OR membership_record.member IN (SELECT oid FROM recovery_roles);
+SQL
+)"
+if [[ "${role_membership_count}" != "0" ]]; then
+    echo "outbox recovery roles unexpectedly participate in role membership edges: ${role_membership_count}" >&2
+    exit 1
+fi
+
+schema_create_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT
+    pg_catalog.has_schema_privilege(
+        'orgmetra_outbox_recovery_owner', 'public', 'CREATE'
+    )::text || '|'
+    || pg_catalog.has_schema_privilege(
+        'orgmetra_outbox_operator', 'public', 'CREATE'
+    )::text;
+SQL
+)"
+if [[ "${schema_create_contract}" != "false|false" ]]; then
+    echo "temporary public-schema CREATE capability was not fully revoked: ${schema_create_contract}" >&2
+    exit 1
+fi
+
+operator_acl_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT
+    pg_catalog.has_function_privilege(
+        'orgmetra_outbox_operator',
+        'public.operator_dead_letter_expired_outbox_delivery(uuid,uuid,uuid,text,text)',
+        'EXECUTE'
+    )::text || '|'
+    || pg_catalog.has_table_privilege(
+        'orgmetra_outbox_operator',
+        'public.outbox_delivery_record',
+        'SELECT'
+    )::text || '|'
+    || pg_catalog.has_table_privilege(
+        'orgmetra_outbox_operator',
+        'public.outbox_delivery_record',
+        'UPDATE'
+    )::text || '|'
+    || pg_catalog.has_table_privilege(
+        'orgmetra_outbox_operator',
+        'public.outbox_delivery_escalation_record',
+        'INSERT'
+    )::text;
+SQL
+)"
+if [[ "${operator_acl_contract}" != "true|false|false|false" ]]; then
+    echo "operator capability must expose recovery EXECUTE without direct outbox read/write DML: ${operator_acl_contract}" >&2
+    exit 1
+fi
+
+hardening_definition="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT pg_catalog.pg_get_functiondef(
+    'public.validate_audit_event_envelope(text,uuid,uuid,text)'::regprocedure
+);
+SQL
+)"
+for required_fragment in 'event_keys IS NULL' 'IS DISTINCT FROM ARRAY' 'COLLATE "C"' 'make_date'; do
+    if [[ "${hardening_definition}" != *"${required_fragment}"* ]]; then
+        echo "immutable envelope validator is missing hardening fragment ${required_fragment}" >&2
+        exit 1
+    fi
+done
+if [[ "${hardening_definition}" == *"::timestamptz"* ]]; then
+    echo "immutable envelope validator still depends on session-sensitive timestamptz input" >&2
+    exit 1
+fi
+
+index_name="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq <<'SQL'
+SELECT pg_catalog.to_regclass('public.outbox_delivery_due_work_index')::text;
+SQL
+)"
+if [[ "${index_name}" != "outbox_delivery_due_work_index" ]]; then
+    echo "dispatcher due-work partial index is missing: ${index_name}" >&2
+    exit 1
+fi
+
+# Build an exhausted one-attempt lease. The normal worker-owner path remains
+# intact, but an expired final lease must also have a governed operator recovery
+# path when the original worker identity is permanently lost.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v tenant_id="${TENANT_ID}" \
+    -v event_id="${EVENT_ID}" \
+    -v initial_delivery_id="${INITIAL_DELIVERY_ID}" \
+    -v exhausted_delivery_id="${EXHAUSTED_DELIVERY_ID}" \
+    -v payload="${canonical_event}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+INSERT INTO public.tenant_record (tenant_record_id, tenant_reference)
+VALUES (:'tenant_id'::uuid, 'tenant_hardening');
+
+SELECT public.record_audit_outbox_event(
+    :'tenant_id'::uuid,
+    :'event_id'::uuid,
+    :'initial_delivery_id'::uuid,
+    :'payload',
+    pg_catalog.encode(public.digest(pg_catalog.convert_to(:'payload', 'UTF8'), 'sha256'), 'hex'),
+    'payroll_gateway'
+);
+
+INSERT INTO public.outbox_delivery_record (
+    tenant_record_id,
+    outbox_delivery_record_id,
+    audit_event_record_id,
+    delivery_target_code,
+    maximum_attempt_count
+) VALUES (
+    :'tenant_id'::uuid,
+    :'exhausted_delivery_id'::uuid,
+    :'event_id'::uuid,
+    'review_gateway',
+    1
+);
+
+SELECT *
+FROM public.claim_outbox_delivery(
+    :'tenant_id'::uuid,
+    'review_gateway',
+    'dispatcher_worker:lost-final-owner',
+    1
+);
+SQL
+
+sleep 1.2
+
+# Even after expiry, the externally assignable operator role must not be able to
+# emulate the recovery function by mutating transport state directly.
+set +e
+operator_direct_dml_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v tenant_id="${TENANT_ID}" \
+    -v delivery_id="${EXHAUSTED_DELIVERY_ID}" <<'SQL'
+SET ROLE orgmetra_outbox_operator;
+SET orgmetra.tenant_record_id = :'tenant_id';
+UPDATE public.outbox_delivery_record
+SET last_failure_code = 'direct_operator_mutation'
+WHERE tenant_record_id = :'tenant_id'::uuid
+  AND outbox_delivery_record_id = :'delivery_id'::uuid;
+SQL
+} 2>&1)"
+operator_direct_dml_status=$?
+set -e
+if [[ ${operator_direct_dml_status} -eq 0 || "${operator_direct_dml_output}" != *"permission denied"* ]]; then
+    echo "operator capability unexpectedly permits direct outbox DML: ${operator_direct_dml_output}" >&2
+    exit 1
+fi
+
+# Execute the governed recovery as the purpose-bound capability role. The
+# function's NOLOGIN owner performs only its explicitly granted transport DML,
+# while FORCE RLS and the tenant-context check remain active.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v tenant_id="${TENANT_ID}" \
+    -v delivery_id="${EXHAUSTED_DELIVERY_ID}" \
+    -v escalation_id="${ESCALATION_ID}" <<'SQL'
+SET ROLE orgmetra_outbox_operator;
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT public.operator_dead_letter_expired_outbox_delivery(
+    :'tenant_id'::uuid,
+    :'delivery_id'::uuid,
+    :'escalation_id'::uuid,
+    'operations_actor:queue-recovery-01',
+    'lease_owner_lost'
+);
+RESET ROLE;
+SQL
+
+recovered_state="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq \
+    -v tenant_id="${TENANT_ID}" \
+    -v delivery_id="${EXHAUSTED_DELIVERY_ID}" \
+    -v escalation_id="${ESCALATION_ID}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_id';
+SELECT
+    delivery_record.delivery_state_code || '|'
+    || delivery_record.delivery_attempt_count::text || '|'
+    || delivery_record.maximum_attempt_count::text || '|'
+    || escalation_record.failure_code || '|'
+    || escalation_record.escalation_reference
+FROM public.outbox_delivery_record AS delivery_record
+JOIN public.outbox_delivery_escalation_record AS escalation_record
+  ON escalation_record.tenant_record_id = delivery_record.tenant_record_id
+ AND escalation_record.outbox_delivery_record_id = delivery_record.outbox_delivery_record_id
+WHERE delivery_record.tenant_record_id = :'tenant_id'::uuid
+  AND delivery_record.outbox_delivery_record_id = :'delivery_id'::uuid
+  AND escalation_record.outbox_delivery_escalation_record_id = :'escalation_id'::uuid;
+SQL
+)"
+if [[ "${recovered_state}" != "dead_lettered|1|1|lease_owner_lost|operations_actor:queue-recovery-01" ]]; then
+    echo "operator recovery did not terminalize the expired exhausted lease with immutable evidence: ${recovered_state}" >&2
+    exit 1
+fi
+
+echo "audit/outbox review hardening contract passed"

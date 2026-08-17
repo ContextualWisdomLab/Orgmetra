@@ -1,7 +1,7 @@
 """Tenant- and identity-scoped bitemporal employment-truth kernel.
 
-Use these functions to reconstruct, correct, or reject HR facts inside an
-explicit tenant boundary before they are persisted. Persistence,
+Use these functions to reconstruct, correct, reject, or emit governed audit
+facts inside an explicit tenant boundary before persistence. Persistence,
 authorization, and UI stay outside this package.
 """
 
@@ -12,6 +12,7 @@ from orgmetra_hris_kernel.assignment import (
     validate_assignment_write,
     validate_position_seat_capacity,
 )
+from orgmetra_hris_kernel.audit import AuditOutboxEvent
 from orgmetra_hris_kernel.correction import close_recorded_interval
 from orgmetra_hris_kernel.employment import validate_person_employment_exclusivity
 from orgmetra_hris_kernel.errors import (
@@ -40,6 +41,7 @@ from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts, resolve_si
 __all__ = [
     "AssignmentFact",
     "AssignmentPortfolioError",
+    "AuditOutboxEvent",
     "CorrectionError",
     "DateInterval",
     "EmploymentCoverageError",

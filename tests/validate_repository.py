@@ -45,19 +45,34 @@ REQUIRED = [
     "docs/adr/0003-bitemporal-hris-data-contract.md",
     "docs/adr/0004-employment-position-version-and-assignment-binding.md",
     "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
+    "docs/adr/0006-governed-audit-outbox-envelope.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
     "database/migrations/0001_foundation_schema.sql",
     "database/migrations/0002_sealed_evidence_digest.sql",
+    "database/migrations/0003_audit_outbox_persistence.sql",
+    "database/migrations/0004_outbox_delivery_claim.sql",
+    "database/migrations/0005_outbox_delivery_finalization.sql",
+    "database/migrations/0006_outbox_delivery_dead_letter.sql",
+    "database/migrations/0007_outbox_retry_exhaustion.sql",
+    "database/migrations/0008_audit_outbox_review_hardening.sql",
+    "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
+    "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
     "scripts/foundation-contract-core.mjs",
     "scripts/foundation-contract.mjs",
+    "tests/dispatcher-inventory.test.mjs",
     "tests/foundation-contract.test.mjs",
     "tests/openapi-contract.test.mjs",
     "tests/test_bitemporal_postgres.sh",
     "tests/test_tenant_isolation_postgres.sh",
     "tests/test_evidence_sealing_postgres.sh",
+    "tests/test_operational_uuid_postgres.sh",
+    "tests/test_audit_outbox_postgres.sh",
+    "tests/test_outbox_claim_postgres.sh",
+    "tests/test_outbox_dead_letter_postgres.sh",
+    "tests/test_audit_outbox_hardening_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -87,7 +102,7 @@ def _line_count(data: bytes) -> int:
 
 
 def _expected_manifest_document() -> dict[str, Any]:
-    """Build the deterministic manifest expected for the exact checked-out files."""
+    """Build deterministic provenance for the exact active branch artifact set."""
     files = []
     for relative_path in sorted(set(REQUIRED) - {"manifest.json"}):
         path = ROOT / relative_path
@@ -105,7 +120,7 @@ def _expected_manifest_document() -> dict[str, Any]:
     return {
         "package": "orgmetra-foundation-pack",
         "version": "0.1.0",
-        "generated_for_branch": "feat/foundation-product-baseline",
+        "generated_for_branch": "feat/audit-outbox-envelope",
         "files": files,
     }
 
@@ -119,6 +134,11 @@ def _manifest_entries() -> dict[str, dict[str, Any]]:
 
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         _fail("manifest.json must contain a files array")
+    if manifest.get("generated_for_branch") != "feat/audit-outbox-envelope":
+        _fail(
+            "manifest generated_for_branch must identify the active generation branch "
+            "feat/audit-outbox-envelope"
+        )
 
     entries: dict[str, dict[str, Any]] = {}
     for raw_entry in manifest["files"]:
@@ -164,14 +184,12 @@ def _validate_manifest() -> None:
 
 
 def _validate_database_contract() -> None:
-    """Validate naming, temporal, tenant, evidence-sealing, and append-only DDL contracts."""
-    foundation_sql = (ROOT / "database/migrations/0001_foundation_schema.sql").read_text(
-        encoding="utf-8"
-    )
-    evidence_sql = (ROOT / "database/migrations/0002_sealed_evidence_digest.sql").read_text(
-        encoding="utf-8"
-    )
-    sql = foundation_sql + "\n" + evidence_sql
+    """Validate naming, temporal, tenant, audit, evidence, and append-only DDL contracts."""
+    migration_paths = sorted((ROOT / "database/migrations").glob("*.sql"))
+    if not migration_paths:
+        _fail("No database migrations found")
+    sql = "\n".join(path.read_text(encoding="utf-8") for path in migration_paths)
+    table_sql = sql
 
     table_pattern = re.compile(
         r"\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
@@ -179,7 +197,7 @@ def _validate_database_contract() -> None:
         r"(?P<table>[a-z_][a-z0-9_]*)",
         flags=re.IGNORECASE,
     )
-    matches = list(table_pattern.finditer(foundation_sql))
+    matches = list(table_pattern.finditer(table_sql))
     if not matches:
         _fail("No CREATE TABLE statement found")
 
@@ -268,6 +286,35 @@ def _validate_database_contract() -> None:
         "CREATE TRIGGER candidate_worker_link_append_only_guard",
         "CREATE TRIGGER selection_decision_append_only_guard",
         "CREATE TRIGGER selection_decision_evidence_append_only_guard",
+        "CREATE FUNCTION validate_audit_event_envelope",
+        "CREATE TABLE audit_event_record",
+        "CREATE TABLE outbox_delivery_record",
+        "digest(convert_to(p_canonical_event_json, 'UTF8'), 'sha256')",
+        "CREATE TRIGGER audit_event_record_append_only_guard",
+        "audit event records are append-only",
+        "CREATE FUNCTION protect_outbox_delivery_transition",
+        "outbox delivery must transition pending -> leased before completion",
+        "CREATE FUNCTION record_audit_outbox_event",
+        "CREATE POLICY audit_event_record_scope_policy",
+        "CREATE POLICY outbox_delivery_record_scope_policy",
+        "CREATE FUNCTION claim_outbox_delivery",
+        "CREATE FUNCTION complete_outbox_delivery",
+        "CREATE FUNCTION retry_outbox_delivery",
+        "CREATE TABLE outbox_delivery_escalation_record",
+        "CREATE TRIGGER outbox_delivery_escalation_append_only_guard",
+        "CREATE POLICY outbox_delivery_escalation_scope_policy",
+        "CREATE FUNCTION dead_letter_outbox_delivery",
+        "terminal outbox delivery records are immutable",
+        "outbox delivery stored attempt budget is exhausted and cannot be reclaimed",
+        "outbox delivery stored attempt budget is exhausted and requires terminal dead-lettering",
+        "CREATE TRIGGER audit_event_record_truncate_guard",
+        "CREATE TRIGGER outbox_delivery_record_truncate_guard",
+        "CREATE INDEX CONCURRENTLY outbox_delivery_due_work_index",
+        "CREATE FUNCTION public.operator_dead_letter_expired_outbox_delivery",
+        "CREATE ROLE orgmetra_outbox_recovery_owner",
+        "CREATE ROLE orgmetra_outbox_operator",
+        "SECURITY DEFINER",
+        "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
@@ -280,15 +327,11 @@ def _validate_database_contract() -> None:
             continue
         block_start = match.start()
         next_match_index = index + 1
-        block_end = (
-            matches[next_match_index].start()
-            if next_match_index < len(matches)
-            else len(foundation_sql)
-        )
-        table_block = foundation_sql[block_start:block_end]
+        block_end = matches[next_match_index].start() if next_match_index < len(matches) else len(table_sql)
+        table_block = table_sql[block_start:block_end]
         if "tenant_record_id uuid NOT NULL" not in table_block:
             _fail(f"Tenant binding is missing from table: {table_name}")
-        if f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in foundation_sql:
+        if f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in sql:
             _fail(f"Forced row-level security is missing from table: {table_name}")
 
     if len(tenant_matches) != len(matches) - 1:
