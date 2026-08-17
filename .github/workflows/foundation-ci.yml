@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - bootstrap
+      - develop
       - main
       - feat/foundation-product-baseline
   push:
