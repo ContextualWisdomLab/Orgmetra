@@ -42,7 +42,7 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     assert.ok(rehearsal.includes(fragment), `restore rehearsal must contain ${fragment}`);
   }
 
-  assert.ok(traceability.includes('protected-main truth'), 'traceability must distinguish protected-main truth');
+  assert.ok(traceability.includes('Protected-main truth'), 'traceability must distinguish protected-main truth');
   assert.ok(traceability.includes('exact restored database'), 'traceability must bind evidence to the restored database');
   assert.ok(traceability.includes('No certification claim'), 'traceability must avoid unsupported certification claims');
 });
