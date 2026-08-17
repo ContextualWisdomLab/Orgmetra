@@ -15,6 +15,7 @@ from orgmetra_keyverse_adapter.authorization import (
 
 TENANT = UUID("10000000-0000-7000-8000-000000000501")
 OTHER_TENANT = UUID("10000000-0000-7000-8000-000000000502")
+RESOURCE_REFERENCE = "person_record:per_01J5EXACTTARGET"
 POLICY = PurposeBoundAccessPolicy(
     tenant_record_id=TENANT,
     policy_version_code="people_pii_v1",
@@ -29,6 +30,7 @@ REQUEST = PurposeBoundAccessRequest(
     actor_tenant_record_id=TENANT,
     resource_tenant_record_id=TENANT,
     actor_reference="keyverse_subject:sub_jordan_hale",
+    resource_reference=RESOURCE_REFERENCE,
     purpose_code="hr_operations",
     operation_code="read_person_pii",
     resource_kind="person_record",
@@ -47,6 +49,7 @@ def test_exact_tenant_purpose_scope_and_field_subset_is_authorized() -> None:
     assert decision.requested_fields == REQUEST.requested_fields
     assert decision.policy_version_code == "people_pii_v1"
     assert decision.actor_reference == REQUEST.actor_reference
+    assert decision.resource_reference == RESOURCE_REFERENCE
     assert decision.next_action == "Continue with only the authorized fields."
 
 
@@ -102,6 +105,7 @@ def test_fail_closed_decisions_explain_the_next_safe_action(
     assert decision.authorized_fields == frozenset()
     assert decision.reason_code == reason_code
     assert decision.next_action == next_action
+    assert decision.resource_reference == access_request.resource_reference
 
     with pytest.raises(AuthorizationDeniedError) as caught:
         require_purpose_bound_access(request=access_request, policy=POLICY)
@@ -151,6 +155,7 @@ def test_policy_rejects_ambiguous_or_wildcard_like_attributes(
         ("actor_tenant_record_id", UUID(int=(1 << 128) - 1)),
         ("resource_tenant_record_id", "not-a-uuid"),
         ("actor_reference", "jordan-hale"),
+        ("resource_reference", "person-record"),
         ("purpose_code", "*"),
         ("operation_code", "read-person-pii"),
         ("resource_kind", "person"),
@@ -166,7 +171,7 @@ def test_request_rejects_untrusted_or_ambiguous_authorization_attributes(
     field_name: str,
     invalid_value: object,
 ) -> None:
-    """Reject malformed identity, tenant, purpose, field, and token-scope inputs."""
+    """Reject malformed identity, target, tenant, purpose, field, and token-scope inputs."""
     with pytest.raises(ValueError):
         replace(REQUEST, **{field_name: invalid_value})
 
@@ -179,16 +184,15 @@ def test_authorization_decision_exposes_only_governance_metadata() -> None:
     assert decision.purpose_code == "hr_operations"
     assert decision.operation_code == "read_person_pii"
     assert decision.resource_kind == "person_record"
+    assert decision.resource_reference == RESOURCE_REFERENCE
     assert not hasattr(decision, "resource_value")
 
 
 def test_authorization_evidence_preserves_exact_opaque_target_reference() -> None:
     """Bind allow/deny evidence to the exact target record without copying its PII."""
-    expected_reference = "person_record:per_01J5EXACTTARGET"
-
-    assert REQUEST.resource_reference == expected_reference
+    assert REQUEST.resource_reference == RESOURCE_REFERENCE
     decision = evaluate_purpose_bound_access(request=REQUEST, policy=POLICY)
-    assert decision.resource_reference == expected_reference
+    assert decision.resource_reference == RESOURCE_REFERENCE
 
 
 def test_request_rejects_malformed_target_reference() -> None:
