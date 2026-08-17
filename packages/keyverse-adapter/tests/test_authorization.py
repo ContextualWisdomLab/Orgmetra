@@ -180,3 +180,18 @@ def test_authorization_decision_exposes_only_governance_metadata() -> None:
     assert decision.operation_code == "read_person_pii"
     assert decision.resource_kind == "person_record"
     assert not hasattr(decision, "resource_value")
+
+
+def test_authorization_evidence_preserves_exact_opaque_target_reference() -> None:
+    """Bind allow/deny evidence to the exact target record without copying its PII."""
+    expected_reference = "person_record:per_01J5EXACTTARGET"
+
+    assert REQUEST.resource_reference == expected_reference
+    decision = evaluate_purpose_bound_access(request=REQUEST, policy=POLICY)
+    assert decision.resource_reference == expected_reference
+
+
+def test_request_rejects_malformed_target_reference() -> None:
+    """Fail closed when the target cannot be correlated to one opaque Orgmetra record."""
+    with pytest.raises(ValueError):
+        replace(REQUEST, resource_reference="person-record")
