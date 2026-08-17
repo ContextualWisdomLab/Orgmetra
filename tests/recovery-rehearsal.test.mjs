@@ -45,9 +45,13 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     'pull_request:',
     '- develop',
     'ref: ${{ github.event.pull_request.head.sha || github.sha }}',
-    'postgres:',
+    'source_postgres:',
+    'restore_postgres:',
     'POSTGRES_DB: postgres',
-    'POSTGRES_CLIENT_CONTAINER: ${{ job.services.postgres.id }}',
+    'POSTGRES_SOURCE_CONTAINER: ${{ job.services.source_postgres.id }}',
+    'POSTGRES_RESTORE_CONTAINER: ${{ job.services.restore_postgres.id }}',
+    'POSTGRES_SOURCE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5432/postgres',
+    'POSTGRES_RESTORE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5433/postgres',
     'bash .github/scripts/restore-rehearsal-postgres.sh',
     'python tests/validate_repository.py',
     'npm run validate',
@@ -57,6 +61,11 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
   }
 
   for (const fragment of [
+    'POSTGRES_SOURCE_ADMIN_URL',
+    'POSTGRES_RESTORE_ADMIN_URL',
+    'POSTGRES_SOURCE_CONTAINER',
+    'POSTGRES_RESTORE_CONTAINER',
+    'source and restore PostgreSQL endpoints must differ',
     'docker exec',
     'pg_dump',
     '--format=custom',
