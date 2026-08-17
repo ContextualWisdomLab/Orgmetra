@@ -53,6 +53,9 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0005_outbox_delivery_finalization.sql',
   'database/migrations/0006_outbox_delivery_dead_letter.sql',
   'database/migrations/0007_outbox_retry_exhaustion.sql',
+  'database/migrations/0008_audit_outbox_review_hardening.sql',
+  'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
+  'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
   'scripts/foundation-contract-core.mjs',
   'scripts/foundation-contract.mjs',
@@ -66,6 +69,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_audit_outbox_postgres.sh',
   'tests/test_outbox_claim_postgres.sh',
   'tests/test_outbox_dead_letter_postgres.sh',
+  'tests/test_audit_outbox_hardening_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
