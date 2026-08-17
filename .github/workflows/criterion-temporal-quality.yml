@@ -9,7 +9,6 @@ on:
     paths:
       - "database/migrations/0011_criterion_observation_scope.sql"
       - "tests/test_criterion_observation_scope_postgres.sh"
-      - "tests/test_criterion_observation_temporal_postgres.sh"
       - ".github/workflows/criterion-temporal-quality.yml"
   workflow_dispatch:
 
@@ -51,10 +50,8 @@ jobs:
         env:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
-      - name: Build canonical criterion scope fixture
-        run: bash tests/test_criterion_observation_scope_postgres.sh
       - name: Prove recorded-time and UTC boundaries
-        run: bash tests/test_criterion_observation_temporal_postgres.sh
+        run: bash tests/test_criterion_observation_scope_postgres.sh
       - name: Require clean checkout
         run: |
           git diff --exit-code

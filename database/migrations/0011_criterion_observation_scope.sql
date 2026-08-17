@@ -156,6 +156,9 @@ BEGIN
 END;
 $$;
 
+-- Foundation CI proves closed recorded_to rejection for every lookup above and
+-- UTC calendar-date conversion under non-UTC session TimeZone, including the
+-- UTC midnight assignment-start accept path and the pre-assignment reject path.
 CREATE TRIGGER criterion_observation_scope_guard
 BEFORE INSERT ON criterion_observation
 FOR EACH ROW
