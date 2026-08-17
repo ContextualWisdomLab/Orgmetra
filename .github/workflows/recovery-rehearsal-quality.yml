@@ -77,6 +77,7 @@ jobs:
       - name: Exercise real dump and restore
         env:
           POSTGRES_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5432/postgres
+          POSTGRES_CLIENT_CONTAINER: ${{ job.services.postgres.id }}
         run: bash .github/scripts/restore-rehearsal-postgres.sh
       - name: Prove clean checkout
         run: git diff --exit-code
