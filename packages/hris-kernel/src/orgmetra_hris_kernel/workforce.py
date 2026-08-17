@@ -51,7 +51,7 @@ class WorkforceCompositionSnapshot:
 
     def __post_init__(self) -> None:
         """Reject non-canonical direct evidence before it can be hashed or exported."""
-        if self.known_at.tzinfo is None:
+        if self.known_at.utcoffset() is None:
             raise IntervalError(
                 "Workforce snapshot knowledge cutoff must be timezone-aware.",
                 next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
@@ -217,7 +217,7 @@ def build_workforce_composition_snapshot(
         Aggregate workforce counts and deterministic evidence without row-level PII.
 
     Raises:
-        IntervalError: ``known_at`` is timezone-naive.
+        IntervalError: ``known_at`` is timezone-naive or has no usable UTC offset.
         SingleValuedFactError: One employment or assignment has contradictory
             visible versions.
         EmploymentExclusivityError: A worker has malformed or overlapping
@@ -226,7 +226,7 @@ def build_workforce_composition_snapshot(
         AssignmentPortfolioError: Existing allocation integrity rejects visible FTE.
         PositionSeatError: Existing position-capacity integrity rejects visible FTE.
     """
-    if known_at.tzinfo is None:
+    if known_at.utcoffset() is None:
         raise IntervalError(
             "Workforce snapshot knowledge cutoff must be timezone-aware.",
             next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
