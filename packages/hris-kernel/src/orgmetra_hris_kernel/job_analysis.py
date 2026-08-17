@@ -312,6 +312,14 @@ class JobAnalysisSnapshot:
             if item.job_record_id != self.job_record_id:
                 raise ValueError("all job-analysis evidence must share job_record_id")
 
+        sources = [
+            *(task.source for task in self.tasks),
+            *(item.source for item in self.ksao_requirements),
+            self.fja_profile.source,
+        ]
+        if any(source.retrieved_at > recorded_at for source in sources):
+            raise ValueError("retrieved_at must not be later than recorded_at")
+
         task_ids = [task.task_record_id for task in self.tasks]
         ksao_ids = [item.ksao_record_id for item in self.ksao_requirements]
         if len(task_ids) != len(set(task_ids)):
@@ -350,11 +358,6 @@ class JobAnalysisSnapshot:
                 raise ValueError("validated analysis must link every task to at least one KSAO")
             if linked_ksao_ids != ksao_id_set:
                 raise ValueError("validated analysis must link every KSAO to at least one task")
-            sources = [
-                *(task.source for task in self.tasks),
-                *(item.source for item in self.ksao_requirements),
-                self.fja_profile.source,
-            ]
             if any(source.origin_code == "llm_draft" for source in sources):
                 raise ValueError("LLM-origin evidence must remain analysis_draft")
 
