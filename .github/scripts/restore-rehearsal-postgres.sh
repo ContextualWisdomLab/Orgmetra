@@ -2,6 +2,7 @@
 set -euo pipefail
 
 : "${POSTGRES_ADMIN_URL:=postgresql://orgmetra:orgmetra@localhost:5432/postgres}"
+: "${POSTGRES_CLIENT_CONTAINER:?POSTGRES_CLIENT_CONTAINER is required}"
 
 SOURCE_DATABASE_NAME="orgmetra_recovery_source"
 RESTORE_DATABASE_NAME="orgmetra_recovery_target"
@@ -86,10 +87,12 @@ SELECT record_audit_outbox_event(
 );
 SQL
 
-pg_dump --format=custom --file="${DUMP_PATH}" "${SOURCE_DATABASE_URL}"
+docker exec "${POSTGRES_CLIENT_CONTAINER}" \
+    pg_dump --format=custom "${SOURCE_DATABASE_URL}" > "${DUMP_PATH}"
 psql "${POSTGRES_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
     "CREATE DATABASE ${RESTORE_DATABASE_NAME};" >/dev/null
-pg_restore --exit-on-error --dbname="${RESTORE_DATABASE_URL}" "${DUMP_PATH}" >/dev/null
+docker exec -i "${POSTGRES_CLIENT_CONTAINER}" \
+    pg_restore --exit-on-error --dbname="${RESTORE_DATABASE_URL}" < "${DUMP_PATH}" >/dev/null
 
 bitemporal_count="$(PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" \
     psql "${RESTORE_DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
