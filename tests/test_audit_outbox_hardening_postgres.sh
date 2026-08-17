@@ -15,8 +15,8 @@ ESCALATION_ID="00000000-0000-4000-8000-0000000000b4"
 canonical_event='{"data":{"high_impact":false,"result_code":"recorded"},"datacontenttype":"application/json","id":"00000000-0000-4000-8000-0000000000b1","orgmetraactor":"keyverse_subject:01JACTOROPAQUE","orgmetraevidence":"employment-offer:v3","orgmetrapurpose":"workforce_administration","orgmetrareason":"hire_completion","orgmetratenant":"10000000-0000-7000-8000-000000000001","source":"urn:orgmetra:people_core","specversion":"1.0","subject":"assignment_record:01JTESTOPAQUE","time":"2026-08-17T03:00:00Z","type":"orgmetra.people.assignment.recorded"}'
 
 # Immutable evidence and mutable delivery state must both reject TRUNCATE. The
-# audit probe uses CASCADE so the database reaches the statement trigger rather
-# than stopping first at the outbox foreign-key dependency. The transaction is
+# probes use CASCADE so PostgreSQL reaches the statement triggers instead of
+# stopping first at dependent foreign-key prechecks. The transactions are
 # intentionally left uncommitted so a vulnerable implementation cannot destroy
 # later fixtures during the RED run.
 set +e
@@ -35,7 +35,7 @@ fi
 set +e
 outbox_truncate_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
-TRUNCATE public.outbox_delivery_record;
+TRUNCATE public.outbox_delivery_record CASCADE;
 SQL
 } 2>&1)"
 outbox_truncate_status=$?
