@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from hashlib import sha256
 import json
 import unittest
@@ -35,6 +35,14 @@ TRANSACTION_AT = datetime(2026, 8, 18, 0, 1, tzinfo=timezone.utc)
 ACTOR = "keyverse_subject:operator-17"
 PURPOSE = "candidate_hire"
 CONFIRMATION = "human_confirmation:review-88"
+
+
+class NullOffsetTimezone(tzinfo):
+    """Timezone object that deliberately cannot resolve a UTC offset."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta | None:
+        del dt
+        return None
 
 
 def command(**overrides: object) -> HireAcceptanceCommand:
@@ -244,14 +252,34 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
                 self.assertEqual(len(cursor.executions), 3)
                 self.assertIs(connection.exit_exception, error_type)
 
+    def test_malformed_decision_row_shape_fails_before_business_insert(self) -> None:
+        port, _, cursor = self._port([(ACTOR,)])
+        with self.assertRaisesRegex(HireDecisionIntegrityError, "invalid shape"):
+            accept_confirmed_hire(
+                principal=PRINCIPAL,
+                command=command(),
+                purpose_code=PURPOSE,
+                policy=policy(),
+                mutation_port=port,
+            )
+        self.assertEqual(len(cursor.executions), 3)
+
     def test_decision_must_match_authorized_actor_purpose_and_hire_semantics(self) -> None:
+        unresolved_zone = NullOffsetTimezone()
         invalid_rows = (
             decision_row(actor_reference="keyverse_subject:other-operator"),
             decision_row(purpose_code="benefits_admin"),
             decision_row(decision_code="reject"),
-            decision_row(confirmation_reference=""),
+            decision_row(confirmation_reference=None),
+            decision_row(confirmation_reference="bad confirmation"),
+            decision_row(decision_evidence_set_id="not-a-uuid"),
             decision_row(decision_evidence_set_id=UUID(int=0)),
+            decision_row(decided_at="not-a-datetime"),
+            decision_row(decided_at=datetime(2026, 8, 18, 0, 0)),
+            decision_row(decided_at=datetime(2026, 8, 18, 0, 0, tzinfo=unresolved_zone)),
             decision_row(transaction_recorded_at="not-a-datetime"),
+            decision_row(transaction_recorded_at=datetime(2026, 8, 18, 0, 1)),
+            decision_row(transaction_recorded_at=datetime(2026, 8, 18, 0, 1, tzinfo=unresolved_zone)),
             decision_row(decided_at=TRANSACTION_AT.replace(minute=2)),
         )
         for row in invalid_rows:
@@ -302,9 +330,36 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
             reason_code="access_denied",
             next_action="stop",
         )
-        with self.assertRaisesRegex(HireDecisionIntegrityError, "authorization"):
-            port.accept_hire(command=command(), authorization=forged)
+        invalid_authorizations: tuple[object, ...] = (
+            object(),
+            forged,
+            AuthorizationDecision(
+                allowed=True,
+                tenant_record_id=TENANT,
+                actor_reference=ACTOR,
+                resource_reference="selection_decision:wrong-target",
+                policy_version_code="people-hire-v1",
+                purpose_code=PURPOSE,
+                operation_code="materialize_worker",
+                resource_kind="selection_decision",
+                requested_fields=frozenset({"candidate_worker_conversion"}),
+                authorized_fields=frozenset({"candidate_worker_conversion"}),
+                reason_code="access_permitted",
+                next_action="continue",
+            ),
+        )
+        for authorization in invalid_authorizations:
+            with self.subTest(authorization=authorization), self.assertRaisesRegex(
+                HireDecisionIntegrityError,
+                "authorization",
+            ):
+                port.accept_hire(command=command(), authorization=authorization)  # type: ignore[arg-type]
         self.assertEqual(calls, 0)
+
+    def test_direct_port_requires_typed_command(self) -> None:
+        port, _, _ = self._port([decision_row()])
+        with self.assertRaisesRegex(TypeError, "command must be a HireAcceptanceCommand"):
+            port.accept_hire(command=object(), authorization=object())  # type: ignore[arg-type]
 
     def test_connection_factory_must_be_callable(self) -> None:
         with self.assertRaisesRegex(TypeError, "connection_factory must be callable"):
