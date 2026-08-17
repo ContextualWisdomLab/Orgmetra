@@ -15,12 +15,14 @@ ESCALATION_ID="00000000-0000-4000-8000-0000000000b4"
 canonical_event='{"data":{"high_impact":false,"result_code":"recorded"},"datacontenttype":"application/json","id":"00000000-0000-4000-8000-0000000000b1","orgmetraactor":"keyverse_subject:01JACTOROPAQUE","orgmetraevidence":"employment-offer:v3","orgmetrapurpose":"workforce_administration","orgmetrareason":"hire_completion","orgmetratenant":"10000000-0000-7000-8000-000000000001","source":"urn:orgmetra:people_core","specversion":"1.0","subject":"assignment_record:01JTESTOPAQUE","time":"2026-08-17T03:00:00Z","type":"orgmetra.people.assignment.recorded"}'
 
 # Immutable evidence and mutable delivery state must both reject TRUNCATE. The
-# transaction is intentionally left uncommitted so a vulnerable implementation
-# cannot destroy later fixtures during the RED run.
+# audit probe uses CASCADE so the database reaches the statement trigger rather
+# than stopping first at the outbox foreign-key dependency. The transaction is
+# intentionally left uncommitted so a vulnerable implementation cannot destroy
+# later fixtures during the RED run.
 set +e
 audit_truncate_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
-TRUNCATE public.audit_event_record;
+TRUNCATE public.audit_event_record CASCADE;
 SQL
 } 2>&1)"
 audit_truncate_status=$?
