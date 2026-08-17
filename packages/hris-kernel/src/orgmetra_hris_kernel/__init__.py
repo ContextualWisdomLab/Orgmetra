@@ -1,8 +1,8 @@
-"""Tenant- and identity-scoped bitemporal employment-truth kernel.
+"""Tenant-scoped bitemporal HRIS, governed audit, and job-analysis kernel.
 
-Use these functions to reconstruct, correct, reject, or emit governed audit
-facts inside an explicit tenant boundary before persistence. Persistence,
-authorization, and UI stay outside this package.
+Use these contracts to reconstruct, correct, reject, or emit governed HRIS and
+job-analysis evidence inside an explicit tenant boundary before persistence.
+Persistence, authorization, and UI stay outside this package.
 """
 
 from orgmetra_hris_kernel.assignment import (
@@ -35,6 +35,14 @@ from orgmetra_hris_kernel.facts import (
     PositionVersion,
 )
 from orgmetra_hris_kernel.intervals import DateInterval, RecordedInterval
+from orgmetra_hris_kernel.job_analysis import (
+    EvidenceSource,
+    FunctionalJobAnalysisProfile,
+    JobAnalysisSnapshot,
+    KSAORequirement,
+    TaskEvidence,
+    TaskKSAOLink,
+)
 from orgmetra_hris_kernel.organization import validate_organization_hierarchy
 from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts, resolve_single_valued_fact
 
@@ -47,8 +55,12 @@ __all__ = [
     "EmploymentCoverageError",
     "EmploymentExclusivityError",
     "EmploymentVersion",
+    "EvidenceSource",
+    "FunctionalJobAnalysisProfile",
     "IdentityScopeError",
     "IntervalError",
+    "JobAnalysisSnapshot",
+    "KSAORequirement",
     "KernelError",
     "OrganizationHierarchyError",
     "OrganizationUnitVersion",
@@ -57,6 +69,8 @@ __all__ = [
     "PositionVersion",
     "RecordedInterval",
     "SingleValuedFactError",
+    "TaskEvidence",
+    "TaskKSAOLink",
     "close_recorded_interval",
     "resolve_bitemporal_facts",
     "resolve_single_valued_fact",
