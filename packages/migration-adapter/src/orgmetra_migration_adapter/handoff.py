@@ -238,6 +238,8 @@ def _require_operational_uuid(value: str) -> None:
         parsed = UUID(value)
     except (AttributeError, TypeError, ValueError) as exc:
         raise ContractViolation("tenant record identifier is malformed") from exc
+    if str(parsed) != value:
+        raise ContractViolation("tenant record identifier must use canonical UUID text")
     if parsed.int in (0, (1 << 128) - 1):
         raise ContractViolation("tenant record identifier uses a reserved UUID sentinel")
 

@@ -92,6 +92,14 @@ def test_builds_deterministic_value_free_handoff() -> None:
     [
         ({"tenant_record_id": "not-a-uuid"}, "tenant record identifier is malformed"),
         (
+            {"tenant_record_id": "10000000000070008000000000000001"},
+            "tenant record identifier must use canonical UUID text",
+        ),
+        (
+            {"tenant_record_id": "{10000000-0000-7000-8000-000000000001}"},
+            "tenant record identifier must use canonical UUID text",
+        ),
+        (
             {"tenant_record_id": "00000000-0000-0000-0000-000000000000"},
             "tenant record identifier uses a reserved UUID sentinel",
         ),
@@ -198,6 +206,14 @@ def test_handoff_fails_closed_on_invalid_or_stale_evidence(
             "migration target objects must be unique",
         ),
         ({"tenant_record_id": "not-a-uuid"}, "tenant record identifier is malformed"),
+        (
+            {"tenant_record_id": "10000000000070008000000000000001"},
+            "tenant record identifier must use canonical UUID text",
+        ),
+        (
+            {"tenant_record_id": "{10000000-0000-7000-8000-000000000001}"},
+            "tenant record identifier must use canonical UUID text",
+        ),
         (
             {"migration_batch_reference": "migration batch 1"},
             "migration batch reference is malformed",
