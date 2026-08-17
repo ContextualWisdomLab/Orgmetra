@@ -46,6 +46,7 @@ REQUIRED = [
     "docs/adr/0004-employment-position-version-and-assignment-binding.md",
     "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
     "docs/adr/0006-governed-audit-outbox-envelope.md",
+    "docs/adr/0008-purpose-bound-pii-authorization.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
