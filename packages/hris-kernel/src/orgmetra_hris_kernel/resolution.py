@@ -37,7 +37,9 @@ def resolve_bitemporal_facts(
     if identity_of not in IDENTITY_FIELDS:
         raise IdentityScopeError(
             f"Unsupported identity field: {identity_of}",
-            next_action="Query by employment, person, position, assignment, or tenant identity.",
+            next_action=(
+                "Query by employment, person, organization, position, assignment, or tenant identity."
+            ),
         )
     visible: list[FactT] = []
     for fact in facts:

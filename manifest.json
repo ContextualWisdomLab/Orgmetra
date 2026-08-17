@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f0a31c33803a9ca730d04a0215ac491f8580874bd2b32b519fe3cfdf2ec0a84d",
-      "bytes": 6285,
-      "lines": 62
+      "sha256": "7cb98d19ad5c487d34f91d69f1509ee2967d8f07bcbeda4604469692da2bdebf",
+      "bytes": 6747,
+      "lines": 64
     },
     {
       "path": "CLAUDE.md",
@@ -131,9 +131,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "e1e4e0a3d432a8354783aa79caf05f06cb732c62a0cdf1b38c654fba8242b306",
-      "bytes": 5417,
-      "lines": 31
+      "sha256": "26554f60babaf77f01a81f19d795bff9600d5f6f95d681b213e31ea105ed7033",
+      "bytes": 5780,
+      "lines": 32
     },
     {
       "path": "docs/TRD.md",
