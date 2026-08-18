@@ -2,10 +2,10 @@
 -- decisions, evidence sets, criterion outcomes, or workers.
 --
 -- The original three independent link tables remain readable for historical
--- compatibility, but new writes are closed. New study membership must use one
--- normalized validity_study_case_record that binds the exact hire decision,
--- its sealed evidence set, the governed candidate->worker conversion, and the
--- criterion observation for that same worker and study criterion.
+-- compatibility, but new writes and table-wide destruction are closed. New study
+-- membership must use one normalized validity_study_case_record that binds the
+-- exact hire decision, its sealed evidence set, the governed candidate->worker
+-- conversion, and the criterion observation for that same worker and study criterion.
 
 BEGIN;
 
@@ -36,6 +36,36 @@ CREATE TRIGGER validity_study_evidence_legacy_insert_guard
 BEFORE INSERT ON validity_study_evidence_set_link
 FOR EACH ROW
 EXECUTE FUNCTION public.reject_legacy_validity_study_link_insert();
+
+CREATE FUNCTION public.reject_legacy_validity_study_link_truncate()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+BEGIN
+    RAISE EXCEPTION 'legacy validity-study links are read-only; use validity_study_case_record'
+        USING ERRCODE = '55000';
+END;
+$$;
+
+CREATE TRIGGER validity_study_decision_legacy_truncate_guard
+BEFORE TRUNCATE ON validity_study_decision_link
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.reject_legacy_validity_study_link_truncate();
+
+CREATE TRIGGER validity_study_outcome_legacy_truncate_guard
+BEFORE TRUNCATE ON validity_study_outcome_link
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.reject_legacy_validity_study_link_truncate();
+
+CREATE TRIGGER validity_study_evidence_legacy_truncate_guard
+BEFORE TRUNCATE ON validity_study_evidence_set_link
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.reject_legacy_validity_study_link_truncate();
+
+REVOKE TRUNCATE ON validity_study_decision_link FROM PUBLIC;
+REVOKE TRUNCATE ON validity_study_outcome_link FROM PUBLIC;
+REVOKE TRUNCATE ON validity_study_evidence_set_link FROM PUBLIC;
 
 CREATE TABLE validity_study_case_record (
     tenant_record_id uuid NOT NULL REFERENCES public.tenant_record(tenant_record_id),
