@@ -1,10 +1,10 @@
 # Orgmetra Assignment Change Review
 
-`orgmetra-assignment-change-review` is a transport-neutral pre-mutation governance contract for internal assignment changes. It lets an HR workflow correlate one worker's current authoritative Employment/Assignment/Job/Position scope with a proposed Job/Position allocation, worker-impact evidence, and a communication plan without copying worker values into the review envelope.
+`orgmetra-assignment-change-review` is a transport-neutral pre-mutation governance contract for internal assignment changes. It lets an HR workflow correlate one worker's current authoritative Employment/Assignment/Job/Position scope with a proposed Job/Position allocation, reviewed allocation policy, worker-impact evidence, and a communication plan without copying worker values into the review envelope.
 
 ## What the packet binds
 
-The packet requires opaque UUID-backed references for the Person, Employment, current Assignment, current Job and Position, proposed Job and Position, current-scope snapshot, reviewed workforce-allocation plan, worker-impact assessment, communication plan, requester, and a distinct accountable reviewer. Each trust-bearing evidence artifact is paired with a lowercase SHA-256 digest.
+The packet requires opaque UUID-backed references for the Person, Employment, current Assignment, current Job and Position, proposed Job and Position, current-scope snapshot, reviewed workforce-allocation plan, exact workforce-allocation policy, worker-impact assessment, communication plan, requester, and a distinct accountable reviewer. Each trust-bearing evidence artifact is paired with a lowercase SHA-256 digest.
 
 `requested_effective_on` is review intent, not proof that the date is valid or authorized. The host must resolve the current and proposed relationships against authoritative bitemporal Orgmetra records immediately before approval/mutation. Canonical JSON and the packet SHA-256 provide immutable correlation evidence only.
 
@@ -16,6 +16,7 @@ The packet always remains value-minimized and pre-mutation:
 - Person PII, compensation values, numeric allocation values, and free-form model output are not fields in the envelope.
 - Requester and reviewer must be different actors.
 - `purpose_code` is fixed to `assignment_change_review`.
+- `reason_code` is limited to reviewed non-sensitive categories: `internal_reassignment`, `workforce_reallocation`, `temporary_detail`, `position_reclassification`, or `organizational_realignment`; free-form personal reasons belong outside this packet.
 - Human confirmation is mandatory; decision authority remains `human_review_only`.
 - `scope_verification_state` remains `requires_authoritative_resolution`.
 - `mutation_state` remains `not_authorized_to_apply`.
@@ -23,7 +24,7 @@ The packet always remains value-minimized and pre-mutation:
 
 ## Next action
 
-Before mutation, verify authoritative Employment and current Assignment/Job/Position scope; proposed Position-to-Job binding and capacity; requested effective date; workforce-allocation policy; worker-impact evidence; and communication-plan provenance. Record accountable human approval, then apply the change only through Orgmetra's authoritative People mutation boundary. This package does not write HRIS tables and does not bypass purpose-bound authorization, idempotency, immutable audit/outbox, or bitemporal invariants.
+Before mutation, verify authoritative Employment and current Assignment/Job/Position scope; proposed Position-to-Job binding and capacity; requested effective date; the exact bound workforce-allocation policy; worker-impact evidence; and communication-plan provenance. Record accountable human approval, then apply the change only through Orgmetra's authoritative People mutation boundary. This package does not write HRIS tables and does not bypass purpose-bound authorization, idempotency, immutable audit/outbox, or bitemporal invariants.
 
 ## Standards boundary
 
