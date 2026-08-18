@@ -26,6 +26,7 @@ CONVERSION = UUID("0198a412-7000-7000-8000-000000000040")
 AUDIT_EVENT = UUID("0198a412-7000-7000-8000-000000000050")
 OUTBOX_DELIVERY = UUID("0198a412-7000-7000-8000-000000000051")
 EFFECTIVE_FROM = date(2026, 8, 18)
+IDEMPOTENCY_KEY = "hire-idempotency-key-17"
 
 
 def command(**overrides: object) -> HireAcceptanceCommand:
@@ -43,6 +44,7 @@ def command(**overrides: object) -> HireAcceptanceCommand:
         "outbox_delivery_record_id": OUTBOX_DELIVERY,
         "effective_from": EFFECTIVE_FROM,
         "display_name": "Ada Lovelace",
+        "idempotency_key": IDEMPOTENCY_KEY,
         "employment_status_code": "active",
     }
     values.update(overrides)
@@ -112,6 +114,7 @@ class HireAcceptanceTests(unittest.TestCase):
         self.assertEqual(len(port.calls), 1)
         written_command, authorization = port.calls[0]
         self.assertEqual(written_command, request)
+        self.assertEqual(written_command.idempotency_key, IDEMPOTENCY_KEY)
         self.assertEqual(authorization.resource_reference, f"selection_decision:{DECISION.hex}")
         self.assertEqual(authorization.actor_reference, PRINCIPAL.actor_reference)
         self.assertEqual(authorization.operation_code, "materialize_worker")
@@ -148,6 +151,8 @@ class HireAcceptanceTests(unittest.TestCase):
             {"display_name": "   "},
             {"display_name": "A" * 513},
             {"display_name": "Ada\nLovelace"},
+            {"idempotency_key": "short"},
+            {"idempotency_key": "hire-idempotency\nkey-17"},
             {"employment_status_code": 17},
             {"employment_status_code": "Active Worker"},
         )
