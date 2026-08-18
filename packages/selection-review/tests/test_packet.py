@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from orgmetra_selection_review import SelectionReviewPacket, build_selection_review_packet
+from orgmetra_selection_review import build_selection_review_packet
 
 TENANT = "2b37b937-c3f1-49aa-8d19-785a7b7a9917"
 DIGEST = "0" * 64
