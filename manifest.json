@@ -113,15 +113,15 @@
     },
     {
       "path": "database/migrations/0012_people_mutation_idempotency.sql",
-      "sha256": "c57fa2f1a44fba61d35fafd702ce5730c9bca2e5587ad390dc98079da7e8c6a3",
-      "bytes": 3115,
-      "lines": 75
+      "sha256": "52dbbb9ec7f9be5291593ba88f228d7fffd736dcb99547a08c1d6cad076afb69",
+      "bytes": 3162,
+      "lines": 76
     },
     {
       "path": "docs/API_CONTRACT.md",
-      "sha256": "6335cd88d5435a4787a4bf8c1173595648618fb4d22cb16e8818b6ddaf135449",
-      "bytes": 3233,
-      "lines": 73
+      "sha256": "63533dff785da62b89e585d742a158e2aeb05913644f2bf9fb6486f281c2e589",
+      "bytes": 4555,
+      "lines": 76
     },
     {
       "path": "docs/DATA_MODEL.md",
@@ -149,9 +149,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "86f1cf488b5568d4bc85171d52ef0f61fec01c8f1a38758577c08d7f8ffe9e6b",
-      "bytes": 9502,
-      "lines": 69
+      "sha256": "8aaaacdc1a8c45ec769066737824269db86207b072c1685c96ed004f6d2b4628",
+      "bytes": 10801,
+      "lines": 64
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -167,9 +167,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "2845adca59d305f7c17961bd10d8c417a74d67dd91590bac7e8c06b06e7a5c84",
-      "bytes": 14959,
-      "lines": 128
+      "sha256": "d857546bd0478a1504d189e49f5abb0c2212e35b3ee153b8e349d5eccd17a9f6",
+      "bytes": 15881,
+      "lines": 130
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -191,9 +191,9 @@
     },
     {
       "path": "docs/UML.md",
-      "sha256": "f067dcd0c0185f7dddeaa789f6ddb0b4ffb0a26aedca85d5766744cbcaae5808",
-      "bytes": 5444,
-      "lines": 121
+      "sha256": "fe67c37aa88e5814ceb2db7e8f7d8d85ca27a994802efbb7c75164b387adf0a9",
+      "bytes": 5528,
+      "lines": 122
     },
     {
       "path": "docs/USER_STORIES.md",
