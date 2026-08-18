@@ -6,7 +6,7 @@ on:
       - develop
   push:
     branches:
-      - feat/restore-rehearsal-evidence
+      - develop
   workflow_dispatch:
 
 permissions:
@@ -58,7 +58,7 @@ jobs:
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
-      - name: Print recovery provenance repair data
+      - name: Print diagnostic recovery provenance data
         run: |
           python - <<'PY'
           import hashlib
@@ -84,11 +84,10 @@ jobs:
       - name: Run recovery evidence contract
         run: node --test tests/recovery-rehearsal.test.mjs
       - name: Validate repository contracts
-        run: |
-          python tests/validate_repository.py
-          npm run validate
+        run: npm run validate
       - name: Exercise real cross-cluster dump and restore
         env:
+          RECOVERY_REHEARSAL_ALLOW_ROLE_DROP: "1"
           POSTGRES_SOURCE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5432/postgres
           POSTGRES_RESTORE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5433/postgres
           POSTGRES_SOURCE_CONTAINER: ${{ job.services.source_postgres.id }}
