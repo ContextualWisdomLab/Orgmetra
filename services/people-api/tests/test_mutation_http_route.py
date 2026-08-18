@@ -312,7 +312,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(port.assignment_calls[0][0].allocation_ratio, Decimal("1.0000"))
         self.assertEqual(port.assignment_calls[0][0].idempotency_key, "idempotency-key-17xx")
 
-    async def test_invalid_input_fails_before_authentication(self) -> None:
+    async def test_route_header_and_media_input_fail_before_authentication(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
         port = RecordingMutationPort()
         app = self._app(authenticator=authenticator, mutation_port=port)
@@ -337,10 +337,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
                     ("idempotency-key", "idempotency-key-17xx"),
                 ]
             },
-            {
-                "headers": self._headers()
-                + [(b"idempotency-key", b"idempotency-key-17xx")]
-            },
+            {"headers": self._headers() + [(b"idempotency-key", b"idempotency-key-17xx")]},
             {
                 "headers": [
                     (b"authorization", b"Bearer opaque-token"),
@@ -391,6 +388,17 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
                     (b"x-purpose-code", b"workforce_admin"),
                 ]
             },
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                status, _, payload = await self._request(app, **case)
+                self.assertIn(status, (400, 404, 415))
+                self.assertIn(payload["error"], {"invalid_request", "route_not_found", "unsupported_media_type"})
+        self.assertEqual(authenticator.tokens, [])
+        self.assertEqual(port.employment_calls, [])
+
+    async def test_body_validation_occurs_after_authentication_without_mutation(self) -> None:
+        cases = (
             {"body": employment_body(unexpected="field")},
             {"path": "/v1/position-records", "body": employment_body()},
             {"path": "/v1/assignment-records", "body": employment_body()},
@@ -403,14 +411,18 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
         )
         for case in cases:
             with self.subTest(case=case):
-                status, _, payload = await self._request(app, **case)
-                self.assertIn(status, (400, 404, 413, 415))
-                self.assertIn(
-                    payload["error"],
-                    {"invalid_request", "route_not_found", "payload_too_large", "unsupported_media_type"},
+                authenticator = FakeAuthenticator(self.principal)
+                port = RecordingMutationPort()
+                status, _, payload = await self._request(
+                    self._app(authenticator=authenticator, mutation_port=port),
+                    **case,
                 )
-        self.assertEqual(authenticator.tokens, [])
-        self.assertEqual(port.employment_calls, [])
+                self.assertIn(status, (400, 413))
+                self.assertIn(payload["error"], {"invalid_request", "payload_too_large"})
+                self.assertEqual(authenticator.tokens, ["opaque-token"])
+                self.assertEqual(port.employment_calls, [])
+                self.assertEqual(port.position_calls, [])
+                self.assertEqual(port.assignment_calls, [])
 
     async def test_wrong_method_and_auth_failures_never_mutate(self) -> None:
         port = RecordingMutationPort()
@@ -434,8 +446,12 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_actor_or_policy_mismatch_never_mutates(self) -> None:
         port = RecordingMutationPort()
-        foreign_headers = self._headers()
-        foreign_headers[4] = (b"x-actor-reference", b"keyverse_subject:other-operator")
+        foreign_headers = [
+            (b"x-actor-reference", b"keyverse_subject:other-operator")
+            if name == b"x-actor-reference"
+            else (name, value)
+            for name, value in self._headers()
+        ]
         status, _, payload = await self._request(self._app(mutation_port=port), headers=foreign_headers)
         self.assertEqual((status, payload["error"]), (403, "access_denied"))
         denied = PurposeBoundAccessPolicy(
