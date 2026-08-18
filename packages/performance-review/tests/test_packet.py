@@ -63,6 +63,7 @@ def test_builds_value_free_human_review_packet() -> None:
     assert packet.human_confirmation_required is True
     assert packet.decision_authority == "human_review_only"
     assert packet.review_state == "requires_human_review"
+    assert packet.scope_verification_state == "requires_authoritative_resolution"
     assert "record accountable human rating and feedback" in packet.next_action
 
 
@@ -71,6 +72,7 @@ def test_canonical_json_and_digest_are_deterministic() -> None:
     canonical = packet.canonical_json()
     payload = json.loads(canonical)
     assert payload["person_record_reference"] == PERSON
+    assert payload["scope_verification_state"] == "requires_authoritative_resolution"
     assert payload["generated_at"] == "2026-08-19T05:15:30.123456Z"
     assert packet.sha256_digest() == sha256(canonical.encode("utf-8")).hexdigest()
     assert canonical == build_valid().canonical_json()
@@ -164,6 +166,7 @@ def test_generated_at_must_be_timezone_aware_datetime(generated_at: object) -> N
         ("human_confirmation_required", 1, "human confirmation is mandatory"),
         ("decision_authority", "model_decision", "decision_authority"),
         ("review_state", "approved", "review_state"),
+        ("scope_verification_state", "verified", "scope_verification_state"),
         ("next_action", "Auto-rate the employee.", "next_action"),
     ],
 )
