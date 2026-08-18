@@ -76,6 +76,8 @@ class StructuredInterviewPlan:
     job_analysis_digest: str
     question_set_reference: str
     question_set_digest: str
+    question_competency_map_reference: str
+    question_competency_map_digest: str
     rating_anchor_reference: str
     rating_anchor_digest: str
     competency_references: tuple[str, ...]
@@ -98,6 +100,12 @@ class StructuredInterviewPlan:
         _validate_digest(self.job_analysis_digest, "job_analysis_digest")
         _validate_reference(self.question_set_reference, "question_set", "question_set_reference")
         _validate_digest(self.question_set_digest, "question_set_digest")
+        _validate_reference(
+            self.question_competency_map_reference,
+            "question_competency_map",
+            "question_competency_map_reference",
+        )
+        _validate_digest(self.question_competency_map_digest, "question_competency_map_digest")
         _validate_reference(self.rating_anchor_reference, "rating_anchor", "rating_anchor_reference")
         _validate_digest(self.rating_anchor_digest, "rating_anchor_digest")
         if not isinstance(self.competency_references, tuple) or not 1 <= len(self.competency_references) <= 12:
@@ -141,6 +149,8 @@ class StructuredInterviewPlan:
             "next_action": self.next_action,
             "panel_actor_references": list(self.panel_actor_references),
             "purpose_code": self.purpose_code,
+            "question_competency_map_digest": self.question_competency_map_digest,
+            "question_competency_map_reference": self.question_competency_map_reference,
             "question_count": self.question_count,
             "question_set_digest": self.question_set_digest,
             "question_set_reference": self.question_set_reference,
@@ -168,6 +178,8 @@ def build_structured_interview_plan(
     job_analysis_digest: str,
     question_set_reference: str,
     question_set_digest: str,
+    question_competency_map_reference: str,
+    question_competency_map_digest: str,
     rating_anchor_reference: str,
     rating_anchor_digest: str,
     competency_references: tuple[str, ...],
@@ -187,6 +199,8 @@ def build_structured_interview_plan(
         job_analysis_digest=job_analysis_digest,
         question_set_reference=question_set_reference,
         question_set_digest=question_set_digest,
+        question_competency_map_reference=question_competency_map_reference,
+        question_competency_map_digest=question_competency_map_digest,
         rating_anchor_reference=rating_anchor_reference,
         rating_anchor_digest=rating_anchor_digest,
         competency_references=competency_references,
