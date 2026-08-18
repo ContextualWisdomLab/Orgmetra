@@ -76,13 +76,26 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     'restored audit event was mutable',
     'TRUNCATE TABLE audit_event_record CASCADE;',
     'restored audit history was truncatable',
-    "has_function_privilege('orgmetra_outbox_operator'",
-    "has_column_privilege('orgmetra_outbox_recovery_owner'",
-    "NOT has_table_privilege('orgmetra_outbox_operator'",
     'least-privilege recovery ACLs did not survive restore'
   ]) {
     assert.ok(rehearsal.includes(fragment), `restore rehearsal must contain ${fragment}`);
   }
+
+  assert.match(
+    rehearsal,
+    /has_function_privilege\(\s*'orgmetra_outbox_operator'\s*,\s*'public\.operator_dead_letter_expired_outbox_delivery\(uuid,uuid,uuid,text,text\)'/,
+    'restore rehearsal must prove the operator retains only the governed function capability'
+  );
+  assert.match(
+    rehearsal,
+    /has_column_privilege\(\s*'orgmetra_outbox_recovery_owner'\s*,\s*'public\.outbox_delivery_record'/,
+    'restore rehearsal must prove bounded recovery-owner column privileges'
+  );
+  assert.match(
+    rehearsal,
+    /NOT has_table_privilege\('orgmetra_outbox_operator', 'public\.outbox_delivery_record', '(?:SELECT|INSERT|UPDATE)'\)/,
+    'restore rehearsal must prove the operator cannot directly mutate transport tables'
+  );
 
   assert.ok(traceability.includes('Protected-main truth'), 'traceability must distinguish protected-main truth');
   assert.ok(traceability.includes('exact restored database'), 'traceability must bind evidence to the restored database');
