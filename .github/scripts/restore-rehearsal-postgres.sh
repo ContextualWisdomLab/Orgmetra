@@ -12,10 +12,41 @@ if [[ "${POSTGRES_SOURCE_ADMIN_URL}" == "${POSTGRES_RESTORE_ADMIN_URL}" \
     exit 1
 fi
 
+require_disposable_role_cleanup() {
+    if [[ "${RECOVERY_REHEARSAL_ALLOW_ROLE_DROP:-}" != "1" ]]; then
+        echo "recovery rehearsal role cleanup requires RECOVERY_REHEARSAL_ALLOW_ROLE_DROP=1" >&2
+        return 1
+    fi
+}
+
+replace_database_name() {
+    local administrator_url="$1"
+    local database_name="$2"
+    python3 - "${administrator_url}" "${database_name}" <<'PY'
+import sys
+from urllib.parse import urlsplit, urlunsplit
+
+administrator_url, database_name = sys.argv[1], sys.argv[2]
+parts = urlsplit(administrator_url)
+if parts.scheme not in {"postgres", "postgresql"}:
+    print("administrator URL must use the postgres or postgresql scheme", file=sys.stderr)
+    raise SystemExit(2)
+if not parts.netloc:
+    print("administrator URL must include a PostgreSQL network location", file=sys.stderr)
+    raise SystemExit(2)
+if parts.fragment:
+    print("administrator URL must not contain a fragment", file=sys.stderr)
+    raise SystemExit(2)
+print(urlunsplit((parts.scheme, parts.netloc, f"/{database_name}", parts.query, "")))
+PY
+}
+
+require_disposable_role_cleanup
+
 SOURCE_DATABASE_NAME="orgmetra_recovery_source"
 RESTORE_DATABASE_NAME="orgmetra_recovery_target"
-SOURCE_DATABASE_URL="${POSTGRES_SOURCE_ADMIN_URL%/postgres}/${SOURCE_DATABASE_NAME}"
-RESTORE_DATABASE_URL="${POSTGRES_RESTORE_ADMIN_URL%/postgres}/${RESTORE_DATABASE_NAME}"
+SOURCE_DATABASE_URL="$(replace_database_name "${POSTGRES_SOURCE_ADMIN_URL}" "${SOURCE_DATABASE_NAME}")"
+RESTORE_DATABASE_URL="$(replace_database_name "${POSTGRES_RESTORE_ADMIN_URL}" "${RESTORE_DATABASE_NAME}")"
 DUMP_PATH="$(mktemp -t orgmetra-recovery-XXXXXX.dump)"
 TENANT_ID="10000000-0000-7000-8000-000000000001"
 PERSON_ID="00000000-0000-7000-8000-000000000101"
@@ -25,6 +56,7 @@ OUTBOX_ID="00000000-0000-7000-8000-000000000104"
 
 drop_recovery_roles() {
     local admin_url="$1"
+    require_disposable_role_cleanup
     psql "${admin_url}" -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
 DROP ROLE IF EXISTS orgmetra_outbox_operator;
 DROP ROLE IF EXISTS orgmetra_outbox_recovery_owner;
@@ -110,6 +142,12 @@ SQL
 
 docker exec "${POSTGRES_SOURCE_CONTAINER}" \
     pg_dump -U orgmetra -d "${SOURCE_DATABASE_NAME}" --format=custom > "${DUMP_PATH}"
+if [[ ! -s "${DUMP_PATH}" ]]; then
+    echo "source dump is empty" >&2
+    exit 1
+fi
+docker exec -i "${POSTGRES_SOURCE_CONTAINER}" \
+    pg_restore -U orgmetra --list < "${DUMP_PATH}" >/dev/null
 
 # pg_dump is database-scoped and intentionally does not include cluster-global
 # roles. A clean replacement cluster must recreate the two least-privilege
@@ -131,6 +169,7 @@ bitemporal_count="$(PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" \
 SELECT count(*)
 FROM person_name_record
 WHERE tenant_record_id = '${TENANT_ID}'::uuid
+  AND person_name_record_id = '${NAME_ID}'::uuid
   AND person_record_id = '${PERSON_ID}'::uuid
   AND display_name = 'Recovery Rehearsal Worker'
   AND effective_from <= DATE '2026-08-18'
