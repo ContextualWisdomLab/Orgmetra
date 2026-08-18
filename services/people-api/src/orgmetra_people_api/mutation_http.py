@@ -10,7 +10,12 @@ from uuid import UUID, uuid4
 from orgmetra_hris_kernel import KernelError
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 
-from orgmetra_people_api.auth import AuthenticationFailed, TokenAuthenticator, extract_bearer_token
+from orgmetra_people_api.auth import (
+    AuthenticatedPrincipal,
+    AuthenticationFailed,
+    TokenAuthenticator,
+    extract_bearer_token,
+)
 from orgmetra_people_api.hire_http import (
     _InvalidHttpRequest,
     _PayloadTooLarge,
@@ -30,11 +35,10 @@ from orgmetra_people_api.mutations import (
     create_employment_record,
     create_position_record,
     parse_allocation_ratio,
+    validate_idempotency_key,
 )
 
 _MAX_UUID_INT = (1 << 128) - 1
-_IDEMPOTENCY_MIN = 16
-_IDEMPOTENCY_MAX = 200
 _EMPLOYMENT_BODY_KEYS = frozenset(
     {
         "person_record_id",
@@ -152,24 +156,6 @@ class PeopleMutationAsgiApp:
         try:
             headers = _parse_command_headers(scope)
             _require_json_content_type(scope)
-            payload = await _read_json_object(receive)
-            command = _command_for_route(
-                route,
-                headers.tenant_record_id,
-                payload,
-                self.id_factory,
-                headers.idempotency_key,
-            )
-        except _PayloadTooLarge:
-            await _send_json(
-                send,
-                status=413,
-                payload={
-                    "error": "payload_too_large",
-                    "message": "Send one bounded JSON mutation command and retry.",
-                },
-            )
-            return
         except _UnsupportedMediaType:
             await _send_json(
                 send,
@@ -216,6 +202,36 @@ class PeopleMutationAsgiApp:
                 payload={
                     "error": "access_denied",
                     "message": "Use the tenant and actor bound to the authenticated credential.",
+                },
+            )
+            return
+
+        try:
+            payload = await _read_json_object(receive)
+            command = _command_for_route(
+                route,
+                headers.tenant_record_id,
+                payload,
+                self.id_factory,
+                headers.idempotency_key,
+            )
+        except _PayloadTooLarge:
+            await _send_json(
+                send,
+                status=413,
+                payload={
+                    "error": "payload_too_large",
+                    "message": "Send one bounded JSON mutation command and retry.",
+                },
+            )
+            return
+        except (_InvalidHttpRequest, ValueError, TypeError):
+            await _send_json(
+                send,
+                status=400,
+                payload={
+                    "error": "invalid_request",
+                    "message": "Correct the tenant, actor, purpose, confirmation, evidence, and command fields, then retry.",
                 },
             )
             return
@@ -322,11 +338,10 @@ def _parse_command_headers(scope: Mapping[str, object]) -> _MutationHeaders:
     }
     if frozenset(values) < required:
         raise _InvalidHttpRequest("command headers are incomplete")
-    idempotency_key = values["idempotency-key"]
-    if not (_IDEMPOTENCY_MIN <= len(idempotency_key) <= _IDEMPOTENCY_MAX) or any(
-        ord(character) < 0x21 or ord(character) > 0x7E for character in idempotency_key
-    ):
-        raise _InvalidHttpRequest("Idempotency-Key is invalid")
+    try:
+        idempotency_key = validate_idempotency_key(values["idempotency-key"])
+    except ValueError as error:
+        raise _InvalidHttpRequest("Idempotency-Key is invalid") from error
     try:
         tenant_record_id = UUID(values["x-tenant-reference"])
     except ValueError as error:
@@ -430,16 +445,17 @@ def _command_for_route(
 def _dispatch_mutation(
     *,
     route: str,
-    principal: object,
+    principal: AuthenticatedPrincipal,
     command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
     purpose_code: str,
     app: PeopleMutationAsgiApp,
 ) -> tuple[dict[str, str], str]:
     """Invoke the authorized application function for the matched route."""
     if route == "employment-records":
-        assert isinstance(command, EmploymentMutationCommand)
+        if not isinstance(command, EmploymentMutationCommand):
+            raise TypeError("employment route requires EmploymentMutationCommand")
         result = create_employment_record(
-            principal=principal,  # type: ignore[arg-type]
+            principal=principal,
             command=command,
             purpose_code=purpose_code,
             policy=app.employment_policy,
@@ -448,9 +464,10 @@ def _dispatch_mutation(
         created = str(result.employment_record_id)
         return {"employment_record_id": created}, f"/v1/employment-records/{created}"
     if route == "position-records":
-        assert isinstance(command, PositionMutationCommand)
+        if not isinstance(command, PositionMutationCommand):
+            raise TypeError("position route requires PositionMutationCommand")
         result = create_position_record(
-            principal=principal,  # type: ignore[arg-type]
+            principal=principal,
             command=command,
             purpose_code=purpose_code,
             policy=app.position_policy,
@@ -458,9 +475,10 @@ def _dispatch_mutation(
         )
         created = str(result.position_record_id)
         return {"position_record_id": created}, f"/v1/position-records/{created}"
-    assert isinstance(command, AssignmentMutationCommand)
+    if not isinstance(command, AssignmentMutationCommand):
+        raise TypeError("assignment route requires AssignmentMutationCommand")
     result = create_assignment_record(
-        principal=principal,  # type: ignore[arg-type]
+        principal=principal,
         command=command,
         purpose_code=purpose_code,
         policy=app.assignment_policy,
