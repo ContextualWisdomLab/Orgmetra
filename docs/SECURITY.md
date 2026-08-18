@@ -41,22 +41,17 @@ Authorization evidence contains only governance metadata, including the opaque a
 
 ## Mutation security contract
 
-Every mutating HTTP operation and its server-side command handler must require and validate:
+Every mutating HTTP operation and its server-side command handler requires one validated `Idempotency-Key` that crosses the command boundary into durable transactional replay state. Employment, position, and assignment creation additionally require `X-Tenant-Reference`, `X-Actor-Reference`, and `X-Purpose-Code`; those values must match the authenticated Keyverse principal and the operation-specific least-privilege scope. Confirmed-hire materialization instead binds the tenant in `/v1/tenants/{tenant_record_id}/candidate-worker-conversions`, the business purpose in its exact query parameter, and the actor through the authenticated principal. It does not accept weaker duplicate actor/tenant/purpose header authorities.
 
-- `Idempotency-Key` bound through the command into the write port and stored on `people_mutation_idempotency_record` with the authoritative mutation;
-- `X-Tenant-Reference`;
-- `X-Actor-Reference`;
-- `X-Purpose-Code`;
-- an authenticated Keyverse principal bound to the actor and tenant;
-- the operation-specific least-privilege Keyverse scope declared in OpenAPI;
-- resource-scoped authorization; and
-- a versioned audit/provenance correlation reference.
+All mutation families additionally require resource-scoped authorization and a versioned audit/provenance correlation reference. High-risk commands require an explicit human-confirmation boundary and immutable versioned evidence. Employment, position, and assignment commands carry confirmation/evidence on the command. Confirmed-hire materialization resolves the exact previously sealed `selection_decision` in the same tenant-bound transaction and rejects the mutation unless that decision records explicit human confirmation and sealed evidence provenance.
 
-High-risk commands additionally require a non-empty decision reason, explicit confirmation reference, and at least one immutable evidence reference with a version. A caller-controlled purpose header cannot substitute for a missing token scope. The OpenAPI contract is executable input to generated gateway and server validation; an implementation that accepts a request outside that contract fails CI.
+`people_mutation_idempotency_record` stores the tenant, route, idempotency key, semantic-command digest, committed resource identity, and transaction time in the same transaction as the authoritative HRIS fact and governed audit/outbox pair. A transaction-scoped advisory lock serializes concurrent requests for the exact tenant/route/key. A same-key same-command replay returns the first committed identity without repeating Person, Employment, candidate-worker conversion, audit, or outbox writes; a changed command under the same key fails closed. A rolled-back command leaves no successful replay marker. The idempotency relation is tenant-RLS isolated and append-only, including TRUNCATE protection.
+
+A caller-controlled purpose value cannot substitute for a missing token scope. The OpenAPI contract is executable input to generated gateway and server validation; an implementation that accepts a request outside its published contract fails CI.
 
 Internal traces remain in restricted telemetry. Customer-facing failures return a bounded `error_code`, actionable `message`, `next_action`, and random `support_reference`; the support lookup is access-controlled and retention-bound.
 
-The same contract applies to selection decisions, compensation changes, terminations, promotions, job-profile publication, validation-study policy changes, data exports, and identity deprovisioning. Draft creation may use a narrower permission, but publication or authoritative state transition may not reuse draft-only authorization.
+The same governance contract applies to selection decisions, compensation changes, terminations, promotions, job-profile publication, validation-study policy changes, data exports, and identity deprovisioning. Draft creation may use a narrower permission, but publication or authoritative state transition may not reuse draft-only authorization.
 
 ## High-risk action flow
 
