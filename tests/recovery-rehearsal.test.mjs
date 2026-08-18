@@ -75,7 +75,11 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     'bitemporal person name did not survive restore',
     'restored audit event was mutable',
     'TRUNCATE TABLE audit_event_record CASCADE;',
-    'restored audit history was truncatable'
+    'restored audit history was truncatable',
+    "has_function_privilege('orgmetra_outbox_operator'",
+    "has_column_privilege('orgmetra_outbox_recovery_owner'",
+    "NOT has_table_privilege('orgmetra_outbox_operator'",
+    'least-privilege recovery ACLs did not survive restore'
   ]) {
     assert.ok(rehearsal.includes(fragment), `restore rehearsal must contain ${fragment}`);
   }
