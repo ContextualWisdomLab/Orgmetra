@@ -123,7 +123,7 @@ class StructuredInterviewPlan:
         if type(self.question_count) is not int or not 1 <= self.question_count <= 20:
             raise ValueError("question_count must be an integer from 1 through 20")
         if self.question_count < len(self.competency_references):
-            raise ValueError("question_count must cover every governed competency")
+            raise ValueError("question_count must be at least the number of governed competencies")
         _validate_code(self.purpose_code, "purpose_code")
         if self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain structured_interview_plan")
