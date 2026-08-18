@@ -18,6 +18,7 @@ from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessP
 
 from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.authorization import authorize_resource_fields
+from orgmetra_people_api.mutations import validate_idempotency_key
 
 _MAX_UUID_INT = (1 << 128) - 1
 _STATUS_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
@@ -62,6 +63,7 @@ class HireAcceptanceCommand:
     outbox_delivery_record_id: UUID
     effective_from: date
     display_name: str
+    idempotency_key: str
     employment_status_code: str = "active"
 
     def __post_init__(self) -> None:
@@ -87,6 +89,7 @@ class HireAcceptanceCommand:
             raise ValueError("display_name must contain 1-512 usable characters.")
         if any(ord(character) < 0x20 for character in self.display_name):
             raise ValueError("display_name must not contain control characters.")
+        validate_idempotency_key(self.idempotency_key)
         if (
             not isinstance(self.employment_status_code, str)
             or _STATUS_CODE_PATTERN.fullmatch(self.employment_status_code) is None
