@@ -164,7 +164,6 @@ class PerformanceReviewPacket:
             )
             _validate_digest(self.development_plan_digest, "development_plan_digest")
         _validate_reference(self.reviewer_reference, "actor", "reviewer_reference")
-        _validate_code(self.purpose_code, "purpose_code")
         if self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain performance_review")
         _validate_code(self.reason_code, "reason_code")
