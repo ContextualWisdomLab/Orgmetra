@@ -13,9 +13,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from hashlib import sha256
+import json
 import re
 from typing import Protocol, runtime_checkable
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessPolicy
 
@@ -23,6 +25,9 @@ from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.authorization import authorize_resource_fields
 
 _MAX_UUID_INT = (1 << 128) - 1
+_IDEMPOTENCY_MIN = 16
+_IDEMPOTENCY_MAX = 200
+_IDEMPOTENCY_NAMESPACE = UUID("0198a412-9000-7000-8000-0000000000aa")
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 _EMPLOYMENT_STATUSES = frozenset({"active", "leave", "terminated"})
@@ -59,6 +64,97 @@ def _validate_evidence_version(value: object) -> None:
         raise ValueError("evidence_version_code must be a whitespace-free version token.")
 
 
+def validate_idempotency_key(value: object) -> str:
+    """Require the same visible-ASCII Idempotency-Key contract as the HTTP boundary."""
+    if not isinstance(value, str) or not (_IDEMPOTENCY_MIN <= len(value) <= _IDEMPOTENCY_MAX):
+        raise ValueError("idempotency_key must be 16 to 200 visible ASCII characters.")
+    if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
+        raise ValueError("idempotency_key must be 16 to 200 visible ASCII characters.")
+    return value
+
+
+def command_route(
+    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
+) -> str:
+    """Return the durable route that scopes one People mutation idempotency key."""
+    if isinstance(command, EmploymentMutationCommand):
+        return "employment-records"
+    if isinstance(command, PositionMutationCommand):
+        return "position-records"
+    if isinstance(command, AssignmentMutationCommand):
+        return "assignment-records"
+    raise TypeError("command must be a governed People mutation command")
+
+
+def idempotency_record_id(
+    *,
+    tenant_record_id: UUID,
+    command_route_value: str,
+    idempotency_key: str,
+) -> UUID:
+    """Derive a stable operational identity for one tenant/route/key binding."""
+    return uuid5(
+        _IDEMPOTENCY_NAMESPACE,
+        f"{tenant_record_id}:{command_route_value}:{idempotency_key}",
+    )
+
+
+def mutation_command_digest(
+    *,
+    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
+    authorization: AuthorizationDecision,
+) -> str:
+    """Hash method, route, tenant, actor, purpose, and semantic command fields.
+
+    Generated record identifiers are excluded so a retry that allocates fresh
+    UUIDs still matches the first committed command.
+    """
+    if not isinstance(authorization, AuthorizationDecision):
+        raise TypeError("authorization must be an AuthorizationDecision")
+    if isinstance(command, EmploymentMutationCommand):
+        route = "employment-records"
+        semantic_command: dict[str, object] = {
+            "confirmation_reference": command.confirmation_reference,
+            "effective_from": command.effective_from.isoformat(),
+            "employment_concurrency_code": command.employment_concurrency_code,
+            "employment_status_code": command.employment_status_code,
+            "evidence_version_code": command.evidence_version_code,
+            "person_record_id": str(command.person_record_id),
+        }
+    elif isinstance(command, PositionMutationCommand):
+        route = "position-records"
+        semantic_command = {
+            "confirmation_reference": command.confirmation_reference,
+            "effective_from": command.effective_from.isoformat(),
+            "evidence_version_code": command.evidence_version_code,
+            "job_profile_id": str(command.job_profile_id),
+            "organization_unit_id": str(command.organization_unit_id),
+            "position_status_code": command.position_status_code,
+        }
+    elif isinstance(command, AssignmentMutationCommand):
+        route = "assignment-records"
+        semantic_command = {
+            "allocation_ratio": format(command.allocation_ratio, "f"),
+            "confirmation_reference": command.confirmation_reference,
+            "effective_from": command.effective_from.isoformat(),
+            "employment_record_id": str(command.employment_record_id),
+            "evidence_version_code": command.evidence_version_code,
+            "person_record_id": str(command.person_record_id),
+            "position_record_id": str(command.position_record_id),
+        }
+    else:
+        raise TypeError("command must be a governed People mutation command")
+    payload = {
+        "actor_reference": authorization.actor_reference,
+        "command_route": route,
+        "method": "POST",
+        "purpose_code": authorization.purpose_code,
+        "semantic_command": semantic_command,
+        "tenant_record_id": str(command.tenant_record_id),
+    }
+    return sha256(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class EmploymentMutationCommand:
     """Opaque identities and high-impact evidence needed to create one employment."""
@@ -74,6 +170,7 @@ class EmploymentMutationCommand:
     effective_from: date
     confirmation_reference: str
     evidence_version_code: str
+    idempotency_key: str
 
     def __post_init__(self) -> None:
         """Fail closed before authorization or persistence on malformed input."""
@@ -94,6 +191,7 @@ class EmploymentMutationCommand:
             raise ValueError("employment_concurrency_code must be exclusive or concurrent.")
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
+        validate_idempotency_key(self.idempotency_key)
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +209,7 @@ class PositionMutationCommand:
     effective_from: date
     confirmation_reference: str
     evidence_version_code: str
+    idempotency_key: str
 
     def __post_init__(self) -> None:
         """Fail closed before authorization or persistence on malformed input."""
@@ -130,6 +229,7 @@ class PositionMutationCommand:
             raise ValueError("position_status_code must be a staffable or closed seat status.")
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
+        validate_idempotency_key(self.idempotency_key)
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +247,7 @@ class AssignmentMutationCommand:
     effective_from: date
     confirmation_reference: str
     evidence_version_code: str
+    idempotency_key: str
 
     def __post_init__(self) -> None:
         """Fail closed before authorization or persistence on malformed input."""
@@ -168,6 +269,7 @@ class AssignmentMutationCommand:
             raise ValueError("allocation_ratio must be greater than 0 and at most 1.0000.")
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
+        validate_idempotency_key(self.idempotency_key)
 
 
 @dataclass(frozen=True, slots=True)

@@ -153,7 +153,13 @@ class PeopleMutationAsgiApp:
             headers = _parse_command_headers(scope)
             _require_json_content_type(scope)
             payload = await _read_json_object(receive)
-            command = _command_for_route(route, headers.tenant_record_id, payload, self.id_factory)
+            command = _command_for_route(
+                route,
+                headers.tenant_record_id,
+                payload,
+                self.id_factory,
+                headers.idempotency_key,
+            )
         except _PayloadTooLarge:
             await _send_json(
                 send,
@@ -361,6 +367,7 @@ def _command_for_route(
     tenant_record_id: UUID,
     payload: Mapping[str, object],
     id_factory: Callable[[], UUID],
+    idempotency_key: str,
 ) -> EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand:
     """Map one OpenAPI command body onto the matching application command."""
     _require_reason(payload)
@@ -381,6 +388,7 @@ def _command_for_route(
             effective_from=date.fromisoformat(str(payload["effective_from"])),
             confirmation_reference=str(confirmation_reference),
             evidence_version_code=evidence_version_code,
+            idempotency_key=idempotency_key,
         )
     if route == "position-records":
         if frozenset(payload) != _POSITION_BODY_KEYS:
@@ -397,6 +405,7 @@ def _command_for_route(
             effective_from=date.fromisoformat(str(payload["effective_from"])),
             confirmation_reference=str(confirmation_reference),
             evidence_version_code=evidence_version_code,
+            idempotency_key=idempotency_key,
         )
     if frozenset(payload) != _ASSIGNMENT_BODY_KEYS:
         raise _InvalidHttpRequest("assignment command fields are incomplete or unsupported")
@@ -412,6 +421,7 @@ def _command_for_route(
         effective_from=date.fromisoformat(str(payload["effective_from"])),
         confirmation_reference=str(confirmation_reference),
         evidence_version_code=evidence_version_code,
+        idempotency_key=idempotency_key,
     )
 
 

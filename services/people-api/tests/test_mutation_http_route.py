@@ -292,6 +292,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
         command = port.employment_calls[0][0]
         self.assertEqual(command.person_record_id, PERSON)
         self.assertEqual(command.effective_from, date(2026, 8, 18))
+        self.assertEqual(command.idempotency_key, "idempotency-key-17xx")
 
         position_status, _, position_payload = await self._request(
             app,
@@ -300,6 +301,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
             body=position_body(),
         )
         self.assertEqual((position_status, position_payload), (201, {"position_record_id": str(POSITION)}))
+        self.assertEqual(port.position_calls[0][0].idempotency_key, "idempotency-key-17xx")
 
         assignment_status, _, assignment_payload = await self._request(
             app,
@@ -308,6 +310,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual((assignment_status, assignment_payload), (201, {"assignment_record_id": str(ASSIGNMENT)}))
         self.assertEqual(port.assignment_calls[0][0].allocation_ratio, Decimal("1.0000"))
+        self.assertEqual(port.assignment_calls[0][0].idempotency_key, "idempotency-key-17xx")
 
     async def test_invalid_input_fails_before_authentication(self) -> None:
         authenticator = FakeAuthenticator(self.principal)

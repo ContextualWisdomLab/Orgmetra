@@ -56,6 +56,7 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0007_outbox_retry_exhaustion.sql',
   'database/migrations/0008_audit_outbox_review_hardening.sql',
   'database/migrations/0009_candidate_worker_conversion_governance.sql',
+  'database/migrations/0012_people_mutation_idempotency.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -73,6 +74,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_outbox_dead_letter_postgres.sh',
   'tests/test_audit_outbox_hardening_postgres.sh',
   'tests/test_candidate_worker_conversion_postgres.sh',
+  'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -113,7 +115,7 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
   'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
   'outbox_event', 'outbox_delivery_record', 'outbox_delivery_escalation_record',
-  'inbox_event', 'integration_delivery'
+  'inbox_event', 'integration_delivery', 'people_mutation_idempotency_record'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;

@@ -7,7 +7,7 @@ from decimal import Decimal
 import unittest
 from uuid import UUID
 
-from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
+from orgmetra_keyverse_adapter import AuthorizationDecision, AuthorizationDeniedError, PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.mutations import (
     AssignmentMutationCommand,
@@ -17,10 +17,13 @@ from orgmetra_people_api.mutations import (
     PeopleMutationPort,
     PositionMutationCommand,
     PositionMutationResult,
+    command_route,
     create_assignment_record,
     create_employment_record,
     create_position_record,
+    mutation_command_digest,
     parse_allocation_ratio,
+    validate_idempotency_key,
 )
 
 TENANT = UUID("0198a412-8000-7000-8000-000000000001")
@@ -37,6 +40,7 @@ OUTBOX = UUID("0198a412-8000-7000-8000-000000000081")
 EFFECTIVE_FROM = date(2026, 8, 18)
 CONFIRMATION = "human_confirmation:review-88"
 EVIDENCE = "decision_evidence_set:v1"
+IDEMPOTENCY = "idempotency-key-17xx"
 
 
 def employment_command(**overrides: object) -> EmploymentMutationCommand:
@@ -53,6 +57,7 @@ def employment_command(**overrides: object) -> EmploymentMutationCommand:
         "effective_from": EFFECTIVE_FROM,
         "confirmation_reference": CONFIRMATION,
         "evidence_version_code": EVIDENCE,
+        "idempotency_key": IDEMPOTENCY,
     }
     values.update(overrides)
     return EmploymentMutationCommand(**values)  # type: ignore[arg-type]
@@ -72,6 +77,7 @@ def position_command(**overrides: object) -> PositionMutationCommand:
         "effective_from": EFFECTIVE_FROM,
         "confirmation_reference": CONFIRMATION,
         "evidence_version_code": EVIDENCE,
+        "idempotency_key": IDEMPOTENCY,
     }
     values.update(overrides)
     return PositionMutationCommand(**values)  # type: ignore[arg-type]
@@ -91,6 +97,7 @@ def assignment_command(**overrides: object) -> AssignmentMutationCommand:
         "effective_from": EFFECTIVE_FROM,
         "confirmation_reference": CONFIRMATION,
         "evidence_version_code": EVIDENCE,
+        "idempotency_key": IDEMPOTENCY,
     }
     values.update(overrides)
     return AssignmentMutationCommand(**values)  # type: ignore[arg-type]
@@ -233,6 +240,10 @@ class PeopleMutationTests(unittest.TestCase):
             lambda: employment_command(employment_concurrency_code="primary"),
             lambda: employment_command(confirmation_reference="not-namespaced"),
             lambda: employment_command(evidence_version_code="has space"),
+            lambda: employment_command(idempotency_key="short"),
+            lambda: employment_command(idempotency_key="x" * 201),
+            lambda: employment_command(idempotency_key="idempotency-key-17\n"),
+            lambda: employment_command(idempotency_key=17),
             lambda: position_command(position_record_id=UUID(int=(1 << 128) - 1)),
             lambda: position_command(effective_from="2026-08-18"),
             lambda: position_command(position_status_code="staffable"),
@@ -313,6 +324,56 @@ class PeopleMutationTests(unittest.TestCase):
                 policy=assignment_policy(),
                 mutation_port=invalid,  # type: ignore[arg-type]
             )
+
+    def test_command_digest_excludes_generated_ids_and_changes_with_semantics(self) -> None:
+        authorization = AuthorizationDecision(
+            allowed=True,
+            tenant_record_id=TENANT,
+            actor_reference="keyverse_subject:operator-17",
+            resource_reference=f"employment_record:{EMPLOYMENT.hex}",
+            policy_version_code="people-mutation-v1",
+            purpose_code="workforce_admin",
+            operation_code="create_record",
+            resource_kind="employment_record",
+            requested_fields=frozenset({"employment_record"}),
+            authorized_fields=frozenset({"employment_record"}),
+            reason_code="access_permitted",
+            next_action="continue",
+        )
+        first = mutation_command_digest(command=employment_command(), authorization=authorization)
+        retried = mutation_command_digest(
+            command=employment_command(
+                employment_record_id=UUID("0198a412-8000-7000-8000-000000000032"),
+                audit_event_record_id=UUID("0198a412-8000-7000-8000-000000000082"),
+            ),
+            authorization=authorization,
+        )
+        changed = mutation_command_digest(
+            command=employment_command(employment_status_code="leave"),
+            authorization=authorization,
+        )
+        self.assertEqual(first, retried)
+        self.assertNotEqual(first, changed)
+        self.assertEqual(command_route(employment_command()), "employment-records")
+        self.assertEqual(command_route(position_command()), "position-records")
+        self.assertEqual(command_route(assignment_command()), "assignment-records")
+        self.assertEqual(validate_idempotency_key(IDEMPOTENCY), IDEMPOTENCY)
+        position_digest = mutation_command_digest(
+            command=position_command(),
+            authorization=authorization,
+        )
+        assignment_digest = mutation_command_digest(
+            command=assignment_command(),
+            authorization=authorization,
+        )
+        self.assertNotEqual(first, position_digest)
+        self.assertNotEqual(first, assignment_digest)
+        with self.assertRaisesRegex(TypeError, "People mutation command"):
+            command_route(object())  # type: ignore[arg-type]
+        with self.assertRaisesRegex(TypeError, "AuthorizationDecision"):
+            mutation_command_digest(command=employment_command(), authorization=object())  # type: ignore[arg-type]
+        with self.assertRaisesRegex(TypeError, "People mutation command"):
+            mutation_command_digest(command=object(), authorization=authorization)  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":

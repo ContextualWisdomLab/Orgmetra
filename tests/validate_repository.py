@@ -59,6 +59,7 @@ REQUIRED = [
     "database/migrations/0007_outbox_retry_exhaustion.sql",
     "database/migrations/0008_audit_outbox_review_hardening.sql",
     "database/migrations/0009_candidate_worker_conversion_governance.sql",
+    "database/migrations/0012_people_mutation_idempotency.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -76,6 +77,7 @@ REQUIRED = [
     "tests/test_outbox_dead_letter_postgres.sh",
     "tests/test_audit_outbox_hardening_postgres.sh",
     "tests/test_candidate_worker_conversion_postgres.sh",
+    "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -318,6 +320,10 @@ def _validate_database_contract() -> None:
         "CREATE ROLE orgmetra_outbox_operator",
         "SECURITY DEFINER",
         "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
+        "CREATE TABLE people_mutation_idempotency_record",
+        "CONSTRAINT people_mutation_idempotency_command_unique",
+        "CREATE TRIGGER people_mutation_idempotency_append_only_guard",
+        "CREATE TRIGGER people_mutation_idempotency_truncate_guard",
     ]
     for fragment in required_fragments:
         if fragment not in sql:

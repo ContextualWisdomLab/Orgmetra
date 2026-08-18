@@ -37,6 +37,9 @@ from orgmetra_people_api.mutations import (
     PeopleMutationNotFound,
     PositionMutationCommand,
     PositionMutationResult,
+    command_route,
+    idempotency_record_id,
+    mutation_command_digest,
 )
 
 PostgresConnectionFactory = Callable[[], AbstractContextManager[Any]]
@@ -200,6 +203,29 @@ INSERT INTO public.assignment_record (
 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
 """.strip()
 
+_LOOKUP_IDEMPOTENCY_SQL = """
+SELECT
+    replay.created_record_id,
+    replay.command_digest
+FROM public.people_mutation_idempotency_record AS replay
+WHERE replay.tenant_record_id = %s
+  AND replay.command_route = %s
+  AND replay.idempotency_key = %s
+LIMIT 2
+""".strip()
+
+_INSERT_IDEMPOTENCY_SQL = """
+INSERT INTO public.people_mutation_idempotency_record (
+    tenant_record_id,
+    people_mutation_idempotency_record_id,
+    command_route,
+    idempotency_key,
+    command_digest,
+    created_record_id,
+    recorded_from
+) VALUES (%s, %s, %s, %s, %s, %s, pg_catalog.transaction_timestamp())
+""".strip()
+
 
 def _is_operational_uuid(value: object) -> bool:
     """Return whether a value is an Orgmetra operational UUID."""
@@ -209,6 +235,59 @@ def _is_operational_uuid(value: object) -> bool:
 def _is_aware_datetime(value: object) -> bool:
     """Return whether a value is a timezone-aware datetime with a real offset."""
     return isinstance(value, datetime) and value.tzinfo is not None and value.utcoffset() is not None
+
+
+def _replayed_record_id(
+    cursor: Any,
+    *,
+    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
+    authorization: AuthorizationDecision,
+) -> UUID | None:
+    """Return the committed record identity for a matching key, or None for a new command."""
+    route = command_route(command)
+    digest = mutation_command_digest(command=command, authorization=authorization)
+    cursor.execute(
+        _LOOKUP_IDEMPOTENCY_SQL,
+        (command.tenant_record_id, route, command.idempotency_key),
+    )
+    rows = cursor.fetchmany(2)
+    if not rows:
+        return None
+    if len(rows) != 1 or len(rows[0]) != 2:
+        raise PeopleMutationIntegrityError("idempotency row is invalid")
+    created_record_id, stored_digest = rows[0]
+    if not _is_operational_uuid(created_record_id) or not isinstance(stored_digest, str):
+        raise PeopleMutationIntegrityError("idempotency row is invalid")
+    if stored_digest != digest:
+        raise PeopleMutationIntegrityError("idempotency key is bound to a different command")
+    assert isinstance(created_record_id, UUID)
+    return created_record_id
+
+
+def _record_idempotency(
+    cursor: Any,
+    *,
+    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
+    authorization: AuthorizationDecision,
+    created_record_id: UUID,
+) -> None:
+    """Persist the command digest with the created HRIS identity in the current transaction."""
+    route = command_route(command)
+    cursor.execute(
+        _INSERT_IDEMPOTENCY_SQL,
+        (
+            command.tenant_record_id,
+            idempotency_record_id(
+                tenant_record_id=command.tenant_record_id,
+                command_route_value=route,
+                idempotency_key=command.idempotency_key,
+            ),
+            route,
+            command.idempotency_key,
+            mutation_command_digest(command=command, authorization=authorization),
+            created_record_id,
+        ),
+    )
 
 
 def _require_authorization(
@@ -434,6 +513,9 @@ class PostgresPeopleMutationPort:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
+                replayed = _replayed_record_id(cursor, command=command, authorization=decision)
+                if replayed is not None:
+                    return EmploymentMutationResult(employment_record_id=replayed)
                 cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
                 _conversion_id, recorded_at = _require_one_conversion(cursor.fetchmany(2))
                 cursor.execute(
@@ -505,6 +587,12 @@ class PostgresPeopleMutationPort:
                         confirmation_reference=command.confirmation_reference,
                     ),
                 )
+                _record_idempotency(
+                    cursor,
+                    command=command,
+                    authorization=decision,
+                    created_record_id=command.employment_record_id,
+                )
         return EmploymentMutationResult(employment_record_id=command.employment_record_id)
 
     def create_position(
@@ -527,6 +615,9 @@ class PostgresPeopleMutationPort:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
+                replayed = _replayed_record_id(cursor, command=command, authorization=decision)
+                if replayed is not None:
+                    return PositionMutationResult(position_record_id=replayed)
                 cursor.execute(
                     _POSITION_PARENTS_SQL,
                     (command.job_profile_id, command.tenant_record_id, command.organization_unit_id),
@@ -586,6 +677,12 @@ class PostgresPeopleMutationPort:
                         confirmation_reference=command.confirmation_reference,
                     ),
                 )
+                _record_idempotency(
+                    cursor,
+                    command=command,
+                    authorization=decision,
+                    created_record_id=command.position_record_id,
+                )
         return PositionMutationResult(position_record_id=command.position_record_id)
 
     def create_assignment(
@@ -608,6 +705,9 @@ class PostgresPeopleMutationPort:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
+                replayed = _replayed_record_id(cursor, command=command, authorization=decision)
+                if replayed is not None:
+                    return AssignmentMutationResult(assignment_record_id=replayed)
                 cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
                 _conversion_id, recorded_at = _require_one_conversion(cursor.fetchmany(2))
                 cursor.execute(
@@ -691,5 +791,11 @@ class PostgresPeopleMutationPort:
                         high_impact=True,
                         confirmation_reference=command.confirmation_reference,
                     ),
+                )
+                _record_idempotency(
+                    cursor,
+                    command=command,
+                    authorization=decision,
+                    created_record_id=command.assignment_record_id,
                 )
         return AssignmentMutationResult(assignment_record_id=command.assignment_record_id)

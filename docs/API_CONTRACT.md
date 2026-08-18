@@ -38,7 +38,7 @@ High-impact commands additionally require:
 - an explicit evidence version for every reference; and
 - append-only decision and audit records.
 
-The server rejects a reused idempotency key when its method, resource, tenant, actor, purpose, or request digest differs.
+The server rejects a reused idempotency key when its method, resource, tenant, actor, purpose, or request digest differs. People employment, position, and assignment writes persist that digest on `people_mutation_idempotency_record` in the same transaction as the HRIS fact and audit/outbox pair. A matching retry returns the first committed record identity. Generated record identifiers are excluded from the digest so a retried POST that allocates fresh UUIDs still replays.
 
 ## Example endpoints
 

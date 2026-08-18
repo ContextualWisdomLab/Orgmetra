@@ -17,6 +17,7 @@ from orgmetra_people_api.mutations import (
     create_assignment_record,
     create_employment_record,
     create_position_record,
+    mutation_command_digest,
 )
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
 from test_people_mutations import (
@@ -181,8 +182,15 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self,
         fetchmany_rows: list[list[tuple[object, ...]]],
         fetchall_rows: list[list[tuple[object, ...]]] | None = None,
+        *,
+        replay_row: tuple[object, ...] | None = None,
+        skip_idempotency_lookup: bool = False,
     ) -> tuple[PostgresPeopleMutationPort, ScriptedCursor]:
-        cursor = ScriptedCursor(fetchmany_rows, fetchall_rows or [])
+        if skip_idempotency_lookup:
+            lookup_rows = list(fetchmany_rows)
+        else:
+            lookup_rows = [[replay_row] if replay_row is not None else []] + list(fetchmany_rows)
+        cursor = ScriptedCursor(lookup_rows, fetchall_rows or [])
         connection = FakeConnection(cursor)
         return PostgresPeopleMutationPort(lambda: connection), cursor
 
@@ -205,6 +213,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self.assertIn("public.employment_record", sql_text)
         self.assertIn("employment_concurrency_code", sql_text)
         self.assertIn("public.record_audit_outbox_event", sql_text)
+        self.assertIn("public.people_mutation_idempotency_record", sql_text)
         self.assertNotIn("candidate_worker_link", sql_text)
         audit_sql, audit_parameters = next(
             execution for execution in cursor.executions if execution[0].startswith("SELECT public.record_audit_outbox_event")
@@ -230,6 +239,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self.assertIn("public.organization_unit", sql_text)
         self.assertIn("public.position_record", sql_text)
         self.assertIn("public.record_audit_outbox_event", sql_text)
+        self.assertIn("public.people_mutation_idempotency_record", sql_text)
         self.assertNotIn("candidate_worker_link", sql_text)
 
     def test_assignment_reuses_kernel_and_conversion_then_audits(self) -> None:
@@ -264,6 +274,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self.assertIn("conversion.recorded_to IS NULL", conversion_sql)
         self.assertIn("public.assignment_record", sql_text)
         self.assertIn("public.record_audit_outbox_event", sql_text)
+        self.assertIn("public.people_mutation_idempotency_record", sql_text)
         self.assertNotIn("candidate_worker_link", sql_text)
 
     def test_missing_or_invalid_conversion_fails_before_insert(self) -> None:
@@ -491,6 +502,142 @@ class PostgresPeopleMutationTests(unittest.TestCase):
                 policy=assignment_policy(),
                 mutation_port=port,
             )
+
+    def test_same_key_replays_without_second_hris_or_audit_facts(self) -> None:
+        employment_digest = mutation_command_digest(
+            command=employment_command(),
+            authorization=employment_authorization(),
+        )
+        port, cursor = self._port([], replay_row=(EMPLOYMENT, employment_digest))
+        result = create_employment_record(
+            principal=PRINCIPAL,
+            command=employment_command(
+                employment_record_id=UUID("0198a412-8200-7000-8000-000000000033"),
+                audit_event_record_id=UUID("0198a412-8200-7000-8000-000000000088"),
+                outbox_delivery_record_id=UUID("0198a412-8200-7000-8000-000000000089"),
+            ),
+            purpose_code="workforce_admin",
+            policy=employment_policy(),
+            mutation_port=port,
+        )
+        self.assertEqual(result.employment_record_id, EMPLOYMENT)
+        sql_text = "\n".join(sql for sql, _parameters in cursor.executions)
+        self.assertFalse(any("INSERT INTO public.employment_record" in sql for sql, _ in cursor.executions))
+        self.assertNotIn("record_audit_outbox_event", sql_text)
+        self.assertFalse(
+            any("INSERT INTO public.people_mutation_idempotency_record" in sql for sql, _ in cursor.executions)
+        )
+
+        position_digest = mutation_command_digest(
+            command=position_command(),
+            authorization=position_authorization(),
+        )
+        port, cursor = self._port([], replay_row=(POSITION, position_digest))
+        position = create_position_record(
+            principal=PRINCIPAL,
+            command=position_command(position_record_id=UUID("0198a412-8200-7000-8000-000000000044")),
+            purpose_code="job_architecture_admin",
+            policy=position_policy(),
+            mutation_port=port,
+        )
+        self.assertEqual(position.position_record_id, POSITION)
+        self.assertFalse(any("INSERT INTO public.position_record" in sql for sql, _ in cursor.executions))
+
+        assignment_digest = mutation_command_digest(
+            command=assignment_command(),
+            authorization=assignment_authorization(),
+        )
+        port, cursor = self._port([], replay_row=(ASSIGNMENT, assignment_digest))
+        assignment = create_assignment_record(
+            principal=PRINCIPAL,
+            command=assignment_command(assignment_record_id=UUID("0198a412-8200-7000-8000-000000000077")),
+            purpose_code="workforce_admin",
+            policy=assignment_policy(),
+            mutation_port=port,
+        )
+        self.assertEqual(assignment.assignment_record_id, ASSIGNMENT)
+        self.assertFalse(any("INSERT INTO public.assignment_record" in sql for sql, _ in cursor.executions))
+
+    def test_same_key_different_command_fails_closed(self) -> None:
+        digest = mutation_command_digest(
+            command=employment_command(),
+            authorization=employment_authorization(),
+        )
+        port, cursor = self._port([], replay_row=(EMPLOYMENT, digest))
+        with self.assertRaisesRegex(PeopleMutationIntegrityError, "different command"):
+            create_employment_record(
+                principal=PRINCIPAL,
+                command=employment_command(employment_status_code="leave"),
+                purpose_code="workforce_admin",
+                policy=employment_policy(),
+                mutation_port=port,
+            )
+        self.assertFalse(any("INSERT INTO public.employment_record" in sql for sql, _ in cursor.executions))
+        self.assertFalse(any("record_audit_outbox_event" in sql for sql, _ in cursor.executions))
+
+    def test_different_key_is_a_new_command(self) -> None:
+        other_employment = UUID("0198a412-8200-7000-8000-000000000034")
+        other_version = UUID("0198a412-8200-7000-8000-000000000035")
+        other_audit = UUID("0198a412-8200-7000-8000-00000000008a")
+        other_outbox = UUID("0198a412-8200-7000-8000-00000000008b")
+        cursor = ScriptedCursor(
+            [[], [(CONVERSION, RECORDED_AT)], [], [(CONVERSION, RECORDED_AT)]],
+            [[], []],
+        )
+        connection = FakeConnection(cursor)
+        port = PostgresPeopleMutationPort(lambda: connection)
+        first = create_employment_record(
+            principal=PRINCIPAL,
+            command=employment_command(),
+            purpose_code="workforce_admin",
+            policy=employment_policy(),
+            mutation_port=port,
+        )
+        second = create_employment_record(
+            principal=PRINCIPAL,
+            command=employment_command(
+                employment_record_id=other_employment,
+                employment_record_version_id=other_version,
+                audit_event_record_id=other_audit,
+                outbox_delivery_record_id=other_outbox,
+                idempotency_key="idempotency-key-29xx",
+            ),
+            purpose_code="workforce_admin",
+            policy=employment_policy(),
+            mutation_port=port,
+        )
+        self.assertEqual(first.employment_record_id, EMPLOYMENT)
+        self.assertEqual(second.employment_record_id, other_employment)
+        employment_inserts = [sql for sql, _ in cursor.executions if sql.startswith("INSERT INTO public.employment_record (")]
+        audit_inserts = [sql for sql, _ in cursor.executions if sql.startswith("SELECT public.record_audit_outbox_event")]
+        idempotency_inserts = [
+            sql for sql, _ in cursor.executions if "INSERT INTO public.people_mutation_idempotency_record" in sql
+        ]
+        self.assertEqual(len(employment_inserts), 2)
+        self.assertEqual(len(audit_inserts), 2)
+        self.assertEqual(len(idempotency_inserts), 2)
+
+    def test_invalid_idempotency_rows_fail_closed(self) -> None:
+        cases = (
+            [(EMPLOYMENT, "digest"), (EMPLOYMENT, "digest")],
+            [(EMPLOYMENT,)],
+            [(UUID(int=0), "a" * 64)],
+            [(EMPLOYMENT, 17)],
+        )
+        for rows in cases:
+            with self.subTest(rows=rows):
+                port, cursor = self._port([], replay_row=rows[0] if len(rows) == 1 else None)
+                if len(rows) != 1:
+                    cursor.fetchmany_rows = [rows]
+                with self.assertRaisesRegex(PeopleMutationIntegrityError, "invalid"):
+                    create_employment_record(
+                        principal=PRINCIPAL,
+                        command=employment_command(),
+                        purpose_code="workforce_admin",
+                        policy=employment_policy(),
+                        mutation_port=port,
+                    )
+                self.assertFalse(any("INSERT INTO public.employment_record" in sql for sql, _ in cursor.executions))
 
 
 if __name__ == "__main__":

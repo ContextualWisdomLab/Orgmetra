@@ -43,7 +43,7 @@ Authorization evidence contains only governance metadata, including the opaque a
 
 Every mutating HTTP operation and its server-side command handler must require and validate:
 
-- `Idempotency-Key`;
+- `Idempotency-Key` bound through the command into the write port and stored on `people_mutation_idempotency_record` with the authoritative mutation;
 - `X-Tenant-Reference`;
 - `X-Actor-Reference`;
 - `X-Purpose-Code`;
