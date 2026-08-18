@@ -87,11 +87,18 @@ def test_references_are_bounded_and_namespaced(field, value):
         ("purpose_code", "Selection_Review"),
         ("reason_code", "candidate assessment"),
         ("evidence_version_code", "v1"),
+        ("reason_code", "candidate_" + "a" * 64),
+        ("evidence_version_code", "evidence_" + "a" * 64),
     ],
 )
-def test_governance_codes_require_descriptive_snake_case(field, value):
+def test_governance_codes_require_bounded_descriptive_snake_case(field, value):
     with pytest.raises(ValueError):
         packet(**{field: value})
+
+
+def test_packet_purpose_is_fixed_to_selection_review():
+    with pytest.raises(ValueError):
+        packet(purpose_code="employment_review")
 
 
 @pytest.mark.parametrize("digest", ["A" * 64, "0" * 63, "z" * 64, 123])
