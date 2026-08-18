@@ -15,6 +15,10 @@ DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
 DIGEST_D = "d" * 64
 DIGEST_E = "e" * 64
+EXPECTED_NEXT_ACTION = (
+    "Verify job relevance, source provenance, permitted handling, retention, and evidence "
+    "completeness; then request authoritative evidence sealing and accountable human review."
+)
 
 
 def values():
@@ -47,6 +51,7 @@ def test_builds_reference_only_deterministic_packet():
     payload = json.loads(packet.canonical_json())
     assert payload["review_state"] == "requires_human_review"
     assert payload["human_confirmation_required"] is True
+    assert payload["next_action"] == EXPECTED_NEXT_ACTION
     assert payload["collected_at"].endswith(".456789Z")
     assert payload["candidate_profile_reference"] == "candidate_profile:candidate-001"
     forbidden = ("candidate_name", "email", "demographic", "assessment_value", "raw_evidence", "model_output")
