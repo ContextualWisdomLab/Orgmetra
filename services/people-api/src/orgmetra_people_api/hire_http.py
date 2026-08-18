@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 import json
+import logging
 import re
 from typing import Mapping
 from urllib.parse import parse_qsl
@@ -33,6 +34,7 @@ from orgmetra_people_api.http import (
 )
 from orgmetra_people_api.mutations import validate_idempotency_key
 
+_LOGGER = logging.getLogger(__name__)
 _ROUTE_PREFIX = ("v1", "tenants")
 _ROUTE_LEAF = "candidate-worker-conversions"
 _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
@@ -57,11 +59,11 @@ _REQUIRED_BODY_KEYS = frozenset(
 
 
 class _InvalidHttpRequest(ValueError):
-    """Indicate malformed hire input that must fail before authentication."""
+    """Indicate malformed hire input that must fail closed."""
 
 
 class _PayloadTooLarge(ValueError):
-    """Indicate a request body that must not be assembled or authenticated."""
+    """Indicate a request body that exceeds the bounded hire command contract."""
 
 
 class _UnsupportedMediaType(ValueError):
@@ -127,6 +129,44 @@ class HireAcceptanceAsgiApp:
 
         try:
             tenant_record_id, purpose_code = _parse_hire_route(path, scope.get("query_string", b""))
+        except (_InvalidHttpRequest, ValueError, TypeError):
+            await _send_json(
+                send,
+                status=400,
+                payload={
+                    "error": "invalid_request",
+                    "message": "Correct the tenant and purpose fields, then retry.",
+                },
+            )
+            return
+
+        try:
+            bearer_token = extract_bearer_token(_authorization_header(scope))
+            principal = await self.authenticator.authenticate(bearer_token)
+        except AuthenticationFailed:
+            await _send_json(
+                send,
+                status=401,
+                payload={
+                    "error": "authentication_required",
+                    "message": "Provide one valid Bearer credential and retry.",
+                },
+                extra_headers=((b"www-authenticate", b"Bearer"),),
+            )
+            return
+
+        if principal.tenant_record_id != tenant_record_id:
+            await _send_json(
+                send,
+                status=403,
+                payload={
+                    "error": "access_denied",
+                    "message": "Use the tenant bound to the authenticated credential.",
+                },
+            )
+            return
+
+        try:
             idempotency_key = _parse_idempotency_key(scope)
             _require_json_content_type(scope)
             payload = await _read_json_object(receive)
@@ -157,23 +197,8 @@ class HireAcceptanceAsgiApp:
                 status=400,
                 payload={
                     "error": "invalid_request",
-                    "message": "Correct the tenant, purpose, idempotency key, and hire command fields, then retry.",
+                    "message": "Correct the idempotency key and hire command fields, then retry.",
                 },
-            )
-            return
-
-        try:
-            bearer_token = extract_bearer_token(_authorization_header(scope))
-            principal = await self.authenticator.authenticate(bearer_token)
-        except AuthenticationFailed:
-            await _send_json(
-                send,
-                status=401,
-                payload={
-                    "error": "authentication_required",
-                    "message": "Provide one valid Bearer credential and retry.",
-                },
-                extra_headers=((b"www-authenticate", b"Bearer"),),
             )
             return
 
@@ -215,7 +240,16 @@ class HireAcceptanceAsgiApp:
                 },
             )
             return
-        except Exception:  # noqa: BLE001 - HTTP boundary must fail closed without leaking backend details.
+        except Exception as error:  # noqa: BLE001 - HTTP boundary must fail closed without leaking backend details.
+            _LOGGER.error(
+                "Hire materialization persistence failed",
+                extra={
+                    "route": _ROUTE_LEAF,
+                    "tenant_record_id": str(tenant_record_id),
+                    "correlation_reference": f"audit_event_record:{command.audit_event_record_id.hex}",
+                    "exception_type": type(error).__name__,
+                },
+            )
             await _send_json(
                 send,
                 status=500,
@@ -244,7 +278,7 @@ def _looks_like_hire_route(path: str) -> bool:
 
 
 def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
-    """Validate tenant and purpose before the request body is interpreted."""
+    """Validate tenant and purpose before authentication and body interpretation."""
     parts = path.strip("/").split("/")
     try:
         tenant_record_id = UUID(parts[2])
@@ -279,7 +313,7 @@ def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
 
 
 def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
-    """Require exactly one visible-ASCII Idempotency-Key before authentication."""
+    """Require exactly one visible-ASCII Idempotency-Key after authentication."""
     raw_headers = scope.get("headers", ())
     if not isinstance(raw_headers, (list, tuple)):
         raise _InvalidHttpRequest("Idempotency-Key is required")
