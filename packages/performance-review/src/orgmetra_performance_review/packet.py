@@ -1,10 +1,12 @@
 """Governed, value-free human performance-review evidence.
 
-The packet binds one employee review to authoritative Employment and Job scope,
+The packet correlates one proposed employee review to Employment and Job references,
 a performance cycle, predetermined criteria and goals, an exact criterion-observation
-snapshot, an optional development plan, and an accountable human reviewer. The opaque
-person reference remains sensitive correlating metadata. Person PII, rating values,
-free-form feedback, and free-form model output remain outside this envelope.
+snapshot, an optional development plan, and an accountable human reviewer. It does not
+assert that those references resolve to one authoritative scope; that verification must
+occur at the authoritative HRIS/performance boundary before rating. The opaque person
+reference remains sensitive correlating metadata. Person PII, rating values, free-form
+feedback, and free-form model output remain outside this envelope.
 """
 from __future__ import annotations
 
@@ -23,6 +25,7 @@ _REFERENCE_PATTERN = re.compile(
 _PURPOSE_CODE = "performance_review"
 _DECISION_AUTHORITY = "human_review_only"
 _REVIEW_STATE = "requires_human_review"
+_SCOPE_VERIFICATION_STATE = "requires_authoritative_resolution"
 _NEXT_ACTION = (
     "Verify authoritative Employment/Job scope, performance-cycle dates, governed "
     "criteria and goals, criterion-observation evidence, and any development-plan "
@@ -87,7 +90,7 @@ def _validate_business_date(value: date, field_name: str) -> None:
 
 @dataclass(frozen=True, slots=True)
 class PerformanceReviewPacket:
-    """Immutable value-free performance-review packet awaiting accountable human review."""
+    """Immutable value-free performance-review packet awaiting authoritative resolution."""
 
     tenant_record_id: str
     performance_review_reference: str
@@ -115,6 +118,7 @@ class PerformanceReviewPacket:
     human_confirmation_required: bool = True
     decision_authority: str = _DECISION_AUTHORITY
     review_state: str = _REVIEW_STATE
+    scope_verification_state: str = _SCOPE_VERIFICATION_STATE
     next_action: str = _NEXT_ACTION
 
     def __post_init__(self) -> None:
@@ -181,6 +185,10 @@ class PerformanceReviewPacket:
             raise ValueError("decision_authority must remain human_review_only")
         if self.review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_review")
+        if self.scope_verification_state != _SCOPE_VERIFICATION_STATE:
+            raise ValueError(
+                "scope_verification_state must remain requires_authoritative_resolution"
+            )
         if self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed performance-review instruction")
 
@@ -213,6 +221,7 @@ class PerformanceReviewPacket:
             "review_period_start": self.review_period_start.isoformat(),
             "review_state": self.review_state,
             "reviewer_reference": self.reviewer_reference,
+            "scope_verification_state": self.scope_verification_state,
             "tenant_record_id": self.tenant_record_id,
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
@@ -245,7 +254,7 @@ def build_performance_review_packet(
     review_period_end: date,
     generated_at: datetime,
 ) -> PerformanceReviewPacket:
-    """Build value-free performance-review evidence pending accountable human review."""
+    """Build value-free performance-review evidence pending authoritative resolution."""
     return PerformanceReviewPacket(
         tenant_record_id=tenant_record_id,
         performance_review_reference=performance_review_reference,
