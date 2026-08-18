@@ -17,7 +17,10 @@ from orgmetra_people_api.hire import (
     HireDecisionNotFound,
     accept_confirmed_hire,
 )
-from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
+from orgmetra_people_api.postgres_hire import (
+    PostgresHireAcceptancePort,
+    _hire_command_digest,
+)
 
 TENANT = UUID("0198a412-7100-7000-8000-000000000001")
 CANDIDATE = UUID("0198a412-7100-7000-8000-000000000010")
@@ -35,6 +38,16 @@ TRANSACTION_AT = datetime(2026, 8, 18, 0, 1, tzinfo=timezone.utc)
 ACTOR = "keyverse_subject:operator-17"
 PURPOSE = "candidate_hire"
 CONFIRMATION = "human_confirmation:review-88"
+IDEMPOTENCY_KEY = "hire-idempotency-key-17"
+_DECISION_ROW_COLUMNS = (
+    "actor_reference",
+    "purpose_code",
+    "decision_code",
+    "confirmation_reference",
+    "decided_at",
+    "decision_evidence_set_id",
+    "transaction_recorded_at",
+)
 
 
 class NullOffsetTimezone(tzinfo):
@@ -60,6 +73,7 @@ def command(**overrides: object) -> HireAcceptanceCommand:
         "outbox_delivery_record_id": OUTBOX_DELIVERY,
         "effective_from": DECIDED_AT.date(),
         "display_name": "Ada Lovelace",
+        "idempotency_key": IDEMPOTENCY_KEY,
         "employment_status_code": "active",
     }
     values.update(overrides)
@@ -67,7 +81,10 @@ def command(**overrides: object) -> HireAcceptanceCommand:
 
 
 def decision_row(**overrides: object) -> tuple[object, ...]:
-    """Return one confirmed, sealed hire-decision provenance row."""
+    """Return one confirmed, sealed hire-decision provenance row in fixed SQL order."""
+    unknown = frozenset(overrides) - frozenset(_DECISION_ROW_COLUMNS)
+    if unknown:
+        raise ValueError(f"unknown decision row overrides: {sorted(unknown)}")
     values: dict[str, object] = {
         "actor_reference": ACTOR,
         "purpose_code": PURPOSE,
@@ -78,7 +95,7 @@ def decision_row(**overrides: object) -> tuple[object, ...]:
         "transaction_recorded_at": TRANSACTION_AT,
     }
     values.update(overrides)
-    return tuple(values[key] for key in values)
+    return tuple(values[column] for column in _DECISION_ROW_COLUMNS)
 
 
 def policy() -> PurposeBoundAccessPolicy:
@@ -94,6 +111,24 @@ def policy() -> PurposeBoundAccessPolicy:
     )
 
 
+def allowed_authorization() -> AuthorizationDecision:
+    """Return the exact allow decision produced for the deterministic test command."""
+    return AuthorizationDecision(
+        allowed=True,
+        tenant_record_id=TENANT,
+        actor_reference=ACTOR,
+        resource_reference=f"selection_decision:{DECISION.hex}",
+        policy_version_code="people-hire-v1",
+        purpose_code=PURPOSE,
+        operation_code="materialize_worker",
+        resource_kind="selection_decision",
+        requested_fields=frozenset({"candidate_worker_conversion"}),
+        authorized_fields=frozenset({"candidate_worker_conversion"}),
+        reason_code="access_permitted",
+        next_action="continue",
+    )
+
+
 PRINCIPAL = AuthenticatedPrincipal(
     tenant_record_id=TENANT,
     actor_reference=ACTOR,
@@ -102,10 +137,10 @@ PRINCIPAL = AuthenticatedPrincipal(
 
 
 class FakeCursor:
-    """Capture SQL and serve a deterministic decision-provenance result."""
+    """Capture SQL and serve deterministic fetchmany batches in execution order."""
 
-    def __init__(self, decision_rows: list[tuple[object, ...]]) -> None:
-        self.decision_rows = decision_rows
+    def __init__(self, fetchmany_batches: list[list[tuple[object, ...]]]) -> None:
+        self.fetchmany_batches = [list(batch) for batch in fetchmany_batches]
         self.executions: list[tuple[str, tuple[object, ...] | None]] = []
         self.fetch_sizes: list[int] = []
 
@@ -120,7 +155,9 @@ class FakeCursor:
 
     def fetchmany(self, size: int) -> list[tuple[object, ...]]:
         self.fetch_sizes.append(size)
-        return self.decision_rows[:size]
+        if not self.fetchmany_batches:
+            return []
+        return self.fetchmany_batches.pop(0)[:size]
 
 
 class FakeConnection:
@@ -146,13 +183,15 @@ class FakeConnection:
 
 
 class PostgresHireAcceptanceTests(unittest.TestCase):
-    """Prove one tenant-bound transaction owns HRIS, audit, outbox, and conversion writes."""
+    """Prove one tenant-bound transaction owns HRIS, audit, outbox, conversion, and replay."""
 
     def _port(
         self,
-        rows: list[tuple[object, ...]],
+        decision_rows: list[tuple[object, ...]],
+        *,
+        idempotency_rows: list[tuple[object, ...]] | None = None,
     ) -> tuple[PostgresHireAcceptancePort, FakeConnection, FakeCursor]:
-        cursor = FakeCursor(rows)
+        cursor = FakeCursor([idempotency_rows or [], decision_rows])
         connection = FakeConnection(cursor)
         return PostgresHireAcceptancePort(lambda: connection), connection, cursor
 
@@ -178,7 +217,7 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual((connection.enter_count, connection.exit_count), (1, 1))
         self.assertIsNone(connection.exit_exception)
-        self.assertEqual(cursor.fetch_sizes, [2])
+        self.assertEqual(cursor.fetch_sizes, [2, 2])
         self.assertEqual(cursor.executions[0], ("SET TRANSACTION READ WRITE", None))
         self.assertEqual(
             cursor.executions[1],
@@ -187,7 +226,16 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
                 (str(TENANT),),
             ),
         )
-        provenance_sql, provenance_parameters = cursor.executions[2]
+        lock_sql, lock_parameters = cursor.executions[2]
+        normalized_lock = " ".join(lock_sql.lower().split())
+        self.assertIn("pg_advisory_xact_lock", normalized_lock)
+        self.assertIn("hashtextextended", normalized_lock)
+        self.assertEqual(lock_parameters, (TENANT, "candidate-worker-conversions", IDEMPOTENCY_KEY))
+        replay_sql, replay_parameters = cursor.executions[3]
+        self.assertIn("public.people_mutation_idempotency_record", replay_sql)
+        self.assertEqual(replay_parameters, lock_parameters)
+
+        provenance_sql, provenance_parameters = cursor.executions[4]
         self.assertIn("public.selection_decision", provenance_sql)
         self.assertIn("public.decision_evidence_set", provenance_sql)
         self.assertIn("public.selection_decision_evidence", provenance_sql)
@@ -200,11 +248,11 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
             "public.employment_record",
             "public.employment_record_version",
         )
-        for execution, table_name in zip(cursor.executions[3:7], expected_tables, strict=True):
+        for execution, table_name in zip(cursor.executions[5:9], expected_tables, strict=True):
             self.assertIn(table_name, execution[0])
-        self.assertEqual(cursor.executions[4][1][3], "Ada Lovelace")
+        self.assertEqual(cursor.executions[6][1][3], "Ada Lovelace")
 
-        audit_sql, audit_parameters = cursor.executions[7]
+        audit_sql, audit_parameters = cursor.executions[9]
         self.assertEqual(audit_sql, "SELECT public.record_audit_outbox_event(%s, %s, %s, %s, %s, %s)")
         self.assertIsNotNone(audit_parameters)
         assert audit_parameters is not None
@@ -226,12 +274,66 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
         self.assertEqual(envelope["time"], "2026-08-18T00:01:00Z")
         self.assertNotIn("Ada Lovelace", envelope_text)
 
-        conversion_sql, conversion_parameters = cursor.executions[8]
+        conversion_sql, conversion_parameters = cursor.executions[10]
         self.assertIn("public.candidate_worker_conversion_record", conversion_sql)
         self.assertEqual(
             conversion_parameters,
             (TENANT, CONVERSION, CANDIDATE, PERSON, EMPLOYMENT, DECISION, AUDIT_EVENT, DECIDED_AT.date(), TRANSACTION_AT),
         )
+        idempotency_sql, idempotency_parameters = cursor.executions[11]
+        self.assertIn("public.people_mutation_idempotency_record", idempotency_sql)
+        self.assertIsNotNone(idempotency_parameters)
+        assert idempotency_parameters is not None
+        self.assertEqual(idempotency_parameters[0], TENANT)
+        self.assertEqual(idempotency_parameters[2:4], ("candidate-worker-conversions", IDEMPOTENCY_KEY))
+        self.assertRegex(str(idempotency_parameters[4]), r"^[0-9a-f]{64}$")
+        self.assertEqual(idempotency_parameters[5], CONVERSION)
+
+    def test_exact_committed_hire_replay_returns_without_duplicate_business_writes(self) -> None:
+        request = command()
+        digest = _hire_command_digest(request, allowed_authorization())
+        port, connection, cursor = self._port([], idempotency_rows=[(CONVERSION, digest)])
+
+        result = accept_confirmed_hire(
+            principal=PRINCIPAL,
+            command=request,
+            purpose_code=PURPOSE,
+            policy=policy(),
+            mutation_port=port,
+        )
+
+        self.assertEqual(result.candidate_worker_conversion_record_id, CONVERSION)
+        self.assertEqual(result.person_record_id, PERSON)
+        self.assertEqual(result.employment_record_id, EMPLOYMENT)
+        self.assertEqual(cursor.fetch_sizes, [2])
+        self.assertEqual(len(cursor.executions), 4)
+        self.assertFalse(any("INSERT INTO public.person_record" in sql for sql, _ in cursor.executions))
+        self.assertIsNone(connection.exit_exception)
+
+    def test_changed_or_malformed_hire_replay_fails_closed_before_business_writes(self) -> None:
+        request = command()
+        digest = _hire_command_digest(request, allowed_authorization())
+        other_conversion = UUID("0198a412-7100-7000-8000-000000000041")
+        scenarios = (
+            (command(display_name="Grace Hopper"), [(CONVERSION, digest)], "different command"),
+            (request, [(UUID(int=0), digest)], "invalid"),
+            (request, [(CONVERSION, object())], "invalid"),
+            (request, [(CONVERSION, digest), (CONVERSION, digest)], "invalid"),
+            (request, [(other_conversion, digest)], "does not match"),
+        )
+        for replay_command, rows, message in scenarios:
+            with self.subTest(message=message):
+                port, connection, cursor = self._port([], idempotency_rows=rows)
+                with self.assertRaisesRegex(HireDecisionIntegrityError, message):
+                    accept_confirmed_hire(
+                        principal=PRINCIPAL,
+                        command=replay_command,
+                        purpose_code=PURPOSE,
+                        policy=policy(),
+                        mutation_port=port,
+                    )
+                self.assertEqual(len(cursor.executions), 4)
+                self.assertIs(connection.exit_exception, HireDecisionIntegrityError)
 
     def test_missing_or_ambiguous_decision_fails_before_business_insert(self) -> None:
         scenarios = (
@@ -249,7 +351,7 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
                         policy=policy(),
                         mutation_port=port,
                     )
-                self.assertEqual(len(cursor.executions), 3)
+                self.assertEqual(len(cursor.executions), 5)
                 self.assertIs(connection.exit_exception, error_type)
 
     def test_malformed_decision_row_shape_fails_before_business_insert(self) -> None:
@@ -262,7 +364,11 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
                 policy=policy(),
                 mutation_port=port,
             )
-        self.assertEqual(len(cursor.executions), 3)
+        self.assertEqual(len(cursor.executions), 5)
+
+    def test_decision_row_helper_rejects_unknown_columns(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unknown decision row overrides"):
+            decision_row(not_selected_by_sql="value")
 
     def test_decision_must_match_authorized_actor_purpose_and_hire_semantics(self) -> None:
         unresolved_zone = NullOffsetTimezone()
@@ -293,7 +399,7 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
                         policy=policy(),
                         mutation_port=port,
                     )
-                self.assertEqual(len(cursor.executions), 3)
+                self.assertEqual(len(cursor.executions), 5)
 
     def test_effective_date_cannot_precede_confirmed_decision(self) -> None:
         port, _, cursor = self._port([decision_row()])
@@ -305,7 +411,7 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
                 policy=policy(),
                 mutation_port=port,
             )
-        self.assertEqual(len(cursor.executions), 3)
+        self.assertEqual(len(cursor.executions), 5)
 
     def test_forged_authorization_is_rejected_before_connection(self) -> None:
         calls = 0
@@ -313,7 +419,7 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
         def factory() -> FakeConnection:
             nonlocal calls
             calls += 1
-            return FakeConnection(FakeCursor([decision_row()]))
+            return FakeConnection(FakeCursor([[], [decision_row()]]))
 
         port = PostgresHireAcceptancePort(factory)
         forged = AuthorizationDecision(
