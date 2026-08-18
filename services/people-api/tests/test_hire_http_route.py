@@ -28,6 +28,7 @@ AUDIT_EVENT = UUID("0198a412-7200-7000-8000-000000000050")
 OUTBOX_DELIVERY = UUID("0198a412-7200-7000-8000-000000000051")
 ROUTE = f"/v1/tenants/{TENANT}/candidate-worker-conversions"
 QUERY = b"purpose=candidate_hire"
+IDEMPOTENCY_KEY = b"hire-idempotency-key-17"
 
 
 def request_body(**overrides: object) -> bytes:
@@ -48,6 +49,15 @@ def request_body(**overrides: object) -> bytes:
     }
     payload.update(overrides)
     return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def valid_headers() -> list[tuple[bytes, bytes]]:
+    """Return the exact authenticated JSON command headers for one hire request."""
+    return [
+        (b"authorization", b"Bearer opaque-token"),
+        (b"content-type", b"application/json"),
+        (b"idempotency-key", IDEMPOTENCY_KEY),
+    ]
 
 
 class FakeAuthenticator:
@@ -131,12 +141,7 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             "method": method,
             "path": path,
             "query_string": query,
-            "headers": headers
-            if headers is not None
-            else [
-                (b"authorization", b"Bearer opaque-token"),
-                (b"content-type", b"application/json"),
-            ],
+            "headers": headers if headers is not None else valid_headers(),
         }
         messages: list[dict[str, object]] = []
         receive_calls = 0
@@ -197,9 +202,10 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(command.tenant_record_id, TENANT)
         self.assertEqual(command.selection_decision_id, DECISION)
         self.assertEqual(command.display_name, "Ada Lovelace")
+        self.assertEqual(command.idempotency_key, IDEMPOTENCY_KEY.decode("ascii"))
         self.assertEqual(authorization.resource_reference, f"selection_decision:{DECISION.hex}")
 
-    async def test_invalid_route_query_content_type_or_body_fails_before_authentication(self) -> None:
+    async def test_invalid_route_query_idempotency_content_type_or_body_fails_before_authentication(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
         port = RecordingHirePort()
         app = self._app(authenticator=authenticator, mutation_port=port)
@@ -212,14 +218,19 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             {"query": b"purpose=candidate_hire&purpose=other"},
             {"query": b"purpose=CandidateHire"},
             {"query": b"extra=value&purpose=candidate_hire"},
-            {"headers": [(b"authorization", b"Bearer opaque-token")]},
-            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type", b"text/plain")]},
+            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type", b"application/json")]},
+            {"headers": valid_headers() + [(b"idempotency-key", b"another-idempotency-key-18")]},
+            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type", b"application/json"), (b"idempotency-key", b"short")]},
+            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type", b"application/json"), (b"idempotency-key", b"hire-idempotency-\xff-key")]},
+            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"idempotency-key", IDEMPOTENCY_KEY)]},
+            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type", b"text/plain"), (b"idempotency-key", IDEMPOTENCY_KEY)]},
             {"headers": {b"content-type": b"application/json"}},
-            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type",)]},
+            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type",), (b"idempotency-key", IDEMPOTENCY_KEY)]},
             {
                 "headers": [
                     (b"authorization", b"Bearer opaque-token"),
                     ("content-type", "application/json"),
+                    (b"idempotency-key", IDEMPOTENCY_KEY),
                 ]
             },
             {"body": b"{"},
@@ -259,9 +270,9 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
     async def test_bad_or_rejected_bearer_authentication_never_mutates(self) -> None:
         port = RecordingHirePort()
         bad_headers = (
-            [(b"content-type", b"application/json")],
-            [(b"authorization", b"Bearer one"), (b"authorization", b"Bearer two"), (b"content-type", b"application/json")],
-            [(b"authorization", b"Bearer \xff"), (b"content-type", b"application/json")],
+            [(b"content-type", b"application/json"), (b"idempotency-key", IDEMPOTENCY_KEY)],
+            [(b"authorization", b"Bearer one"), (b"authorization", b"Bearer two"), (b"content-type", b"application/json"), (b"idempotency-key", IDEMPOTENCY_KEY)],
+            [(b"authorization", b"Bearer \xff"), (b"content-type", b"application/json"), (b"idempotency-key", IDEMPOTENCY_KEY)],
         )
         for headers in bad_headers:
             with self.subTest(headers=headers):
@@ -337,10 +348,7 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
                     "method": "POST",
                     "path": ROUTE,
                     "query_string": QUERY,
-                    "headers": [
-                        (b"authorization", b"Bearer opaque-token"),
-                        (b"content-type", b"application/json"),
-                    ],
+                    "headers": valid_headers(),
                 },
                 receive,
                 capture,
