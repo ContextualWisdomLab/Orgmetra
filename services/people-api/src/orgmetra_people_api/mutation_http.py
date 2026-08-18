@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+import logging
 from typing import Callable, Mapping
 from uuid import UUID, uuid4
 
@@ -38,6 +39,7 @@ from orgmetra_people_api.mutations import (
     validate_idempotency_key,
 )
 
+_LOGGER = logging.getLogger(__name__)
 _MAX_UUID_INT = (1 << 128) - 1
 _EMPLOYMENT_BODY_KEYS = frozenset(
     {
@@ -274,7 +276,16 @@ class PeopleMutationAsgiApp:
                 },
             )
             return
-        except Exception:  # noqa: BLE001 - HTTP boundary must fail closed without leaking backend details.
+        except Exception as error:  # noqa: BLE001 - HTTP boundary must fail closed without leaking backend details.
+            _LOGGER.error(
+                "People mutation persistence failed",
+                extra={
+                    "route": route,
+                    "tenant_record_id": str(headers.tenant_record_id),
+                    "correlation_reference": f"audit_event_record:{command.audit_event_record_id.hex}",
+                    "exception_type": type(error).__name__,
+                },
+            )
             await _send_json(
                 send,
                 status=500,
