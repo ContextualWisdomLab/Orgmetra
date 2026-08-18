@@ -21,6 +21,7 @@ PROPOSED_JOB = "job_profile:88888888-8888-4888-8888-888888888888"
 PROPOSED_POSITION = "position_record:99999999-9999-4999-8999-999999999999"
 SCOPE_SNAPSHOT = "assignment_scope_snapshot:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 ALLOCATION_PLAN = "workforce_allocation_plan:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+ALLOCATION_POLICY = "workforce_allocation_policy:abababab-abab-4bab-8bab-abababababab"
 WORKER_IMPACT = "worker_impact_assessment:cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 COMMUNICATION_PLAN = "assignment_communication_plan:dddddddd-dddd-4ddd-8ddd-dddddddddddd"
 REQUESTER = "actor:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
@@ -29,6 +30,7 @@ DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
 DIGEST_D = "d" * 64
+DIGEST_E = "e" * 64
 GENERATED_AT = datetime(2026, 8, 19, 6, 30, 15, 123456, tzinfo=timezone.utc)
 
 
@@ -55,14 +57,16 @@ def build_valid(**overrides: object) -> AssignmentChangeReviewPacket:
         "current_scope_snapshot_digest": DIGEST_A,
         "allocation_plan_reference": ALLOCATION_PLAN,
         "allocation_plan_digest": DIGEST_B,
+        "allocation_policy_reference": ALLOCATION_POLICY,
+        "allocation_policy_digest": DIGEST_C,
         "worker_impact_assessment_reference": WORKER_IMPACT,
-        "worker_impact_assessment_digest": DIGEST_C,
+        "worker_impact_assessment_digest": DIGEST_D,
         "communication_plan_reference": COMMUNICATION_PLAN,
-        "communication_plan_digest": DIGEST_D,
+        "communication_plan_digest": DIGEST_E,
         "requester_reference": REQUESTER,
         "reviewer_reference": REVIEWER,
         "purpose_code": "assignment_change_review",
-        "reason_code": "approved_internal_reallocation",
+        "reason_code": "workforce_reallocation",
         "requested_effective_on": date(2026, 9, 1),
         "generated_at": GENERATED_AT,
     }
@@ -83,11 +87,13 @@ def test_builds_value_free_pre_mutation_review_packet() -> None:
     assert "authoritative People mutation boundary" in packet.next_action
 
 
-def test_packet_correlates_evidence_without_copying_worker_values() -> None:
+def test_packet_correlates_policy_and_evidence_without_copying_worker_values() -> None:
     payload = json.loads(build_valid().canonical_json())
     assert payload["person_record_reference"] == PERSON
     assert payload["current_assignment_reference"] == CURRENT_ASSIGNMENT
     assert payload["proposed_position_record_reference"] == PROPOSED_POSITION
+    assert payload["allocation_policy_reference"] == ALLOCATION_POLICY
+    assert payload["allocation_policy_digest"] == DIGEST_C
     assert "person_name" not in payload
     assert "salary" not in payload
     assert "allocation_ratio" not in payload
@@ -140,6 +146,7 @@ def test_rejects_noncanonical_tenant_identity(tenant: object) -> None:
         ("proposed_position_record_reference", "position_record:seat-12"),
         ("current_scope_snapshot_reference", "assignment_scope_snapshot:current-state"),
         ("allocation_plan_reference", "workforce_allocation_plan:75-percent"),
+        ("allocation_policy_reference", "workforce_allocation_policy:manager-name"),
         ("worker_impact_assessment_reference", "worker_impact_assessment:Jane-Doe"),
         ("communication_plan_reference", "assignment_communication_plan:email-manager"),
         ("requester_reference", "actor:requester-name"),
@@ -156,6 +163,7 @@ def test_rejects_nonopaque_or_wrong_namespace_references(field: str, value: str)
     [
         "current_scope_snapshot_digest",
         "allocation_plan_digest",
+        "allocation_policy_digest",
         "worker_impact_assessment_digest",
         "communication_plan_digest",
     ],
@@ -172,9 +180,28 @@ def test_purpose_is_fixed(purpose: str) -> None:
 
 
 @pytest.mark.parametrize("reason", ["singleword", "Upper_case", "a" * 65, 7])
-def test_reason_code_is_bounded_descriptive_snake_case(reason: object) -> None:
+def test_reason_code_must_first_be_bounded_descriptive_snake_case(reason: object) -> None:
     with pytest.raises(ValueError, match="reason_code"):
         build_valid(reason_code=reason)
+
+
+def test_reason_code_rejects_sensitive_or_unreviewed_free_form_categories() -> None:
+    with pytest.raises(ValueError, match="approved assignment-change reason"):
+        build_valid(reason_code="sensitive_health_condition")
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "internal_reassignment",
+        "workforce_reallocation",
+        "temporary_detail",
+        "position_reclassification",
+        "organizational_realignment",
+    ],
+)
+def test_accepts_only_reviewed_assignment_change_reason_categories(reason: str) -> None:
+    assert build_valid(reason_code=reason).reason_code == reason
 
 
 def test_requested_effective_date_must_be_a_business_date() -> None:
@@ -221,11 +248,13 @@ def test_direct_construction_cannot_weaken_governance(field: str, value: object,
         replace(build_valid(), **{field: value})
 
 
-def test_direct_construction_revalidates_reference_and_digest() -> None:
+def test_direct_construction_revalidates_reference_digest_and_reason() -> None:
     with pytest.raises(ValueError, match="person_record_reference"):
         replace(build_valid(), person_record_reference="person_record:Jane-Doe")
     with pytest.raises(ValueError, match="allocation_plan_digest"):
         replace(build_valid(), allocation_plan_digest="0" * 63)
+    with pytest.raises(ValueError, match="approved assignment-change reason"):
+        replace(build_valid(), reason_code="sensitive_health_condition")
 
 
 def test_builder_returns_same_public_type_as_direct_contract() -> None:
