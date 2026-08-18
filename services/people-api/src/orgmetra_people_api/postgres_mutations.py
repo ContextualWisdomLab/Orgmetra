@@ -204,6 +204,24 @@ INSERT INTO public.assignment_record (
 """.strip()
 
 _LOOKUP_IDEMPOTENCY_SQL = """
+WITH command_key AS (
+    SELECT
+        %s::uuid AS tenant_record_id,
+        %s::text AS command_route,
+        %s::text AS idempotency_key
+)
+SELECT pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+        command_key.tenant_record_id::text
+        || E'\\x1f' || command_key.command_route
+        || E'\\x1f' || command_key.idempotency_key,
+        0
+    )
+)
+FROM command_key
+""".strip()
+
+_READ_IDEMPOTENCY_SQL = """
 SELECT
     replay.created_record_id,
     replay.command_digest
@@ -243,13 +261,12 @@ def _replayed_record_id(
     command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
     authorization: AuthorizationDecision,
 ) -> UUID | None:
-    """Return the committed record identity for a matching key, or None for a new command."""
+    """Serialize one key, then return its committed record identity when present."""
     route = command_route(command)
     digest = mutation_command_digest(command=command, authorization=authorization)
-    cursor.execute(
-        _LOOKUP_IDEMPOTENCY_SQL,
-        (command.tenant_record_id, route, command.idempotency_key),
-    )
+    key_parameters = (command.tenant_record_id, route, command.idempotency_key)
+    cursor.execute(_LOOKUP_IDEMPOTENCY_SQL, key_parameters)
+    cursor.execute(_READ_IDEMPOTENCY_SQL, key_parameters)
     rows = cursor.fetchmany(2)
     if not rows:
         return None
