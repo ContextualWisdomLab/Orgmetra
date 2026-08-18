@@ -2,11 +2,11 @@
 
 The packet correlates one proposed internal assignment change to authoritative Person,
 Employment, current Assignment/Job/Position scope, proposed Job/Position scope, an exact
-current-scope snapshot, a reviewed workforce-allocation plan, worker-impact evidence,
-and a communication plan. Opaque Person references remain sensitive correlating metadata.
-Person PII, compensation values, allocation values, and free-form model output stay
-outside this envelope. Final relationship resolution, approval, and mutation remain at
-the authoritative Orgmetra HRIS/People boundary.
+current-scope snapshot, a reviewed workforce-allocation plan and policy, worker-impact
+evidence, and a communication plan. Opaque Person references remain sensitive correlating
+metadata. Person PII, compensation values, allocation values, and free-form model output
+stay outside this envelope. Final relationship resolution, approval, and mutation remain
+at the authoritative Orgmetra HRIS/People boundary.
 """
 from __future__ import annotations
 
@@ -23,6 +23,15 @@ _REFERENCE_PATTERN = re.compile(
     r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
 )
 _PURPOSE_CODE = "assignment_change_review"
+_ALLOWED_REASON_CODES = frozenset(
+    {
+        "internal_reassignment",
+        "workforce_reallocation",
+        "temporary_detail",
+        "position_reclassification",
+        "organizational_realignment",
+    }
+)
 _DECISION_AUTHORITY = "human_review_only"
 _REVIEW_STATE = "requires_human_review"
 _SCOPE_VERIFICATION_STATE = "requires_authoritative_resolution"
@@ -107,6 +116,8 @@ class AssignmentChangeReviewPacket:
     current_scope_snapshot_digest: str
     allocation_plan_reference: str
     allocation_plan_digest: str
+    allocation_policy_reference: str
+    allocation_policy_digest: str
     worker_impact_assessment_reference: str
     worker_impact_assessment_digest: str
     communication_plan_reference: str
@@ -179,6 +190,12 @@ class AssignmentChangeReviewPacket:
         )
         _validate_digest(self.allocation_plan_digest, "allocation_plan_digest")
         _validate_reference(
+            self.allocation_policy_reference,
+            "workforce_allocation_policy",
+            "allocation_policy_reference",
+        )
+        _validate_digest(self.allocation_policy_digest, "allocation_policy_digest")
+        _validate_reference(
             self.worker_impact_assessment_reference,
             "worker_impact_assessment",
             "worker_impact_assessment_reference",
@@ -200,6 +217,8 @@ class AssignmentChangeReviewPacket:
         if self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain assignment_change_review")
         _validate_code(self.reason_code, "reason_code")
+        if self.reason_code not in _ALLOWED_REASON_CODES:
+            raise ValueError("reason_code must be an approved assignment-change reason")
         _validate_business_date(self.requested_effective_on, "requested_effective_on")
         _canonical_timestamp(self.generated_at)
         if self.contains_person_pii is not False:
@@ -228,6 +247,8 @@ class AssignmentChangeReviewPacket:
         payload = {
             "allocation_plan_digest": self.allocation_plan_digest,
             "allocation_plan_reference": self.allocation_plan_reference,
+            "allocation_policy_digest": self.allocation_policy_digest,
+            "allocation_policy_reference": self.allocation_policy_reference,
             "assignment_change_review_reference": self.assignment_change_review_reference,
             "communication_plan_digest": self.communication_plan_digest,
             "communication_plan_reference": self.communication_plan_reference,
@@ -281,6 +302,8 @@ def build_assignment_change_review_packet(
     current_scope_snapshot_digest: str,
     allocation_plan_reference: str,
     allocation_plan_digest: str,
+    allocation_policy_reference: str,
+    allocation_policy_digest: str,
     worker_impact_assessment_reference: str,
     worker_impact_assessment_digest: str,
     communication_plan_reference: str,
@@ -307,6 +330,8 @@ def build_assignment_change_review_packet(
         current_scope_snapshot_digest=current_scope_snapshot_digest,
         allocation_plan_reference=allocation_plan_reference,
         allocation_plan_digest=allocation_plan_digest,
+        allocation_policy_reference=allocation_policy_reference,
+        allocation_policy_digest=allocation_policy_digest,
         worker_impact_assessment_reference=worker_impact_assessment_reference,
         worker_impact_assessment_digest=worker_impact_assessment_digest,
         communication_plan_reference=communication_plan_reference,
