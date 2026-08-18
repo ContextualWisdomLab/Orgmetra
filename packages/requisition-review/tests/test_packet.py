@@ -154,6 +154,16 @@ def test_non_utc_input_is_canonicalized_to_utc():
     assert json.loads(value.canonical_json())["generated_at"] == "2026-08-18T10:30:00Z"
 
 
+def test_fractional_seconds_are_preserved_in_canonical_evidence():
+    first = packet(generated_at=datetime.fromisoformat("2026-08-18T19:30:00.123456+09:00"))
+    second = packet(generated_at=datetime.fromisoformat("2026-08-18T19:30:00.123457+09:00"))
+
+    assert json.loads(first.canonical_json())["generated_at"] == "2026-08-18T10:30:00.123456Z"
+    assert json.loads(second.canonical_json())["generated_at"] == "2026-08-18T10:30:00.123457Z"
+    assert first.canonical_json() != second.canonical_json()
+    assert first.sha256_digest() != second.sha256_digest()
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
