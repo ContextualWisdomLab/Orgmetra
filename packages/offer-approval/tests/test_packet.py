@@ -16,24 +16,34 @@ from orgmetra_offer_approval import (
 DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
+OFFER_ID = "10000000-0000-4000-8000-000000000001"
+CANDIDATE_ID = "10000000-0000-4000-8000-000000000002"
+REQUISITION_ID = "10000000-0000-4000-8000-000000000003"
+JOB_ID = "10000000-0000-4000-8000-000000000004"
+POSITION_ID = "10000000-0000-4000-8000-000000000005"
+DECISION_ID = "10000000-0000-4000-8000-000000000006"
+COMPENSATION_ID = "10000000-0000-4000-8000-000000000007"
+TERMS_ID = "10000000-0000-4000-8000-000000000008"
+REQUESTER_ID = "10000000-0000-4000-8000-000000000009"
+APPROVER_ID = "10000000-0000-4000-8000-00000000000a"
 
 
 def valid_kwargs() -> dict[str, object]:
     return {
         "tenant_record_id": "11111111-1111-4111-8111-111111111111",
-        "offer_approval_reference": "offer_approval:offer-001",
-        "candidate_profile_reference": "candidate_profile:candidate-001",
-        "requisition_reference": "requisition:req-001",
-        "job_profile_reference": "job_profile:job-001",
-        "position_record_reference": "position_record:position-001",
-        "selection_decision_reference": "selection_decision:decision-001",
+        "offer_approval_reference": f"offer_approval:{OFFER_ID}",
+        "candidate_profile_reference": f"candidate_profile:{CANDIDATE_ID}",
+        "requisition_reference": f"requisition:{REQUISITION_ID}",
+        "job_profile_reference": f"job_profile:{JOB_ID}",
+        "position_record_reference": f"position_record:{POSITION_ID}",
+        "selection_decision_reference": f"selection_decision:{DECISION_ID}",
         "selection_decision_digest": DIGEST_A,
-        "compensation_package_reference": "compensation_package:package-001",
+        "compensation_package_reference": f"compensation_package:{COMPENSATION_ID}",
         "compensation_package_digest": DIGEST_B,
-        "offer_terms_reference": "offer_terms:terms-001",
+        "offer_terms_reference": f"offer_terms:{TERMS_ID}",
         "offer_terms_digest": DIGEST_C,
-        "requester_reference": "actor:requester-001",
-        "approver_reference": "actor:approver-001",
+        "requester_reference": f"actor:{REQUESTER_ID}",
+        "approver_reference": f"actor:{APPROVER_ID}",
         "purpose_code": "offer_approval_review",
         "reason_code": "selected_candidate_offer_review",
         "generated_at": datetime(2026, 8, 19, 5, 10, 0, 123456, tzinfo=timezone.utc),
@@ -63,7 +73,7 @@ def test_position_reference_is_optional_without_collapsing_job_scope() -> None:
     packet = build_offer_approval_packet(**kwargs)
     payload = json.loads(packet.canonical_json())
 
-    assert packet.job_profile_reference == "job_profile:job-001"
+    assert packet.job_profile_reference == f"job_profile:{JOB_ID}"
     assert payload["position_record_reference"] is None
 
 
@@ -72,7 +82,7 @@ def test_canonical_json_and_digest_are_deterministic_and_value_free() -> None:
     payload = json.loads(packet.canonical_json())
 
     assert payload["generated_at"] == "2026-08-19T05:10:00.123456Z"
-    assert payload["candidate_profile_reference"] == "candidate_profile:candidate-001"
+    assert payload["candidate_profile_reference"] == f"candidate_profile:{CANDIDATE_ID}"
     assert "candidate_name" not in payload
     assert "candidate_email" not in payload
     assert "salary" not in payload
@@ -109,16 +119,16 @@ def test_rejects_nonoperational_tenant_identity(field_name: str, value: object) 
 @pytest.mark.parametrize(
     ("field_name", "value", "message"),
     [
-        ("offer_approval_reference", "offer:offer-001", "offer_approval"),
-        ("candidate_profile_reference", "candidate:candidate-001", "candidate_profile"),
-        ("requisition_reference", "request:req-001", "requisition"),
-        ("job_profile_reference", "job:job-001", "job_profile"),
-        ("position_record_reference", "position:position-001", "position_record"),
-        ("selection_decision_reference", "decision:decision-001", "selection_decision"),
-        ("compensation_package_reference", "compensation:package-001", "compensation_package"),
-        ("offer_terms_reference", "terms:terms-001", "offer_terms"),
-        ("requester_reference", "person:requester-001", "actor"),
-        ("approver_reference", "reviewer:approver-001", "actor"),
+        ("offer_approval_reference", f"offer:{OFFER_ID}", "offer_approval"),
+        ("candidate_profile_reference", f"candidate:{CANDIDATE_ID}", "candidate_profile"),
+        ("requisition_reference", f"request:{REQUISITION_ID}", "requisition"),
+        ("job_profile_reference", f"job:{JOB_ID}", "job_profile"),
+        ("position_record_reference", f"position:{POSITION_ID}", "position_record"),
+        ("selection_decision_reference", f"decision:{DECISION_ID}", "selection_decision"),
+        ("compensation_package_reference", f"compensation:{COMPENSATION_ID}", "compensation_package"),
+        ("offer_terms_reference", f"terms:{TERMS_ID}", "offer_terms"),
+        ("requester_reference", f"person:{REQUESTER_ID}", "actor"),
+        ("approver_reference", f"reviewer:{APPROVER_ID}", "actor"),
         ("requester_reference", "actor:", "actor"),
         ("requester_reference", 1, "actor"),
         ("requester_reference", "actor:" + "a" * 155, "actor"),
@@ -133,6 +143,32 @@ def test_rejects_bad_opaque_references(
     kwargs[field_name] = value
     with pytest.raises(ValueError, match=message):
         build_offer_approval_packet(**kwargs)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value", "message"),
+    [
+        ("candidate_profile_reference", "candidate_profile:Jane-Doe", "opaque candidate_profile"),
+        ("compensation_package_reference", "compensation_package:120000", "opaque compensation_package"),
+        ("offer_terms_reference", "offer_terms:remote-two-days", "opaque offer_terms"),
+        ("requester_reference", "actor:seonghobae", "opaque actor"),
+        ("candidate_profile_reference", "candidate_profile:00000000-0000-0000-0000-000000000000", "opaque candidate_profile"),
+        ("candidate_profile_reference", "candidate_profile:FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF", "opaque candidate_profile"),
+    ],
+)
+def test_rejects_value_bearing_or_noncanonical_reference_suffixes(
+    field_name: str,
+    value: object,
+    message: str,
+) -> None:
+    kwargs = valid_kwargs()
+    kwargs[field_name] = value
+    with pytest.raises(ValueError, match=message):
+        build_offer_approval_packet(**kwargs)
+
+    packet = build_valid()
+    with pytest.raises(ValueError, match=message):
+        replace(packet, **{field_name: value})
 
 
 @pytest.mark.parametrize(
