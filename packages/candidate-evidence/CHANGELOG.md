@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — 2026-08-19
+## Unreleased
 
 - Add a PII-minimized candidate-evidence intake packet with exact candidate/requisition/Job/job-requirements correlation.
 - Bind evidence, source provenance, handling and retention artifacts by opaque reference and SHA-256 digest.
