@@ -205,7 +205,7 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(command.idempotency_key, IDEMPOTENCY_KEY.decode("ascii"))
         self.assertEqual(authorization.resource_reference, f"selection_decision:{DECISION.hex}")
 
-    async def test_invalid_route_query_idempotency_content_type_or_body_fails_before_authentication(self) -> None:
+    async def test_invalid_route_or_query_fails_before_authentication(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
         port = RecordingHirePort()
         app = self._app(authenticator=authenticator, mutation_port=port)
@@ -218,18 +218,38 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             {"query": b"purpose=candidate_hire&purpose=other"},
             {"query": b"purpose=CandidateHire"},
             {"query": b"extra=value&purpose=candidate_hire"},
+        )
+        for case in bad_cases:
+            with self.subTest(case=case):
+                status, _, payload = await self._request(app, **case)
+                self.assertIn(status, (400, 404))
+                self.assertIn(payload["error"], {"invalid_request", "route_not_found"})
+        self.assertEqual(authenticator.tokens, [])
+        self.assertEqual(port.calls, [])
+
+    async def test_idempotency_media_and_body_validation_occurs_after_authentication(self) -> None:
+        bad_cases = (
             {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type", b"application/json")]},
             {"headers": valid_headers() + [(b"idempotency-key", b"another-idempotency-key-18")]},
-            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type", b"application/json"), (b"idempotency-key", b"short")]},
-            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type", b"application/json"), (b"idempotency-key", b"hire-idempotency-\xff-key")]},
-            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"idempotency-key", IDEMPOTENCY_KEY)]},
-            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type", b"text/plain"), (b"idempotency-key", IDEMPOTENCY_KEY)]},
-            {"headers": {b"content-type": b"application/json"}},
-            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"content-type",), (b"idempotency-key", IDEMPOTENCY_KEY)]},
             {
                 "headers": [
                     (b"authorization", b"Bearer opaque-token"),
-                    ("content-type", "application/json"),
+                    (b"content-type", b"application/json"),
+                    (b"idempotency-key", b"short"),
+                ]
+            },
+            {
+                "headers": [
+                    (b"authorization", b"Bearer opaque-token"),
+                    (b"content-type", b"application/json"),
+                    (b"idempotency-key", b"hire-idempotency-\xff-key"),
+                ]
+            },
+            {"headers": [(b"authorization", b"Bearer opaque-token"), (b"idempotency-key", IDEMPOTENCY_KEY)]},
+            {
+                "headers": [
+                    (b"authorization", b"Bearer opaque-token"),
+                    (b"content-type", b"text/plain"),
                     (b"idempotency-key", IDEMPOTENCY_KEY),
                 ]
             },
@@ -246,14 +266,19 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         )
         for case in bad_cases:
             with self.subTest(case=case):
-                status, _, payload = await self._request(app, **case)
-                self.assertIn(status, (400, 404, 413, 415))
+                authenticator = FakeAuthenticator(self.principal)
+                port = RecordingHirePort()
+                status, _, payload = await self._request(
+                    self._app(authenticator=authenticator, mutation_port=port),
+                    **case,
+                )
+                self.assertIn(status, (400, 413, 415))
                 self.assertIn(
                     payload["error"],
-                    {"invalid_request", "route_not_found", "payload_too_large", "unsupported_media_type"},
+                    {"invalid_request", "payload_too_large", "unsupported_media_type"},
                 )
-        self.assertEqual(authenticator.tokens, [])
-        self.assertEqual(port.calls, [])
+                self.assertEqual(authenticator.tokens, ["opaque-token"])
+                self.assertEqual(port.calls, [])
 
     async def test_wrong_method_returns_allow_header_without_authentication(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
@@ -293,6 +318,43 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((status, payload["error"]), (401, "authentication_required"))
         self.assertEqual(port.calls, [])
 
+    async def test_authenticated_tenant_mismatch_fails_before_body_read(self) -> None:
+        foreign_principal = AuthenticatedPrincipal(
+            tenant_record_id=UUID("0198a412-7200-7000-8000-000000000099"),
+            actor_reference="keyverse_subject:operator-17",
+            granted_scope_codes=frozenset({"orgmetra.people.materialize_worker"}),
+        )
+        authenticator = FakeAuthenticator(foreign_principal)
+        port = RecordingHirePort()
+        messages: list[dict[str, object]] = []
+        receive_calls = 0
+
+        async def receive() -> dict[str, object]:
+            nonlocal receive_calls
+            receive_calls += 1
+            raise AssertionError("foreign tenant request body was read")
+
+        async def send(message: dict[str, object]) -> None:
+            messages.append(message)
+
+        await self._app(authenticator=authenticator, mutation_port=port)(
+            {
+                "type": "http",
+                "method": "POST",
+                "path": ROUTE,
+                "query_string": QUERY,
+                "headers": valid_headers(),
+            },
+            receive,
+            send,
+        )
+        start, response = messages
+        payload = json.loads(bytes(response["body"]))
+        self.assertEqual((start["status"], payload["error"]), (403, "access_denied"))
+        self.assertEqual(authenticator.tokens, ["opaque-token"])
+        self.assertEqual(receive_calls, 0)
+        self.assertEqual(port.calls, [])
+
     async def test_policy_denial_never_mutates(self) -> None:
         port = RecordingHirePort()
         denied_policy = PurposeBoundAccessPolicy(
@@ -325,7 +387,29 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("secret", json.dumps(payload))
                 self.assertNotIn("password", json.dumps(payload))
 
-    async def test_missing_or_non_bytes_request_body_fails_before_authentication(self) -> None:
+    async def test_unexpected_persistence_error_logs_only_safe_metadata(self) -> None:
+        with self.assertLogs("orgmetra_people_api.hire_http", level="ERROR") as captured:
+            status, _, payload = await self._request(
+                self._app(
+                    mutation_port=RecordingHirePort(
+                        error=RuntimeError("postgres password=do-not-log display_name=Ada")
+                    )
+                )
+            )
+        self.assertEqual((status, payload["error"]), (500, "internal_error"))
+        self.assertEqual(len(captured.records), 1)
+        record = captured.records[0]
+        self.assertEqual(record.route, "candidate-worker-conversions")
+        self.assertEqual(record.tenant_record_id, str(TENANT))
+        self.assertEqual(record.correlation_reference, f"audit_event_record:{AUDIT_EVENT.hex}")
+        self.assertEqual(record.exception_type, "RuntimeError")
+        rendered = " ".join(captured.output)
+        self.assertNotIn("do-not-log", rendered)
+        self.assertNotIn("password", rendered)
+        self.assertNotIn("Ada", rendered)
+        self.assertNotIn("opaque-token", rendered)
+
+    async def test_missing_or_non_bytes_request_body_fails_after_authentication(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
         port = RecordingHirePort()
         app = self._app(authenticator=authenticator, mutation_port=port)
@@ -336,12 +420,14 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         async def receive_text_body() -> dict[str, object]:
             return {"type": "http.request", "body": "{}", "more_body": False}
 
+        def capture_for(sink: list[dict[str, object]]):
+            async def capture(message: dict[str, object]) -> None:
+                sink.append(message)
+
+            return capture
+
         for receive in (receive_disconnect, receive_text_body):
             messages: list[dict[str, object]] = []
-
-            async def capture(message: dict[str, object]) -> None:
-                messages.append(message)
-
             await app(
                 {
                     "type": "http",
@@ -351,10 +437,10 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
                     "headers": valid_headers(),
                 },
                 receive,
-                capture,
+                capture_for(messages),
             )
             self.assertEqual(int(messages[0]["status"]), 400)
-        self.assertEqual(authenticator.tokens, [])
+        self.assertEqual(authenticator.tokens, ["opaque-token", "opaque-token"])
         self.assertEqual(port.calls, [])
 
     async def test_non_http_scope_is_rejected_as_programming_error(self) -> None:
