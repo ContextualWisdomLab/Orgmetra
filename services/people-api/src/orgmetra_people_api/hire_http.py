@@ -31,6 +31,7 @@ from orgmetra_people_api.http import (
     _authorization_header,
     _send_json,
 )
+from orgmetra_people_api.mutations import validate_idempotency_key
 
 _ROUTE_PREFIX = ("v1", "tenants")
 _ROUTE_LEAF = "candidate-worker-conversions"
@@ -126,9 +127,10 @@ class HireAcceptanceAsgiApp:
 
         try:
             tenant_record_id, purpose_code = _parse_hire_route(path, scope.get("query_string", b""))
+            idempotency_key = _parse_idempotency_key(scope)
             _require_json_content_type(scope)
             payload = await _read_json_object(receive)
-            command = _command_from_payload(tenant_record_id, payload)
+            command = _command_from_payload(tenant_record_id, payload, idempotency_key)
         except _PayloadTooLarge:
             await _send_json(
                 send,
@@ -155,7 +157,7 @@ class HireAcceptanceAsgiApp:
                 status=400,
                 payload={
                     "error": "invalid_request",
-                    "message": "Correct the tenant, purpose, and hire command fields, then retry.",
+                    "message": "Correct the tenant, purpose, idempotency key, and hire command fields, then retry.",
                 },
             )
             return
@@ -276,6 +278,29 @@ def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
     return tenant_record_id, purpose_code
 
 
+def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
+    """Require exactly one visible-ASCII Idempotency-Key before authentication."""
+    raw_headers = scope.get("headers", ())
+    if not isinstance(raw_headers, (list, tuple)):
+        raise _InvalidHttpRequest("Idempotency-Key is required")
+    values: list[bytes] = []
+    for header in raw_headers:
+        if not isinstance(header, (list, tuple)) or len(header) != 2:
+            raise _InvalidHttpRequest("Idempotency-Key is required")
+        name, value = header
+        if not isinstance(name, bytes) or not isinstance(value, bytes):
+            raise _InvalidHttpRequest("Idempotency-Key is required")
+        if name.lower() == b"idempotency-key":
+            values.append(value)
+    if len(values) != 1:
+        raise _InvalidHttpRequest("exactly one Idempotency-Key is required")
+    try:
+        decoded = values[0].decode("ascii")
+        return validate_idempotency_key(decoded)
+    except (UnicodeDecodeError, ValueError) as error:
+        raise _InvalidHttpRequest("Idempotency-Key is invalid") from error
+
+
 def _require_json_content_type(scope: Mapping[str, object]) -> None:
     """Accept exactly one application/json content type before reading the body."""
     raw_headers = scope.get("headers", ())
@@ -327,8 +352,12 @@ def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]
     return payload
 
 
-def _command_from_payload(tenant_record_id: UUID, payload: Mapping[str, object]) -> HireAcceptanceCommand:
-    """Map one exact JSON object onto the hire-acceptance command."""
+def _command_from_payload(
+    tenant_record_id: UUID,
+    payload: Mapping[str, object],
+    idempotency_key: str,
+) -> HireAcceptanceCommand:
+    """Map one exact JSON object and validated idempotency key onto the hire command."""
     if frozenset(payload) != _REQUIRED_BODY_KEYS:
         raise _InvalidHttpRequest("hire command fields are incomplete or unsupported")
     try:
@@ -348,6 +377,7 @@ def _command_from_payload(tenant_record_id: UUID, payload: Mapping[str, object])
             outbox_delivery_record_id=UUID(str(payload["outbox_delivery_record_id"])),
             effective_from=effective_from,
             display_name=payload["display_name"],  # type: ignore[arg-type]
+            idempotency_key=idempotency_key,
             employment_status_code=payload["employment_status_code"],  # type: ignore[arg-type]
         )
     except (TypeError, ValueError) as error:
