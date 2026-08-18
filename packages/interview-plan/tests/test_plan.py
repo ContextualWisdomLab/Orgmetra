@@ -123,6 +123,21 @@ def test_rejects_bad_question_count(count):
         StructuredInterviewPlan(**data)
 
 
+def test_question_count_error_describes_only_the_cardinality_constraint():
+    data = values()
+    data["competency_references"] = (
+        "competency:analysis",
+        "competency:communication",
+        "competency:judgment",
+    )
+    data["question_count"] = 2
+    with pytest.raises(
+        ValueError,
+        match="question_count must be at least the number of governed competencies",
+    ):
+        StructuredInterviewPlan(**data)
+
+
 def test_accepts_question_count_equal_to_competency_count():
     data = values()
     data["question_count"] = 2
