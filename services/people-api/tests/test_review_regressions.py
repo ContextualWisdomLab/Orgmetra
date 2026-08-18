@@ -1,9 +1,9 @@
 """Regression contracts for current People mutation review findings.
 
 These tests intentionally exercise the public/application boundaries rather than
-accepting review narration as evidence.  They cover complete evidence-version
-validation, exact assignment precision, serialized durable idempotency, and the
-confirmed-hire idempotency contract.
+accepting review narration as evidence. They cover complete evidence-version
+validation, exact assignment precision, serialized durable idempotency, the
+confirmed-hire idempotency contract, and shared HTTP header preconditions.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import unittest
 from uuid import UUID
 
 from orgmetra_people_api.hire import HireAcceptanceCommand
+from orgmetra_people_api.hire_http import _UnsupportedMediaType, _require_json_content_type
 from orgmetra_people_api.mutation_http import _InvalidHttpRequest, _evidence_version
 from orgmetra_people_api.postgres_mutations import _LOOKUP_IDEMPOTENCY_SQL
 from test_people_mutations import assignment_command
@@ -88,6 +89,17 @@ class CurrentReviewRegressionTests(unittest.TestCase):
                 employment_status_code=command.employment_status_code,
                 idempotency_key="short",
             )
+
+    def test_shared_json_content_type_helper_fails_closed_on_malformed_header_containers(self) -> None:
+        """Cover defensive helper branches unreachable after validated idempotency headers."""
+        malformed_headers = (
+            {b"content-type": b"application/json"},
+            [(b"content-type",)],
+            [("content-type", "application/json")],
+        )
+        for headers in malformed_headers:
+            with self.subTest(headers=headers), self.assertRaises(_UnsupportedMediaType):
+                _require_json_content_type({"headers": headers})
 
 
 if __name__ == "__main__":
