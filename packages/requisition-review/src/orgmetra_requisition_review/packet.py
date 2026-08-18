@@ -62,10 +62,10 @@ def _validate_reference(value: str, prefix: str, field_name: str) -> None:
 
 
 def _canonical_timestamp(value: datetime) -> str:
-    """Render an aware instant as deterministic UTC RFC 3339 text."""
+    """Render an aware instant as deterministic UTC RFC 3339 text without precision loss."""
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("generated_at must be timezone-aware")
-    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True)
