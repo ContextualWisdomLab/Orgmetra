@@ -187,13 +187,20 @@ assert_rejected() {
 }
 
 # The former three independent link tables could mix unrelated study membership.
-# New writes must fail closed so every new case goes through one normalized row.
+# New writes and destructive table-wide mutation must fail closed so historical
+# compatibility evidence remains readable and every new case uses one normalized row.
 assert_rejected "legacy validity-study links are read-only" \
   "INSERT INTO validity_study_decision_link (tenant_record_id, validity_study_decision_link_id, validity_study_id, selection_decision_id) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000f1', '00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-000000000051');"
 assert_rejected "legacy validity-study links are read-only" \
   "INSERT INTO validity_study_outcome_link (tenant_record_id, validity_study_outcome_link_id, validity_study_id, criterion_observation_id) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000f2', '00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-0000000000b1');"
 assert_rejected "legacy validity-study links are read-only" \
   "INSERT INTO validity_study_evidence_set_link (tenant_record_id, validity_study_evidence_set_link_id, validity_study_id, decision_evidence_set_id) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000f3', '00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-000000000041');"
+assert_rejected "legacy validity-study links are read-only" \
+  "TRUNCATE TABLE validity_study_decision_link;"
+assert_rejected "legacy validity-study links are read-only" \
+  "TRUNCATE TABLE validity_study_outcome_link;"
+assert_rejected "legacy validity-study links are read-only" \
+  "TRUNCATE TABLE validity_study_evidence_set_link;"
 
 assert_rejected "validity-study case requires the selection decision's exact evidence set" \
   "INSERT INTO validity_study_case_record (tenant_record_id, validity_study_case_record_id, validity_study_id, selection_decision_id, decision_evidence_set_id, criterion_observation_id, candidate_worker_conversion_record_id, linked_at) VALUES ('${TENANT_ID}', '00000000-0000-7000-8000-0000000000e1', '00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-000000000051', '00000000-0000-7000-8000-0000000000d1', '00000000-0000-7000-8000-0000000000b1', '00000000-0000-7000-8000-000000000082', TIMESTAMPTZ '2026-11-03 01:00:00+00');"
