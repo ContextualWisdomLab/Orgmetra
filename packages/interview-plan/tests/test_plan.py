@@ -10,6 +10,7 @@ TENANT = "12345678-1234-4234-8234-123456789abc"
 DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
+DIGEST_D = "d" * 64
 
 
 def values():
@@ -22,6 +23,8 @@ def values():
         job_analysis_digest=DIGEST_A,
         question_set_reference="question_set:questions-v1",
         question_set_digest=DIGEST_B,
+        question_competency_map_reference="question_competency_map:map-v1",
+        question_competency_map_digest=DIGEST_D,
         rating_anchor_reference="rating_anchor:anchors-v1",
         rating_anchor_digest=DIGEST_C,
         competency_references=("competency:analysis", "competency:communication"),
@@ -39,6 +42,7 @@ def test_builds_candidate_neutral_deterministic_plan():
     assert payload["review_state"] == "requires_human_approval"
     assert payload["human_confirmation_required"] is True
     assert payload["generated_at"].endswith(".123456Z")
+    assert payload["question_competency_map_reference"] == "question_competency_map:map-v1"
     assert "candidate" not in plan.canonical_json()
     assert plan.sha256_digest() == sha256(plan.canonical_json().encode("utf-8")).hexdigest()
     assert plan == StructuredInterviewPlan(**values())
@@ -53,9 +57,11 @@ def test_builds_candidate_neutral_deterministic_plan():
     ("job_profile_reference", "wrong:job-1"),
     ("job_analysis_reference", "wrong:analysis-1"),
     ("question_set_reference", "wrong:q-1"),
+    ("question_competency_map_reference", "wrong:map-1"),
     ("rating_anchor_reference", "wrong:a-1"),
     ("job_analysis_digest", "A" * 64),
     ("question_set_digest", "b" * 63),
+    ("question_competency_map_digest", "D" * 64),
     ("rating_anchor_digest", 7),
     ("purpose_code", "wrong_purpose"),
     ("purpose_code", "bad"),
