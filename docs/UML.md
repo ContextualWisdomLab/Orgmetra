@@ -32,7 +32,7 @@ flowchart LR
     jobs --> jobs_store
     talent --> talent_store
     performance --> performance_store
-    validation --> validation_store
+n    validation --> validation_store
     documents --> documents_store
     audit --> audit_store
     integration --> integration_store
@@ -110,6 +110,7 @@ sequenceDiagram
     PeopleCore-->>Gateway: employment_record Location
     HROps->>Gateway: Create position(actor, tenant, purpose, confirmation, evidence, idempotency key)
     Gateway->>JobArchitecture: Replay matching key or bind organization and job
+    JobArchitecture->>Audit: Persist position, audit/outbox, and idempotency binding
     JobArchitecture-->>Gateway: position_record Location
     HROps->>Gateway: Create assignment(actor, tenant, purpose, confirmation, evidence, idempotency key)
     Gateway->>PeopleCore: Replay matching key or validate_assignment_write
