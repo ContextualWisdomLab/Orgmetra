@@ -19,6 +19,7 @@ _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(
     r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
 )
+_REVIEW_PURPOSE = "selection_review"
 _REVIEW_STATE = "requires_human_decision"
 _MODEL_OUTPUT_STATUS = "untrusted_draft"
 _NEXT_ACTION = (
@@ -38,9 +39,15 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
 
 
 def _validate_code(value: str, field_name: str) -> None:
-    """Require descriptive two-or-more-word lower snake_case governance codes."""
-    if not isinstance(value, str) or not _CODE_PATTERN.fullmatch(value):
-        raise ValueError(f"{field_name} must be two-or-more-word lower snake_case")
+    """Require a bounded, descriptive lower snake_case governance code."""
+    if (
+        not isinstance(value, str)
+        or len(value) > 64
+        or not _CODE_PATTERN.fullmatch(value)
+    ):
+        raise ValueError(
+            f"{field_name} must be bounded two-or-more-word lower snake_case"
+        )
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
@@ -98,6 +105,8 @@ class SelectionReviewPacket:
             raise ValueError("evidence_set_digest must be lowercase SHA-256 hex")
         _validate_reference(self.reviewer_actor_reference, "actor", "reviewer_actor_reference")
         _validate_code(self.purpose_code, "purpose_code")
+        if self.purpose_code != _REVIEW_PURPOSE:
+            raise ValueError("purpose_code must remain selection_review")
         _validate_code(self.reason_code, "reason_code")
         _validate_code(self.evidence_version_code, "evidence_version_code")
         _canonical_timestamp(self.generated_at)
