@@ -342,17 +342,19 @@ def _parse_command_headers(scope: Mapping[str, object]) -> _MutationHeaders:
 
 
 def _evidence_version(payload: Mapping[str, object]) -> str:
-    """Require one versioned evidence reference from the high-impact command body."""
+    """Validate every evidence reference and return the primary version token."""
     raw_evidence = payload.get("evidence_references")
     if not isinstance(raw_evidence, list) or not raw_evidence:
         raise _InvalidHttpRequest("evidence_references are required")
-    first = raw_evidence[0]
-    if not isinstance(first, dict) or "evidence_version_code" not in first:
-        raise _InvalidHttpRequest("evidence_references must include evidence_version_code")
-    version = first["evidence_version_code"]
-    if not isinstance(version, str):
-        raise _InvalidHttpRequest("evidence_version_code must be a string")
-    return version
+    versions: list[str] = []
+    for reference in raw_evidence:
+        if not isinstance(reference, Mapping) or "evidence_version_code" not in reference:
+            raise _InvalidHttpRequest("evidence_references must include evidence_version_code")
+        version = reference["evidence_version_code"]
+        if not isinstance(version, str):
+            raise _InvalidHttpRequest("evidence_version_code must be a string")
+        versions.append(version)
+    return versions[0]
 
 
 def _require_reason(payload: Mapping[str, object]) -> None:
