@@ -4,9 +4,9 @@
 
 | Requirement | Design / implementation evidence | Executable evidence |
 |---|---|---|
-| Keep Person/Employment/Assignment/Job/Position identities separate | `AssignmentChangeReviewPacket` has distinct expected-namespace opaque references for each concept | `test_packet_correlates_evidence_without_copying_worker_values`, reference-validation matrix |
-| Preserve PII and compensation minimization | Envelope has no person-name/contact, compensation amount, allocation ratio, or free-form model-output field; immutable flags remain false | `test_builds_value_free_pre_mutation_review_packet`, direct-construction governance matrix |
-| Bind exact review evidence | Current-scope snapshot, allocation plan, worker-impact assessment, and communication plan each carry an opaque reference and SHA-256 digest | digest-validation matrix; canonical JSON/digest regression |
+| Keep Person/Employment/Assignment/Job/Position identities separate | `AssignmentChangeReviewPacket` has distinct expected-namespace opaque references for each concept | `test_packet_correlates_policy_and_evidence_without_copying_worker_values`, reference-validation matrix |
+| Preserve PII, compensation, allocation-value, and narrative minimization | Envelope has no person-name/contact, compensation amount, allocation ratio, or free-form model-output field; immutable flags remain false; reason is a controlled category | `test_builds_value_free_pre_mutation_review_packet`, reason-code regressions, direct-construction governance matrix |
+| Bind exact review evidence and policy version | Current-scope snapshot, allocation plan, allocation policy, worker-impact assessment, and communication plan each carry an opaque reference and SHA-256 digest | digest/reference validation matrices; canonical JSON/digest regression |
 | Do not infer authoritative temporal scope from identifiers | `scope_verification_state` is fixed to `requires_authoritative_resolution` and next action requires live authoritative verification | direct-construction governance matrix |
 | Keep high-impact assignment action under accountable human authority | requester and reviewer are separate; human confirmation is mandatory; decision authority is `human_review_only` | requester/reviewer separation regression; direct-construction governance matrix |
 | Packet must not authorize persistence | `mutation_state=not_authorized_to_apply`; next action routes approved change to authoritative People mutation boundary | direct-construction governance matrix |
