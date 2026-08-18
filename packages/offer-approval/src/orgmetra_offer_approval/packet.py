@@ -49,14 +49,22 @@ def _validate_code(value: str, field_name: str) -> None:
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require a bounded namespaced opaque reference with the expected prefix."""
+    """Require an expected namespace plus a canonical operational UUID suffix."""
+    error_message = f"{field_name} must be an opaque {prefix}: reference"
     if (
         not isinstance(value, str)
         or len(value) > 160
         or not _REFERENCE_PATTERN.fullmatch(value)
         or not value.startswith(f"{prefix}:")
     ):
-        raise ValueError(f"{field_name} must be an opaque {prefix}: reference")
+        raise ValueError(error_message)
+    suffix = value.split(":", 1)[1]
+    try:
+        parsed = UUID(suffix)
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError(error_message) from exc
+    if str(parsed) != suffix or parsed.int in (0, (1 << 128) - 1):
+        raise ValueError(error_message)
 
 
 def _validate_digest(value: str, field_name: str) -> None:
