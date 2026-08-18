@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 const workflowPath = '.github/workflows/recovery-rehearsal-quality.yml';
@@ -15,7 +16,11 @@ const provenanceFiles = Object.freeze([
 ]);
 
 function lineCount(buffer) {
-  return buffer.toString('utf8').split(/\r?\n/).filter((_, index, lines) => index < lines.length - 1 || lines[index] !== '').length;
+  const parts = buffer.toString('utf8').split(/\r?\n/);
+  if (parts.at(-1) === '') {
+    parts.pop();
+  }
+  return parts.length;
 }
 
 function verifyRecoveryProvenance() {
@@ -32,6 +37,10 @@ function verifyRecoveryProvenance() {
   }
 }
 
+function requirePattern(text, pattern, message) {
+  assert.match(text, pattern, message);
+}
+
 test('restore rehearsal is executable exact-head recovery evidence', () => {
   for (const requiredPath of [workflowPath, rehearsalPath, traceabilityPath]) {
     assert.equal(existsSync(requiredPath), true, `${requiredPath} must exist`);
@@ -41,64 +50,84 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
   const rehearsal = readFileSync(rehearsalPath, 'utf8');
   const traceability = readFileSync(traceabilityPath, 'utf8');
 
-  for (const fragment of [
-    'pull_request:',
-    '- develop',
-    'ref: ${{ github.event.pull_request.head.sha || github.sha }}',
-    'source_postgres:',
-    'restore_postgres:',
-    'POSTGRES_DB: postgres',
-    'POSTGRES_SOURCE_CONTAINER: ${{ job.services.source_postgres.id }}',
-    'POSTGRES_RESTORE_CONTAINER: ${{ job.services.restore_postgres.id }}',
-    'POSTGRES_SOURCE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5432/postgres',
-    'POSTGRES_RESTORE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5433/postgres',
-    'bash .github/scripts/restore-rehearsal-postgres.sh',
-    'python tests/validate_repository.py',
-    'npm run validate',
-    'git diff --exit-code'
-  ]) {
-    assert.ok(workflow.includes(fragment), `recovery workflow must contain ${fragment}`);
+  const workflowContracts = [
+    [/pull_request:\s*\n\s*branches:\s*\n\s*-\s*develop/, 'pull requests to develop must exercise recovery'],
+    [/push:\s*\n\s*branches:\s*\n\s*-\s*develop/, 'protected develop pushes must exercise recovery'],
+    [/source_postgres:\s*\n\s*image:\s*postgres:17\.6-alpine@sha256:[0-9a-f]{64}/, 'source PostgreSQL must be digest pinned'],
+    [/restore_postgres:\s*\n\s*image:\s*postgres:17\.6-alpine@sha256:[0-9a-f]{64}/, 'restore PostgreSQL must be digest pinned'],
+    [/POSTGRES_DB:\s*postgres/, 'service databases must start from the postgres admin database'],
+    [/ref:\s*\$\{\{\s*github\.event\.pull_request\.head\.sha\s*\|\|\s*github\.sha\s*\}\}/, 'checkout must bind to the exact candidate SHA'],
+    [/name:\s*Print diagnostic recovery provenance data/, 'provenance output must be labeled diagnostic'],
+    [/name:\s*Validate repository contracts\s*\n\s*run:\s*npm run validate/, 'repository validation must not duplicate the Python validator'],
+    [/RECOVERY_REHEARSAL_ALLOW_ROLE_DROP:\s*["']?1["']?/, 'disposable-cluster role deletion must be explicitly authorized'],
+    [/bash\s+\.github\/scripts\/restore-rehearsal-postgres\.sh/, 'workflow must execute the recovery rehearsal'],
+    [/git diff --exit-code/, 'workflow must prove a clean checkout']
+  ];
+  for (const [pattern, message] of workflowContracts) {
+    requirePattern(workflow, pattern, message);
   }
 
-  for (const fragment of [
-    'POSTGRES_SOURCE_ADMIN_URL',
-    'POSTGRES_RESTORE_ADMIN_URL',
-    'POSTGRES_SOURCE_CONTAINER',
-    'POSTGRES_RESTORE_CONTAINER',
-    'source and restore PostgreSQL endpoints must differ',
-    'docker exec',
-    'pg_dump',
-    '--format=custom',
-    'pg_restore',
-    'audit digest did not survive restore',
-    'audit/outbox binding did not survive restore',
-    'bitemporal person name did not survive restore',
-    'restored audit event was mutable',
-    'TRUNCATE TABLE audit_event_record CASCADE;',
-    'restored audit history was truncatable',
-    'least-privilege recovery ACLs did not survive restore'
-  ]) {
-    assert.ok(rehearsal.includes(fragment), `restore rehearsal must contain ${fragment}`);
+  const scriptContracts = [
+    [/source and restore PostgreSQL endpoints must differ/, 'source and restore endpoints must differ'],
+    [/replace_database_name/, 'database URL selection must be explicit'],
+    [/urllib\.parse/, 'database URL rewriting must use a URL parser'],
+    [/RECOVERY_REHEARSAL_ALLOW_ROLE_DROP/, 'role deletion must require a disposable-cluster opt-in'],
+    [/recovery rehearsal role cleanup requires RECOVERY_REHEARSAL_ALLOW_ROLE_DROP=1/, 'role cleanup denial must be actionable'],
+    [/pg_dump[\s\S]*--format=custom/, 'rehearsal must produce a custom-format PostgreSQL dump'],
+    [/source dump is empty/, 'empty dumps must fail closed'],
+    [/pg_restore\s+-U\s+orgmetra\s+--list/, 'custom dump must be list-validated before restore'],
+    [/person_name_record_id\s*=\s*'\$\{NAME_ID\}'::uuid/, 'restored bitemporal name evidence must bind the exact primary key'],
+    [/audit digest did not survive restore/, 'restored audit digest must be checked'],
+    [/audit\/outbox binding did not survive restore/, 'restored audit/outbox lineage must be checked'],
+    [/restored audit event was mutable/, 'append-only UPDATE protection must be exercised'],
+    [/TRUNCATE TABLE audit_event_record CASCADE;/, 'append-only TRUNCATE protection must be exercised'],
+    [/restored audit history was truncatable/, 'TRUNCATE success must fail the rehearsal'],
+    [/has_function_privilege\(\s*'orgmetra_outbox_operator'\s*,\s*'public\.operator_dead_letter_expired_outbox_delivery\(uuid,uuid,uuid,text,text\)'/, 'operator function capability must survive restore'],
+    [/has_column_privilege\(\s*'orgmetra_outbox_recovery_owner'\s*,\s*'public\.outbox_delivery_record'/, 'bounded recovery-owner column privileges must survive restore'],
+    [/NOT has_table_privilege\('orgmetra_outbox_operator', 'public\.outbox_delivery_record', '(?:SELECT|INSERT|UPDATE)'\)/, 'operator direct transport-table DML must remain denied'],
+    [/least-privilege recovery ACLs did not survive restore/, 'ACL drift must fail closed']
+  ];
+  for (const [pattern, message] of scriptContracts) {
+    requirePattern(rehearsal, pattern, message);
   }
-
-  assert.match(
-    rehearsal,
-    /has_function_privilege\(\s*'orgmetra_outbox_operator'\s*,\s*'public\.operator_dead_letter_expired_outbox_delivery\(uuid,uuid,uuid,text,text\)'/,
-    'restore rehearsal must prove the operator retains only the governed function capability'
-  );
-  assert.match(
-    rehearsal,
-    /has_column_privilege\(\s*'orgmetra_outbox_recovery_owner'\s*,\s*'public\.outbox_delivery_record'/,
-    'restore rehearsal must prove bounded recovery-owner column privileges'
-  );
-  assert.match(
-    rehearsal,
-    /NOT has_table_privilege\('orgmetra_outbox_operator', 'public\.outbox_delivery_record', '(?:SELECT|INSERT|UPDATE)'\)/,
-    'restore rehearsal must prove the operator cannot directly mutate transport tables'
-  );
 
   assert.ok(traceability.includes('Protected-main truth'), 'traceability must distinguish protected-main truth');
   assert.ok(traceability.includes('exact restored database'), 'traceability must bind evidence to the restored database');
   assert.ok(traceability.includes('No certification claim'), 'traceability must avoid unsupported certification claims');
   verifyRecoveryProvenance();
+});
+
+test('restore rehearsal refuses destructive role cleanup without disposable-cluster opt-in', () => {
+  const result = spawnSync('bash', [rehearsalPath], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      POSTGRES_SOURCE_ADMIN_URL: 'postgresql://orgmetra:orgmetra@localhost:5432/postgres',
+      POSTGRES_RESTORE_ADMIN_URL: 'postgresql://orgmetra:orgmetra@localhost:5433/postgres',
+      POSTGRES_SOURCE_CONTAINER: 'source-container',
+      POSTGRES_RESTORE_CONTAINER: 'restore-container'
+    }
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /recovery rehearsal role cleanup requires RECOVERY_REHEARSAL_ALLOW_ROLE_DROP=1/);
+  assert.doesNotMatch(result.stderr, /psql:/, 'guard must fail before connecting to PostgreSQL');
+});
+
+test('restore rehearsal fails closed on malformed PostgreSQL administrator URLs', () => {
+  const result = spawnSync('bash', [rehearsalPath], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      RECOVERY_REHEARSAL_ALLOW_ROLE_DROP: '1',
+      POSTGRES_SOURCE_ADMIN_URL: 'not-a-postgresql-url',
+      POSTGRES_RESTORE_ADMIN_URL: 'postgresql://orgmetra:orgmetra@localhost:5433/postgres?sslmode=disable',
+      POSTGRES_SOURCE_CONTAINER: 'source-container',
+      POSTGRES_RESTORE_CONTAINER: 'restore-container'
+    }
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /administrator URL must use the postgres or postgresql scheme/);
+  assert.doesNotMatch(result.stderr, /psql:/, 'URL validation must fail before connecting to PostgreSQL');
 });
