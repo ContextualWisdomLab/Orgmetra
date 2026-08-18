@@ -25,6 +25,7 @@ CREATE TABLE people_mutation_idempotency_record (
     CONSTRAINT people_mutation_idempotency_route_check
         CHECK (
             command_route IN (
+                'candidate-worker-conversions',
                 'employment-records',
                 'position-records',
                 'assignment-records'
