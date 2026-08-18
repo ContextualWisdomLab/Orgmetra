@@ -158,6 +158,41 @@ class StructuredInterviewPlan:
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
-def build_structured_interview_plan(**kwargs: object) -> StructuredInterviewPlan:
+def build_structured_interview_plan(
+    *,
+    tenant_record_id: str,
+    interview_plan_reference: str,
+    requisition_reference: str,
+    job_profile_reference: str,
+    job_analysis_reference: str,
+    job_analysis_digest: str,
+    question_set_reference: str,
+    question_set_digest: str,
+    rating_anchor_reference: str,
+    rating_anchor_digest: str,
+    competency_references: tuple[str, ...],
+    panel_actor_references: tuple[str, ...],
+    question_count: int,
+    purpose_code: str,
+    reason_code: str,
+    generated_at: datetime,
+) -> StructuredInterviewPlan:
     """Build a governed structured-interview plan that remains pending human approval."""
-    return StructuredInterviewPlan(**kwargs)  # type: ignore[arg-type]
+    return StructuredInterviewPlan(
+        tenant_record_id=tenant_record_id,
+        interview_plan_reference=interview_plan_reference,
+        requisition_reference=requisition_reference,
+        job_profile_reference=job_profile_reference,
+        job_analysis_reference=job_analysis_reference,
+        job_analysis_digest=job_analysis_digest,
+        question_set_reference=question_set_reference,
+        question_set_digest=question_set_digest,
+        rating_anchor_reference=rating_anchor_reference,
+        rating_anchor_digest=rating_anchor_digest,
+        competency_references=competency_references,
+        panel_actor_references=panel_actor_references,
+        question_count=question_count,
+        purpose_code=purpose_code,
+        reason_code=reason_code,
+        generated_at=generated_at,
+    )
