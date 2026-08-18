@@ -1,8 +1,9 @@
 """Governed, PII-minimized candidate-evidence intake correlation.
 
 The contract binds candidate evidence intake to an authoritative candidate, requisition,
-Job, job requirements, evidence-set identity, retention policy, and accountable actor.
-It intentionally carries no raw candidate evidence or candidate PII.
+Job, job requirements, evidence-set identity, handling/retention policy, and accountable
+actor. It carries no raw candidate evidence values; the opaque candidate reference remains
+sensitive correlating metadata.
 """
 from __future__ import annotations
 
@@ -19,8 +20,8 @@ _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9
 _PURPOSE_CODE = "candidate_evidence_intake"
 _REVIEW_STATE = "requires_human_review"
 _NEXT_ACTION = (
-    "Verify job relevance, source provenance, retention handling, and evidence completeness "
-    "before sealing this candidate evidence set for accountable human review."
+    "Verify job relevance, source provenance, permitted handling, retention, and evidence "
+    "completeness; then request authoritative evidence sealing and accountable human review."
 )
 
 
