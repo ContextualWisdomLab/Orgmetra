@@ -267,6 +267,8 @@ class AssignmentMutationCommand:
             raise ValueError("allocation_ratio must be a Decimal.")
         if self.allocation_ratio <= Decimal("0") or self.allocation_ratio > Decimal("1.0000"):
             raise ValueError("allocation_ratio must be greater than 0 and at most 1.0000.")
+        if self.allocation_ratio.as_tuple().exponent < -4:
+            raise ValueError("allocation_ratio must have at most four decimal places.")
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
         validate_idempotency_key(self.idempotency_key)
@@ -433,4 +435,3 @@ def parse_allocation_ratio(raw_value: object) -> Decimal:
     if not isinstance(raw_value, str) or re.fullmatch(r"^(0\.[0-9]{4}|1\.0000)$", raw_value) is None:
         raise ValueError("allocation_ratio must match 0.0001-1.0000 four-decimal form.")
     return Decimal(raw_value)
-
