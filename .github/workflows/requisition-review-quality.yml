@@ -8,7 +8,7 @@ on:
       - "packages/requisition-review/**"
       - ".github/requirements/foundation-test.txt"
       - ".github/workflows/requisition-review-quality.yml"
-      - "docs/adr/0012-governed-requisition-review-packet.md"
+      - "docs/adr/0013-governed-requisition-review-packet.md"
       - "docs/doctoring/requisition-review-references.md"
       - "docs/traceability/requisition-review.md"
       - "docs/TRACEABILITY.md"
