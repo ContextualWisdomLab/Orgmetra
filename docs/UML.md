@@ -32,7 +32,7 @@ flowchart LR
     jobs --> jobs_store
     talent --> talent_store
     performance --> performance_store
-n    validation --> validation_store
+    validation --> validation_store
     documents --> documents_store
     audit --> audit_store
     integration --> integration_store
