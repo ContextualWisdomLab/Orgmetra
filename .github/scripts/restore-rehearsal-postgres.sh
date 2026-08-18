@@ -219,4 +219,95 @@ if [[ "${recovery_owner_count}" != "1" ]]; then
     exit 1
 fi
 
+recovery_acl_count="$(psql "${RESTORE_DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT count(*)
+FROM pg_roles AS owner_role
+CROSS JOIN pg_roles AS operator_role
+WHERE owner_role.rolname = 'orgmetra_outbox_recovery_owner'
+  AND operator_role.rolname = 'orgmetra_outbox_operator'
+  AND NOT owner_role.rolcanlogin
+  AND NOT owner_role.rolsuper
+  AND NOT owner_role.rolcreatedb
+  AND NOT owner_role.rolcreaterole
+  AND NOT owner_role.rolreplication
+  AND NOT owner_role.rolbypassrls
+  AND NOT operator_role.rolcanlogin
+  AND NOT operator_role.rolsuper
+  AND NOT operator_role.rolcreatedb
+  AND NOT operator_role.rolcreaterole
+  AND NOT operator_role.rolreplication
+  AND NOT operator_role.rolbypassrls
+  AND has_schema_privilege('orgmetra_outbox_recovery_owner', 'public', 'USAGE')
+  AND NOT has_schema_privilege('orgmetra_outbox_recovery_owner', 'public', 'CREATE')
+  AND has_schema_privilege('orgmetra_outbox_operator', 'public', 'USAGE')
+  AND NOT has_schema_privilege('orgmetra_outbox_operator', 'public', 'CREATE')
+  AND has_function_privilege(
+        'orgmetra_outbox_operator',
+        'public.operator_dead_letter_expired_outbox_delivery(uuid,uuid,uuid,text,text)',
+        'EXECUTE'
+      )
+  AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_record', 'SELECT')
+  AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_record', 'INSERT')
+  AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_record', 'UPDATE')
+  AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_escalation_record', 'SELECT')
+  AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_escalation_record', 'INSERT')
+  AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_escalation_record', 'UPDATE')
+  AND has_table_privilege('orgmetra_outbox_recovery_owner', 'public.outbox_delivery_record', 'SELECT')
+  AND has_column_privilege(
+        'orgmetra_outbox_recovery_owner',
+        'public.outbox_delivery_record',
+        'delivery_state_code',
+        'UPDATE'
+      )
+  AND has_column_privilege(
+        'orgmetra_outbox_recovery_owner',
+        'public.outbox_delivery_record',
+        'lease_owner_reference',
+        'UPDATE'
+      )
+  AND has_column_privilege(
+        'orgmetra_outbox_recovery_owner',
+        'public.outbox_delivery_record',
+        'lease_expires_at',
+        'UPDATE'
+      )
+  AND has_column_privilege(
+        'orgmetra_outbox_recovery_owner',
+        'public.outbox_delivery_record',
+        'last_failure_code',
+        'UPDATE'
+      )
+  AND NOT has_column_privilege(
+        'orgmetra_outbox_recovery_owner',
+        'public.outbox_delivery_record',
+        'audit_event_record_id',
+        'UPDATE'
+      )
+  AND NOT has_column_privilege(
+        'orgmetra_outbox_recovery_owner',
+        'public.outbox_delivery_record',
+        'maximum_attempt_count',
+        'UPDATE'
+      )
+  AND has_table_privilege(
+        'orgmetra_outbox_recovery_owner',
+        'public.outbox_delivery_escalation_record',
+        'SELECT'
+      )
+  AND has_table_privilege(
+        'orgmetra_outbox_recovery_owner',
+        'public.outbox_delivery_escalation_record',
+        'INSERT'
+      )
+  AND NOT has_table_privilege(
+        'orgmetra_outbox_recovery_owner',
+        'public.outbox_delivery_escalation_record',
+        'UPDATE'
+      );
+")"
+if [[ "${recovery_acl_count}" != "1" ]]; then
+    echo "least-privilege recovery ACLs did not survive restore" >&2
+    exit 1
+fi
+
 printf '%s\n' "PostgreSQL restore rehearsal passed for exact restored database ${RESTORE_DATABASE_NAME} on a separate PostgreSQL cluster."
