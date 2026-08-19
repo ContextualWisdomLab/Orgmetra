@@ -13,6 +13,8 @@ A packet binds one tenant and proposed employment separation to exact opaque ref
 - access-deprovisioning, asset-return, knowledge-transfer, and communication plans; and
 - separate requester and accountable reviewer actors.
 
+The packet also carries a bounded positive `evidence_version` in canonical evidence so a later review contract cannot be mistaken for an earlier one.
+
 Opaque Person and Employment references remain sensitive correlating metadata. The packet deliberately excludes names, email addresses, protected-attribute values, compensation or benefit amounts, disciplinary or medical narrative, credentials, allocation values, and free-form model output.
 
 ## Human authority and owner boundaries
@@ -35,4 +37,4 @@ These categories are routing/governance metadata only. They do not prove legal s
 
 ## Evidence semantics
 
-`canonical_json()` produces deterministic, precision-preserving correlation evidence and `sha256_digest()` hashes those exact UTF-8 bytes. A digest proves only the identity/integrity of this governance envelope; it does not prove the truth of referenced evidence or completion of any HR, payroll, benefits, identity, or security action.
+`canonical_json()` produces deterministic, precision-preserving, explicitly versioned correlation evidence and `sha256_digest()` hashes those exact UTF-8 bytes. A digest proves only the identity/integrity of this governance envelope; it does not prove the truth of referenced evidence or completion of any HR, payroll, benefits, identity, or security action.
