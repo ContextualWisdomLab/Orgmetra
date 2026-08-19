@@ -88,6 +88,12 @@ def _validate_reason_code(value: str) -> None:
         raise ValueError("reason_code must be an authorized performance-review reason code")
 
 
+def _validate_evidence_version(value: int) -> None:
+    """Require a bounded positive integer version for high-impact review evidence."""
+    if type(value) is not int or value < 1 or value > 2_147_483_647:
+        raise ValueError("evidence_version must be an integer from 1 through 2147483647")
+
+
 @dataclass(frozen=True, slots=True, repr=False)
 class PerformanceReviewPacket:
     """Immutable value-free performance-review packet awaiting authoritative resolution."""
@@ -112,6 +118,7 @@ class PerformanceReviewPacket:
     review_period_start: date
     review_period_end: date
     generated_at: datetime
+    evidence_version: int = 1
     contains_person_pii: bool = False
     contains_rating_value: bool = False
     contains_free_form_model_output: bool = False
@@ -176,6 +183,7 @@ class PerformanceReviewPacket:
         if self.review_period_start > self.review_period_end:
             raise ValueError("review period start must not be after review period end")
         _canonical_timestamp(self.generated_at)
+        _validate_evidence_version(self.evidence_version)
         if self.contains_person_pii is not False:
             raise ValueError("performance review packet must not contain person PII")
         if self.contains_rating_value is not False:
@@ -209,6 +217,7 @@ class PerformanceReviewPacket:
             "development_plan_digest": self.development_plan_digest,
             "development_plan_reference": self.development_plan_reference,
             "employment_record_reference": self.employment_record_reference,
+            "evidence_version": self.evidence_version,
             "generated_at": _canonical_timestamp(self.generated_at),
             "goal_plan_digest": self.goal_plan_digest,
             "goal_plan_reference": self.goal_plan_reference,
@@ -256,6 +265,7 @@ def build_performance_review_packet(
     review_period_start: date,
     review_period_end: date,
     generated_at: datetime,
+    evidence_version: int = 1,
 ) -> PerformanceReviewPacket:
     """Build value-free performance-review evidence pending authoritative resolution."""
     return PerformanceReviewPacket(
@@ -279,4 +289,5 @@ def build_performance_review_packet(
         review_period_start=review_period_start,
         review_period_end=review_period_end,
         generated_at=generated_at,
+        evidence_version=evidence_version,
     )
