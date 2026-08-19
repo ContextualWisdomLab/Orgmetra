@@ -21,6 +21,7 @@ _REFERENCE_PATTERN = re.compile(
     r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
 )
 _PURPOSE_CODE = "offer_approval_review"
+_ALLOWED_REASON_CODES = frozenset({"selected_candidate_offer_review"})
 _DECISION_AUTHORITY = "human_approval_only"
 _REVIEW_STATE = "requires_human_approval"
 _DELIVERY_STATE = "not_authorized_to_send"
@@ -158,6 +159,8 @@ class OfferApprovalPacket:
         if self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain offer_approval_review")
         _validate_code(self.reason_code, "reason_code")
+        if self.reason_code not in _ALLOWED_REASON_CODES:
+            raise ValueError("reason_code must use a reviewed non-sensitive offer reason")
         _canonical_timestamp(self.generated_at)
         if self.contains_candidate_pii is not False:
             raise ValueError("offer approval packet must not contain candidate PII")
