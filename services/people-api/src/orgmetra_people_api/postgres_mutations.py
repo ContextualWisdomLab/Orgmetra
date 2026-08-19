@@ -44,7 +44,7 @@ from orgmetra_people_api.mutations import (
 
 PostgresConnectionFactory = Callable[[], AbstractContextManager[Any]]
 
-_READ_WRITE_SQL = "SET TRANSACTION READ WRITE"
+_READ_WRITE_SQL = "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE"
 _TENANT_CONTEXT_SQL = "SELECT pg_catalog.set_config('orgmetra.tenant_record_id', %s, true)"
 _RECORD_AUDIT_OUTBOX_SQL = "SELECT public.record_audit_outbox_event(%s, %s, %s, %s, %s, %s)"
 _MAX_UUID_INT = (1 << 128) - 1
@@ -61,6 +61,7 @@ WHERE conversion.tenant_record_id = %s
   AND conversion.person_record_id = %s
   AND conversion.recorded_to IS NULL
 LIMIT 2
+FOR UPDATE OF conversion
 """.strip()
 
 _EMPLOYMENT_VERSIONS_SQL = """
@@ -166,9 +167,13 @@ SELECT
     version.effective_to,
     version.recorded_from,
     version.recorded_to
-FROM public.position_record_version AS version
-WHERE version.tenant_record_id = %s
-  AND version.position_record_id = %s
+FROM public.position_record AS position
+JOIN public.position_record_version AS version
+  ON version.tenant_record_id = position.tenant_record_id
+ AND version.position_record_id = position.position_record_id
+WHERE position.tenant_record_id = %s
+  AND position.position_record_id = %s
+FOR UPDATE OF position
 """.strip()
 
 _EXISTING_ASSIGNMENTS_SQL = """
