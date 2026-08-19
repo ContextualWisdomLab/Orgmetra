@@ -2,5 +2,6 @@
 
 ## Unreleased
 
-- Added a governed, value-free employment-leave review packet with authoritative tenant/worker-scope resolution, exact leave-case/policy provenance, work/benefits continuity and return-to-work evidence, human-only approval, and fail-closed mutation/external-execution states.
-- Excluded medical/family values and free-form leave-reason narrative from the portable governance envelope; only non-sensitive workflow reason categories are permitted.
+- Added a governed, value-minimized employment-leave review packet with authoritative tenant/worker-scope resolution, exact leave-case/policy provenance, work/benefits continuity and return-to-work evidence, human-only approval, and fail-closed mutation/external-execution states.
+- Excluded direct identifiers, medical/family values, compensation/benefit values, and free-form leave-reason narrative from the portable governance envelope; only non-sensitive workflow reason categories are permitted.
+- Classified the opaque worker correlation plus exact requested leave dates honestly as minimum-necessary personal data (`contains_person_pii=true`) instead of misrepresenting data minimization as PII-free evidence.
