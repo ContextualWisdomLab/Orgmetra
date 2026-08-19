@@ -22,6 +22,7 @@ _NEXT_ACTION = (
     "Confirm the competencies, predetermined questions, rating anchors, and trained panel "
     "are job-related and appropriate before activating this structured interview plan."
 )
+_MAX_EVIDENCE_VERSION = 2_147_483_647
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -89,6 +90,7 @@ class StructuredInterviewPlan:
     purpose_code: str
     reason_code: str
     generated_at: datetime
+    evidence_version: int = 1
     human_confirmation_required: bool = True
     review_state: str = _REVIEW_STATE
     next_action: str = _NEXT_ACTION
@@ -134,6 +136,8 @@ class StructuredInterviewPlan:
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive interview-plan reason")
         _canonical_timestamp(self.generated_at)
+        if type(self.evidence_version) is not int or not 1 <= self.evidence_version <= _MAX_EVIDENCE_VERSION:
+            raise ValueError("evidence_version must be an integer from 1 through 2147483647")
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for interview-plan approval")
         if self.review_state != _REVIEW_STATE:
@@ -149,6 +153,7 @@ class StructuredInterviewPlan:
         """Return deterministic canonical JSON for immutable audit correlation."""
         payload = {
             "competency_references": list(self.competency_references),
+            "evidence_version": self.evidence_version,
             "generated_at": _canonical_timestamp(self.generated_at),
             "human_confirmation_required": self.human_confirmation_required,
             "interview_plan_reference": self.interview_plan_reference,
@@ -197,6 +202,7 @@ def build_structured_interview_plan(
     purpose_code: str,
     reason_code: str,
     generated_at: datetime,
+    evidence_version: int = 1,
 ) -> StructuredInterviewPlan:
     """Build a governed structured-interview plan that remains pending human approval."""
     return StructuredInterviewPlan(
@@ -218,4 +224,5 @@ def build_structured_interview_plan(
         purpose_code=purpose_code,
         reason_code=reason_code,
         generated_at=generated_at,
+        evidence_version=evidence_version,
     )
