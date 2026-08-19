@@ -2,8 +2,8 @@
 
 The contract binds candidate evidence intake to an authoritative candidate, requisition,
 Job, job requirements, evidence-set identity, handling/retention policy, and accountable
-actor. It carries no raw candidate evidence values; the opaque candidate reference remains
-sensitive correlating metadata.
+actor. It carries no raw candidate evidence values; UUID-backed opaque references remain
+sensitive correlating metadata and are redacted from the ordinary object representation.
 """
 from __future__ import annotations
 
@@ -16,7 +16,9 @@ from uuid import UUID
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
-_REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$")
+_REFERENCE_PATTERN = re.compile(
+    r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
+)
 _PURPOSE_CODE = "candidate_evidence_intake"
 _REVIEW_STATE = "requires_human_review"
 _NEXT_ACTION = (
@@ -42,14 +44,22 @@ def _validate_code(value: str, field_name: str) -> None:
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require a bounded namespaced opaque reference with the expected prefix."""
+    """Require the expected namespace plus a canonical operational UUID suffix."""
+    message = f"{field_name} must be an opaque {prefix}: reference"
     if (
         not isinstance(value, str)
         or len(value) > 160
         or not _REFERENCE_PATTERN.fullmatch(value)
         or not value.startswith(f"{prefix}:")
     ):
-        raise ValueError(f"{field_name} must be an opaque {prefix}: reference")
+        raise ValueError(message)
+    suffix = value.split(":", 1)[1]
+    try:
+        parsed = UUID(suffix)
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError(message) from exc
+    if str(parsed) != suffix or parsed.int in (0, (1 << 128) - 1):
+        raise ValueError(message)
 
 
 def _validate_digest(value: str, field_name: str) -> None:
@@ -65,7 +75,7 @@ def _canonical_timestamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class CandidateEvidenceIntakePacket:
     """Immutable reference-only candidate-evidence intake awaiting human review."""
 
@@ -93,22 +103,46 @@ class CandidateEvidenceIntakePacket:
     review_state: str = _REVIEW_STATE
     next_action: str = _NEXT_ACTION
 
+    def __repr__(self) -> str:
+        """Return a representation that never emits candidate correlation evidence."""
+        return "CandidateEvidenceIntakePacket(<redacted>)"
+
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(self.intake_reference, "candidate_evidence_intake", "intake_reference")
-        _validate_reference(self.candidate_profile_reference, "candidate_profile", "candidate_profile_reference")
+        _validate_reference(
+            self.candidate_profile_reference,
+            "candidate_profile",
+            "candidate_profile_reference",
+        )
         _validate_reference(self.requisition_reference, "requisition", "requisition_reference")
         _validate_reference(self.job_profile_reference, "job_profile", "job_profile_reference")
-        _validate_reference(self.job_requirements_reference, "job_requirements", "job_requirements_reference")
+        _validate_reference(
+            self.job_requirements_reference,
+            "job_requirements",
+            "job_requirements_reference",
+        )
         _validate_digest(self.job_requirements_digest, "job_requirements_digest")
         _validate_reference(self.evidence_set_reference, "evidence_set", "evidence_set_reference")
         _validate_digest(self.evidence_set_digest, "evidence_set_digest")
-        _validate_reference(self.source_provenance_reference, "source_provenance", "source_provenance_reference")
+        _validate_reference(
+            self.source_provenance_reference,
+            "source_provenance",
+            "source_provenance_reference",
+        )
         _validate_digest(self.source_provenance_digest, "source_provenance_digest")
-        _validate_reference(self.handling_policy_reference, "handling_policy", "handling_policy_reference")
+        _validate_reference(
+            self.handling_policy_reference,
+            "handling_policy",
+            "handling_policy_reference",
+        )
         _validate_digest(self.handling_policy_digest, "handling_policy_digest")
-        _validate_reference(self.retention_policy_reference, "retention_policy", "retention_policy_reference")
+        _validate_reference(
+            self.retention_policy_reference,
+            "retention_policy",
+            "retention_policy_reference",
+        )
         _validate_digest(self.retention_policy_digest, "retention_policy_digest")
         _validate_reference(self.actor_reference, "actor", "actor_reference")
         if type(self.evidence_item_count) is not int or not 1 <= self.evidence_item_count <= 100:
