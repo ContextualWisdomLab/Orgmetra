@@ -24,9 +24,11 @@ _ANALYSIS_SCOPE = "total_selection_process_by_job"
 _REVIEW_STATE = "requires_human_review"
 _DECISION_AUTHORITY = "human_review_only"
 _NEXT_ACTION = (
-    "Verify Job scope, aggregate population completeness, protected-attribute handling, "
-    "small-sample policy, and statistical-plan provenance; then submit the aggregate "
-    "evidence to an authorized analyst and accountable human reviewer before any "
+    "Within tenant_record_id, re-resolve actor_reference and reviewer_reference through the "
+    "authoritative actor boundary and verify their resolved actor identities are distinct; "
+    "then verify Job scope, aggregate population completeness, protected-attribute handling, "
+    "small-sample policy, and statistical-plan provenance before submitting the aggregate "
+    "evidence to an authorized analyst and accountable human reviewer for any "
     "employment-process change or legal conclusion."
 )
 
