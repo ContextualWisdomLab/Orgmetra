@@ -22,7 +22,7 @@ Add a transport-neutral `AssignmentChangeReviewPacket` that:
 5. requires requester/reviewer separation and exact human-review-only state;
 6. records `scope_verification_state=requires_authoritative_resolution` because reference correlation alone cannot prove bitemporal relationship validity;
 7. records `mutation_state=not_authorized_to_apply`; creation or hashing of the packet is never approval or mutation evidence; and
-8. directs the host to re-resolve authoritative current/proposed scope, exact policy, capacity, worker-impact, communication, and effective-date requirements before recording accountable approval and invoking the authoritative People mutation boundary.
+8. directs the host, immediately before approval, to re-resolve **every packet reference within `tenant_record_id`**, verify the Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position worker scope, and then verify proposed Job/Position binding/capacity, exact policy, worker-impact, communication, and effective-date requirements before invoking the authoritative People mutation boundary.
 
 The package performs no database write, no direct cross-service application-table SQL, and no provider execution. Purpose-bound authorization, transactional idempotency, immutable audit/outbox, and bitemporal persistence remain separate authoritative controls.
 
@@ -30,7 +30,7 @@ The package performs no database write, no direct cross-service application-tabl
 
 Buyers gain a deterministic, PII-minimized review handoff that can be audited without treating the packet as an employment action. Internal mobility and allocation workflows can use one contract while preserving Job/Position/Assignment separation and keeping the eventual mutation under protected HRIS ownership.
 
-The trade-off is deliberate: consumers must resolve the exact relationships and applicable policy at decision time. A valid packet cannot prove Position capacity, effective-date legality, worker consultation, collective-agreement compliance, or successful persistence on its own.
+The trade-off is deliberate: consumers must resolve every bound reference in the exact tenant context and verify the Person/Employment/current-Assignment worker binding plus proposed scope and applicable policy at decision time. A valid packet cannot prove Position capacity, effective-date legality, worker consultation, collective-agreement compliance, or successful persistence on its own.
 
 ## References
 
