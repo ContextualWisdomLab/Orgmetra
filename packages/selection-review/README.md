@@ -12,7 +12,7 @@ The packet is **not** an employment decision. It does not contain a candidate na
 
 Every packet is fixed to `review_state="requires_human_decision"` and `human_confirmation_required=True`. A caller cannot construct a packet that silently changes those values. The next action always tells the reviewer to examine the evidence, confirm job relatedness and business necessity, and then record the accountable human selection decision through Orgmetra's authoritative decision boundary.
 
-If model-backed material is referenced, both a UUID-backed `model_draft:` reference and a UUID-backed `model_provenance:` reference are required and the packet marks the material `untrusted_draft`. Model output never becomes authoritative merely by appearing in the packet.
+If model-backed material is referenced, the packet requires all four model-evidence bindings together: a UUID-backed `model_draft:` reference and its exact lowercase SHA-256 digest, plus a UUID-backed `model_provenance:` reference and its exact lowercase SHA-256 digest. The packet marks that material `untrusted_draft`. Changing either model digest changes the packet digest, so a stable opaque reference cannot silently substitute different model content or provenance. Model output never becomes authoritative merely by appearing in the packet.
 
 ## Example
 
@@ -32,6 +32,10 @@ packet = build_selection_review_packet(
     reason_code="candidate_assessment",
     evidence_version_code="evidence_version_1",
     generated_at=datetime.now(timezone.utc),
+    model_draft_reference="model_draft:55555555-5555-4555-8555-555555555555",
+    model_draft_digest="1" * 64,
+    model_provenance_reference="model_provenance:66666666-6666-4666-8666-666666666666",
+    model_provenance_digest="2" * 64,
 )
 
 canonical_bytes = packet.canonical_json().encode("utf-8")
