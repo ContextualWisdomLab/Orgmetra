@@ -107,11 +107,17 @@ async def _send_error(
     status: int,
     payload: Mapping[str, object],
     extra_headers: tuple[tuple[bytes, bytes], ...] = (),
+    support_reference: str | None = None,
 ) -> None:
-    """Normalize one internal error description to the published client-safe schema."""
+    """Normalize one internal error description to the published client-safe schema.
+
+    A caller may supply an already-generated support reference so the restricted
+    root-cause log and the buyer-visible error envelope share one lookup identity.
+    """
     error_code = cast(str, payload["error"])
     message = cast(str, payload["message"])
-    support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+    if support_reference is None:
+        support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
     _LOGGER.info(
         "People mutation request rejected",
         extra={
@@ -323,6 +329,7 @@ class PeopleMutationAsgiApp:
             )
             return
         except Exception as error:  # noqa: BLE001 - HTTP boundary must fail closed without leaking backend details.
+            support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
             _LOGGER.error(
                 "People mutation persistence failed",
                 extra={
@@ -330,6 +337,7 @@ class PeopleMutationAsgiApp:
                     "tenant_record_id": str(headers.tenant_record_id),
                     "correlation_reference": f"audit_event_record:{command.audit_event_record_id.hex}",
                     "exception_type": type(error).__name__,
+                    "support_reference": support_reference,
                 },
             )
             await _send_error(
@@ -339,6 +347,7 @@ class PeopleMutationAsgiApp:
                     "error": "internal_error",
                     "message": "Retry later or contact an Orgmetra operator with non-sensitive request metadata; never include the bearer token.",
                 },
+                support_reference=support_reference,
             )
             return
 
