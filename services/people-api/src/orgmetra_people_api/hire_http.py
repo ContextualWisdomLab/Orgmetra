@@ -89,6 +89,15 @@ async def _send_json(
     """
     error_code = cast(str, payload["error"])
     message = cast(str, payload["message"])
+    support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+    _LOGGER.info(
+        "Confirmed-hire request rejected",
+        extra={
+            "error_code": error_code,
+            "http_status": status,
+            "support_reference": support_reference,
+        },
+    )
     await _emit_json(
         send,
         status=status,
@@ -97,7 +106,7 @@ async def _send_json(
             "error_code": error_code,
             "message": message,
             "next_action": message,
-            "support_reference": f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}",
+            "support_reference": support_reference,
         },
         extra_headers=extra_headers,
     )
