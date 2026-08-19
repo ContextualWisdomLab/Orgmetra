@@ -10,19 +10,26 @@ from orgmetra_requisition_review import build_requisition_review_packet
 TENANT = "2b37b937-c3f1-49aa-8d19-785a7b7a9917"
 DIGEST = "0" * 64
 NOW = datetime.fromisoformat("2026-08-18T10:30:00+00:00")
+REQUISITION = "requisition:11111111-1111-4111-8111-111111111111"
+JOB = "job_profile:22222222-2222-4222-8222-222222222222"
+JOB_REQUIREMENTS = "job_requirements:33333333-3333-4333-8333-333333333333"
+HEADCOUNT = "headcount_authorization:44444444-4444-4444-8444-444444444444"
+HIRING_MANAGER = "actor:55555555-5555-4555-8555-555555555555"
+APPROVER = "actor:66666666-6666-4666-8666-666666666666"
+POSITION = "position_record:77777777-7777-4777-8777-777777777777"
 
 
 def packet(**overrides):
     values = dict(
         tenant_record_id=TENANT,
-        requisition_reference="requisition:req-01",
-        job_profile_reference="job_profile:job-01",
-        job_requirements_reference="job_requirements:reqs-01",
+        requisition_reference=REQUISITION,
+        job_profile_reference=JOB,
+        job_requirements_reference=JOB_REQUIREMENTS,
         job_requirements_digest=DIGEST,
         requirements_version_code="requirements_version_1",
-        headcount_authorization_reference="headcount_authorization:hc-01",
-        hiring_manager_actor_reference="actor:manager-01",
-        approver_actor_reference="actor:approver-01",
+        headcount_authorization_reference=HEADCOUNT,
+        hiring_manager_actor_reference=HIRING_MANAGER,
+        approver_actor_reference=APPROVER,
         requested_opening_count=3,
         purpose_code="requisition_review",
         reason_code="approved_growth_plan",
@@ -45,11 +52,8 @@ def test_packet_is_deterministic_and_contains_no_candidate_or_employee_values():
 
 
 def test_exact_position_seat_supports_one_opening():
-    value = packet(
-        requested_opening_count=1,
-        position_record_reference="position_record:seat-01",
-    )
-    assert value.position_record_reference == "position_record:seat-01"
+    value = packet(requested_opening_count=1, position_record_reference=POSITION)
+    assert value.position_record_reference == POSITION
 
 
 @pytest.mark.parametrize(
@@ -78,9 +82,12 @@ def test_tenant_must_be_canonical_operational_uuid(tenant):
         ("hiring_manager_actor_reference", "user:manager"),
         ("approver_actor_reference", "reviewer:approver"),
         ("requisition_reference", "requisition:" + "a" * 150),
+        ("requisition_reference", "requisition:00000000-0000-0000-0000-000000000000"),
+        ("job_profile_reference", "job_profile:FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"),
+        ("approver_actor_reference", 123),
     ],
 )
-def test_references_are_bounded_and_namespaced(field, value):
+def test_references_are_bounded_namespaced_canonical_operational_uuids(field, value):
     with pytest.raises(ValueError):
         packet(**{field: value})
 
@@ -97,8 +104,8 @@ def test_opening_count_is_bounded_exact_integer(opening_count):
 
 
 def test_exact_position_cannot_claim_multiple_openings():
-    with pytest.raises(ValueError):
-        packet(position_record_reference="position_record:seat-01", requested_opening_count=2)
+    with pytest.raises(ValueError, match="exactly one opening"):
+        packet(position_record_reference=POSITION, requested_opening_count=2)
 
 
 @pytest.mark.parametrize(
@@ -109,10 +116,11 @@ def test_exact_position_cannot_claim_multiple_openings():
         ("reason_code", "growth"),
         ("reason_code", "approved growth plan"),
         ("requirements_version_code", "v1"),
+        ("requirements_version_code", 1),
         ("reason_code", "approved_" + "a" * 64),
     ],
 )
-def test_governance_codes_require_bounded_descriptive_snake_case(field, value):
+def test_governance_codes_require_bounded_governed_forms(field, value):
     with pytest.raises(ValueError):
         packet(**{field: value})
 
@@ -166,7 +174,7 @@ def test_fractional_seconds_are_preserved_in_canonical_evidence():
 
 def test_hiring_manager_and_approver_require_authoritative_separation():
     with pytest.raises(ValueError, match="hiring manager and approver"):
-        packet(approver_actor_reference="actor:manager-01")
+        packet(approver_actor_reference=HIRING_MANAGER)
 
     normalized_next_action = packet().next_action.lower()
     assert "hiring_manager_actor_reference and approver_actor_reference" in normalized_next_action
