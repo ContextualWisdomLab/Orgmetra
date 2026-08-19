@@ -172,3 +172,69 @@ def test_direct_replace_is_revalidated():
     plan = StructuredInterviewPlan(**values())
     with pytest.raises(ValueError, match="question_set_digest"):
         replace(plan, question_set_digest="not-a-digest")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("interview_plan_reference", "interview_plan:Jane-Doe"),
+        ("requisition_reference", "requisition:customer-42"),
+        ("job_profile_reference", "job_profile:RN-ICU"),
+        ("job_analysis_reference", "job_analysis:salary-120000"),
+        ("question_set_reference", "question_set:executive-candidates"),
+        ("question_competency_map_reference", "question_competency_map:race-gender"),
+        ("rating_anchor_reference", "rating_anchor:top-secret"),
+    ],
+)
+def test_scalar_trust_references_reject_value_bearing_non_uuid_suffixes(field, value):
+    """Reject semantic or value-bearing scalar trust references before serialization."""
+    data = values()
+    data[field] = value
+    with pytest.raises(ValueError):
+        StructuredInterviewPlan(**data)
+
+
+def test_collection_trust_references_reject_value_bearing_non_uuid_suffixes():
+    """Apply opaque-reference requirements to competency and panel collections."""
+    for field, refs in (
+        ("competency_references", ("competency:analysis", "competency:Jane-Doe")),
+        ("panel_actor_references", ("actor:interviewer-a", "actor:seonghobae")),
+    ):
+        data = values()
+        data[field] = refs
+        with pytest.raises(ValueError):
+            StructuredInterviewPlan(**data)
+
+
+@pytest.mark.parametrize("reason", ["jane_doe", "salary_120000", "race_gender_review"])
+def test_reason_code_rejects_personal_or_value_bearing_free_form_codes(reason):
+    """Keep interview-plan reason metadata on a reviewed value-free vocabulary."""
+    data = values()
+    data["reason_code"] = reason
+    with pytest.raises(ValueError):
+        StructuredInterviewPlan(**data)
+
+
+def test_repr_redacts_interview_plan_correlations():
+    """Prevent routine logging from exposing governance references or evidence digests."""
+    plan = StructuredInterviewPlan(**values())
+    rendered = repr(plan)
+    assert rendered == "StructuredInterviewPlan(<redacted>)"
+    for sensitive in (
+        plan.interview_plan_reference,
+        plan.job_profile_reference,
+        plan.panel_actor_references[0],
+        plan.job_analysis_digest,
+    ):
+        assert sensitive not in rendered
+
+
+def test_replace_cannot_reintroduce_value_bearing_metadata():
+    """Preserve the privacy boundary under dataclass replacement."""
+    plan = StructuredInterviewPlan(**values())
+    for field, value in (
+        ("job_profile_reference", "job_profile:RN-ICU"),
+        ("reason_code", "salary_120000"),
+    ):
+        with pytest.raises(ValueError):
+            replace(plan, **{field: value})
