@@ -100,6 +100,12 @@ def _validate_business_date(value: date, field_name: str) -> None:
         raise ValueError(f"{field_name} must be a date")
 
 
+def _validate_evidence_version(value: int) -> None:
+    """Require a bounded positive integer version for high-impact review evidence."""
+    if type(value) is not int or value < 1 or value > 2_147_483_647:
+        raise ValueError("evidence_version must be an integer from 1 through 2147483647")
+
+
 @dataclass(frozen=True, slots=True)
 class AssignmentChangeReviewPacket:
     """Immutable assignment-change evidence that cannot itself authorize a mutation."""
@@ -129,6 +135,7 @@ class AssignmentChangeReviewPacket:
     reason_code: str
     requested_effective_on: date
     generated_at: datetime
+    evidence_version: int = 1
     contains_person_pii: bool = False
     contains_compensation_values: bool = False
     contains_free_form_model_output: bool = False
@@ -222,6 +229,7 @@ class AssignmentChangeReviewPacket:
             raise ValueError("reason_code must be an approved assignment-change reason")
         _validate_business_date(self.requested_effective_on, "requested_effective_on")
         _canonical_timestamp(self.generated_at)
+        _validate_evidence_version(self.evidence_version)
         if self.contains_person_pii is not False:
             raise ValueError("assignment change review packet must not contain person PII")
         if self.contains_compensation_values is not False:
@@ -263,6 +271,7 @@ class AssignmentChangeReviewPacket:
             "current_scope_snapshot_reference": self.current_scope_snapshot_reference,
             "decision_authority": self.decision_authority,
             "employment_record_reference": self.employment_record_reference,
+            "evidence_version": self.evidence_version,
             "generated_at": _canonical_timestamp(self.generated_at),
             "human_confirmation_required": self.human_confirmation_required,
             "mutation_state": self.mutation_state,
@@ -315,6 +324,7 @@ def build_assignment_change_review_packet(
     reason_code: str,
     requested_effective_on: date,
     generated_at: datetime,
+    evidence_version: int = 1,
 ) -> AssignmentChangeReviewPacket:
     """Build a value-free assignment-change packet pending authoritative approval."""
     return AssignmentChangeReviewPacket(
@@ -343,4 +353,5 @@ def build_assignment_change_review_packet(
         reason_code=reason_code,
         requested_effective_on=requested_effective_on,
         generated_at=generated_at,
+        evidence_version=evidence_version,
     )
