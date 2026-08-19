@@ -1,4 +1,4 @@
-"""Actor-separation regressions for selection-monitoring review evidence."""
+"""Actor-separation and tenant-scope regressions for selection-monitoring evidence."""
 
 from __future__ import annotations
 
@@ -46,3 +46,17 @@ def test_requester_and_reviewer_require_authoritative_actor_separation() -> None
     normalized_next_action = _build().next_action.lower()
     assert "actor_reference and reviewer_reference" in normalized_next_action
     assert "resolved actor identities are distinct" in normalized_next_action
+
+
+def test_review_requires_every_reference_to_resolve_in_the_exact_tenant() -> None:
+    """Prevent cross-tenant evidence mixing behind otherwise valid opaque references."""
+    action = _build().next_action
+    tenant_clause = "re-resolve every packet reference within tenant_record_id"
+    actor_clause = "verify their resolved actor identities are distinct"
+    job_clause = "verify Job scope"
+    review_clause = "accountable human reviewer"
+
+    assert tenant_clause in action
+    assert action.index(tenant_clause) < action.index(actor_clause)
+    assert action.index(actor_clause) < action.index(job_clause)
+    assert action.index(job_clause) < action.index(review_clause)
