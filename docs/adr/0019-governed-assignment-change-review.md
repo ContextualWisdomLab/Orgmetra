@@ -15,20 +15,21 @@ ISO 30434:2023 describes workforce allocation as a managed process involving all
 
 Add a transport-neutral `AssignmentChangeReviewPacket` that:
 
-1. correlates one tenant, Person, Employment, current Assignment/Job/Position, proposed Job/Position, current-scope snapshot, workforce-allocation plan, exact allocation-policy version, worker-impact assessment, communication plan, requester, reviewer, controlled reason category, requested effective date, and evidence-generation instant;
+1. correlates one tenant, Person, Employment, current Assignment/Job/Position, proposed Job/Position, current-scope snapshot, workforce-allocation plan, exact allocation-policy version, worker-impact assessment, communication plan, requester, reviewer, controlled reason category, requested effective date, evidence version, and evidence-generation instant;
 2. represents trust-bearing HR and evidence identities only as expected-namespace canonical non-sentinel UUID references, with lowercase SHA-256 digests for evidence artifacts;
 3. keeps Person PII, compensation values, numeric allocation values, free-form model output, and free-form personal reasons outside the envelope;
 4. limits `reason_code` to reviewed operational categories (`internal_reassignment`, `workforce_reallocation`, `temporary_detail`, `position_reclassification`, `organizational_realignment`) so the governance envelope cannot become an accidental sensitive narrative channel;
-5. requires requester/reviewer separation and exact human-review-only state;
-6. records `scope_verification_state=requires_authoritative_resolution` because reference correlation alone cannot prove bitemporal relationship validity;
-7. records `mutation_state=not_authorized_to_apply`; creation or hashing of the packet is never approval or mutation evidence; and
-8. directs the host, immediately before approval, to re-resolve **every packet reference within `tenant_record_id`**, verify the Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position worker scope, and then verify proposed Job/Position binding/capacity, exact policy, worker-impact, communication, and effective-date requirements before invoking the authoritative People mutation boundary.
+5. includes a bounded positive `evidence_version` in canonical JSON/SHA-256 so actor/purpose/reason evidence from different review-contract revisions cannot silently collide;
+6. requires requester/reviewer separation and exact human-review-only state;
+7. records `scope_verification_state=requires_authoritative_resolution` because reference correlation alone cannot prove bitemporal relationship validity;
+8. records `mutation_state=not_authorized_to_apply`; creation or hashing of the packet is never approval or mutation evidence; and
+9. directs the host, immediately before approval, to re-resolve **every packet reference within `tenant_record_id`**, verify the Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position worker scope, and then verify proposed Job/Position binding/capacity, exact policy, worker-impact, communication, and effective-date requirements before invoking the authoritative People mutation boundary.
 
 The package performs no database write, no direct cross-service application-table SQL, and no provider execution. Purpose-bound authorization, transactional idempotency, immutable audit/outbox, and bitemporal persistence remain separate authoritative controls.
 
 ## Consequences
 
-Buyers gain a deterministic, PII-minimized review handoff that can be audited without treating the packet as an employment action. Internal mobility and allocation workflows can use one contract while preserving Job/Position/Assignment separation and keeping the eventual mutation under protected HRIS ownership.
+Buyers gain a deterministic, explicitly versioned, PII-minimized review handoff that can be audited without treating the packet as an employment action. Internal mobility and allocation workflows can use one contract while preserving Job/Position/Assignment separation and keeping the eventual mutation under protected HRIS ownership.
 
 The trade-off is deliberate: consumers must resolve every bound reference in the exact tenant context and verify the Person/Employment/current-Assignment worker binding plus proposed scope and applicable policy at decision time. A valid packet cannot prove Position capacity, effective-date legality, worker consultation, collective-agreement compliance, or successful persistence on its own.
 
