@@ -74,9 +74,6 @@ def test_valid_packet_is_value_minimized_human_review_only_and_deterministic() -
     payload = json.loads(p.canonical_json())
     assert p.sha256_digest() == sha256(p.canonical_json().encode("utf-8")).hexdigest()
     assert payload["generated_at"] == "2026-08-19T02:24:51.123456Z"
-    # The opaque worker correlation plus exact leave dates remain personal data; claiming
-    # PII-free evidence would be misleading even though direct identifiers and case values
-    # are excluded.
     assert payload["contains_person_pii"] is True
     assert payload["contains_medical_or_family_values"] is False
     assert payload["decision_authority"] == "human_review_only"
@@ -221,6 +218,20 @@ def test_handling_or_retention_policy_change_changes_audit_digest() -> None:
     r = replace(p, retention_policy_digest="c" * 64)
     assert p.sha256_digest() != q.sha256_digest()
     assert p.sha256_digest() != r.sha256_digest()
+
+
+def test_repr_redacts_personal_data_and_governance_evidence() -> None:
+    p = packet()
+    rendered = repr(p)
+
+    assert rendered == "EmploymentLeaveReviewPacket(<redacted>)"
+    assert p.tenant_record_id not in rendered
+    assert p.person_record_reference not in rendered
+    assert p.employment_record_reference not in rendered
+    assert p.leave_case_reference not in rendered
+    assert p.requester_reference not in rendered
+    assert p.handling_policy_digest not in rendered
+    assert p.requested_leave_start_on.isoformat() not in rendered
 
 
 @pytest.mark.parametrize(
