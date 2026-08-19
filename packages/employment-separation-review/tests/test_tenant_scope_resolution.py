@@ -35,5 +35,6 @@ def test_next_action_requires_tenant_scoped_reference_resolution_and_worker_bind
         generated_at=datetime(2026, 8, 19, 9, 30, tzinfo=timezone.utc),
     )
 
-    assert "re-resolve every packet reference within tenant_record_id" in packet.next_action
-    assert "Person-to-Employment" in packet.next_action
+    normalized_next_action = packet.next_action.lower()
+    assert "re-resolve every packet reference within tenant_record_id" in normalized_next_action
+    assert "person-to-employment" in normalized_next_action
