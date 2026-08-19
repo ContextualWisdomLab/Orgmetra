@@ -54,6 +54,46 @@ NAME_ID="00000000-0000-7000-8000-000000000102"
 AUDIT_ID="00000000-0000-7000-8000-000000000103"
 OUTBOX_ID="00000000-0000-7000-8000-000000000104"
 
+cluster_system_identifier_from_url() {
+    local administrator_url="$1"
+    psql "${administrator_url}" -v ON_ERROR_STOP=1 -Atqc \
+        "SELECT (pg_control_system()).system_identifier;"
+}
+
+cluster_system_identifier_from_container() {
+    local container_name="$1"
+    docker exec "${container_name}" \
+        psql -U orgmetra -d postgres -v ON_ERROR_STOP=1 -Atqc \
+        "SELECT (pg_control_system()).system_identifier;"
+}
+
+verify_rehearsal_cluster_identity() {
+    local source_url_identifier
+    local source_container_identifier
+    local restore_url_identifier
+    local restore_container_identifier
+
+    source_url_identifier="$(cluster_system_identifier_from_url "${POSTGRES_SOURCE_ADMIN_URL}")"
+    source_container_identifier="$(cluster_system_identifier_from_container "${POSTGRES_SOURCE_CONTAINER}")"
+    restore_url_identifier="$(cluster_system_identifier_from_url "${POSTGRES_RESTORE_ADMIN_URL}")"
+    restore_container_identifier="$(cluster_system_identifier_from_container "${POSTGRES_RESTORE_CONTAINER}")"
+
+    if [[ -z "${source_url_identifier}" \
+       || "${source_url_identifier}" != "${source_container_identifier}" ]]; then
+        echo "source administrator URL does not target POSTGRES_SOURCE_CONTAINER" >&2
+        return 1
+    fi
+    if [[ -z "${restore_url_identifier}" \
+       || "${restore_url_identifier}" != "${restore_container_identifier}" ]]; then
+        echo "restore administrator URL does not target POSTGRES_RESTORE_CONTAINER" >&2
+        return 1
+    fi
+    if [[ "${source_url_identifier}" == "${restore_url_identifier}" ]]; then
+        echo "source and restore PostgreSQL clusters must differ" >&2
+        return 1
+    fi
+}
+
 drop_recovery_roles() {
     local admin_url="$1"
     require_disposable_role_cleanup
@@ -72,6 +112,10 @@ cleanup() {
         "DROP DATABASE IF EXISTS ${SOURCE_DATABASE_NAME} WITH (FORCE);" >/dev/null || true
     drop_recovery_roles "${POSTGRES_SOURCE_ADMIN_URL}" || true
 }
+
+# Verify the administrator URLs are bound to the intended disposable service
+# containers before installing a cleanup trap or executing any destructive DDL.
+verify_rehearsal_cluster_identity
 trap cleanup EXIT
 
 psql "${POSTGRES_SOURCE_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
@@ -288,10 +332,14 @@ WHERE owner_role.rolname = 'orgmetra_outbox_recovery_owner'
   AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_record', 'SELECT')
   AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_record', 'INSERT')
   AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_record', 'UPDATE')
+  AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_record', 'DELETE')
   AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_escalation_record', 'SELECT')
   AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_escalation_record', 'INSERT')
   AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_escalation_record', 'UPDATE')
+  AND NOT has_table_privilege('orgmetra_outbox_operator', 'public.outbox_delivery_escalation_record', 'DELETE')
   AND has_table_privilege('orgmetra_outbox_recovery_owner', 'public.outbox_delivery_record', 'SELECT')
+  AND NOT has_table_privilege('orgmetra_outbox_recovery_owner', 'public.outbox_delivery_record', 'UPDATE')
+  AND NOT has_table_privilege('orgmetra_outbox_recovery_owner', 'public.outbox_delivery_record', 'DELETE')
   AND has_column_privilege(
         'orgmetra_outbox_recovery_owner',
         'public.outbox_delivery_record',
@@ -316,18 +364,25 @@ WHERE owner_role.rolname = 'orgmetra_outbox_recovery_owner'
         'last_failure_code',
         'UPDATE'
       )
-  AND NOT has_column_privilege(
-        'orgmetra_outbox_recovery_owner',
-        'public.outbox_delivery_record',
-        'audit_event_record_id',
-        'UPDATE'
-      )
-  AND NOT has_column_privilege(
-        'orgmetra_outbox_recovery_owner',
-        'public.outbox_delivery_record',
-        'maximum_attempt_count',
-        'UPDATE'
-      )
+  AND NOT EXISTS (
+      SELECT 1
+      FROM pg_attribute AS attribute
+      WHERE attribute.attrelid = 'public.outbox_delivery_record'::regclass
+        AND attribute.attnum > 0
+        AND NOT attribute.attisdropped
+        AND attribute.attname NOT IN (
+            'delivery_state_code',
+            'lease_owner_reference',
+            'lease_expires_at',
+            'last_failure_code'
+        )
+        AND has_column_privilege(
+            'orgmetra_outbox_recovery_owner',
+            'public.outbox_delivery_record',
+            attribute.attname,
+            'UPDATE'
+        )
+  )
   AND has_table_privilege(
         'orgmetra_outbox_recovery_owner',
         'public.outbox_delivery_escalation_record',
@@ -342,6 +397,11 @@ WHERE owner_role.rolname = 'orgmetra_outbox_recovery_owner'
         'orgmetra_outbox_recovery_owner',
         'public.outbox_delivery_escalation_record',
         'UPDATE'
+      )
+  AND NOT has_table_privilege(
+        'orgmetra_outbox_recovery_owner',
+        'public.outbox_delivery_escalation_record',
+        'DELETE'
       );
 ")"
 if [[ "${recovery_acl_count}" != "1" ]]; then
