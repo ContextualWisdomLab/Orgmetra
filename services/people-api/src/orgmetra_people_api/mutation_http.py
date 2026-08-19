@@ -7,6 +7,7 @@ from datetime import date
 from hashlib import sha256
 import json
 import logging
+import re
 from secrets import token_urlsafe
 from typing import Callable, Mapping, cast
 from uuid import UUID, uuid4
@@ -43,6 +44,7 @@ from orgmetra_people_api.mutations import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_RFC3339_FULL_DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", flags=re.ASCII)
 _MAX_UUID_INT = (1 << 128) - 1
 _EMPLOYMENT_BODY_KEYS = frozenset(
     {
@@ -455,6 +457,14 @@ def _require_string_field(payload: Mapping[str, object], field_name: str) -> str
     return value
 
 
+def _parse_effective_date(payload: Mapping[str, object]) -> date:
+    """Require the RFC 3339 full-date form published by the OpenAPI date contract."""
+    value = _require_string_field(payload, "effective_from")
+    if _RFC3339_FULL_DATE.fullmatch(value) is None:
+        raise _InvalidHttpRequest("effective_from must be an RFC 3339 full-date")
+    return date.fromisoformat(value)
+
+
 def _require_confirmation_reference(payload: Mapping[str, object]) -> str:
     """Require the published bounded human-confirmation reference before domain parsing."""
     value = _require_string_field(payload, "confirmation_reference")
@@ -474,7 +484,7 @@ def _command_for_route(
     _require_reason(payload)
     evidence_version_code = _evidence_version(payload)
     confirmation_reference = _require_confirmation_reference(payload)
-    effective_from = _require_string_field(payload, "effective_from")
+    effective_from = _parse_effective_date(payload)
     if route == "employment-records":
         if frozenset(payload) != _EMPLOYMENT_BODY_KEYS:
             raise _InvalidHttpRequest("employment command fields are incomplete or unsupported")
@@ -487,7 +497,7 @@ def _command_for_route(
             outbox_delivery_record_id=id_factory(),
             employment_status_code=_require_string_field(payload, "employment_status_code"),
             employment_concurrency_code=_require_string_field(payload, "employment_concurrency_code"),
-            effective_from=date.fromisoformat(effective_from),
+            effective_from=effective_from,
             confirmation_reference=confirmation_reference,
             evidence_version_code=evidence_version_code,
             idempotency_key=idempotency_key,
@@ -504,7 +514,7 @@ def _command_for_route(
             audit_event_record_id=id_factory(),
             outbox_delivery_record_id=id_factory(),
             position_status_code=_require_string_field(payload, "position_status_code"),
-            effective_from=date.fromisoformat(effective_from),
+            effective_from=effective_from,
             confirmation_reference=confirmation_reference,
             evidence_version_code=evidence_version_code,
             idempotency_key=idempotency_key,
@@ -520,7 +530,7 @@ def _command_for_route(
         audit_event_record_id=id_factory(),
         outbox_delivery_record_id=id_factory(),
         allocation_ratio=parse_allocation_ratio(payload["allocation_ratio"]),
-        effective_from=date.fromisoformat(effective_from),
+        effective_from=effective_from,
         confirmation_reference=confirmation_reference,
         evidence_version_code=evidence_version_code,
         idempotency_key=idempotency_key,
