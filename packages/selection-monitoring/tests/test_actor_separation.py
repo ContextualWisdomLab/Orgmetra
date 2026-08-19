@@ -51,7 +51,7 @@ def test_requester_and_reviewer_require_authoritative_actor_separation() -> None
 def test_review_requires_every_reference_to_resolve_in_the_exact_tenant() -> None:
     """Prevent cross-tenant evidence mixing behind otherwise valid opaque references."""
     action = _build().next_action
-    tenant_clause = "re-resolve every packet reference within tenant_record_id"
+    tenant_clause = "Within tenant_record_id, re-resolve every packet reference"
     actor_clause = "verify their resolved actor identities are distinct"
     job_clause = "verify Job scope"
     review_clause = "accountable human reviewer"
