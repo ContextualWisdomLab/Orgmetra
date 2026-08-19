@@ -47,6 +47,7 @@ REQUIRED = [
     "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
     "docs/adr/0006-governed-audit-outbox-envelope.md",
     "docs/adr/0008-purpose-bound-pii-authorization.md",
+    "docs/adr/0009-performance-criterion-observation-scope.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -60,6 +61,7 @@ REQUIRED = [
     "database/migrations/0008_audit_outbox_review_hardening.sql",
     "database/migrations/0009_candidate_worker_conversion_governance.sql",
     "database/migrations/0010_validity_study_case_integrity.sql",
+    "database/migrations/0011_criterion_observation_scope.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -78,6 +80,7 @@ REQUIRED = [
     "tests/test_audit_outbox_hardening_postgres.sh",
     "tests/test_candidate_worker_conversion_postgres.sh",
     "tests/test_validity_study_case_postgres.sh",
+    "tests/test_criterion_observation_scope_postgres.sh",
     "tests/validate_repository.py",
 ]
 
