@@ -12,7 +12,7 @@ Every packet requires a `job_profile:` reference. A `position_record:` reference
 
 Every packet is fixed to `review_state="requires_human_approval"` and `human_confirmation_required=True`. Direct construction cannot change those values or replace the governed next action. The packet therefore cannot claim that a requisition has already been approved.
 
-The next action asks the reviewer to confirm two things before recording approval through the authoritative Talent Acquisition boundary: the opening is tied to approved Job requirements, and headcount is authorized.
+The packet rejects identical hiring-manager and approver references as an early syntactic separation guard. That guard is not authoritative separation-of-duties evidence: before approval, the host must re-resolve both `hiring_manager_actor_reference` and `approver_actor_reference` within the exact `tenant_record_id` through the authoritative actor boundary and prove the resolved actor identities are distinct. It must then confirm that the opening is tied to approved Job requirements and authorized headcount before recording accountable human requisition approval.
 
 ## Example
 
@@ -41,4 +41,4 @@ canonical_bytes = packet.canonical_json().encode("utf-8")
 digest = packet.sha256_digest()
 ```
 
-This package owns only the review-evidence contract. Requisition persistence, identity authorization, job-analysis persistence, candidate selection, employment creation, and immutable audit/outbox recording remain in their authoritative Orgmetra or published dependency boundaries.
+This package owns only the review-evidence contract. Requisition persistence, authoritative actor resolution, identity authorization, job-analysis persistence, candidate selection, employment creation, and immutable audit/outbox recording remain in their authoritative Orgmetra or published dependency boundaries.
