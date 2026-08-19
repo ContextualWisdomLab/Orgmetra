@@ -1,6 +1,6 @@
 # ADR 0008: Purpose-bound PII authorization
 
-- Status: Accepted on active implementation branch
+- Status: Accepted on protected `develop`
 - Date: 2026-08-17
 - Owners: Orgmetra Security / People API
 

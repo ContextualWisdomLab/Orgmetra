@@ -23,6 +23,30 @@ if ! grep -Fq -- "${expected_pythonpath}" "${workflow_path}"; then
   exit 1
 fi
 
+mapfile -t pull_request_branches < <(
+  awk '
+    /^  pull_request:/ { in_pull_request=1; next }
+    in_pull_request && /^  [[:alnum:]_-]+:/ { exit }
+    in_pull_request && /^      - / {
+      sub(/^      - /, "")
+      print
+    }
+  ' "${workflow_path}"
+)
+
+if [[ "${#pull_request_branches[@]}" -eq 0 ]]; then
+  printf 'Foundation CI must declare pull_request target branches.\n' >&2
+  exit 1
+fi
+
+duplicate_pull_request_branches="$(
+  printf '%s\n' "${pull_request_branches[@]}" | sort | uniq -d
+)"
+if [[ -n "${duplicate_pull_request_branches}" ]]; then
+  printf 'Foundation CI pull_request branches must be unique: %s\n' "${duplicate_pull_request_branches}" >&2
+  exit 1
+fi
+
 if [[ ! -f "${requirements_path}" ]]; then
   printf 'Hash-locked Foundation CI requirements are missing.\n' >&2
   exit 1
