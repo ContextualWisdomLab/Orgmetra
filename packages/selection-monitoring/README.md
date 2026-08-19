@@ -6,7 +6,7 @@
 
 A `SelectionOutcomeMonitoringPlan` ties one tenant and authoritative Job to the total selection process being monitored, an aggregate population snapshot, an aggregate selection-outcome snapshot, the protected-attribute handling policy, small-sample interpretation policy, statistical analysis plan, accountable requester and reviewer references, and an explicit monitoring window.
 
-Every trust-bearing artifact is represented by a bounded opaque reference plus an independent SHA-256 digest. Canonical JSON and a packet digest support immutable audit correlation without copying candidate identities, protected-attribute values, assessment scores, individual decisions, or free-form model output.
+Every trust-bearing artifact is represented by a bounded namespaced reference whose suffix is a canonical non-sentinel UUID, plus an independent SHA-256 digest where integrity evidence is required. Human-readable, value-bearing, sentinel, and noncanonical reference suffixes are rejected so Job labels, policy values, protected-attribute concepts, actor names, or other sensitive semantics cannot be smuggled through a field described as opaque. Canonical JSON and a packet digest support immutable audit correlation without copying candidate identities, protected-attribute values, assessment scores, individual decisions, or free-form model output.
 
 ## Governance boundary
 
@@ -23,21 +23,21 @@ from orgmetra_selection_monitoring import build_selection_outcome_monitoring_pla
 
 plan = build_selection_outcome_monitoring_plan(
     tenant_record_id="11111111-1111-4111-8111-111111111111",
-    monitoring_plan_reference="selection_monitoring_plan:plan-001",
-    job_profile_reference="job_profile:job-001",
-    selection_process_reference="selection_process:process-001",
-    population_snapshot_reference="population_snapshot:population-001",
+    monitoring_plan_reference="selection_monitoring_plan:10000000-0000-4000-8000-000000000001",
+    job_profile_reference="job_profile:10000000-0000-4000-8000-000000000002",
+    selection_process_reference="selection_process:10000000-0000-4000-8000-000000000003",
+    population_snapshot_reference="population_snapshot:10000000-0000-4000-8000-000000000004",
     population_snapshot_digest="a" * 64,
-    outcome_snapshot_reference="selection_outcome_snapshot:outcomes-001",
+    outcome_snapshot_reference="selection_outcome_snapshot:10000000-0000-4000-8000-000000000005",
     outcome_snapshot_digest="b" * 64,
-    protected_attribute_policy_reference="protected_attribute_policy:policy-001",
+    protected_attribute_policy_reference="protected_attribute_policy:10000000-0000-4000-8000-000000000006",
     protected_attribute_policy_digest="c" * 64,
-    small_sample_policy_reference="small_sample_policy:policy-001",
+    small_sample_policy_reference="small_sample_policy:10000000-0000-4000-8000-000000000007",
     small_sample_policy_digest="d" * 64,
-    statistical_plan_reference="statistical_plan:plan-001",
+    statistical_plan_reference="statistical_plan:10000000-0000-4000-8000-000000000008",
     statistical_plan_digest="e" * 64,
-    actor_reference="actor:requester-001",
-    reviewer_reference="actor:reviewer-001",
+    actor_reference="actor:10000000-0000-4000-8000-000000000009",
+    reviewer_reference="actor:10000000-0000-4000-8000-00000000000a",
     monitoring_start=date(2026, 1, 1),
     monitoring_end=date(2026, 3, 31),
     purpose_code="selection_outcome_monitoring",
