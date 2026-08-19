@@ -208,6 +208,21 @@ def test_model_reference_and_digest_evidence_must_travel_together(field):
         packet(**values)
 
 
+@pytest.mark.parametrize(
+    "field",
+    [
+        "model_draft_reference",
+        "model_draft_digest",
+        "model_provenance_reference",
+        "model_provenance_digest",
+    ],
+)
+def test_replace_cannot_remove_one_model_evidence_binding(field):
+    base = model_packet()
+    with pytest.raises(ValueError):
+        replace(base, **{field: None})
+
+
 def test_model_evidence_must_be_uuid_backed_namespaced_and_untrusted():
     base = model_packet()
     with pytest.raises(ValueError):
