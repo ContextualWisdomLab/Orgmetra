@@ -12,7 +12,8 @@ from datetime import date
 import json
 import logging
 import re
-from typing import Mapping
+from secrets import token_urlsafe
+from typing import Mapping, cast
 from urllib.parse import parse_qsl
 from uuid import UUID
 
@@ -30,7 +31,7 @@ from orgmetra_people_api.http import (
     AsgiReceive,
     AsgiSend,
     _authorization_header,
-    _send_json,
+    _send_json as _emit_json,
 )
 from orgmetra_people_api.mutations import validate_idempotency_key
 
@@ -41,6 +42,7 @@ _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _RFC3339_FULL_DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", flags=re.ASCII)
 _MAX_UUID_INT = (1 << 128) - 1
 _MAX_BODY_BYTES = 65536
+_SUPPORT_REFERENCE_RANDOM_BYTES = 24
 _REQUIRED_BODY_KEYS = frozenset(
     {
         "candidate_profile_id",
@@ -69,6 +71,36 @@ class _PayloadTooLarge(ValueError):
 
 class _UnsupportedMediaType(ValueError):
     """Indicate a missing or non-JSON content type."""
+
+
+async def _send_json(
+    send: AsgiSend,
+    *,
+    status: int,
+    payload: Mapping[str, object],
+    extra_headers: tuple[tuple[bytes, bytes], ...] = (),
+) -> None:
+    """Emit one client-safe hire failure with canonical actionable metadata.
+
+    The legacy ``error`` alias remains during the route's compatibility window,
+    while ``error_code``, ``next_action``, and a random support reference satisfy
+    the published governed API error semantics without exposing tenant or trace
+    identifiers in the lookup token.
+    """
+    error_code = cast(str, payload["error"])
+    message = cast(str, payload["message"])
+    await _emit_json(
+        send,
+        status=status,
+        payload={
+            "error": error_code,
+            "error_code": error_code,
+            "message": message,
+            "next_action": message,
+            "support_reference": f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}",
+        },
+        extra_headers=extra_headers,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,7 +293,7 @@ class HireAcceptanceAsgiApp:
             )
             return
 
-        await _send_json(
+        await _emit_json(
             send,
             status=201,
             payload={
