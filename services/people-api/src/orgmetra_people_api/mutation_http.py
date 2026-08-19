@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from hashlib import sha256
+import json
 import logging
 from typing import Callable, Mapping
 from uuid import UUID, uuid4
@@ -75,6 +77,10 @@ _ASSIGNMENT_BODY_KEYS = frozenset(
         "evidence_references",
     }
 )
+_EVIDENCE_REFERENCE_KEYS = frozenset({"evidence_reference", "evidence_version_code"})
+_MAX_EVIDENCE_REFERENCES = 100
+_MAX_EVIDENCE_REFERENCE_LENGTH = 500
+_MAX_EVIDENCE_VERSION_LENGTH = 200
 
 
 @dataclass(frozen=True, slots=True)
@@ -368,19 +374,30 @@ def _parse_command_headers(scope: Mapping[str, object]) -> _MutationHeaders:
 
 
 def _evidence_version(payload: Mapping[str, object]) -> str:
-    """Validate every evidence reference and return the primary version token."""
+    """Validate the exact OpenAPI evidence set and return its PII-minimized binding code."""
     raw_evidence = payload.get("evidence_references")
-    if not isinstance(raw_evidence, list) or not raw_evidence:
-        raise _InvalidHttpRequest("evidence_references are required")
-    versions: list[str] = []
+    if not isinstance(raw_evidence, list) or not 1 <= len(raw_evidence) <= _MAX_EVIDENCE_REFERENCES:
+        raise _InvalidHttpRequest("evidence_references must contain 1 through 100 entries")
+
+    normalized: list[tuple[str, str]] = []
     for reference in raw_evidence:
-        if not isinstance(reference, Mapping) or "evidence_version_code" not in reference:
-            raise _InvalidHttpRequest("evidence_references must include evidence_version_code")
-        version = reference["evidence_version_code"]
-        if not isinstance(version, str):
-            raise _InvalidHttpRequest("evidence_version_code must be a string")
-        versions.append(version)
-    return versions[0]
+        if not isinstance(reference, Mapping) or frozenset(reference) != _EVIDENCE_REFERENCE_KEYS:
+            raise _InvalidHttpRequest("each evidence reference must contain only reference and version")
+        evidence_reference = reference["evidence_reference"]
+        evidence_version = reference["evidence_version_code"]
+        if (
+            not isinstance(evidence_reference, str)
+            or not 1 <= len(evidence_reference) <= _MAX_EVIDENCE_REFERENCE_LENGTH
+        ):
+            raise _InvalidHttpRequest("evidence_reference must be a bounded non-empty string")
+        if not isinstance(evidence_version, str) or not 1 <= len(evidence_version) <= _MAX_EVIDENCE_VERSION_LENGTH:
+            raise _InvalidHttpRequest("evidence_version_code must be a bounded non-empty string")
+        normalized.append((evidence_reference, evidence_version))
+
+    if len(set(normalized)) != len(normalized):
+        raise _InvalidHttpRequest("evidence_references must be unique")
+    canonical = json.dumps(sorted(normalized), ensure_ascii=False, separators=(",", ":"))
+    return f"evidence_set_v1:{sha256(canonical.encode('utf-8')).hexdigest()}"
 
 
 def _require_reason(payload: Mapping[str, object]) -> None:
