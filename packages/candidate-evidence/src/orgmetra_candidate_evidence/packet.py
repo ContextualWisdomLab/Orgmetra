@@ -21,6 +21,7 @@ _REFERENCE_PATTERN = re.compile(
 )
 _PURPOSE_CODE = "candidate_evidence_intake"
 _REVIEW_STATE = "requires_human_review"
+_ALLOWED_REASON_CODES = frozenset({"requisition_candidate_review"})
 _NEXT_ACTION = (
     "Verify job relevance, source provenance, permitted handling, retention, and evidence "
     "completeness; then request authoritative evidence sealing and accountable human review."
@@ -151,6 +152,8 @@ class CandidateEvidenceIntakePacket:
         if self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain candidate_evidence_intake")
         _validate_code(self.reason_code, "reason_code")
+        if self.reason_code not in _ALLOWED_REASON_CODES:
+            raise ValueError("reason_code must use a reviewed non-sensitive candidate-evidence reason")
         _canonical_timestamp(self.collected_at)
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory before sealing candidate evidence")
