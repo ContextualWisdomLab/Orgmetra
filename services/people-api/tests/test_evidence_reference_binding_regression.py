@@ -78,7 +78,9 @@ class EvidenceReferenceBindingRegressionTests(unittest.TestCase):
         cases = (
             [{"evidence_version_code": "v1"}],
             [{"evidence_reference": "decision:17", "evidence_version_code": "v1", "candidate_name": "do-not-copy"}],
+            [{"evidence_reference": 17, "evidence_version_code": "v1"}],
             [{"evidence_reference": "", "evidence_version_code": "v1"}],
+            [{"evidence_reference": "decision:17", "evidence_version_code": 1}],
             [{"evidence_reference": "decision:17", "evidence_version_code": ""}],
             [{"evidence_reference": "x" * 501, "evidence_version_code": "v1"}],
             [{"evidence_reference": "decision:17", "evidence_version_code": "v" * 201}],
