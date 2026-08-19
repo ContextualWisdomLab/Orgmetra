@@ -277,6 +277,11 @@ def test_direct_constructor_and_replace_fail_closed(
     value: object,
     message: str,
 ) -> None:
+    direct_kwargs = valid_kwargs()
+    direct_kwargs[field_name] = value
+    with pytest.raises(ValueError, match=message):
+        OfferApprovalPacket(**direct_kwargs)
+
     packet = build_valid()
     with pytest.raises(ValueError, match=message):
         replace(packet, **{field_name: value})
