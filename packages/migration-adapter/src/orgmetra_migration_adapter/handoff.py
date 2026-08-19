@@ -234,6 +234,7 @@ def _validate_migration_evidence(
 
 
 def _require_operational_uuid(value: str) -> None:
+    """Require one canonical, non-sentinel tenant UUID before migration handoff."""
     try:
         parsed = UUID(value)
     except (AttributeError, TypeError, ValueError) as exc:
@@ -245,31 +246,37 @@ def _require_operational_uuid(value: str) -> None:
 
 
 def _require_reference(value: str, label: str) -> None:
+    """Require a bounded namespaced opaque reference without echoing bad input."""
     if not isinstance(value, str) or not _REFERENCE_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} is malformed")
 
 
 def _require_code(value: str, label: str) -> None:
+    """Require a lowercase snake-case governance code used by stable contracts."""
     if not isinstance(value, str) or not _CODE_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} is malformed")
 
 
 def _require_schema_proposal_id(value: str) -> None:
+    """Require the immutable identifier for the reviewed source schema proposal."""
     if not isinstance(value, str) or not _SCHEMA_PROPOSAL_PATTERN.fullmatch(value):
         raise ContractViolation("schema proposal identifier is malformed")
 
 
 def _require_sha256(value: str, label: str) -> None:
+    """Require a lowercase SHA-256 hex digest for provenance-bearing evidence."""
     if not isinstance(value, str) or not _SHA256_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} must be lowercase SHA-256")
 
 
 def _require_positive_int(value: int, label: str) -> None:
+    """Require a positive integer while rejecting booleans masquerading as counts."""
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ContractViolation(f"{label} must be a positive integer")
 
 
 def _canonical_target_objects(values: tuple[str, ...]) -> tuple[str, ...]:
+    """Validate supported HRIS targets and return their stable canonical ordering."""
     if not isinstance(values, tuple) or not values:
         raise ContractViolation("migration target objects must be a non-empty tuple")
     if any(not isinstance(value, str) for value in values):
