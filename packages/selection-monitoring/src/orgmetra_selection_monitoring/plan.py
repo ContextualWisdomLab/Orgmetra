@@ -25,12 +25,13 @@ _REVIEW_STATE = "requires_human_review"
 _DECISION_AUTHORITY = "human_review_only"
 _ALLOWED_REASON_CODES = frozenset({"quarterly_selection_governance"})
 _NEXT_ACTION = (
-    "Within tenant_record_id, re-resolve actor_reference and reviewer_reference through the "
-    "authoritative actor boundary and verify their resolved actor identities are distinct; "
-    "then verify Job scope, aggregate population completeness, protected-attribute handling, "
-    "small-sample policy, and statistical-plan provenance before submitting the aggregate "
-    "evidence to an authorized analyst and accountable human reviewer for any "
-    "employment-process change or legal conclusion."
+    "Within tenant_record_id, re-resolve every packet reference through its authoritative "
+    "boundary; specifically re-resolve actor_reference and reviewer_reference and verify "
+    "their resolved actor identities are distinct; then verify Job scope, aggregate "
+    "population completeness, protected-attribute handling, small-sample policy, and "
+    "statistical-plan provenance before submitting the aggregate evidence to an authorized "
+    "analyst and accountable human reviewer for any employment-process change or legal "
+    "conclusion."
 )
 
 
