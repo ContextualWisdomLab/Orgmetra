@@ -16,17 +16,18 @@
 | `position_record_version` | Bitemporal position status and effective period. |
 | `assignment_record` | A person's allocation to a position through one employment. |
 | `candidate_profile` | Applicant/candidate record before hire. |
-| `candidate_worker_link` | Append-only linkage from candidate to worker after hiring. |
+| `candidate_worker_link` | Legacy append-only candidate-to-worker linkage retained for historical reads; new writes use `candidate_worker_conversion_record`. |
+| `candidate_worker_conversion_record` | Governed bitemporal candidate-to-worker conversion bound to the hire decision, person, employment, immutable audit event, and outbox evidence. |
 | `criterion_blueprint` | Job-related performance criterion definition. |
 | `criterion_observation` | Observed criterion result. |
 | `decision_evidence_set` | Versioned evidence-set header whose database-computed digest and membership are sealed by one accountable selection decision. |
 | `selection_decision_evidence` | Immutable versioned evidence member belonging to one open decision evidence set. |
 | `selection_decision` | Human-accountable high-impact decision bound to exactly one sealed evidence set. |
-| `validity_study` | Study registry linking its criterion definition to exact decisions, sealed evidence sets, and observed outcomes. |
-| `validity_study_decision_link` | Append-only study-to-selection-decision relationship. |
-| `validity_study_evidence_set_link` | Append-only study-to-versioned-evidence relationship. |
-| `validity_study_outcome_link` | Append-only study-to-criterion-observation relationship. |
-| `people_mutation_idempotency_record` | Append-only tenant/route/key binding that stores the semantic command digest and the first committed People mutation identity. |
+| `validity_study` | Study registry binding one criterion definition to normalized worker-level validity-study cases. |
+| `validity_study_case_record` | Append-only tenant-scoped study case binding one selection decision, its exact sealed evidence set, its governed candidate-to-worker conversion, and one criterion observation for that same worker and criterion. |
+| `validity_study_decision_link` | Legacy append-only study-to-selection-decision relationship retained for historical reads; new writes are rejected. |
+| `validity_study_evidence_set_link` | Legacy append-only study-to-versioned-evidence relationship retained for historical reads; new writes are rejected. |
+| `validity_study_outcome_link` | Legacy append-only study-to-criterion-observation relationship retained for historical reads; new writes are rejected. |
 | `audit_event_record` | Append-only, tenant-scoped canonical audit envelope bytes plus database-verified SHA-256 digest. |
 | `outbox_delivery_record` | Mutable asynchronous delivery coordination for one immutable audit event and delivery target, including immutable database-owned retry budget. |
 | `outbox_delivery_escalation_record` | Append-only terminal-failure evidence for one dead-lettered delivery, including failure classification, terminal attempt count, and opaque escalation reference. |
@@ -56,7 +57,7 @@ Assignments remain a legitimately multiple-membership fact. Each assignment must
 
 Evidence membership is constructed in `selection_decision_evidence` while its `decision_evidence_set` is open. An open set has no caller-supplied content digest. Finalizing `selection_decision` requires at least one versioned evidence member, canonicalizes the members by `(evidence_reference, evidence_version_code)`, computes SHA-256 inside PostgreSQL, and atomically stores that digest while binding `sealed_selection_decision_id`. Database triggers reject later evidence inserts, second-decision reuse, arbitrary post-seal mutation, and a sealed-set pointer that does not resolve back to the decision that consumed that exact set. This makes the stored digest evidence about database-observed membership at finalization rather than an unverified client assertion.
 
-Validation-study link tables preserve the exact decisions, evidence sets and criterion observations included in a study. External specialist results remain references through published contracts; Orgmetra does not reach into a specialist service's application tables.
+New predictive-validity membership uses `validity_study_case_record` rather than three independently writable study links. One normalized case must bind the study's exact criterion to a selection decision for the same Job, that decision's exact sealed evidence set, the governed `candidate_worker_conversion_record` for the selected candidate, and a `criterion_observation` belonging to the converted worker. The case insert also requires the study version, decision, sealed evidence, observation, and conversion to have been visible in system-recorded time at `linked_at`; a conversion or observation already closed at that knowledge coordinate is rejected. This prevents an analytic cohort from structurally mixing one person's decision/evidence with another person's outcome. The three original validity-study link relations remain readable historical compatibility surfaces, but migration 0010 rejects new inserts through them so new production evidence cannot bypass the normalized case boundary. External specialist results remain references through published contracts; Orgmetra does not reach into a specialist service's application tables.
 
 ## Audit and outbox normalization
 
@@ -65,8 +66,6 @@ Validation-study link tables preserve the exact decisions, evidence sets and cri
 `outbox_delivery_record` stores only delivery coordination: target, state, attempt count, immutable `maximum_attempt_count`, availability, lease metadata, bounded failure code, and terminal delivery time. Migration 0006 gives existing/new deliveries a default maximum of 5 and constrains the persisted budget to 1 through 100; the transition guard prevents changing it later. It references the immutable audit event through a tenant-qualified foreign key. A unique tenant/event/target key prevents duplicate delivery work for the same target. The guarded lifecycle is `pending -> leased -> delivered`, with `leased -> pending` available for a recorded retry while attempts remain, `leased -> leased` allowed only for expired-lease takeover while attempts remain, and `leased -> dead_lettered` allowed only after the stored retry budget is exhausted and matching escalation evidence exists. Delivered and dead-lettered rows are terminal. Once `delivery_attempt_count` reaches `maximum_attempt_count`, retry and claim cannot create attempt N+1; an expired final lease remains associated with its recorded stable worker reference for terminalization. This separation prevents retry mechanics from becoming mutable audit history and avoids repeating the event payload per delivery target.
 
 `outbox_delivery_escalation_record` is normalized terminal evidence rather than another queue. Exactly one escalation row may bind to one tenant/delivery pair. It captures an operational UUID, lower `snake_case` terminal failure code, namespaced opaque escalation reference, durable terminal attempt count, and recorded time. The row is append-only and forced through the same tenant RLS contract. A deferred binding constraint rejects the row unless its referenced delivery commits as matching terminal `dead_lettered` state with the same attempt count and failure code. It does not duplicate canonical event bytes or mutable HR payloads.
-
-`people_mutation_idempotency_record` is a separate 3NF fact from the HRIS row it names. Uniqueness is `(tenant_record_id, command_route, idempotency_key)`. The stored `command_digest` covers method, route, tenant, actor, purpose, and semantic command fields, not generated record identifiers, so a retry that allocates fresh UUIDs can replay the first committed identity. A changed command under the same key cannot insert a second row. The idempotency row is written in the same transaction as the HRIS fact and `record_audit_outbox_event(...)`; rollback therefore cannot leave a successful replay marker.
 
 `record_audit_outbox_event(...)` inserts the audit and delivery rows in one statement. It is called by the owning service inside the same PostgreSQL transaction as the authoritative business mutation. If the outbox insert fails, the audit insert from that statement rolls back; if a later business-transaction statement fails, the transaction owner must roll back the entire mutation/audit/outbox unit.
 
