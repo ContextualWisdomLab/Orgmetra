@@ -102,6 +102,12 @@ def _validate_business_date(value: date, field_name: str) -> None:
         raise ValueError(f"{field_name} must be a date")
 
 
+def _validate_evidence_version(value: int) -> None:
+    """Require a bounded positive integer version for high-impact review evidence."""
+    if type(value) is not int or value < 1 or value > 2_147_483_647:
+        raise ValueError("evidence_version must be an integer from 1 through 2147483647")
+
+
 @dataclass(frozen=True, slots=True)
 class EmploymentSeparationReviewPacket:
     """Immutable separation evidence that cannot authorize mutation or owner execution."""
@@ -134,6 +140,7 @@ class EmploymentSeparationReviewPacket:
     reason_code: str
     proposed_separation_on: date
     generated_at: datetime
+    evidence_version: int = 1
     contains_person_pii: bool = False
     contains_compensation_values: bool = False
     contains_free_form_case_narrative: bool = False
@@ -234,6 +241,7 @@ class EmploymentSeparationReviewPacket:
             raise ValueError("reason_code must be an approved separation reason")
         _validate_business_date(self.proposed_separation_on, "proposed_separation_on")
         _canonical_timestamp(self.generated_at)
+        _validate_evidence_version(self.evidence_version)
         if self.contains_person_pii is not False:
             raise ValueError("employment separation review packet must not contain person PII")
         if self.contains_compensation_values is not False:
@@ -286,6 +294,7 @@ class EmploymentSeparationReviewPacket:
             "contains_person_pii": self.contains_person_pii,
             "decision_authority": self.decision_authority,
             "employment_record_reference": self.employment_record_reference,
+            "evidence_version": self.evidence_version,
             "external_execution_state": self.external_execution_state,
             "final_pay_handoff_digest": self.final_pay_handoff_digest,
             "final_pay_handoff_reference": self.final_pay_handoff_reference,
@@ -347,6 +356,7 @@ def build_employment_separation_review_packet(
     reason_code: str,
     proposed_separation_on: date,
     generated_at: datetime,
+    evidence_version: int = 1,
 ) -> EmploymentSeparationReviewPacket:
     """Build a value-free separation packet pending authoritative human approval."""
     return EmploymentSeparationReviewPacket(
@@ -378,4 +388,5 @@ def build_employment_separation_review_packet(
         reason_code=reason_code,
         proposed_separation_on=proposed_separation_on,
         generated_at=generated_at,
+        evidence_version=evidence_version,
     )
