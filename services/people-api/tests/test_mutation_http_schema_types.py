@@ -58,6 +58,18 @@ class PeopleMutationSchemaTypeTests(unittest.TestCase):
                 "idempotency-key-17xx",
             )
 
+    def test_non_rfc3339_iso_date_forms_are_rejected(self) -> None:
+        """OpenAPI date accepts RFC 3339 full-date, not Python's extra ISO date forms."""
+        for value in ("20260818", "2026-W34-2"):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "effective_from"):
+                _command_for_route(
+                    "employment-records",
+                    TENANT,
+                    employment_payload(effective_from=value),
+                    id_factory(),
+                    "idempotency-key-17xx",
+                )
+
     def test_decision_reason_above_openapi_maximum_is_rejected(self) -> None:
         """Decision rationale must stay within the published 4000-character bound."""
         with self.assertRaisesRegex(ValueError, "decision_reason"):
