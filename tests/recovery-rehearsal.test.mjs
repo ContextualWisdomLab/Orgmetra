@@ -73,6 +73,11 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     [/urllib\.parse/, 'database URL rewriting must use a URL parser'],
     [/RECOVERY_REHEARSAL_ALLOW_ROLE_DROP/, 'role deletion must require a disposable-cluster opt-in'],
     [/recovery rehearsal role cleanup requires RECOVERY_REHEARSAL_ALLOW_ROLE_DROP=1/, 'role cleanup denial must be actionable'],
+    [/pg_control_system\(\).*system_identifier/s, 'administrator connections must expose their PostgreSQL cluster identities'],
+    [/pg_controldata[\s\S]*Database system identifier/, 'service containers must expose their PostgreSQL cluster identities independently of administrator URLs'],
+    [/source administrator URL does not target POSTGRES_SOURCE_CONTAINER/, 'source administrator URL/container identity mismatch must fail closed'],
+    [/restore administrator URL does not target POSTGRES_RESTORE_CONTAINER/, 'restore administrator URL/container identity mismatch must fail closed'],
+    [/source and restore PostgreSQL clusters must differ/, 'source and restore cluster identities must be distinct'],
     [/pg_dump[\s\S]*--format=custom/, 'rehearsal must produce a custom-format PostgreSQL dump'],
     [/source dump is empty/, 'empty dumps must fail closed'],
     [/pg_restore\s+-U\s+orgmetra\s+--list/, 'custom dump must be list-validated before restore'],
@@ -84,7 +89,9 @@ test('restore rehearsal is executable exact-head recovery evidence', () => {
     [/restored audit history was truncatable/, 'TRUNCATE success must fail the rehearsal'],
     [/has_function_privilege\(\s*'orgmetra_outbox_operator'\s*,\s*'public\.operator_dead_letter_expired_outbox_delivery\(uuid,uuid,uuid,text,text\)'/, 'operator function capability must survive restore'],
     [/has_column_privilege\(\s*'orgmetra_outbox_recovery_owner'\s*,\s*'public\.outbox_delivery_record'/, 'bounded recovery-owner column privileges must survive restore'],
-    [/NOT has_table_privilege\('orgmetra_outbox_operator', 'public\.outbox_delivery_record', '(?:SELECT|INSERT|UPDATE)'\)/, 'operator direct transport-table DML must remain denied'],
+    [/NOT has_table_privilege\('orgmetra_outbox_operator', 'public\.outbox_delivery_record', 'DELETE'\)/, 'operator DELETE on delivery transport state must remain denied'],
+    [/NOT has_table_privilege\('orgmetra_outbox_operator', 'public\.outbox_delivery_escalation_record', 'DELETE'\)/, 'operator DELETE on escalation transport state must remain denied'],
+    [/pg_attribute[\s\S]*attname NOT IN[\s\S]*delivery_state_code[\s\S]*lease_owner_reference[\s\S]*lease_expires_at[\s\S]*last_failure_code[\s\S]*has_column_privilege/s, 'recovery-owner UPDATE privileges must be a closed four-column set'],
     [/least-privilege recovery ACLs did not survive restore/, 'ACL drift must fail closed']
   ];
   for (const [pattern, message] of scriptContracts) {
