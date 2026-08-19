@@ -354,21 +354,24 @@ def _require_json_content_type(scope: Mapping[str, object]) -> None:
 
 
 async def _read_json_object(receive: AsgiReceive) -> dict[str, object]:
-    """Read one bounded JSON object and reject duplicate keys or streamed bodies."""
-    message = await receive()
-    if message.get("type") != "http.request":
-        raise _InvalidHttpRequest("request body is missing")
-    if message.get("more_body") is True:
-        raise _PayloadTooLarge("chunked hire bodies are not accepted")
-    raw_body = message.get("body", b"")
-    if not isinstance(raw_body, (bytes, bytearray)):
-        raise _InvalidHttpRequest("request body must be bytes")
-    if len(raw_body) == 0 or len(raw_body) > _MAX_BODY_BYTES:
-        if len(raw_body) > _MAX_BODY_BYTES:
+    """Read one bounded JSON object across ordinary ASGI request-body frames."""
+    body = bytearray()
+    while True:
+        message = await receive()
+        if message.get("type") != "http.request":
+            raise _InvalidHttpRequest("request body is missing")
+        raw_chunk = message.get("body", b"")
+        if not isinstance(raw_chunk, (bytes, bytearray)):
+            raise _InvalidHttpRequest("request body must be bytes")
+        if len(body) + len(raw_chunk) > _MAX_BODY_BYTES:
             raise _PayloadTooLarge("hire command exceeds the bounded size")
+        body.extend(raw_chunk)
+        if message.get("more_body") is not True:
+            break
+    if len(body) == 0:
         raise _InvalidHttpRequest("request body is empty")
     try:
-        payload = json.loads(bytes(raw_body), object_pairs_hook=_reject_duplicate_keys)
+        payload = json.loads(bytes(body), object_pairs_hook=_reject_duplicate_keys)
     except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as error:
         raise _InvalidHttpRequest("request body must be one JSON object") from error
     if not isinstance(payload, dict):
