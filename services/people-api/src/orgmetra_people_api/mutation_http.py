@@ -45,6 +45,7 @@ from orgmetra_people_api.mutations import (
 
 _LOGGER = logging.getLogger(__name__)
 _RFC3339_FULL_DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", flags=re.ASCII)
+_PURPOSE_CODE_PATTERN = re.compile(r"\A[a-z][a-z0-9_]{2,63}\Z", flags=re.ASCII)
 _MAX_UUID_INT = (1 << 128) - 1
 _EMPLOYMENT_BODY_KEYS = frozenset(
     {
@@ -86,6 +87,7 @@ _MAX_EVIDENCE_REFERENCE_LENGTH = 500
 _MAX_EVIDENCE_VERSION_LENGTH = 200
 _MAX_DECISION_REASON_LENGTH = 4000
 _MAX_CONFIRMATION_REFERENCE_LENGTH = 300
+_MAX_ACTOR_REFERENCE_LENGTH = 200
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 
 
@@ -403,10 +405,16 @@ def _parse_command_headers(scope: Mapping[str, object]) -> _MutationHeaders:
         raise _InvalidHttpRequest("X-Tenant-Reference must be a UUID") from error
     if tenant_record_id.int in (0, _MAX_UUID_INT):
         raise _InvalidHttpRequest("X-Tenant-Reference must be an operational UUID")
+    actor_reference = values["x-actor-reference"]
+    if not 1 <= len(actor_reference) <= _MAX_ACTOR_REFERENCE_LENGTH:
+        raise _InvalidHttpRequest("X-Actor-Reference must contain 1 through 200 characters")
+    purpose_code = values["x-purpose-code"]
+    if _PURPOSE_CODE_PATTERN.fullmatch(purpose_code) is None:
+        raise _InvalidHttpRequest("X-Purpose-Code must match the published lower-case purpose schema")
     return _MutationHeaders(
         tenant_record_id=tenant_record_id,
-        actor_reference=values["x-actor-reference"],
-        purpose_code=values["x-purpose-code"],
+        actor_reference=actor_reference,
+        purpose_code=purpose_code,
         idempotency_key=idempotency_key,
     )
 
