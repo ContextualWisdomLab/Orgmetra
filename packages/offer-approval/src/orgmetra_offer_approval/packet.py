@@ -83,6 +83,12 @@ def _canonical_timestamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _validate_evidence_version(value: int) -> None:
+    """Require a bounded positive integer version for high-impact offer-review evidence."""
+    if type(value) is not int or value < 1 or value > 2_147_483_647:
+        raise ValueError("evidence_version must be an integer from 1 through 2147483647")
+
+
 @dataclass(frozen=True, slots=True, repr=False)
 class OfferApprovalPacket:
     """Immutable value-free offer review packet awaiting accountable approval."""
@@ -104,6 +110,7 @@ class OfferApprovalPacket:
     purpose_code: str
     reason_code: str
     generated_at: datetime
+    evidence_version: int = 1
     contains_candidate_pii: bool = False
     contains_compensation_values: bool = False
     human_confirmation_required: bool = True
@@ -162,6 +169,7 @@ class OfferApprovalPacket:
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive offer reason")
         _canonical_timestamp(self.generated_at)
+        _validate_evidence_version(self.evidence_version)
         if self.contains_candidate_pii is not False:
             raise ValueError("offer approval packet must not contain candidate PII")
         if self.contains_compensation_values is not False:
@@ -188,6 +196,7 @@ class OfferApprovalPacket:
             "contains_compensation_values": self.contains_compensation_values,
             "decision_authority": self.decision_authority,
             "delivery_state": self.delivery_state,
+            "evidence_version": self.evidence_version,
             "generated_at": _canonical_timestamp(self.generated_at),
             "human_confirmation_required": self.human_confirmation_required,
             "job_profile_reference": self.job_profile_reference,
@@ -231,6 +240,7 @@ def build_offer_approval_packet(
     purpose_code: str,
     reason_code: str,
     generated_at: datetime,
+    evidence_version: int = 1,
 ) -> OfferApprovalPacket:
     """Build value-free offer-approval evidence pending accountable human approval."""
     return OfferApprovalPacket(
@@ -251,4 +261,5 @@ def build_offer_approval_packet(
         purpose_code=purpose_code,
         reason_code=reason_code,
         generated_at=generated_at,
+        evidence_version=evidence_version,
     )
