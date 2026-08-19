@@ -5,7 +5,7 @@
 
 ## Context
 
-Employment separation is a high-impact lifecycle action that can terminate employment truth and trigger downstream payroll/final-pay, benefits, identity/access, asset, knowledge-transfer, and communication work. A syntactically valid Person or Employment reference does not prove that the currently effective assignments, Jobs, Positions, policy/process version, separation date, or downstream handoffs are correct at the decision coordinate. Nor does a namespaced UUID prove that a referenced object belongs to the packet tenant or that the Person and Employment records identify the same worker scope.
+Employment separation is a high-impact lifecycle action that can terminate employment truth and trigger downstream payroll/final-pay, benefits, identity/access, asset, knowledge-transfer, and communication work. A syntactically valid Person or Employment reference does not prove that the currently effective assignments, Jobs, Positions, policy/process version, separation date, or downstream handoffs are correct at the decision coordinate. Nor does a namespaced UUID prove that a referenced object belongs to the packet tenant or that the Person and Employment records identify the same worker scope. Likewise, two different opaque actor references do not by themselves prove that the requester and reviewer resolve to different authoritative actor identities.
 
 Putting free-form reasons, worker PII, compensation values, credentials, or model-generated narrative into a portable approval envelope would also create unnecessary privacy and data-governance channels. Conversely, treating a review packet as the mutation or as proof that downstream owner systems executed would collapse distinct authority boundaries.
 
@@ -28,9 +28,9 @@ The packet is fail-closed at direct construction as well as through its builder.
 - `mutation_state = not_authorized_to_apply`; and
 - `external_execution_state = not_authorized_to_execute`.
 
-Requester and reviewer must be different actors. The proposed separation date is a business date, while evidence generation is a timezone-aware precision-preserving instant. Canonical JSON and SHA-256 provide correlation/integrity evidence only.
+Requester and reviewer opaque references must differ as an early syntactic guard, but that comparison is not authoritative separation-of-duties evidence. The proposed separation date is a business date, while evidence generation is a timezone-aware precision-preserving instant. Canonical JSON and SHA-256 provide correlation/integrity evidence only.
 
-Immediately before approval, the host must re-resolve every packet reference within the exact `tenant_record_id`, prove the Person-to-Employment binding, and prove each active Assignment/Job/Position represented by the bound snapshot belongs to that authoritative worker scope. It must then verify the proposed separation date, separation policy/process, final-pay and benefits handoffs, access deprovisioning, asset return, knowledge transfer, and communication provenance. Reference grammar and digests alone are never tenant-ownership or relationship evidence.
+Immediately before approval, the host must re-resolve every packet reference within the exact `tenant_record_id`. It must specifically resolve `requester_reference` and `reviewer_reference` through the authoritative actor boundary and reject approval unless their resolved actor identities are distinct. It must also prove the Person-to-Employment binding and each active Assignment/Job/Position represented by the bound snapshot belongs to that authoritative worker scope. It must then verify the proposed separation date, separation policy/process, final-pay and benefits handoffs, access deprovisioning, asset return, knowledge transfer, and communication provenance. Reference grammar, reference inequality, and digests alone are never tenant-ownership, actor-identity, or relationship evidence.
 
 After review, any authoritative employment mutation must go through the Orgmetra People mutation boundary with its own purpose-bound authorization, idempotency, bitemporal persistence, and immutable audit/outbox evidence. Identity/access, payroll/final-pay, benefits, or other downstream work must execute only through the relevant published owner contracts. This packet performs no foreign-service execution and no cross-service application-table SQL.
 
@@ -42,16 +42,17 @@ After review, any authoritative employment mutation must go through the Orgmetra
 - Buyers can correlate the exact reviewed scope and downstream handoff evidence without copying worker values into a broad governance artifact.
 - Multiple current assignments are represented through an explicit authoritative snapshot rather than assuming one Job/Position.
 - Cross-tenant or same-tenant wrong-worker reference correlation must be rejected at the authoritative resolution boundary before approval.
+- Requester/reviewer separation must be proven from resolved authoritative actor identities rather than inferred from different opaque reference strings.
 - Sensitive or legally nuanced personal reasons are not normalized into an uncontrolled free-text channel.
 - Access deprovisioning is reviewable without giving this package credentials or ownership of Keyverse/identity execution.
 - Evidence revisions remain explicit in the immutable packet rather than being inferred from package version or prose.
 
 ### Trade-offs
 
-- The packet alone cannot prove authoritative relationship resolution, policy applicability, lawful procedure, final pay/benefits correctness, or downstream completion.
-- A host must resolve all bound references in the packet tenant and prove the worker relationship plus active-assignment snapshot against live authoritative systems before approval.
+- The packet alone cannot prove authoritative relationship resolution, actor separation, policy applicability, lawful procedure, final pay/benefits correctness, or downstream completion.
+- A host must resolve all bound references in the packet tenant, prove distinct requester/reviewer actor identities, and prove the worker relationship plus active-assignment snapshot against live authoritative systems before approval.
 - Jurisdiction-specific separation workflows remain external policy/process artifacts rather than hard-coded universal rules.
 
 ## Verification
 
-The package contract requires exact 100% owned statement and branch coverage, direct-construction and `dataclasses.replace(...)` fail-closed regressions, canonical timestamp/digest evidence, bounded positive evidence-version regressions, strict UUID-backed opaque references, controlled reason categories, value-minimization assertions, actor separation, immutable review/mutation/execution states, and an executable next-action regression requiring tenant-scoped reference re-resolution plus Person-to-Employment worker binding before approval.
+The package contract requires exact 100% owned statement and branch coverage, direct-construction and `dataclasses.replace(...)` fail-closed regressions, canonical timestamp/digest evidence, bounded positive evidence-version regressions, strict UUID-backed opaque references, controlled reason categories, value-minimization assertions, syntactic actor-reference separation, immutable review/mutation/execution states, and an executable next-action regression requiring tenant-scoped reference re-resolution, authoritative resolved-actor separation, and Person-to-Employment worker binding before approval.
