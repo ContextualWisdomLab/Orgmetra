@@ -438,8 +438,8 @@ def _evidence_version(payload: Mapping[str, object]) -> str:
     return f"evidence_set_v1:{sha256(canonical.encode('utf-8')).hexdigest()}"
 
 
-def _require_reason(payload: Mapping[str, object]) -> None:
-    """Reject blank or overlong high-impact decision reasons without persisting the free text."""
+def _require_reason(payload: Mapping[str, object]) -> str:
+    """Return a validated high-impact reason without copying the free text into audit metadata."""
     reason = payload.get("decision_reason")
     if (
         not isinstance(reason, str)
@@ -447,6 +447,21 @@ def _require_reason(payload: Mapping[str, object]) -> None:
         or len(reason) > _MAX_DECISION_REASON_LENGTH
     ):
         raise _InvalidHttpRequest("decision_reason must be non-blank and at most 4000 characters")
+    return reason
+
+
+def _governance_evidence_binding(payload: Mapping[str, object]) -> str:
+    """Bind decision reason and versioned evidence into one non-disclosing audit token."""
+    canonical = json.dumps(
+        {
+            "decision_reason": _require_reason(payload),
+            "evidence_set_version": _evidence_version(payload),
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return f"governance_evidence_v1:{sha256(canonical.encode('utf-8')).hexdigest()}"
 
 
 def _require_string_field(payload: Mapping[str, object], field_name: str) -> str:
@@ -481,8 +496,7 @@ def _command_for_route(
     idempotency_key: str,
 ) -> EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand:
     """Map one OpenAPI command body onto the matching application command."""
-    _require_reason(payload)
-    evidence_version_code = _evidence_version(payload)
+    evidence_version_code = _governance_evidence_binding(payload)
     confirmation_reference = _require_confirmation_reference(payload)
     effective_from = _parse_effective_date(payload)
     if route == "employment-records":
