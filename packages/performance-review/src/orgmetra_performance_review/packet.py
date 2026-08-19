@@ -17,12 +17,12 @@ import json
 import re
 from uuid import UUID
 
-_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(
     r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
 )
 _PURPOSE_CODE = "performance_review"
+_ALLOWED_REASON_CODES = frozenset({"scheduled_cycle_review"})
 _DECISION_AUTHORITY = "human_review_only"
 _REVIEW_STATE = "requires_human_review"
 _SCOPE_VERIFICATION_STATE = "requires_authoritative_resolution"
@@ -42,12 +42,6 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be canonical UUID text") from exc
     if str(parsed) != value or parsed.int in (0, (1 << 128) - 1):
         raise ValueError(f"{field_name} must be a canonical operational UUID")
-
-
-def _validate_code(value: str, field_name: str) -> None:
-    """Require a bounded descriptive lower snake_case governance code."""
-    if not isinstance(value, str) or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
-        raise ValueError(f"{field_name} must be bounded two-or-more-word lower snake_case")
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
@@ -86,6 +80,12 @@ def _validate_business_date(value: date, field_name: str) -> None:
     """Require a business date rather than a datetime or textual date."""
     if type(value) is not date:
         raise ValueError(f"{field_name} must be a date")
+
+
+def _validate_reason_code(value: str) -> None:
+    """Require a closed, reviewed reason code so free-form PII cannot enter evidence."""
+    if not isinstance(value, str) or value not in _ALLOWED_REASON_CODES:
+        raise ValueError("reason_code must be an authorized performance-review reason code")
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -170,7 +170,7 @@ class PerformanceReviewPacket:
         _validate_reference(self.reviewer_reference, "actor", "reviewer_reference")
         if self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain performance_review")
-        _validate_code(self.reason_code, "reason_code")
+        _validate_reason_code(self.reason_code)
         _validate_business_date(self.review_period_start, "review_period_start")
         _validate_business_date(self.review_period_end, "review_period_end")
         if self.review_period_start > self.review_period_end:

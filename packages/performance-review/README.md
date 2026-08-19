@@ -4,7 +4,7 @@
 
 The packet correlates one opaque Person and Employment reference with a Job, performance cycle, governed criterion set, goal plan, exact criterion-observation snapshot, optional development plan, and reviewer. Every evidence artifact is represented by an opaque UUID-backed reference and, where integrity matters, an independent SHA-256 digest. **The packet does not assert that those independently supplied references already resolve to one authoritative employment/performance scope.** `scope_verification_state` is fixed to `requires_authoritative_resolution`; the authoritative HRIS/performance boundary must resolve that relationship before a rating is recorded.
 
-The person reference is still sensitive correlating metadata. Hosts must enforce purpose-bound authorization, least privilege, retention/export controls, and immutable audit evidence around packet access.
+The person reference is still sensitive correlating metadata. Hosts must enforce purpose-bound authorization, least privilege, retention/export controls, and immutable audit evidence around packet access. `reason_code` is not free-form metadata: the current reviewed vocabulary accepts only `scheduled_cycle_review`. New business reasons must be introduced through an explicit governed contract change rather than encoded into arbitrary lower-snake-case strings, preventing names, identifiers, or other unreviewed context from entering canonical evidence.
 
 ## What this packet does not do
 

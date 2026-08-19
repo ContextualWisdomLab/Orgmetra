@@ -24,7 +24,9 @@ The packet MUST bind:
 - an exact criterion-observation-snapshot reference plus independent SHA-256 digest;
 - an optional development-plan reference/digest pair;
 - explicit business review-period dates;
-- one accountable reviewer, fixed `performance_review` purpose, bounded reason code, and precision-preserving evidence timestamp.
+- one accountable reviewer, fixed `performance_review` purpose, a reviewed closed reason code, and precision-preserving evidence timestamp.
+
+The initial closed reason vocabulary contains only `scheduled_cycle_review`. Arbitrary lower-snake-case values are rejected even when syntactically well formed, because free-form reason text can encode a person name, identifier, or unreviewed decision context. Additional reasons require an explicit governed contract change and regression evidence before they can enter canonical review evidence.
 
 The packet MUST NOT carry person PII, a rating value, free-form feedback, or free-form model output. Direct construction and mutation-by-copy MUST fail closed unless `human_confirmation_required=True`, `decision_authority="human_review_only"`, `review_state="requires_human_review"`, and `scope_verification_state="requires_authoritative_resolution"` remain intact.
 
