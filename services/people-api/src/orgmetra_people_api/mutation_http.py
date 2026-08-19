@@ -107,6 +107,15 @@ async def _send_error(
     """Normalize one internal error description to the published client-safe schema."""
     error_code = cast(str, payload["error"])
     message = cast(str, payload["message"])
+    support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+    _LOGGER.info(
+        "People mutation request rejected",
+        extra={
+            "error_code": error_code,
+            "http_status": status,
+            "support_reference": support_reference,
+        },
+    )
     await _send_json(
         send,
         status=status,
@@ -114,7 +123,7 @@ async def _send_error(
             "error_code": error_code,
             "message": message,
             "next_action": message,
-            "support_reference": f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}",
+            "support_reference": support_reference,
         },
         extra_headers=extra_headers,
     )
