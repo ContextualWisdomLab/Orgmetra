@@ -3,14 +3,16 @@
 These tests intentionally exercise the public/application boundaries rather than
 accepting review narration as evidence. They cover complete evidence-version
 validation, exact assignment precision, serialized durable idempotency, the
-confirmed-hire idempotency contract, shared HTTP header preconditions, and
-fail-closed route/command dispatch typing.
+confirmed-hire idempotency contract, shared HTTP header preconditions,
+fail-closed route/command dispatch typing, and published mutation-security
+scope.
 """
 
 from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from typing import cast
 import unittest
 from uuid import UUID
@@ -158,6 +160,39 @@ class CurrentReviewRegressionTests(unittest.TestCase):
                     purpose_code="workforce_admin",
                     app=unreachable_app,
                 )
+
+    def test_security_contract_matches_published_openapi_header_scope(self) -> None:
+        """Keep published command scope distinct from currently executable handlers."""
+        repository_root = Path(__file__).resolve().parents[3]
+        security_contract = (repository_root / "docs/SECURITY.md").read_text(encoding="utf-8")
+        api_contract = (repository_root / "docs/API_CONTRACT.md").read_text(encoding="utf-8")
+        openapi_contract = (repository_root / "schemas/openapi.yaml").read_text(encoding="utf-8")
+
+        published_scope = (
+            "The published OpenAPI employment, position, assignment, person, job-profile, "
+            "and selection-decision command families require `X-Tenant-Reference`, "
+            "`X-Actor-Reference`, and `X-Purpose-Code`"
+        )
+        executable_scope = (
+            "The executable People mutation handlers added on this branch currently implement "
+            "employment, position, and assignment creation with those headers."
+        )
+        self.assertIn(published_scope, security_contract)
+        self.assertIn(executable_scope, security_contract)
+        self.assertIn(
+            "Employment, position, assignment, person, job-profile, and selection-decision commands",
+            api_contract,
+        )
+        for operation_id in (
+            "createEmploymentRecord",
+            "createPositionRecord",
+            "createAssignmentRecord",
+            "createPersonRecord",
+            "createJobProfile",
+            "recordSelectionDecision",
+        ):
+            with self.subTest(operation_id=operation_id):
+                self.assertIn(f"operationId: {operation_id}", openapi_contract)
 
 
 if __name__ == "__main__":
