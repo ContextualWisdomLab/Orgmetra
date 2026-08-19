@@ -6,6 +6,7 @@ Status: `implemented_on_active_pr` only. This document does not describe protect
 |---|---|---|---|
 | Correlate one proposed separation to authoritative worker scope without copying worker values | `EmploymentSeparationReviewPacket` binds Person, Employment and exact active Assignment/Job/Position snapshot references/digest | valid-packet and canonical payload regressions | implemented_on_active_pr |
 | Require reviewed separation policy/process | exact policy/process references plus independent SHA-256 digests | malformed reference/digest and deterministic evidence regressions | implemented_on_active_pr |
+| Version high-impact actor/purpose/reason evidence | bounded positive `evidence_version` included in canonical JSON/SHA-256 | version presence, range and digest-change regressions | implemented_on_active_pr |
 | Coordinate final-pay and benefits without copying amounts | value-free final-pay/benefits handoff references and digests; `contains_compensation_values=false` | payload-minimization and direct-construction regressions | implemented_on_active_pr |
 | Coordinate identity/access without owning identity execution | access-deprovisioning plan reference/digest; `external_execution_state=not_authorized_to_execute` | direct-construction fail-closed regression | implemented_on_active_pr |
 | Coordinate organizational-property and continuity work | asset-return, knowledge-transfer and communication plan references/digests | namespace/digest validation regressions | implemented_on_active_pr |
