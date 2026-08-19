@@ -8,7 +8,7 @@ import pytest
 from orgmetra_selection_review import build_selection_review_packet
 
 
-def _build(evidence_version_code: str = "evidence_version_1"):
+def _build(evidence_version_code: object = "evidence_version_1"):
     """Build a valid selection-review packet while varying only its evidence version."""
     return build_selection_review_packet(
         tenant_record_id="2b37b937-c3f1-49aa-8d19-785a7b7a9917",
@@ -19,7 +19,7 @@ def _build(evidence_version_code: str = "evidence_version_1"):
         reviewer_actor_reference="actor:44444444-4444-4444-8444-444444444444",
         purpose_code="selection_review",
         reason_code="candidate_assessment",
-        evidence_version_code=evidence_version_code,
+        evidence_version_code=evidence_version_code,  # type: ignore[arg-type]
         generated_at=datetime(2026, 8, 19, 9, 10, tzinfo=timezone.utc),
     )
 
@@ -40,6 +40,13 @@ def test_rejects_value_bearing_or_noncanonical_evidence_version_codes(
     evidence_version_code: str,
 ) -> None:
     """Prevent evidence-version metadata from becoming a candidate/value side channel."""
+    with pytest.raises(ValueError, match="canonical positive evidence version"):
+        _build(evidence_version_code)
+
+
+@pytest.mark.parametrize("evidence_version_code", [None, True, 1, 1.0, b"evidence_version_1"])
+def test_rejects_non_text_evidence_versions(evidence_version_code: object) -> None:
+    """Fail closed before regex matching when callers bypass static type hints."""
     with pytest.raises(ValueError, match="canonical positive evidence version"):
         _build(evidence_version_code)
 
