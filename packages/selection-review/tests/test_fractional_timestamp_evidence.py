@@ -18,7 +18,7 @@ def _build():
         evidence_set_digest="a" * 64,
         reviewer_actor_reference="actor:55555555-5555-4555-8555-555555555555",
         purpose_code="selection_review",
-        reason_code="structured_selection_review",
+        reason_code="candidate_assessment",
         evidence_version_code="evidence_version_1",
         generated_at=datetime(2026, 8, 19, 2, 20, 0, 123456, tzinfo=timezone.utc),
     )
