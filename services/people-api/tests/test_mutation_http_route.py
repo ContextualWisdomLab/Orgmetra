@@ -393,7 +393,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(case=case):
                 status, _, payload = await self._request(app, **case)
                 self.assertIn(status, (400, 404, 415))
-                self.assertIn(payload["error"], {"invalid_request", "route_not_found", "unsupported_media_type"})
+                self.assertIn(payload["error_code"], {"invalid_request", "route_not_found", "unsupported_media_type"})
         self.assertEqual(authenticator.tokens, [])
         self.assertEqual(port.employment_calls, [])
 
@@ -418,7 +418,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
                     **case,
                 )
                 self.assertIn(status, (400, 413))
-                self.assertIn(payload["error"], {"invalid_request", "payload_too_large"})
+                self.assertIn(payload["error_code"], {"invalid_request", "payload_too_large"})
                 self.assertEqual(authenticator.tokens, ["opaque-token"])
                 self.assertEqual(port.employment_calls, [])
                 self.assertEqual(port.position_calls, [])
@@ -427,7 +427,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
     async def test_wrong_method_and_auth_failures_never_mutate(self) -> None:
         port = RecordingMutationPort()
         status, headers, payload = await self._request(self._app(mutation_port=port), method="GET")
-        self.assertEqual((status, payload["error"], headers[b"allow"]), (405, "method_not_allowed", b"POST"))
+        self.assertEqual((status, payload["error_code"], headers[b"allow"]), (405, "method_not_allowed", b"POST"))
         status, _, payload = await self._request(
             self._app(mutation_port=port),
             headers=[
@@ -438,10 +438,10 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
                 (b"x-purpose-code", b"workforce_admin"),
             ],
         )
-        self.assertEqual((status, payload["error"]), (401, "authentication_required"))
+        self.assertEqual((status, payload["error_code"]), (401, "authentication_required"))
         rejected = FakeAuthenticator(self.principal, error=AuthenticationFailed("expired"))
         status, _, payload = await self._request(self._app(authenticator=rejected, mutation_port=port))
-        self.assertEqual((status, payload["error"]), (401, "authentication_required"))
+        self.assertEqual((status, payload["error_code"]), (401, "authentication_required"))
         self.assertEqual(port.employment_calls, [])
 
     async def test_actor_or_policy_mismatch_never_mutates(self) -> None:
@@ -453,7 +453,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
             for name, value in self._headers()
         ]
         status, _, payload = await self._request(self._app(mutation_port=port), headers=foreign_headers)
-        self.assertEqual((status, payload["error"]), (403, "access_denied"))
+        self.assertEqual((status, payload["error_code"]), (403, "access_denied"))
         denied = PurposeBoundAccessPolicy(
             tenant_record_id=TENANT,
             policy_version_code="people-mutation-v1",
@@ -464,7 +464,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
             permitted_fields=frozenset({"employment_record"}),
         )
         status, _, payload = await self._request(self._app(employment_policy=denied, mutation_port=port))
-        self.assertEqual((status, payload["error"]), (403, "access_denied"))
+        self.assertEqual((status, payload["error_code"]), (403, "access_denied"))
         self.assertEqual(port.employment_calls, [])
 
     async def test_persistence_errors_are_stable_and_non_disclosing(self) -> None:
@@ -476,7 +476,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
         for error, expected in cases:
             with self.subTest(error=error):
                 status, _, payload = await self._request(self._app(mutation_port=RecordingMutationPort(error=error)))
-                self.assertEqual((status, payload["error"]), expected)
+                self.assertEqual((status, payload["error_code"]), expected)
                 self.assertNotIn("password", json.dumps(payload))
                 self.assertNotIn("do-not-leak", json.dumps(payload))
 
