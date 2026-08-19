@@ -35,12 +35,15 @@ unless the resolved actor identities are distinct. Reference inequality alone is
 separation-of-duties evidence.
 
 The packet must not contain candidate PII, compensation values, assessment scores, or
-free-form model output. Direct construction and `dataclasses.replace(...)` revalidate all
-trust-bearing invariants.
+free-form model output. The `reason_code` field is not free-form metadata: it is closed to the
+reviewed value-free `selected_candidate_offer_review` code so syntactically valid text cannot
+smuggle candidate, compensation, or offer-term values into canonical evidence. Direct
+construction and `dataclasses.replace(...)` revalidate all trust-bearing invariants.
 
 Every packet is fixed to:
 
 - purpose `offer_approval_review`;
+- reviewed reason `selected_candidate_offer_review`;
 - `human_confirmation_required=True`;
 - decision authority `human_approval_only`;
 - review state `requires_human_approval`;
@@ -54,7 +57,9 @@ communicate, send, execute, persist an offer, or prove authoritative actor ident
 A buyer can review one deterministic, PII-minimized envelope before an offer moves to the
 authoritative offer workflow. Compensation values stay in their purpose-bound owner boundary,
 while Orgmetra keeps exact provenance references and human accountability. Requester/approver
-separation is proven only after tenant-scoped authoritative actor resolution.
+separation is proven only after tenant-scoped authoritative actor resolution. New offer-review
+reason categories require an explicit contract change and regression evidence rather than
+accepting arbitrary caller text.
 
 Downstream offer persistence/execution must independently enforce authorization, evidence
 versioning, idempotency where applicable, and immutable audit/outbox evidence. This ADR remains
