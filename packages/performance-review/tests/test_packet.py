@@ -142,6 +142,15 @@ def test_reason_code_is_bounded_descriptive_snake_case(reason: str) -> None:
         build_valid(reason_code=reason)
 
 
+@pytest.mark.parametrize(
+    "reason",
+    ["employee_jane_doe", "ssn_123_45_6789", "manager_override"],
+)
+def test_reason_code_rejects_ungoverned_free_form_values(reason: str) -> None:
+    with pytest.raises(ValueError, match="reason_code must be an authorized"):
+        build_valid(reason_code=reason)
+
+
 def test_review_period_must_be_real_dates_in_order() -> None:
     with pytest.raises(ValueError, match="review_period_start"):
         build_valid(review_period_start="2026-01-01")
