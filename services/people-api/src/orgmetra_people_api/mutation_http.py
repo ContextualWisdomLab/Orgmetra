@@ -82,6 +82,8 @@ _EVIDENCE_REFERENCE_KEYS = frozenset({"evidence_reference", "evidence_version_co
 _MAX_EVIDENCE_REFERENCES = 100
 _MAX_EVIDENCE_REFERENCE_LENGTH = 500
 _MAX_EVIDENCE_VERSION_LENGTH = 200
+_MAX_DECISION_REASON_LENGTH = 4000
+_MAX_CONFIRMATION_REFERENCE_LENGTH = 300
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 
 
@@ -426,10 +428,14 @@ def _evidence_version(payload: Mapping[str, object]) -> str:
 
 
 def _require_reason(payload: Mapping[str, object]) -> None:
-    """Reject blank high-impact decision reasons without persisting the free text."""
+    """Reject blank or overlong high-impact decision reasons without persisting the free text."""
     reason = payload.get("decision_reason")
-    if not isinstance(reason, str) or not reason.strip():
-        raise _InvalidHttpRequest("decision_reason is required")
+    if (
+        not isinstance(reason, str)
+        or not reason.strip()
+        or len(reason) > _MAX_DECISION_REASON_LENGTH
+    ):
+        raise _InvalidHttpRequest("decision_reason must be non-blank and at most 4000 characters")
 
 
 def _require_string_field(payload: Mapping[str, object], field_name: str) -> str:
@@ -437,6 +443,14 @@ def _require_string_field(payload: Mapping[str, object], field_name: str) -> str
     value = payload.get(field_name)
     if not isinstance(value, str):
         raise _InvalidHttpRequest(f"{field_name} must be a string")
+    return value
+
+
+def _require_confirmation_reference(payload: Mapping[str, object]) -> str:
+    """Require the published bounded human-confirmation reference before domain parsing."""
+    value = _require_string_field(payload, "confirmation_reference")
+    if not 1 <= len(value) <= _MAX_CONFIRMATION_REFERENCE_LENGTH:
+        raise _InvalidHttpRequest("confirmation_reference must contain 1 through 300 characters")
     return value
 
 
@@ -450,7 +464,7 @@ def _command_for_route(
     """Map one OpenAPI command body onto the matching application command."""
     _require_reason(payload)
     evidence_version_code = _evidence_version(payload)
-    confirmation_reference = _require_string_field(payload, "confirmation_reference")
+    confirmation_reference = _require_confirmation_reference(payload)
     effective_from = _require_string_field(payload, "effective_from")
     if route == "employment-records":
         if frozenset(payload) != _EMPLOYMENT_BODY_KEYS:
