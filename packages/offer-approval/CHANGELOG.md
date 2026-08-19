@@ -6,4 +6,6 @@
 - Require separate requester and approver identities and exact human approval.
 - Bind selected-candidate, Job/optional Position, selection-decision, compensation-package,
   and offer-terms provenance without copying candidate or compensation values.
+- Close `reason_code` to the reviewed value-free `selected_candidate_offer_review` contract so
+  arbitrary candidate, compensation, or offer-term text cannot enter canonical evidence.
 - Keep every packet `requires_human_approval` and `not_authorized_to_send`.
