@@ -8,6 +8,14 @@ import pytest
 from orgmetra_selection_review import build_selection_review_packet
 
 TENANT = "2b37b937-c3f1-49aa-8d19-785a7b7a9917"
+REF = {
+    "candidate": "11111111-1111-4111-8111-111111111111",
+    "job": "22222222-2222-4222-8222-222222222222",
+    "evidence": "33333333-3333-4333-8333-333333333333",
+    "reviewer": "44444444-4444-4444-8444-444444444444",
+    "draft": "55555555-5555-4555-8555-555555555555",
+    "provenance": "66666666-6666-4666-8666-666666666666",
+}
 DIGEST = "0" * 64
 NOW = datetime.fromisoformat("2026-08-18T02:30:00+00:00")
 
@@ -15,11 +23,11 @@ NOW = datetime.fromisoformat("2026-08-18T02:30:00+00:00")
 def packet(**overrides):
     values = dict(
         tenant_record_id=TENANT,
-        candidate_reference="candidate_profile:candidate-01",
-        job_profile_reference="job_profile:job-01",
-        decision_evidence_set_reference="decision_evidence_set:evidence-01",
+        candidate_reference=f"candidate_profile:{REF['candidate']}",
+        job_profile_reference=f"job_profile:{REF['job']}",
+        decision_evidence_set_reference=f"decision_evidence_set:{REF['evidence']}",
         evidence_set_digest=DIGEST,
-        reviewer_actor_reference="actor:reviewer-01",
+        reviewer_actor_reference=f"actor:{REF['reviewer']}",
         purpose_code="selection_review",
         reason_code="candidate_assessment",
         evidence_version_code="evidence_version_1",
@@ -31,8 +39,8 @@ def packet(**overrides):
 
 def test_packet_is_deterministic_and_requires_human_decision():
     value = packet(
-        model_draft_reference="model_draft:draft-01",
-        model_provenance_reference="model_provenance:run-01",
+        model_draft_reference=f"model_draft:{REF['draft']}",
+        model_provenance_reference=f"model_provenance:{REF['provenance']}",
     )
     payload = json.loads(value.canonical_json())
     assert payload["human_confirmation_required"] is True
@@ -50,6 +58,16 @@ def test_packet_without_model_evidence_has_no_model_status():
     assert value.model_output_status is None
 
 
+def test_repr_redacts_candidate_reviewer_and_evidence_correlation():
+    value = packet()
+    rendered = repr(value)
+    assert rendered == "SelectionReviewPacket(<redacted>)"
+    assert value.tenant_record_id not in rendered
+    assert value.candidate_reference not in rendered
+    assert value.reviewer_actor_reference not in rendered
+    assert value.evidence_set_digest not in rendered
+
+
 @pytest.mark.parametrize(
     "tenant",
     [
@@ -65,19 +83,24 @@ def test_tenant_must_be_canonical_operational_uuid(tenant):
 
 
 @pytest.mark.parametrize(
-    ("field", "value"),
+    ("field", "prefix"),
     [
-        ("candidate_reference", "person_record:wrong"),
-        ("candidate_reference", "candidate_profile:"),
-        ("job_profile_reference", "job:wrong"),
-        ("decision_evidence_set_reference", "decision:e1"),
-        ("reviewer_actor_reference", "user:r1"),
-        ("candidate_reference", "candidate_profile:" + "a" * 150),
+        ("candidate_reference", "candidate_profile"),
+        ("job_profile_reference", "job_profile"),
+        ("decision_evidence_set_reference", "decision_evidence_set"),
+        ("reviewer_actor_reference", "actor"),
     ],
 )
-def test_references_are_bounded_and_namespaced(field, value):
-    with pytest.raises(ValueError):
-        packet(**{field: value})
+def test_references_require_expected_namespace_and_operational_uuid(field, prefix):
+    for value in (
+        f"wrong:{REF['candidate']}",
+        f"{prefix}:Jane-Doe",
+        f"{prefix}:00000000-0000-0000-0000-000000000000",
+        f"{prefix}:FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF",
+        f"{prefix}:" + "a" * 150,
+    ):
+        with pytest.raises(ValueError):
+            packet(**{field: value})
 
 
 @pytest.mark.parametrize(
@@ -146,20 +169,22 @@ def test_direct_constructor_cannot_bypass_human_review(field, value):
 def test_model_draft_and_provenance_must_travel_together():
     base = packet()
     with pytest.raises(ValueError):
-        replace(base, model_draft_reference="model_draft:draft-01")
+        replace(base, model_draft_reference=f"model_draft:{REF['draft']}")
     with pytest.raises(ValueError):
-        replace(base, model_provenance_reference="model_provenance:run-01")
+        replace(base, model_provenance_reference=f"model_provenance:{REF['provenance']}")
 
 
-def test_model_evidence_must_be_namespaced_and_untrusted():
+def test_model_evidence_must_be_uuid_backed_namespaced_and_untrusted():
     base = packet(
-        model_draft_reference="model_draft:draft-01",
-        model_provenance_reference="model_provenance:run-01",
+        model_draft_reference=f"model_draft:{REF['draft']}",
+        model_provenance_reference=f"model_provenance:{REF['provenance']}",
     )
     with pytest.raises(ValueError):
         replace(base, model_draft_reference="draft:wrong")
     with pytest.raises(ValueError):
-        replace(base, model_provenance_reference="provenance:wrong")
+        replace(base, model_draft_reference="model_draft:free-form-output")
+    with pytest.raises(ValueError):
+        replace(base, model_provenance_reference="model_provenance:run-01")
     with pytest.raises(ValueError):
         replace(base, model_output_status="verified")
     with pytest.raises(ValueError):
