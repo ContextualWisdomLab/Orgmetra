@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from orgmetra_people_api.hire_http import _read_json_object
+from orgmetra_people_api.hire_http import _PayloadTooLarge, _read_json_object
 
 
 class HireHttpStreamingRegressionTests(unittest.IsolatedAsyncioTestCase):
@@ -26,3 +26,18 @@ class HireHttpStreamingRegressionTests(unittest.IsolatedAsyncioTestCase):
             await _read_json_object(receive),
             {"candidate_profile_id": "candidate-17"},
         )
+
+    async def test_split_body_enforces_the_cumulative_64_kib_limit(self) -> None:
+        """Reject a body whose separate acceptable chunks exceed the total request bound."""
+        messages = iter(
+            (
+                {"type": "http.request", "body": b"x" * 40_000, "more_body": True},
+                {"type": "http.request", "body": b"y" * 25_537, "more_body": False},
+            )
+        )
+
+        async def receive() -> dict[str, object]:
+            return next(messages)
+
+        with self.assertRaises(_PayloadTooLarge):
+            await _read_json_object(receive)
