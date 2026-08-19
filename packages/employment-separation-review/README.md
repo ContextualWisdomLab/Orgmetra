@@ -11,7 +11,7 @@ A packet binds one tenant and proposed employment separation to exact opaque ref
 - the reviewed employment-separation policy and process;
 - value-free final-pay and benefits handoffs;
 - access-deprovisioning, asset-return, knowledge-transfer, and communication plans; and
-- separate requester and accountable reviewer actors.
+- separate requester and accountable reviewer references, whose authoritative actor identities must still be resolved and proven distinct before approval.
 
 The packet also carries a bounded positive `evidence_version` in canonical evidence so a later review contract cannot be mistaken for an earlier one.
 
@@ -21,7 +21,7 @@ Opaque Person and Employment references remain sensitive correlating metadata. T
 
 `scope_verification_state` remains `requires_authoritative_resolution`, `mutation_state` remains `not_authorized_to_apply`, and `external_execution_state` remains `not_authorized_to_execute`. The packet cannot be directly constructed or modified into an approved/executed state.
 
-Immediately before approval, the host must re-resolve **every packet reference within the exact `tenant_record_id` context**, prove the Person-to-Employment binding and every active Assignment/Job/Position represented by the bound snapshot, then verify the proposed date, policy/process evidence, final-pay and benefits handoffs, access deprovisioning, asset return, knowledge transfer, and communication provenance. Reference syntax and packet digests prove correlation/integrity only; they do not prove tenant ownership or worker relationship validity. Only after accountable human approval may the employment mutation proceed through the authoritative Orgmetra People boundary. Downstream actions must use their published owner contracts; this package neither stores provider credentials nor executes foreign-service operations.
+Immediately before approval, the host must re-resolve **every packet reference within the exact `tenant_record_id` context**. That includes resolving `requester_reference` and `reviewer_reference` through the authoritative actor boundary and proving the resolved actor identities are distinct; string inequality between two opaque references is only an early syntactic guard and is not separation-of-duties evidence. The host must also prove the Person-to-Employment binding and every active Assignment/Job/Position represented by the bound snapshot, then verify the proposed date, policy/process evidence, final-pay and benefits handoffs, access deprovisioning, asset return, knowledge transfer, and communication provenance. Reference syntax and packet digests prove correlation/integrity only; they do not prove tenant ownership, actor identity, or worker relationship validity. Only after accountable human approval may the employment mutation proceed through the authoritative Orgmetra People boundary. Downstream actions must use their published owner contracts; this package neither stores provider credentials nor executes foreign-service operations.
 
 ## Reason metadata
 
