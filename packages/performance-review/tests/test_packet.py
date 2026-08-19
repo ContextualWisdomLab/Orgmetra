@@ -55,9 +55,10 @@ def build_valid(**overrides: object) -> PerformanceReviewPacket:
     return build_performance_review_packet(**values)
 
 
-def test_builds_value_free_human_review_packet() -> None:
+def test_builds_value_minimized_human_review_packet() -> None:
     packet = build_valid()
-    assert packet.contains_person_pii is False
+    assert packet.contains_personal_data is True
+    assert packet.contains_direct_person_identifiers is False
     assert packet.contains_rating_value is False
     assert packet.contains_free_form_model_output is False
     assert packet.human_confirmation_required is True
@@ -72,6 +73,8 @@ def test_canonical_json_and_digest_are_deterministic() -> None:
     canonical = packet.canonical_json()
     payload = json.loads(canonical)
     assert payload["person_record_reference"] == PERSON
+    assert payload["contains_personal_data"] is True
+    assert payload["contains_direct_person_identifiers"] is False
     assert payload["scope_verification_state"] == "requires_authoritative_resolution"
     assert payload["generated_at"] == "2026-08-19T05:15:30.123456Z"
     assert packet.sha256_digest() == sha256(canonical.encode("utf-8")).hexdigest()
@@ -188,7 +191,8 @@ def test_generated_at_must_be_timezone_aware_datetime(generated_at: object) -> N
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("contains_person_pii", True, "must not contain person PII"),
+        ("contains_personal_data", False, "personal data"),
+        ("contains_direct_person_identifiers", True, "direct person identifiers"),
         ("contains_rating_value", True, "must not contain rating values"),
         ("contains_free_form_model_output", True, "must not contain free-form model output"),
         ("human_confirmation_required", 1, "human confirmation is mandatory"),
