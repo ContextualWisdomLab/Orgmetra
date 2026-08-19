@@ -3,21 +3,37 @@
 These tests intentionally exercise the public/application boundaries rather than
 accepting review narration as evidence. They cover complete evidence-version
 validation, exact assignment precision, serialized durable idempotency, the
-confirmed-hire idempotency contract, and shared HTTP header preconditions.
+confirmed-hire idempotency contract, shared HTTP header preconditions, and
+fail-closed route/command dispatch typing.
 """
 
 from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import cast
 import unittest
 from uuid import UUID
 
 from orgmetra_people_api.hire import HireAcceptanceCommand
-from orgmetra_people_api.hire_http import _UnsupportedMediaType, _require_json_content_type
-from orgmetra_people_api.mutation_http import _InvalidHttpRequest, _evidence_version
+from orgmetra_people_api.hire_http import (
+    _UnsupportedMediaType,
+    _parse_idempotency_key,
+    _require_json_content_type,
+)
+from orgmetra_people_api.mutation_http import (
+    PeopleMutationAsgiApp,
+    _InvalidHttpRequest,
+    _dispatch_mutation,
+    _evidence_version,
+)
 from orgmetra_people_api.postgres_mutations import _LOOKUP_IDEMPOTENCY_SQL
-from test_people_mutations import assignment_command
+from test_people_mutations import (
+    PRINCIPAL,
+    assignment_command,
+    employment_command,
+    position_command,
+)
 
 
 class CurrentReviewRegressionTests(unittest.TestCase):
@@ -100,6 +116,48 @@ class CurrentReviewRegressionTests(unittest.TestCase):
         for headers in malformed_headers:
             with self.subTest(headers=headers), self.assertRaises(_UnsupportedMediaType):
                 _require_json_content_type({"headers": headers})
+
+    def test_idempotency_key_fails_closed_on_malformed_header_shape_and_types(self) -> None:
+        """Reject malformed ASGI header containers before accepting a retry identity."""
+        malformed_headers: tuple[object, ...] = (
+            {b"idempotency-key": b"idempotency-key-17xx"},
+            [(b"idempotency-key",)],
+            [("idempotency-key", b"idempotency-key-17xx")],
+            [(b"idempotency-key", "idempotency-key-17xx")],
+        )
+        for headers in malformed_headers:
+            with self.subTest(headers=headers), self.assertRaises(_InvalidHttpRequest):
+                _parse_idempotency_key({"headers": headers})
+
+    def test_dispatch_rejects_commands_for_a_different_route(self) -> None:
+        """Do not let a valid command type cross into another mutation route."""
+        unreachable_app = cast(PeopleMutationAsgiApp, object())
+        mismatches = (
+            (
+                "employment-records",
+                position_command(),
+                "employment route requires EmploymentMutationCommand",
+            ),
+            (
+                "position-records",
+                assignment_command(),
+                "position route requires PositionMutationCommand",
+            ),
+            (
+                "assignment-records",
+                employment_command(),
+                "assignment route requires AssignmentMutationCommand",
+            ),
+        )
+        for route, command, error_message in mismatches:
+            with self.subTest(route=route), self.assertRaisesRegex(TypeError, error_message):
+                _dispatch_mutation(
+                    route=route,
+                    principal=PRINCIPAL,
+                    command=command,
+                    purpose_code="workforce_admin",
+                    app=unreachable_app,
+                )
 
 
 if __name__ == "__main__":
