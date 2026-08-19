@@ -1,8 +1,10 @@
 """PII-minimized human selection-review packet contracts.
 
-The packet is review evidence, not an employment decision. It carries only opaque
-resource references and governance metadata so candidate-facing or HR workflows
+The packet is review evidence, not an employment decision. It carries only UUID-backed
+opaque resource references and governance metadata so candidate-facing or HR workflows
 can prepare a decision for an accountable human without copying protected values.
+Ordinary object representation is redacted because candidate/evidence references remain
+sensitive correlating metadata.
 """
 
 from __future__ import annotations
@@ -51,14 +53,22 @@ def _validate_code(value: str, field_name: str) -> None:
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require a bounded namespaced opaque reference with the expected prefix."""
+    """Require the expected namespace plus a canonical operational UUID suffix."""
+    message = f"{field_name} must be an opaque {prefix}: reference"
     if (
         not isinstance(value, str)
         or len(value) > 160
         or not _REFERENCE_PATTERN.fullmatch(value)
         or not value.startswith(f"{prefix}:")
     ):
-        raise ValueError(f"{field_name} must be an opaque {prefix}: reference")
+        raise ValueError(message)
+    suffix = value.split(":", 1)[1]
+    try:
+        parsed = UUID(suffix)
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError(message) from exc
+    if str(parsed) != suffix or parsed.int in (0, (1 << 128) - 1):
+        raise ValueError(message)
 
 
 def _canonical_timestamp(value: datetime) -> str:
@@ -68,7 +78,7 @@ def _canonical_timestamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class SelectionReviewPacket:
     """Immutable, PII-minimized evidence packet awaiting an accountable human decision."""
 
@@ -88,6 +98,10 @@ class SelectionReviewPacket:
     model_draft_reference: str | None = None
     model_provenance_reference: str | None = None
     model_output_status: str | None = None
+
+    def __repr__(self) -> str:
+        """Return a representation that never emits candidate/evidence correlation."""
+        return "SelectionReviewPacket(<redacted>)"
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
