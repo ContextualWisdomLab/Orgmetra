@@ -11,6 +11,7 @@
 | Preserve job-related evidence context | Versioned job-requirements reference + SHA-256 digest |
 | Preserve evidence identity and source provenance without copying values | Evidence-set and source-provenance references + independent SHA-256 digests |
 | Bind privacy/operational handling | Handling-policy and retention-policy references + independent SHA-256 digests |
+| Version actor/purpose/reason evidence explicitly | `evidence_version` is a true positive integer through signed-int32 max and participates in canonical JSON/SHA-256 | `test_evidence_version.py` proves presence, digest separation, bounds, and `dataclasses.replace(...)` revalidation |
 | Preserve accountable collection context | Actor reference, fixed purpose, bounded reason, exact evidence-item count and precision-preserving UTC time |
 | Prevent packet-as-decision misuse | Exact boolean human confirmation, immutable `requires_human_review` state and fixed next action |
 | Prevent ordinary logs/assertions from leaking candidate correlation | generated dataclass repr disabled; `repr(packet)` is `CandidateEvidenceIntakePacket(<redacted>)` | repr-redaction regression |
