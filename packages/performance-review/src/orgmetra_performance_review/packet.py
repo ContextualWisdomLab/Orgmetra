@@ -88,7 +88,7 @@ def _validate_business_date(value: date, field_name: str) -> None:
         raise ValueError(f"{field_name} must be a date")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class PerformanceReviewPacket:
     """Immutable value-free performance-review packet awaiting authoritative resolution."""
 
@@ -120,6 +120,10 @@ class PerformanceReviewPacket:
     review_state: str = _REVIEW_STATE
     scope_verification_state: str = _SCOPE_VERIFICATION_STATE
     next_action: str = _NEXT_ACTION
+
+    def __repr__(self) -> str:
+        """Return a representation that never emits worker/rating correlation evidence."""
+        return "PerformanceReviewPacket(<redacted>)"
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
