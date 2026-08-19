@@ -108,7 +108,7 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class AssignmentChangeReviewPacket:
     """Immutable assignment-change evidence that cannot itself authorize a mutation."""
 
@@ -147,6 +147,10 @@ class AssignmentChangeReviewPacket:
     scope_verification_state: str = _SCOPE_VERIFICATION_STATE
     mutation_state: str = _MUTATION_STATE
     next_action: str = _NEXT_ACTION
+
+    def __repr__(self) -> str:
+        """Return a representation that never emits worker/assignment correlation evidence."""
+        return "AssignmentChangeReviewPacket(<redacted>)"
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
