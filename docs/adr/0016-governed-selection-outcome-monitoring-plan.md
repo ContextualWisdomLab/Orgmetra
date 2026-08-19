@@ -18,9 +18,10 @@ Orgmetra will expose a transport-neutral `SelectionOutcomeMonitoringPlan` that b
 - exact aggregate population and selection-outcome snapshot references and SHA-256 digests;
 - exact protected-attribute handling, small-sample interpretation, and statistical-analysis plan references and digests;
 - an accountable requester reference and an accountable reviewer reference;
+- fixed purpose and reviewed reason metadata plus a bounded positive `evidence_version` that is part of canonical evidence;
 - an explicit monitoring business-date window and evidence-generation instant.
 
-Every namespaced trust-bearing reference uses a canonical non-sentinel UUID suffix. Human-readable, value-bearing, sentinel, and noncanonical suffixes are rejected so labels, policy values, protected-attribute concepts, or actor names cannot be carried through fields represented as opaque identifiers.
+Every namespaced trust-bearing reference uses a canonical non-sentinel UUID suffix. Human-readable, value-bearing, sentinel, and noncanonical suffixes are rejected so labels, policy values, protected-attribute concepts, or actor names cannot be carried through fields represented as opaque identifiers. `evidence_version` must be a true integer from 1 through 2147483647; changing it changes canonical JSON and the packet SHA-256, so revisions to actor/purpose/reason-bound evidence cannot silently collide.
 
 The packet rejects identical requester/reviewer references as an early syntactic guard. Before review, the host must re-resolve both actor references within the exact packet tenant through the authoritative actor boundary and reject review use unless the resolved actor identities are distinct. Reference inequality alone is not separation-of-duties evidence.
 
@@ -30,7 +31,7 @@ Any later analytics or persistence boundary must independently enforce purpose-b
 
 ## Consequences
 
-- Buyers obtain a deterministic governance envelope for recurring selection monitoring without creating a second psychometrics/statistics engine inside Orgmetra.
+- Buyers obtain a deterministic, explicitly versioned governance envelope for recurring selection monitoring without creating a second psychometrics/statistics engine inside Orgmetra.
 - The total-process-by-Job scope is explicit before any future component drill-down.
 - Privacy risk is reduced because individual protected-attribute values and candidate records remain outside the plan envelope and opaque reference fields cannot carry value-bearing suffixes.
 - Requester/reviewer separation is proven from authoritative resolved actor identities rather than inferred from different opaque strings.
