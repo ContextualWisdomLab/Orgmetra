@@ -37,11 +37,12 @@ _REVIEW_STATE = "requires_human_review"
 _SCOPE_VERIFICATION_STATE = "requires_authoritative_resolution"
 _MUTATION_STATE = "not_authorized_to_apply"
 _NEXT_ACTION = (
-    "Verify authoritative Employment and current Assignment/Job/Position scope, "
-    "proposed Position-to-Job binding and capacity, requested effective date, workforce-"
-    "allocation policy, worker-impact evidence, and communication-plan provenance; then "
-    "record accountable human approval and apply the change only through the authoritative "
-    "People mutation boundary."
+    "Before approval, re-resolve every packet reference within tenant_record_id and verify the "
+    "Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position "
+    "worker scope; then verify proposed Position-to-Job binding and capacity, requested "
+    "effective date, workforce-allocation policy, worker-impact evidence, and communication-"
+    "plan provenance. Record accountable human approval and apply the change only through "
+    "the authoritative People mutation boundary."
 )
 
 
