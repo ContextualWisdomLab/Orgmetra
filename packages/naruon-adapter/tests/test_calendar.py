@@ -1,3 +1,5 @@
+"""Regression coverage for the governed Naruon calendar-intent boundary."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -18,6 +20,7 @@ PERSON_ID = "22222222-2222-4222-8222-222222222222"
 
 
 def context(**changes: object) -> CalendarIntentContext:
+    """Build one valid calendar-intent context with optional test overrides."""
     base = CalendarIntentContext(
         tenant_record_id=TENANT_ID,
         resource_reference=f"person_record:{PERSON_ID}",
@@ -33,6 +36,7 @@ def context(**changes: object) -> CalendarIntentContext:
 
 
 def valid_response() -> dict[str, object]:
+    """Return one reviewed intent-only Naruon response fixture."""
     return {
         "workspace_id": "workspace-9",
         "target_source_id": "caldav-source-7",
@@ -56,6 +60,7 @@ def valid_response() -> dict[str, object]:
 
 
 def test_builds_confirmed_intent_without_pii_or_provider_execution() -> None:
+    """Build only a confirmed PII-minimized intent with provider execution disabled."""
     plan = build_calendar_intent(context())
 
     assert plan.method == "POST"
@@ -90,11 +95,13 @@ def test_builds_confirmed_intent_without_pii_or_provider_execution() -> None:
     ],
 )
 def test_rejects_malformed_or_unsafe_context(field: str, bad_value: object) -> None:
+    """Reject malformed identifiers, metadata codes, and transport tokens."""
     with pytest.raises(ContractViolation):
         build_calendar_intent(context(**{field: bad_value}))
 
 
 def test_requires_explicit_human_confirmation() -> None:
+    """Reject a calendar intent when accountable human confirmation is false."""
     with pytest.raises(ContractViolation, match="human confirmation"):
         build_calendar_intent(context(human_confirmed=False))
 
@@ -107,11 +114,13 @@ def test_rejects_truthy_non_boolean_human_confirmation(truthy_non_boolean: objec
 
 
 def test_rejects_unknown_action_kind() -> None:
+    """Reject an action kind that has no reviewed PII-minimized summary contract."""
     with pytest.raises(ContractViolation, match="action kind"):
         build_calendar_intent(context(action_kind="unknown"))
 
 
 def test_optional_target_source_can_be_omitted() -> None:
+    """Allow Naruon to select the target when the caller does not request one."""
     plan = build_calendar_intent(context(target_source_id=None, action_kind="onboarding_task"))
     assert plan.body == {
         "action": "create",
@@ -122,6 +131,7 @@ def test_optional_target_source_can_be_omitted() -> None:
 
 
 def test_validates_intent_only_response_and_retains_correlation_context() -> None:
+    """Normalize a reviewed response while preserving Orgmetra audit correlation."""
     plan = build_calendar_intent(context())
     result = validate_calendar_intent_response(plan, valid_response())
 
@@ -141,7 +151,7 @@ def test_validates_intent_only_response_and_retains_correlation_context() -> Non
         ({"protocol": "webdav"}, "protocol"),
         ({"writeback_mode": "server_owned"}, "writeback mode"),
         ({"requires_if_match": True}, "If-Match"),
-        ({"if_match": '"etag"'}, "If-Match"),
+        ({"if_match": '\"etag\"'}, "If-Match"),
         ({"audit_event": "calendar.writeback.executed"}, "audit event"),
         ({"provider_write_executed": True}, "provider execution"),
         ({"status": "executed"}, "intent status"),
@@ -158,6 +168,7 @@ def test_validates_intent_only_response_and_retains_correlation_context() -> Non
 def test_response_validation_fails_closed_on_contract_drift(
     mutation: dict[str, object], message: str
 ) -> None:
+    """Fail closed for any unreviewed Naruon response shape or semantic drift."""
     plan = build_calendar_intent(context())
     response = valid_response()
     response.update(mutation)
@@ -166,12 +177,14 @@ def test_response_validation_fails_closed_on_contract_drift(
 
 
 def test_response_can_return_auto_selected_target_when_request_omits_one() -> None:
+    """Accept a reviewed target chosen by Naruon when none was requested."""
     plan = build_calendar_intent(context(target_source_id=None))
     result = validate_calendar_intent_response(plan, valid_response())
     assert result.target_source_id == "caldav-source-7"
 
 
 def test_rejects_non_string_and_noncanonical_uuid_inputs() -> None:
+    """Reject non-string and noncanonical tenant UUID representations."""
     with pytest.raises(ContractViolation, match="tenant_record_id"):
         build_calendar_intent(context(tenant_record_id=123))
     with pytest.raises(ContractViolation, match="tenant_record_id"):
@@ -179,6 +192,7 @@ def test_rejects_non_string_and_noncanonical_uuid_inputs() -> None:
 
 
 def test_rejects_non_string_and_unnamespaced_resource_references() -> None:
+    """Reject resource references that are non-string or lack a reviewed namespace."""
     with pytest.raises(ContractViolation, match="resource_reference"):
         build_calendar_intent(context(resource_reference=None))
     with pytest.raises(ContractViolation, match="resource_reference"):
@@ -186,6 +200,7 @@ def test_rejects_non_string_and_unnamespaced_resource_references() -> None:
 
 
 def test_rejects_non_string_code_and_token_values() -> None:
+    """Reject typed values that cannot satisfy code or opaque-token contracts."""
     with pytest.raises(ContractViolation, match="purpose_code"):
         build_calendar_intent(context(purpose_code=7))
     with pytest.raises(ContractViolation, match="actor_reference"):
@@ -193,6 +208,7 @@ def test_rejects_non_string_code_and_token_values() -> None:
 
 
 def test_rejects_non_mapping_response() -> None:
+    """Reject a Naruon response that is not a mapping before field validation."""
     plan = build_calendar_intent(context())
     with pytest.raises(ContractViolation, match="response must be a mapping"):
         validate_calendar_intent_response(plan, [])  # type: ignore[arg-type]
