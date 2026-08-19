@@ -15,7 +15,7 @@ Current primary-source context is recorded in `docs/doctoring/employment-separat
 
 Orgmetra will expose a value-free `EmploymentSeparationReviewPacket` before any authoritative employment-separation mutation.
 
-The packet binds canonical tenant identity and UUID-backed opaque references to the Person, Employment, an exact active Assignment/Job/Position scope snapshot, reviewed separation policy/process, value-free final-pay and benefits handoffs, access-deprovisioning, asset-return, knowledge-transfer, and communication plans. Every evidence artifact is independently bound by lowercase SHA-256.
+The packet binds canonical tenant identity and UUID-backed opaque references to the Person, Employment, an exact active Assignment/Job/Position scope snapshot, reviewed separation policy/process, value-free final-pay and benefits handoffs, access-deprovisioning, asset-return, knowledge-transfer, and communication plans. Every evidence artifact is independently bound by lowercase SHA-256. A bounded positive `evidence_version` is included in canonical evidence so actor/purpose/reason evidence cannot silently drift across review-contract revisions.
 
 The packet carries only reviewed operational `reason_code` categories and no free-form case narrative. Opaque Person/Employment references remain sensitive correlating metadata. Person PII, compensation/benefit values, protected-attribute values, disciplinary or medical narrative, credentials, and free-form model output are outside this envelope.
 
@@ -41,6 +41,7 @@ After review, any authoritative employment mutation must go through the Orgmetra
 - Multiple current assignments are represented through an explicit authoritative snapshot rather than assuming one Job/Position.
 - Sensitive or legally nuanced personal reasons are not normalized into an uncontrolled free-text channel.
 - Access deprovisioning is reviewable without giving this package credentials or ownership of Keyverse/identity execution.
+- Evidence revisions remain explicit in the immutable packet rather than being inferred from package version or prose.
 
 ### Trade-offs
 
@@ -50,4 +51,4 @@ After review, any authoritative employment mutation must go through the Orgmetra
 
 ## Verification
 
-The package contract requires exact 100% owned statement and branch coverage, direct-construction and `dataclasses.replace(...)` fail-closed regressions, canonical timestamp/digest evidence, strict UUID-backed opaque references, controlled reason categories, value-minimization assertions, actor separation, and immutable review/mutation/execution states.
+The package contract requires exact 100% owned statement and branch coverage, direct-construction and `dataclasses.replace(...)` fail-closed regressions, canonical timestamp/digest evidence, bounded positive evidence-version regressions, strict UUID-backed opaque references, controlled reason categories, value-minimization assertions, actor separation, and immutable review/mutation/execution states.
