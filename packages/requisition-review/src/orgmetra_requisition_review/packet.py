@@ -23,8 +23,11 @@ _REFERENCE_PATTERN = re.compile(
 _REVIEW_PURPOSE = "requisition_review"
 _REVIEW_STATE = "requires_human_approval"
 _NEXT_ACTION = (
-    "Confirm the opening is tied to the approved Job requirements and authorized "
-    "headcount, then record the accountable human requisition approval."
+    "Within tenant_record_id, re-resolve hiring_manager_actor_reference and "
+    "approver_actor_reference through the authoritative actor boundary and verify their "
+    "resolved actor identities are distinct; then confirm the opening is tied to the "
+    "approved Job requirements and authorized headcount before recording accountable human "
+    "requisition approval."
 )
 
 
@@ -117,6 +120,8 @@ class RequisitionReviewPacket:
             "hiring_manager_actor_reference",
         )
         _validate_reference(self.approver_actor_reference, "actor", "approver_actor_reference")
+        if self.hiring_manager_actor_reference == self.approver_actor_reference:
+            raise ValueError("hiring manager and approver must be different actor references")
         if type(self.requested_opening_count) is not int or not 1 <= self.requested_opening_count <= 100:
             raise ValueError("requested_opening_count must be an integer from 1 through 100")
         if self.position_record_reference is not None:
