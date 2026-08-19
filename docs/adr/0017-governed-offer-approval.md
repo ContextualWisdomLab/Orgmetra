@@ -44,10 +44,15 @@ Every packet is fixed to:
 
 - purpose `offer_approval_review`;
 - reviewed reason `selected_candidate_offer_review`;
+- bounded positive integer `evidence_version` (default `1`), included in canonical JSON/SHA-256;
 - `human_confirmation_required=True`;
 - decision authority `human_approval_only`;
 - review state `requires_human_approval`;
 - delivery state `not_authorized_to_send`.
+
+`evidence_version` accepts only real integers from `1` through `2147483647`; booleans, text,
+zero, negative values, and overflow values fail closed. It versions the immutable pre-send
+evidence envelope and does not itself prove source-version resolution, approval, or delivery.
 
 Canonical JSON and SHA-256 are audit-correlation evidence only. The packet does not approve,
 communicate, send, execute, persist an offer, or prove authoritative actor identity.
@@ -56,13 +61,13 @@ communicate, send, execute, persist an offer, or prove authoritative actor ident
 
 A buyer can review one deterministic, PII-minimized envelope before an offer moves to the
 authoritative offer workflow. Compensation values stay in their purpose-bound owner boundary,
-while Orgmetra keeps exact provenance references and human accountability. Requester/approver
-separation is proven only after tenant-scoped authoritative actor resolution. New offer-review
-reason categories require an explicit contract change and regression evidence rather than
-accepting arbitrary caller text.
+while Orgmetra keeps exact provenance references, evidence version, and human accountability.
+Requester/approver separation is proven only after tenant-scoped authoritative actor resolution.
+New offer-review reason categories require an explicit contract change and regression evidence
+rather than accepting arbitrary caller text.
 
-Downstream offer persistence/execution must independently enforce authorization, evidence
-versioning, idempotency where applicable, and immutable audit/outbox evidence. This ADR remains
+Downstream offer persistence/execution must independently enforce authorization, source-evidence
+resolution, idempotency where applicable, and immutable audit/outbox evidence. This ADR remains
 proposed active-PR truth until integrated into protected `develop`.
 
 ## References
