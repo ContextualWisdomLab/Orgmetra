@@ -18,6 +18,12 @@ identities cannot be smuggled into the governance envelope through a reference f
 `selected_candidate_offer_review` code; arbitrary lower-snake-case text is rejected so the
 reason field cannot become a side channel for candidate, compensation, or offer-term values.
 
+Every packet also carries a bounded positive integer `evidence_version` (default `1`). It is
+serialized into canonical JSON, so changing the governed evidence version changes the packet
+SHA-256 digest. Zero, negative, boolean, textual, and values above `2147483647` fail closed.
+The field versions this immutable pre-send evidence envelope; it is not approval, delivery,
+or proof that referenced source versions were authoritatively resolved.
+
 A valid packet always remains `requires_human_approval` and
 `not_authorized_to_send`. Before approval, the host must re-resolve `requester_reference` and
 `approver_reference` within the exact `tenant_record_id` through the authoritative actor
