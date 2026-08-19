@@ -17,11 +17,10 @@ from uuid import UUID
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
-_REFERENCE_PATTERN = re.compile(
-    r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
-)
+_REQUIREMENTS_VERSION_PATTERN = re.compile(r"^requirements_version_[1-9][0-9]{0,8}$")
 _REVIEW_PURPOSE = "requisition_review"
 _REVIEW_STATE = "requires_human_approval"
+_ALLOWED_REASON_CODES = frozenset({"approved_growth_plan"})
 _NEXT_ACTION = (
     "Within tenant_record_id, re-resolve hiring_manager_actor_reference and "
     "approver_actor_reference through the authoritative actor boundary and verify their "
@@ -54,14 +53,31 @@ def _validate_code(value: str, field_name: str) -> None:
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require a bounded namespaced opaque reference with the expected prefix."""
-    if (
-        not isinstance(value, str)
-        or len(value) > 160
-        or not _REFERENCE_PATTERN.fullmatch(value)
-        or not value.startswith(f"{prefix}:")
-    ):
-        raise ValueError(f"{field_name} must be an opaque {prefix}: reference")
+    """Require an expected namespace plus a canonical non-sentinel UUID suffix."""
+    namespace = f"{prefix}:"
+    if not isinstance(value, str) or len(value) > 160 or not value.startswith(namespace):
+        raise ValueError(
+            f"{field_name} must be an opaque {prefix}:<canonical-uuid> reference"
+        )
+    suffix = value[len(namespace) :]
+    try:
+        parsed = UUID(suffix)
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError(
+            f"{field_name} must be an opaque {prefix}:<canonical-uuid> reference"
+        ) from exc
+    if str(parsed) != suffix or parsed.int in (0, (1 << 128) - 1):
+        raise ValueError(
+            f"{field_name} must be an opaque {prefix}:<canonical-uuid> reference"
+        )
+
+
+def _validate_requirements_version_code(value: str) -> None:
+    """Require a bounded numeric requirements-version identifier without semantic text."""
+    if not isinstance(value, str) or not _REQUIREMENTS_VERSION_PATTERN.fullmatch(value):
+        raise ValueError(
+            "requirements_version_code must match requirements_version_<positive-integer>"
+        )
 
 
 def _canonical_timestamp(value: datetime) -> str:
@@ -71,7 +87,7 @@ def _canonical_timestamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class RequisitionReviewPacket:
     """Immutable evidence packet awaiting accountable human requisition approval."""
 
@@ -108,7 +124,7 @@ class RequisitionReviewPacket:
             or not _DIGEST_PATTERN.fullmatch(self.job_requirements_digest)
         ):
             raise ValueError("job_requirements_digest must be lowercase SHA-256 hex")
-        _validate_code(self.requirements_version_code, "requirements_version_code")
+        _validate_requirements_version_code(self.requirements_version_code)
         _validate_reference(
             self.headcount_authorization_reference,
             "headcount_authorization",
@@ -136,6 +152,8 @@ class RequisitionReviewPacket:
         if self.purpose_code != _REVIEW_PURPOSE:
             raise ValueError("purpose_code must remain requisition_review")
         _validate_code(self.reason_code, "reason_code")
+        if self.reason_code not in _ALLOWED_REASON_CODES:
+            raise ValueError("reason_code must use a reviewed non-sensitive requisition reason")
         _canonical_timestamp(self.generated_at)
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for requisition approval")
@@ -143,6 +161,10 @@ class RequisitionReviewPacket:
             raise ValueError("review_state must remain requires_human_approval")
         if self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed requisition-review instruction")
+
+    def __repr__(self) -> str:
+        """Return a fully redacted representation safe for routine logs and assertions."""
+        return "RequisitionReviewPacket(<redacted>)"
 
     def canonical_json(self) -> str:
         """Return deterministic canonical JSON for immutable audit correlation."""
