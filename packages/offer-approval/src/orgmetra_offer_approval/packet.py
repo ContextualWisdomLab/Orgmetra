@@ -82,7 +82,7 @@ def _canonical_timestamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class OfferApprovalPacket:
     """Immutable value-free offer review packet awaiting accountable approval."""
 
@@ -110,6 +110,10 @@ class OfferApprovalPacket:
     review_state: str = _REVIEW_STATE
     delivery_state: str = _DELIVERY_STATE
     next_action: str = _NEXT_ACTION
+
+    def __repr__(self) -> str:
+        """Return a representation that never emits candidate or compensation evidence."""
+        return "OfferApprovalPacket(<redacted>)"
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
