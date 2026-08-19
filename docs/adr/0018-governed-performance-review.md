@@ -24,9 +24,12 @@ The packet MUST bind:
 - an exact criterion-observation-snapshot reference plus independent SHA-256 digest;
 - an optional development-plan reference/digest pair;
 - explicit business review-period dates;
-- one accountable reviewer, fixed `performance_review` purpose, a reviewed closed reason code, and precision-preserving evidence timestamp.
+- one accountable reviewer, fixed `performance_review` purpose, a reviewed closed reason code, and precision-preserving evidence timestamp;
+- a bounded positive integer `evidence_version`, defaulting to `1`, that is included in canonical evidence and therefore changes the packet digest when the governed evidence version changes.
 
 The initial closed reason vocabulary contains only `scheduled_cycle_review`. Arbitrary lower-snake-case values are rejected even when syntactically well formed, because free-form reason text can encode a person name, identifier, or unreviewed decision context. Additional reasons require an explicit governed contract change and regression evidence before they can enter canonical review evidence.
+
+`evidence_version` accepts only real integers from `1` through `2147483647`; booleans, text, zero, negative values, and overflow values fail closed. The field versions the immutable review evidence envelope and does not itself prove source-version resolution, human approval, or rating completion.
 
 The packet MUST NOT carry person PII, a rating value, free-form feedback, or free-form model output. Direct construction and mutation-by-copy MUST fail closed unless `human_confirmation_required=True`, `decision_authority="human_review_only"`, `review_state="requires_human_review"`, and `scope_verification_state="requires_authoritative_resolution"` remain intact.
 
@@ -38,7 +41,7 @@ Canonical JSON and SHA-256 are immutable correlation evidence only. They do not 
 
 Buyers can present a review-ready correlation envelope while keeping authoritative Employment/Job and performance evidence separable from the later human rating/feedback event. A consumer cannot truthfully treat the packet itself as proof that all referenced records belong to the same employee/job/cycle. Person correlation remains sensitive metadata and therefore still requires purpose-bound access, least privilege, retention/export controls, and immutable audit handling.
 
-This slice adds no database migration, no rating computation, no cross-service table access, and no automated employment decision. Later authoritative rating persistence must independently preserve actor, purpose, reason, evidence version, human confirmation, audit/outbox, temporal scope, authoritative scope-resolution evidence, and any applicable policy requirements.
+This slice adds no database migration, no rating computation, no cross-service table access, and no automated employment decision. The pre-rating packet now preserves actor, purpose, reviewed reason, and evidence version in its immutable correlation evidence; later authoritative rating persistence must independently preserve those values plus human confirmation, audit/outbox, temporal scope, authoritative scope-resolution evidence, and any applicable policy requirements.
 
 ## References
 
