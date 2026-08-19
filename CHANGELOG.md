@@ -33,6 +33,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- New predictive-validity membership must use one normalized worker-level case; the three independent validity-study decision/evidence/outcome link relations are historical read surfaces only and can no longer accept new rows. A case insert also rejects a criterion observation whose recorded interval is already closed at `linked_at`.
 - Canonicalized service identifiers as two-or-more-word `snake_case` across architecture, deployment, ACL, metrics, and client contracts.
 - Separated fast-mlsirm, TEPP, and Psychometrics Commons into immutable external scientific contracts.
 - Defined 100% owned production statement and branch coverage as a CI gate where the pinned toolchain exposes those metrics.
@@ -51,6 +52,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Security
 
+- Predictive-validity cases fail closed when selection evidence, Job scope, study criterion, converted worker, or system-recorded visibility does not match; the normalized case relation is tenant-qualified, append-only, TRUNCATE-protected, and forced through row-level security.
 - Purpose-bound PII authorization now fails closed across active tenant, authenticated actor tenant, resource tenant, resource kind, purpose, operation, operation-specific Keyverse scope, and requested-field subset; malformed/wildcard-like attributes, mutable field/scope collections, reserved UUID sentinels, and cross-tenant confused-deputy contexts are rejected before protected values are returned. Authorization requests and allow/deny evidence now also require and preserve one namespaced opaque target-resource reference, so immutable audit correlation identifies the exact HR record without copying its protected values. Authorization evidence otherwise contains governance metadata and field names only, with stable denial reasons and actionable next steps rather than PII.
 - LLM output constrained to draft evidence.
 - No direct cross-service application-table access.
@@ -67,4 +69,4 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Notes
 
-- Protected `bootstrap` includes the integrated foundation, governed audit/outbox persistence, hire-to-assignment and employment-status recovery, bitemporal organization-hierarchy validation, and governed job-analysis evidence through merge commit `67537a3061580dc299a0852c1ddf7babfb0d96e3`; candidate-to-worker conversion, worker-bound validity cases, and purpose-bound PII authorization remain active-PR truth until their exact protected-base gates pass and they merge.
+- Protected `develop` at `f815feedcb0bac264d9814b2932338c512276110` includes governed candidate-to-worker conversion, purpose-bound PII authorization, and the GET-only People API; normalized worker-bound validity-study case integrity remains active-PR truth until this exact reconciled branch passes fresh protected-base gates and merges.
