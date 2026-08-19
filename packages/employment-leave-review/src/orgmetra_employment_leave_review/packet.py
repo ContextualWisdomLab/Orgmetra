@@ -1,9 +1,11 @@
-"""Governed, value-free pre-mutation employment-leave review evidence.
+"""Governed, value-minimized pre-mutation employment-leave review evidence.
 
 The packet correlates one proposed leave/status transition to authoritative Person and
 Employment scope plus reviewed policy, leave-case, continuity, benefits-continuity and
-return-to-work evidence. It intentionally carries no leave reason narrative, medical or
-family information, compensation/benefit values, credentials, or free-form model output.
+return-to-work evidence. The opaque worker correlation and exact leave dates remain
+personal data, so the packet is deliberately purpose-bound rather than falsely labeled
+PII-free. It excludes direct identifiers, leave reason narrative, medical or family
+values, compensation/benefit values, credentials, and free-form model output.
 Authoritative eligibility, scope resolution, approval, HRIS mutation, and downstream
 execution remain outside this package.
 """
@@ -128,7 +130,7 @@ class EmploymentLeaveReviewPacket:
     requested_leave_end_on: date
     generated_at: datetime
     evidence_version: int = 1
-    contains_person_pii: bool = False
+    contains_person_pii: bool = True
     contains_medical_or_family_values: bool = False
     contains_compensation_or_benefit_values: bool = False
     contains_free_form_case_narrative: bool = False
@@ -197,8 +199,10 @@ class EmploymentLeaveReviewPacket:
             raise ValueError("requested_leave_end_on must not precede requested_leave_start_on")
         _canonical_timestamp(self.generated_at)
         _validate_evidence_version(self.evidence_version)
-        if self.contains_person_pii is not False:
-            raise ValueError("employment leave review packet must not contain person PII")
+        if self.contains_person_pii is not True:
+            raise ValueError(
+                "employment leave review packet must acknowledge minimum-necessary personal data"
+            )
         if self.contains_medical_or_family_values is not False:
             raise ValueError("employment leave review packet must not contain medical or family values")
         if self.contains_compensation_or_benefit_values is not False:
@@ -298,7 +302,7 @@ def build_employment_leave_review_packet(
     generated_at: datetime,
     evidence_version: int = 1,
 ) -> EmploymentLeaveReviewPacket:
-    """Build a value-free leave packet pending authoritative human approval."""
+    """Build a value-minimized leave packet pending authoritative human approval."""
     return EmploymentLeaveReviewPacket(
         tenant_record_id=tenant_record_id,
         leave_review_reference=leave_review_reference,
