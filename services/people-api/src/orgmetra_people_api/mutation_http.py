@@ -407,6 +407,14 @@ def _require_reason(payload: Mapping[str, object]) -> None:
         raise _InvalidHttpRequest("decision_reason is required")
 
 
+def _require_string_field(payload: Mapping[str, object], field_name: str) -> str:
+    """Require an exact JSON string instead of accepting values after coercion."""
+    value = payload.get(field_name)
+    if not isinstance(value, str):
+        raise _InvalidHttpRequest(f"{field_name} must be a string")
+    return value
+
+
 def _command_for_route(
     route: str,
     tenant_record_id: UUID,
@@ -417,21 +425,22 @@ def _command_for_route(
     """Map one OpenAPI command body onto the matching application command."""
     _require_reason(payload)
     evidence_version_code = _evidence_version(payload)
-    confirmation_reference = payload.get("confirmation_reference")
+    confirmation_reference = _require_string_field(payload, "confirmation_reference")
+    effective_from = _require_string_field(payload, "effective_from")
     if route == "employment-records":
         if frozenset(payload) != _EMPLOYMENT_BODY_KEYS:
             raise _InvalidHttpRequest("employment command fields are incomplete or unsupported")
         return EmploymentMutationCommand(
             tenant_record_id=tenant_record_id,
-            person_record_id=UUID(str(payload["person_record_id"])),
+            person_record_id=UUID(_require_string_field(payload, "person_record_id")),
             employment_record_id=id_factory(),
             employment_record_version_id=id_factory(),
             audit_event_record_id=id_factory(),
             outbox_delivery_record_id=id_factory(),
-            employment_status_code=str(payload["employment_status_code"]),
-            employment_concurrency_code=str(payload["employment_concurrency_code"]),
-            effective_from=date.fromisoformat(str(payload["effective_from"])),
-            confirmation_reference=str(confirmation_reference),
+            employment_status_code=_require_string_field(payload, "employment_status_code"),
+            employment_concurrency_code=_require_string_field(payload, "employment_concurrency_code"),
+            effective_from=date.fromisoformat(effective_from),
+            confirmation_reference=confirmation_reference,
             evidence_version_code=evidence_version_code,
             idempotency_key=idempotency_key,
         )
@@ -440,15 +449,15 @@ def _command_for_route(
             raise _InvalidHttpRequest("position command fields are incomplete or unsupported")
         return PositionMutationCommand(
             tenant_record_id=tenant_record_id,
-            organization_unit_id=UUID(str(payload["organization_unit_id"])),
-            job_profile_id=UUID(str(payload["job_profile_id"])),
+            organization_unit_id=UUID(_require_string_field(payload, "organization_unit_id")),
+            job_profile_id=UUID(_require_string_field(payload, "job_profile_id")),
             position_record_id=id_factory(),
             position_record_version_id=id_factory(),
             audit_event_record_id=id_factory(),
             outbox_delivery_record_id=id_factory(),
-            position_status_code=str(payload["position_status_code"]),
-            effective_from=date.fromisoformat(str(payload["effective_from"])),
-            confirmation_reference=str(confirmation_reference),
+            position_status_code=_require_string_field(payload, "position_status_code"),
+            effective_from=date.fromisoformat(effective_from),
+            confirmation_reference=confirmation_reference,
             evidence_version_code=evidence_version_code,
             idempotency_key=idempotency_key,
         )
@@ -456,15 +465,15 @@ def _command_for_route(
         raise _InvalidHttpRequest("assignment command fields are incomplete or unsupported")
     return AssignmentMutationCommand(
         tenant_record_id=tenant_record_id,
-        employment_record_id=UUID(str(payload["employment_record_id"])),
-        person_record_id=UUID(str(payload["person_record_id"])),
-        position_record_id=UUID(str(payload["position_record_id"])),
+        employment_record_id=UUID(_require_string_field(payload, "employment_record_id")),
+        person_record_id=UUID(_require_string_field(payload, "person_record_id")),
+        position_record_id=UUID(_require_string_field(payload, "position_record_id")),
         assignment_record_id=id_factory(),
         audit_event_record_id=id_factory(),
         outbox_delivery_record_id=id_factory(),
         allocation_ratio=parse_allocation_ratio(payload["allocation_ratio"]),
-        effective_from=date.fromisoformat(str(payload["effective_from"])),
-        confirmation_reference=str(confirmation_reference),
+        effective_from=date.fromisoformat(effective_from),
+        confirmation_reference=confirmation_reference,
         evidence_version_code=evidence_version_code,
         idempotency_key=idempotency_key,
     )
