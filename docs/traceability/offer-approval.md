@@ -10,12 +10,13 @@ Status: **active PR / proposed capability**, not protected-main truth.
 | Compensation/terms provenance without value duplication | value-free canonical JSON test; digest/reference validation tests | Package and terms are exact reference+digest pairs; salary/benefit values are absent. |
 | Value-free reason metadata | `test_rejects_value_bearing_reason_codes_through_direct_and_replace` | `reason_code` is closed to reviewed `selected_candidate_offer_review`; arbitrary lower-snake-case candidate, compensation, or offer-term text fails closed. |
 | Human accountability and separation of duties | same-reference rejection plus `test_actor_separation.py` | Requester/approver references differ locally, and approval requires tenant-scoped authoritative resolution proving distinct resolved actor identities. |
+| High-impact evidence versioning | `test_evidence_version.py` | Bounded positive `evidence_version` is in canonical JSON, changes correlation SHA-256 across versions, and revalidates through mutation-by-copy. |
 | No premature offer delivery | direct-constructor/replace fail-closed tests | State remains `requires_human_approval` and `not_authorized_to_send`. |
-| Deterministic audit correlation | canonical JSON, fractional-second, timezone, SHA-256 tests | Canonical evidence is precision-preserving and deterministic. |
+| Deterministic audit correlation | canonical JSON, fractional-second, timezone, evidence-version, SHA-256 tests | Canonical evidence is precision-preserving, versioned, and deterministic. |
 | Public API readability | module/class/function docstrings | Beginner-readable contract boundary is documented in source and package README. |
 
 The SHA-256 packet digest proves only the exact canonical envelope bytes. It does not prove that
 referenced evidence is substantively correct, that requester/approver resolve to different
 identities, that compensation is lawful/fair, that a human approved the offer, or that an offer
-was delivered. Authoritative actor resolution remains outside this evidence packet and is a
-required pre-approval host check.
+was delivered. Authoritative actor and source-evidence resolution remain outside this evidence
+packet and are required pre-approval host checks.
