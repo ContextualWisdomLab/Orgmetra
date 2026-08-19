@@ -186,3 +186,49 @@ def test_direct_constructor_cannot_bypass_human_approval(field, value):
     base = packet()
     with pytest.raises(ValueError):
         replace(base, **{field: value})
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("requisition_reference", "requisition:Jane-Doe"),
+        ("job_profile_reference", "job_profile:RN-ICU"),
+        ("job_requirements_reference", "job_requirements:salary-120000"),
+        ("headcount_authorization_reference", "headcount_authorization:finance-budget"),
+        ("hiring_manager_actor_reference", "actor:seonghobae"),
+        ("approver_actor_reference", "actor:jane_doe"),
+        ("position_record_reference", "position_record:seat-01"),
+    ],
+)
+def test_trust_references_reject_value_bearing_non_uuid_suffixes(field, value):
+    """Prevent portable governance evidence from accepting human-readable trust references."""
+    overrides = {field: value}
+    if field == "position_record_reference":
+        overrides["requested_opening_count"] = 1
+    with pytest.raises(ValueError):
+        packet(**overrides)
+
+
+@pytest.mark.parametrize("reason_code", ["jane_doe", "salary_120000", "manager_seonghobae"])
+def test_reason_code_rejects_personal_or_value_bearing_free_form_codes(reason_code):
+    """Keep reason metadata on a reviewed value-free vocabulary."""
+    with pytest.raises(ValueError):
+        packet(reason_code=reason_code)
+
+
+def test_requirements_version_rejects_semantic_or_personal_text():
+    """Keep requirements version metadata numeric and non-semantic."""
+    with pytest.raises(ValueError):
+        packet(requirements_version_code="requirements_version_jane_doe")
+
+
+def test_dataclass_replacement_cannot_reintroduce_value_bearing_metadata():
+    """Apply the same privacy invariants to direct dataclass replacement paths."""
+    base = packet()
+    for field, value in (
+        ("job_profile_reference", "job_profile:RN-ICU"),
+        ("reason_code", "salary_120000"),
+        ("requirements_version_code", "requirements_version_jane_doe"),
+    ):
+        with pytest.raises(ValueError):
+            replace(base, **{field: value})
