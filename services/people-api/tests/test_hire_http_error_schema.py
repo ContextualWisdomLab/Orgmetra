@@ -42,7 +42,7 @@ class HireHttpErrorSchemaTests(unittest.IsolatedAsyncioTestCase):
     """Keep confirmed-hire failures compatible with the published client error contract."""
 
     async def test_route_failure_contains_canonical_client_safe_error_fields(self) -> None:
-        """Require actionable error metadata instead of the legacy two-field envelope."""
+        """Require actionable metadata and an operator-resolvable support reference."""
         app = HireAcceptanceAsgiApp(
             authenticator=_UnusedAuthenticator(),
             policy=PurposeBoundAccessPolicy(
@@ -66,17 +66,18 @@ class HireHttpErrorSchemaTests(unittest.IsolatedAsyncioTestCase):
             """Capture the ASGI response for contract assertions."""
             messages.append(message)
 
-        await app(
-            {
-                "type": "http",
-                "method": "POST",
-                "path": "/v1/not-the-hire-route",
-                "query_string": b"purpose=candidate_hire",
-                "headers": (),
-            },
-            receive,
-            send,
-        )
+        with self.assertLogs("orgmetra_people_api.hire_http", level="INFO") as captured:
+            await app(
+                {
+                    "type": "http",
+                    "method": "POST",
+                    "path": "/v1/not-the-hire-route",
+                    "query_string": b"purpose=candidate_hire",
+                    "headers": (),
+                },
+                receive,
+                send,
+            )
 
         start, response = messages
         payload = json.loads(bytes(response["body"]))
@@ -89,3 +90,9 @@ class HireHttpErrorSchemaTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             {"error_code", "message", "next_action", "support_reference"}.issubset(payload)
         )
+        self.assertEqual(len(captured.records), 1)
+        record = captured.records[0]
+        self.assertEqual(record.error_code, payload["error_code"])
+        self.assertEqual(record.http_status, 404)
+        self.assertEqual(record.support_reference, payload["support_reference"])
+        self.assertNotIn(str(_TENANT), record.getMessage())
