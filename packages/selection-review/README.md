@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from orgmetra_selection_review import build_selection_review_packet
 
 packet = build_selection_review_packet(
-    tenant_record_id="2b37b937-c3f1-49aa-8d19-785A7B7A9917".lower(),
+    tenant_record_id="2b37b937-c3f1-49aa-8d19-785a7b7a9917",
     candidate_reference="candidate_profile:11111111-1111-4111-8111-111111111111",
     job_profile_reference="job_profile:22222222-2222-4222-8222-222222222222",
     decision_evidence_set_reference="decision_evidence_set:33333333-3333-4333-8333-333333333333",
