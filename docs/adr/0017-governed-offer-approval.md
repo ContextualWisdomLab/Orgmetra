@@ -14,7 +14,9 @@ compensation-package provenance, offer-terms provenance, and accountable human a
 Offer review is high-impact employment workflow. A governance envelope must not become an
 alternate decision authority, a salary-value cache, or a channel that lets generated/model
 material masquerade as an approved offer. Different opaque requester/approver references also
-do not prove that the authoritative actor boundary resolves them to different people.
+do not prove that the authoritative actor boundary resolves them to different people, and
+canonical UUID syntax does not prove that the referenced candidate, requisition, Job/Position,
+selection decision, compensation package, or offer terms belong to the packet tenant.
 
 ISO 30405:2023 provides current recruitment guidance across planning, assessment, employment,
 stakeholder management, and review. EEOC guidance on tests and selection procedures emphasizes
@@ -28,11 +30,12 @@ Orgmetra will expose `OfferApprovalPacket` as value-free review evidence only.
 
 The packet binds opaque references for the candidate profile, requisition, Job, optional
 Position, selection decision, compensation package, and offer terms. Decision/package/terms
-artifacts are independently SHA-256 bound. Identical requester/approver references are rejected
-as an early syntactic guard. Before approval, the host must re-resolve both actor references
-within the exact packet tenant through the authoritative actor boundary and reject approval
-unless the resolved actor identities are distinct. Reference inequality alone is not
-separation-of-duties evidence.
+artifacts are independently SHA-256 bound. Before approval, the host must re-resolve **every
+packet reference** within the exact `tenant_record_id` through its authoritative boundary and
+reject approval if any reference belongs to another tenant or cannot be authoritatively
+resolved. Identical requester/approver references are rejected as an early syntactic guard;
+after tenant-scoped resolution, the host must prove their resolved actor identities are
+distinct. Reference inequality alone is not separation-of-duties evidence.
 
 The packet must not contain candidate PII, compensation values, assessment scores, or
 free-form model output. The `reason_code` field is not free-form metadata: it is closed to the
@@ -55,20 +58,21 @@ zero, negative values, and overflow values fail closed. It versions the immutabl
 evidence envelope and does not itself prove source-version resolution, approval, or delivery.
 
 Canonical JSON and SHA-256 are audit-correlation evidence only. The packet does not approve,
-communicate, send, execute, persist an offer, or prove authoritative actor identity.
+communicate, send, execute, persist an offer, or prove authoritative reference/actor identity.
 
 ## Consequences
 
 A buyer can review one deterministic, PII-minimized envelope before an offer moves to the
 authoritative offer workflow. Compensation values stay in their purpose-bound owner boundary,
 while Orgmetra keeps exact provenance references, evidence version, and human accountability.
-Requester/approver separation is proven only after tenant-scoped authoritative actor resolution.
-New offer-review reason categories require an explicit contract change and regression evidence
-rather than accepting arbitrary caller text.
+Cross-tenant evidence mixing is fail-closed at the host approval boundary because every packet
+reference must resolve in the exact tenant. Requester/approver separation is proven only after
+tenant-scoped authoritative actor resolution. New offer-review reason categories require an
+explicit contract change and regression evidence rather than accepting arbitrary caller text.
 
-Downstream offer persistence/execution must independently enforce authorization, source-evidence
-resolution, idempotency where applicable, and immutable audit/outbox evidence. This ADR remains
-proposed active-PR truth until integrated into protected `develop`.
+Downstream offer persistence/execution must independently enforce authorization, tenant-scoped
+source-evidence resolution, idempotency where applicable, and immutable audit/outbox evidence.
+This ADR remains proposed active-PR truth until integrated into protected `develop`.
 
 ## References
 
