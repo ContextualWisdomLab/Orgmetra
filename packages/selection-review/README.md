@@ -4,6 +4,8 @@
 
 The packet is **not** an employment decision. It does not contain a candidate name, email address, demographic attribute, assessment value, recommendation score, or model-generated prose. It binds UUID-backed opaque candidate, Job, evidence-set and reviewer references plus purpose/reason/evidence-version metadata to deterministic canonical JSON and a SHA-256 digest. Human-readable or value-bearing reference suffixes are rejected so reference fields cannot become a covert candidate-data channel, and `repr(packet)` is fully redacted to avoid accidental disclosure in logs/assertion failures.
 
+`reason_code` is likewise not free-form metadata. The reviewed vocabulary currently accepts only `candidate_assessment`. Arbitrary lower-snake-case values are rejected even when syntactically valid, preventing names, compensation figures, protected-attribute labels, work-arrangement terms, or other unreviewed candidate context from entering canonical high-impact decision evidence through the reason field. Additional business reasons require an explicit governed contract change with regression evidence.
+
 ## Human decision boundary
 
 Every packet is fixed to `review_state="requires_human_decision"` and `human_confirmation_required=True`. A caller cannot construct a packet that silently changes those values. The next action always tells the reviewer to examine the evidence, confirm job relatedness and business necessity, and then record the accountable human selection decision through Orgmetra's authoritative decision boundary.
