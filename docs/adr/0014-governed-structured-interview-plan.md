@@ -20,9 +20,9 @@ Add a transport-neutral `StructuredInterviewPlan` value object that binds:
 - a sorted, unique set of UUID-backed job-related competency references;
 - a sorted, unique interviewer panel of 2–8 UUID-backed accountable actor references;
 - a bounded question count that is at least the governed competency count, while the separately bound mapping artifact provides the evidence of actual question-to-competency coverage;
-- fixed purpose `structured_interview_plan`, closed reviewed reason `approved_requisition_interview`, precision-preserving UTC time, mandatory human confirmation, and `requires_human_approval` state.
+- fixed purpose `structured_interview_plan`, closed reviewed reason `approved_requisition_interview`, a bounded positive `evidence_version`, precision-preserving UTC time, mandatory human confirmation, and `requires_human_approval` state.
 
-All trust-bearing references require their expected namespace plus a canonical, non-sentinel UUID suffix; names, labels, compensation/protected-attribute values, or other semantic suffixes fail closed. Direct construction, builder construction, and `dataclasses.replace(...)` share the same validation. The generated dataclass representation is disabled and replaced with `StructuredInterviewPlan(<redacted>)`; canonical JSON is the explicit evidence serialization boundary.
+All trust-bearing references require their expected namespace plus a canonical, non-sentinel UUID suffix; names, labels, compensation/protected-attribute values, or other semantic suffixes fail closed. Direct construction, builder construction, and `dataclasses.replace(...)` share the same validation. `evidence_version` is restricted to true integers from 1 through 2147483647, is serialized canonically, and therefore changes immutable SHA-256 correlation when revised; version 1 is the initial schema default. The generated dataclass representation is disabled and replaced with `StructuredInterviewPlan(<redacted>)`; canonical JSON is the explicit evidence serialization boundary.
 
 The plan is candidate-neutral. It contains no candidate identity, response, score, demographic attribute, free-form model output, provider credential, or final selection recommendation. Canonical JSON and SHA-256 provide immutable audit correlation; they do not prove the interview is valid, fair, legally compliant, or approved. Opaque references remain sensitive correlation metadata rather than anonymous data.
 
@@ -30,11 +30,11 @@ The plan is candidate-neutral. It contains no candidate identity, response, scor
 
 ### Positive
 
-- Buyers can prove which Job Analysis, competencies, questions, question-to-competency mapping, rating anchors, and interview panel were approved before candidate use.
+- Buyers can prove which Job Analysis, competencies, questions, question-to-competency mapping, rating anchors, interviewer panel, and evidence revision were approved before candidate use.
 - Candidate PII and assessment values remain outside the planning artifact.
 - Value-bearing trust-reference suffixes and free-form reason metadata cannot enter portable evidence.
 - Routine representation/logging does not expose references or evidence digests.
-- Downstream interview-result and selection-decision boundaries can reject drift from the approved plan by reference/digest rather than copying question content.
+- Downstream interview-result and selection-decision boundaries can reject drift from the approved plan by reference/digest/version rather than copying question content.
 - The contract supports standalone use and later MSA extraction without cross-service application-table SQL.
 
 ### Costs and constraints
@@ -42,7 +42,7 @@ The plan is candidate-neutral. It contains no candidate identity, response, scor
 - The plan does not persist requisitions, Job Analysis, interview questions/mappings, responses, or scores.
 - Human approval remains mandatory; model output cannot activate or approve the plan.
 - UUID-backed opacity reduces accidental value leakage but does not remove authorization, retention, export-control, or audit obligations for correlation metadata.
-- The mapping digest proves identity/integrity of the approved mapping artifact, not that its content is scientifically adequate; content validity, criterion-related validity, adverse-impact analysis, interviewer training evidence, accommodations, and jurisdiction-specific legal review remain separate evidence obligations.
+- Evidence version and digests identify the reviewed revision but do not establish substantive scientific adequacy; content validity, criterion-related validity, adverse-impact analysis, interviewer training evidence, accommodations, and jurisdiction-specific legal review remain separate evidence obligations.
 - This ADR remains proposed until its exact PR head merges into protected `develop`.
 
 ## References
