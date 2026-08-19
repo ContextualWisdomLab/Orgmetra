@@ -1,3 +1,5 @@
+"""Regression tests for governed, candidate-neutral structured-interview plans."""
+
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone, tzinfo
 from hashlib import sha256
@@ -26,6 +28,7 @@ PANEL_B = "actor:cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 
 
 def values():
+    """Return one valid plan input mapping for focused mutation-based regressions."""
     return dict(
         tenant_record_id=TENANT,
         interview_plan_reference=INTERVIEW_PLAN,
@@ -49,6 +52,7 @@ def values():
 
 
 def test_builds_candidate_neutral_deterministic_plan():
+    """Build deterministic evidence without candidate values or autonomous authority."""
     plan = build_structured_interview_plan(**values())
     payload = json.loads(plan.canonical_json())
     assert payload["review_state"] == "requires_human_approval"
@@ -89,6 +93,7 @@ def test_builds_candidate_neutral_deterministic_plan():
     ("next_action", "Skip human review"),
 ])
 def test_rejects_invalid_scalar_contract(field, bad):
+    """Reject malformed scalar identity, digest, governance, time, and state inputs."""
     data = values()
     data[field] = bad
     with pytest.raises((ValueError, TypeError)):
@@ -97,6 +102,7 @@ def test_rejects_invalid_scalar_contract(field, bad):
 
 @pytest.mark.parametrize("refs", [(), tuple(f"competency:c{i}" for i in range(13)), [COMPETENCY_A]])
 def test_rejects_bad_competency_collection_shape(refs):
+    """Require competencies to use the governed bounded tuple collection shape."""
     data = values()
     data["competency_references"] = refs
     with pytest.raises(ValueError, match="competency_references"):
@@ -110,6 +116,7 @@ def test_rejects_bad_competency_collection_shape(refs):
     ("competency:Jane-Doe",),
 ])
 def test_rejects_noncanonical_competencies(refs):
+    """Reject unsorted, duplicate, wrong-namespace, or value-bearing competencies."""
     data = values()
     data["competency_references"] = refs
     with pytest.raises(ValueError):
@@ -126,6 +133,7 @@ def test_rejects_noncanonical_competencies(refs):
     (PANEL_A, "actor:seonghobae"),
 ])
 def test_rejects_bad_panel_contract(refs):
+    """Require a sorted unique bounded panel of opaque accountable actor references."""
     data = values()
     data["panel_actor_references"] = refs
     with pytest.raises(ValueError, match="panel_actor_references|actor"):
@@ -134,6 +142,7 @@ def test_rejects_bad_panel_contract(refs):
 
 @pytest.mark.parametrize("count", [True, 0, 21, 1])
 def test_rejects_bad_question_count(count):
+    """Reject boolean, out-of-range, or competency-underflow question counts."""
     data = values()
     data["question_count"] = count
     with pytest.raises(ValueError, match="question_count"):
@@ -141,6 +150,7 @@ def test_rejects_bad_question_count(count):
 
 
 def test_question_count_error_describes_only_the_cardinality_constraint():
+    """Keep the count failure message limited to cardinality rather than coverage claims."""
     data = values()
     data["competency_references"] = (COMPETENCY_A, COMPETENCY_B, COMPETENCY_C)
     data["question_count"] = 2
@@ -152,20 +162,26 @@ def test_question_count_error_describes_only_the_cardinality_constraint():
 
 
 def test_accepts_question_count_equal_to_competency_count():
+    """Accept the smallest count consistent with the governed competency cardinality."""
     data = values()
     data["question_count"] = 2
     assert StructuredInterviewPlan(**data).question_count == 2
 
 
 class UnknownOffset(tzinfo):
+    """Timezone fixture whose UTC offset is intentionally unknowable."""
+
     def utcoffset(self, dt):
+        """Return no UTC offset so timestamp validation must fail closed."""
         return None
 
     def dst(self, dt):
+        """Return no daylight-saving offset for this deliberately invalid fixture."""
         return None
 
 
 def test_rejects_timezone_with_unknown_offset():
+    """Reject tzinfo objects that cannot resolve an actual UTC offset."""
     data = values()
     data["generated_at"] = datetime(2026, 8, 18, tzinfo=UnknownOffset())
     with pytest.raises(ValueError, match="timezone-aware"):
@@ -173,6 +189,7 @@ def test_rejects_timezone_with_unknown_offset():
 
 
 def test_canonicalizes_non_utc_offset_and_preserves_fractional_precision():
+    """Normalize valid offsets to UTC without collapsing fractional-second evidence."""
     data = values()
     data["generated_at"] = datetime(
         2026, 8, 18, 21, 34, 56, 123456, tzinfo=timezone(timedelta(hours=9))
@@ -182,6 +199,7 @@ def test_canonicalizes_non_utc_offset_and_preserves_fractional_precision():
 
 
 def test_direct_replace_is_revalidated():
+    """Re-run all fail-closed invariants when immutable plans are copied with changes."""
     plan = StructuredInterviewPlan(**values())
     with pytest.raises(ValueError, match="question_set_digest"):
         replace(plan, question_set_digest="not-a-digest")
