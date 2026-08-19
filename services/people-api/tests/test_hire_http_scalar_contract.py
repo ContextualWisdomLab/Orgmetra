@@ -48,6 +48,14 @@ class HireHttpScalarContractTests(unittest.TestCase):
         with self.assertRaises(_InvalidHttpRequest):
             _command_from_payload(TENANT, payload, IDEMPOTENCY_KEY)
 
+    def test_basic_format_date_string_is_rejected(self) -> None:
+        """Require the RFC 3339 full-date spelling instead of Python's compact basic date."""
+        payload = _valid_payload()
+        payload["effective_from"] = "20260818"
+
+        with self.assertRaises(_InvalidHttpRequest):
+            _command_from_payload(TENANT, payload, IDEMPOTENCY_KEY)
+
 
 if __name__ == "__main__":
     unittest.main()
