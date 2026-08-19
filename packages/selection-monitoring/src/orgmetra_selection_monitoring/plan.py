@@ -107,6 +107,7 @@ class SelectionOutcomeMonitoringPlan:
     purpose_code: str
     reason_code: str
     generated_at: datetime
+    evidence_version: int = 1
     analysis_scope: str = _ANALYSIS_SCOPE
     contains_individual_records: bool = False
     human_confirmation_required: bool = True
@@ -178,6 +179,8 @@ class SelectionOutcomeMonitoringPlan:
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive monitoring reason")
         _canonical_timestamp(self.generated_at)
+        if type(self.evidence_version) is not int or not 1 <= self.evidence_version <= 2_147_483_647:
+            raise ValueError("evidence_version must be an integer from 1 through 2147483647")
         if self.analysis_scope != _ANALYSIS_SCOPE:
             raise ValueError("analysis_scope must remain total_selection_process_by_job")
         if self.contains_individual_records is not False:
@@ -202,6 +205,7 @@ class SelectionOutcomeMonitoringPlan:
             "analysis_scope": self.analysis_scope,
             "contains_individual_records": self.contains_individual_records,
             "decision_authority": self.decision_authority,
+            "evidence_version": self.evidence_version,
             "generated_at": _canonical_timestamp(self.generated_at),
             "human_confirmation_required": self.human_confirmation_required,
             "job_profile_reference": self.job_profile_reference,
@@ -256,6 +260,7 @@ def build_selection_outcome_monitoring_plan(
     purpose_code: str,
     reason_code: str,
     generated_at: datetime,
+    evidence_version: int = 1,
 ) -> SelectionOutcomeMonitoringPlan:
     """Build an aggregate-only monitoring plan pending accountable human review."""
     return SelectionOutcomeMonitoringPlan(
@@ -280,4 +285,5 @@ def build_selection_outcome_monitoring_plan(
         purpose_code=purpose_code,
         reason_code=reason_code,
         generated_at=generated_at,
+        evidence_version=evidence_version,
     )
