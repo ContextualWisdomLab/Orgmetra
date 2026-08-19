@@ -26,12 +26,12 @@ _DECISION_AUTHORITY = "human_approval_only"
 _REVIEW_STATE = "requires_human_approval"
 _DELIVERY_STATE = "not_authorized_to_send"
 _NEXT_ACTION = (
-    "Within tenant_record_id, re-resolve requester_reference and approver_reference through "
-    "the authoritative actor boundary and verify their resolved actor identities are "
-    "distinct; then verify authoritative Job/Position scope, selected-candidate evidence, "
-    "compensation-package provenance, and offer-terms provenance before recording "
-    "accountable human approval through the authoritative offer workflow and before "
-    "communicating or executing the offer."
+    "Within tenant_record_id, re-resolve every packet reference through its authoritative "
+    "boundary; specifically re-resolve requester_reference and approver_reference and verify "
+    "their resolved actor identities are distinct; then verify authoritative Job/Position "
+    "scope, selected-candidate evidence, compensation-package provenance, and offer-terms "
+    "provenance before recording accountable human approval through the authoritative offer "
+    "workflow and before communicating or executing the offer."
 )
 
 
