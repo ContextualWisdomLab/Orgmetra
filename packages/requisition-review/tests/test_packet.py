@@ -164,6 +164,15 @@ def test_fractional_seconds_are_preserved_in_canonical_evidence():
     assert first.sha256_digest() != second.sha256_digest()
 
 
+def test_hiring_manager_and_approver_require_authoritative_separation():
+    with pytest.raises(ValueError, match="hiring manager and approver"):
+        packet(approver_actor_reference="actor:manager-01")
+
+    normalized_next_action = packet().next_action.lower()
+    assert "hiring_manager_actor_reference and approver_actor_reference" in normalized_next_action
+    assert "resolved actor identities are distinct" in normalized_next_action
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
