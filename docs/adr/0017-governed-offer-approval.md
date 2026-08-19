@@ -13,7 +13,8 @@ compensation-package provenance, offer-terms provenance, and accountable human a
 
 Offer review is high-impact employment workflow. A governance envelope must not become an
 alternate decision authority, a salary-value cache, or a channel that lets generated/model
-material masquerade as an approved offer.
+material masquerade as an approved offer. Different opaque requester/approver references also
+do not prove that the authoritative actor boundary resolves them to different people.
 
 ISO 30405:2023 provides current recruitment guidance across planning, assessment, employment,
 stakeholder management, and review. EEOC guidance on tests and selection procedures emphasizes
@@ -27,7 +28,11 @@ Orgmetra will expose `OfferApprovalPacket` as value-free review evidence only.
 
 The packet binds opaque references for the candidate profile, requisition, Job, optional
 Position, selection decision, compensation package, and offer terms. Decision/package/terms
-artifacts are independently SHA-256 bound. Requester and approver must be different actors.
+artifacts are independently SHA-256 bound. Identical requester/approver references are rejected
+as an early syntactic guard. Before approval, the host must re-resolve both actor references
+within the exact packet tenant through the authoritative actor boundary and reject approval
+unless the resolved actor identities are distinct. Reference inequality alone is not
+separation-of-duties evidence.
 
 The packet must not contain candidate PII, compensation values, assessment scores, or
 free-form model output. Direct construction and `dataclasses.replace(...)` revalidate all
@@ -42,13 +47,14 @@ Every packet is fixed to:
 - delivery state `not_authorized_to_send`.
 
 Canonical JSON and SHA-256 are audit-correlation evidence only. The packet does not approve,
-communicate, send, execute, or persist an offer.
+communicate, send, execute, persist an offer, or prove authoritative actor identity.
 
 ## Consequences
 
 A buyer can review one deterministic, PII-minimized envelope before an offer moves to the
 authoritative offer workflow. Compensation values stay in their purpose-bound owner boundary,
-while Orgmetra keeps exact provenance references and human accountability.
+while Orgmetra keeps exact provenance references and human accountability. Requester/approver
+separation is proven only after tenant-scoped authoritative actor resolution.
 
 Downstream offer persistence/execution must independently enforce authorization, evidence
 versioning, idempotency where applicable, and immutable audit/outbox evidence. This ADR remains
