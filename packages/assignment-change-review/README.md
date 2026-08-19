@@ -6,7 +6,7 @@
 
 The packet requires opaque UUID-backed references for the Person, Employment, current Assignment, current Job and Position, proposed Job and Position, current-scope snapshot, reviewed workforce-allocation plan, exact workforce-allocation policy, worker-impact assessment, communication plan, requester, and a distinct accountable reviewer. Each trust-bearing evidence artifact is paired with a lowercase SHA-256 digest.
 
-`requested_effective_on` is review intent, not proof that the date is valid or authorized. The host must resolve the current and proposed relationships against authoritative bitemporal Orgmetra records immediately before approval/mutation. Canonical JSON and the packet SHA-256 provide immutable correlation evidence only.
+`requested_effective_on` is review intent, not proof that the date is valid or authorized. Immediately before approval/mutation, the host must re-resolve **every packet reference within `tenant_record_id`**, verify the Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position worker scope, and then resolve the proposed relationships against authoritative bitemporal Orgmetra records. Canonical JSON and the packet SHA-256 provide immutable correlation evidence only.
 
 ## Fail-closed governance
 
@@ -24,7 +24,7 @@ The packet always remains value-minimized and pre-mutation:
 
 ## Next action
 
-Before mutation, verify authoritative Employment and current Assignment/Job/Position scope; proposed Position-to-Job binding and capacity; requested effective date; the exact bound workforce-allocation policy; worker-impact evidence; and communication-plan provenance. Record accountable human approval, then apply the change only through Orgmetra's authoritative People mutation boundary. This package does not write HRIS tables and does not bypass purpose-bound authorization, idempotency, immutable audit/outbox, or bitemporal invariants.
+Before mutation, re-resolve every packet reference in the exact `tenant_record_id` context; verify the Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position worker scope; verify proposed Position-to-Job binding and capacity; check the requested effective date; and verify the exact bound workforce-allocation policy, worker-impact evidence, and communication-plan provenance. Record accountable human approval, then apply the change only through Orgmetra's authoritative People mutation boundary. This package does not write HRIS tables and does not bypass purpose-bound authorization, idempotency, immutable audit/outbox, or bitemporal invariants.
 
 ## Standards boundary
 
