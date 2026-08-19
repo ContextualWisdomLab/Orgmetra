@@ -57,7 +57,7 @@ class PeopleMutationErrorSchemaTests(unittest.IsolatedAsyncioTestCase):
     """Bind runtime InvalidCommand responses to the published ErrorResponse schema."""
 
     async def test_invalid_command_returns_complete_client_safe_error_contract(self) -> None:
-        """Malformed command headers expose the four required safe error fields and no extras."""
+        """Malformed headers return a safe error whose lookup key is present in restricted telemetry."""
         policy = PurposeBoundAccessPolicy(
             tenant_record_id=TENANT,
             policy_version_code="error-schema-v1",
@@ -82,17 +82,18 @@ class PeopleMutationErrorSchemaTests(unittest.IsolatedAsyncioTestCase):
         async def send(message: dict[str, object]) -> None:
             messages.append(message)
 
-        await app(
-            {
-                "type": "http",
-                "method": "POST",
-                "path": "/v1/employment-records",
-                "query_string": b"",
-                "headers": [(b"content-type", b"application/json")],
-            },
-            receive,
-            send,
-        )
+        with self.assertLogs("orgmetra_people_api.mutation_http", level="INFO") as telemetry:
+            await app(
+                {
+                    "type": "http",
+                    "method": "POST",
+                    "path": "/v1/employment-records",
+                    "query_string": b"",
+                    "headers": [(b"content-type", b"application/json")],
+                },
+                receive,
+                send,
+            )
 
         start, body = messages
         payload = json.loads(bytes(body["body"]))
@@ -106,6 +107,12 @@ class PeopleMutationErrorSchemaTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(payload["next_action"], str)
         self.assertTrue(payload["next_action"])
         self.assertRegex(payload["support_reference"], _SUPPORT_REFERENCE)
+        self.assertEqual(len(telemetry.records), 1)
+        record = telemetry.records[0]
+        self.assertEqual(getattr(record, "support_reference"), payload["support_reference"])
+        self.assertEqual(getattr(record, "error_code"), "invalid_request")
+        self.assertEqual(getattr(record, "http_status"), 400)
+        self.assertNotIn(str(TENANT), record.getMessage())
 
 
 if __name__ == "__main__":
