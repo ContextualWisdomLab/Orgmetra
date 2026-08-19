@@ -31,8 +31,10 @@ DIGEST_C = "c" * 64
 DIGEST_D = "d" * 64
 DIGEST_E = "e" * 64
 EXPECTED_NEXT_ACTION = (
-    "Verify job relevance, source provenance, permitted handling, retention, and evidence "
-    "completeness; then request authoritative evidence sealing and accountable human review."
+    "Re-resolve every packet reference within tenant_record_id through its authoritative "
+    "boundary; verify candidate, requisition, and Job correlation; then verify job relevance, "
+    "source provenance, permitted handling, retention, and evidence completeness before "
+    "requesting authoritative evidence sealing and accountable human review."
 )
 
 
