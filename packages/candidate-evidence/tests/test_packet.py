@@ -1,3 +1,5 @@
+"""Regression coverage for governed candidate-evidence intake packets."""
+
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone, tzinfo
 from hashlib import sha256
@@ -34,7 +36,8 @@ EXPECTED_NEXT_ACTION = (
 )
 
 
-def values():
+def values() -> dict[str, object]:
+    """Return one valid candidate-evidence packet input mapping for focused overrides."""
     return dict(
         tenant_record_id=TENANT,
         intake_reference=f"candidate_evidence_intake:{REF['intake']}",
@@ -59,7 +62,8 @@ def values():
     )
 
 
-def test_builds_reference_only_deterministic_packet():
+def test_builds_reference_only_deterministic_packet() -> None:
+    """Build deterministic reference-only evidence without candidate value duplication."""
     packet = build_candidate_evidence_intake_packet(**values())
     payload = json.loads(packet.canonical_json())
     assert payload["review_state"] == "requires_human_review"
@@ -112,7 +116,8 @@ def test_builds_reference_only_deterministic_packet():
         ("next_action", "Skip human review"),
     ],
 )
-def test_rejects_invalid_scalar_contract(field, bad):
+def test_rejects_invalid_scalar_contract(field: str, bad: object) -> None:
+    """Reject malformed scalar governance metadata and attempts to bypass review state."""
     data = values()
     data[field] = bad
     with pytest.raises((ValueError, TypeError)):
@@ -134,7 +139,10 @@ def test_rejects_invalid_scalar_contract(field, bad):
         ("actor_reference", "actor"),
     ],
 )
-def test_reference_suffixes_are_opaque_canonical_operational_uuids(field, prefix):
+def test_reference_suffixes_are_opaque_canonical_operational_uuids(
+    field: str, prefix: str
+) -> None:
+    """Reject semantic, sentinel, and noncanonical values in opaque reference suffixes."""
     packet = CandidateEvidenceIntakePacket(**values())
     for suffix in (
         "Jane-Doe",
@@ -145,7 +153,8 @@ def test_reference_suffixes_are_opaque_canonical_operational_uuids(field, prefix
             replace(packet, **{field: f"{prefix}:{suffix}"})
 
 
-def test_repr_redacts_candidate_correlation_and_evidence():
+def test_repr_redacts_candidate_correlation_and_evidence() -> None:
+    """Keep candidate correlation, actor identity, and evidence digests out of repr output."""
     packet = CandidateEvidenceIntakePacket(**values())
     rendered = repr(packet)
     assert rendered == "CandidateEvidenceIntakePacket(<redacted>)"
@@ -156,7 +165,8 @@ def test_repr_redacts_candidate_correlation_and_evidence():
 
 
 @pytest.mark.parametrize("count", [True, 0, 101, 1.0])
-def test_rejects_invalid_evidence_item_count(count):
+def test_rejects_invalid_evidence_item_count(count: object) -> None:
+    """Require a bounded true integer count rather than booleans or numeric lookalikes."""
     data = values()
     data["evidence_item_count"] = count
     with pytest.raises(ValueError, match="evidence_item_count"):
@@ -164,21 +174,27 @@ def test_rejects_invalid_evidence_item_count(count):
 
 
 class UnknownOffset(tzinfo):
-    def utcoffset(self, dt):
+    """Timezone fixture whose UTC offset cannot be resolved."""
+
+    def utcoffset(self, dt: datetime | None) -> None:
+        """Return an unknown offset to exercise fail-closed timestamp validation."""
         return None
 
-    def dst(self, dt):
+    def dst(self, dt: datetime | None) -> None:
+        """Return no daylight-saving offset for the unknown-offset fixture."""
         return None
 
 
-def test_rejects_timezone_with_unknown_offset():
+def test_rejects_timezone_with_unknown_offset() -> None:
+    """Reject datetime values whose timezone object cannot resolve an absolute instant."""
     data = values()
     data["collected_at"] = datetime(2026, 8, 19, tzinfo=UnknownOffset())
     with pytest.raises(ValueError, match="timezone-aware"):
         CandidateEvidenceIntakePacket(**data)
 
 
-def test_canonicalizes_non_utc_offset_and_preserves_fractional_precision():
+def test_canonicalizes_non_utc_offset_and_preserves_fractional_precision() -> None:
+    """Normalize an aware local instant to UTC without dropping microsecond evidence."""
     data = values()
     data["collected_at"] = datetime(
         2026, 8, 19, 10, 2, 3, 456789, tzinfo=timezone(timedelta(hours=9))
@@ -187,16 +203,20 @@ def test_canonicalizes_non_utc_offset_and_preserves_fractional_precision():
     assert payload["collected_at"] == "2026-08-19T01:02:03.456789Z"
 
 
-def test_distinct_subsecond_instants_produce_distinct_evidence():
+def test_distinct_subsecond_instants_produce_distinct_evidence() -> None:
+    """Preserve digest separation for valid evidence timestamps one microsecond apart."""
     first = CandidateEvidenceIntakePacket(**values())
     data = values()
-    data["collected_at"] = data["collected_at"].replace(microsecond=456790)
+    collected_at = data["collected_at"]
+    assert isinstance(collected_at, datetime)
+    data["collected_at"] = collected_at.replace(microsecond=456790)
     second = CandidateEvidenceIntakePacket(**data)
     assert first.canonical_json() != second.canonical_json()
     assert first.sha256_digest() != second.sha256_digest()
 
 
-def test_direct_replace_is_revalidated():
+def test_direct_replace_is_revalidated() -> None:
+    """Re-run invariant validation when an immutable packet is copied with new fields."""
     packet = CandidateEvidenceIntakePacket(**values())
     with pytest.raises(ValueError, match="retention_policy_digest"):
         replace(packet, retention_policy_digest="not-a-digest")
