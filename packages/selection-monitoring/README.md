@@ -4,9 +4,9 @@
 
 ## What the contract binds
 
-A `SelectionOutcomeMonitoringPlan` ties one tenant and authoritative Job to the total selection process being monitored, an aggregate population snapshot, an aggregate selection-outcome snapshot, the protected-attribute handling policy, small-sample interpretation policy, statistical analysis plan, accountable requester and reviewer references, and an explicit monitoring window.
+A `SelectionOutcomeMonitoringPlan` ties one tenant and authoritative Job to the total selection process being monitored, an aggregate population snapshot, an aggregate selection-outcome snapshot, the protected-attribute handling policy, small-sample interpretation policy, statistical analysis plan, accountable requester and reviewer references, an explicit monitoring window, and a bounded positive `evidence_version`.
 
-Every trust-bearing artifact is represented by a bounded namespaced reference whose suffix is a canonical non-sentinel UUID, plus an independent SHA-256 digest where integrity evidence is required. Human-readable, value-bearing, sentinel, and noncanonical reference suffixes are rejected so Job labels, policy values, protected-attribute concepts, actor names, or other sensitive semantics cannot be smuggled through a field described as opaque. `reason_code` is closed to the reviewed non-sensitive `quarterly_selection_governance` value for this initial contract, rather than accepting arbitrary lower-snake-case text. Canonical JSON and a packet digest support immutable audit correlation without copying candidate identities, protected-attribute values, assessment scores, individual decisions, or free-form model output.
+Every trust-bearing artifact is represented by a bounded namespaced reference whose suffix is a canonical non-sentinel UUID, plus an independent SHA-256 digest where integrity evidence is required. Human-readable, value-bearing, sentinel, and noncanonical reference suffixes are rejected so Job labels, policy values, protected-attribute concepts, actor names, or other sensitive semantics cannot be smuggled through a field described as opaque. `reason_code` is closed to the reviewed non-sensitive `quarterly_selection_governance` value for this initial contract, rather than accepting arbitrary lower-snake-case text. `evidence_version` must be a true integer from 1 through 2147483647 and participates in canonical JSON and SHA-256 evidence, so revisions to the actor/purpose/reason-bound monitoring evidence cannot silently collide. Canonical JSON and a packet digest support immutable audit correlation without copying candidate identities, protected-attribute values, assessment scores, individual decisions, or free-form model output.
 
 The ordinary representation is fully redacted as `SelectionOutcomeMonitoringPlan(<redacted>)`, so routine logs and assertion failures do not expose Job, actor, policy, snapshot, or statistical-plan correlations. Canonical JSON remains the explicit evidence serialization boundary. UUID-backed correlations are value-minimized metadata, not anonymous data, and remain subject to purpose-bound authorization, least privilege, retention/export controls, and audit.
 
@@ -45,6 +45,7 @@ plan = build_selection_outcome_monitoring_plan(
     purpose_code="selection_outcome_monitoring",
     reason_code="quarterly_selection_governance",
     generated_at=datetime(2026, 4, 2, 8, 30, tzinfo=timezone.utc),
+    evidence_version=1,
 )
 ```
 
