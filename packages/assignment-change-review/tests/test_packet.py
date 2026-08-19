@@ -87,6 +87,13 @@ def test_builds_value_free_pre_mutation_review_packet() -> None:
     assert "authoritative People mutation boundary" in packet.next_action
 
 
+def test_next_action_requires_tenant_scoped_worker_binding_resolution() -> None:
+    next_action = build_valid().next_action
+    assert "re-resolve every packet reference within tenant_record_id" in next_action
+    assert "Person-to-Employment-to-current-Assignment binding" in next_action
+    assert "current Assignment/Job/Position worker scope" in next_action
+
+
 def test_packet_correlates_policy_and_evidence_without_copying_worker_values() -> None:
     payload = json.loads(build_valid().canonical_json())
     assert payload["person_record_reference"] == PERSON
