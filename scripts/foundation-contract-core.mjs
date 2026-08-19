@@ -59,6 +59,7 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0009_candidate_worker_conversion_governance.sql',
   'database/migrations/0010_validity_study_case_integrity.sql',
   'database/migrations/0011_criterion_observation_scope.sql',
+  'database/migrations/0012_people_mutation_idempotency.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
