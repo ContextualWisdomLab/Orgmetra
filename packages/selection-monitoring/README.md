@@ -4,7 +4,7 @@
 
 ## What the contract binds
 
-A `SelectionOutcomeMonitoringPlan` ties one tenant and authoritative Job to the total selection process being monitored, an aggregate population snapshot, an aggregate selection-outcome snapshot, the protected-attribute handling policy, small-sample interpretation policy, statistical analysis plan, accountable requester and distinct reviewer, and an explicit monitoring window.
+A `SelectionOutcomeMonitoringPlan` ties one tenant and authoritative Job to the total selection process being monitored, an aggregate population snapshot, an aggregate selection-outcome snapshot, the protected-attribute handling policy, small-sample interpretation policy, statistical analysis plan, accountable requester and reviewer references, and an explicit monitoring window.
 
 Every trust-bearing artifact is represented by a bounded opaque reference plus an independent SHA-256 digest. Canonical JSON and a packet digest support immutable audit correlation without copying candidate identities, protected-attribute values, assessment scores, individual decisions, or free-form model output.
 
@@ -12,7 +12,7 @@ Every trust-bearing artifact is represented by a bounded opaque reference plus a
 
 The packet always remains `requires_human_review`, requires explicit human confirmation, and fixes decision authority to `human_review_only`. Its analysis scope is the total selection process for one Job. It does not calculate selection rates, apply the four-fifths rule, estimate statistical significance, infer discrimination, or make an employment-process change.
 
-The next action is deliberately operational: verify Job scope, aggregate population completeness, protected-attribute handling, small-sample policy, and statistical-plan provenance; then route the evidence to an authorized analyst and accountable human reviewer before any process change or legal conclusion.
+Different requester/reviewer references are only an early syntactic guard. Before review, the host must re-resolve `actor_reference` and `reviewer_reference` within the exact `tenant_record_id` through the authoritative actor boundary and prove their resolved actor identities are distinct. It must then verify Job scope, aggregate population completeness, protected-attribute handling, small-sample policy, and statistical-plan provenance before routing the evidence to an authorized analyst and accountable human reviewer for any process change or legal conclusion.
 
 ## Example
 
@@ -46,4 +46,4 @@ plan = build_selection_outcome_monitoring_plan(
 )
 ```
 
-This package writes no database tables and performs no cross-service SQL. A future persistence or analytics implementation must preserve purpose-bound authorization, aggregate-only/minimum-necessary access, small-sample controls, immutable audit evidence, and accountable human review independently.
+This package writes no database tables and performs no cross-service SQL. A future persistence or analytics implementation must preserve purpose-bound authorization, authoritative actor resolution, aggregate-only/minimum-necessary access, small-sample controls, immutable audit evidence, and accountable human review independently.
