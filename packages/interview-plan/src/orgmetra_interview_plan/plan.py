@@ -19,8 +19,12 @@ _PURPOSE_CODE = "structured_interview_plan"
 _REVIEW_STATE = "requires_human_approval"
 _ALLOWED_REASON_CODES = frozenset({"approved_requisition_interview"})
 _NEXT_ACTION = (
-    "Confirm the competencies, predetermined questions, rating anchors, and trained panel "
-    "are job-related and appropriate before activating this structured interview plan."
+    "Within tenant_record_id, re-resolve every plan reference and verify the "
+    "requisition-to-Job-to-job-analysis binding; verify question-set, "
+    "question-to-competency mapping, and rating-anchor provenance; re-resolve every "
+    "panel_actor_reference, prove the resolved panel actor identities are distinct, "
+    "and verify panel eligibility and training before an accountable human activates "
+    "this structured interview plan."
 )
 _MAX_EVIDENCE_VERSION = 2_147_483_647
 
