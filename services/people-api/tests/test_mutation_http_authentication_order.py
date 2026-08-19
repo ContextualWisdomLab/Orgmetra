@@ -182,7 +182,10 @@ class PeopleMutationAuthenticationOrderTests(unittest.IsolatedAsyncioTestCase):
 
         start, response = messages
         payload = json.loads(bytes(response["body"]))
-        self.assertEqual((start["status"], payload["error"]), (401, "authentication_required"))
+        self.assertEqual(
+            (start["status"], payload["error_code"]),
+            (401, "authentication_required"),
+        )
         self.assertEqual(authenticator.tokens, ["opaque-token"])
         self.assertEqual(receive_calls, 0)
         self.assertEqual(id_factory.calls, 0)
@@ -226,7 +229,7 @@ class PeopleMutationAuthenticationOrderTests(unittest.IsolatedAsyncioTestCase):
 
         start, response = messages
         payload = json.loads(bytes(response["body"]))
-        self.assertEqual((start["status"], payload["error"]), (500, "internal_error"))
+        self.assertEqual((start["status"], payload["error_code"]), (500, "internal_error"))
         self.assertEqual(len(captured.records), 1)
         record = captured.records[0]
         self.assertEqual(record.route, "employment-records")
