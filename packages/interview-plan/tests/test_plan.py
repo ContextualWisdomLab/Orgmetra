@@ -11,24 +11,36 @@ DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
 DIGEST_D = "d" * 64
+INTERVIEW_PLAN = "interview_plan:11111111-1111-4111-8111-111111111111"
+REQUISITION = "requisition:22222222-2222-4222-8222-222222222222"
+JOB_PROFILE = "job_profile:33333333-3333-4333-8333-333333333333"
+JOB_ANALYSIS = "job_analysis:44444444-4444-4444-8444-444444444444"
+QUESTION_SET = "question_set:55555555-5555-4555-8555-555555555555"
+QUESTION_MAP = "question_competency_map:66666666-6666-4666-8666-666666666666"
+RATING_ANCHOR = "rating_anchor:77777777-7777-4777-8777-777777777777"
+COMPETENCY_A = "competency:88888888-8888-4888-8888-888888888888"
+COMPETENCY_B = "competency:99999999-9999-4999-8999-999999999999"
+COMPETENCY_C = "competency:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+PANEL_A = "actor:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+PANEL_B = "actor:cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 
 
 def values():
     return dict(
         tenant_record_id=TENANT,
-        interview_plan_reference="interview_plan:si-2026-001",
-        requisition_reference="requisition:req-2026-001",
-        job_profile_reference="job_profile:job-001",
-        job_analysis_reference="job_analysis:analysis-001",
+        interview_plan_reference=INTERVIEW_PLAN,
+        requisition_reference=REQUISITION,
+        job_profile_reference=JOB_PROFILE,
+        job_analysis_reference=JOB_ANALYSIS,
         job_analysis_digest=DIGEST_A,
-        question_set_reference="question_set:questions-v1",
+        question_set_reference=QUESTION_SET,
         question_set_digest=DIGEST_B,
-        question_competency_map_reference="question_competency_map:map-v1",
+        question_competency_map_reference=QUESTION_MAP,
         question_competency_map_digest=DIGEST_D,
-        rating_anchor_reference="rating_anchor:anchors-v1",
+        rating_anchor_reference=RATING_ANCHOR,
         rating_anchor_digest=DIGEST_C,
-        competency_references=("competency:analysis", "competency:communication"),
-        panel_actor_references=("actor:interviewer-a", "actor:interviewer-b"),
+        competency_references=(COMPETENCY_A, COMPETENCY_B),
+        panel_actor_references=(PANEL_A, PANEL_B),
         question_count=4,
         purpose_code="structured_interview_plan",
         reason_code="approved_requisition_interview",
@@ -42,7 +54,7 @@ def test_builds_candidate_neutral_deterministic_plan():
     assert payload["review_state"] == "requires_human_approval"
     assert payload["human_confirmation_required"] is True
     assert payload["generated_at"].endswith(".123456Z")
-    assert payload["question_competency_map_reference"] == "question_competency_map:map-v1"
+    assert payload["question_competency_map_reference"] == QUESTION_MAP
     assert "candidate" not in plan.canonical_json()
     assert plan.sha256_digest() == sha256(plan.canonical_json().encode("utf-8")).hexdigest()
     assert plan == StructuredInterviewPlan(**values())
@@ -59,6 +71,9 @@ def test_builds_candidate_neutral_deterministic_plan():
     ("question_set_reference", "wrong:q-1"),
     ("question_competency_map_reference", "wrong:map-1"),
     ("rating_anchor_reference", "wrong:a-1"),
+    ("interview_plan_reference", "interview_plan:00000000-0000-0000-0000-000000000000"),
+    ("job_profile_reference", "job_profile:FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"),
+    ("rating_anchor_reference", 7),
     ("job_analysis_digest", "A" * 64),
     ("question_set_digest", "b" * 63),
     ("question_competency_map_digest", "D" * 64),
@@ -80,7 +95,7 @@ def test_rejects_invalid_scalar_contract(field, bad):
         StructuredInterviewPlan(**data)
 
 
-@pytest.mark.parametrize("refs", [(), tuple(f"competency:c{i}" for i in range(13)), ["competency:a"]])
+@pytest.mark.parametrize("refs", [(), tuple(f"competency:c{i}" for i in range(13)), [COMPETENCY_A]])
 def test_rejects_bad_competency_collection_shape(refs):
     data = values()
     data["competency_references"] = refs
@@ -89,9 +104,10 @@ def test_rejects_bad_competency_collection_shape(refs):
 
 
 @pytest.mark.parametrize("refs", [
-    ("competency:communication", "competency:analysis"),
-    ("competency:analysis", "competency:analysis"),
+    (COMPETENCY_B, COMPETENCY_A),
+    (COMPETENCY_A, COMPETENCY_A),
     ("wrong:analysis",),
+    ("competency:Jane-Doe",),
 ])
 def test_rejects_noncanonical_competencies(refs):
     data = values()
@@ -101,12 +117,13 @@ def test_rejects_noncanonical_competencies(refs):
 
 
 @pytest.mark.parametrize("refs", [
-    ("actor:only-one",),
+    (PANEL_A,),
     tuple(f"actor:p{i}" for i in range(9)),
-    ["actor:a", "actor:b"],
-    ("actor:b", "actor:a"),
-    ("actor:a", "actor:a"),
-    ("wrong:a", "actor:b"),
+    [PANEL_A, PANEL_B],
+    (PANEL_B, PANEL_A),
+    (PANEL_A, PANEL_A),
+    ("wrong:a", PANEL_B),
+    (PANEL_A, "actor:seonghobae"),
 ])
 def test_rejects_bad_panel_contract(refs):
     data = values()
@@ -125,11 +142,7 @@ def test_rejects_bad_question_count(count):
 
 def test_question_count_error_describes_only_the_cardinality_constraint():
     data = values()
-    data["competency_references"] = (
-        "competency:analysis",
-        "competency:communication",
-        "competency:judgment",
-    )
+    data["competency_references"] = (COMPETENCY_A, COMPETENCY_B, COMPETENCY_C)
     data["question_count"] = 2
     with pytest.raises(
         ValueError,
@@ -197,8 +210,8 @@ def test_scalar_trust_references_reject_value_bearing_non_uuid_suffixes(field, v
 def test_collection_trust_references_reject_value_bearing_non_uuid_suffixes():
     """Apply opaque-reference requirements to competency and panel collections."""
     for field, refs in (
-        ("competency_references", ("competency:analysis", "competency:Jane-Doe")),
-        ("panel_actor_references", ("actor:interviewer-a", "actor:seonghobae")),
+        ("competency_references", (COMPETENCY_A, "competency:Jane-Doe")),
+        ("panel_actor_references", (PANEL_A, "actor:seonghobae")),
     ):
         data = values()
         data[field] = refs
