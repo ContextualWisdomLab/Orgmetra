@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, fields, replace
 import hashlib
+import inspect
 import json
 
 import pytest
+import orgmetra_migration_adapter.handoff as handoff_module
 
 from orgmetra_migration_adapter import (
     MAXIMUM_BATCH_RECORDS,
@@ -341,3 +343,15 @@ def test_all_supported_hris_targets_are_accepted_in_canonical_order() -> None:
         "person_record",
         "position_record",
     )
+
+
+def test_every_migration_adapter_callable_has_beginner_readable_docstring() -> None:
+    """Every owned callable documents its contract, including internal validators."""
+    undocumented = sorted(
+        name
+        for name, value in vars(handoff_module).items()
+        if (inspect.isfunction(value) or inspect.isclass(value))
+        and getattr(value, "__module__", None) == handoff_module.__name__
+        and not inspect.getdoc(value)
+    )
+    assert undocumented == []
