@@ -18,6 +18,7 @@ from uuid import UUID
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_EVIDENCE_VERSION_PATTERN = re.compile(r"^evidence_version_([1-9][0-9]{0,9})$")
 _REFERENCE_PATTERN = re.compile(
     r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
 )
@@ -51,6 +52,15 @@ def _validate_code(value: str, field_name: str) -> None:
         raise ValueError(
             f"{field_name} must be bounded two-or-more-word lower snake_case"
         )
+
+
+def _validate_evidence_version_code(value: str) -> None:
+    """Require canonical positive evidence_version_N text without value-bearing suffixes."""
+    if not isinstance(value, str):
+        raise ValueError("evidence_version_code must be a canonical positive evidence version")
+    match = _EVIDENCE_VERSION_PATTERN.fullmatch(value)
+    if match is None or int(match.group(1)) > 2_147_483_647:
+        raise ValueError("evidence_version_code must be a canonical positive evidence version")
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
@@ -125,7 +135,7 @@ class SelectionReviewPacket:
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must be an authorized selection-review reason")
-        _validate_code(self.evidence_version_code, "evidence_version_code")
+        _validate_evidence_version_code(self.evidence_version_code)
         _canonical_timestamp(self.generated_at)
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for selection decisions")
