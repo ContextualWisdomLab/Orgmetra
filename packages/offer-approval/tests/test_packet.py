@@ -230,6 +230,25 @@ def test_rejects_bad_governance_codes(
         build_offer_approval_packet(**kwargs)
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        "jane_doe",
+        "salary_120000",
+        "remote_two_days",
+    ],
+)
+def test_rejects_value_bearing_reason_codes_through_direct_and_replace(value: str) -> None:
+    kwargs = valid_kwargs()
+    kwargs["reason_code"] = value
+    with pytest.raises(ValueError, match="reviewed non-sensitive"):
+        OfferApprovalPacket(**kwargs)
+
+    packet = build_valid()
+    with pytest.raises(ValueError, match="reviewed non-sensitive"):
+        replace(packet, reason_code=value)
+
+
 class NullOffsetTz(tzinfo):
     def utcoffset(self, dt: datetime | None) -> None:
         return None
