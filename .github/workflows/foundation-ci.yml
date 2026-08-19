@@ -85,6 +85,7 @@ jobs:
           - test_outbox_dead_letter_postgres.sh
           - test_audit_outbox_hardening_postgres.sh
           - test_candidate_worker_conversion_postgres.sh
+          - test_validity_study_case_postgres.sh
           - test_criterion_observation_scope_postgres.sh
     services:
       postgres:
