@@ -14,7 +14,7 @@ The ordinary representation is fully redacted as `SelectionOutcomeMonitoringPlan
 
 The packet always remains `requires_human_review`, requires explicit human confirmation, and fixes decision authority to `human_review_only`. Its analysis scope is the total selection process for one Job. It does not calculate selection rates, apply the four-fifths rule, estimate statistical significance, infer discrimination, or make an employment-process change.
 
-Different requester/reviewer references are only an early syntactic guard. Before review, the host must re-resolve `actor_reference` and `reviewer_reference` within the exact `tenant_record_id` through the authoritative actor boundary and prove their resolved actor identities are distinct. It must then verify Job scope, aggregate population completeness, protected-attribute handling, small-sample policy, and statistical-plan provenance before routing the evidence to an authorized analyst and accountable human reviewer for any process change or legal conclusion.
+Different requester/reviewer references are only an early syntactic guard. Before review, the host must re-resolve **every packet reference** within the exact `tenant_record_id` through its authoritative boundary so a syntactically valid reference from another tenant cannot be mixed into the monitoring envelope. It must specifically re-resolve `actor_reference` and `reviewer_reference` and prove their resolved actor identities are distinct, then verify Job scope, aggregate population completeness, protected-attribute handling, small-sample policy, and statistical-plan provenance before routing the evidence to an authorized analyst and accountable human reviewer for any process change or legal conclusion.
 
 ## Example
 
@@ -49,4 +49,4 @@ plan = build_selection_outcome_monitoring_plan(
 )
 ```
 
-This package writes no database tables and performs no cross-service SQL. A future persistence or analytics implementation must preserve purpose-bound authorization, authoritative actor resolution, aggregate-only/minimum-necessary access, small-sample controls, immutable audit evidence, and accountable human review independently.
+This package writes no database tables and performs no cross-service SQL. A future persistence or analytics implementation must preserve purpose-bound authorization, authoritative tenant-scoped reference and actor resolution, aggregate-only/minimum-necessary access, small-sample controls, immutable audit evidence, and accountable human review independently.
