@@ -38,6 +38,7 @@ _LOGGER = logging.getLogger(__name__)
 _ROUTE_PREFIX = ("v1", "tenants")
 _ROUTE_LEAF = "candidate-worker-conversions"
 _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+_RFC3339_FULL_DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", flags=re.ASCII)
 _MAX_UUID_INT = (1 << 128) - 1
 _MAX_BODY_BYTES = 65536
 _REQUIRED_BODY_KEYS = frozenset(
@@ -389,6 +390,14 @@ def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]
     return payload
 
 
+def _require_string_field(payload: Mapping[str, object], field_name: str) -> str:
+    """Require the exact JSON string type for one confirmed-hire command field."""
+    value = payload.get(field_name)
+    if not isinstance(value, str):
+        raise _InvalidHttpRequest(f"{field_name} must be a string")
+    return value
+
+
 def _command_from_payload(
     tenant_record_id: UUID,
     payload: Mapping[str, object],
@@ -398,24 +407,31 @@ def _command_from_payload(
     if frozenset(payload) != _REQUIRED_BODY_KEYS:
         raise _InvalidHttpRequest("hire command fields are incomplete or unsupported")
     try:
-        effective_from = date.fromisoformat(str(payload["effective_from"]))
+        effective_from_raw = _require_string_field(payload, "effective_from")
+        if _RFC3339_FULL_DATE.fullmatch(effective_from_raw) is None:
+            raise _InvalidHttpRequest("effective_from must be an RFC 3339 full-date")
+        effective_from = date.fromisoformat(effective_from_raw)
         return HireAcceptanceCommand(
             tenant_record_id=tenant_record_id,
-            candidate_profile_id=UUID(str(payload["candidate_profile_id"])),
-            selection_decision_id=UUID(str(payload["selection_decision_id"])),
-            person_record_id=UUID(str(payload["person_record_id"])),
-            person_name_record_id=UUID(str(payload["person_name_record_id"])),
-            employment_record_id=UUID(str(payload["employment_record_id"])),
-            employment_record_version_id=UUID(str(payload["employment_record_version_id"])),
-            candidate_worker_conversion_record_id=UUID(
-                str(payload["candidate_worker_conversion_record_id"])
+            candidate_profile_id=UUID(_require_string_field(payload, "candidate_profile_id")),
+            selection_decision_id=UUID(_require_string_field(payload, "selection_decision_id")),
+            person_record_id=UUID(_require_string_field(payload, "person_record_id")),
+            person_name_record_id=UUID(_require_string_field(payload, "person_name_record_id")),
+            employment_record_id=UUID(_require_string_field(payload, "employment_record_id")),
+            employment_record_version_id=UUID(
+                _require_string_field(payload, "employment_record_version_id")
             ),
-            audit_event_record_id=UUID(str(payload["audit_event_record_id"])),
-            outbox_delivery_record_id=UUID(str(payload["outbox_delivery_record_id"])),
+            candidate_worker_conversion_record_id=UUID(
+                _require_string_field(payload, "candidate_worker_conversion_record_id")
+            ),
+            audit_event_record_id=UUID(_require_string_field(payload, "audit_event_record_id")),
+            outbox_delivery_record_id=UUID(
+                _require_string_field(payload, "outbox_delivery_record_id")
+            ),
             effective_from=effective_from,
-            display_name=payload["display_name"],  # type: ignore[arg-type]
+            display_name=_require_string_field(payload, "display_name"),
             idempotency_key=idempotency_key,
-            employment_status_code=payload["employment_status_code"],  # type: ignore[arg-type]
+            employment_status_code=_require_string_field(payload, "employment_status_code"),
         )
     except (TypeError, ValueError) as error:
         raise _InvalidHttpRequest("hire command fields are invalid") from error
