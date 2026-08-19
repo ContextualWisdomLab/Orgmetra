@@ -4,9 +4,9 @@
 
 ## What the packet binds
 
-The packet requires opaque UUID-backed references for the Person, Employment, current Assignment, current Job and Position, proposed Job and Position, current-scope snapshot, reviewed workforce-allocation plan, exact workforce-allocation policy, worker-impact assessment, communication plan, requester, and a distinct accountable reviewer. Each trust-bearing evidence artifact is paired with a lowercase SHA-256 digest. A bounded positive `evidence_version` is part of canonical evidence so actor/purpose/reason evidence from different review-contract revisions cannot silently collide.
+The packet requires opaque UUID-backed references for the Person, Employment, current Assignment, current Job and Position, proposed Job and Position, current-scope snapshot, reviewed workforce-allocation plan, exact workforce-allocation policy, worker-impact assessment, communication plan, requester, and reviewer. Each trust-bearing evidence artifact is paired with a lowercase SHA-256 digest. A bounded positive `evidence_version` is part of canonical evidence so actor/purpose/reason evidence from different review-contract revisions cannot silently collide.
 
-`requested_effective_on` is review intent, not proof that the date is valid or authorized. Immediately before approval/mutation, the host must re-resolve **every packet reference within `tenant_record_id`**, verify the Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position worker scope, and then resolve the proposed relationships against authoritative bitemporal Orgmetra records. Canonical JSON and the packet SHA-256 provide immutable correlation evidence only.
+`requested_effective_on` is review intent, not proof that the date is valid or authorized. Immediately before approval/mutation, the host must re-resolve **every packet reference within `tenant_record_id`**, specifically resolve `requester_reference` and `reviewer_reference` through the authoritative actor boundary and prove their resolved identities are distinct, verify the Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position worker scope, and then resolve the proposed relationships against authoritative bitemporal Orgmetra records. Canonical JSON and the packet SHA-256 provide immutable correlation evidence only.
 
 ## Fail-closed governance
 
@@ -14,7 +14,7 @@ The packet always remains value-minimized and pre-mutation:
 
 - Person identity is sensitive correlating metadata even when represented by an opaque reference.
 - Person PII, compensation values, numeric allocation values, and free-form model output are not fields in the envelope.
-- Requester and reviewer must be different actors.
+- Requester and reviewer references must differ as an early syntactic guard; reference inequality is not authoritative separation-of-duties evidence.
 - `purpose_code` is fixed to `assignment_change_review`.
 - `reason_code` is limited to reviewed non-sensitive categories: `internal_reassignment`, `workforce_reallocation`, `temporary_detail`, `position_reclassification`, or `organizational_realignment`; free-form personal reasons belong outside this packet.
 - `evidence_version` is a positive integer included in canonical JSON and the packet digest.
@@ -25,7 +25,7 @@ The packet always remains value-minimized and pre-mutation:
 
 ## Next action
 
-Before mutation, re-resolve every packet reference in the exact `tenant_record_id` context; verify the Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position worker scope; verify proposed Position-to-Job binding and capacity; check the requested effective date; and verify the exact bound workforce-allocation policy, worker-impact evidence, and communication-plan provenance. Record accountable human approval, then apply the change only through Orgmetra's authoritative People mutation boundary. This package does not write HRIS tables and does not bypass purpose-bound authorization, idempotency, immutable audit/outbox, or bitemporal invariants.
+Before mutation, re-resolve every packet reference in the exact `tenant_record_id` context; prove requester/reviewer resolve to distinct authoritative actor identities; verify the Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position worker scope; verify proposed Position-to-Job binding and capacity; check the requested effective date; and verify the exact bound workforce-allocation policy, worker-impact evidence, and communication-plan provenance. Record accountable human approval, then apply the change only through Orgmetra's authoritative People mutation boundary. This package does not write HRIS tables and does not bypass purpose-bound authorization, idempotency, immutable audit/outbox, or bitemporal invariants.
 
 ## Standards boundary
 
