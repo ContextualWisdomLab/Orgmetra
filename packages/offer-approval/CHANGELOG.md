@@ -8,4 +8,6 @@
   and offer-terms provenance without copying candidate or compensation values.
 - Close `reason_code` to the reviewed value-free `selected_candidate_offer_review` contract so
   arbitrary candidate, compensation, or offer-term text cannot enter canonical evidence.
+- Bind a bounded positive `evidence_version` into canonical JSON and SHA-256 correlation
+  evidence so high-impact offer-review evidence versions are explicit and fail closed.
 - Keep every packet `requires_human_approval` and `not_authorized_to_send`.
