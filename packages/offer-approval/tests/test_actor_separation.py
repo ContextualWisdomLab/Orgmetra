@@ -8,6 +8,7 @@ from orgmetra_offer_approval import build_offer_approval_packet
 
 
 def _build(**overrides):
+    """Build a valid offer-approval packet, allowing one field to be varied by a regression."""
     values = {
         "tenant_record_id": "11111111-1111-4111-8111-111111111111",
         "offer_approval_reference": "offer_approval:22222222-2222-4222-8222-222222222222",
@@ -24,7 +25,7 @@ def _build(**overrides):
         "requester_reference": "actor:99999999-9999-4999-8999-999999999999",
         "approver_reference": "actor:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         "purpose_code": "offer_approval_review",
-        "reason_code": "approved_offer_terms",
+        "reason_code": "selected_candidate_offer_review",
         "generated_at": datetime(2026, 8, 19, 2, 15, tzinfo=timezone.utc),
     }
     values.update(overrides)
@@ -32,6 +33,7 @@ def _build(**overrides):
 
 
 def test_requester_and_approver_require_authoritative_actor_separation() -> None:
+    """Require distinct actor references plus authoritative identity separation before approval."""
     with pytest.raises(ValueError, match="different accountable actor"):
         _build(approver_reference="actor:99999999-9999-4999-8999-999999999999")
 
