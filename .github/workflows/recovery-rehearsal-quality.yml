@@ -1,0 +1,97 @@
+name: Recovery Rehearsal Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recovery-rehearsal-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  restore-rehearsal:
+    name: PostgreSQL restore rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      source_postgres:
+        image: postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      restore_postgres:
+        image: postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
+      - name: Print diagnostic recovery provenance data
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          paths = [
+              '.github/workflows/recovery-rehearsal-quality.yml',
+              'docs/traceability/restore-rehearsal.md',
+              'tests/recovery-rehearsal.test.mjs',
+              '.github/scripts/restore-rehearsal-postgres.sh',
+          ]
+          files = []
+          for path_text in paths:
+              data = Path(path_text).read_bytes()
+              files.append({
+                  'path': path_text,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+                  'bytes': len(data),
+                  'lines': len(data.decode('utf-8').splitlines()),
+              })
+          print(json.dumps({'package': 'orgmetra-recovery-rehearsal', 'version': '0.1.0', 'files': files}, separators=(',', ':')))
+          PY
+      - name: Run recovery evidence contract
+        run: node --test tests/recovery-rehearsal.test.mjs
+      - name: Validate repository contracts
+        run: npm run validate
+      - name: Exercise real cross-cluster dump and restore
+        env:
+          RECOVERY_REHEARSAL_ALLOW_ROLE_DROP: "1"
+          POSTGRES_SOURCE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5432/postgres
+          POSTGRES_RESTORE_ADMIN_URL: postgresql://orgmetra:orgmetra@localhost:5433/postgres
+          POSTGRES_SOURCE_CONTAINER: ${{ job.services.source_postgres.id }}
+          POSTGRES_RESTORE_CONTAINER: ${{ job.services.restore_postgres.id }}
+        run: bash .github/scripts/restore-rehearsal-postgres.sh
+      - name: Prove clean checkout
+        run: git diff --exit-code
