@@ -39,14 +39,15 @@ _SCOPE_VERIFICATION_STATE = "requires_authoritative_resolution"
 _MUTATION_STATE = "not_authorized_to_apply"
 _EXTERNAL_EXECUTION_STATE = "not_authorized_to_execute"
 _NEXT_ACTION = (
-    "Re-resolve every packet reference within tenant_record_id, prove the "
-    "Person-to-Employment binding and every active Assignment/Job/Position in the bound "
-    "snapshot, then verify the proposed separation date, reviewed separation policy and "
-    "process, value-free final-pay and benefits handoffs, access-deprovisioning, "
-    "asset-return, knowledge-transfer, and communication-plan provenance; then record "
-    "accountable human approval, apply the employment change only through the authoritative "
-    "People mutation boundary, and execute downstream actions only through their published "
-    "owner boundaries."
+    "Re-resolve every packet reference within tenant_record_id; specifically re-resolve "
+    "requester_reference and reviewer_reference within tenant_record_id and verify their "
+    "resolved actor identities are distinct, then prove the Person-to-Employment binding "
+    "and every active Assignment/Job/Position in the bound snapshot, then verify the "
+    "proposed separation date, reviewed separation policy and process, value-free final-pay "
+    "and benefits handoffs, access-deprovisioning, asset-return, knowledge-transfer, and "
+    "communication-plan provenance; then record accountable human approval, apply the "
+    "employment change only through the authoritative People mutation boundary, and execute "
+    "downstream actions only through their published owner boundaries."
 )
 
 
