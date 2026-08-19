@@ -17,6 +17,8 @@ REF = {
     "provenance": "66666666-6666-4666-8666-666666666666",
 }
 DIGEST = "0" * 64
+DRAFT_DIGEST = "1" * 64
+PROVENANCE_DIGEST = "2" * 64
 NOW = datetime.fromisoformat("2026-08-18T02:30:00+00:00")
 
 
@@ -37,24 +39,36 @@ def packet(**overrides):
     return build_selection_review_packet(**values)
 
 
-def test_packet_is_deterministic_and_requires_human_decision():
-    value = packet(
+def model_packet(**overrides):
+    values = dict(
         model_draft_reference=f"model_draft:{REF['draft']}",
+        model_draft_digest=DRAFT_DIGEST,
         model_provenance_reference=f"model_provenance:{REF['provenance']}",
+        model_provenance_digest=PROVENANCE_DIGEST,
     )
+    values.update(overrides)
+    return packet(**values)
+
+
+def test_packet_is_deterministic_and_requires_human_decision():
+    value = model_packet()
     payload = json.loads(value.canonical_json())
     assert payload["human_confirmation_required"] is True
     assert payload["review_state"] == "requires_human_decision"
     assert payload["model_output_status"] == "untrusted_draft"
+    assert payload["model_draft_digest"] == DRAFT_DIGEST
+    assert payload["model_provenance_digest"] == PROVENANCE_DIGEST
     assert payload["generated_at"] == "2026-08-18T02:30:00Z"
     assert "name" not in value.canonical_json().lower()
     assert value.sha256_digest() == sha256(value.canonical_json().encode("utf-8")).hexdigest()
 
 
-def test_packet_without_model_evidence_has_no_model_status():
+def test_packet_without_model_evidence_has_no_model_status_or_digests():
     value = packet()
     assert value.model_draft_reference is None
+    assert value.model_draft_digest is None
     assert value.model_provenance_reference is None
+    assert value.model_provenance_digest is None
     assert value.model_output_status is None
 
 
@@ -130,6 +144,13 @@ def test_digest_must_be_lowercase_sha256(digest):
         packet(evidence_set_digest=digest)
 
 
+@pytest.mark.parametrize("field", ["model_draft_digest", "model_provenance_digest"])
+@pytest.mark.parametrize("digest", ["A" * 64, "0" * 63, "z" * 64, 123])
+def test_model_evidence_digests_must_be_lowercase_sha256(field, digest):
+    with pytest.raises(ValueError):
+        model_packet(**{field: digest})
+
+
 class UnknownOffset(tzinfo):
     def utcoffset(self, dt):
         return None
@@ -166,19 +187,44 @@ def test_direct_constructor_cannot_bypass_human_review(field, value):
         replace(base, **{field: value})
 
 
-def test_model_draft_and_provenance_must_travel_together():
-    base = packet()
+@pytest.mark.parametrize(
+    "field",
+    [
+        "model_draft_reference",
+        "model_draft_digest",
+        "model_provenance_reference",
+        "model_provenance_digest",
+    ],
+)
+def test_model_reference_and_digest_evidence_must_travel_together(field):
+    values = {
+        "model_draft_reference": f"model_draft:{REF['draft']}",
+        "model_draft_digest": DRAFT_DIGEST,
+        "model_provenance_reference": f"model_provenance:{REF['provenance']}",
+        "model_provenance_digest": PROVENANCE_DIGEST,
+    }
+    values.pop(field)
     with pytest.raises(ValueError):
-        replace(base, model_draft_reference=f"model_draft:{REF['draft']}")
+        packet(**values)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "model_draft_reference",
+        "model_draft_digest",
+        "model_provenance_reference",
+        "model_provenance_digest",
+    ],
+)
+def test_replace_cannot_remove_one_model_evidence_binding(field):
+    base = model_packet()
     with pytest.raises(ValueError):
-        replace(base, model_provenance_reference=f"model_provenance:{REF['provenance']}")
+        replace(base, **{field: None})
 
 
 def test_model_evidence_must_be_uuid_backed_namespaced_and_untrusted():
-    base = packet(
-        model_draft_reference=f"model_draft:{REF['draft']}",
-        model_provenance_reference=f"model_provenance:{REF['provenance']}",
-    )
+    base = model_packet()
     with pytest.raises(ValueError):
         replace(base, model_draft_reference="draft:wrong")
     with pytest.raises(ValueError):
@@ -189,6 +235,14 @@ def test_model_evidence_must_be_uuid_backed_namespaced_and_untrusted():
         replace(base, model_output_status="verified")
     with pytest.raises(ValueError):
         replace(packet(), model_output_status="untrusted_draft")
+
+
+def test_model_evidence_digests_bind_exact_reviewed_material():
+    base = model_packet()
+    changed_draft = replace(base, model_draft_digest="3" * 64)
+    changed_provenance = replace(base, model_provenance_digest="4" * 64)
+    assert base.sha256_digest() != changed_draft.sha256_digest()
+    assert base.sha256_digest() != changed_provenance.sha256_digest()
 
 
 def test_non_utc_input_is_canonicalized_to_utc():
