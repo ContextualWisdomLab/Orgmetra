@@ -38,3 +38,5 @@ def test_next_action_requires_tenant_scoped_reference_resolution_and_worker_bind
     normalized_next_action = packet.next_action.lower()
     assert "re-resolve every packet reference within tenant_record_id" in normalized_next_action
     assert "person-to-employment" in normalized_next_action
+    assert "requester_reference and reviewer_reference within tenant_record_id" in normalized_next_action
+    assert "resolved actor identities are distinct" in normalized_next_action
