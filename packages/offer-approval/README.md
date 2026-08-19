@@ -5,8 +5,8 @@ envelope, not an offer engine and not an employment decision.
 
 The packet binds one selected candidate to the exact requisition and authoritative Job,
 an optional exact Position, the reviewed selection-decision digest, compensation-package
-provenance, offer-terms provenance, and two accountable actors. The requester and approver
-must be different.
+provenance, offer-terms provenance, and two accountable actor references. Identical requester
+and approver references are rejected as an early syntactic guard.
 
 The envelope intentionally excludes candidate names, email addresses, demographic values,
 assessment scores, salary/benefit amounts, credentials, and free-form model output.
@@ -16,14 +16,17 @@ or value-bearing suffixes are rejected so names, compensation values, offer term
 identities cannot be smuggled into the governance envelope through a reference field.
 
 A valid packet always remains `requires_human_approval` and
-`not_authorized_to_send`. The next action is to verify Job/Position scope, selected-candidate
-evidence, compensation-package provenance, and offer-terms provenance, then record
-accountable human approval through the authoritative offer workflow before communicating
-or executing the offer.
+`not_authorized_to_send`. Before approval, the host must re-resolve `requester_reference` and
+`approver_reference` within the exact `tenant_record_id` through the authoritative actor
+boundary and prove their resolved actor identities are distinct; opaque-reference inequality
+alone is not separation-of-duties evidence. The host must then verify Job/Position scope,
+selected-candidate evidence, compensation-package provenance, and offer-terms provenance before
+recording accountable human approval through the authoritative offer workflow and before
+communicating or executing the offer.
 
 Canonical JSON and its SHA-256 digest support immutable audit correlation. They do not prove
-that the referenced evidence is true, that compensation is lawful or fair, that an offer
-was approved, or that an offer was communicated.
+that the referenced evidence is true, that actor identities are distinct, that compensation is
+lawful or fair, that an offer was approved, or that an offer was communicated.
 
 ## Example
 
