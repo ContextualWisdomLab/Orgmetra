@@ -6,6 +6,8 @@ The packet correlates one opaque Person and Employment reference with a Job, per
 
 The person reference is still sensitive correlating metadata. Hosts must enforce purpose-bound authorization, least privilege, retention/export controls, and immutable audit evidence around packet access. `reason_code` is not free-form metadata: the current reviewed vocabulary accepts only `scheduled_cycle_review`. New business reasons must be introduced through an explicit governed contract change rather than encoded into arbitrary lower-snake-case strings, preventing names, identifiers, or other unreviewed context from entering canonical evidence.
 
+Every packet also carries a bounded positive integer `evidence_version` (default `1`). The version is part of canonical JSON and therefore changes the SHA-256 correlation digest when the reviewed evidence contract/version changes. Zero, negative, boolean, textual, and values above `2147483647` fail closed. The version identifies the review evidence envelope; it is not a rating, approval, or substitute for authoritative source-version verification.
+
 ## What this packet does not do
 
 It does not calculate or persist a rating, write narrative feedback, infer performance, make an employment decision, modify compensation, execute a development action, or prove cross-record scope consistency by syntax alone. It does not replace the authoritative performance/criterion persistence boundary. Canonical JSON and SHA-256 provide correlation integrity only; they do not prove fairness, scientific validity, legal compliance, authoritative scope resolution, or that a human review actually occurred.
