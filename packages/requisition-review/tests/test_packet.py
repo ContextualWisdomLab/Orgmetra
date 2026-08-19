@@ -232,3 +232,18 @@ def test_dataclass_replacement_cannot_reintroduce_value_bearing_metadata():
     ):
         with pytest.raises(ValueError):
             replace(base, **{field: value})
+
+
+def test_repr_redacts_correlating_governance_metadata():
+    """Prevent routine logging or assertion output from exposing sensitive correlations."""
+    value = packet()
+    rendered = repr(value)
+    assert rendered == "RequisitionReviewPacket(<redacted>)"
+    for sensitive in (
+        value.requisition_reference,
+        value.job_profile_reference,
+        value.hiring_manager_actor_reference,
+        value.approver_actor_reference,
+        value.job_requirements_digest,
+    ):
+        assert sensitive not in rendered
