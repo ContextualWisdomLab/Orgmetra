@@ -7,7 +7,8 @@ from datetime import date
 from hashlib import sha256
 import json
 import logging
-from typing import Callable, Mapping
+from secrets import token_urlsafe
+from typing import Callable, Mapping, cast
 from uuid import UUID, uuid4
 
 from orgmetra_hris_kernel import KernelError
@@ -81,6 +82,7 @@ _EVIDENCE_REFERENCE_KEYS = frozenset({"evidence_reference", "evidence_version_co
 _MAX_EVIDENCE_REFERENCES = 100
 _MAX_EVIDENCE_REFERENCE_LENGTH = 500
 _MAX_EVIDENCE_VERSION_LENGTH = 200
+_SUPPORT_REFERENCE_RANDOM_BYTES = 24
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +93,29 @@ class _MutationHeaders:
     actor_reference: str
     purpose_code: str
     idempotency_key: str
+
+
+async def _send_error(
+    send: AsgiSend,
+    *,
+    status: int,
+    payload: Mapping[str, object],
+    extra_headers: tuple[tuple[bytes, bytes], ...] = (),
+) -> None:
+    """Normalize one internal error description to the published client-safe schema."""
+    error_code = cast(str, payload["error"])
+    message = cast(str, payload["message"])
+    await _send_json(
+        send,
+        status=status,
+        payload={
+            "error_code": error_code,
+            "message": message,
+            "next_action": message,
+            "support_reference": f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}",
+        },
+        extra_headers=extra_headers,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,7 +162,7 @@ class PeopleMutationAsgiApp:
 
         method = scope.get("method")
         if method != "POST":
-            await _send_json(
+            await _send_error(
                 send,
                 status=405,
                 payload={
@@ -151,7 +176,7 @@ class PeopleMutationAsgiApp:
         path = scope.get("path")
         route = _mutation_route(path)
         if route is None:
-            await _send_json(
+            await _send_error(
                 send,
                 status=404,
                 payload={
@@ -165,7 +190,7 @@ class PeopleMutationAsgiApp:
             headers = _parse_command_headers(scope)
             _require_json_content_type(scope)
         except _UnsupportedMediaType:
-            await _send_json(
+            await _send_error(
                 send,
                 status=415,
                 payload={
@@ -175,7 +200,7 @@ class PeopleMutationAsgiApp:
             )
             return
         except (_InvalidHttpRequest, ValueError, TypeError):
-            await _send_json(
+            await _send_error(
                 send,
                 status=400,
                 payload={
@@ -189,7 +214,7 @@ class PeopleMutationAsgiApp:
             bearer_token = extract_bearer_token(_authorization_header(scope))
             principal = await self.authenticator.authenticate(bearer_token)
         except AuthenticationFailed:
-            await _send_json(
+            await _send_error(
                 send,
                 status=401,
                 payload={
@@ -204,7 +229,7 @@ class PeopleMutationAsgiApp:
             principal.tenant_record_id != headers.tenant_record_id
             or principal.actor_reference != headers.actor_reference
         ):
-            await _send_json(
+            await _send_error(
                 send,
                 status=403,
                 payload={
@@ -224,7 +249,7 @@ class PeopleMutationAsgiApp:
                 headers.idempotency_key,
             )
         except _PayloadTooLarge:
-            await _send_json(
+            await _send_error(
                 send,
                 status=413,
                 payload={
@@ -234,7 +259,7 @@ class PeopleMutationAsgiApp:
             )
             return
         except (_InvalidHttpRequest, ValueError, TypeError):
-            await _send_json(
+            await _send_error(
                 send,
                 status=400,
                 payload={
@@ -253,7 +278,7 @@ class PeopleMutationAsgiApp:
                 app=self,
             )
         except AuthorizationDeniedError:
-            await _send_json(
+            await _send_error(
                 send,
                 status=403,
                 payload={
@@ -263,7 +288,7 @@ class PeopleMutationAsgiApp:
             )
             return
         except PeopleMutationNotFound:
-            await _send_json(
+            await _send_error(
                 send,
                 status=404,
                 payload={
@@ -273,7 +298,7 @@ class PeopleMutationAsgiApp:
             )
             return
         except (PeopleMutationIntegrityError, KernelError):
-            await _send_json(
+            await _send_error(
                 send,
                 status=409,
                 payload={
@@ -292,7 +317,7 @@ class PeopleMutationAsgiApp:
                     "exception_type": type(error).__name__,
                 },
             )
-            await _send_json(
+            await _send_error(
                 send,
                 status=500,
                 payload={
