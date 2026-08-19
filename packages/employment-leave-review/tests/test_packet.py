@@ -28,7 +28,7 @@ D = "a" * 64
 
 
 def args() -> dict[str, object]:
-    """Return one realistic value-free leave-review fixture."""
+    """Return one realistic value-minimized leave-review fixture."""
     return {
         "tenant_record_id": U["tenant"],
         "leave_review_reference": f"employment_leave_review:{U['review']}",
@@ -63,12 +63,15 @@ def packet() -> EmploymentLeaveReviewPacket:
     return build_employment_leave_review_packet(**args())
 
 
-def test_valid_packet_is_value_free_human_review_only_and_deterministic() -> None:
+def test_valid_packet_is_value_minimized_human_review_only_and_deterministic() -> None:
     p = packet()
     payload = json.loads(p.canonical_json())
     assert p.sha256_digest() == sha256(p.canonical_json().encode("utf-8")).hexdigest()
     assert payload["generated_at"] == "2026-08-19T02:24:51.123456Z"
-    assert payload["contains_person_pii"] is False
+    # The opaque worker correlation plus exact leave dates remain personal data; claiming
+    # PII-free evidence would be misleading even though direct identifiers and case values
+    # are excluded.
+    assert payload["contains_person_pii"] is True
     assert payload["contains_medical_or_family_values"] is False
     assert payload["decision_authority"] == "human_review_only"
     assert "medical/family evidence" in p.next_action
@@ -202,7 +205,7 @@ def test_evidence_version_changes_digest() -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("contains_person_pii", True),
+        ("contains_person_pii", False),
         ("contains_medical_or_family_values", True),
         ("contains_compensation_or_benefit_values", True),
         ("contains_free_form_case_narrative", True),
