@@ -220,3 +220,22 @@ def test_direct_replace_is_revalidated() -> None:
     packet = CandidateEvidenceIntakePacket(**values())
     with pytest.raises(ValueError, match="retention_policy_digest"):
         replace(packet, retention_policy_digest="not-a-digest")
+
+
+@pytest.mark.parametrize(
+    "reason_code",
+    ["jane_doe", "salary_120000", "race_gender_review", "candidate_alice_smith"],
+)
+def test_reason_code_rejects_personal_or_value_bearing_free_form_codes(reason_code: str) -> None:
+    """Prevent nominal governance reason metadata from becoming a candidate-data channel."""
+    data = values()
+    data["reason_code"] = reason_code
+    with pytest.raises(ValueError):
+        CandidateEvidenceIntakePacket(**data)
+
+
+def test_reason_code_replace_path_is_revalidated() -> None:
+    """Reject value-bearing reason metadata when copying an immutable intake packet."""
+    packet = CandidateEvidenceIntakePacket(**values())
+    with pytest.raises(ValueError):
+        replace(packet, reason_code="salary_120000")
