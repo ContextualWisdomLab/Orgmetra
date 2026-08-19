@@ -25,17 +25,19 @@ The field versions this immutable pre-send evidence envelope; it is not approval
 or proof that referenced source versions were authoritatively resolved.
 
 A valid packet always remains `requires_human_approval` and
-`not_authorized_to_send`. Before approval, the host must re-resolve `requester_reference` and
-`approver_reference` within the exact `tenant_record_id` through the authoritative actor
-boundary and prove their resolved actor identities are distinct; opaque-reference inequality
-alone is not separation-of-duties evidence. The host must then verify Job/Position scope,
-selected-candidate evidence, compensation-package provenance, and offer-terms provenance before
-recording accountable human approval through the authoritative offer workflow and before
-communicating or executing the offer.
+`not_authorized_to_send`. Before approval, the host must re-resolve **every packet reference**
+within the exact `tenant_record_id` through its authoritative boundary so valid UUIDs from a
+foreign tenant cannot be mixed into the approval envelope. It must specifically re-resolve
+`requester_reference` and `approver_reference` and prove their resolved actor identities are
+distinct; opaque-reference inequality alone is not separation-of-duties evidence. The host
+must then verify Job/Position scope, selected-candidate evidence, compensation-package
+provenance, and offer-terms provenance before recording accountable human approval through the
+authoritative offer workflow and before communicating or executing the offer.
 
 Canonical JSON and its SHA-256 digest support immutable audit correlation. They do not prove
-that the referenced evidence is true, that actor identities are distinct, that compensation is
-lawful or fair, that an offer was approved, or that an offer was communicated.
+that the referenced evidence is true, that all references belong to the packet tenant, that
+actor identities are distinct, that compensation is lawful or fair, that an offer was approved,
+or that an offer was communicated.
 
 ## Example
 
