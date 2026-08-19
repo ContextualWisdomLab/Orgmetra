@@ -23,6 +23,8 @@ U = {
     "return": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     "requester": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
     "reviewer": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    "handling": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    "retention": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
 }
 D = "a" * 64
 
@@ -46,6 +48,10 @@ def args() -> dict[str, object]:
         "benefits_continuity_plan_digest": D,
         "return_to_work_plan_reference": f"return_to_work_plan:{U['return']}",
         "return_to_work_plan_digest": D,
+        "handling_policy_reference": f"personal_data_handling_policy:{U['handling']}",
+        "handling_policy_digest": D,
+        "retention_policy_reference": f"retention_policy:{U['retention']}",
+        "retention_policy_digest": D,
         "requester_reference": f"actor:{U['requester']}",
         "reviewer_reference": f"actor:{U['reviewer']}",
         "purpose_code": "employment_leave_review",
@@ -74,6 +80,9 @@ def test_valid_packet_is_value_minimized_human_review_only_and_deterministic() -
     assert payload["contains_person_pii"] is True
     assert payload["contains_medical_or_family_values"] is False
     assert payload["decision_authority"] == "human_review_only"
+    assert payload["handling_policy_reference"].startswith("personal_data_handling_policy:")
+    assert payload["retention_policy_reference"].startswith("retention_policy:")
+    assert "handling/retention policy" in p.next_action
     assert "medical/family evidence" in p.next_action
     assert "resolved actor identities are distinct" in p.next_action
     assert "person_record_reference" in payload
@@ -92,6 +101,8 @@ def test_valid_packet_is_value_minimized_human_review_only_and_deterministic() -
         ("work_continuity_plan_reference", "work_continuity_plan"),
         ("benefits_continuity_plan_reference", "benefits_continuity_plan"),
         ("return_to_work_plan_reference", "return_to_work_plan"),
+        ("handling_policy_reference", "personal_data_handling_policy"),
+        ("retention_policy_reference", "retention_policy"),
         ("requester_reference", "actor"),
         ("reviewer_reference", "actor"),
     ],
@@ -117,6 +128,8 @@ def test_reference_guards_reject_wrong_namespace_and_non_uuid(field: str, prefix
         "work_continuity_plan_digest",
         "benefits_continuity_plan_digest",
         "return_to_work_plan_digest",
+        "handling_policy_digest",
+        "retention_policy_digest",
     ],
 )
 def test_digest_guards(field: str) -> None:
@@ -200,6 +213,14 @@ def test_evidence_version_changes_digest() -> None:
     p = packet()
     q = replace(p, evidence_version=2)
     assert p.sha256_digest() != q.sha256_digest()
+
+
+def test_handling_or_retention_policy_change_changes_audit_digest() -> None:
+    p = packet()
+    q = replace(p, handling_policy_digest="b" * 64)
+    r = replace(p, retention_policy_digest="c" * 64)
+    assert p.sha256_digest() != q.sha256_digest()
+    assert p.sha256_digest() != r.sha256_digest()
 
 
 @pytest.mark.parametrize(
