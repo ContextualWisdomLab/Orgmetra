@@ -4,7 +4,7 @@
 
 ## What the packet binds
 
-The packet requires opaque UUID-backed references for the Person, Employment, current Assignment, current Job and Position, proposed Job and Position, current-scope snapshot, reviewed workforce-allocation plan, exact workforce-allocation policy, worker-impact assessment, communication plan, requester, and a distinct accountable reviewer. Each trust-bearing evidence artifact is paired with a lowercase SHA-256 digest.
+The packet requires opaque UUID-backed references for the Person, Employment, current Assignment, current Job and Position, proposed Job and Position, current-scope snapshot, reviewed workforce-allocation plan, exact workforce-allocation policy, worker-impact assessment, communication plan, requester, and a distinct accountable reviewer. Each trust-bearing evidence artifact is paired with a lowercase SHA-256 digest. A bounded positive `evidence_version` is part of canonical evidence so actor/purpose/reason evidence from different review-contract revisions cannot silently collide.
 
 `requested_effective_on` is review intent, not proof that the date is valid or authorized. Immediately before approval/mutation, the host must re-resolve **every packet reference within `tenant_record_id`**, verify the Person-to-Employment-to-current-Assignment binding and current Assignment/Job/Position worker scope, and then resolve the proposed relationships against authoritative bitemporal Orgmetra records. Canonical JSON and the packet SHA-256 provide immutable correlation evidence only.
 
@@ -17,10 +17,11 @@ The packet always remains value-minimized and pre-mutation:
 - Requester and reviewer must be different actors.
 - `purpose_code` is fixed to `assignment_change_review`.
 - `reason_code` is limited to reviewed non-sensitive categories: `internal_reassignment`, `workforce_reallocation`, `temporary_detail`, `position_reclassification`, or `organizational_realignment`; free-form personal reasons belong outside this packet.
+- `evidence_version` is a positive integer included in canonical JSON and the packet digest.
 - Human confirmation is mandatory; decision authority remains `human_review_only`.
 - `scope_verification_state` remains `requires_authoritative_resolution`.
 - `mutation_state` remains `not_authorized_to_apply`.
-- Direct construction and `dataclasses.replace(...)` are revalidated, so callers cannot manufacture an approved/applied packet.
+- Direct construction and `dataclasses.replace(...)` are revalidated, so callers cannot manufacture an approved/applied packet or an invalid evidence version.
 
 ## Next action
 
