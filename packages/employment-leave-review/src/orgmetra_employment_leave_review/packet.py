@@ -1,13 +1,13 @@
 """Governed, value-minimized pre-mutation employment-leave review evidence.
 
 The packet correlates one proposed leave/status transition to authoritative Person and
-Employment scope plus reviewed policy, leave-case, continuity, benefits-continuity and
-return-to-work evidence. The opaque worker correlation and exact leave dates remain
-personal data, so the packet is deliberately purpose-bound rather than falsely labeled
-PII-free. It excludes direct identifiers, leave reason narrative, medical or family
-values, compensation/benefit values, credentials, and free-form model output.
-Authoritative eligibility, scope resolution, approval, HRIS mutation, and downstream
-execution remain outside this package.
+Employment scope plus reviewed policy, leave-case, continuity, benefits-continuity,
+return-to-work, personal-data handling, and retention-policy evidence. The opaque worker
+correlation and exact leave dates remain personal data, so the packet is deliberately
+purpose-bound rather than falsely labeled PII-free. It excludes direct identifiers,
+leave reason narrative, medical or family values, compensation/benefit values,
+credentials, and free-form model output. Authoritative eligibility, scope resolution,
+approval, HRIS mutation, and downstream execution remain outside this package.
 """
 from __future__ import annotations
 
@@ -41,10 +41,11 @@ _NEXT_ACTION = (
     "requester_reference and reviewer_reference and prove their resolved actor identities "
     "are distinct, prove the Person-to-Employment binding and active Assignment/Job/Position "
     "scope represented by the snapshot, verify the authoritative leave case, applicable "
-    "policy version, requested effective dates, work-continuity, benefits-continuity, and "
-    "return-to-work provenance without copying medical/family evidence into this packet, then "
-    "record accountable human approval and apply any Employment/Assignment status mutation only "
-    "through the authoritative People boundary; downstream actions must use published owner contracts."
+    "leave policy version, exact personal-data handling/retention policy versions, requested "
+    "effective dates, work-continuity, benefits-continuity, and return-to-work provenance "
+    "without copying medical/family evidence into this packet, then record accountable human "
+    "approval and apply any Employment/Assignment status mutation only through the authoritative "
+    "People boundary; downstream actions must use published owner contracts."
 )
 
 
@@ -122,6 +123,10 @@ class EmploymentLeaveReviewPacket:
     benefits_continuity_plan_digest: str
     return_to_work_plan_reference: str
     return_to_work_plan_digest: str
+    handling_policy_reference: str
+    handling_policy_digest: str
+    retention_policy_reference: str
+    retention_policy_digest: str
     requester_reference: str
     reviewer_reference: str
     purpose_code: str
@@ -185,6 +190,18 @@ class EmploymentLeaveReviewPacket:
             "return_to_work_plan_reference",
         )
         _validate_digest(self.return_to_work_plan_digest, "return_to_work_plan_digest")
+        _validate_reference(
+            self.handling_policy_reference,
+            "personal_data_handling_policy",
+            "handling_policy_reference",
+        )
+        _validate_digest(self.handling_policy_digest, "handling_policy_digest")
+        _validate_reference(
+            self.retention_policy_reference,
+            "retention_policy",
+            "retention_policy_reference",
+        )
+        _validate_digest(self.retention_policy_digest, "retention_policy_digest")
         _validate_reference(self.requester_reference, "actor", "requester_reference")
         _validate_reference(self.reviewer_reference, "actor", "reviewer_reference")
         if self.requester_reference == self.reviewer_reference:
@@ -245,6 +262,8 @@ class EmploymentLeaveReviewPacket:
             "evidence_version": self.evidence_version,
             "external_execution_state": self.external_execution_state,
             "generated_at": _canonical_timestamp(self.generated_at),
+            "handling_policy_digest": self.handling_policy_digest,
+            "handling_policy_reference": self.handling_policy_reference,
             "human_confirmation_required": self.human_confirmation_required,
             "leave_case_digest": self.leave_case_digest,
             "leave_case_reference": self.leave_case_reference,
@@ -259,6 +278,8 @@ class EmploymentLeaveReviewPacket:
             "requested_leave_end_on": self.requested_leave_end_on.isoformat(),
             "requested_leave_start_on": self.requested_leave_start_on.isoformat(),
             "requester_reference": self.requester_reference,
+            "retention_policy_digest": self.retention_policy_digest,
+            "retention_policy_reference": self.retention_policy_reference,
             "return_to_work_plan_digest": self.return_to_work_plan_digest,
             "return_to_work_plan_reference": self.return_to_work_plan_reference,
             "review_state": self.review_state,
@@ -293,6 +314,10 @@ def build_employment_leave_review_packet(
     benefits_continuity_plan_digest: str,
     return_to_work_plan_reference: str,
     return_to_work_plan_digest: str,
+    handling_policy_reference: str,
+    handling_policy_digest: str,
+    retention_policy_reference: str,
+    retention_policy_digest: str,
     requester_reference: str,
     reviewer_reference: str,
     purpose_code: str,
@@ -320,6 +345,10 @@ def build_employment_leave_review_packet(
         benefits_continuity_plan_digest=benefits_continuity_plan_digest,
         return_to_work_plan_reference=return_to_work_plan_reference,
         return_to_work_plan_digest=return_to_work_plan_digest,
+        handling_policy_reference=handling_policy_reference,
+        handling_policy_digest=handling_policy_digest,
+        retention_policy_reference=retention_policy_reference,
+        retention_policy_digest=retention_policy_digest,
         requester_reference=requester_reference,
         reviewer_reference=reviewer_reference,
         purpose_code=purpose_code,
