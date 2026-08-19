@@ -111,7 +111,7 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class EmploymentSeparationReviewPacket:
     """Immutable separation evidence that cannot authorize mutation or owner execution."""
 
@@ -155,6 +155,10 @@ class EmploymentSeparationReviewPacket:
     mutation_state: str = _MUTATION_STATE
     external_execution_state: str = _EXTERNAL_EXECUTION_STATE
     next_action: str = _NEXT_ACTION
+
+    def __repr__(self) -> str:
+        """Return a representation that never emits sensitive correlation evidence."""
+        return "EmploymentSeparationReviewPacket(<redacted>)"
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
