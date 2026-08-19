@@ -3,8 +3,9 @@ from datetime import date, datetime, timezone
 from orgmetra_employment_separation_review import build_employment_separation_review_packet
 
 
-def test_next_action_requires_tenant_scoped_reference_resolution_and_worker_binding() -> None:
-    packet = build_employment_separation_review_packet(
+def _packet():
+    """Build one governed separation packet for boundary assertions."""
+    return build_employment_separation_review_packet(
         tenant_record_id="11111111-1111-4111-8111-111111111111",
         separation_review_reference="employment_separation_review:22222222-2222-4222-8222-222222222222",
         person_record_reference="person_record:33333333-3333-4333-8333-333333333333",
@@ -35,8 +36,32 @@ def test_next_action_requires_tenant_scoped_reference_resolution_and_worker_bind
         generated_at=datetime(2026, 8, 19, 9, 30, tzinfo=timezone.utc),
     )
 
-    normalized_next_action = packet.next_action.lower()
-    assert "re-resolve every packet reference within tenant_record_id" in normalized_next_action
-    assert "person-to-employment" in normalized_next_action
-    assert "requester_reference and reviewer_reference within tenant_record_id" in normalized_next_action
-    assert "resolved actor identities are distinct" in normalized_next_action
+
+def test_next_action_requires_tenant_scoped_reference_resolution_and_worker_binding() -> None:
+    packet = _packet()
+    action = packet.next_action
+    actor_clause = (
+        "specifically re-resolve requester_reference and reviewer_reference within "
+        "tenant_record_id and verify their resolved actor identities are distinct"
+    )
+    worker_clause = "prove the Person-to-Employment binding"
+    approval_clause = "record accountable human approval"
+
+    assert action.startswith("Re-resolve every packet reference within tenant_record_id;")
+    assert actor_clause in action
+    assert worker_clause in action
+    assert approval_clause in action
+    assert action.index(actor_clause) < action.index(worker_clause) < action.index(approval_clause)
+    assert action.endswith("downstream actions only through their published owner boundaries.")
+
+
+def test_repr_redacts_sensitive_correlation_and_evidence() -> None:
+    packet = _packet()
+    rendered = repr(packet)
+
+    assert rendered == "EmploymentSeparationReviewPacket(<redacted>)"
+    assert packet.tenant_record_id not in rendered
+    assert packet.person_record_reference not in rendered
+    assert packet.employment_record_reference not in rendered
+    assert packet.requester_reference not in rendered
+    assert packet.active_assignment_snapshot_digest not in rendered
