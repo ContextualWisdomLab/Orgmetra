@@ -23,6 +23,7 @@ _PURPOSE_CODE = "selection_outcome_monitoring"
 _ANALYSIS_SCOPE = "total_selection_process_by_job"
 _REVIEW_STATE = "requires_human_review"
 _DECISION_AUTHORITY = "human_review_only"
+_ALLOWED_REASON_CODES = frozenset({"quarterly_selection_governance"})
 _NEXT_ACTION = (
     "Within tenant_record_id, re-resolve actor_reference and reviewer_reference through the "
     "authoritative actor boundary and verify their resolved actor identities are distinct; "
@@ -81,7 +82,7 @@ def _canonical_timestamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class SelectionOutcomeMonitoringPlan:
     """Immutable aggregate-monitoring plan awaiting accountable human review."""
 
@@ -174,6 +175,8 @@ class SelectionOutcomeMonitoringPlan:
         if self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain selection_outcome_monitoring")
         _validate_code(self.reason_code, "reason_code")
+        if self.reason_code not in _ALLOWED_REASON_CODES:
+            raise ValueError("reason_code must use a reviewed non-sensitive monitoring reason")
         _canonical_timestamp(self.generated_at)
         if self.analysis_scope != _ANALYSIS_SCOPE:
             raise ValueError("analysis_scope must remain total_selection_process_by_job")
@@ -187,6 +190,10 @@ class SelectionOutcomeMonitoringPlan:
             raise ValueError("review_state must remain requires_human_review")
         if self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed monitoring instruction")
+
+    def __repr__(self) -> str:
+        """Return a fully redacted representation safe for routine logs and assertions."""
+        return "SelectionOutcomeMonitoringPlan(<redacted>)"
 
     def canonical_json(self) -> str:
         """Return deterministic canonical JSON for immutable audit correlation."""
