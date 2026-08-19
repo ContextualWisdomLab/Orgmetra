@@ -16,16 +16,18 @@
 | `position_record_version` | Bitemporal position status and effective period. |
 | `assignment_record` | A person's allocation to a position through one employment. |
 | `candidate_profile` | Applicant/candidate record before hire. |
-| `candidate_worker_link` | Append-only linkage from candidate to worker after hiring. |
+| `candidate_worker_link` | Legacy append-only candidate-to-worker linkage retained for historical reads; new writes use `candidate_worker_conversion_record`. |
+| `candidate_worker_conversion_record` | Governed bitemporal candidate-to-worker conversion bound to the hire decision, person, employment, immutable audit event, and outbox evidence. |
 | `criterion_blueprint` | Job-related performance criterion definition. |
 | `criterion_observation` | Observed criterion result. |
 | `decision_evidence_set` | Versioned evidence-set header whose database-computed digest and membership are sealed by one accountable selection decision. |
 | `selection_decision_evidence` | Immutable versioned evidence member belonging to one open decision evidence set. |
 | `selection_decision` | Human-accountable high-impact decision bound to exactly one sealed evidence set. |
-| `validity_study` | Study registry linking its criterion definition to exact decisions, sealed evidence sets, and observed outcomes. |
-| `validity_study_decision_link` | Append-only study-to-selection-decision relationship. |
-| `validity_study_evidence_set_link` | Append-only study-to-versioned-evidence relationship. |
-| `validity_study_outcome_link` | Append-only study-to-criterion-observation relationship. |
+| `validity_study` | Study registry binding one criterion definition to normalized worker-level validity-study cases. |
+| `validity_study_case_record` | Append-only tenant-scoped study case binding one selection decision, its exact sealed evidence set, its governed candidate-to-worker conversion, and one criterion observation for that same worker and criterion. |
+| `validity_study_decision_link` | Legacy append-only study-to-selection-decision relationship retained for historical reads; new writes are rejected. |
+| `validity_study_evidence_set_link` | Legacy append-only study-to-versioned-evidence relationship retained for historical reads; new writes are rejected. |
+| `validity_study_outcome_link` | Legacy append-only study-to-criterion-observation relationship retained for historical reads; new writes are rejected. |
 | `audit_event_record` | Append-only, tenant-scoped canonical audit envelope bytes plus database-verified SHA-256 digest. |
 | `outbox_delivery_record` | Mutable asynchronous delivery coordination for one immutable audit event and delivery target, including immutable database-owned retry budget. |
 | `outbox_delivery_escalation_record` | Append-only terminal-failure evidence for one dead-lettered delivery, including failure classification, terminal attempt count, and opaque escalation reference. |
@@ -55,7 +57,7 @@ Assignments remain a legitimately multiple-membership fact. Each assignment must
 
 Evidence membership is constructed in `selection_decision_evidence` while its `decision_evidence_set` is open. An open set has no caller-supplied content digest. Finalizing `selection_decision` requires at least one versioned evidence member, canonicalizes the members by `(evidence_reference, evidence_version_code)`, computes SHA-256 inside PostgreSQL, and atomically stores that digest while binding `sealed_selection_decision_id`. Database triggers reject later evidence inserts, second-decision reuse, arbitrary post-seal mutation, and a sealed-set pointer that does not resolve back to the decision that consumed that exact set. This makes the stored digest evidence about database-observed membership at finalization rather than an unverified client assertion.
 
-Validation-study link tables preserve the exact decisions, evidence sets and criterion observations included in a study. External specialist results remain references through published contracts; Orgmetra does not reach into a specialist service's application tables.
+New predictive-validity membership uses `validity_study_case_record` rather than three independently writable study links. One normalized case must bind the study's exact criterion to a selection decision for the same Job, that decision's exact sealed evidence set, the governed `candidate_worker_conversion_record` for the selected candidate, and a `criterion_observation` belonging to the converted worker. The case insert also requires the study version, decision, sealed evidence, observation, and conversion to have been visible in system-recorded time at `linked_at`; a conversion or observation already closed at that knowledge coordinate is rejected. This prevents an analytic cohort from structurally mixing one person's decision/evidence with another person's outcome. The three original validity-study link relations remain readable historical compatibility surfaces, but migration 0010 rejects new inserts through them so new production evidence cannot bypass the normalized case boundary. External specialist results remain references through published contracts; Orgmetra does not reach into a specialist service's application tables.
 
 ## Audit and outbox normalization
 
