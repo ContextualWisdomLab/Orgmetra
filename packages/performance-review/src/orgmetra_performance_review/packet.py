@@ -1,12 +1,13 @@
-"""Governed, value-free human performance-review evidence.
+"""Governed, value-minimized human performance-review evidence.
 
 The packet correlates one proposed employee review to Employment and Job references,
 a performance cycle, predetermined criteria and goals, an exact criterion-observation
 snapshot, an optional development plan, and an accountable human reviewer. It does not
 assert that those references resolve to one authoritative scope; that verification must
-occur at the authoritative HRIS/performance boundary before rating. The opaque person
-reference remains sensitive correlating metadata. Person PII, rating values, free-form
-feedback, and free-form model output remain outside this envelope.
+occur at the authoritative HRIS/performance boundary before rating. Opaque worker
+references remain personal data because they can be re-associated with an identifiable
+person through the authoritative HRIS boundary. Direct identifiers, rating values,
+free-form feedback, and free-form model output remain outside this envelope.
 """
 from __future__ import annotations
 
@@ -96,7 +97,7 @@ def _validate_evidence_version(value: int) -> None:
 
 @dataclass(frozen=True, slots=True, repr=False)
 class PerformanceReviewPacket:
-    """Immutable value-free performance-review packet awaiting authoritative resolution."""
+    """Immutable value-minimized review packet awaiting authoritative resolution."""
 
     tenant_record_id: str
     performance_review_reference: str
@@ -119,7 +120,8 @@ class PerformanceReviewPacket:
     review_period_end: date
     generated_at: datetime
     evidence_version: int = 1
-    contains_person_pii: bool = False
+    contains_personal_data: bool = True
+    contains_direct_person_identifiers: bool = False
     contains_rating_value: bool = False
     contains_free_form_model_output: bool = False
     human_confirmation_required: bool = True
@@ -184,8 +186,10 @@ class PerformanceReviewPacket:
             raise ValueError("review period start must not be after review period end")
         _canonical_timestamp(self.generated_at)
         _validate_evidence_version(self.evidence_version)
-        if self.contains_person_pii is not False:
-            raise ValueError("performance review packet must not contain person PII")
+        if self.contains_personal_data is not True:
+            raise ValueError("performance review packet contains personal data through worker references")
+        if self.contains_direct_person_identifiers is not False:
+            raise ValueError("performance review packet must not contain direct person identifiers")
         if self.contains_rating_value is not False:
             raise ValueError("performance review packet must not contain rating values")
         if self.contains_free_form_model_output is not False:
@@ -206,8 +210,9 @@ class PerformanceReviewPacket:
     def canonical_json(self) -> str:
         """Return deterministic canonical JSON for immutable audit correlation."""
         payload = {
+            "contains_direct_person_identifiers": self.contains_direct_person_identifiers,
             "contains_free_form_model_output": self.contains_free_form_model_output,
-            "contains_person_pii": self.contains_person_pii,
+            "contains_personal_data": self.contains_personal_data,
             "contains_rating_value": self.contains_rating_value,
             "criterion_observation_snapshot_digest": self.criterion_observation_snapshot_digest,
             "criterion_observation_snapshot_reference": self.criterion_observation_snapshot_reference,
@@ -267,7 +272,7 @@ def build_performance_review_packet(
     generated_at: datetime,
     evidence_version: int = 1,
 ) -> PerformanceReviewPacket:
-    """Build value-free performance-review evidence pending authoritative resolution."""
+    """Build value-minimized performance-review evidence pending authoritative resolution."""
     return PerformanceReviewPacket(
         tenant_record_id=tenant_record_id,
         performance_review_reference=performance_review_reference,
