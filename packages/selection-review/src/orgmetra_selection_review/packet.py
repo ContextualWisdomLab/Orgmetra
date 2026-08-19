@@ -18,10 +18,12 @@ from uuid import UUID
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_EVIDENCE_VERSION_PATTERN = re.compile(r"^evidence_version_([1-9][0-9]{0,9})$")
 _REFERENCE_PATTERN = re.compile(
     r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
 )
 _REVIEW_PURPOSE = "selection_review"
+_ALLOWED_REASON_CODES = frozenset({"candidate_assessment"})
 _REVIEW_STATE = "requires_human_decision"
 _MODEL_OUTPUT_STATUS = "untrusted_draft"
 _NEXT_ACTION = (
@@ -50,6 +52,21 @@ def _validate_code(value: str, field_name: str) -> None:
         raise ValueError(
             f"{field_name} must be bounded two-or-more-word lower snake_case"
         )
+
+
+def _validate_digest(value: str, field_name: str) -> None:
+    """Require a lowercase SHA-256 digest for immutable evidence binding."""
+    if not isinstance(value, str) or not _DIGEST_PATTERN.fullmatch(value):
+        raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
+
+
+def _validate_evidence_version_code(value: str) -> None:
+    """Require canonical positive evidence_version_N text without value-bearing suffixes."""
+    if not isinstance(value, str):
+        raise ValueError("evidence_version_code must be a canonical positive evidence version")
+    match = _EVIDENCE_VERSION_PATTERN.fullmatch(value)
+    if match is None or int(match.group(1)) > 2_147_483_647:
+        raise ValueError("evidence_version_code must be a canonical positive evidence version")
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
@@ -96,7 +113,9 @@ class SelectionReviewPacket:
     review_state: str = _REVIEW_STATE
     next_action: str = _NEXT_ACTION
     model_draft_reference: str | None = None
+    model_draft_digest: str | None = None
     model_provenance_reference: str | None = None
+    model_provenance_digest: str | None = None
     model_output_status: str | None = None
 
     def __repr__(self) -> str:
@@ -113,16 +132,15 @@ class SelectionReviewPacket:
             "decision_evidence_set",
             "decision_evidence_set_reference",
         )
-        if not isinstance(self.evidence_set_digest, str) or not _DIGEST_PATTERN.fullmatch(
-            self.evidence_set_digest
-        ):
-            raise ValueError("evidence_set_digest must be lowercase SHA-256 hex")
+        _validate_digest(self.evidence_set_digest, "evidence_set_digest")
         _validate_reference(self.reviewer_actor_reference, "actor", "reviewer_actor_reference")
         _validate_code(self.purpose_code, "purpose_code")
         if self.purpose_code != _REVIEW_PURPOSE:
             raise ValueError("purpose_code must remain selection_review")
         _validate_code(self.reason_code, "reason_code")
-        _validate_code(self.evidence_version_code, "evidence_version_code")
+        if self.reason_code not in _ALLOWED_REASON_CODES:
+            raise ValueError("reason_code must be an authorized selection-review reason")
+        _validate_evidence_version_code(self.evidence_version_code)
         _canonical_timestamp(self.generated_at)
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for selection decisions")
@@ -130,19 +148,27 @@ class SelectionReviewPacket:
             raise ValueError("review_state must remain requires_human_decision")
         if self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed human-review instruction")
-        has_draft = self.model_draft_reference is not None
-        has_provenance = self.model_provenance_reference is not None
-        if has_draft != has_provenance:
-            raise ValueError("model draft and provenance references must be supplied together")
-        if has_draft:
+        model_presence = (
+            self.model_draft_reference is not None,
+            self.model_draft_digest is not None,
+            self.model_provenance_reference is not None,
+            self.model_provenance_digest is not None,
+        )
+        if len(set(model_presence)) != 1:
+            raise ValueError(
+                "model draft, draft digest, provenance, and provenance digest must be supplied together"
+            )
+        if model_presence[0]:
             _validate_reference(
                 self.model_draft_reference, "model_draft", "model_draft_reference"
             )
+            _validate_digest(self.model_draft_digest, "model_draft_digest")
             _validate_reference(
                 self.model_provenance_reference,
                 "model_provenance",
                 "model_provenance_reference",
             )
+            _validate_digest(self.model_provenance_digest, "model_provenance_digest")
             if self.model_output_status != _MODEL_OUTPUT_STATUS:
                 raise ValueError("model-backed evidence must remain untrusted_draft")
         elif self.model_output_status is not None:
@@ -158,8 +184,10 @@ class SelectionReviewPacket:
             "generated_at": _canonical_timestamp(self.generated_at),
             "human_confirmation_required": self.human_confirmation_required,
             "job_profile_reference": self.job_profile_reference,
+            "model_draft_digest": self.model_draft_digest,
             "model_draft_reference": self.model_draft_reference,
             "model_output_status": self.model_output_status,
+            "model_provenance_digest": self.model_provenance_digest,
             "model_provenance_reference": self.model_provenance_reference,
             "next_action": self.next_action,
             "purpose_code": self.purpose_code,
@@ -188,12 +216,22 @@ def build_selection_review_packet(
     evidence_version_code: str,
     generated_at: datetime,
     model_draft_reference: str | None = None,
+    model_draft_digest: str | None = None,
     model_provenance_reference: str | None = None,
+    model_provenance_digest: str | None = None,
 ) -> SelectionReviewPacket:
     """Build a governed packet that can only proceed to an accountable human decision."""
     model_output_status = (
         _MODEL_OUTPUT_STATUS
-        if model_draft_reference is not None or model_provenance_reference is not None
+        if any(
+            value is not None
+            for value in (
+                model_draft_reference,
+                model_draft_digest,
+                model_provenance_reference,
+                model_provenance_digest,
+            )
+        )
         else None
     )
     return SelectionReviewPacket(
@@ -208,6 +246,8 @@ def build_selection_review_packet(
         evidence_version_code=evidence_version_code,
         generated_at=generated_at,
         model_draft_reference=model_draft_reference,
+        model_draft_digest=model_draft_digest,
         model_provenance_reference=model_provenance_reference,
+        model_provenance_digest=model_provenance_digest,
         model_output_status=model_output_status,
     )
