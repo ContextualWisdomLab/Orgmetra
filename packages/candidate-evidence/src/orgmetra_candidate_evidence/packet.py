@@ -100,6 +100,7 @@ class CandidateEvidenceIntakePacket:
     purpose_code: str
     reason_code: str
     collected_at: datetime
+    evidence_version: int = 1
     human_confirmation_required: bool = True
     review_state: str = _REVIEW_STATE
     next_action: str = _NEXT_ACTION
@@ -155,6 +156,8 @@ class CandidateEvidenceIntakePacket:
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive candidate-evidence reason")
         _canonical_timestamp(self.collected_at)
+        if type(self.evidence_version) is not int or not 1 <= self.evidence_version <= 2_147_483_647:
+            raise ValueError("evidence_version must be an integer from 1 through 2147483647")
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory before sealing candidate evidence")
         if self.review_state != _REVIEW_STATE:
@@ -171,6 +174,7 @@ class CandidateEvidenceIntakePacket:
             "evidence_item_count": self.evidence_item_count,
             "evidence_set_digest": self.evidence_set_digest,
             "evidence_set_reference": self.evidence_set_reference,
+            "evidence_version": self.evidence_version,
             "handling_policy_digest": self.handling_policy_digest,
             "handling_policy_reference": self.handling_policy_reference,
             "human_confirmation_required": self.human_confirmation_required,
@@ -218,6 +222,7 @@ def build_candidate_evidence_intake_packet(
     purpose_code: str,
     reason_code: str,
     collected_at: datetime,
+    evidence_version: int = 1,
 ) -> CandidateEvidenceIntakePacket:
     """Build a reference-only candidate-evidence packet pending accountable review."""
     return CandidateEvidenceIntakePacket(
@@ -241,4 +246,5 @@ def build_candidate_evidence_intake_packet(
         purpose_code=purpose_code,
         reason_code=reason_code,
         collected_at=collected_at,
+        evidence_version=evidence_version,
     )
