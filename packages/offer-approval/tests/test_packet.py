@@ -92,6 +92,19 @@ def test_canonical_json_and_digest_are_deterministic_and_value_free() -> None:
     assert packet.sha256_digest() == sha256(packet.canonical_json().encode("utf-8")).hexdigest()
 
 
+def test_repr_redacts_candidate_compensation_and_actor_correlation() -> None:
+    packet = build_valid()
+    rendered = repr(packet)
+
+    assert rendered == "OfferApprovalPacket(<redacted>)"
+    assert packet.tenant_record_id not in rendered
+    assert packet.candidate_profile_reference not in rendered
+    assert packet.compensation_package_reference not in rendered
+    assert packet.compensation_package_digest not in rendered
+    assert packet.requester_reference not in rendered
+    assert packet.approver_reference not in rendered
+
+
 def test_fractional_seconds_remain_distinct_evidence() -> None:
     first = build_valid()
     second = replace(first, generated_at=first.generated_at + timedelta(microseconds=1))
