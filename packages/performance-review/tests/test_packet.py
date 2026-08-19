@@ -78,6 +78,25 @@ def test_canonical_json_and_digest_are_deterministic() -> None:
     assert canonical == build_valid().canonical_json()
 
 
+def test_evidence_version_is_bound_to_canonical_evidence() -> None:
+    """Require review evidence versioning to change the immutable correlation digest."""
+    first = build_valid()
+    assert first.evidence_version == 1
+    assert json.loads(first.canonical_json())["evidence_version"] == 1
+
+    second = build_valid(evidence_version=2)
+    assert second.evidence_version == 2
+    assert second.canonical_json() != first.canonical_json()
+    assert second.sha256_digest() != first.sha256_digest()
+
+
+@pytest.mark.parametrize("evidence_version", [0, -1, True, "1", 2_147_483_648])
+def test_rejects_invalid_evidence_version(evidence_version: object) -> None:
+    """Reject unbounded or non-integer performance-review evidence versions."""
+    with pytest.raises(ValueError, match="evidence_version"):
+        build_valid(evidence_version=evidence_version)
+
+
 def test_timestamp_normalizes_to_utc_without_losing_precision() -> None:
     shifted = GENERATED_AT.astimezone(timezone(timedelta(hours=9)))
     assert build_valid(generated_at=shifted).canonical_json() == build_valid().canonical_json()
