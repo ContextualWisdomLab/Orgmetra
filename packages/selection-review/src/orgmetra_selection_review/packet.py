@@ -22,6 +22,7 @@ _REFERENCE_PATTERN = re.compile(
     r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
 )
 _REVIEW_PURPOSE = "selection_review"
+_ALLOWED_REASON_CODES = frozenset({"candidate_assessment"})
 _REVIEW_STATE = "requires_human_decision"
 _MODEL_OUTPUT_STATUS = "untrusted_draft"
 _NEXT_ACTION = (
@@ -122,6 +123,8 @@ class SelectionReviewPacket:
         if self.purpose_code != _REVIEW_PURPOSE:
             raise ValueError("purpose_code must remain selection_review")
         _validate_code(self.reason_code, "reason_code")
+        if self.reason_code not in _ALLOWED_REASON_CODES:
+            raise ValueError("reason_code must be an authorized selection-review reason")
         _validate_code(self.evidence_version_code, "evidence_version_code")
         _canonical_timestamp(self.generated_at)
         if self.human_confirmation_required is not True:
