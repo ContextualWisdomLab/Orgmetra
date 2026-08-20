@@ -261,6 +261,94 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
+  /tenants/{tenant_record_id}/job-analysis-snapshots:
+    post:
+      operationId: persistJobAnalysisSnapshot
+      summary: Persist a governed job-analysis snapshot
+      tags:
+        - job-architecture
+      security:
+        - keyverse_oidc:
+            - orgmetra.job_architecture.write
+      parameters:
+        - name: tenant_record_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/PurposeCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersistJobAnalysisSnapshotCommand'
+      responses:
+        '201':
+          description: Persisted
+          headers:
+            Location:
+              description: Canonical URI for the persisted job-analysis snapshot.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAnalysisSnapshotDocument'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+  /tenants/{tenant_record_id}/job-analysis-snapshots/{analysis_record_id}:
+    get:
+      operationId: readJobAnalysisSnapshot
+      summary: Read the persisted job-analysis snapshot
+      tags:
+        - job-architecture
+      security:
+        - keyverse_oidc:
+            - orgmetra.job_architecture.read
+      parameters:
+        - name: tenant_record_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: analysis_record_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: purpose
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z][a-z0-9_]{2,63}$'
+      responses:
+        '200':
+          description: The exact persisted snapshot document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAnalysisSnapshotDocument'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/InvalidCommand'
 components:
   securitySchemes:
     keyverse_oidc:
@@ -586,6 +674,116 @@ components:
         assignment_record_id:
           type: string
           format: uuid
+    PersistJobAnalysisSnapshotCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - analysis_record_id
+        - tenant_record_id
+        - job_record_id
+        - analysis_version_code
+        - status_code
+        - effective_from
+        - recorded_at
+        - tasks
+        - ksao_requirements
+        - task_ksao_links
+        - fja_profile
+      properties:
+        analysis_record_id:
+          type: string
+          format: uuid
+        tenant_record_id:
+          type: string
+          format: uuid
+        job_record_id:
+          type: string
+          format: uuid
+        position_record_id:
+          type: string
+          format: uuid
+        criterion_blueprint_id:
+          type: string
+          format: uuid
+        analysis_version_code:
+          type: string
+          minLength: 1
+          maxLength: 100
+        status_code:
+          type: string
+          pattern: '^(analysis_draft|analysis_validated)$'
+        effective_from:
+          type: string
+          format: date
+        recorded_at:
+          type: string
+          format: date-time
+        reviewed_by_reference:
+          type: string
+          minLength: 1
+          maxLength: 300
+        reviewed_at:
+          type: string
+          format: date-time
+        tasks:
+          type: array
+          minItems: 1
+        ksao_requirements:
+          type: array
+          minItems: 1
+        task_ksao_links:
+          type: array
+          minItems: 1
+        fja_profile:
+          type: object
+    JobAnalysisSnapshotDocument:
+      type: object
+      additionalProperties: false
+      required:
+        - analysis_record_id
+        - tenant_record_id
+        - job_record_id
+        - analysis_version_code
+        - status_code
+        - effective_from
+        - recorded_at
+        - tasks
+        - ksao_requirements
+        - task_ksao_links
+        - fja_profile
+      properties:
+        analysis_record_id:
+          type: string
+          format: uuid
+        tenant_record_id:
+          type: string
+          format: uuid
+        job_record_id:
+          type: string
+          format: uuid
+        analysis_version_code:
+          type: string
+        status_code:
+          type: string
+        effective_from:
+          type: string
+          format: date
+        recorded_at:
+          type: string
+          format: date-time
+        reviewed_by_reference:
+          type: string
+        reviewed_at:
+          type: string
+          format: date-time
+        tasks:
+          type: array
+        ksao_requirements:
+          type: array
+        task_ksao_links:
+          type: array
+        fja_profile:
+          type: object
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -595,6 +793,11 @@ components:
         - next_action
         - support_reference
       properties:
+        error:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{2,63}$'
+          deprecated: true
+          description: Backward-compatible alias for error_code; new clients must use error_code.
         error_code:
           type: string
           pattern: '^[a-z][a-z0-9_]{2,63}$'
@@ -638,6 +841,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     InsufficientEvidence:
       description: The high-impact command lacks sufficient versioned evidence.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnsupportedMediaType:
+      description: The job-analysis POST body is missing application/json media type.
       content:
         application/json:
           schema:
