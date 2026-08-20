@@ -64,3 +64,15 @@ def test_uuid1_trust_reference_is_rejected_by_builder_and_replace(
     packet = build_candidate_evidence_intake_packet(**valid_kwargs())
     with pytest.raises(ValueError, match=field_name):
         replace(packet, **{field_name: value})
+
+
+def test_uuid1_tenant_identity_is_rejected_by_builder_and_replace() -> None:
+    """A public tenant identity must not admit UUIDv1 timestamp/node correlation metadata."""
+    kwargs = valid_kwargs()
+    kwargs["tenant_record_id"] = UUID1_ID
+    with pytest.raises(ValueError, match="tenant_record_id"):
+        build_candidate_evidence_intake_packet(**kwargs)
+
+    packet = build_candidate_evidence_intake_packet(**valid_kwargs())
+    with pytest.raises(ValueError, match="tenant_record_id"):
+        replace(packet, tenant_record_id=UUID1_ID)
