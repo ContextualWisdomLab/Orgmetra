@@ -107,9 +107,14 @@ The following is the current GitHub inventory checked on 2026-08-20. All listed 
 
 No open GitHub Issue was returned by the current `gh issue list` query. This does not mean product work is exhausted: the backlog above is derived from protected runtime gaps and is intentionally independent of issue presence.
 
+## Operating scheduler boundary
+
+The review/repair/merge sweep is centrally owned by
+[`ContextualWisdomLab/.github`](https://github.com/ContextualWisdomLab/.github/blob/main/.github/workflows/pr-review-merge-scheduler.yml), not copied into Orgmetra. The live central `main` workflow currently exposes `*/15` and `*/30` GitHub Actions sweeps, which is more frequent than the hourly operating contract below. Its organization sweep dispatches target-repository scans while target checks still execute against the target repository's exact head. Orgmetra therefore has no repository-local privileged scheduler or model credential path; this is an accepted control-plane boundary, not evidence that any individual PR is merge-ready.
+
 ## Loop contract
 
-Every hourly sweep performs the same bounded sequence:
+Every central scheduler sweep performs the same bounded sequence:
 
 1. Re-fetch the protected `develop` head and current open PR list.
 2. For each open PR, inspect current review threads, exact head, mergeability, and all repository/security/recovery/coverage checks.
