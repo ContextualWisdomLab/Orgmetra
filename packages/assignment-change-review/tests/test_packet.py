@@ -26,6 +26,7 @@ WORKER_IMPACT = "worker_impact_assessment:cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 COMMUNICATION_PLAN = "assignment_communication_plan:dddddddd-dddd-4ddd-8ddd-dddddddddddd"
 REQUESTER = "actor:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
 REVIEWER = "actor:ffffffff-ffff-4fff-8fff-fffffffffff0"
+UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
@@ -163,6 +164,38 @@ def test_rejects_noncanonical_tenant_identity(tenant: object) -> None:
 def test_rejects_nonopaque_or_wrong_namespace_references(field: str, value: str) -> None:
     with pytest.raises(ValueError, match=field):
         build_valid(**{field: value})
+
+
+@pytest.mark.parametrize(
+    ("field", "prefix"),
+    [
+        ("assignment_change_review_reference", "assignment_change_review"),
+        ("person_record_reference", "person_record"),
+        ("employment_record_reference", "employment_record"),
+        ("current_assignment_reference", "assignment_record"),
+        ("current_job_profile_reference", "job_profile"),
+        ("current_position_record_reference", "position_record"),
+        ("proposed_job_profile_reference", "job_profile"),
+        ("proposed_position_record_reference", "position_record"),
+        ("current_scope_snapshot_reference", "assignment_scope_snapshot"),
+        ("allocation_plan_reference", "workforce_allocation_plan"),
+        ("allocation_policy_reference", "workforce_allocation_policy"),
+        ("worker_impact_assessment_reference", "worker_impact_assessment"),
+        ("communication_plan_reference", "assignment_communication_plan"),
+        ("requester_reference", "actor"),
+        ("reviewer_reference", "actor"),
+    ],
+)
+def test_rejects_uuid1_trust_references_through_builder_and_replace(
+    field: str,
+    prefix: str,
+) -> None:
+    value = f"{prefix}:{UUID1_ID}"
+    with pytest.raises(ValueError, match=field):
+        build_valid(**{field: value})
+
+    with pytest.raises(ValueError, match=field):
+        replace(build_valid(), **{field: value})
 
 
 @pytest.mark.parametrize(
