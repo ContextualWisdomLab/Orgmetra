@@ -41,3 +41,16 @@ class HireHttpStreamingRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(_PayloadTooLarge):
             await _read_json_object(receive)
+
+    async def test_empty_frame_stream_is_bounded_before_body_bytes_accumulate(self) -> None:
+        """Reject an attacker-controlled stream that never terminates and consumes no byte budget."""
+        messages = iter(
+            {"type": "http.request", "body": b"", "more_body": True}
+            for _ in range(1_025)
+        )
+
+        async def receive() -> dict[str, object]:
+            return next(messages)
+
+        with self.assertRaises(_PayloadTooLarge):
+            await _read_json_object(receive)
