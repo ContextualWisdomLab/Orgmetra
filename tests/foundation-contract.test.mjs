@@ -18,7 +18,8 @@ import {
   validateAdrIndex,
   validateDatabaseObjectNames,
   validateFoundation,
-  validateLocalLinks
+  validateLocalLinks,
+  validateMigrationBackedDatabaseObjectNames
 } from '../scripts/foundation-contract-core.mjs';
 
 function temporaryDirectory() {
@@ -41,6 +42,11 @@ function pythonRequiredFiles() {
 
 function makeMinimalValidFoundation(root) {
   for (const filePath of REQUIRED_FILES) write(root, filePath);
+  write(
+    root,
+    'database/migrations/0012_people_mutation_idempotency.sql',
+    'CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid NOT NULL);\n'
+  );
   write(
     root,
     'schemas/openapi.yaml',
@@ -105,7 +111,30 @@ test('required constants are frozen and use accepted values', () => {
   assert.equal(Object.isFrozen(MATURITY_VALUES), true);
   assert.ok(REQUIRED_FILES.length > 20);
   assert.ok(DATABASE_OBJECT_NAMES.every(isValidDatabaseObjectName));
+  assert.ok(DATABASE_OBJECT_NAMES.includes('people_mutation_idempotency_record'));
   assert.ok(MATURITY_VALUES.has('accepted_architecture'));
+});
+
+test('migration-backed database object validation detects table rename', () => {
+  const root = temporaryDirectory();
+  try {
+    write(
+      root,
+      'database/migrations/0012_people_mutation_idempotency.sql',
+      'CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid NOT NULL);\n'
+    );
+    assert.deepEqual(validateMigrationBackedDatabaseObjectNames(root), []);
+    write(
+      root,
+      'database/migrations/0012_people_mutation_idempotency.sql',
+      'CREATE TABLE people_mutation_replay_record (tenant_record_id uuid NOT NULL);\n'
+    );
+    assert.deepEqual(validateMigrationBackedDatabaseObjectNames(root), [
+      'Migration-backed database object is missing from migrations: people_mutation_idempotency_record'
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('collectMarkdownFiles handles missing directories and stable recursion', () => {
@@ -229,8 +258,9 @@ test('foundation validator reports every missing artifact', () => {
   const root = temporaryDirectory();
   try {
     const errors = validateFoundation(root);
-    assert.equal(errors.length, REQUIRED_FILES.length);
+    assert.equal(errors.length, REQUIRED_FILES.length + 1);
     assert.match(errors[0], /Missing required foundation artifact/);
+    assert.ok(errors.some((error) => /Migration-backed database object is missing/.test(error)));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
