@@ -21,6 +21,7 @@ GOAL_PLAN = "performance_goal_plan:88888888-8888-4888-8888-888888888888"
 OBSERVATION_SNAPSHOT = "criterion_observation_snapshot:99999999-9999-4999-8999-999999999999"
 DEVELOPMENT_PLAN = "development_plan:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 REVIEWER = "actor:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
@@ -137,6 +138,33 @@ def test_rejects_noncanonical_tenant_identity(tenant: object) -> None:
 def test_rejects_nonopaque_or_wrong_namespace_references(field: str, value: str) -> None:
     with pytest.raises(ValueError, match=field):
         build_valid(**{field: value})
+
+
+@pytest.mark.parametrize(
+    ("field", "prefix"),
+    [
+        ("performance_review_reference", "performance_review"),
+        ("person_record_reference", "person_record"),
+        ("employment_record_reference", "employment_record"),
+        ("job_profile_reference", "job_profile"),
+        ("performance_cycle_reference", "performance_cycle"),
+        ("criterion_set_reference", "criterion_set"),
+        ("goal_plan_reference", "performance_goal_plan"),
+        ("criterion_observation_snapshot_reference", "criterion_observation_snapshot"),
+        ("development_plan_reference", "development_plan"),
+        ("reviewer_reference", "actor"),
+    ],
+)
+def test_rejects_uuid1_trust_references_through_builder_and_replace(
+    field: str,
+    prefix: str,
+) -> None:
+    value = f"{prefix}:{UUID1_ID}"
+    with pytest.raises(ValueError, match=field):
+        build_valid(**{field: value})
+
+    with pytest.raises(ValueError, match=field):
+        replace(build_valid(), **{field: value})
 
 
 @pytest.mark.parametrize("field", ["criterion_set_digest", "goal_plan_digest", "criterion_observation_snapshot_digest", "development_plan_digest"])
