@@ -11,10 +11,11 @@ and approver references are rejected as an early syntactic guard.
 The envelope intentionally excludes candidate names, email addresses, demographic values,
 assessment scores, salary/benefit amounts, credentials, and free-form model output.
 `candidate_profile_reference` remains sensitive correlating metadata even though it is
-opaque. Every namespaced reference uses a canonical, non-sentinel UUIDv4 suffix; UUIDv1 and
-other UUID versions are rejected so timestamp/node correlation metadata, names, compensation
-values, offer terms, and actor identities cannot be smuggled into the governance envelope
-through a reference field. `reason_code` is likewise closed to the reviewed, value-free
+opaque. The public `tenant_record_id` and every namespaced reference use canonical,
+non-sentinel UUIDv4 identity; namespaced references additionally require their expected
+namespace. UUIDv1 and other UUID versions are rejected so timestamp/node correlation metadata,
+names, compensation values, offer terms, and actor identities cannot be smuggled into public
+governance identity fields. `reason_code` is likewise closed to the reviewed, value-free
 `selected_candidate_offer_review` code; arbitrary lower-snake-case text is rejected so the
 reason field cannot become a side channel for candidate, compensation, or offer-term values.
 
@@ -32,7 +33,8 @@ foreign tenant cannot be mixed into the approval envelope. It must specifically 
 distinct; opaque-reference inequality alone is not separation-of-duties evidence. The host
 must then verify Job/Position scope, selected-candidate evidence, compensation-package
 provenance, and offer-terms provenance before recording accountable human approval through the
-authoritative offer workflow and before communicating or executing the offer.
+authoritative offer workflow and before communicating or executing the offer. UUIDv4 is only
+an opacity constraint; it is not proof of tenant membership, authorization, or source truth.
 
 Canonical JSON and its SHA-256 digest support immutable audit correlation. They do not prove
 that the referenced evidence is true, that all references belong to the packet tenant, that
