@@ -5,6 +5,7 @@ import { isPurposeAuthorized, nextLocale } from '../apps/hr-workspace/app.js';
 
 const html = readFileSync(new URL('../apps/hr-workspace/index.html', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../apps/hr-workspace/styles.css', import.meta.url), 'utf8');
+const app = readFileSync(new URL('../apps/hr-workspace/app.js', import.meta.url), 'utf8');
 const story = readFileSync(new URL('../apps/hr-workspace/workspace.stories.js', import.meta.url), 'utf8');
 const storybookConfig = readFileSync(new URL('../.storybook/main.js', import.meta.url), 'utf8');
 const storybookPreview = readFileSync(new URL('../.storybook/preview.js', import.meta.url), 'utf8');
@@ -29,6 +30,21 @@ test('workspace includes keyboard-accessible review and high-impact states', () 
   assert.match(html, /Exact assignment allocation values/);
 });
 
+test('locale-sensitive icon controls translate their accessible names', () => {
+  assert.match(
+    html,
+    /id="locale-toggle"[^>]*data-i18n-aria-label="changeLanguage"/,
+    'language toggle needs a locale-bound accessible name',
+  );
+  assert.equal(
+    (html.match(/data-i18n-aria-label="close"/g) ?? []).length,
+    2,
+    'both icon-only dialog close buttons need locale-bound accessible names',
+  );
+  assert.match(app, /querySelectorAll\('\[data-i18n-aria-label\]'\)/);
+  assert.match(app, /dictionary\[element\.dataset\.i18nAriaLabel\]/);
+});
+
 test('Storybook exposes tokenized workspace states without claiming API connectivity', () => {
   assert.match(storybookConfig, /@storybook\/web-components-vite/);
   assert.match(storybookPreview, /design-tokens\/tokens\.css/);
@@ -45,6 +61,6 @@ test('purpose and locale transitions preserve the trust boundary', () => {
   assert.equal(isPurposeAuthorized('recruiting'), false);
   assert.equal(nextLocale('en'), 'ko');
   assert.equal(nextLocale('ko'), 'en');
-  assert.match(readFileSync(new URL('../apps/hr-workspace/app.js', import.meta.url), 'utf8'), /no API mutation was sent/);
+  assert.match(app, /no API mutation was sent/);
   assert.doesNotMatch(html, /password|passkey_value|private_key/i);
 });
