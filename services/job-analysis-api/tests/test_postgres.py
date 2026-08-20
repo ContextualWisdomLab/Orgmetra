@@ -53,9 +53,8 @@ class FakeCursor:
         return self._last
 
     def fetchmany(self, size: int) -> list[object]:
-        """Return a scripted header list and record the requested bound."""
-        del size
-        return list(self._last or [])
+        """Return at most ``size`` scripted rows, like a DB-API cursor."""
+        return list(self._last or [])[:size]
 
     def fetchall(self) -> list[object]:
         """Return scripted child rows for tasks, KSAOs, or links."""
@@ -208,7 +207,14 @@ class PostgresJobAnalysisPortTests(unittest.TestCase):
 
     def test_persists_snapshot_with_idempotency_key_and_audit_outbox(self) -> None:
         snapshot = clinical_psychologist_snapshot()
-        port, cursor = self._port([None, None, (JOB,)] + [None] * 20)
+        write_statement_count = (
+            1
+            + len(snapshot.tasks)
+            + len(snapshot.ksao_requirements)
+            + len(snapshot.task_ksao_links)
+            + 2
+        )
+        port, cursor = self._port([None, None, (JOB,)] + [None] * write_statement_count)
 
         persisted = self._persist(port)
 
