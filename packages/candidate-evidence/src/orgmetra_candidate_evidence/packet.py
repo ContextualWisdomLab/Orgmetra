@@ -31,13 +31,13 @@ _NEXT_ACTION = (
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
-    """Require canonical UUIDv4 text so a public governance identity stays opaque."""
+    """Require canonical non-sentinel UUID text owned by the authoritative HRIS."""
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as exc:
         raise ValueError(f"{field_name} must be canonical UUID text") from exc
-    if str(parsed) != value or parsed.version != 4 or parsed.int in (0, (1 << 128) - 1):
-        raise ValueError(f"{field_name} must be a canonical operational UUIDv4")
+    if str(parsed) != value or parsed.int in (0, (1 << 128) - 1):
+        raise ValueError(f"{field_name} must be a canonical operational UUID")
 
 
 def _validate_code(value: str, field_name: str) -> None:
