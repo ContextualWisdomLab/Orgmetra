@@ -10,7 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 import json
+import logging
 import re
+from secrets import token_urlsafe
 from typing import Awaitable, Callable, Mapping, Sequence
 from urllib.parse import parse_qsl
 from uuid import UUID
@@ -28,11 +30,13 @@ from orgmetra_people_api.people import (
 AsgiReceive = Callable[[], Awaitable[dict[str, object]]]
 AsgiSend = Callable[[dict[str, object]], Awaitable[None]]
 
+_LOGGER = logging.getLogger(__name__)
 _ROUTE_PREFIX = ("v1", "tenants")
 _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _FIELD_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _MAX_UUID_INT = (1 << 128) - 1
 _REQUIRED_QUERY_KEYS = frozenset({"effective_on", "purpose", "fields"})
+_SUPPORT_REFERENCE_RANDOM_BYTES = 24
 
 
 class _InvalidHttpRequest(ValueError):
@@ -296,8 +300,27 @@ async def _send_json(
     payload: Mapping[str, object],
     extra_headers: tuple[tuple[bytes, bytes], ...] = (),
 ) -> None:
-    """Emit a deterministic JSON response that is never cached as shared PII."""
-    body = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    """Emit deterministic no-store JSON and governed correlation for failures."""
+    response_payload = dict(payload)
+    error_code = response_payload.get("error")
+    if isinstance(error_code, str):
+        support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+        response_payload.update(
+            {
+                "error_code": error_code,
+                "next_action": str(response_payload["message"]),
+                "support_reference": support_reference,
+            }
+        )
+        _LOGGER.info(
+            "People read request rejected",
+            extra={
+                "error_code": error_code,
+                "http_status": status,
+                "support_reference": support_reference,
+            },
+        )
+    body = json.dumps(response_payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
     headers = (
         (b"content-type", b"application/json"),
         (b"cache-control", b"no-store"),
