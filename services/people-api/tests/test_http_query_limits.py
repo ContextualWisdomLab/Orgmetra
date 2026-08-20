@@ -49,7 +49,7 @@ class GuardReadPort:
 
 
 class PeopleHttpQueryLimitTests(unittest.IsolatedAsyncioTestCase):
-    """Prove unauthenticated path/query parsing is bounded before avoidable work."""
+    """Prove unauthenticated path/query/header parsing is bounded before avoidable work."""
 
     def _build_app(self) -> tuple[PeopleAsgiApp, GuardAuthenticator, GuardReadPort]:
         """Build one guarded People app for pre-authentication resource-bound tests."""
@@ -131,6 +131,66 @@ class PeopleHttpQueryLimitTests(unittest.IsolatedAsyncioTestCase):
         payload = json.loads(bytes(body["body"]))
         self.assertEqual(int(start["status"]), 400)
         self.assertEqual(payload["error"], "invalid_request")
+        self.assertEqual(authenticator.calls, 0)
+        self.assertEqual(read_port.calls, 0)
+
+    async def test_oversized_header_field_is_rejected_before_token_parse_auth_or_read(self) -> None:
+        """Reject one oversized header field before bearer parsing or protected dependencies."""
+        app, authenticator, read_port = self._build_app()
+        messages: list[dict[str, object]] = []
+
+        async def receive() -> dict[str, object]:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message: dict[str, object]) -> None:
+            messages.append(message)
+
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": f"/v1/tenants/{TENANT}/people/{PERSON}",
+            "query_string": b"effective_on=2026-08-17&purpose=people_read&fields=display_name",
+            "headers": [(b"authorization", b"Bearer " + (b"x" * 16384))],
+        }
+
+        with patch(
+            "orgmetra_people_api.http.extract_bearer_token",
+            side_effect=AssertionError("oversized authorization reached bearer parsing"),
+        ):
+            await app(scope, receive, send)
+
+        start, body = messages
+        payload = json.loads(bytes(body["body"]))
+        self.assertEqual(int(start["status"]), 401)
+        self.assertEqual(payload["error"], "authentication_required")
+        self.assertEqual(authenticator.calls, 0)
+        self.assertEqual(read_port.calls, 0)
+
+    async def test_excessive_header_count_is_rejected_before_auth_or_read(self) -> None:
+        """Reject excessive header cardinality before identity resolution or protected reads."""
+        app, authenticator, read_port = self._build_app()
+        messages: list[dict[str, object]] = []
+
+        async def receive() -> dict[str, object]:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message: dict[str, object]) -> None:
+            messages.append(message)
+
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": f"/v1/tenants/{TENANT}/people/{PERSON}",
+            "query_string": b"effective_on=2026-08-17&purpose=people_read&fields=display_name",
+            "headers": [(b"x-extra", b"ok")] * 64 + [(b"authorization", b"Bearer opaque-token")],
+        }
+
+        await app(scope, receive, send)
+
+        start, body = messages
+        payload = json.loads(bytes(body["body"]))
+        self.assertEqual(int(start["status"]), 401)
+        self.assertEqual(payload["error"], "authentication_required")
         self.assertEqual(authenticator.calls, 0)
         self.assertEqual(read_port.calls, 0)
 
