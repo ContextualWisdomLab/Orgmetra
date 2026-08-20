@@ -90,6 +90,8 @@ def _validate_idempotency_key(value: str) -> None:
         raise ValueError("idempotency_key must contain 16 through 128 visible ASCII characters")
     if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
         raise ValueError("idempotency_key must contain 16 through 128 visible ASCII characters")
+    if value.lower().startswith(_CREDENTIAL_PREFIXES):
+        raise ValueError("idempotency_key must not contain a credential-shaped value")
 
 
 def _validate_governed_code(value: str, field_name: str) -> None:
