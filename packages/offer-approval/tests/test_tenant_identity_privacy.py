@@ -1,12 +1,10 @@
-"""Privacy regression for the public tenant identity in offer approval."""
+"""Privacy and interoperability regression for offer-approval tenant identity."""
 from dataclasses import replace
 from datetime import datetime, timezone
 
-import pytest
-
 from orgmetra_offer_approval import build_offer_approval_packet
 
-UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+UUID7_TENANT = "10000000-0000-7000-8000-000000000001"
 
 
 def _valid_kwargs() -> dict[str, object]:
@@ -32,13 +30,13 @@ def _valid_kwargs() -> dict[str, object]:
     }
 
 
-def test_uuid1_tenant_identity_is_rejected_by_builder_and_replace() -> None:
-    """UUIDv1 timestamp/node metadata must not enter the public tenant identity."""
+def test_authoritative_uuid7_tenant_identity_is_accepted_by_builder_and_replace() -> None:
+    """Accept tenant UUIDs already valid at the authoritative Orgmetra core boundary."""
     kwargs = _valid_kwargs()
-    kwargs["tenant_record_id"] = UUID1_ID
-    with pytest.raises(ValueError, match="tenant_record_id"):
-        build_offer_approval_packet(**kwargs)
+    kwargs["tenant_record_id"] = UUID7_TENANT
 
-    packet = build_offer_approval_packet(**_valid_kwargs())
-    with pytest.raises(ValueError, match="tenant_record_id"):
-        replace(packet, tenant_record_id=UUID1_ID)
+    packet = build_offer_approval_packet(**kwargs)
+    replaced = replace(build_offer_approval_packet(**_valid_kwargs()), tenant_record_id=UUID7_TENANT)
+
+    assert packet.tenant_record_id == UUID7_TENANT
+    assert replaced.tenant_record_id == UUID7_TENANT
