@@ -126,9 +126,6 @@ class SnapshotDocumentTests(unittest.TestCase):
             ({**posted, "analysis_record_id": "zzzz"}, TENANT),
             ({**posted, "recorded_at": datetime(2026, 8, 18, 5, 0)}, TENANT),
         )
-        naive = {**posted, "recorded_at": datetime(2026, 8, 18, 5, 0)}
-        with self.assertRaises(ValueError):
-            snapshot_from_document(naive, tenant_record_id=TENANT)
         rebuilt = snapshot_from_document(
             {
                 **posted,
