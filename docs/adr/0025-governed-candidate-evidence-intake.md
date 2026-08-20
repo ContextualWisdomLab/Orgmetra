@@ -1,4 +1,4 @@
-# ADR 0015: Govern candidate evidence intake as reference-only evidence
+# ADR 0025: Govern candidate evidence intake as reference-only evidence
 
 - **Status:** Proposed — active PR only
 - **Date:** 2026-08-19

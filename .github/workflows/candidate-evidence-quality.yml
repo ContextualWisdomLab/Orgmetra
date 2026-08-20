@@ -8,7 +8,7 @@ on:
       - "packages/candidate-evidence/**"
       - ".github/requirements/foundation-test.txt"
       - ".github/workflows/candidate-evidence-quality.yml"
-      - "docs/adr/0015-governed-candidate-evidence-intake.md"
+      - "docs/adr/0025-governed-candidate-evidence-intake.md"
       - "docs/doctoring/candidate-evidence-intake-references.md"
       - "docs/traceability/candidate-evidence-intake.md"
   workflow_dispatch:
