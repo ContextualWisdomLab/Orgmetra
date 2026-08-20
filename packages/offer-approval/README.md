@@ -11,10 +11,10 @@ and approver references are rejected as an early syntactic guard.
 The envelope intentionally excludes candidate names, email addresses, demographic values,
 assessment scores, salary/benefit amounts, credentials, and free-form model output.
 `candidate_profile_reference` remains sensitive correlating metadata even though it is
-opaque. Every namespaced reference uses a canonical, non-sentinel UUID suffix; human-readable
-or value-bearing suffixes are rejected so names, compensation values, offer terms, and actor
-identities cannot be smuggled into the governance envelope through a reference field.
-`reason_code` is likewise closed to the reviewed, value-free
+opaque. Every namespaced reference uses a canonical, non-sentinel UUIDv4 suffix; UUIDv1 and
+other UUID versions are rejected so timestamp/node correlation metadata, names, compensation
+values, offer terms, and actor identities cannot be smuggled into the governance envelope
+through a reference field. `reason_code` is likewise closed to the reviewed, value-free
 `selected_candidate_offer_review` code; arbitrary lower-snake-case text is rejected so the
 reason field cannot become a side channel for candidate, compensation, or offer-term values.
 
