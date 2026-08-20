@@ -15,7 +15,7 @@ Offer review is high-impact employment workflow. A governance envelope must not 
 alternate decision authority, a salary-value cache, or a channel that lets generated/model
 material masquerade as an approved offer. Different opaque requester/approver references also
 do not prove that the authoritative actor boundary resolves them to different people, and
-canonical UUID syntax does not prove that the referenced candidate, requisition, Job/Position,
+canonical UUIDv4 syntax does not prove that the referenced candidate, requisition, Job/Position,
 selection decision, compensation package, or offer terms belong to the packet tenant.
 
 ISO 30405:2023 provides current recruitment guidance across planning, assessment, employment,
@@ -29,13 +29,15 @@ or decide the legality of any offer.
 Orgmetra will expose `OfferApprovalPacket` as value-free review evidence only.
 
 The packet binds opaque references for the candidate profile, requisition, Job, optional
-Position, selection decision, compensation package, and offer terms. Decision/package/terms
-artifacts are independently SHA-256 bound. Before approval, the host must re-resolve **every
-packet reference** within the exact `tenant_record_id` through its authoritative boundary and
-reject approval if any reference belongs to another tenant or cannot be authoritatively
-resolved. Identical requester/approver references are rejected as an early syntactic guard;
-after tenant-scoped resolution, the host must prove their resolved actor identities are
-distinct. Reference inequality alone is not separation-of-duties evidence.
+Position, selection decision, compensation package, and offer terms. Every namespaced trust
+reference requires a canonical non-sentinel UUIDv4 suffix; UUIDv1 and other UUID versions fail
+closed so reference identity cannot carry UUIDv1 timestamp/node correlation metadata. Decision,
+package, and terms artifacts are independently SHA-256 bound. Before approval, the host must
+re-resolve **every packet reference** within the exact `tenant_record_id` through its
+authoritative boundary and reject approval if any reference belongs to another tenant or cannot
+be authoritatively resolved. Identical requester/approver references are rejected as an early
+syntactic guard; after tenant-scoped resolution, the host must prove their resolved actor
+identities are distinct. Reference inequality alone is not separation-of-duties evidence.
 
 The packet must not contain candidate PII, compensation values, assessment scores, or
 free-form model output. The `reason_code` field is not free-form metadata: it is closed to the
