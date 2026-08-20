@@ -21,6 +21,7 @@ export const REQUIRED_FILES = Object.freeze([
   'manifest.json',
   'package.json',
   '.github/workflows/foundation-ci.yml',
+  '.github/workflows/job-analysis-api-quality.yml',
   'docs/PRD.md',
   'docs/TRD.md',
   'docs/USER_STORIES.md',
@@ -43,8 +44,14 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0004-employment-position-version-and-assignment-binding.md',
   'docs/adr/0005-exclusive-employment-and-staffable-seats.md',
   'docs/adr/0006-governed-audit-outbox-envelope.md',
+  'docs/adr/0007-governed-job-analysis-evidence.md',
   'docs/adr/0008-purpose-bound-pii-authorization.md',
   'docs/adr/0009-performance-criterion-observation-scope.md',
+  'docs/adr/0010-naruon-calendar-intent-boundary.md',
+  'docs/adr/0011-bitemporal-workforce-composition.md',
+  'docs/adr/0012-governed-migration-handoff.md',
+  'docs/adr/0013-governed-requisition-review-packet.md',
+  'docs/adr/0014-job-analysis-snapshot-persistence.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
@@ -60,6 +67,7 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0010_validity_study_case_integrity.sql',
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
+  'database/migrations/0013_job_analysis_snapshot.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -80,6 +88,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_validity_study_case_postgres.sh',
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
+  'tests/test_job_analysis_snapshot_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -104,9 +113,9 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'cost_center_record', 'job_family', 'job_profile', 'job_profile_version',
   'position_record', 'position_record_version', 'position_relation',
   'assignment_record',
-  'job_analysis_case', 'source_record', 'source_version', 'task_statement',
-  'task_rating', 'fja_function', 'task_fja_link', 'ksao_requirement',
-  'task_ksao_link', 'qualification_rule', 'candidate_profile',
+  'job_analysis_snapshot', 'job_analysis_task_item', 'job_analysis_ksao_item',
+  'job_analysis_task_ksao_link', 'job_analysis_write_command',
+  'qualification_rule', 'candidate_profile',
   'requisition_record', 'application_record', 'application_stage_history',
   'candidate_evidence_link', 'assessment_assignment', 'interview_session',
   'interview_rating', 'selection_decision', 'decision_evidence_link',
@@ -125,7 +134,12 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
 
 /** Migration-backed logical objects whose persisted table identity must not drift. */
 export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
-  'people_mutation_idempotency_record'
+  'people_mutation_idempotency_record',
+  'job_analysis_snapshot',
+  'job_analysis_task_item',
+  'job_analysis_ksao_item',
+  'job_analysis_task_ksao_link',
+  'job_analysis_write_command'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
@@ -301,15 +315,23 @@ export function validateMigrationBackedDatabaseObjectNames(
   const migrationDirectory = join(rootPath, 'database/migrations');
   const inventoryNames = new Set(DATABASE_OBJECT_NAMES);
   const createdTableNames = new Set();
+  const migrationPrefixes = new Map();
+  const errors = [];
   if (existsSync(migrationDirectory)) {
     for (const entryName of readdirSync(migrationDirectory).sort()) {
       if (!/^\d{4}_[a-z0-9_]+\.sql$/.test(entryName)) continue;
+      const prefix = entryName.slice(0, 4);
+      const prior = migrationPrefixes.get(prefix);
+      if (prior) {
+        errors.push(`Duplicate migration number prefix ${prefix}: ${prior}, ${entryName}`);
+      } else {
+        migrationPrefixes.set(prefix, entryName);
+      }
       const migrationText = readFileSync(join(migrationDirectory, entryName), 'utf8');
       for (const tableName of extractCreatedTableNames(migrationText)) createdTableNames.add(tableName);
     }
   }
 
-  const errors = [];
   for (const objectName of objectNames) {
     if (!inventoryNames.has(objectName)) {
       errors.push(`Database object inventory omitted migration-backed object: ${objectName}`);
@@ -490,6 +512,31 @@ export function validateOpenApiContract(openapiText) {
       requireWithin(errors, contract.operationId, pathBlock, responseCode, `response ${responseCode.trim()}`);
     }
     requireWithin(errors, contract.operationId, pathBlock, '            Location:', '201 Location header');
+  }
+
+  const jobAnalysisWrite = extractYamlBlock(openapiText, '  /tenants/{tenant_record_id}/job-analysis-snapshots:');
+  if (!jobAnalysisWrite) {
+    errors.push('persistJobAnalysisSnapshot: path block is missing');
+  } else {
+    requireWithin(errors, 'persistJobAnalysisSnapshot', jobAnalysisWrite, 'operationId: persistJobAnalysisSnapshot', 'operationId');
+    requireWithin(errors, 'persistJobAnalysisSnapshot', jobAnalysisWrite, '            - orgmetra.job_architecture.write', 'least-privilege write scope');
+    requireWithin(errors, 'persistJobAnalysisSnapshot', jobAnalysisWrite, `$ref: '#/components/parameters/IdempotencyKey'`, 'Idempotency-Key');
+    requireWithin(errors, 'persistJobAnalysisSnapshot', jobAnalysisWrite, `$ref: '#/components/parameters/PurposeCode'`, 'purpose parameter');
+    requireWithin(errors, 'persistJobAnalysisSnapshot', jobAnalysisWrite, `$ref: '#/components/schemas/PersistJobAnalysisSnapshotCommand'`, 'request body binding');
+    requireWithin(errors, 'persistJobAnalysisSnapshot', jobAnalysisWrite, "        '201':", '201 response');
+    requireWithin(errors, 'persistJobAnalysisSnapshot', jobAnalysisWrite, '            Location:', '201 Location header');
+    requireWithin(errors, 'persistJobAnalysisSnapshot', jobAnalysisWrite, "        '415':", 'unsupported-media response');
+  }
+
+  const jobAnalysisRead = extractYamlBlock(
+    openapiText,
+    '  /tenants/{tenant_record_id}/job-analysis-snapshots/{analysis_record_id}:'
+  );
+  if (!jobAnalysisRead) {
+    errors.push('readJobAnalysisSnapshot: path block is missing');
+  } else {
+    requireWithin(errors, 'readJobAnalysisSnapshot', jobAnalysisRead, 'operationId: readJobAnalysisSnapshot', 'operationId');
+    requireWithin(errors, 'readJobAnalysisSnapshot', jobAnalysisRead, '            - orgmetra.job_architecture.read', 'least-privilege read scope');
   }
 
   const jobCommand = extractYamlBlock(openapiText, '    CreateJobProfileCommand:');
