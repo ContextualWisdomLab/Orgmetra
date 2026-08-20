@@ -78,4 +78,6 @@ Job evidence
 
 ## Status
 
-Protected `develop` includes the employment-truth kernel, governed candidate-to-worker conversion, purpose-bound PII authorization, and the GET-only People API. Normalized worker-bound validity-study case integrity on this branch remains active-PR truth until it merges. Review `orgmetra_hris_kernel` reconstructions, correct overlapping versions, and keep current-head gates green before treating unmerged work as shipped behavior.
+Protected `develop` is the sole shipped repository truth. It includes the normalized bitemporal HRIS foundation; exclusive/concurrent employment and staffable-seat invariants; acyclic organization reconstruction; governed candidate-to-worker conversion; purpose-bound PII authorization; the GET-only People API; evidence-grounded Task/FJA/KSAO job-analysis snapshots; Job/cycle/staffing-scoped criterion observations; normalized validity-study cases; immutable audit and transactional outbox persistence with bounded recovery; bitemporal workforce-composition snapshots; executable PostgreSQL restore rehearsal evidence; governed Naruon calendar intents; governed migration handoff; requisition review; and human selection-review evidence.
+
+Capabilities on open PRs are not shipped until integrated into protected `develop`. Use `docs/TRACEABILITY.md` as the canonical maturity map and treat `implemented_on_active_pr` as non-protected evidence only.
