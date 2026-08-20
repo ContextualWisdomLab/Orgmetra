@@ -71,14 +71,14 @@
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "32b55bfb34b0081aa5b2a712a1b248c8fe86650871b69cbafa758ba7bff6cf45",
-      "bytes": 10708,
-      "lines": 89
+      "sha256": "d2c069ebeaccbd344b10af52960f7ae23dbffb2a3c9d7650c6c26bee12022c38",
+      "bytes": 10978,
+      "lines": 93
     },
     {
       "path": "apps/hr-workspace/index.html",
-      "sha256": "037beda6f1ed1690f81eb620718d5b9a3ba4b16f205009dfb267673ef1496b14",
-      "bytes": 13408,
+      "sha256": "fc0e31865d114834d214a86fc1b16e7d4f424ceb8f4919a2fc6700bb19bcfb8c",
+      "bytes": 13504,
       "lines": 113
     },
     {
@@ -395,9 +395,9 @@
     },
     {
       "path": "tests/hr-workspace.test.mjs",
-      "sha256": "ff233f8228c1cc80bc54cfc8c030bff79334e461eadcd3497f5a632b2b3c5e67",
-      "bytes": 2634,
-      "lines": 50
+      "sha256": "03d395e3f62ab9178e7d9f9979926b186ca0f224c71e4368b23beffb9aecd940",
+      "bytes": 3206,
+      "lines": 66
     },
     {
       "path": "tests/openapi-contract.test.mjs",
