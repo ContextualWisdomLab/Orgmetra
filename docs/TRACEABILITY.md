@@ -1,5 +1,7 @@
 # Traceability
 
+`implemented_on_protected_main` is the repository's stable maturity enum for capability evidence integrated into the protected branch. In Orgmetra the protected branch is `develop`; the enum is intentionally retained for compatibility and must not be interpreted as a literal Git branch named `main`. `implemented_on_active_pr` means evidence exists only on an open, non-shipped PR.
+
 ## 2. Product traceability matrix
 
 | Requirement | Architecture | Data object | Test family | ADR | Maturity |
