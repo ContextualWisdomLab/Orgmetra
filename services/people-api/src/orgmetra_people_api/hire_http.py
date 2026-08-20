@@ -19,7 +19,12 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 
-from orgmetra_people_api.auth import AuthenticationFailed, TokenAuthenticator, extract_bearer_token
+from orgmetra_people_api.auth import (
+    AuthenticatedPrincipal,
+    AuthenticationFailed,
+    TokenAuthenticator,
+    extract_bearer_token,
+)
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
     HireAcceptancePort,
@@ -189,6 +194,8 @@ class HireAcceptanceAsgiApp:
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
             principal = await self.authenticator.authenticate(bearer_token)
+            if not isinstance(principal, AuthenticatedPrincipal):
+                raise TypeError("authenticator returned an invalid principal")
         except AuthenticationFailed:
             await _send_json(
                 send,
