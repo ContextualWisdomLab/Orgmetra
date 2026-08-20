@@ -11,9 +11,9 @@
     },
     {
       "path": ".github/workflows/job-analysis-api-quality.yml",
-      "sha256": "7d63d6ef358b1c2af0947056be937455b1895c65c0d4d2faf54b0d9927159a6a",
-      "bytes": 4016,
-      "lines": 102
+      "sha256": "352dc78931dd94afea3e88912d38dcc4b562a004112f199f3d7a12d22b6d637a",
+      "bytes": 4159,
+      "lines": 105
     },
     {
       "path": ".gitignore",
@@ -137,9 +137,9 @@
     },
     {
       "path": "database/migrations/0013_job_analysis_snapshot.sql",
-      "sha256": "21dddd6bb2285314fd2b426a350b275a8a69b3f8c530d54c853f2b80a547e5fc",
-      "bytes": 12509,
-      "lines": 253
+      "sha256": "b6553a5a4c94c4aa9f341a474e13bbe34db63044eda2446b3ebee178995977ee",
+      "bytes": 12713,
+      "lines": 260
     },
     {
       "path": "docs/API_CONTRACT.md",
@@ -359,9 +359,9 @@
     },
     {
       "path": "schemas/openapi.yaml",
-      "sha256": "b76d604ee1e5b03f966ca4a42116ef640c9a2562b053e8c36393a43e79fab814",
-      "bytes": 29607,
-      "lines": 1025
+      "sha256": "09c1e43486779198574fe31b8bcabbd1c1f74beec7bf86245ae578061619838f",
+      "bytes": 29503,
+      "lines": 1020
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
