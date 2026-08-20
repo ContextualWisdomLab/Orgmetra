@@ -1,12 +1,10 @@
-"""Privacy regression for the public tenant identity in performance review."""
+"""Privacy and interoperability regression for performance-review tenant identity."""
 from dataclasses import replace
 from datetime import date, datetime, timezone
 
-import pytest
-
 from orgmetra_performance_review import build_performance_review_packet
 
-UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+UUID7_TENANT = "10000000-0000-7000-8000-000000000001"
 
 
 def _build():
@@ -35,17 +33,18 @@ def _build():
     )
 
 
-def test_uuid1_tenant_identity_is_rejected_by_builder_and_replace() -> None:
-    """UUIDv1 timestamp/node metadata must not enter the public tenant identity."""
+def test_authoritative_uuid7_tenant_identity_is_accepted_by_builder_and_replace() -> None:
+    """Accept tenant UUIDs already valid at the authoritative Orgmetra core boundary."""
     packet = _build()
-    with pytest.raises(ValueError, match="tenant_record_id"):
-        replace(packet, tenant_record_id=UUID1_ID)
+    replaced = replace(packet, tenant_record_id=UUID7_TENANT)
 
     kwargs = {
         field: getattr(packet, field)
         for field in packet.__dataclass_fields__
         if field not in {"contains_personal_data", "contains_direct_person_identifiers", "contains_rating_value", "contains_free_form_model_output", "human_confirmation_required", "decision_authority", "review_state", "scope_verification_state", "next_action"}
     }
-    kwargs["tenant_record_id"] = UUID1_ID
-    with pytest.raises(ValueError, match="tenant_record_id"):
-        build_performance_review_packet(**kwargs)
+    kwargs["tenant_record_id"] = UUID7_TENANT
+    rebuilt = build_performance_review_packet(**kwargs)
+
+    assert replaced.tenant_record_id == UUID7_TENANT
+    assert rebuilt.tenant_record_id == UUID7_TENANT
