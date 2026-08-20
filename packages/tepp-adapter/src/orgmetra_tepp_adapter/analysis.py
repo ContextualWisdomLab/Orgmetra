@@ -44,9 +44,7 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
 
 
 def _validate_uuid4(value: str, field_name: str) -> None:
-    """Require one canonical, non-sentinel UUIDv4 string."""
-    if not isinstance(value, str):
-        raise ValueError(f"{field_name} must be a canonical UUIDv4 string")
+    """Require one canonical, non-sentinel UUIDv4 string from a validated namespace suffix."""
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as error:
