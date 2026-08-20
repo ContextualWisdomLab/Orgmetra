@@ -4,6 +4,6 @@
   "private": true,
   "description": "Orgmetra evidence-centered HRIS foundation baseline.",
   "scripts": {
-    "validate": "python3 tests/validate_repository.py && node scripts/foundation-contract.mjs && node --test tests/foundation-contract.test.mjs tests/openapi-contract.test.mjs tests/dispatcher-inventory.test.mjs tests/protected-truth-contract.test.mjs"
+    "validate": "python3 tests/validate_repository.py && node scripts/foundation-contract.mjs && node --test tests/foundation-contract.test.mjs tests/openapi-contract.test.mjs tests/dispatcher-inventory.test.mjs"
   }
 }

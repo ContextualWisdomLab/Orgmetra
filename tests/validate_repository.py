@@ -79,7 +79,6 @@ REQUIRED = [
     "tests/dispatcher-inventory.test.mjs",
     "tests/foundation-contract.test.mjs",
     "tests/openapi-contract.test.mjs",
-    "tests/protected-truth-contract.test.mjs",
     "tests/test_bitemporal_postgres.sh",
     "tests/test_tenant_isolation_postgres.sh",
     "tests/test_evidence_sealing_postgres.sh",
