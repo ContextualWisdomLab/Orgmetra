@@ -36,6 +36,7 @@ _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _FIELD_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _MAX_UUID_INT = (1 << 128) - 1
 _REQUIRED_QUERY_KEYS = frozenset({"effective_on", "purpose", "fields"})
+_MAX_REQUEST_PATH_CHARACTERS = 256
 _MAX_QUERY_STRING_BYTES = 4096
 _MAX_QUERY_FIELDS = len(_REQUIRED_QUERY_KEYS) + 1
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
@@ -105,7 +106,27 @@ class PeopleAsgiApp:
             return
 
         path = scope.get("path")
-        if not isinstance(path, str) or not _looks_like_people_route(path):
+        if not isinstance(path, str):
+            await _send_json(
+                send,
+                status=404,
+                payload={
+                    "error": "route_not_found",
+                    "message": "Use /v1/tenants/{tenant_record_id}/people/{person_record_id}.",
+                },
+            )
+            return
+        if len(path) > _MAX_REQUEST_PATH_CHARACTERS:
+            await _send_json(
+                send,
+                status=400,
+                payload={
+                    "error": "invalid_request",
+                    "message": "Use the canonical People route without oversized path data, then retry.",
+                },
+            )
+            return
+        if not _looks_like_people_route(path):
             await _send_json(
                 send,
                 status=404,
