@@ -134,6 +134,7 @@ def test_repr_and_immutability_protect_correlation_values() -> None:
         ("tenant_record_id", "00000000-0000-0000-0000-000000000000", "UUID"),
         ("tenant_record_id", "ffffffff-ffff-ffff-ffff-ffffffffffff", "UUID"),
         ("tenant_record_id", "11111111-1111-4111-8111-11111111111A", "UUID"),
+        ("tenant_record_id", "not-a-uuid", "UUID"),
         ("tenant_record_id", 1, "UUID"),
         ("validation_study_reference", "wrong:22222222-2222-4222-8222-222222222222", "validation_study"),
         ("validation_study_reference", f"validation_study:{uuid1()}", "UUIDv4"),
