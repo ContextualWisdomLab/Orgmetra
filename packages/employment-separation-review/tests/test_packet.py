@@ -25,6 +25,7 @@ KNOWLEDGE_TRANSFER = "knowledge_transfer_plan:cccccccc-cccc-4ccc-8ccc-cccccccccc
 COMMUNICATION = "separation_communication_plan:dddddddd-dddd-4ddd-8ddd-dddddddddddd"
 REQUESTER = "actor:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
 REVIEWER = "actor:ffffffff-ffff-4fff-8fff-fffffffffff0"
+UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
@@ -166,6 +167,37 @@ def test_rejects_noncanonical_tenant_identity(tenant: object) -> None:
 def test_rejects_nonopaque_or_wrong_namespace_references(field: str, value: str) -> None:
     with pytest.raises(ValueError, match=field):
         build_valid(**{field: value})
+
+
+@pytest.mark.parametrize(
+    ("field", "prefix"),
+    [
+        ("separation_review_reference", "employment_separation_review"),
+        ("person_record_reference", "person_record"),
+        ("employment_record_reference", "employment_record"),
+        ("active_assignment_snapshot_reference", "active_assignment_snapshot"),
+        ("separation_policy_reference", "employment_separation_policy"),
+        ("separation_process_reference", "employment_separation_process"),
+        ("final_pay_handoff_reference", "final_pay_handoff"),
+        ("benefits_handoff_reference", "benefits_handoff"),
+        ("access_deprovisioning_plan_reference", "access_deprovisioning_plan"),
+        ("asset_return_plan_reference", "asset_return_plan"),
+        ("knowledge_transfer_plan_reference", "knowledge_transfer_plan"),
+        ("communication_plan_reference", "separation_communication_plan"),
+        ("requester_reference", "actor"),
+        ("reviewer_reference", "actor"),
+    ],
+)
+def test_rejects_uuid1_trust_references_through_builder_and_replace(
+    field: str,
+    prefix: str,
+) -> None:
+    value = f"{prefix}:{UUID1_ID}"
+    with pytest.raises(ValueError, match=field):
+        build_valid(**{field: value})
+
+    with pytest.raises(ValueError, match=field):
+        replace(build_valid(), **{field: value})
 
 
 @pytest.mark.parametrize(
