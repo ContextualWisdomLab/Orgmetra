@@ -34,6 +34,7 @@ REVIEWED_AT = datetime(2026, 8, 18, 4, 50, tzinfo=timezone.utc)
 RETRIEVED_AT = datetime(2026, 8, 18, 3, 0, tzinfo=timezone.utc)
 ONET_DIGEST = "b" * 64
 DOT_DIGEST = "c" * 64
+SME_DIGEST = "d" * 64
 IDEMPOTENCY_KEY = "idempotency-clinical-psych-01"
 
 
@@ -52,11 +53,11 @@ def onet_source() -> EvidenceSource:
 def sme_source() -> EvidenceSource:
     """Return hospital SME provenance for local 임상심리사 duties."""
     return EvidenceSource(
-        source_uri="https://www.opm.gov/policy-data-oversight/assessment-and-selection/job-analysis/",
+        source_uri="https://evidence.orgmetra.example/job-analysis/clinical-psychologist/sme-review/2026-08",
         source_title="Hospital clinical-psychologist SME review",
         source_version_code="sme:2026-08",
         retrieved_at=RETRIEVED_AT,
-        content_digest_sha256=ONET_DIGEST,
+        content_digest_sha256=SME_DIGEST,
         origin_code="supervisor_sme",
     )
 
