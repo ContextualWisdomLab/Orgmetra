@@ -82,6 +82,7 @@ REQUIRED = [
     "tests/test_candidate_worker_conversion_postgres.sh",
     "tests/test_validity_study_case_postgres.sh",
     "tests/test_criterion_observation_scope_postgres.sh",
+    "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/validate_repository.py",
 ]
 
