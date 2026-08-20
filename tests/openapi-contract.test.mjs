@@ -194,22 +194,32 @@ test('structural OpenAPI gate rejects an empty-scope OIDC requirement', () => {
   assert.ok(errors.some((error) => /empty-scope OIDC/.test(error)), errors.join('\n'));
 });
 
-test('buyer-facing changelog distinguishes contract-only People mutations from shipped runtime', () => {
+test('buyer-facing changelog and README preserve protected People mutation truth', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
   const mutationLine = changelog
     .split('\n')
     .find((line) => line.includes('`POST /v1/employment-records`'));
 
-  assert.ok(mutationLine, 'People mutation contract changelog entry is missing');
-  assert.match(
+  assert.ok(mutationLine, 'People mutation runtime changelog entry is missing');
+  assert.doesNotMatch(
     readme,
     /GET-only People API/i,
-    'README must continue to describe the People API as GET-only'
+    'README must not demote the integrated People API to GET-only'
+  );
+  assert.match(
+    readme,
+    /purpose-bound People mutation/i,
+    'README must describe the protected People mutation boundary'
   );
   assert.match(
     mutationLine,
+    /Protected governed People mutation/i,
+    'integrated People mutations must be recorded as protected runtime'
+  );
+  assert.doesNotMatch(
+    mutationLine,
     /contract-only|non-shipped runtime/i,
-    'contract-only People mutations must not be presented as shipped runtime'
+    'protected People mutations must not be mislabeled as non-shipped'
   );
 });
