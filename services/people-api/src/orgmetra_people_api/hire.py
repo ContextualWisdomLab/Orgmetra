@@ -85,6 +85,10 @@ class HireAcceptanceCommand:
             raise ValueError("effective_from must be a business date.")
         if not isinstance(self.display_name, str):
             raise ValueError("display_name must be a string.")
+        try:
+            self.display_name.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError("display_name must contain valid Unicode scalar values.") from error
         if not self.display_name.strip() or len(self.display_name) > _MAX_DISPLAY_NAME_LENGTH:
             raise ValueError("display_name must contain 1-512 usable characters.")
         if any(ord(character) < 0x20 for character in self.display_name):
