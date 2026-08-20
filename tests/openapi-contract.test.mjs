@@ -193,3 +193,20 @@ test('structural OpenAPI gate rejects an empty-scope OIDC requirement', () => {
   const errors = validateOpenApiContract(`${canonical}\nkeyverse_oidc: []\n`);
   assert.ok(errors.some((error) => /empty-scope OIDC/.test(error)), errors.join('\n'));
 });
+
+test('buyer-facing changelog distinguishes contract-only People mutations from shipped runtime', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+  const mutationLine = changelog
+    .split('\n')
+    .find((line) => line.includes('`POST /v1/employment-records`'));
+
+  assert.ok(mutationLine, 'People mutation contract changelog entry is missing');
+  if (/GET-only People API/i.test(readme)) {
+    assert.match(
+      mutationLine,
+      /contract-only|non-shipped runtime/i,
+      'contract-only People mutations must not be presented as shipped runtime'
+    );
+  }
+});
