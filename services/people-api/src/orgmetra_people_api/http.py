@@ -166,7 +166,17 @@ class PeopleAsgiApp:
                 extra_headers=((b"www-authenticate", b"Bearer"),),
             )
             return
-        except Exception:  # noqa: BLE001 - identity backend failures must remain client-safe.
+        except Exception as error:  # noqa: BLE001 - identity backend failures must remain client-safe.
+            support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+            _LOGGER.error(
+                "People read authentication backend failed",
+                extra={
+                    "route": "people",
+                    "tenant_record_id": str(request.tenant_record_id),
+                    "exception_type": type(error).__name__,
+                    "support_reference": support_reference,
+                },
+            )
             await _send_json(
                 send,
                 status=500,
@@ -174,6 +184,7 @@ class PeopleAsgiApp:
                     "error": "internal_error",
                     "message": "Retry later or contact an Orgmetra operator with non-secret request metadata; never include the bearer token.",
                 },
+                support_reference=support_reference,
             )
             return
 
@@ -218,7 +229,17 @@ class PeopleAsgiApp:
                 },
             )
             return
-        except Exception:  # noqa: BLE001 - HTTP boundary must fail closed without leaking backend details.
+        except Exception as error:  # noqa: BLE001 - HTTP boundary must fail closed without leaking backend details.
+            support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+            _LOGGER.error(
+                "People read persistence backend failed",
+                extra={
+                    "route": "people",
+                    "tenant_record_id": str(request.tenant_record_id),
+                    "exception_type": type(error).__name__,
+                    "support_reference": support_reference,
+                },
+            )
             await _send_json(
                 send,
                 status=500,
@@ -226,6 +247,7 @@ class PeopleAsgiApp:
                     "error": "internal_error",
                     "message": "Retry later or contact an Orgmetra operator with non-secret request metadata; never include the bearer token.",
                 },
+                support_reference=support_reference,
             )
             return
 
@@ -335,12 +357,14 @@ async def _send_json(
     status: int,
     payload: Mapping[str, object],
     extra_headers: tuple[tuple[bytes, bytes], ...] = (),
+    support_reference: str | None = None,
 ) -> None:
     """Emit deterministic no-store JSON and governed correlation for failures."""
     response_payload = dict(payload)
     error_code = response_payload.get("error")
     if isinstance(error_code, str):
-        support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+        if support_reference is None:
+            support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
         response_payload.update(
             {
                 "error_code": error_code,
