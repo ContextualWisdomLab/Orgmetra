@@ -330,6 +330,16 @@ def _validate_database_contract() -> None:
         "CREATE ROLE orgmetra_outbox_operator",
         "SECURITY DEFINER",
         "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
+        "CREATE TABLE people_mutation_idempotency_record",
+        "CONSTRAINT people_mutation_idempotency_command_unique",
+        "CONSTRAINT people_mutation_idempotency_key_check",
+        "CONSTRAINT people_mutation_idempotency_digest_check",
+        "CREATE TRIGGER people_mutation_idempotency_append_only_guard",
+        "CREATE FUNCTION public.reject_people_mutation_idempotency_truncate",
+        "CREATE TRIGGER people_mutation_idempotency_truncate_guard",
+        "REVOKE TRUNCATE ON people_mutation_idempotency_record FROM PUBLIC",
+        "ALTER TABLE people_mutation_idempotency_record FORCE ROW LEVEL SECURITY",
+        "CREATE POLICY people_mutation_idempotency_scope_policy",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
