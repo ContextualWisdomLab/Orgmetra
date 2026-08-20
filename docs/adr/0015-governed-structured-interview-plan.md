@@ -9,7 +9,7 @@ Orgmetra already separates authoritative Job/Position/Assignment truth, governed
 
 A structured interview is stronger when the assessed competencies come from current job analysis, candidates receive the same predetermined questions, and responses are evaluated against common rating standards. A question count by itself cannot prove that each governed competency is represented, so the approved question-to-competency mapping also needs its own immutable evidence identity. The plan itself should therefore be versioned and auditable before applicant responses or scores exist. Candidate identity, assessment values, and semantic/value-bearing labels in portable trust metadata are unnecessary at this pre-use boundary and would increase privacy risk. Packet-owned trust references therefore use UUIDv4 so value-bearing and timestamp/node-bearing UUIDv1 suffixes cannot masquerade as this package's opaque reference format. The authoritative tenant identifier is different: it is issued by Orgmetra core, so this leaf package must accept the canonical non-sentinel operational UUID contract owned by that boundary rather than silently imposing a second version policy.
 
-Opaque identities and artifact digests identify evidence but do not prove that every object belongs to the packet tenant, that the requisition is bound to the stated Job and Job Analysis, or that distinct actor references resolve to distinct people. Those relationships must be re-resolved at authoritative owner boundaries immediately before activation.
+Opaque identities and artifact digests identify evidence but do not prove that every object belongs to the packet tenant, that the requisition is bound to the stated Job and Job Analysis, or that distinct actor references resolve to distinct people. Those relationships must be re-resolved at authoritative owner boundaries immediately before activation. A prose-only `next_action` is insufficient runtime enforcement: the package also needs an executable host boundary that cannot issue activation evidence when authoritative checks reject or when verification evidence is bound to another plan or actor.
 
 ## Decision
 
@@ -26,29 +26,35 @@ Add a transport-neutral `StructuredInterviewPlan` value object that binds:
 
 `tenant_record_id` must be canonical and non-sentinel under Orgmetra's authoritative operational UUID contract. The package does not reinterpret the tenant UUID version because tenant identity generation and migration policy belong to the authoritative HRIS boundary. Packet-owned trust-bearing references separately require canonical, non-sentinel UUIDv4 plus their expected namespace. UUIDv1 and other non-v4 suffixes fail closed for those references; names, labels, compensation/protected-attribute values, or other semantic reference suffixes also fail closed. Direct construction, builder construction, and `dataclasses.replace(...)` share the same validation. `evidence_version` is restricted to true integers from 1 through 2147483647, is serialized canonically, and therefore changes immutable SHA-256 correlation when revised; version 1 is the initial schema default. The generated dataclass representation is disabled and replaced with `StructuredInterviewPlan(<redacted>)`; canonical JSON is the explicit evidence serialization boundary.
 
-The immutable next action requires the host, immediately before activation, to re-resolve every plan reference within `tenant_record_id`; prove the requisition-to-Job-to-job-analysis binding; verify question-set, question-to-competency mapping, and rating-anchor provenance; re-resolve every panel actor; prove the resolved panel actor identities are distinct; and verify panel eligibility and training. The packet does not perform or claim those authoritative resolutions. Only after they succeed may an accountable human activate the plan.
+The immutable next action requires the host, immediately before activation, to re-resolve every plan reference within `tenant_record_id`; prove the requisition-to-Job-to-job-analysis binding; verify question-set, question-to-competency mapping, and rating-anchor provenance; re-resolve every panel actor; prove the resolved panel actor identities are distinct; and verify panel eligibility and training.
 
-The plan is candidate-neutral. It contains no candidate identity, response, score, demographic attribute, free-form model output, provider credential, or final selection recommendation. Canonical JSON and SHA-256 provide immutable audit correlation; they do not prove the interview is valid, fair, legally compliant, tenant-owned, correctly linked, or approved. Opaque identifiers and references remain sensitive correlation metadata rather than anonymous data.
+Make that control flow executable through `StructuredInterviewActivationAuthority` and `activate_structured_interview_plan(...)`. The injected host authority must return `StructuredInterviewActivationVerification` only after all authoritative checks succeed and must raise otherwise. Verification evidence is bound to the exact tenant, interview-plan reference, plan SHA-256 digest, approving actor, opaque `activation_verification:` reference, and verification digest. The activation function rejects non-contract authority results, malformed verification evidence, and well-shaped evidence for a different tenant/plan/digest/actor before producing any approval artifact.
+
+A successful activation emits a separate immutable `StructuredInterviewActivationReceipt` rather than mutating the reviewed plan. The receipt records the exact plan digest, accountable UUIDv4 approving actor, authority-verification reference/digest, fixed purpose `structured_interview_activation`, fixed reason `human_approved_plan_activation`, bounded positive evidence version, precision-preserving approval time, `human_confirmation=True`, and fixed `approved_for_use` state. Its routine representation is fully redacted and its canonical JSON/SHA-256 is the explicit immutable correlation surface.
+
+The plan and activation receipt are candidate-neutral. They contain no candidate identity, response, score, demographic attribute, compensation value, free-form model output, provider credential, or final selection recommendation. Canonical JSON and SHA-256 provide immutable audit correlation; they do not prove the interview is valid, fair, legally compliant, tenant-owned, correctly linked, or scientifically adequate. Opaque identifiers and references remain sensitive correlation metadata rather than anonymous data.
 
 ## Consequences
 
 ### Positive
 
 - Buyers can prove which Job Analysis, competencies, questions, question-to-competency mapping, rating anchors, interviewer panel, and evidence revision were reviewed before candidate use.
-- Activation fails closed unless authoritative tenant, Job, evidence-provenance, and panel-identity relationships are re-resolved.
-- Candidate PII and assessment values remain outside the planning artifact.
+- Runtime activation orchestration fails closed when the authoritative host rejects, returns the wrong contract type, returns malformed evidence, or returns evidence bound to another tenant/plan/digest/actor.
+- Successful activation evidence names the accountable human actor and binds that approval to the exact reviewed plan digest plus authoritative verification evidence.
+- Candidate PII and assessment values remain outside the planning and activation artifacts.
 - Packet-owned trust references reject UUIDv1/time-node-bearing suffixes and value-bearing metadata without making the leaf package incompatible with authoritative Orgmetra tenant UUIDs.
 - Routine representation/logging does not expose references or evidence digests.
 - Downstream interview-result and selection-decision boundaries can reject drift from the approved plan by reference/digest/version rather than copying question content.
-- The contract supports standalone use and later MSA extraction without cross-service application-table SQL.
+- The authority protocol preserves standalone operation and later MSA extraction without cross-service application-table SQL or duplicated foreign service state.
 
 ### Costs and constraints
 
-- The plan does not persist requisitions, Job Analysis, interview questions/mappings, responses, scores, or authoritative relationship-resolution results.
+- The package does not persist requisitions, Job Analysis, interview questions/mappings, responses, scores, or authoritative relationship-resolution results.
+- The authority protocol is not itself proof that a concrete production adapter performs tenant/database/API checks correctly; production adapters need their own executable integration evidence.
 - Human approval remains mandatory; model output cannot activate or approve the plan.
-- UUIDv4-backed packet references reduce accidental value leakage but do not remove authorization, retention, export-control, or audit obligations for correlation metadata. Tenant UUID generation/privacy policy remains owned by the authoritative HRIS boundary.
+- UUIDv4-backed package references reduce accidental value leakage but do not remove authorization, retention, export-control, or audit obligations for correlation metadata. Tenant UUID generation/privacy policy remains owned by the authoritative HRIS boundary.
 - Reference inequality does not prove distinct authoritative panel identities; the host must resolve and compare those identities in the exact tenant.
-- Evidence version and digests identify the reviewed revision but do not establish substantive scientific adequacy; content validity, criterion-related validity, adverse-impact analysis, interviewer training evidence, accommodations, and jurisdiction-specific legal review remain separate evidence obligations.
+- Evidence versions and digests identify reviewed revisions but do not establish substantive scientific adequacy; content validity, criterion-related validity, adverse-impact analysis, interviewer training evidence, accommodations, and jurisdiction-specific legal review remain separate evidence obligations.
 - This ADR remains proposed until its exact PR head merges into protected `develop`.
 
 ## References
