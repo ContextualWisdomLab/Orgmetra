@@ -52,7 +52,7 @@ def _validate_code(value: str, field_name: str) -> None:
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require an expected namespace plus a canonical operational UUID suffix."""
+    """Require an expected namespace plus a canonical opaque UUIDv4 suffix."""
     error_message = f"{field_name} must be an opaque {prefix}: reference"
     if (
         not isinstance(value, str)
@@ -66,7 +66,7 @@ def _validate_reference(value: str, prefix: str, field_name: str) -> None:
         parsed = UUID(suffix)
     except (ValueError, AttributeError, TypeError) as exc:
         raise ValueError(error_message) from exc
-    if str(parsed) != suffix or parsed.int in (0, (1 << 128) - 1):
+    if str(parsed) != suffix or parsed.version != 4 or parsed.int in (0, (1 << 128) - 1):
         raise ValueError(error_message)
 
 
