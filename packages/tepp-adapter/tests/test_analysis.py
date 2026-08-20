@@ -152,6 +152,7 @@ def test_local_authority_and_evidence_identifiers_fail_closed(field_name: str, v
         ("idempotency_key", "short", "16 through 128"),
         ("idempotency_key", "a" * 129, "16 through 128"),
         ("idempotency_key", "valid-length-but space", "16 through 128"),
+        ("idempotency_key", "sk-secret-looking-idempotency", "credential-shaped"),
         ("idempotency_key", 7, "16 through 128"),
         ("model_contract_version", "Temporal Event", "governed machine code"),
         ("model_contract_version", "", "governed machine code"),
