@@ -4,7 +4,7 @@ This package creates a **pre-mutation review packet** for employment separation.
 
 ## What the packet proves
 
-A packet binds one tenant and proposed employment separation to exact opaque canonical non-sentinel UUIDv4 references and SHA-256 evidence for:
+A packet binds one canonical non-sentinel UUIDv4 tenant and proposed employment separation to exact opaque canonical non-sentinel UUIDv4 references and SHA-256 evidence for:
 
 - the authoritative Person and Employment record;
 - the active Assignment/Job/Position scope snapshot to be resolved at review time;
@@ -13,7 +13,7 @@ A packet binds one tenant and proposed employment separation to exact opaque can
 - access-deprovisioning, asset-return, knowledge-transfer, and communication plans; and
 - separate requester and accountable reviewer references, whose authoritative actor identities must still be resolved and proven distinct before approval.
 
-UUIDv1 and every other UUID version are rejected for namespaced trust references so timestamp/node correlation metadata cannot enter an otherwise opaque evidence field. The packet also carries a bounded positive `evidence_version` in canonical evidence so a later review contract cannot be mistaken for an earlier one.
+UUIDv1 and every other UUID version are rejected for the packet tenant identity and namespaced trust references so timestamp/node correlation metadata cannot enter values presented as opaque governance identity. The packet also carries a bounded positive `evidence_version` in canonical evidence so a later review contract cannot be mistaken for an earlier one.
 
 Opaque Person and Employment references remain sensitive correlating metadata. The packet deliberately excludes names, email addresses, protected-attribute values, compensation or benefit amounts, disciplinary or medical narrative, credentials, allocation values, and free-form model output.
 
