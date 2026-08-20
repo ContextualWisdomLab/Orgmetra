@@ -9,9 +9,9 @@ on:
       - feat/foundation-product-baseline
   push:
     branches:
+      - develop
       - bootstrap
       - main
-      - feat/audit-outbox-envelope
   workflow_dispatch:
 
 permissions:
