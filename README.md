@@ -80,4 +80,6 @@ Job evidence
 
 Protected `develop` is the sole shipped repository truth. It includes the normalized bitemporal HRIS foundation; exclusive/concurrent employment and staffable-seat invariants; acyclic organization reconstruction; governed candidate-to-worker conversion; purpose-bound PII authorization; the GET-only People API; evidence-grounded Task/FJA/KSAO job-analysis snapshots; Job/cycle/staffing-scoped criterion observations; normalized validity-study cases; immutable audit and transactional outbox persistence with bounded recovery; bitemporal workforce-composition snapshots; executable PostgreSQL restore rehearsal evidence; governed Naruon calendar intents; governed migration handoff; requisition review; and human selection-review evidence.
 
+`implemented_on_protected_main` is the stable maturity enum for capability evidence integrated into Orgmetra's protected branch; in this repository that protected branch is `develop`. The enum is a compatibility vocabulary value, not a literal Git branch named `main`.
+
 Capabilities on open PRs are not shipped until integrated into protected `develop`. Use `docs/TRACEABILITY.md` as the canonical maturity map and treat `implemented_on_active_pr` as non-protected evidence only.
