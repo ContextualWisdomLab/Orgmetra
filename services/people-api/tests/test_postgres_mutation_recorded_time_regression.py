@@ -34,6 +34,20 @@ from test_postgres_people_mutations import (
 _POST_LOCK_CLOCK_SQL = "SELECT pg_catalog.clock_timestamp()"
 
 
+class ClockRowsCursor(ScriptedCursor):
+    """Allow malformed database-clock rows without changing the shared happy-path fake."""
+
+    def __init__(self, clock_rows: list[tuple[object, ...]]) -> None:
+        super().__init__([[], [(CONVERSION, RECORDED_AT)]], [[]])
+        self.clock_rows = list(clock_rows)
+
+    def fetchmany(self, size: int) -> list[tuple[object, ...]]:
+        if self._clock_result_pending:
+            self._clock_result_pending = False
+            return self.clock_rows[:size]
+        return super().fetchmany(size)
+
+
 class PostLockRecordedTimeRegressionTests(unittest.TestCase):
     """Prevent lock wait order from hiding the winner at the validation cutoff."""
 
@@ -118,6 +132,33 @@ class PostLockRecordedTimeRegressionTests(unittest.TestCase):
         )
         self.assertLess(position_lock_index, clock_index)
         self.assertLess(clock_index, assignment_snapshot_index)
+
+    def test_employment_fails_closed_on_invalid_post_lock_database_clock_rows(self) -> None:
+        """Malformed or non-aware clock evidence must never fall back to transaction start time."""
+        scenarios: tuple[list[tuple[object, ...]], ...] = (
+            [],
+            [(RECORDED_AT,), (RECORDED_AT,)],
+            [(RECORDED_AT, "unexpected")],
+            [("2026-08-18T00:01:00Z",)],
+        )
+        for clock_rows in scenarios:
+            with self.subTest(clock_rows=clock_rows):
+                cursor = ClockRowsCursor(clock_rows)
+                port = PostgresPeopleMutationPort(lambda: FakeConnection(cursor))
+                with self.assertRaisesRegex(PeopleMutationIntegrityError, "post-lock database clock"):
+                    create_employment_record(
+                        principal=PRINCIPAL,
+                        command=employment_command(),
+                        purpose_code="workforce_admin",
+                        policy=employment_policy(),
+                        mutation_port=port,
+                    )
+                self.assertFalse(
+                    any(
+                        statement.startswith("INSERT INTO public.employment_record (")
+                        for statement, _parameters in cursor.executions
+                    )
+                )
 
 
 if __name__ == "__main__":
