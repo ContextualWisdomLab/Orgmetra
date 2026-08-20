@@ -330,12 +330,7 @@ paths:
           schema:
             type: string
             format: uuid
-        - name: purpose
-          in: query
-          required: true
-          schema:
-            type: string
-            pattern: '^[a-z][a-z0-9_]{2,63}$'
+        - $ref: '#/components/parameters/PurposeCode'
       responses:
         '200':
           description: The exact persisted snapshot document.
