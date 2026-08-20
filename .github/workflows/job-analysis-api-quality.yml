@@ -10,6 +10,7 @@ on:
       - "packages/keyverse-adapter/**"
       - "database/migrations/0013_job_analysis_snapshot.sql"
       - "tests/test_job_analysis_snapshot_postgres.sh"
+      - "tests/test_job_analysis_snapshot_schema_hardening.sh"
       - "tests/validate_repository.py"
       - "scripts/foundation-contract-core.mjs"
       - "schemas/openapi.yaml"
@@ -95,7 +96,9 @@ jobs:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
       - name: Run persisted job-analysis PostgreSQL contract
-        run: bash tests/test_job_analysis_snapshot_postgres.sh
+        run: |
+          bash tests/test_job_analysis_snapshot_postgres.sh
+          bash tests/test_job_analysis_snapshot_schema_hardening.sh
       - name: Require clean checkout
         run: |
           git diff --exit-code
