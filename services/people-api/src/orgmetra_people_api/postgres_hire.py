@@ -32,7 +32,7 @@ from orgmetra_people_api.mutations import idempotency_record_id
 
 PostgresConnectionFactory = Callable[[], AbstractContextManager[Any]]
 
-_READ_WRITE_SQL = "SET TRANSACTION READ WRITE"
+_READ_WRITE_SQL = "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE"
 _TENANT_CONTEXT_SQL = "SELECT pg_catalog.set_config('orgmetra.tenant_record_id', %s, true)"
 _HIRE_MUTATION_FIELDS = frozenset({"candidate_worker_conversion"})
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
