@@ -50,7 +50,7 @@ class WorkforceCompositionSnapshot:
     employment_status_counts: tuple[tuple[str, int], ...]
 
     def __post_init__(self) -> None:
-        """Reject non-canonical direct evidence before it can be hashed or exported."""
+        """Reject non-canonical or internally inconsistent evidence before export."""
         if self.known_at.utcoffset() is None:
             raise IntervalError(
                 "Workforce snapshot knowledge cutoff must be timezone-aware.",
@@ -66,6 +66,47 @@ class WorkforceCompositionSnapshot:
             raise SingleValuedFactError(
                 "Workforce snapshot status codes must use canonical status order.",
                 next_action="Sort employment status counts by status code, then rebuild the snapshot.",
+            )
+
+        aggregate_counts = (
+            self.person_headcount,
+            self.employment_count,
+            self.staffed_assignment_count,
+            self.unassigned_person_count,
+        )
+        if not all(type(value) is int and value >= 0 for value in aggregate_counts):
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action=(
+                    "Rebuild the snapshot from authoritative HRIS facts so every aggregate count is a "
+                    "non-negative integer."
+                ),
+            )
+        if not self.staffed_fte.is_finite() or self.staffed_fte < _ZERO_FTE:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot from authoritative HRIS facts with a finite non-negative FTE.",
+            )
+        if self.person_headcount > self.employment_count or self.unassigned_person_count > self.person_headcount:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action=(
+                    "Rebuild the snapshot from authoritative HRIS facts so headcount, employment, and "
+                    "unassigned-person totals reconcile."
+                ),
+            )
+        if any(status not in _WORKFORCE_INCLUDED_STATUSES for status in status_codes):
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot using only reportable workforce employment statuses.",
+            )
+        if sum(count for _status, count in self.employment_status_counts) != self.employment_count:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action=(
+                    "Rebuild the snapshot from authoritative HRIS facts so per-status employment counts "
+                    "reconcile to the total employment count."
+                ),
             )
 
     def canonical_json(self) -> str:
@@ -219,7 +260,7 @@ def build_workforce_composition_snapshot(
     Raises:
         IntervalError: ``known_at`` is timezone-naive or has no usable UTC offset.
         SingleValuedFactError: One employment or assignment has contradictory
-            visible versions.
+            visible versions, or direct aggregate evidence is inconsistent.
         EmploymentExclusivityError: A worker has malformed or overlapping
             exclusive employment at the report coordinate.
         EmploymentCoverageError: Existing assignment integrity rejects a worker link.
