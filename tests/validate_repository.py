@@ -24,6 +24,7 @@ REQUIRED = [
     "manifest.json",
     "package.json",
     ".github/workflows/foundation-ci.yml",
+    ".github/workflows/job-analysis-api-quality.yml",
     "docs/PRD.md",
     "docs/TRD.md",
     "docs/USER_STORIES.md",
@@ -46,8 +47,14 @@ REQUIRED = [
     "docs/adr/0004-employment-position-version-and-assignment-binding.md",
     "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
     "docs/adr/0006-governed-audit-outbox-envelope.md",
+    "docs/adr/0007-governed-job-analysis-evidence.md",
     "docs/adr/0008-purpose-bound-pii-authorization.md",
     "docs/adr/0009-performance-criterion-observation-scope.md",
+    "docs/adr/0010-naruon-calendar-intent-boundary.md",
+    "docs/adr/0011-bitemporal-workforce-composition.md",
+    "docs/adr/0012-governed-migration-handoff.md",
+    "docs/adr/0013-governed-requisition-review-packet.md",
+    "docs/adr/0014-job-analysis-snapshot-persistence.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -63,6 +70,7 @@ REQUIRED = [
     "database/migrations/0010_validity_study_case_integrity.sql",
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
+    "database/migrations/0013_job_analysis_snapshot.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -83,6 +91,7 @@ REQUIRED = [
     "tests/test_validity_study_case_postgres.sh",
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
+    "tests/test_job_analysis_snapshot_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -198,6 +207,12 @@ def _validate_database_contract() -> None:
     migration_paths = sorted((ROOT / "database/migrations").glob("*.sql"))
     if not migration_paths:
         _fail("No database migrations found")
+    migration_prefixes = [path.name.split("_", 1)[0] for path in migration_paths]
+    duplicate_prefixes = sorted(
+        prefix for prefix in set(migration_prefixes) if migration_prefixes.count(prefix) > 1
+    )
+    if duplicate_prefixes:
+        _fail(f"Duplicate migration number prefixes: {duplicate_prefixes}")
     sql = "\n".join(path.read_text(encoding="utf-8") for path in migration_paths)
     table_sql = sql
 
@@ -340,6 +355,15 @@ def _validate_database_contract() -> None:
         "REVOKE TRUNCATE ON people_mutation_idempotency_record FROM PUBLIC",
         "ALTER TABLE people_mutation_idempotency_record FORCE ROW LEVEL SECURITY",
         "CREATE POLICY people_mutation_idempotency_scope_policy",
+        "CREATE TABLE job_analysis_snapshot",
+        "CREATE TABLE job_analysis_task_item",
+        "CREATE TABLE job_analysis_ksao_item",
+        "CREATE TABLE job_analysis_task_ksao_link",
+        "CREATE TABLE job_analysis_write_command",
+        "CONSTRAINT job_analysis_write_command_idempotency_unique",
+        "CREATE TRIGGER job_analysis_snapshot_append_only_guard",
+        "ALTER TABLE job_analysis_snapshot FORCE ROW LEVEL SECURITY",
+        "CREATE POLICY job_analysis_snapshot_scope_policy",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
@@ -474,6 +498,42 @@ def _validate_openapi_contract() -> None:
         ):
             _require_in_block(block, operation_id, response, f"response {response.strip()}")
         _require_in_block(block, operation_id, "            Location:", "201 Location header")
+
+    job_analysis_block = _yaml_block(
+        openapi, "  /tenants/{tenant_record_id}/job-analysis-snapshots:"
+    )
+    if not job_analysis_block:
+        _fail("persistJobAnalysisSnapshot: path block is missing")
+    for fragment, description in (
+        ("operationId: persistJobAnalysisSnapshot", "operationId"),
+        ("            - orgmetra.job_architecture.write", "least-privilege write scope"),
+        ("$ref: '#/components/parameters/IdempotencyKey'", "Idempotency-Key"),
+        ("$ref: '#/components/parameters/PurposeCode'", "purpose parameter"),
+        ("$ref: '#/components/schemas/PersistJobAnalysisSnapshotCommand'", "request schema"),
+        ("        '201':", "201 response"),
+        ("            Location:", "201 Location header"),
+        ("        '415':", "unsupported-media response"),
+    ):
+        _require_in_block(job_analysis_block, "persistJobAnalysisSnapshot", fragment, description)
+
+    job_analysis_read_block = _yaml_block(
+        openapi,
+        "  /tenants/{tenant_record_id}/job-analysis-snapshots/{analysis_record_id}:",
+    )
+    if not job_analysis_read_block:
+        _fail("readJobAnalysisSnapshot: path block is missing")
+    _require_in_block(
+        job_analysis_read_block,
+        "readJobAnalysisSnapshot",
+        "operationId: readJobAnalysisSnapshot",
+        "operationId",
+    )
+    _require_in_block(
+        job_analysis_read_block,
+        "readJobAnalysisSnapshot",
+        "            - orgmetra.job_architecture.read",
+        "least-privilege read scope",
+    )
 
     for schema_name in (
         "CreateJobProfileCommand",
