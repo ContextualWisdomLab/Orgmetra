@@ -7,7 +7,7 @@
 
 Compensation changes are high-impact employment actions. A useful enterprise review boundary must correlate the proposed change to authoritative worker scope, the exact current/proposed compensation artifacts, the governing policy, pay-equity review, budget authorization, and payroll handoff without copying salary, wage, bonus, benefit, equity, protected-attribute, or free-form case values into portable evidence.
 
-Syntactically valid Person, Employment, Assignment, policy, actor, or compensation-artifact references do not prove tenant membership, worker scope, policy applicability, actor separation, or effective-date correctness. Opaque identifiers also remain sensitive correlating metadata even when direct identifiers and pay values are absent.
+Syntactically valid Person, Employment, Assignment, policy, actor, or compensation-artifact references do not prove tenant membership, worker scope, policy applicability, actor separation, or effective-date correctness. Opaque identifiers also remain sensitive correlating metadata even when direct identifiers and pay values are absent. UUID syntax is itself part of the privacy boundary: UUIDv1 can carry timestamp/node-derived correlation metadata despite appearing opaque.
 
 Current primary-source context is recorded in `docs/doctoring/compensation-change-review-references.md`. ISO 30414:2025 provides current human-capital reporting/disclosure context; U.S. EEOC compensation guidance demonstrates why compensation governance must not turn protected-attribute review into uncontrolled evidence copying; U.S. Department of Labor FLSA recordkeeping guidance demonstrates the need for accountable wage/time records. These are governance inputs only, not certification or universal legal-compliance claims.
 
@@ -15,7 +15,7 @@ Current primary-source context is recorded in `docs/doctoring/compensation-chang
 
 Orgmetra will expose a value-minimized `CompensationChangeReviewPacket` before any authoritative compensation-related HRIS mutation or payroll execution.
 
-The packet binds one canonical tenant to UUID-backed opaque references for the compensation review, Person, Employment, active Assignment/Job/Position snapshot, current compensation snapshot, proposed compensation plan, compensation policy, pay-equity review, budget authorization, payroll handoff plan, requester, and reviewer. Evidence artifacts carry independent lowercase SHA-256 digests; a bounded positive `evidence_version`, proposed business effective date, and precision-preserving timezone-aware evidence instant are part of canonical evidence.
+The packet binds one canonical tenant to canonical non-sentinel UUIDv4-backed opaque references for the compensation review, Person, Employment, active Assignment/Job/Position snapshot, current compensation snapshot, proposed compensation plan, compensation policy, pay-equity review, budget authorization, payroll handoff plan, requester, and reviewer. UUIDv1 and every other UUID version fail closed for these namespaced trust references so timestamp/node-derived correlation metadata cannot enter the envelope through identifiers presented as opaque. Evidence artifacts carry independent lowercase SHA-256 digests; a bounded positive `evidence_version`, proposed business effective date, and precision-preserving timezone-aware evidence instant are part of canonical evidence.
 
 The packet deliberately excludes compensation values, protected-attribute values, free-form case narrative, credentials, and free-form model output. It explicitly acknowledges remaining personal-data correlation with `contains_personal_data = true`.
 
@@ -28,7 +28,7 @@ Direct construction and replacement fail closed unless the packet remains:
 - `mutation_state = not_authorized_to_apply`; and
 - `external_execution_state = not_authorized_to_execute`.
 
-Requester and reviewer opaque references must differ, but authoritative separation of duties requires both identities to be re-resolved inside the packet tenant immediately before approval. The host must also re-resolve every packet reference, prove Person-to-Employment and active Assignment/Job/Position scope, and verify the current compensation snapshot, proposed plan, exact compensation policy, pay-equity review, budget authorization, effective date, and payroll-handoff provenance without copying compensation or protected-attribute values into the packet.
+Requester and reviewer opaque references must differ, but authoritative separation of duties requires both identities to be re-resolved inside the packet tenant immediately before approval. The host must also re-resolve every packet reference, prove Person-to-Employment and active Assignment/Job/Position scope, and verify the current compensation snapshot, proposed plan, exact compensation policy, pay-equity review, budget authorization, effective date, and payroll-handoff provenance without copying compensation or protected-attribute values into the packet. UUIDv4 syntax constrains opacity only; it does not prove tenant membership, actor identity, worker scope, policy applicability, or substantive correctness.
 
 Any authorized HRIS change must use the authoritative Orgmetra People boundary with its own purpose-bound authorization, idempotency, bitemporal persistence, and immutable audit/outbox evidence. Payroll execution remains behind the payroll owner's published contract. This package performs no foreign mutation and no direct cross-service application-table SQL.
 
@@ -38,16 +38,18 @@ Any authorized HRIS change must use the authoritative Orgmetra People boundary w
 
 - A review envelope cannot masquerade as compensation approval, an applied HRIS change, or completed payroll execution.
 - Buyers can correlate exact policy/equity/budget/proposed-plan evidence while minimizing duplicated pay and protected-attribute values.
+- UUIDv1 timestamp/node correlation cannot enter namespaced trust references.
 - Changes to governed evidence or `evidence_version` change the canonical packet digest.
 - Cross-tenant, wrong-worker, stale-policy, actor-separation, and effective-date questions remain explicit authoritative-resolution obligations instead of being inferred from reference syntax.
 
 ### Trade-offs
 
 - The packet is not anonymous; opaque worker/evidence correlations still require purpose-bound access, retention, export, and audit controls.
+- UUIDv4 syntax is not authorization, ownership, or relationship evidence.
 - A pay-equity evidence reference/digest proves which artifact was reviewed, not that compensation is fair, nondiscriminatory, or legally sufficient.
 - The packet does not calculate compensation, payroll, taxes, protected-class statistics, pay-equity findings, or legal conclusions.
 - Hosts must perform authoritative scope and actor resolution at approval time.
 
 ## Verification
 
-The package requires exact 100% owned statement and branch coverage; beginner-readable module/class/callable docstrings; direct-construction and `dataclasses.replace(...)` fail-closed regressions; strict UUID-backed opaque references; lowercase SHA-256 evidence; redacted `repr`; closed non-sensitive reason categories; bounded evidence versions; business-date and precision-preserving timestamp validation; deterministic canonical JSON/digest evidence; separate requester/reviewer references plus explicit authoritative identity re-resolution; and immutable human-review/no-mutation/no-execution states.
+The package requires exact 100% owned statement and branch coverage; beginner-readable module/class/callable docstrings; direct-construction and `dataclasses.replace(...)` fail-closed regressions; strict canonical non-sentinel UUIDv4-backed opaque references including UUIDv1 rejection; lowercase SHA-256 evidence; redacted `repr`; closed non-sensitive reason categories; bounded evidence versions; business-date and precision-preserving timestamp validation; deterministic canonical JSON/digest evidence; separate requester/reviewer references plus explicit authoritative identity re-resolution; and immutable human-review/no-mutation/no-execution states.
