@@ -32,6 +32,9 @@ from orgmetra_job_analysis_api.authorization import authorize_resource_fields
 _MAX_UUID_INT = (1 << 128) - 1
 _IDEMPOTENCY_MIN = 16
 _IDEMPOTENCY_MAX = 200
+_MAX_TASKS = 500
+_MAX_KSAOS = 500
+_MAX_TASK_KSAO_LINKS = 5000
 _SNAPSHOT_FIELDS = frozenset(
     {
         "analysis_record_id",
@@ -126,7 +129,7 @@ def _reject_unknown_fields(
         )
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> UUID:
+def validate_operational_uuid(field_name: str, value: object) -> UUID:
     """Require a UUID that is not one of Orgmetra's reserved protocol sentinels."""
     if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
@@ -145,14 +148,14 @@ def _validate_idempotency_key(value: object) -> str:
 def _parse_uuid(field_name: str, value: object) -> UUID:
     """Parse one posted UUID string or reject a non-operational identity."""
     if isinstance(value, UUID):
-        return _validate_operational_uuid(field_name, value)
+        return validate_operational_uuid(field_name, value)
     if not isinstance(value, str):
         raise ValueError(f"{field_name} must be a UUID string.")
     try:
         parsed = UUID(value)
     except ValueError as error:
         raise ValueError(f"{field_name} must be a UUID string.") from error
-    return _validate_operational_uuid(field_name, parsed)
+    return validate_operational_uuid(field_name, parsed)
 
 
 def _parse_aware_datetime(field_name: str, value: object) -> datetime:
@@ -225,10 +228,18 @@ def snapshot_from_document(
     raw_fja = document.get("fja_profile")
     if not isinstance(raw_tasks, list) or not raw_tasks:
         raise ValueError("tasks must be a non-empty list.")
+    if len(raw_tasks) > _MAX_TASKS:
+        raise ValueError(f"tasks must contain at most {_MAX_TASKS} items.")
     if not isinstance(raw_ksaos, list) or not raw_ksaos:
         raise ValueError("ksao_requirements must be a non-empty list.")
+    if len(raw_ksaos) > _MAX_KSAOS:
+        raise ValueError(f"ksao_requirements must contain at most {_MAX_KSAOS} items.")
     if not isinstance(raw_links, list) or not raw_links:
         raise ValueError("task_ksao_links must be a non-empty list.")
+    if len(raw_links) > _MAX_TASK_KSAO_LINKS:
+        raise ValueError(
+            f"task_ksao_links must contain at most {_MAX_TASK_KSAO_LINKS} items."
+        )
     if not isinstance(raw_fja, dict):
         raise ValueError("fja_profile must be an object.")
     _reject_unknown_fields("fja_profile", raw_fja, _FJA_FIELDS)
@@ -387,7 +398,7 @@ def persist_job_analysis_snapshot(
     Job-analysis rows are occupational evidence, not person PII, so the authorized
     field set is the snapshot document itself rather than a masked subset.
     """
-    tenant_record_id = _validate_operational_uuid("tenant_record_id", tenant_record_id)
+    tenant_record_id = validate_operational_uuid("tenant_record_id", tenant_record_id)
     key = _validate_idempotency_key(idempotency_key)
     snapshot = snapshot_from_document(document, tenant_record_id=tenant_record_id)
     position_id = _optional_scope_id("position_record_id", position_record_id)
@@ -452,8 +463,8 @@ def read_job_analysis_snapshot(
     read_port: JobAnalysisReadPort,
 ) -> PersistedJobAnalysisView:
     """Authorize an exact snapshot target before reconstructing persisted evidence."""
-    tenant_record_id = _validate_operational_uuid("tenant_record_id", tenant_record_id)
-    analysis_record_id = _validate_operational_uuid("analysis_record_id", analysis_record_id)
+    tenant_record_id = validate_operational_uuid("tenant_record_id", tenant_record_id)
+    analysis_record_id = validate_operational_uuid("analysis_record_id", analysis_record_id)
     resource_reference = f"job_analysis_snapshot:{analysis_record_id.hex}"
     decision = authorize_resource_fields(
         principal=principal,
