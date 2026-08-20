@@ -59,7 +59,7 @@ class PeopleReadAuthenticationBackendFailureTests(unittest.IsolatedAsyncioTestCa
     """Require a client-safe 500 when the identity backend fails unexpectedly."""
 
     async def test_identity_backend_failure_is_normalized_without_read_or_secret_disclosure(self) -> None:
-        """Keep backend exceptions inside the People transport boundary with support evidence."""
+        """Keep backend exceptions client-safe while retaining correlated operator evidence."""
         read_port = RecordingReadPort()
         app = PeopleAsgiApp(
             authenticator=ExplodingAuthenticator(),
@@ -92,7 +92,8 @@ class PeopleReadAuthenticationBackendFailureTests(unittest.IsolatedAsyncioTestCa
         async def send(message: dict[str, object]) -> None:
             messages.append(message)
 
-        await app(scope, receive, send)
+        with self.assertLogs("orgmetra_people_api.http", level="ERROR") as captured:
+            await app(scope, receive, send)
 
         start, body = messages
         payload = json.loads(bytes(body["body"]))
@@ -104,6 +105,18 @@ class PeopleReadAuthenticationBackendFailureTests(unittest.IsolatedAsyncioTestCa
         self.assertNotIn("client_secret", serialized)
         self.assertNotIn("do-not-leak", serialized)
         self.assertEqual(read_port.calls, [])
+
+        self.assertEqual(len(captured.records), 1)
+        record = captured.records[0]
+        self.assertEqual(record.getMessage(), "People read authentication backend failed")
+        self.assertEqual(record.route, "people")
+        self.assertEqual(record.tenant_record_id, str(TENANT))
+        self.assertEqual(record.exception_type, "RuntimeError")
+        self.assertEqual(record.support_reference, payload["support_reference"])
+        logged = repr(record.__dict__)
+        self.assertNotIn("client_secret", logged)
+        self.assertNotIn("do-not-leak", logged)
+        self.assertNotIn("opaque-token", logged)
 
 
 if __name__ == "__main__":
