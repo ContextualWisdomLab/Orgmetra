@@ -1,4 +1,4 @@
-"""Regression contract for People-read authentication backend failures."""
+"""Regression contract for People-read unexpected backend failures."""
 
 from __future__ import annotations
 
@@ -29,6 +29,19 @@ class ExplodingAuthenticator:
         raise RuntimeError("oidc client_secret=do-not-leak")
 
 
+class StaticAuthenticator:
+    """Return one valid principal so persistence failure handling is exercised."""
+
+    async def authenticate(self, bearer_token: str) -> AuthenticatedPrincipal:
+        """Return a tenant-bound principal without retaining the bearer token."""
+        del bearer_token
+        return AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:operator-1",
+            granted_scope_codes=frozenset({"orgmetra.people.read"}),
+        )
+
+
 class RecordingReadPort:
     """Record whether protected HR data was touched after authentication failed."""
 
@@ -55,46 +68,73 @@ class RecordingReadPort:
         )
 
 
-class PeopleReadAuthenticationBackendFailureTests(unittest.IsolatedAsyncioTestCase):
-    """Require a client-safe 500 when the identity backend fails unexpectedly."""
+class ExplodingReadPort:
+    """Model a secret-bearing persistence failure after successful authorization."""
 
-    async def test_identity_backend_failure_is_normalized_without_read_or_secret_disclosure(self) -> None:
-        """Keep backend exceptions client-safe while retaining correlated operator evidence."""
-        read_port = RecordingReadPort()
-        app = PeopleAsgiApp(
-            authenticator=ExplodingAuthenticator(),
-            policy=PurposeBoundAccessPolicy(
-                tenant_record_id=TENANT,
-                policy_version_code="http-auth-failure-v1",
-                resource_kind="person_record",
-                purpose_code="people_read",
-                operation_code="read_record",
-                required_scope_code="orgmetra.people.read",
-                permitted_fields=frozenset({"display_name", "employment_status_code"}),
-            ),
-            read_port=read_port,
-        )
-        scope = {
-            "type": "http",
-            "method": "GET",
-            "path": f"/v1/tenants/{TENANT}/people/{PERSON}",
-            "query_string": (
-                b"effective_on=2026-08-17&purpose=people_read"
-                b"&fields=display_name,employment_status_code"
-            ),
-            "headers": [(b"authorization", b"Bearer opaque-token")],
-        }
-        messages: list[dict[str, object]] = []
+    def read_worker(
+        self,
+        *,
+        tenant_record_id: UUID,
+        person_record_id: UUID,
+        effective_on: date,
+    ) -> WorkerPeopleRecord | None:
+        """Fail without exposing persistence credentials to logs or responses."""
+        del tenant_record_id, person_record_id, effective_on
+        raise RuntimeError("postgres password=do-not-leak")
 
-        async def receive() -> dict[str, object]:
-            return {"type": "http.request", "body": b"", "more_body": False}
 
-        async def send(message: dict[str, object]) -> None:
-            messages.append(message)
+def policy() -> PurposeBoundAccessPolicy:
+    """Build the governed People-read policy shared by backend-failure tests."""
+    return PurposeBoundAccessPolicy(
+        tenant_record_id=TENANT,
+        policy_version_code="http-backend-failure-v1",
+        resource_kind="person_record",
+        purpose_code="people_read",
+        operation_code="read_record",
+        required_scope_code="orgmetra.people.read",
+        permitted_fields=frozenset({"display_name", "employment_status_code"}),
+    )
 
-        with self.assertLogs("orgmetra_people_api.http", level="ERROR") as captured:
-            await app(scope, receive, send)
 
+def scope() -> dict[str, object]:
+    """Build one valid People-read ASGI scope with an opaque bearer credential."""
+    return {
+        "type": "http",
+        "method": "GET",
+        "path": f"/v1/tenants/{TENANT}/people/{PERSON}",
+        "query_string": (
+            b"effective_on=2026-08-17&purpose=people_read"
+            b"&fields=display_name,employment_status_code"
+        ),
+        "headers": [(b"authorization", b"Bearer opaque-token")],
+    }
+
+
+async def exercise(app: PeopleAsgiApp) -> list[dict[str, object]]:
+    """Execute one request and return the emitted ASGI response frames."""
+    messages: list[dict[str, object]] = []
+
+    async def receive() -> dict[str, object]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: dict[str, object]) -> None:
+        messages.append(message)
+
+    await app(scope(), receive, send)
+    return messages
+
+
+class PeopleReadBackendFailureTests(unittest.IsolatedAsyncioTestCase):
+    """Require client-safe responses and correlated operator evidence for backend failures."""
+
+    def assert_correlated_failure(
+        self,
+        *,
+        messages: list[dict[str, object]],
+        captured: unittest._log._AssertLogsContext,  # type: ignore[attr-defined]
+        expected_message: str,
+    ) -> None:
+        """Require one non-disclosing 500 whose support reference matches its ERROR log."""
         start, body = messages
         payload = json.loads(bytes(body["body"]))
         self.assertEqual((start["status"], payload["error_code"]), (500, "internal_error"))
@@ -102,21 +142,58 @@ class PeopleReadAuthenticationBackendFailureTests(unittest.IsolatedAsyncioTestCa
         self.assertTrue(payload["next_action"])
         self.assertRegex(payload["support_reference"], _SUPPORT_REFERENCE)
         serialized = json.dumps(payload)
+        self.assertNotIn("password", serialized)
         self.assertNotIn("client_secret", serialized)
         self.assertNotIn("do-not-leak", serialized)
-        self.assertEqual(read_port.calls, [])
 
         self.assertEqual(len(captured.records), 1)
         record = captured.records[0]
-        self.assertEqual(record.getMessage(), "People read authentication backend failed")
-        self.assertEqual(record.route, "people")
-        self.assertEqual(record.tenant_record_id, str(TENANT))
-        self.assertEqual(record.exception_type, "RuntimeError")
-        self.assertEqual(record.support_reference, payload["support_reference"])
+        self.assertEqual(record.getMessage(), expected_message)
+        self.assertEqual(getattr(record, "route"), "people")
+        self.assertEqual(getattr(record, "tenant_record_id"), str(TENANT))
+        self.assertEqual(getattr(record, "exception_type"), "RuntimeError")
+        self.assertEqual(getattr(record, "support_reference"), payload["support_reference"])
         logged = repr(record.__dict__)
+        self.assertNotIn("password", logged)
         self.assertNotIn("client_secret", logged)
         self.assertNotIn("do-not-leak", logged)
         self.assertNotIn("opaque-token", logged)
+
+    async def test_identity_backend_failure_is_normalized_without_read_or_secret_disclosure(self) -> None:
+        """Keep identity exceptions client-safe while retaining correlated operator evidence."""
+        read_port = RecordingReadPort()
+        app = PeopleAsgiApp(
+            authenticator=ExplodingAuthenticator(),
+            policy=policy(),
+            read_port=read_port,
+        )
+
+        with self.assertLogs("orgmetra_people_api.http", level="ERROR") as captured:
+            messages = await exercise(app)
+
+        self.assert_correlated_failure(
+            messages=messages,
+            captured=captured,
+            expected_message="People read authentication backend failed",
+        )
+        self.assertEqual(read_port.calls, [])
+
+    async def test_persistence_backend_failure_is_correlated_without_secret_disclosure(self) -> None:
+        """Keep read-port exceptions client-safe while retaining correlated operator evidence."""
+        app = PeopleAsgiApp(
+            authenticator=StaticAuthenticator(),
+            policy=policy(),
+            read_port=ExplodingReadPort(),
+        )
+
+        with self.assertLogs("orgmetra_people_api.http", level="ERROR") as captured:
+            messages = await exercise(app)
+
+        self.assert_correlated_failure(
+            messages=messages,
+            captured=captured,
+            expected_message="People read persistence backend failed",
+        )
 
 
 if __name__ == "__main__":
