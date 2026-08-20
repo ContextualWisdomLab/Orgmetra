@@ -463,18 +463,20 @@ async def _read_json_object(receive: AsgiReceive) -> dict[str, object]:
 
 
 def _require_bounded_json_nesting(payload: object) -> None:
-    """Reject JSON whose logical nesting exceeds the stable HTTP parsing budget."""
+    """Reject JSON whose nested-container depth exceeds the stable parsing budget."""
     stack: list[tuple[object, int]] = [(payload, 0)]
     while stack:
         value, depth = stack.pop()
+        if isinstance(value, dict):
+            children = value.values()
+        elif isinstance(value, list):
+            children = value
+        else:
+            continue
         if depth > _MAX_JSON_NESTING_DEPTH:
             raise _InvalidHttpRequest("request body must be one JSON object")
-        if isinstance(value, dict):
-            for child in value.values():
-                stack.append((child, depth + 1))
-        elif isinstance(value, list):
-            for child in value:
-                stack.append((child, depth + 1))
+        for child in children:
+            stack.append((child, depth + 1))
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:

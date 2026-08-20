@@ -16,6 +16,10 @@ class HireReadmeRequestBoundaryTests(unittest.TestCase):
         self.assertIn("Authentication and tenant binding occur before request-body parsing", readme)
         self.assertIn("64 KiB cumulative request-body limit", readme)
         self.assertIn("1024 ASGI request frames", readme)
+        self.assertIn(
+            "128 nested JSON containers below the top-level command object",
+            readme,
+        )
         self.assertIn("Idempotency-Key", readme)
         self.assertIn("one tenant-bound transaction", readme)
 
