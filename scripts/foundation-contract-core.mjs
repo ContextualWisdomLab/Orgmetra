@@ -120,12 +120,18 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
   'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
   'outbox_event', 'outbox_delivery_record', 'outbox_delivery_escalation_record',
-  'inbox_event', 'integration_delivery'
+  'people_mutation_idempotency_record', 'inbox_event', 'integration_delivery'
+]);
+
+/** Migration-backed logical objects whose persisted table identity must not drift. */
+export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
+  'people_mutation_idempotency_record'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
 const ADR_STATUS_PATTERN = /^\|\s*\[\d{4}\]\(([^)]+)\)\s*\|.*\|\s*(Proposed|Accepted|Superseded|Rejected)\s*\|$/;
 const LOCAL_LINK_PATTERN = /\[[^\]]+\]\((?!https?:\/\/|mailto:|#)([^)]+)\)/g;
+const CREATE_TABLE_PATTERN = /\bCREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)/gi;
 
 /** Recursively collect Markdown files in stable lexical order. */
 export function collectMarkdownFiles(directoryPath) {
@@ -175,6 +181,43 @@ export function validateDatabaseObjectNames(objectNames = DATABASE_OBJECT_NAMES)
   return objectNames
     .filter((objectName) => !isValidDatabaseObjectName(objectName))
     .map((objectName) => `Invalid database object name: ${objectName}`);
+}
+
+/** Extract created table names from one SQL document. */
+export function extractCreatedTableNames(sqlText) {
+  CREATE_TABLE_PATTERN.lastIndex = 0;
+  return new Set([...sqlText.matchAll(CREATE_TABLE_PATTERN)].map((match) => match[1].toLowerCase()));
+}
+
+/**
+ * Prove that migration-backed logical table identities remain present in both
+ * the canonical object inventory and the checked-in migration history.
+ */
+export function validateMigrationBackedDatabaseObjectNames(
+  rootPath,
+  objectNames = MIGRATION_BACKED_DATABASE_OBJECT_NAMES
+) {
+  const migrationDirectory = join(rootPath, 'database/migrations');
+  const inventoryNames = new Set(DATABASE_OBJECT_NAMES);
+  const createdTableNames = new Set();
+  if (existsSync(migrationDirectory)) {
+    for (const entryName of readdirSync(migrationDirectory).sort()) {
+      if (!/^\d{4}_[a-z0-9_]+\.sql$/.test(entryName)) continue;
+      const migrationText = readFileSync(join(migrationDirectory, entryName), 'utf8');
+      for (const tableName of extractCreatedTableNames(migrationText)) createdTableNames.add(tableName);
+    }
+  }
+
+  const errors = [];
+  for (const objectName of objectNames) {
+    if (!inventoryNames.has(objectName)) {
+      errors.push(`Database object inventory omitted migration-backed object: ${objectName}`);
+    }
+    if (!createdTableNames.has(objectName)) {
+      errors.push(`Migration-backed database object is missing from migrations: ${objectName}`);
+    }
+  }
+  return errors;
 }
 
 /** Extract a level-two Markdown section. */
@@ -458,6 +501,7 @@ export function validateFoundation(rootPath) {
   }
 
   errors.push(...validateDatabaseObjectNames());
+  errors.push(...validateMigrationBackedDatabaseObjectNames(resolvedRoot));
 
   const traceabilityPath = join(resolvedRoot, 'docs/TRACEABILITY.md');
   if (existsSync(traceabilityPath)) {
