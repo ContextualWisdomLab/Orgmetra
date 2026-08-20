@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from datetime import date
 from uuid import UUID
@@ -16,6 +17,7 @@ PERSON = UUID("0198a412-6000-7000-8000-000000000010")
 EMPLOYMENT = UUID("0198a412-6000-7000-8000-000000000020")
 CONVERSION = UUID("0198a412-6000-7000-8000-000000000030")
 CANDIDATE = UUID("0198a412-6000-7000-8000-000000000040")
+_SUPPORT_REFERENCE = re.compile(r"^err_[A-Za-z0-9_-]{20,80}$")
 
 
 class ExplodingAuthenticator:
@@ -57,7 +59,7 @@ class PeopleReadAuthenticationBackendFailureTests(unittest.IsolatedAsyncioTestCa
     """Require a client-safe 500 when the identity backend fails unexpectedly."""
 
     async def test_identity_backend_failure_is_normalized_without_read_or_secret_disclosure(self) -> None:
-        """Keep backend exceptions inside the People transport boundary."""
+        """Keep backend exceptions inside the People transport boundary with support evidence."""
         read_port = RecordingReadPort()
         app = PeopleAsgiApp(
             authenticator=ExplodingAuthenticator(),
@@ -94,8 +96,13 @@ class PeopleReadAuthenticationBackendFailureTests(unittest.IsolatedAsyncioTestCa
 
         start, body = messages
         payload = json.loads(bytes(body["body"]))
-        self.assertEqual((start["status"], payload["error"]), (500, "internal_error"))
-        self.assertNotIn("client_secret", json.dumps(payload))
+        self.assertEqual((start["status"], payload["error_code"]), (500, "internal_error"))
+        self.assertEqual(payload["error"], payload["error_code"])
+        self.assertTrue(payload["next_action"])
+        self.assertRegex(payload["support_reference"], _SUPPORT_REFERENCE)
+        serialized = json.dumps(payload)
+        self.assertNotIn("client_secret", serialized)
+        self.assertNotIn("do-not-leak", serialized)
         self.assertEqual(read_port.calls, [])
 
 
