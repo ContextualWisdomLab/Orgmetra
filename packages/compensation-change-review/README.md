@@ -4,7 +4,7 @@
 
 ## What the packet carries
 
-The packet correlates one tenant, Person, Employment, active Assignment/Job/Position scope snapshot, current compensation snapshot, proposed compensation plan, exact compensation policy, pay-equity review, budget authorization, payroll handoff plan, requester, reviewer, business effective date, and evidence version. Trust-bearing artifacts use canonical UUID-backed opaque references; evidence artifacts also carry independent lowercase SHA-256 digests.
+The packet correlates one tenant, Person, Employment, active Assignment/Job/Position scope snapshot, current compensation snapshot, proposed compensation plan, exact compensation policy, pay-equity review, budget authorization, payroll handoff plan, requester, reviewer, business effective date, and evidence version. Every namespaced trust-bearing artifact uses a canonical non-sentinel UUIDv4-backed opaque reference; UUIDv1 and every other UUID version are rejected so timestamp/node-derived correlation metadata cannot enter an otherwise opaque field. Evidence artifacts also carry independent lowercase SHA-256 digests.
 
 The envelope intentionally **does not carry salary, wage, bonus, benefit, equity, protected-attribute, credential, or free-form case/model values**. Opaque Person/Employment and evidence references still create sensitive personal-data correlation, so the packet explicitly reports `contains_personal_data = true` rather than claiming anonymity.
 
@@ -18,7 +18,7 @@ A valid packet is not an approval. It remains:
 - `mutation_state = not_authorized_to_apply`; and
 - `external_execution_state = not_authorized_to_execute`.
 
-Immediately before approval, the host must re-resolve every reference in the packet tenant, prove requester/reviewer resolve to distinct authoritative actor identities, prove the Person-to-Employment and active Assignment/Job/Position scope, and verify the exact current/proposed compensation evidence, compensation policy, pay-equity review, budget authorization, effective date, and payroll-handoff provenance. Any authorized HRIS change then goes through Orgmetra's authoritative People boundary. Payroll execution remains behind the payroll owner's published contract.
+Immediately before approval, the host must re-resolve every reference in the packet tenant, prove requester/reviewer resolve to distinct authoritative actor identities, prove the Person-to-Employment and active Assignment/Job/Position scope, and verify the exact current/proposed compensation evidence, compensation policy, pay-equity review, budget authorization, effective date, and payroll-handoff provenance. UUIDv4 syntax is only an opacity constraint; it does not prove tenant ownership, actor identity, worker scope, or policy applicability. Any authorized HRIS change then goes through Orgmetra's authoritative People boundary. Payroll execution remains behind the payroll owner's published contract.
 
 ## Example
 
