@@ -4,7 +4,7 @@
 
 ## What the packet carries
 
-The packet correlates one canonical non-sentinel UUIDv4 tenant, Person, Employment, active Assignment/Job/Position scope snapshot, current compensation snapshot, proposed compensation plan, exact compensation policy, pay-equity review, budget authorization, payroll handoff plan, requester, reviewer, business effective date, and evidence version. The tenant identity and every namespaced trust-bearing artifact use canonical non-sentinel UUIDv4 identity; UUIDv1 and every other UUID version are rejected so timestamp/node-derived correlation metadata cannot enter values presented as opaque governance identity. Evidence artifacts also carry independent lowercase SHA-256 digests.
+The packet correlates one authoritative Orgmetra tenant, Person, Employment, active Assignment/Job/Position scope snapshot, current compensation snapshot, proposed compensation plan, exact compensation policy, pay-equity review, budget authorization, payroll handoff plan, requester, reviewer, business effective date, and evidence version. `tenant_record_id` follows the authoritative HRIS canonical non-sentinel operational-UUID contract, so valid tenant UUID versions accepted by protected Orgmetra core remain interoperable. Packet-owned namespaced trust-bearing references use canonical non-sentinel UUIDv4 identities so timestamp/node-derived correlation metadata cannot enter leaf-owned opaque references. Evidence artifacts also carry independent lowercase SHA-256 digests.
 
 The envelope intentionally **does not carry salary, wage, bonus, benefit, equity, protected-attribute, credential, or free-form case/model values**. Opaque Person/Employment and evidence references still create sensitive personal-data correlation, so the packet explicitly reports `contains_personal_data = true` rather than claiming anonymity.
 
@@ -18,7 +18,7 @@ A valid packet is not an approval. It remains:
 - `mutation_state = not_authorized_to_apply`; and
 - `external_execution_state = not_authorized_to_execute`.
 
-Immediately before approval, the host must re-resolve every reference in the packet tenant, prove requester/reviewer resolve to distinct authoritative actor identities, prove the Person-to-Employment and active Assignment/Job/Position scope, and verify the exact current/proposed compensation evidence, compensation policy, pay-equity review, budget authorization, effective date, and payroll-handoff provenance. UUIDv4 syntax is only an opacity constraint; it does not prove tenant ownership, actor identity, worker scope, or policy applicability. Any authorized HRIS change then goes through Orgmetra's authoritative People boundary. Payroll execution remains behind the payroll owner's published contract.
+Immediately before approval, the host must re-resolve every reference in the packet tenant, prove requester/reviewer resolve to distinct authoritative actor identities, prove the Person-to-Employment and active Assignment/Job/Position scope, and verify the exact current/proposed compensation evidence, compensation policy, pay-equity review, budget authorization, effective date, and payroll-handoff provenance. UUID syntax is not authorization or relationship evidence: the tenant UUID is governed by authoritative Orgmetra core, while UUIDv4 on packet-owned references is only an opacity/privacy constraint. Any authorized HRIS change then goes through Orgmetra's authoritative People boundary. Payroll execution remains behind the payroll owner's published contract.
 
 ## Example
 
@@ -27,7 +27,7 @@ from datetime import date, datetime, timezone
 from orgmetra_compensation_change_review import build_compensation_change_review_packet
 
 packet = build_compensation_change_review_packet(
-    tenant_record_id="11111111-1111-4111-8111-111111111111",
+    tenant_record_id="10000000-0000-7000-8000-000000000001",
     compensation_review_reference="compensation_change_review:22222222-2222-4222-8222-222222222222",
     person_record_reference="person_record:33333333-3333-4333-8333-333333333333",
     employment_record_reference="employment_record:44444444-4444-4444-8444-444444444444",
