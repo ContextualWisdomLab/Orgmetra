@@ -47,6 +47,7 @@ PostgresConnectionFactory = Callable[[], AbstractContextManager[Any]]
 _READ_WRITE_SQL = "SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE"
 _TENANT_CONTEXT_SQL = "SELECT pg_catalog.set_config('orgmetra.tenant_record_id', %s, true)"
 _RECORD_AUDIT_OUTBOX_SQL = "SELECT public.record_audit_outbox_event(%s, %s, %s, %s, %s, %s)"
+_POST_LOCK_RECORDED_AT_SQL = "SELECT pg_catalog.clock_timestamp()"
 _MAX_UUID_INT = (1 << 128) - 1
 _EMPLOYMENT_FIELDS = frozenset({"employment_record"})
 _POSITION_FIELDS = frozenset({"position_record"})
@@ -500,6 +501,17 @@ def _require_one_conversion(rows: list[tuple[object, ...]]) -> tuple[UUID, datet
     return conversion_id, recorded_at
 
 
+def _post_lock_recorded_at(cursor: Any) -> datetime:
+    """Read one database clock instant only after the relevant conflict lock is held."""
+    cursor.execute(_POST_LOCK_RECORDED_AT_SQL)
+    rows = cursor.fetchmany(2)
+    if len(rows) != 1 or len(rows[0]) != 1 or not _is_aware_datetime(rows[0][0]):
+        raise PeopleMutationIntegrityError("post-lock database clock row is invalid")
+    recorded_at = rows[0][0]
+    assert isinstance(recorded_at, datetime)
+    return recorded_at
+
+
 @dataclass(frozen=True, slots=True)
 class PostgresPeopleMutationPort:
     """Persist People mutations and governance evidence in one DB transaction.
@@ -539,7 +551,8 @@ class PostgresPeopleMutationPort:
                 if replayed is not None:
                     return EmploymentMutationResult(employment_record_id=replayed)
                 cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
-                _conversion_id, recorded_at = _require_one_conversion(cursor.fetchmany(2))
+                _conversion_id, _transaction_started_at = _require_one_conversion(cursor.fetchmany(2))
+                recorded_at = _post_lock_recorded_at(cursor)
                 cursor.execute(
                     _EMPLOYMENT_VERSIONS_SQL,
                     (command.tenant_record_id, command.person_record_id),
@@ -731,7 +744,7 @@ class PostgresPeopleMutationPort:
                 if replayed is not None:
                     return AssignmentMutationResult(assignment_record_id=replayed)
                 cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
-                _conversion_id, recorded_at = _require_one_conversion(cursor.fetchmany(2))
+                _conversion_id, _transaction_started_at = _require_one_conversion(cursor.fetchmany(2))
                 cursor.execute(
                     _NAMED_EMPLOYMENT_VERSIONS_SQL,
                     (command.tenant_record_id, command.employment_record_id),
@@ -748,6 +761,7 @@ class PostgresPeopleMutationPort:
                     _position_version_from_row(command.tenant_record_id, row)
                     for row in cursor.fetchall()
                 ]
+                recorded_at = _post_lock_recorded_at(cursor)
                 cursor.execute(
                     _EXISTING_ASSIGNMENTS_SQL,
                     (
