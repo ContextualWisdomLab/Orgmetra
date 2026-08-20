@@ -44,6 +44,7 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0005-exclusive-employment-and-staffable-seats.md',
   'docs/adr/0006-governed-audit-outbox-envelope.md',
   'docs/adr/0008-purpose-bound-pii-authorization.md',
+  'docs/adr/0009-performance-criterion-observation-scope.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
@@ -56,6 +57,9 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0007_outbox_retry_exhaustion.sql',
   'database/migrations/0008_audit_outbox_review_hardening.sql',
   'database/migrations/0009_candidate_worker_conversion_governance.sql',
+  'database/migrations/0010_validity_study_case_integrity.sql',
+  'database/migrations/0011_criterion_observation_scope.sql',
+  'database/migrations/0012_people_mutation_idempotency.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -73,6 +77,9 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_outbox_dead_letter_postgres.sh',
   'tests/test_audit_outbox_hardening_postgres.sh',
   'tests/test_candidate_worker_conversion_postgres.sh',
+  'tests/test_validity_study_case_postgres.sh',
+  'tests/test_criterion_observation_scope_postgres.sh',
+  'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -113,12 +120,19 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
   'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
   'outbox_event', 'outbox_delivery_record', 'outbox_delivery_escalation_record',
-  'inbox_event', 'integration_delivery'
+  'people_mutation_idempotency_record', 'inbox_event', 'integration_delivery'
+]);
+
+/** Migration-backed logical objects whose persisted table identity must not drift. */
+export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
+  'people_mutation_idempotency_record'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
 const ADR_STATUS_PATTERN = /^\|\s*\[\d{4}\]\(([^)]+)\)\s*\|.*\|\s*(Proposed|Accepted|Superseded|Rejected)\s*\|$/;
 const LOCAL_LINK_PATTERN = /\[[^\]]+\]\((?!https?:\/\/|mailto:|#)([^)]+)\)/g;
+const CREATE_TABLE_PATTERN = /\bCREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)/gi;
+const DOLLAR_QUOTE_START_PATTERN = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/;
 
 /** Recursively collect Markdown files in stable lexical order. */
 export function collectMarkdownFiles(directoryPath) {
@@ -168,6 +182,143 @@ export function validateDatabaseObjectNames(objectNames = DATABASE_OBJECT_NAMES)
   return objectNames
     .filter((objectName) => !isValidDatabaseObjectName(objectName))
     .map((objectName) => `Invalid database object name: ${objectName}`);
+}
+
+function maskedSqlCharacter(character) {
+  return character === '\n' || character === '\r' ? character : ' ';
+}
+
+/**
+ * Mask PostgreSQL comments and literal bodies while preserving code positions.
+ *
+ * Migration inventory is intentionally lexical and dependency-free, but it must
+ * never treat DDL-shaped prose as executable SQL. PostgreSQL permits nested block
+ * comments, ordinary/escape strings, quoted identifiers, and dollar-quoted
+ * bodies; masking those regions prevents false CREATE TABLE evidence while
+ * preserving actual unquoted lower-snake-case DDL for the naming contract.
+ */
+export function maskPostgresNonCode(sqlText) {
+  if (typeof sqlText !== 'string') throw new TypeError('sqlText must be a string');
+  let output = '';
+  let index = 0;
+
+  const maskThrough = (endIndex) => {
+    while (index < endIndex) {
+      output += maskedSqlCharacter(sqlText[index]);
+      index += 1;
+    }
+  };
+
+  while (index < sqlText.length) {
+    if (sqlText.startsWith('--', index)) {
+      while (index < sqlText.length && sqlText[index] !== '\n' && sqlText[index] !== '\r') {
+        output += ' ';
+        index += 1;
+      }
+      continue;
+    }
+
+    if (sqlText.startsWith('/*', index)) {
+      let depth = 0;
+      while (index < sqlText.length) {
+        if (sqlText.startsWith('/*', index)) {
+          depth += 1;
+          maskThrough(index + 2);
+          continue;
+        }
+        if (sqlText.startsWith('*/', index)) {
+          depth -= 1;
+          maskThrough(index + 2);
+          if (depth === 0) break;
+          continue;
+        }
+        output += maskedSqlCharacter(sqlText[index]);
+        index += 1;
+      }
+      continue;
+    }
+
+    if (sqlText[index] === "'" || sqlText[index] === '"') {
+      const delimiter = sqlText[index];
+      output += ' ';
+      index += 1;
+      while (index < sqlText.length) {
+        if (sqlText[index] === '\\') {
+          maskThrough(Math.min(index + 2, sqlText.length));
+          continue;
+        }
+        if (sqlText[index] === delimiter) {
+          if (sqlText[index + 1] === delimiter) {
+            maskThrough(index + 2);
+            continue;
+          }
+          output += ' ';
+          index += 1;
+          break;
+        }
+        output += maskedSqlCharacter(sqlText[index]);
+        index += 1;
+      }
+      continue;
+    }
+
+    if (sqlText[index] === '$') {
+      const delimiterMatch = sqlText.slice(index).match(DOLLAR_QUOTE_START_PATTERN);
+      if (delimiterMatch) {
+        const delimiter = delimiterMatch[0];
+        maskThrough(index + delimiter.length);
+        const closingIndex = sqlText.indexOf(delimiter, index);
+        if (closingIndex < 0) {
+          maskThrough(sqlText.length);
+          continue;
+        }
+        maskThrough(closingIndex + delimiter.length);
+        continue;
+      }
+    }
+
+    output += sqlText[index];
+    index += 1;
+  }
+  return output;
+}
+
+/** Extract created table names from executable regions of one SQL document. */
+export function extractCreatedTableNames(sqlText) {
+  CREATE_TABLE_PATTERN.lastIndex = 0;
+  const executableSql = maskPostgresNonCode(sqlText);
+  return new Set([...executableSql.matchAll(CREATE_TABLE_PATTERN)].map((match) => match[1].toLowerCase()));
+}
+
+/**
+ * Prove that migration-backed logical table identities remain present in both
+ * the canonical object inventory and the checked-in migration history.
+ */
+export function validateMigrationBackedDatabaseObjectNames(
+  rootPath,
+  objectNames = MIGRATION_BACKED_DATABASE_OBJECT_NAMES
+) {
+  const migrationDirectory = join(rootPath, 'database/migrations');
+  const inventoryNames = new Set(DATABASE_OBJECT_NAMES);
+  const createdTableNames = new Set();
+  if (existsSync(migrationDirectory)) {
+    for (const entryName of readdirSync(migrationDirectory).sort()) {
+      if (!/^\d{4}_[a-z0-9_]+\.sql$/.test(entryName)) continue;
+      const migrationText = readFileSync(join(migrationDirectory, entryName), 'utf8');
+      for (const tableName of extractCreatedTableNames(migrationText)) createdTableNames.add(tableName);
+    }
+  }
+
+  const errors = [];
+  for (const objectName of objectNames) {
+    if (!inventoryNames.has(objectName)) {
+      errors.push(`Database object inventory omitted migration-backed object: ${objectName}`);
+    }
+    if (!createdTableNames.has(objectName)) {
+      errors.push(`Migration-backed database object is missing from migrations: ${objectName}`);
+    }
+  }
+  return errors;
 }
 
 /** Extract a level-two Markdown section. */
@@ -451,6 +602,7 @@ export function validateFoundation(rootPath) {
   }
 
   errors.push(...validateDatabaseObjectNames());
+  errors.push(...validateMigrationBackedDatabaseObjectNames(resolvedRoot));
 
   const traceabilityPath = join(resolvedRoot, 'docs/TRACEABILITY.md');
   if (existsSync(traceabilityPath)) {

@@ -16,6 +16,8 @@ Selection validity also requires post-hire records. The Uniform Guidelines on Em
 
 Psychometrics Commons, fast-mlsirm, and TEPP remain specialist boundaries for assessment operations, numerical kernels, and temporal analysis artifacts. Orgmetra stores references to those artifacts. It does not reimplement their engines, and it does not let model output become an autonomous high-impact employment decision.
 
+A hiring workflow may also need to prepare reviewed evidence for an accountable human before the authoritative selection decision is recorded. That pre-decision material must not become a shadow decision store, duplicate candidate PII, or make model output authoritative merely because it was presented to a reviewer.
+
 ## Decision
 
 Orgmetra owns the authoritative record for people, employment, organization, jobs, positions, assignments, candidate-worker linkage, performance criteria, criterion observations, compensation, employment transitions, selection decisions, and validity studies.
@@ -25,6 +27,8 @@ Person, employment, organization, job, position, and assignment remain separate 
 External CWL services may provide identity, communication, assessment snapshots, ontology, document rendering, migration, or analysis artifacts through published contracts. They do not own employment truth. Keyverse remains the identity leaf. Orgmetra remains the employment-truth leaf.
 
 High-impact selection, hire, promotion, compensation, and similar decisions stay human-accountable. Orgmetra records the decision, the sealed evidence set, and later outcomes so an operator can approve, review, correct, request evidence, compare, export, or escalate. LLM output may enter only as draft evidence.
+
+Pre-decision selection-review packets are non-authoritative evidence views. They may carry only opaque resource/provenance references and governance metadata needed to identify the candidate, Job, exact sealed evidence set, accountable reviewer, purpose, reason, and evidence version. They must require an explicit human decision and must not contain candidate PII, assessment values, recommendation scores, or free-form model output. When model-backed material is referenced, its draft and provenance references travel together and remain explicitly untrusted draft evidence.
 
 ## Consequences
 
@@ -46,3 +50,4 @@ International Organization for Standardization. (2022). *ISO 30400:2022 Human re
 International Organization for Standardization. (2025). *ISO 30414:2025 Human resource management — Requirements and recommendations for human capital reporting and disclosure*. ISO. https://www.iso.org/standard/30414
 
 Society for Industrial and Organizational Psychology. (2018). *Principles for the validation and use of personnel selection procedures* (5th ed.). SIOP. https://doi.org/10.1017/iop.2018.195
+- Human-review packets cannot finalize hiring, promotion, termination, compensation, or another high-impact employment action; final authority remains the governed Orgmetra decision mutation and immutable audit boundary.

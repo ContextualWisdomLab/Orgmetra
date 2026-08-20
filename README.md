@@ -78,4 +78,4 @@ Job evidence
 
 ## Status
 
-Foundation plus the employment-truth kernel through exclusive jobs, staffable seats, and hire-to-assignment commands. The protected default branch still contains only bootstrap; review `orgmetra_hris_kernel` reconstructions, correct overlapping versions, and keep current-head gates green before treating this as shipped behavior.
+Protected `develop` includes the employment-truth kernel, governed candidate-to-worker conversion, purpose-bound PII authorization, normalized worker-bound validity studies, criterion-observation scope, bitemporal workforce-composition evidence, the governed Naruon intent adapter, and requisition review packets. This active PR adds durable purpose-bound People mutation and confirmed-hire materialization paths for Employment, Position, and Assignment with atomic audit/outbox evidence and tenant-scoped idempotency; treat those write paths as active-PR truth until this exact head passes all fresh protected-base gates and merges.

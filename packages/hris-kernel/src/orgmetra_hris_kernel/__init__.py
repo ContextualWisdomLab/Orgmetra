@@ -1,8 +1,9 @@
-"""Tenant-scoped bitemporal HRIS, governed audit, and job-analysis kernel.
+"""Tenant-scoped bitemporal HRIS, governed audit, job-analysis, and workforce kernel.
 
-Use these contracts to reconstruct, correct, reject, or emit governed HRIS and
-job-analysis evidence inside an explicit tenant boundary before persistence.
-Persistence, authorization, and UI stay outside this package.
+Use these contracts to reconstruct, correct, reject, emit governed evidence, or
+build PII-minimized descriptive workforce snapshots inside an explicit tenant
+boundary before persistence. Persistence, authorization, and UI stay outside
+this package.
 """
 
 from orgmetra_hris_kernel.assignment import (
@@ -45,6 +46,10 @@ from orgmetra_hris_kernel.job_analysis import (
 )
 from orgmetra_hris_kernel.organization import validate_organization_hierarchy
 from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts, resolve_single_valued_fact
+from orgmetra_hris_kernel.workforce import (
+    WorkforceCompositionSnapshot,
+    build_workforce_composition_snapshot,
+)
 
 __all__ = [
     "AssignmentFact",
@@ -71,6 +76,8 @@ __all__ = [
     "SingleValuedFactError",
     "TaskEvidence",
     "TaskKSAOLink",
+    "WorkforceCompositionSnapshot",
+    "build_workforce_composition_snapshot",
     "close_recorded_interval",
     "resolve_bitemporal_facts",
     "resolve_single_valued_fact",

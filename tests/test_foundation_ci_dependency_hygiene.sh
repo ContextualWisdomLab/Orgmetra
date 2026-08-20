@@ -7,6 +7,7 @@ requirements_path="${repository_root}/.github/requirements/foundation-test.txt"
 
 expected_install="python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt"
 expected_pythonpath="PYTHONPATH: packages/hris-kernel/src:packages/keyverse-adapter/src"
+expected_default_pr_target=$'  pull_request:\n    branches:\n      - develop\n'
 
 if ! grep -Fq -- "${expected_install}" "${workflow_path}"; then
   printf 'Foundation CI must install only the hash-locked test toolchain.\n' >&2
@@ -20,6 +21,35 @@ fi
 
 if ! grep -Fq -- "${expected_pythonpath}" "${workflow_path}"; then
   printf 'Foundation CI must import repository-local packages directly from their src trees.\n' >&2
+  exit 1
+fi
+
+if ! grep -Fq -- "${expected_default_pr_target}" "${workflow_path}"; then
+  printf 'Foundation CI must run for pull requests targeting the repository default branch develop.\n' >&2
+  exit 1
+fi
+
+mapfile -t pull_request_branches < <(
+  awk '
+    /^  pull_request:/ { in_pull_request=1; next }
+    in_pull_request && /^  [[:alnum:]_-]+:/ { exit }
+    in_pull_request && /^      - / {
+      sub(/^      - /, "")
+      print
+    }
+  ' "${workflow_path}"
+)
+
+if [[ "${#pull_request_branches[@]}" -eq 0 ]]; then
+  printf 'Foundation CI must declare pull_request target branches.\n' >&2
+  exit 1
+fi
+
+duplicate_pull_request_branches="$(
+  printf '%s\n' "${pull_request_branches[@]}" | sort | uniq -d
+)"
+if [[ -n "${duplicate_pull_request_branches}" ]]; then
+  printf 'Foundation CI pull_request branches must be unique: %s\n' "${duplicate_pull_request_branches}" >&2
   exit 1
 fi
 
