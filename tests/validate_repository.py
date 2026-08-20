@@ -110,7 +110,7 @@ def _line_count(data: bytes) -> int:
 
 
 def _expected_manifest_document() -> dict[str, Any]:
-    """Build deterministic provenance for the exact active branch artifact set."""
+    """Build deterministic integrity metadata for the canonical protected branch artifact set."""
     files = []
     for relative_path in sorted(set(REQUIRED) - {"manifest.json"}):
         path = ROOT / relative_path
@@ -128,22 +128,34 @@ def _expected_manifest_document() -> dict[str, Any]:
     return {
         "package": "orgmetra-foundation-pack",
         "version": "0.1.0",
-        "generated_for_branch": "develop",
+        "canonical_protected_branch": "develop",
         "files": files,
     }
 
 
 def _manifest_entries() -> dict[str, dict[str, Any]]:
-    """Parse unique, relative manifest entries and reject self-reference."""
+    """Parse exact canonical manifest metadata plus unique safe file entries."""
     try:
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         _fail(f"manifest.json is not readable JSON: {error}")
 
+    expected_metadata = {
+        "package": "orgmetra-foundation-pack",
+        "version": "0.1.0",
+        "canonical_protected_branch": "develop",
+    }
+    expected_keys = frozenset((*expected_metadata, "files"))
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         _fail("manifest.json must contain a files array")
-    if manifest.get("generated_for_branch") != "develop":
-        _fail("manifest generated_for_branch must identify protected develop")
+    if frozenset(manifest) != expected_keys:
+        _fail(
+            "manifest top-level metadata must contain only package, version, "
+            "canonical_protected_branch, and files"
+        )
+    for field_name, expected_value in expected_metadata.items():
+        if manifest.get(field_name) != expected_value:
+            _fail(f"manifest {field_name} must equal {expected_value!r}")
 
     entries: dict[str, dict[str, Any]] = {}
     for raw_entry in manifest["files"]:
