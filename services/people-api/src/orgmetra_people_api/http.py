@@ -39,6 +39,8 @@ _REQUIRED_QUERY_KEYS = frozenset({"effective_on", "purpose", "fields"})
 _MAX_REQUEST_PATH_CHARACTERS = 256
 _MAX_QUERY_STRING_BYTES = 4096
 _MAX_QUERY_FIELDS = len(_REQUIRED_QUERY_KEYS) + 1
+_MAX_REQUEST_HEADERS = 64
+_MAX_REQUEST_HEADER_BYTES = 16384
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 
 
@@ -302,10 +304,12 @@ def _parse_worker_request(path: str, raw_query: object) -> _ParsedWorkerRequest:
 
 
 def _authorization_header(scope: Mapping[str, object]) -> str | None:
-    """Return one ASCII Authorization header, rejecting duplicates and bad bytes."""
+    """Return one bounded ASCII Authorization header, rejecting malformed input."""
     raw_headers = scope.get("headers", ())
     if not isinstance(raw_headers, Sequence):
         raise AuthenticationFailed("request headers are invalid")
+    if len(raw_headers) > _MAX_REQUEST_HEADERS:
+        raise AuthenticationFailed("request headers exceed the accepted count")
     authorization_values: list[bytes] = []
     for header in raw_headers:
         if not isinstance(header, Sequence) or len(header) != 2:
@@ -313,6 +317,8 @@ def _authorization_header(scope: Mapping[str, object]) -> str | None:
         name, value = header
         if not isinstance(name, bytes) or not isinstance(value, bytes):
             raise AuthenticationFailed("request headers are invalid")
+        if len(name) + len(value) > _MAX_REQUEST_HEADER_BYTES:
+            raise AuthenticationFailed("request header exceeds the accepted size")
         if name.lower() == b"authorization":
             authorization_values.append(value)
     if len(authorization_values) != 1:
