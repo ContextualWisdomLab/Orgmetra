@@ -95,3 +95,14 @@ class ReadPurposeHeaderTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual((status, payload["error"]), (400, "invalid_request"))
+
+    async def test_read_route_rejects_query_parameters_even_with_valid_purpose_header(self) -> None:
+        status, payload = await self._get(
+            headers=[
+                (b"authorization", b"Bearer opaque-token"),
+                (b"x-purpose-code", b"job_analysis_read"),
+            ],
+            query_string=b"purpose=job_analysis_read",
+        )
+
+        self.assertEqual((status, payload["error"]), (400, "invalid_request"))
