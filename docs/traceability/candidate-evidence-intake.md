@@ -6,9 +6,9 @@
 
 | Requirement | Evidence |
 |---|---|
-| Correlate candidate evidence to the correct recruiting context | Canonical tenant plus UUID-backed candidate-profile, requisition and Job references; immutable next action requires every packet reference to be re-resolved within the exact tenant and candidate↔requisition↔Job correlation verified before sealing/review |
+| Correlate candidate evidence to the correct recruiting context | Canonical tenant plus UUIDv4-backed candidate-profile, requisition and Job references; immutable next action requires every packet reference to be re-resolved within the exact tenant and candidate↔requisition↔Job correlation verified before sealing/review |
 | Prevent cross-tenant evidence mixing | `test_tenant_scope.py` requires tenant-scoped resolution of every packet reference before correlation/provenance checks and authoritative sealing; UUID syntax alone is not tenant authority |
-| Prevent reference fields from becoming a covert PII/value channel | Every governed reference requires its expected namespace plus a canonical non-sentinel UUID suffix; human-readable/value-bearing suffixes are rejected |
+| Prevent reference fields from becoming a covert PII/value/correlation channel | Every governed reference requires its expected namespace plus a canonical non-sentinel UUIDv4 suffix; human-readable/value-bearing suffixes, UUIDv1 timestamp/node metadata, and other UUID versions are rejected; `test_reference_privacy.py` covers every trust-reference field through builder and replacement paths |
 | Preserve job-related evidence context | Versioned job-requirements reference + SHA-256 digest |
 | Preserve evidence identity and source provenance without copying values | Evidence-set and source-provenance references + independent SHA-256 digests |
 | Bind privacy/operational handling | Handling-policy and retention-policy references + independent SHA-256 digests |
@@ -20,4 +20,4 @@
 | Minimize candidate content exposure | No candidate name/email/demographic attribute/assessment value/raw evidence/credential/free-form model output in the packet |
 | Keep service ownership boundaries intact | No database migration, no provider execution, no cross-service application-table SQL |
 
-The packet is correlation evidence, not proof of evidence truth, tenant ownership until authoritative resolution, lawful use, selection validity, fairness, policy execution, evidence sealing, or a final employment decision. Those claims require their own owner-bound evidence.
+The packet is correlation evidence, not proof of evidence truth, tenant ownership until authoritative resolution, lawful use, selection validity, fairness, policy execution, evidence sealing, or a final employment decision. UUIDv4 is an opacity/privacy constraint only; those claims require their own owner-bound evidence.
