@@ -265,6 +265,8 @@ class AssignmentMutationCommand:
             raise ValueError("effective_from must be a business date.")
         if not isinstance(self.allocation_ratio, Decimal):
             raise ValueError("allocation_ratio must be a Decimal.")
+        if not self.allocation_ratio.is_finite():
+            raise ValueError("allocation_ratio must be finite.")
         if self.allocation_ratio <= Decimal("0") or self.allocation_ratio > Decimal("1.0000"):
             raise ValueError("allocation_ratio must be greater than 0 and at most 1.0000.")
         if self.allocation_ratio.as_tuple().exponent < -4:
