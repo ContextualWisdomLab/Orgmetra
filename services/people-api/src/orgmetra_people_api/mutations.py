@@ -73,6 +73,12 @@ def validate_idempotency_key(value: object) -> str:
     return value
 
 
+def _canonical_allocation_ratio(value: Decimal) -> str:
+    """Return the context-independent numeric(5,4) spelling used by persistence."""
+    whole, _separator, fraction = format(value, "f").partition(".")
+    return f"{whole}.{fraction:0<4}"
+
+
 def command_route(
     command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
 ) -> str:
@@ -134,7 +140,7 @@ def mutation_command_digest(
     elif isinstance(command, AssignmentMutationCommand):
         route = "assignment-records"
         semantic_command = {
-            "allocation_ratio": format(command.allocation_ratio.quantize(Decimal("0.0001")), "f"),
+            "allocation_ratio": _canonical_allocation_ratio(command.allocation_ratio),
             "confirmation_reference": command.confirmation_reference,
             "effective_from": command.effective_from.isoformat(),
             "employment_record_id": str(command.employment_record_id),
