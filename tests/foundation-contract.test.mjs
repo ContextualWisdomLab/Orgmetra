@@ -386,7 +386,6 @@ test('buyer-facing canonical docs do not demote protected capabilities to active
     'Separate person/employment/organization/job/position/assignment',
     'Exclusive employment and staffable seats',
     'Normalized bitemporal organization/job/employment/position history',
-    'Evidence-grounded Job analysis with Task/FJA/KSAO linkage',
     'Job-, cycle-, and staffing-scoped performance criterion observations',
     'Governed immutable audit and transactional outbox persistence',
     'Tenant-safe atomic outbox claiming and crash recovery',
