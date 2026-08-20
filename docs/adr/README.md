@@ -15,3 +15,4 @@
 | [0011](0011-bitemporal-workforce-composition.md) | Workforce composition is a bitemporal aggregate evidence boundary | Accepted |
 | [0012](0012-governed-migration-handoff.md) | Governed HRIS migration uses a value-free handoff envelope | Accepted |
 | [0013](0013-governed-requisition-review-packet.md) | Governed requisition review packet | Accepted |
+| [0014](0014-job-analysis-snapshot-persistence.md) | Persist governed job-analysis snapshots | Accepted on protected `develop` |
