@@ -10,6 +10,7 @@ import pytest
 from orgmetra_selection_monitoring import build_selection_outcome_monitoring_plan
 
 UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+UUID7_TENANT = "10000000-0000-7000-8000-000000000001"
 
 
 def _build(**overrides):
@@ -41,13 +42,13 @@ def _build(**overrides):
     return build_selection_outcome_monitoring_plan(**values)
 
 
-def test_uuid1_tenant_identity_is_rejected_by_builder_and_replace() -> None:
-    """UUIDv1 timestamp/node metadata must not enter the public tenant identity."""
-    with pytest.raises(ValueError, match="tenant_record_id"):
-        _build(tenant_record_id=UUID1_ID)
+def test_authoritative_uuid7_tenant_identity_is_accepted_by_builder_and_replace() -> None:
+    """The monitoring leaf must accept tenant UUIDs already valid in authoritative core."""
+    packet = _build(tenant_record_id=UUID7_TENANT)
+    replaced = replace(_build(), tenant_record_id=UUID7_TENANT)
 
-    with pytest.raises(ValueError, match="tenant_record_id"):
-        replace(_build(), tenant_record_id=UUID1_ID)
+    assert packet.tenant_record_id == UUID7_TENANT
+    assert replaced.tenant_record_id == UUID7_TENANT
 
 
 @pytest.mark.parametrize(
