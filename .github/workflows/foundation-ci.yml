@@ -50,6 +50,10 @@ jobs:
         run: python -m compileall -q tests
       - name: Validate foundation pack
         run: npm run validate
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Build Storybook
+        run: npm run build-storybook
       - name: Prove Foundation CI dependency hygiene
         run: bash tests/test_foundation_ci_dependency_hygiene.sh
       - name: Prove HRIS kernel
