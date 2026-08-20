@@ -1,4 +1,4 @@
-"""Regression coverage for UUIDv4-only structured-interview trust references."""
+"""Regression coverage for tenant interoperability and UUIDv4 trust references."""
 
 from datetime import datetime, timezone
 
@@ -7,6 +7,7 @@ import pytest
 from orgmetra_interview_plan import build_structured_interview_plan
 
 _UUID1 = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+_UUID7_TENANT = "10000000-0000-7000-8000-000000000001"
 
 
 def _plan_kwargs() -> dict[str, object]:
@@ -37,12 +38,14 @@ def _plan_kwargs() -> dict[str, object]:
     }
 
 
-def test_uuid1_tenant_identity_fails_closed() -> None:
-    """Reject UUIDv1 timestamp/node metadata in the public tenant identity."""
+def test_authoritative_uuid7_tenant_identity_is_accepted() -> None:
+    """Accept the canonical UUIDv7 tenant identity already valid in Orgmetra core."""
     data = _plan_kwargs()
-    data["tenant_record_id"] = _UUID1
-    with pytest.raises(ValueError, match="tenant_record_id"):
-        build_structured_interview_plan(**data)
+    data["tenant_record_id"] = _UUID7_TENANT
+
+    plan = build_structured_interview_plan(**data)
+
+    assert plan.tenant_record_id == _UUID7_TENANT
 
 
 @pytest.mark.parametrize(
