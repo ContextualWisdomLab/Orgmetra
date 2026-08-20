@@ -37,7 +37,7 @@ _FIELD_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _MAX_UUID_INT = (1 << 128) - 1
 _REQUIRED_QUERY_KEYS = frozenset({"effective_on", "purpose", "fields"})
 _MAX_QUERY_STRING_BYTES = 4096
-_MAX_QUERY_FIELDS = len(_REQUIRED_QUERY_KEYS)
+_MAX_QUERY_FIELDS = len(_REQUIRED_QUERY_KEYS) + 1
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 
 
