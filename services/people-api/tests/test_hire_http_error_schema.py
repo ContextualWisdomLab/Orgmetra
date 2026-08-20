@@ -95,4 +95,8 @@ class HireHttpErrorSchemaTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(record.error_code, payload["error_code"])
         self.assertEqual(record.http_status, 404)
         self.assertEqual(record.support_reference, payload["support_reference"])
-        self.assertNotIn(str(_TENANT), record.getMessage())
+        self.assertNotIn(str(_TENANT), " ".join(captured.output))
+        self.assertNotIn(
+            str(_TENANT),
+            " ".join(str(value) for value in vars(record).values()),
+        )
