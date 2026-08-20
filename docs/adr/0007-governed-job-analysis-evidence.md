@@ -1,6 +1,6 @@
 # ADR 0007: Governed job-analysis evidence snapshots
 
-- Status: Accepted
+- Status: Accepted on stacked implementation branch
 - Date: 2026-08-17
 - Owners: Orgmetra Job Analysis / Workforce Validation
 
@@ -44,7 +44,7 @@ This contract does not make hiring, promotion, termination, compensation, or oth
 
 ### Costs and limitations
 
-- This slice is a pure domain/evidence contract; persistence, SME workflow, source ingestion, authorization, retention/export controls, UI, and selection-validity computation remain separate owner boundaries.
+- Persistence of the canonical snapshot as tenant-scoped 3NF rows is specified by ADR 0014. SME workflow, source ingestion, retention/export controls, UI, and selection-validity computation remain separate owner boundaries.
 - The 1–5 rating scales are contract-level normalized ordinals. A production job-analysis method must document its sampling, anchors, aggregation, criticality rules, inter-rater treatment, and local validation rationale rather than infer those properties from the ordinal values alone.
 - O*NET provides occupation-level evidence and does not eliminate the need to verify local Job content, context, and essential requirements with appropriate job experts.
 
