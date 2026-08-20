@@ -8,6 +8,7 @@ on:
       - main
     paths:
       - "services/people-api/**"
+      - "packages/hris-kernel/**"
       - "packages/keyverse-adapter/**"
       - ".github/requirements/foundation-test.txt"
       - ".github/workflows/people-api-quality.yml"
@@ -45,10 +46,10 @@ jobs:
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
       - name: Compile People API boundary
-        run: python -m compileall -q services/people-api/src packages/keyverse-adapter/src services/people-api/tests
+        run: python -m compileall -q services/people-api/src packages/hris-kernel/src packages/keyverse-adapter/src services/people-api/tests
       - name: Test governed People contracts with exact statement and branch coverage
         env:
-          PYTHONPATH: services/people-api/src:packages/keyverse-adapter/src
+          PYTHONPATH: services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src
           COVERAGE_FILE: /tmp/orgmetra-people-api.coverage
         run: python -m pytest -c services/people-api/pyproject.toml services/people-api/tests
       - name: Require clean checkout
