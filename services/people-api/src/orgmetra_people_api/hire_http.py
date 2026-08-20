@@ -425,7 +425,7 @@ async def _read_json_object(receive: AsgiReceive) -> dict[str, object]:
         raise _InvalidHttpRequest("request body is empty")
     try:
         payload = json.loads(bytes(body), object_pairs_hook=_reject_duplicate_keys)
-    except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as error:
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, TypeError, ValueError) as error:
         raise _InvalidHttpRequest("request body must be one JSON object") from error
     if not isinstance(payload, dict):
         raise _InvalidHttpRequest("request body must be one JSON object")
