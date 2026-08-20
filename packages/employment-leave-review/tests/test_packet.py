@@ -27,6 +27,7 @@ U = {
     "retention": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
 }
 D = "a" * 64
+UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 
 
 def args() -> dict[str, object]:
@@ -114,6 +115,37 @@ def test_reference_guards_reject_wrong_namespace_and_non_uuid(field: str, prefix
         replace(p, **{field: f"{prefix}:00000000-0000-0000-0000-000000000000"})
     with pytest.raises(ValueError):
         replace(p, **{field: 3})
+
+
+@pytest.mark.parametrize(
+    ("field", "prefix"),
+    [
+        ("leave_review_reference", "employment_leave_review"),
+        ("person_record_reference", "person_record"),
+        ("employment_record_reference", "employment_record"),
+        ("active_assignment_snapshot_reference", "active_assignment_snapshot"),
+        ("leave_case_reference", "leave_case"),
+        ("leave_policy_reference", "leave_policy"),
+        ("work_continuity_plan_reference", "work_continuity_plan"),
+        ("benefits_continuity_plan_reference", "benefits_continuity_plan"),
+        ("return_to_work_plan_reference", "return_to_work_plan"),
+        ("handling_policy_reference", "personal_data_handling_policy"),
+        ("retention_policy_reference", "retention_policy"),
+        ("requester_reference", "actor"),
+        ("reviewer_reference", "actor"),
+    ],
+)
+def test_reference_guards_reject_uuid1_through_builder_and_replace(
+    field: str,
+    prefix: str,
+) -> None:
+    value = f"{prefix}:{UUID1_ID}"
+    builder_args = args()
+    builder_args[field] = value
+    with pytest.raises(ValueError, match=field):
+        build_employment_leave_review_packet(**builder_args)
+    with pytest.raises(ValueError, match=field):
+        replace(packet(), **{field: value})
 
 
 @pytest.mark.parametrize(
