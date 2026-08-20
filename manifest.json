@@ -209,9 +209,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "732682f1c3a459a1903b1c8b473070f8dc3f306fdc32aa0deda36f218e0d0281",
-      "bytes": 11347,
-      "lines": 41
+      "sha256": "c3e9e94816069a90eac7677b13cd6961e19c2a088c76c560638edca0c78ec857",
+      "bytes": 11761,
+      "lines": 42
     },
     {
       "path": "docs/TRD.md",
@@ -305,9 +305,9 @@
     },
     {
       "path": "docs/product-technical-gap-baseline.md",
-      "sha256": "d4901696b3e687ff1cb9c44c6947bb12ea10e573ceeaac09be8f4f512068e344",
-      "bytes": 18954,
-      "lines": 147
+      "sha256": "d44b4e7fb383da1e498c0cabc99ac5e07a107f772bd2df632827be6914f8f47d",
+      "bytes": 19347,
+      "lines": 148
     },
     {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",

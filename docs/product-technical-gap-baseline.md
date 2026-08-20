@@ -74,7 +74,7 @@ checked, and merged independently before P0-1 can change maturity.
 
 | ID | Priority and owner | Gap and smallest acceptable closure evidence | Dependency |
 |---|---|---|---|
-| P0-1 | Product / Web | Ship one Employee Profile + HR Home vertical slice backed by the protected People API, using existing tokens and Figma source. Prove keyboard/focus/permission/confirmation states, exact-value tables, i18n, and browser E2E. | Protected People API evidence |
+| P0-1 | Product / Web | Review and merge the active HR Home + Employee Profile fixture, then connect it to the protected People API and prove keyboard/focus/permission/confirmation states, exact-value tables, i18n, and browser E2E. | Protected People API evidence |
 | P0-2 | Job Architecture | Merge and verify PR #38 as one persisted Job Analysis case: one migration owner, one ADR, versioned source evidence, SME approval, retrieval API, and protected PostgreSQL acceptance test. | Protected People API evidence |
 | P0-3 | Workforce Validation / scientific owner | Add a Rust-first estimator boundary or a versioned adapter to `fast-mlsirm`/TEPP. Publish true-parameter recovery, bias, MAE, RMSE, coverage, convergence, temporal, multilevel, multiple-membership, CPU reference, and material GPU parity evidence. | P0-2 and external contract re-resolution |
 | P0-4 | Release / Platform | Produce a deployable release with version, changelog, migration inventory, rollback/recovery evidence, support runbook, and exact commit provenance. | P0-1 through P0-3 |
@@ -89,6 +89,7 @@ The following is the current GitHub inventory checked on 2026-08-20. All listed 
 
 | PR | Head branch / exact head | Scope | Current state | Next action |
 |---:|---|---|---|---|
+| 53 | `codex/product-gap-baseline-workspace` / see live PR #53 for current exact head | HR Home + Employee Profile fixture and baseline repair | Draft; current base is protected `39d3c15`; seven exact-head runs queued; no independent approval | Review the fixture/API boundary, wait for every current-head check, obtain independent approval, then decide whether to merge as a local product-surface slice. |
 | 38 | `cursor/job-analysis-snapshot-5eef` / `21949fba6671e24fae2f719ea53cda0e363e8874` | Canonical Job Analysis persistence/API | Draft; mergeable; base is current `39d3c15`; seven exact-head runs queued; two unresolved threads are outdated | Wait for terminal exact-head checks, then obtain independent approval; no predecessor evidence transfers. |
 | 41 | `feat/candidate-evidence-intake` / `b64c4118905861ca8bf8b220764a411e5e92e5f7` | Candidate evidence intake | Ready; mergeable; base is stale `ebad8c1`; all sampled checks green; no qualifying approval | Rebase or close after comparing with current protected contracts; do not merge predecessor-base evidence. |
 | 48 | `feat/governed-compensation-change-review` / `e57369fefda046acb2bf2df108316c1b303f99af` | Compensation review packet | Ready; not mergeable; stale base `ebad8c1`; all sampled checks green | Rebase on current develop, reacquire exact-head checks, then obtain independent approval. |
