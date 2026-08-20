@@ -41,6 +41,15 @@ def _build(**overrides):
     return build_selection_outcome_monitoring_plan(**values)
 
 
+def test_uuid1_tenant_identity_is_rejected_by_builder_and_replace() -> None:
+    """UUIDv1 timestamp/node metadata must not enter the public tenant identity."""
+    with pytest.raises(ValueError, match="tenant_record_id"):
+        _build(tenant_record_id=UUID1_ID)
+
+    with pytest.raises(ValueError, match="tenant_record_id"):
+        replace(_build(), tenant_record_id=UUID1_ID)
+
+
 @pytest.mark.parametrize(
     ("field_name", "value", "message"),
     [
