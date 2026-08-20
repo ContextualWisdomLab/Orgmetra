@@ -207,8 +207,10 @@ class JobAnalysisHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             app,
             method="GET",
             path=f"/v1/tenants/{TENANT}/job-analysis-snapshots/{ANALYSIS}",
-            query=b"purpose=job_analysis_read",
-            headers=[(b"authorization", b"Bearer opaque-token")],
+            headers=[
+                (b"authorization", b"Bearer opaque-token"),
+                (b"x-purpose-code", b"job_analysis_read"),
+            ],
         )
         self.assertEqual(status, 200)
         self.assertEqual(fetched, clinical_psychologist_document())
@@ -228,9 +230,9 @@ class JobAnalysisHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         cases = (
             {"path": "/v1/tenants/not-a-uuid/job-analysis-snapshots"},
             {"path": f"/v1/tenants/{UUID(int=0)}/job-analysis-snapshots"},
-            {"method": "GET", "path": f"/v1/tenants/{TENANT}/job-analysis-snapshots/{UUID(int=(1 << 128) - 1)}", "query": b"purpose=job_analysis_read"},
+            {"method": "GET", "path": f"/v1/tenants/{TENANT}/job-analysis-snapshots/{UUID(int=(1 << 128) - 1)}"},
             {"path": f"/v1/tenants/{TENANT}/job-analysis-snapshots/{ANALYSIS}"},
-            {"method": "GET", "path": f"/v1/tenants/{TENANT}/job-analysis-snapshots", "query": b"purpose=job_analysis_read"},
+            {"method": "GET", "path": f"/v1/tenants/{TENANT}/job-analysis-snapshots"},
         )
         for case in cases:
             with self.subTest(case=case):
@@ -324,8 +326,10 @@ class JobAnalysisHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             self._app(read_port=FakeReadPort(None)),
             method="GET",
             path=f"/v1/tenants/{TENANT}/job-analysis-snapshots/{ANALYSIS}",
-            query=b"purpose=job_analysis_read",
-            headers=[(b"authorization", b"Bearer opaque-token")],
+            headers=[
+                (b"authorization", b"Bearer opaque-token"),
+                (b"x-purpose-code", b"job_analysis_read"),
+            ],
         )
         self.assertEqual((status, payload["error"]), (404, "snapshot_not_found"))
 
@@ -333,8 +337,10 @@ class JobAnalysisHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             self._app(),
             method="GET",
             path=f"/v1/tenants/{TENANT}/job-analysis-snapshots/{ANALYSIS}",
-            query=b"purpose=people_read",
-            headers=[(b"authorization", b"Bearer opaque-token")],
+            headers=[
+                (b"authorization", b"Bearer opaque-token"),
+                (b"x-purpose-code", b"people_read"),
+            ],
         )
         self.assertEqual((status, payload["error"]), (403, "access_denied"))
 
@@ -344,7 +350,10 @@ class JobAnalysisHttpRouteTests(unittest.IsolatedAsyncioTestCase):
                 method="GET",
                 path=f"/v1/tenants/{TENANT}/job-analysis-snapshots/{ANALYSIS}",
                 query=query,
-                headers=[(b"authorization", b"Bearer opaque-token")],
+                headers=[
+                    (b"authorization", b"Bearer opaque-token"),
+                    (b"x-purpose-code", b"job_analysis_read"),
+                ],
             )
             self.assertEqual((status, payload["error"]), (400, "invalid_request"))
 
@@ -352,8 +361,10 @@ class JobAnalysisHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             self._app(),
             method="GET",
             path=f"/v1/tenants/{TENANT}/job-analysis-snapshots/{ANALYSIS}",
-            query=b"purpose=JobAnalysis",
-            headers=[(b"authorization", b"Bearer opaque-token")],
+            headers=[
+                (b"authorization", b"Bearer opaque-token"),
+                (b"x-purpose-code", b"JobAnalysis"),
+            ],
         )
         self.assertEqual((status, payload["error"]), (400, "invalid_request"))
 
