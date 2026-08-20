@@ -84,6 +84,8 @@ def test_governance_evidence_is_value_minimized_and_actionable() -> None:
     assert evidence["tenant_record_id"] == packet.tenant_record_id
     assert evidence["validation_study_reference"] == packet.validation_study_reference
     assert evidence["requested_by_actor_reference"] == packet.requested_by_actor_reference
+    assert evidence["tepp_workspace_id"] == packet.tepp_workspace_id
+    assert evidence["tepp_snapshot_id"] == packet.tepp_snapshot_id
     assert evidence["snapshot_digest"] == "a" * 64
     assert evidence["generated_at"] == "2026-08-20T07:50:01.123456Z"
     assert evidence["tepp_contract_version"] == 1
@@ -143,6 +145,8 @@ def test_local_authority_and_evidence_identifiers_fail_closed(field_name: str, v
         ("tepp_workspace_id", "", "bounded opaque"),
         ("tepp_workspace_id", "a" * 257, "bounded opaque"),
         ("tepp_workspace_id", "workspace with space", "visible ASCII"),
+        ("tepp_workspace_id", "sk-secret-looking-token", "credential-shaped"),
+        ("tepp_snapshot_id", "github_pat_secretlooking", "credential-shaped"),
         ("tepp_workspace_id", 7, "bounded opaque"),
         ("tepp_snapshot_id", "snapshot\nvalue", "visible ASCII"),
         ("idempotency_key", "short", "16 through 128"),
