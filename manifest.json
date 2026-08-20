@@ -41,9 +41,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3e175e662a9052837fa75a524ca00ab8aeb7a624f6255420f4b2f2cb6156b8e4",
-      "bytes": 17092,
-      "lines": 78
+      "sha256": "19fdfe972e27b94f8c43b4ddaf3f1878c699218117015f0186798f6bcd0c47c8",
+      "bytes": 17677,
+      "lines": 80
     },
     {
       "path": "CLAUDE.md",
@@ -257,33 +257,33 @@
     },
     {
       "path": "docs/adr/0001-orgmetra-authoritative-hris-record.md",
-      "sha256": "d6e6c51bef662ce456b5ceef9854ad2fc6292edda7e7626c981301f56af92028",
-      "bytes": 1995,
-      "lines": 24
+      "sha256": "0f8055b73c63d3130321415ad53233588ff952aabd1a88952b39c71747253572",
+      "bytes": 6108,
+      "lines": 53
     },
     {
       "path": "docs/adr/0002-federated-cwl-integration-boundaries.md",
-      "sha256": "5886a5ac960273e2c99dadce6dfab04a33d19693ebff52152d0adb04e8f90b61",
-      "bytes": 724,
-      "lines": 20
+      "sha256": "b77165f2aacfa6f4fde994baf77d5879c6da3e8dae4fd2db0ed912d60ae9b3b2",
+      "bytes": 4072,
+      "lines": 44
     },
     {
       "path": "docs/adr/0003-bitemporal-hris-data-contract.md",
-      "sha256": "9e3653c7eab86996ea6b53cc7e34dc562ce9dfd1dadc5c5f4260c8cadb691c1d",
-      "bytes": 1877,
-      "lines": 28
+      "sha256": "d7f2660616622c1a7994b28aa66d99d13836bcf755735595f9609a41282ab799",
+      "bytes": 4453,
+      "lines": 47
     },
     {
       "path": "docs/adr/0004-employment-position-version-and-assignment-binding.md",
-      "sha256": "455f5a1cca6c96d2cfd0cf63a95c5ac30ab449efeb068a45223ad5a77c86d05f",
-      "bytes": 1688,
-      "lines": 26
+      "sha256": "fee89e700414abe0b1cffec2acc687e5e014634db8f5ef9e8a92abba5c3cf182",
+      "bytes": 1872,
+      "lines": 30
     },
     {
       "path": "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
-      "sha256": "a01ade272ecc05666e6319d9597006f0a5282696ec0c1380e867023770d98fe9",
-      "bytes": 1895,
-      "lines": 30
+      "sha256": "10f0eb409f4fa32d2c5bed2d583d8b43be8e61b5cbef0e927e5bebb5f5c8f85b",
+      "bytes": 2091,
+      "lines": 34
     },
     {
       "path": "docs/adr/0006-governed-audit-outbox-envelope.md",
