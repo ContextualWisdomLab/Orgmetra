@@ -37,6 +37,14 @@ def _plan_kwargs() -> dict[str, object]:
     }
 
 
+def test_uuid1_tenant_identity_fails_closed() -> None:
+    """Reject UUIDv1 timestamp/node metadata in the public tenant identity."""
+    data = _plan_kwargs()
+    data["tenant_record_id"] = _UUID1
+    with pytest.raises(ValueError, match="tenant_record_id"):
+        build_structured_interview_plan(**data)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
