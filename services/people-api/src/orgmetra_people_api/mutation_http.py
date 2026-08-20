@@ -245,6 +245,27 @@ class PeopleMutationAsgiApp:
                 extra_headers=((b"www-authenticate", b"Bearer"),),
             )
             return
+        except Exception as error:  # noqa: BLE001 - identity backend failures must remain client-safe.
+            support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+            _LOGGER.error(
+                "People mutation authentication failed",
+                extra={
+                    "route": route,
+                    "tenant_record_id": str(headers.tenant_record_id),
+                    "exception_type": type(error).__name__,
+                    "support_reference": support_reference,
+                },
+            )
+            await _send_error(
+                send,
+                status=500,
+                payload={
+                    "error": "internal_error",
+                    "message": "Retry later or contact an Orgmetra operator with non-sensitive request metadata; never include the bearer token.",
+                },
+                support_reference=support_reference,
+            )
+            return
 
         if (
             principal.tenant_record_id != headers.tenant_record_id
