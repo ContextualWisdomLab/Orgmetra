@@ -40,6 +40,7 @@ erDiagram
     decision_evidence_set ||--o{ validity_study_evidence_set_link : supplies_evidence
     person_record ||--o{ compensation_record : has
     employment_record ||--o{ employment_transition : changes_through
+    tenant_record ||--o{ people_mutation_idempotency_record : scopes
     audit_event_record ||--o{ outbox_delivery_record : delivers_through
     outbox_delivery_record ||--o| outbox_delivery_escalation_record : terminally_escalates
 ```
@@ -59,6 +60,8 @@ A high-impact selection decision seals exactly one versioned `decision_evidence_
 A `validity_study` connects the criterion blueprint to the exact selection decisions, sealed evidence sets, and criterion observations used as outcomes through append-only link relations. This makes predictor/decision-policy evidence and observed outcomes reconstructable without copying specialist-system payloads into Orgmetra.
 
 One immutable `audit_event_record` may have multiple `outbox_delivery_record` rows when the same event must reach multiple delivery targets. The unique `(tenant_record_id, audit_event_record_id, delivery_target_code)` key permits at most one delivery lifecycle per target. Delivery retries mutate only the delivery relation; the canonical event bytes and digest are append-only and therefore cannot drift with transport state.
+
+A `people_mutation_idempotency_record` belongs to one tenant and names one created employment, position, or assignment identity for one route and `Idempotency-Key`. The unique `(tenant_record_id, command_route, idempotency_key)` key prevents a retry from creating a second authoritative fact. Tenants do not share keys.
 
 A delivery can have at most one `outbox_delivery_escalation_record`, enforced by the unique `(tenant_record_id, outbox_delivery_record_id)` key. The escalation row exists only for a terminal `dead_lettered` delivery and records the failure classification, terminal attempt count, recorded time, and an opaque operator/customer escalation reference without copying the event payload. The row is append-only; terminal queue history is not reopened or rewritten.
 

@@ -62,6 +62,7 @@ REQUIRED = [
     "database/migrations/0009_candidate_worker_conversion_governance.sql",
     "database/migrations/0010_validity_study_case_integrity.sql",
     "database/migrations/0011_criterion_observation_scope.sql",
+    "database/migrations/0012_people_mutation_idempotency.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -81,6 +82,7 @@ REQUIRED = [
     "tests/test_candidate_worker_conversion_postgres.sh",
     "tests/test_validity_study_case_postgres.sh",
     "tests/test_criterion_observation_scope_postgres.sh",
+    "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -337,6 +339,16 @@ def _validate_database_contract() -> None:
         "CREATE ROLE orgmetra_outbox_operator",
         "SECURITY DEFINER",
         "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
+        "CREATE TABLE people_mutation_idempotency_record",
+        "CONSTRAINT people_mutation_idempotency_command_unique",
+        "CONSTRAINT people_mutation_idempotency_key_check",
+        "CONSTRAINT people_mutation_idempotency_digest_check",
+        "CREATE TRIGGER people_mutation_idempotency_append_only_guard",
+        "CREATE FUNCTION public.reject_people_mutation_idempotency_truncate",
+        "CREATE TRIGGER people_mutation_idempotency_truncate_guard",
+        "REVOKE TRUNCATE ON people_mutation_idempotency_record FROM PUBLIC",
+        "ALTER TABLE people_mutation_idempotency_record FORCE ROW LEVEL SECURITY",
+        "CREATE POLICY people_mutation_idempotency_scope_policy",
     ]
     for fragment in required_fragments:
         if fragment not in sql:

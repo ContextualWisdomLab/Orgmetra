@@ -102,19 +102,21 @@ sequenceDiagram
     participant Kernel
     participant Audit
 
-    HROps->>Gateway: Create employment(actor, tenant, purpose, confirmation, evidence)
-    Gateway->>PeopleCore: Validate exclusive-or-concurrent overlap
+    HROps->>Gateway: Create employment(actor, tenant, purpose, confirmation, evidence, idempotency key)
+    Gateway->>PeopleCore: Replay matching key or validate exclusive-or-concurrent overlap
     PeopleCore->>Kernel: validate_person_employment_exclusivity
     Kernel-->>PeopleCore: Accept or next-action error
+    PeopleCore->>Audit: Persist employment, audit/outbox, and idempotency binding
     PeopleCore-->>Gateway: employment_record Location
-    HROps->>Gateway: Create position(actor, tenant, purpose, confirmation, evidence)
-    Gateway->>JobArchitecture: Bind organization and job
+    HROps->>Gateway: Create position(actor, tenant, purpose, confirmation, evidence, idempotency key)
+    Gateway->>JobArchitecture: Replay matching key or bind organization and job
+    JobArchitecture->>Audit: Persist position, audit/outbox, and idempotency binding
     JobArchitecture-->>Gateway: position_record Location
-    HROps->>Gateway: Create assignment(actor, tenant, purpose, confirmation, evidence)
-    Gateway->>PeopleCore: validate_assignment_write
+    HROps->>Gateway: Create assignment(actor, tenant, purpose, confirmation, evidence, idempotency key)
+    Gateway->>PeopleCore: Replay matching key or validate_assignment_write
     PeopleCore->>Kernel: employment, position, portfolio, and seat checks
     Kernel-->>PeopleCore: Accept or next-action error
-    PeopleCore->>Audit: Append assignment provenance
+    PeopleCore->>Audit: Persist assignment, audit/outbox, and idempotency binding
     PeopleCore-->>Gateway: assignment_record Location
     Gateway-->>HROps: Review the roster, then approve or correct
 ```
