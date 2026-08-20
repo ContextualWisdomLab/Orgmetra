@@ -1,45 +1,16 @@
 # Orgmetra governed offer approval
 
-This package creates a **value-free pre-send offer approval packet**. It is a governance
-envelope, not an offer engine and not an employment decision.
+This package creates a **value-free pre-send offer approval packet**. It is a governance envelope, not an offer engine and not an employment decision.
 
-The packet binds one selected candidate to the exact requisition and authoritative Job,
-an optional exact Position, the reviewed selection-decision digest, compensation-package
-provenance, offer-terms provenance, and two accountable actor references. Identical requester
-and approver references are rejected as an early syntactic guard.
+The packet binds one selected candidate to the exact requisition and authoritative Job, an optional exact Position, the reviewed selection-decision digest, compensation-package provenance, offer-terms provenance, and two accountable actor references. Identical requester and approver references are rejected as an early syntactic guard.
 
-The envelope intentionally excludes candidate names, email addresses, demographic values,
-assessment scores, salary/benefit amounts, credentials, and free-form model output.
-`candidate_profile_reference` remains sensitive correlating metadata even though it is
-opaque. The public `tenant_record_id` and every namespaced reference use canonical,
-non-sentinel UUIDv4 identity; namespaced references additionally require their expected
-namespace. UUIDv1 and other UUID versions are rejected so timestamp/node correlation metadata,
-names, compensation values, offer terms, and actor identities cannot be smuggled into public
-governance identity fields. `reason_code` is likewise closed to the reviewed, value-free
-`selected_candidate_offer_review` code; arbitrary lower-snake-case text is rejected so the
-reason field cannot become a side channel for candidate, compensation, or offer-term values.
+The envelope intentionally excludes candidate names, email addresses, demographic values, assessment scores, salary/benefit amounts, credentials, and free-form model output. `candidate_profile_reference` remains sensitive correlating metadata even though it is opaque. `tenant_record_id` follows Orgmetra's authoritative canonical non-sentinel operational UUID contract rather than imposing a second UUID-version rule in this leaf package. Packet-owned namespaced references remain canonical non-sentinel UUIDv4 values and require their expected namespace. UUIDv1 and other non-v4 reference suffixes are rejected so timestamp/node correlation metadata, names, compensation values, offer terms, and actor identities cannot be smuggled into packet-owned governance references. `reason_code` is likewise closed to the reviewed, value-free `selected_candidate_offer_review` code; arbitrary lower-snake-case text is rejected so the reason field cannot become a side channel for candidate, compensation, or offer-term values.
 
-Every packet also carries a bounded positive integer `evidence_version` (default `1`). It is
-serialized into canonical JSON, so changing the governed evidence version changes the packet
-SHA-256 digest. Zero, negative, boolean, textual, and values above `2147483647` fail closed.
-The field versions this immutable pre-send evidence envelope; it is not approval, delivery,
-or proof that referenced source versions were authoritatively resolved.
+Every packet also carries a bounded positive integer `evidence_version` (default `1`). It is serialized into canonical JSON, so changing the governed evidence version changes the packet SHA-256 digest. Zero, negative, boolean, textual, and values above `2147483647` fail closed. The field versions this immutable pre-send evidence envelope; it is not approval, delivery, or proof that referenced source versions were authoritatively resolved.
 
-A valid packet always remains `requires_human_approval` and
-`not_authorized_to_send`. Before approval, the host must re-resolve **every packet reference**
-within the exact `tenant_record_id` through its authoritative boundary so valid UUIDs from a
-foreign tenant cannot be mixed into the approval envelope. It must specifically re-resolve
-`requester_reference` and `approver_reference` and prove their resolved actor identities are
-distinct; opaque-reference inequality alone is not separation-of-duties evidence. The host
-must then verify Job/Position scope, selected-candidate evidence, compensation-package
-provenance, and offer-terms provenance before recording accountable human approval through the
-authoritative offer workflow and before communicating or executing the offer. UUIDv4 is only
-an opacity constraint; it is not proof of tenant membership, authorization, or source truth.
+A valid packet always remains `requires_human_approval` and `not_authorized_to_send`. Before approval, the host must re-resolve **every packet reference** within the exact `tenant_record_id` through its authoritative boundary so valid references from a foreign tenant cannot be mixed into the approval envelope. It must specifically re-resolve `requester_reference` and `approver_reference` and prove their resolved actor identities are distinct; opaque-reference inequality alone is not separation-of-duties evidence. The host must then verify Job/Position scope, selected-candidate evidence, compensation-package provenance, and offer-terms provenance before recording accountable human approval through the authoritative offer workflow and before communicating or executing the offer. UUIDv4 is only an opacity constraint for packet-owned references; tenant UUID generation/privacy policy remains owned by the authoritative HRIS boundary.
 
-Canonical JSON and its SHA-256 digest support immutable audit correlation. They do not prove
-that the referenced evidence is true, that all references belong to the packet tenant, that
-actor identities are distinct, that compensation is lawful or fair, that an offer was approved,
-or that an offer was communicated.
+Canonical JSON and its SHA-256 digest support immutable audit correlation. They do not prove that the referenced evidence is true, that all references belong to the packet tenant, that actor identities are distinct, that compensation is lawful or fair, that an offer was approved, or that an offer was communicated.
 
 ## Example
 
