@@ -27,7 +27,8 @@ test('protected buyer truth is positively pinned for recently integrated capabil
     'bitemporal workforce-composition snapshots',
     'governed migration handoff',
     'requisition review',
-    'human selection-review evidence'
+    'human selection-review evidence',
+    'governed Job Analysis snapshot persistence'
   ]) {
     assert.match(
       readme,
@@ -38,7 +39,7 @@ test('protected buyer truth is positively pinned for recently integrated capabil
 
   assert.doesNotMatch(
     readme,
-    /(?:validity-study|workforce-composition|migration handoff|requisition review|selection-review)[^\n]*(?:active[-_ ]PR|implemented_on_active_pr)/i,
+    /(?:validity-study|workforce-composition|migration handoff|requisition review|selection-review|Job Analysis)[^\n]*(?:active[-_ ]PR|implemented_on_active_pr)/i,
     'README must not demote protected capabilities to active-PR truth'
   );
 
@@ -57,7 +58,8 @@ test('protected buyer truth is positively pinned for recently integrated capabil
     'Bitemporal workforce-composition evidence',
     'Governed requisition review evidence',
     'Governed human selection review evidence',
-    'Governed People writes and confirmed-hire materialization'
+    'Governed People writes and confirmed-hire materialization',
+    'Evidence-grounded Job analysis with Task/FJA/KSAO linkage'
   ]) {
     const row = traceabilityRow(traceability, requirement);
     assert.ok(row, `missing traceability row: ${requirement}`);
@@ -77,7 +79,7 @@ test('protected buyer truth is positively pinned for recently integrated capabil
   );
 });
 
-test('open job-analysis persistence remains active-PR truth until integration', () => {
+test('integrated job-analysis persistence is protected buyer truth', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
   const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
@@ -89,22 +91,22 @@ test('open job-analysis persistence remains active-PR truth until integration', 
   assert.ok(jobAnalysisRow, 'missing Job Analysis traceability row');
   assert.match(
     jobAnalysisRow,
-    /\| implemented_on_active_pr \|$/,
-    'open Job Analysis persistence must not be promoted to protected maturity'
+    /\| implemented_on_protected_main \|$/,
+    'merged Job Analysis persistence must be promoted to protected maturity'
   );
   assert.match(
     readme,
-    /Job Analysis persistence remains active-PR truth/i,
-    'README must disclose that Job Analysis persistence is not shipped yet'
+    /governed Job Analysis snapshot persistence/i,
+    'README must list integrated Job Analysis persistence as protected truth'
   );
   assert.doesNotMatch(
     readme,
-    /Protected `develop`[^\n]*job-analysis snapshots/i,
-    'README must not list open Job Analysis snapshots as protected shipped truth'
+    /Job Analysis persistence remains active-PR truth/i,
+    'README must not describe merged Job Analysis persistence as open-PR truth'
   );
   assert.match(
     changelog,
-    /Active-PR governed job-analysis evidence contract/i,
-    'CHANGELOG must label the open Job Analysis contract as active-PR truth'
+    /Protected governed job-analysis evidence contract/i,
+    'CHANGELOG must label the merged Job Analysis contract as protected truth'
   );
 });
