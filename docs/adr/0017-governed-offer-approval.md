@@ -16,7 +16,9 @@ alternate decision authority, a salary-value cache, or a channel that lets gener
 material masquerade as an approved offer. Different opaque requester/approver references also
 do not prove that the authoritative actor boundary resolves them to different people, and
 canonical UUIDv4 syntax does not prove that the referenced candidate, requisition, Job/Position,
-selection decision, compensation package, or offer terms belong to the packet tenant.
+selection decision, compensation package, or offer terms belong to the packet tenant. UUIDv1
+also carries timestamp/node-derived correlation metadata, so it is unsuitable for the public
+tenant identity as well as fields represented as opaque references.
 
 ISO 30405:2023 provides current recruitment guidance across planning, assessment, employment,
 stakeholder management, and review. EEOC guidance on tests and selection procedures emphasizes
@@ -28,16 +30,17 @@ or decide the legality of any offer.
 
 Orgmetra will expose `OfferApprovalPacket` as value-free review evidence only.
 
-The packet binds opaque references for the candidate profile, requisition, Job, optional
-Position, selection decision, compensation package, and offer terms. Every namespaced trust
-reference requires a canonical non-sentinel UUIDv4 suffix; UUIDv1 and other UUID versions fail
-closed so reference identity cannot carry UUIDv1 timestamp/node correlation metadata. Decision,
-package, and terms artifacts are independently SHA-256 bound. Before approval, the host must
-re-resolve **every packet reference** within the exact `tenant_record_id` through its
-authoritative boundary and reject approval if any reference belongs to another tenant or cannot
-be authoritatively resolved. Identical requester/approver references are rejected as an early
-syntactic guard; after tenant-scoped resolution, the host must prove their resolved actor
-identities are distinct. Reference inequality alone is not separation-of-duties evidence.
+The packet requires canonical non-sentinel UUIDv4 for the public `tenant_record_id` and opaque
+candidate profile, requisition, Job, optional Position, selection decision, compensation package,
+offer terms, and accountable actor references; namespaced references additionally require their
+expected prefix. UUIDv1 and other UUID versions fail closed so public governance identities
+cannot carry timestamp/node-derived correlation metadata. Decision, package, and terms artifacts
+are independently SHA-256 bound. Before approval, the host must re-resolve **every packet
+reference** within the exact `tenant_record_id` through its authoritative boundary and reject
+approval if any reference belongs to another tenant or cannot be authoritatively resolved.
+Identical requester/approver references are rejected as an early syntactic guard; after
+tenant-scoped resolution, the host must prove their resolved actor identities are distinct.
+Reference inequality alone is not separation-of-duties evidence.
 
 The packet must not contain candidate PII, compensation values, assessment scores, or
 free-form model output. The `reason_code` field is not free-form metadata: it is closed to the
@@ -67,10 +70,11 @@ communicate, send, execute, persist an offer, or prove authoritative reference/a
 A buyer can review one deterministic, PII-minimized envelope before an offer moves to the
 authoritative offer workflow. Compensation values stay in their purpose-bound owner boundary,
 while Orgmetra keeps exact provenance references, evidence version, and human accountability.
-Cross-tenant evidence mixing is fail-closed at the host approval boundary because every packet
-reference must resolve in the exact tenant. Requester/approver separation is proven only after
-tenant-scoped authoritative actor resolution. New offer-review reason categories require an
-explicit contract change and regression evidence rather than accepting arbitrary caller text.
+UUIDv1/non-v4 public tenant/reference identities fail closed before serialization. Cross-tenant
+evidence mixing is fail-closed at the host approval boundary because every packet reference
+must resolve in the exact tenant. Requester/approver separation is proven only after tenant-
+scoped authoritative actor resolution. New offer-review reason categories require an explicit
+contract change and regression evidence rather than accepting arbitrary caller text.
 
 Downstream offer persistence/execution must independently enforce authorization, tenant-scoped
 source-evidence resolution, idempotency where applicable, and immutable audit/outbox evidence.
