@@ -10,7 +10,7 @@ This package is **active-PR Orgmetra code**. It does not make TEPP HTTP service 
 
 `TeppAnalysisRequestPacket.tepp_request()` emits exactly seven TEPP v1 fields: `contract_version`, `idempotency_key`, `tenant_workspace_id`, `snapshot_id`, RFC 3339 `knowledge_cutoff`, `model_contract_version`, and `output_profile`. Unknown Orgmetra governance fields never enter the foreign body because TEPP's DTO is fail-closed on unknown fields.
 
-The packet additionally binds, on the Orgmetra side, canonical UUIDv4 tenant identity, opaque validation-study and actor references, an independent SHA-256 snapshot digest, evidence version, generation instant, reviewed TEPP revision, and a digest of the exact TEPP request body. Same-key exact retries are distinguishable from same-key semantic conflicts before transport.
+The packet additionally binds, on the Orgmetra side, the authoritative canonical non-sentinel operational tenant UUID, opaque UUIDv4 validation-study and actor references, an independent SHA-256 snapshot digest, evidence version, generation instant, reviewed TEPP revision, and a digest of the exact TEPP request body. Same-key exact retries are distinguishable from same-key semantic conflicts before transport. The tenant identifier follows the protected Orgmetra core identity contract rather than imposing a duplicate UUID-version policy; packet-owned trust references remain UUIDv4-constrained.
 
 ## Privacy and authority
 
