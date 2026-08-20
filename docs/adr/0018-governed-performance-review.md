@@ -7,7 +7,7 @@
 
 Orgmetra already owns authoritative Employment/Job truth and performance/criterion evidence boundaries, but a buyer-facing review workflow also needs a small pre-rating object that identifies which employment references, review period, performance cycle, criteria, goals, outcome evidence, and reviewer are being considered without copying person values or prematurely materializing a rating.
 
-A transport-neutral packet cannot prove merely from syntactically valid opaque references that the Person, Employment, Job, cycle, goals, and observation snapshot all resolve to one authoritative temporal scope. Treating correlation as verified scope would create a misleading high-impact evidence boundary. Authoritative relationship and temporal resolution therefore remains a required downstream step before rating. UUID syntax is also part of the privacy boundary: UUIDv1 can expose timestamp/node-derived correlation metadata despite looking opaque, so trust references must not accept arbitrary UUID versions.
+A transport-neutral packet cannot prove merely from syntactically valid opaque references that the Person, Employment, Job, cycle, goals, and observation snapshot all resolve to one authoritative temporal scope. Treating correlation as verified scope would create a misleading high-impact evidence boundary. Authoritative relationship and temporal resolution therefore remains a required downstream step before rating. UUID syntax is also part of the privacy boundary: UUIDv1 can expose timestamp/node-derived correlation metadata despite looking opaque, so neither the public tenant identity nor trust references may accept arbitrary UUID versions.
 
 U.S. OPM performance-management guidance treats performance management as a continuous cycle of planning, monitoring, developing, rating, and rewarding, and describes rating as evaluation against established elements and standards. ISO 30414:2025 Edition 2 provides current human-capital reporting requirements and recommendations across areas including productivity, skills/capabilities, and related workforce governance. Orgmetra uses those sources as design evidence, not as a claim that this packet by itself satisfies any jurisdiction-specific appraisal rule or ISO certification requirement.
 
@@ -17,7 +17,7 @@ Introduce a transport-neutral `PerformanceReviewPacket` that remains pre-rating,
 
 The packet MUST bind:
 
-- canonical tenant identity;
+- a canonical non-sentinel UUIDv4 tenant identity, rejecting UUIDv1 and every other UUID version;
 - opaque canonical non-sentinel UUIDv4-backed Person, Employment, Job, performance-cycle and performance-review references, rejecting UUIDv1 and every other UUID version;
 - a governed criterion-set UUIDv4 reference plus independent SHA-256 digest;
 - a governed performance-goal-plan UUIDv4 reference plus independent SHA-256 digest;
@@ -33,13 +33,13 @@ The initial closed reason vocabulary contains only `scheduled_cycle_review`. Arb
 
 The packet MUST NOT carry person PII, a rating value, free-form feedback, or free-form model output. Direct construction and mutation-by-copy MUST fail closed unless `human_confirmation_required=True`, `decision_authority="human_review_only"`, `review_state="requires_human_review"`, and `scope_verification_state="requires_authoritative_resolution"` remain intact.
 
-`scope_verification_state` deliberately cannot be changed to `verified` inside this package. Before rating, the authoritative HRIS/performance boundary must resolve the Person↔Employment↔Job relation, performance-cycle/review-period alignment, and the governed evidence scope using its current temporal truth and purpose-bound authorization.
+`scope_verification_state` deliberately cannot be changed to `verified` inside this package. Before rating, the authoritative HRIS/performance boundary must resolve the Person↔Employment↔Job relation, performance-cycle/review-period alignment, and the governed evidence scope using its current temporal truth and purpose-bound authorization. UUIDv4 syntax is only an opacity constraint and does not prove tenant ownership, worker scope, authorization, or temporal validity.
 
 Canonical JSON and SHA-256 are immutable correlation evidence only. They do not prove the correctness of source evidence, authoritative cross-record scope, substantive validity or fairness of a criterion, lawful use, human completion, or the final rating.
 
 ## Consequences
 
-Buyers can present a review-ready correlation envelope while keeping authoritative Employment/Job and performance evidence separable from the later human rating/feedback event. A consumer cannot truthfully treat the packet itself as proof that all referenced records belong to the same employee/job/cycle. Person correlation remains sensitive metadata and therefore still requires purpose-bound access, least privilege, retention/export controls, and immutable audit handling. Requiring UUIDv4 for namespaced trust references also closes UUIDv1 timestamp/node correlation leakage, while authoritative resolution remains mandatory because UUIDv4 syntax does not establish tenant or business scope.
+Buyers can present a review-ready correlation envelope while keeping authoritative Employment/Job and performance evidence separable from the later human rating/feedback event. A consumer cannot truthfully treat the packet itself as proof that all referenced records belong to the same employee/job/cycle. Person correlation remains sensitive metadata and therefore still requires purpose-bound access, least privilege, retention/export controls, and immutable audit handling. Requiring UUIDv4 for both tenant identity and namespaced trust references closes UUIDv1 timestamp/node correlation leakage, while authoritative resolution remains mandatory because UUIDv4 syntax does not establish tenant or business scope.
 
 This slice adds no database migration, no rating computation, no cross-service table access, and no automated employment decision. The pre-rating packet now preserves actor, purpose, reviewed reason, and evidence version in its immutable correlation evidence; later authoritative rating persistence must independently preserve those values plus human confirmation, audit/outbox, temporal scope, authoritative scope-resolution evidence, and any applicable policy requirements.
 
