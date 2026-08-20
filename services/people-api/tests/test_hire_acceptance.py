@@ -160,6 +160,11 @@ class HireAcceptanceTests(unittest.TestCase):
             with self.subTest(overrides=overrides), self.assertRaises(ValueError):
                 command(**overrides)
 
+    def test_command_rejects_unpaired_unicode_surrogate_display_name(self) -> None:
+        """Reject strings that Python accepts but PostgreSQL UTF-8 cannot encode."""
+        with self.assertRaisesRegex(ValueError, "Unicode"):
+            command(display_name=chr(0xD800))
+
     def test_result_rejects_reserved_identifiers(self) -> None:
         with self.assertRaises(ValueError):
             HireAcceptanceResult(
