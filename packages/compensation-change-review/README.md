@@ -4,7 +4,7 @@
 
 ## What the packet carries
 
-The packet correlates one tenant, Person, Employment, active Assignment/Job/Position scope snapshot, current compensation snapshot, proposed compensation plan, exact compensation policy, pay-equity review, budget authorization, payroll handoff plan, requester, reviewer, business effective date, and evidence version. Every namespaced trust-bearing artifact uses a canonical non-sentinel UUIDv4-backed opaque reference; UUIDv1 and every other UUID version are rejected so timestamp/node-derived correlation metadata cannot enter an otherwise opaque field. Evidence artifacts also carry independent lowercase SHA-256 digests.
+The packet correlates one canonical non-sentinel UUIDv4 tenant, Person, Employment, active Assignment/Job/Position scope snapshot, current compensation snapshot, proposed compensation plan, exact compensation policy, pay-equity review, budget authorization, payroll handoff plan, requester, reviewer, business effective date, and evidence version. The tenant identity and every namespaced trust-bearing artifact use canonical non-sentinel UUIDv4 identity; UUIDv1 and every other UUID version are rejected so timestamp/node-derived correlation metadata cannot enter values presented as opaque governance identity. Evidence artifacts also carry independent lowercase SHA-256 digests.
 
 The envelope intentionally **does not carry salary, wage, bonus, benefit, equity, protected-attribute, credential, or free-form case/model values**. Opaque Person/Employment and evidence references still create sensitive personal-data correlation, so the packet explicitly reports `contains_personal_data = true` rather than claiming anonymity.
 
