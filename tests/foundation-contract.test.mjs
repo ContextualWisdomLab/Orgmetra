@@ -137,6 +137,32 @@ test('migration-backed database object validation detects table rename', () => {
   }
 });
 
+test('migration-backed validation ignores fake CREATE TABLE text in comments and literals', () => {
+  const root = temporaryDirectory();
+  try {
+    write(
+      root,
+      'database/migrations/0012_people_mutation_idempotency.sql',
+      [
+        '-- CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid);',
+        '/* outer comment',
+        '   /* nested comment */',
+        '   CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid);',
+        '*/',
+        "SELECT 'CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid);';",
+        "SELECT E'CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid);';",
+        'SELECT $$CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid);$$;',
+        'SELECT $payload$CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid);$payload$;'
+      ].join('\n')
+    );
+    assert.deepEqual(validateMigrationBackedDatabaseObjectNames(root), [
+      'Migration-backed database object is missing from migrations: people_mutation_idempotency_record'
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('collectMarkdownFiles handles missing directories and stable recursion', () => {
   const root = temporaryDirectory();
   try {
