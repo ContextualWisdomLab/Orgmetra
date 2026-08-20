@@ -134,7 +134,7 @@ def mutation_command_digest(
     elif isinstance(command, AssignmentMutationCommand):
         route = "assignment-records"
         semantic_command = {
-            "allocation_ratio": format(command.allocation_ratio, "f"),
+            "allocation_ratio": format(command.allocation_ratio.quantize(Decimal("0.0001")), "f"),
             "confirmation_reference": command.confirmation_reference,
             "effective_from": command.effective_from.isoformat(),
             "employment_record_id": str(command.employment_record_id),
