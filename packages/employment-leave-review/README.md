@@ -4,7 +4,7 @@ This package creates a **pre-mutation review packet** for employment leave and t
 
 ## What the packet binds
 
-A packet correlates one canonical non-sentinel UUIDv4 tenant and proposed leave window to exact opaque canonical non-sentinel UUIDv4 references and SHA-256 evidence for:
+A packet correlates one authoritative Orgmetra tenant and proposed leave window to exact opaque canonical non-sentinel UUIDv4 references and SHA-256 evidence for:
 
 - the authoritative Person and Employment record;
 - the active Assignment/Job/Position scope snapshot that must be resolved at review time;
@@ -14,7 +14,7 @@ A packet correlates one canonical non-sentinel UUIDv4 tenant and proposed leave 
 - the exact personal-data handling-policy and retention-policy versions governing the PII-bearing packet; and
 - separate requester and accountable reviewer references whose authoritative actor identities must still be resolved and proven distinct before approval.
 
-UUIDv1 and every other UUID version are rejected for the packet tenant identity and namespaced trust references so timestamp/node correlation metadata cannot enter values presented as opaque governance identity. The packet carries a bounded positive `evidence_version` in canonical evidence. Opaque Person, Employment, and leave-case references plus the requested leave dates are **minimum-necessary personal data**, not anonymous evidence. The packet therefore self-identifies `contains_person_pii=true`. Its exact handling and retention policy references/digests are immutable audit correlation evidence; the host must still enforce purpose-bound authorization, least privilege, retention/export controls, and audit.
+`tenant_record_id` follows protected Orgmetra core's canonical non-sentinel operational-UUID contract, including valid UUIDv7 tenant identities. Packet-owned namespaced trust references remain canonical UUIDv4 so timestamp/node-derived correlation metadata cannot enter leaf-owned opaque references. The packet carries a bounded positive `evidence_version` in canonical evidence. Opaque Person, Employment, and leave-case references plus the requested leave dates are **minimum-necessary personal data**, not anonymous evidence. The packet therefore self-identifies `contains_person_pii=true`. Its exact handling and retention policy references/digests are immutable audit correlation evidence; the host must still enforce purpose-bound authorization, least privilege, retention/export controls, and audit.
 
 ## Privacy and human authority
 
@@ -24,4 +24,4 @@ The envelope deliberately excludes direct identifiers such as names/email addres
 
 Immediately before approval, the host must re-resolve every packet reference inside the exact tenant context, prove requester/reviewer separation from resolved authoritative identities, prove the Person-to-Employment and active Assignment/Job/Position scope, then verify the leave case, leave-policy version, exact handling/retention policy versions, requested business dates, continuity plans, and return-to-work provenance. Any HRIS mutation must then go through the authoritative People boundary with its own authorization, idempotency, bitemporal persistence, and immutable audit/outbox evidence.
 
-Canonical JSON and SHA-256 are correlation/integrity evidence only. UUIDv4 syntax does not prove tenant ownership, worker relationship, or policy validity. The packet does not prove leave eligibility, lawful use, policy applicability or enforcement, medical facts, approval, mutation, benefit correctness, or downstream execution.
+Canonical JSON and SHA-256 are correlation/integrity evidence only. UUID syntax does not prove tenant ownership, worker relationship, or policy validity. The packet does not prove leave eligibility, lawful use, policy applicability or enforcement, medical facts, approval, mutation, benefit correctness, or downstream execution.
