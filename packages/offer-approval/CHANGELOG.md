@@ -6,8 +6,7 @@
 - Require separate requester and approver identities and exact human approval.
 - Bind selected-candidate, Job/optional Position, selection-decision, compensation-package,
   and offer-terms provenance without copying candidate or compensation values.
-- Reject UUIDv1 and other non-v4 trust-reference suffixes so opaque packet references do not
-  carry UUIDv1 timestamp/node correlation metadata.
+- Require canonical non-sentinel UUIDv4 for the public `tenant_record_id` and every trust-reference suffix so public packet identities cannot carry UUIDv1 timestamp/node correlation metadata or other non-v4 identity forms.
 - Close `reason_code` to the reviewed value-free `selected_candidate_offer_review` contract so
   arbitrary candidate, compensation, or offer-term text cannot enter canonical evidence.
 - Bind a bounded positive `evidence_version` into canonical JSON and SHA-256 correlation
