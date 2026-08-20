@@ -7,6 +7,7 @@ import pytest
 from orgmetra_candidate_evidence import build_candidate_evidence_intake_packet
 
 UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+UUID7_TENANT = "10000000-0000-7000-8000-000000000001"
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -66,13 +67,13 @@ def test_uuid1_trust_reference_is_rejected_by_builder_and_replace(
         replace(packet, **{field_name: value})
 
 
-def test_uuid1_tenant_identity_is_rejected_by_builder_and_replace() -> None:
-    """A public tenant identity must not admit UUIDv1 timestamp/node correlation metadata."""
+def test_authoritative_uuid7_tenant_identity_is_accepted_by_builder_and_replace() -> None:
+    """The leaf packet must accept tenant UUIDs already valid in authoritative Orgmetra core."""
     kwargs = valid_kwargs()
-    kwargs["tenant_record_id"] = UUID1_ID
-    with pytest.raises(ValueError, match="tenant_record_id"):
-        build_candidate_evidence_intake_packet(**kwargs)
+    kwargs["tenant_record_id"] = UUID7_TENANT
 
-    packet = build_candidate_evidence_intake_packet(**valid_kwargs())
-    with pytest.raises(ValueError, match="tenant_record_id"):
-        replace(packet, tenant_record_id=UUID1_ID)
+    packet = build_candidate_evidence_intake_packet(**kwargs)
+    replaced = replace(build_candidate_evidence_intake_packet(**valid_kwargs()), tenant_record_id=UUID7_TENANT)
+
+    assert packet.tenant_record_id == UUID7_TENANT
+    assert replaced.tenant_record_id == UUID7_TENANT
