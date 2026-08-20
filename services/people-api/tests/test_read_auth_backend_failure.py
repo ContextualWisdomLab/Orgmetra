@@ -6,6 +6,7 @@ import json
 import re
 import unittest
 from datetime import date
+from typing import Any
 from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
@@ -131,7 +132,7 @@ class PeopleReadBackendFailureTests(unittest.IsolatedAsyncioTestCase):
         self,
         *,
         messages: list[dict[str, object]],
-        captured: unittest._log._AssertLogsContext,  # type: ignore[attr-defined]
+        captured: Any,
         expected_message: str,
     ) -> None:
         """Require one non-disclosing 500 whose support reference matches its ERROR log."""
