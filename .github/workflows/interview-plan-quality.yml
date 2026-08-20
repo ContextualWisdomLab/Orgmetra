@@ -8,7 +8,7 @@ on:
       - "packages/interview-plan/**"
       - ".github/requirements/foundation-test.txt"
       - ".github/workflows/interview-plan-quality.yml"
-      - "docs/adr/0014-governed-structured-interview-plan.md"
+      - "docs/adr/0015-governed-structured-interview-plan.md"
       - "docs/doctoring/structured-interview-plan-references.md"
       - "docs/traceability/structured-interview-plan.md"
   workflow_dispatch:

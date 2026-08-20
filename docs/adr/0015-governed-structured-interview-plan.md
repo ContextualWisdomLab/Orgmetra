@@ -1,4 +1,4 @@
-# ADR 0014: Govern structured-interview plans as candidate-neutral evidence
+# ADR 0015: Govern structured-interview plans as candidate-neutral evidence
 
 - **Status:** Proposed — active PR only
 - **Date:** 2026-08-18
