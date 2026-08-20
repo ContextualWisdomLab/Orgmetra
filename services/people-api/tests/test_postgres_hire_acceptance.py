@@ -218,7 +218,10 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
         self.assertEqual((connection.enter_count, connection.exit_count), (1, 1))
         self.assertIsNone(connection.exit_exception)
         self.assertEqual(cursor.fetch_sizes, [2, 2])
-        self.assertEqual(cursor.executions[0], ("SET TRANSACTION READ WRITE", None))
+        self.assertEqual(
+            cursor.executions[0],
+            ("SET TRANSACTION ISOLATION LEVEL READ COMMITTED, READ WRITE", None),
+        )
         self.assertEqual(
             cursor.executions[1],
             (
