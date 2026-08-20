@@ -200,6 +200,27 @@ class HireAcceptanceAsgiApp:
                 extra_headers=((b"www-authenticate", b"Bearer"),),
             )
             return
+        except Exception as error:  # noqa: BLE001 - identity backend failures must remain client-safe.
+            support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+            _LOGGER.error(
+                "Hire authentication failed",
+                extra={
+                    "route": _ROUTE_LEAF,
+                    "tenant_record_id": str(tenant_record_id),
+                    "exception_type": type(error).__name__,
+                    "support_reference": support_reference,
+                },
+            )
+            await _send_json(
+                send,
+                status=500,
+                payload={
+                    "error": "internal_error",
+                    "message": "Retry later or contact an Orgmetra operator with non-sensitive request metadata; never include the bearer token.",
+                },
+                support_reference=support_reference,
+            )
+            return
 
         if principal.tenant_record_id != tenant_record_id:
             await _send_json(
