@@ -41,15 +41,24 @@ from test_people_mutations import (
 CONVERSION = UUID("0198a412-8200-7000-8000-000000000090")
 RECORDED_AT = datetime(2026, 8, 18, 0, 1, tzinfo=timezone.utc)
 ACTOR = "keyverse_subject:operator-17"
+_POST_LOCK_CLOCK_SQL = "SELECT pg_catalog.clock_timestamp()"
 
 
 class ScriptedCursor:
-    """Serve scripted fetch results while capturing SQL."""
+    """Serve scripted fetch results while capturing SQL and a database clock."""
 
-    def __init__(self, fetchmany_rows: list[list[tuple[object, ...]]], fetchall_rows: list[list[tuple[object, ...]]]) -> None:
+    def __init__(
+        self,
+        fetchmany_rows: list[list[tuple[object, ...]]],
+        fetchall_rows: list[list[tuple[object, ...]]],
+        *,
+        clock_timestamp: datetime = RECORDED_AT,
+    ) -> None:
         self.fetchmany_rows = list(fetchmany_rows)
         self.fetchall_rows = list(fetchall_rows)
+        self.clock_timestamp = clock_timestamp
         self.executions: list[tuple[str, tuple[object, ...] | None]] = []
+        self._clock_result_pending = False
 
     def __enter__(self) -> ScriptedCursor:
         return self
@@ -59,8 +68,12 @@ class ScriptedCursor:
 
     def execute(self, sql: str, parameters: tuple[object, ...] | None = None) -> None:
         self.executions.append((sql, parameters))
+        self._clock_result_pending = sql == _POST_LOCK_CLOCK_SQL
 
     def fetchmany(self, size: int) -> list[tuple[object, ...]]:
+        if self._clock_result_pending:
+            self._clock_result_pending = False
+            return [(self.clock_timestamp,)][:size]
         rows = self.fetchmany_rows.pop(0)
         return rows[:size]
 
