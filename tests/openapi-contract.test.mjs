@@ -202,11 +202,14 @@ test('buyer-facing changelog distinguishes contract-only People mutations from s
     .find((line) => line.includes('`POST /v1/employment-records`'));
 
   assert.ok(mutationLine, 'People mutation contract changelog entry is missing');
-  if (/GET-only People API/i.test(readme)) {
-    assert.match(
-      mutationLine,
-      /contract-only|non-shipped runtime/i,
-      'contract-only People mutations must not be presented as shipped runtime'
-    );
-  }
+  assert.match(
+    readme,
+    /GET-only People API/i,
+    'README must continue to describe the People API as GET-only'
+  );
+  assert.match(
+    mutationLine,
+    /contract-only|non-shipped runtime/i,
+    'contract-only People mutations must not be presented as shipped runtime'
+  );
 });
