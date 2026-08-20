@@ -76,3 +76,35 @@ test('protected buyer truth is positively pinned for recently integrated capabil
     'protected migration integration is mislabeled'
   );
 });
+
+test('open job-analysis persistence remains active-PR truth until integration', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+  const traceability = readFileSync(new URL('../docs/TRACEABILITY.md', import.meta.url), 'utf8');
+
+  const jobAnalysisRow = traceabilityRow(
+    traceability,
+    'Evidence-grounded Job analysis with Task/FJA/KSAO linkage'
+  );
+  assert.ok(jobAnalysisRow, 'missing Job Analysis traceability row');
+  assert.match(
+    jobAnalysisRow,
+    /\| implemented_on_active_pr \|$/,
+    'open Job Analysis persistence must not be promoted to protected maturity'
+  );
+  assert.match(
+    readme,
+    /Job Analysis persistence remains active-PR truth/i,
+    'README must disclose that Job Analysis persistence is not shipped yet'
+  );
+  assert.doesNotMatch(
+    readme,
+    /Protected `develop`[^\n]*job-analysis snapshots/i,
+    'README must not list open Job Analysis snapshots as protected shipped truth'
+  );
+  assert.match(
+    changelog,
+    /Active-PR governed job-analysis evidence contract/i,
+    'CHANGELOG must label the open Job Analysis contract as active-PR truth'
+  );
+});
