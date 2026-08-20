@@ -10,9 +10,14 @@ on:
       - "packages/keyverse-adapter/**"
       - "database/migrations/0013_job_analysis_snapshot.sql"
       - "tests/test_job_analysis_snapshot_postgres.sh"
+      - "tests/validate_repository.py"
+      - "scripts/foundation-contract-core.mjs"
       - "schemas/openapi.yaml"
+      - "manifest.json"
+      - "docs/adr/0007-governed-job-analysis-evidence.md"
       - "docs/adr/0014-job-analysis-snapshot-persistence.md"
       - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/foundation-ci.yml"
       - ".github/workflows/job-analysis-api-quality.yml"
   workflow_dispatch:
 
