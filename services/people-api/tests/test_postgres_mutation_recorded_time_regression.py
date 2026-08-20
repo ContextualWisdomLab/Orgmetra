@@ -31,6 +31,8 @@ from test_postgres_people_mutations import (
     employment_policy,
 )
 
+_POST_LOCK_CLOCK_SQL = "SELECT pg_catalog.clock_timestamp()"
+
 
 class PostLockRecordedTimeRegressionTests(unittest.TestCase):
     """Prevent lock wait order from hiding the winner at the validation cutoff."""
@@ -52,6 +54,7 @@ class PostLockRecordedTimeRegressionTests(unittest.TestCase):
         cursor = ScriptedCursor(
             [[], [(CONVERSION, RECORDED_AT)]],
             [[winner]],
+            clock_timestamp=winner_recorded_at,
         )
         port = PostgresPeopleMutationPort(lambda: FakeConnection(cursor))
 
@@ -63,6 +66,17 @@ class PostLockRecordedTimeRegressionTests(unittest.TestCase):
                 policy=employment_policy(),
                 mutation_port=port,
             )
+
+        sql = [statement for statement, _parameters in cursor.executions]
+        conversion_index = next(
+            index for index, statement in enumerate(sql) if "candidate_worker_conversion_record" in statement
+        )
+        clock_index = sql.index(_POST_LOCK_CLOCK_SQL)
+        employment_snapshot_index = next(
+            index for index, statement in enumerate(sql) if "JOIN public.employment_record_version" in statement
+        )
+        self.assertLess(conversion_index, clock_index)
+        self.assertLess(clock_index, employment_snapshot_index)
 
     def test_assignment_rejects_capacity_winner_recorded_after_waiter_transaction_started(self) -> None:
         """A later lock winner must be visible after the position lock is acquired."""
@@ -81,6 +95,7 @@ class PostLockRecordedTimeRegressionTests(unittest.TestCase):
         cursor = ScriptedCursor(
             [[], [(CONVERSION, RECORDED_AT)]],
             [[covering_employment_row()], [covering_position_row()], [winner]],
+            clock_timestamp=winner_recorded_at,
         )
         port = PostgresPeopleMutationPort(lambda: FakeConnection(cursor))
 
@@ -92,6 +107,17 @@ class PostLockRecordedTimeRegressionTests(unittest.TestCase):
                 policy=assignment_policy(),
                 mutation_port=port,
             )
+
+        sql = [statement for statement, _parameters in cursor.executions]
+        position_lock_index = next(
+            index for index, statement in enumerate(sql) if "FOR UPDATE OF position" in statement
+        )
+        clock_index = sql.index(_POST_LOCK_CLOCK_SQL)
+        assignment_snapshot_index = next(
+            index for index, statement in enumerate(sql) if statement.startswith("SELECT\n    assignment.assignment_record_id")
+        )
+        self.assertLess(position_lock_index, clock_index)
+        self.assertLess(clock_index, assignment_snapshot_index)
 
 
 if __name__ == "__main__":
