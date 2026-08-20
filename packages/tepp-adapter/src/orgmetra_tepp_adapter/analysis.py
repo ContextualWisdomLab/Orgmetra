@@ -31,6 +31,18 @@ _NEXT_ACTION: Final = (
 )
 
 
+def _validate_operational_uuid(value: str, field_name: str) -> None:
+    """Require canonical non-sentinel UUID text for an authoritative Orgmetra identity."""
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be canonical UUID text")
+    try:
+        parsed = UUID(value)
+    except (ValueError, AttributeError, TypeError) as error:
+        raise ValueError(f"{field_name} must be canonical UUID text") from error
+    if str(parsed) != value or parsed.int in {0, _MAX_UUID_INT}:
+        raise ValueError(f"{field_name} must be a canonical operational UUID")
+
+
 def _validate_uuid4(value: str, field_name: str) -> None:
     """Require one canonical, non-sentinel UUIDv4 string."""
     if not isinstance(value, str):
@@ -140,7 +152,7 @@ class TeppAnalysisRequestPacket:
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed boundary."""
-        _validate_uuid4(self.tenant_record_id, "tenant_record_id")
+        _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(self.validation_study_reference, "validation_study", "validation_study_reference")
         _validate_reference(self.requested_by_actor_reference, "actor", "requested_by_actor_reference")
         _validate_opaque_identifier(self.tepp_workspace_id, "tepp_workspace_id")
