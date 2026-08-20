@@ -36,6 +36,8 @@ _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _FIELD_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _MAX_UUID_INT = (1 << 128) - 1
 _REQUIRED_QUERY_KEYS = frozenset({"effective_on", "purpose", "fields"})
+_MAX_QUERY_STRING_BYTES = 4096
+_MAX_QUERY_FIELDS = len(_REQUIRED_QUERY_KEYS)
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 
 
@@ -233,9 +235,16 @@ def _parse_worker_request(path: str, raw_query: object) -> _ParsedWorkerRequest:
 
     if not isinstance(raw_query, bytes):
         raise _InvalidHttpRequest("query_string must be bytes")
+    if len(raw_query) > _MAX_QUERY_STRING_BYTES:
+        raise _InvalidHttpRequest("query string exceeds the accepted size")
     try:
         query_text = raw_query.decode("ascii")
-        pairs = parse_qsl(query_text, keep_blank_values=True, strict_parsing=True)
+        pairs = parse_qsl(
+            query_text,
+            keep_blank_values=True,
+            strict_parsing=True,
+            max_num_fields=_MAX_QUERY_FIELDS,
+        )
     except (UnicodeDecodeError, ValueError) as error:
         raise _InvalidHttpRequest("query string is malformed") from error
 
