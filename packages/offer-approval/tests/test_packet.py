@@ -26,6 +26,7 @@ COMPENSATION_ID = "10000000-0000-4000-8000-000000000007"
 TERMS_ID = "10000000-0000-4000-8000-000000000008"
 REQUESTER_ID = "10000000-0000-4000-8000-000000000009"
 APPROVER_ID = "10000000-0000-4000-8000-00000000000a"
+UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -156,6 +157,35 @@ def test_rejects_bad_opaque_references(
     kwargs[field_name] = value
     with pytest.raises(ValueError, match=message):
         build_offer_approval_packet(**kwargs)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "prefix"),
+    [
+        ("offer_approval_reference", "offer_approval"),
+        ("candidate_profile_reference", "candidate_profile"),
+        ("requisition_reference", "requisition"),
+        ("job_profile_reference", "job_profile"),
+        ("position_record_reference", "position_record"),
+        ("selection_decision_reference", "selection_decision"),
+        ("compensation_package_reference", "compensation_package"),
+        ("offer_terms_reference", "offer_terms"),
+        ("requester_reference", "actor"),
+        ("approver_reference", "actor"),
+    ],
+)
+def test_rejects_uuid1_trust_references_through_direct_and_replace(
+    field_name: str,
+    prefix: str,
+) -> None:
+    kwargs = valid_kwargs()
+    kwargs[field_name] = f"{prefix}:{UUID1_ID}"
+    with pytest.raises(ValueError, match=f"opaque {prefix}"):
+        OfferApprovalPacket(**kwargs)
+
+    packet = build_valid()
+    with pytest.raises(ValueError, match=f"opaque {prefix}"):
+        replace(packet, **{field_name: f"{prefix}:{UUID1_ID}"})
 
 
 @pytest.mark.parametrize(
