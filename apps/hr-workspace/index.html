@@ -27,7 +27,7 @@
             <p class="eyebrow" data-i18n="workspaceLabel">People workspace</p>
             <p class="topbar-status" data-i18n="apiBoundary">Protected People API boundary: not connected in this fixture</p>
           </div>
-          <button class="button button-secondary" id="locale-toggle" type="button" aria-label="Change language">한국어</button>
+          <button class="button button-secondary" id="locale-toggle" type="button" aria-label="Change language" data-i18n-aria-label="changeLanguage">한국어</button>
         </header>
 
         <section class="view" id="view-hr-home" data-view="hr-home" aria-labelledby="hr-home-title">
@@ -94,7 +94,7 @@
     </div>
 
     <dialog id="evidence-dialog" class="dialog" aria-labelledby="evidence-dialog-title">
-      <div class="dialog-heading"><div><p class="eyebrow" data-i18n="evidenceDrawer">Evidence drawer</p><h2 id="evidence-dialog-title" data-i18n="evidenceTitle">Decision packet evidence</h2></div><button class="dialog-close" type="button" data-close-dialog="evidence-dialog" aria-label="Close">×</button></div>
+      <div class="dialog-heading"><div><p class="eyebrow" data-i18n="evidenceDrawer">Evidence drawer</p><h2 id="evidence-dialog-title" data-i18n="evidenceTitle">Decision packet evidence</h2></div><button class="dialog-close" type="button" data-close-dialog="evidence-dialog" aria-label="Close" data-i18n-aria-label="close">×</button></div>
       <p class="panel-copy" data-i18n="evidenceCopy">These references are reviewable inputs. They do not make an autonomous employment decision.</p>
       <ul class="evidence-list"><li><strong>EV-2026-014</strong><span data-i18n="evidenceOne">Structured interview criterion ratings</span></li><li><strong>EV-2026-021</strong><span data-i18n="evidenceTwo">SME-approved job profile version 4</span></li><li><strong>EV-2026-027</strong><span data-i18n="evidenceThree">Human reviewer reason and purpose record</span></li></ul>
       <div class="dialog-actions"><button class="button button-secondary" type="button" data-close-dialog="evidence-dialog" data-i18n="close">Close</button><button class="button button-review" type="button" data-close-dialog="evidence-dialog" data-i18n="requestEvidence">Request more evidence</button></div>
@@ -102,7 +102,7 @@
 
     <dialog id="confirmation-dialog" class="dialog" aria-labelledby="confirmation-dialog-title">
       <form method="dialog" id="confirmation-form">
-        <div class="dialog-heading"><div><p class="eyebrow" data-i18n="highImpactConfirmation">High-impact confirmation</p><h2 id="confirmation-dialog-title" data-i18n="correctHistoryTitle">Correct history</h2></div><button class="dialog-close" type="submit" value="cancel" aria-label="Close">×</button></div>
+        <div class="dialog-heading"><div><p class="eyebrow" data-i18n="highImpactConfirmation">High-impact confirmation</p><h2 id="confirmation-dialog-title" data-i18n="correctHistoryTitle">Correct history</h2></div><button class="dialog-close" type="submit" value="cancel" aria-label="Close" data-i18n-aria-label="close">×</button></div>
         <p class="panel-copy" data-i18n="confirmationCopy">A correction remains a draft until a human confirms the actor, purpose, reason, and evidence context.</p>
         <div class="form-grid"><label class="field-label" for="confirmation-actor"><span data-i18n="actor">Actor</span><input id="confirmation-actor" value="HR operations reviewer" readonly></label><label class="field-label" for="confirmation-purpose"><span data-i18n="purpose">Purpose</span><input id="confirmation-purpose" value="HR operations" readonly></label><label class="field-label field-wide" for="confirmation-reason"><span data-i18n="reason">Reason</span><textarea id="confirmation-reason" required rows="3" placeholder="Required" data-i18n-placeholder="reasonPlaceholder"></textarea></label></div>
         <div id="confirmation-status" class="notice notice-success" role="status" hidden data-i18n="draftConfirmed">Draft correction confirmed for local fixture evidence; no API mutation was sent.</div>
