@@ -51,7 +51,7 @@ class StructuredInterviewActivationAuthority(Protocol):
         approving_actor_reference: str,
     ) -> StructuredInterviewActivationVerification:
         """Return exact-scope evidence only after authoritative checks succeed."""
-        ...
+        pass
 
 
 @dataclass(frozen=True, slots=True, repr=False)
