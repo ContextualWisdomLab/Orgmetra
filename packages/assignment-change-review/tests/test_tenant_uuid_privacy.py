@@ -1,10 +1,13 @@
-"""Tenant identity privacy regressions for assignment-change review evidence."""
+"""Tenant identity interoperability regressions for assignment-change review evidence."""
 
 from datetime import date, datetime, timezone
 
 import pytest
 
 from orgmetra_assignment_change_review import build_assignment_change_review_packet
+
+
+_AUTHORITATIVE_UUIDV7_TENANT = "10000000-0000-7000-8000-000000000001"
 
 
 def _build_with_tenant(tenant_record_id: str):
@@ -38,7 +41,20 @@ def _build_with_tenant(tenant_record_id: str):
     )
 
 
-def test_rejects_uuid1_tenant_identity() -> None:
-    """Prevent timestamp/node-correlating UUIDv1 from masquerading as opaque tenant identity."""
+def test_accepts_authoritative_operational_uuidv7_tenant_identity() -> None:
+    """Accept the canonical UUIDv7 tenant form already accepted by protected HRIS core."""
+    packet = _build_with_tenant(_AUTHORITATIVE_UUIDV7_TENANT)
+    assert packet.tenant_record_id == _AUTHORITATIVE_UUIDV7_TENANT
+
+
+@pytest.mark.parametrize(
+    "tenant_record_id",
+    [
+        "00000000-0000-0000-0000-000000000000",
+        "ffffffff-ffff-ffff-ffff-ffffffffffff",
+    ],
+)
+def test_rejects_reserved_sentinel_tenant_identity(tenant_record_id: str) -> None:
+    """Reject RFC 9562 Nil/Max sentinels while deferring UUID version policy to HRIS core."""
     with pytest.raises(ValueError, match="tenant_record_id"):
-        _build_with_tenant("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+        _build_with_tenant(tenant_record_id)
