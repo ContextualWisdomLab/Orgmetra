@@ -12,7 +12,6 @@ import json
 import re
 from secrets import token_urlsafe
 from typing import Awaitable, Callable, Mapping, Sequence
-from urllib.parse import parse_qsl
 from uuid import UUID
 
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
@@ -69,8 +68,9 @@ class JobAnalysisAsgiApp:
 
     POST requires ``Authorization``, ``Content-Type: application/json``,
     ``Idempotency-Key``, and ``X-Purpose-Code``. The request body is the
-    snapshot document. GET requires ``purpose`` as a query parameter.
-    Successful responses are never cached as shared evidence.
+    snapshot document. GET requires ``Authorization`` and ``X-Purpose-Code``;
+    purpose never travels in the URL or query string. Successful responses are
+    never cached as shared evidence.
     """
 
     authenticator: TokenAuthenticator
@@ -157,12 +157,13 @@ class JobAnalysisAsgiApp:
             return
 
         try:
+            headers = _typed_headers(scope)
+            purpose_code = _required_header(headers, b"x-purpose-code")
+            if _PURPOSE_PATTERN.fullmatch(purpose_code) is None:
+                raise _InvalidHttpRequest("purpose must be a lower snake_case code")
+
             if method == "POST":
-                headers = _typed_headers(scope)
                 idempotency_key = _required_header(headers, b"idempotency-key")
-                purpose_code = _required_header(headers, b"x-purpose-code")
-                if _PURPOSE_PATTERN.fullmatch(purpose_code) is None:
-                    raise _InvalidHttpRequest("purpose must be a lower snake_case code")
                 _require_json_content_type(headers)
                 document = await _read_json_object(receive)
                 position_record_id = _optional_uuid(document.pop("position_record_id", None))
@@ -191,7 +192,9 @@ class JobAnalysisAsgiApp:
                 )
                 return
 
-            purpose_code = _query_purpose(scope.get("query_string", b""))
+            raw_query = scope.get("query_string", b"")
+            if not isinstance(raw_query, bytes) or raw_query:
+                raise _InvalidHttpRequest("job-analysis reads do not accept query parameters")
             view = read_job_analysis_snapshot(
                 principal=principal,
                 tenant_record_id=tenant_record_id,
@@ -300,26 +303,6 @@ def _optional_uuid(value: object) -> UUID | None:
     return parsed
 
 
-def _query_purpose(raw_query: object) -> str:
-    """Require exactly one lower snake_case purpose query parameter for reads."""
-    if not isinstance(raw_query, bytes):
-        raise _InvalidHttpRequest("query_string must be bytes")
-    try:
-        pairs = parse_qsl(raw_query.decode("ascii"), keep_blank_values=True, strict_parsing=True)
-    except (UnicodeDecodeError, ValueError) as error:
-        raise _InvalidHttpRequest("query string is malformed") from error
-    query: dict[str, str] = {}
-    for key, value in pairs:
-        if key in query:
-            raise _InvalidHttpRequest("duplicate query parameter")
-        query[key] = value
-    if frozenset(query) != frozenset({"purpose"}):
-        raise _InvalidHttpRequest("query parameters are incomplete or unsupported")
-    if _PURPOSE_PATTERN.fullmatch(query["purpose"]) is None:
-        raise _InvalidHttpRequest("purpose must be a lower snake_case code")
-    return query["purpose"]
-
-
 def _typed_headers(scope: Mapping[str, object]) -> dict[bytes, bytes]:
     """Return lower-cased singleton headers or reject malformed header frames."""
     raw_headers = scope.get("headers", ())
@@ -352,7 +335,7 @@ def _authorization_header(scope: Mapping[str, object]) -> str | None:
 
 
 def _required_header(headers: Mapping[bytes, bytes], name: bytes) -> str:
-    """Return one required printable ASCII header used by governed writes."""
+    """Return one required printable ASCII header used by governed requests."""
     value = headers.get(name)
     if value is None:
         raise _InvalidHttpRequest(f"{name.decode('ascii')} header is required")
