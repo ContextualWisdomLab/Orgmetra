@@ -7,7 +7,7 @@
 
 Orgmetra already owns authoritative Employment/Job truth and performance/criterion evidence boundaries, but a buyer-facing review workflow also needs a small pre-rating object that identifies which employment references, review period, performance cycle, criteria, goals, outcome evidence, and reviewer are being considered without copying person values or prematurely materializing a rating.
 
-A transport-neutral packet cannot prove merely from syntactically valid opaque references that the Person, Employment, Job, cycle, goals, and observation snapshot all resolve to one authoritative temporal scope. Treating correlation as verified scope would create a misleading high-impact evidence boundary. Authoritative relationship and temporal resolution therefore remains a required downstream step before rating.
+A transport-neutral packet cannot prove merely from syntactically valid opaque references that the Person, Employment, Job, cycle, goals, and observation snapshot all resolve to one authoritative temporal scope. Treating correlation as verified scope would create a misleading high-impact evidence boundary. Authoritative relationship and temporal resolution therefore remains a required downstream step before rating. UUID syntax is also part of the privacy boundary: UUIDv1 can expose timestamp/node-derived correlation metadata despite looking opaque, so trust references must not accept arbitrary UUID versions.
 
 U.S. OPM performance-management guidance treats performance management as a continuous cycle of planning, monitoring, developing, rating, and rewarding, and describes rating as evaluation against established elements and standards. ISO 30414:2025 Edition 2 provides current human-capital reporting requirements and recommendations across areas including productivity, skills/capabilities, and related workforce governance. Orgmetra uses those sources as design evidence, not as a claim that this packet by itself satisfies any jurisdiction-specific appraisal rule or ISO certification requirement.
 
@@ -18,13 +18,13 @@ Introduce a transport-neutral `PerformanceReviewPacket` that remains pre-rating,
 The packet MUST bind:
 
 - canonical tenant identity;
-- opaque UUID-backed Person, Employment, Job, performance-cycle and performance-review references;
-- a governed criterion-set reference plus independent SHA-256 digest;
-- a governed performance-goal-plan reference plus independent SHA-256 digest;
-- an exact criterion-observation-snapshot reference plus independent SHA-256 digest;
-- an optional development-plan reference/digest pair;
+- opaque canonical non-sentinel UUIDv4-backed Person, Employment, Job, performance-cycle and performance-review references, rejecting UUIDv1 and every other UUID version;
+- a governed criterion-set UUIDv4 reference plus independent SHA-256 digest;
+- a governed performance-goal-plan UUIDv4 reference plus independent SHA-256 digest;
+- an exact criterion-observation-snapshot UUIDv4 reference plus independent SHA-256 digest;
+- an optional development-plan UUIDv4 reference/digest pair;
 - explicit business review-period dates;
-- one accountable reviewer, fixed `performance_review` purpose, a reviewed closed reason code, and precision-preserving evidence timestamp;
+- one accountable UUIDv4-backed reviewer, fixed `performance_review` purpose, a reviewed closed reason code, and precision-preserving evidence timestamp;
 - a bounded positive integer `evidence_version`, defaulting to `1`, that is included in canonical evidence and therefore changes the packet digest when the governed evidence version changes.
 
 The initial closed reason vocabulary contains only `scheduled_cycle_review`. Arbitrary lower-snake-case values are rejected even when syntactically well formed, because free-form reason text can encode a person name, identifier, or unreviewed decision context. Additional reasons require an explicit governed contract change and regression evidence before they can enter canonical review evidence.
@@ -39,7 +39,7 @@ Canonical JSON and SHA-256 are immutable correlation evidence only. They do not 
 
 ## Consequences
 
-Buyers can present a review-ready correlation envelope while keeping authoritative Employment/Job and performance evidence separable from the later human rating/feedback event. A consumer cannot truthfully treat the packet itself as proof that all referenced records belong to the same employee/job/cycle. Person correlation remains sensitive metadata and therefore still requires purpose-bound access, least privilege, retention/export controls, and immutable audit handling.
+Buyers can present a review-ready correlation envelope while keeping authoritative Employment/Job and performance evidence separable from the later human rating/feedback event. A consumer cannot truthfully treat the packet itself as proof that all referenced records belong to the same employee/job/cycle. Person correlation remains sensitive metadata and therefore still requires purpose-bound access, least privilege, retention/export controls, and immutable audit handling. Requiring UUIDv4 for namespaced trust references also closes UUIDv1 timestamp/node correlation leakage, while authoritative resolution remains mandatory because UUIDv4 syntax does not establish tenant or business scope.
 
 This slice adds no database migration, no rating computation, no cross-service table access, and no automated employment decision. The pre-rating packet now preserves actor, purpose, reviewed reason, and evidence version in its immutable correlation evidence; later authoritative rating persistence must independently preserve those values plus human confirmation, audit/outbox, temporal scope, authoritative scope-resolution evidence, and any applicable policy requirements.
 
