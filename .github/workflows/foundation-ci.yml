@@ -87,6 +87,7 @@ jobs:
           - test_candidate_worker_conversion_postgres.sh
           - test_validity_study_case_postgres.sh
           - test_criterion_observation_scope_postgres.sh
+          - test_people_mutation_idempotency_postgres.sh
     services:
       postgres:
         image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
