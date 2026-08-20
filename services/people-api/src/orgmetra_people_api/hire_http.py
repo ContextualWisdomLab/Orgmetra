@@ -42,6 +42,7 @@ _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _RFC3339_FULL_DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", flags=re.ASCII)
 _MAX_UUID_INT = (1 << 128) - 1
 _MAX_BODY_BYTES = 65536
+_MAX_BODY_FRAMES = 1024
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 _REQUIRED_BODY_KEYS = frozenset(
     {
@@ -402,10 +403,14 @@ def _require_json_content_type(scope: Mapping[str, object]) -> None:
 
 
 async def _read_json_object(receive: AsgiReceive) -> dict[str, object]:
-    """Read one bounded JSON object across ordinary ASGI request-body frames."""
+    """Read one byte- and frame-bounded JSON object across ASGI request messages."""
     body = bytearray()
+    frame_count = 0
     while True:
+        if frame_count >= _MAX_BODY_FRAMES:
+            raise _PayloadTooLarge("hire command exceeds the bounded frame count")
         message = await receive()
+        frame_count += 1
         if message.get("type") != "http.request":
             raise _InvalidHttpRequest("request body is missing")
         raw_chunk = message.get("body", b"")
