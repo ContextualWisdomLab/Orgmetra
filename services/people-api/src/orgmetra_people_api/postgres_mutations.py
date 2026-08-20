@@ -551,7 +551,7 @@ class PostgresPeopleMutationPort:
                 if replayed is not None:
                     return EmploymentMutationResult(employment_record_id=replayed)
                 cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
-                _conversion_id, _transaction_started_at = _require_one_conversion(cursor.fetchmany(2))
+                _require_one_conversion(cursor.fetchmany(2))
                 recorded_at = _post_lock_recorded_at(cursor)
                 cursor.execute(
                     _EMPLOYMENT_VERSIONS_SQL,
@@ -744,7 +744,7 @@ class PostgresPeopleMutationPort:
                 if replayed is not None:
                     return AssignmentMutationResult(assignment_record_id=replayed)
                 cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
-                _conversion_id, _transaction_started_at = _require_one_conversion(cursor.fetchmany(2))
+                _require_one_conversion(cursor.fetchmany(2))
                 cursor.execute(
                     _NAMED_EMPLOYMENT_VERSIONS_SQL,
                     (command.tenant_record_id, command.employment_record_id),
