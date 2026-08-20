@@ -28,3 +28,7 @@ Allen (1983) treats interval overlap as a first-class relation. Diez-Roux (1998)
 - A second job must be marked concurrent, or the prior exclusive period must end, before save.
 - Closing or freezing a seat fails later assignment days even when employment coverage remains valid.
 - Persistence still applies these kernel checks before insert; this ADR does not add HTTP handlers.
+
+## References
+
+See `docs/doctoring/REFERENCES.md` for the APA 7th records cited above, including Allen (1983), Diez-Roux (1998), Robinson (1950), ISO 30414:2025, and Jensen and Snodgrass (1999).
