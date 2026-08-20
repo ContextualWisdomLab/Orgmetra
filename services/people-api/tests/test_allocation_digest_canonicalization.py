@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, localcontext
 import unittest
 
 from orgmetra_people_api.mutations import mutation_command_digest
@@ -24,6 +24,17 @@ class AllocationDigestCanonicalizationTests(unittest.TestCase):
             for token in ("0.25", "0.250", "0.2500")
         }
         self.assertEqual(len(digests), 1)
+
+    def test_digest_canonicalization_does_not_depend_on_decimal_context_precision(self) -> None:
+        """A caller's thread-local Decimal precision must not break a valid command digest."""
+        authorization = assignment_authorization()
+        with localcontext() as context:
+            context.prec = 1
+            digest = mutation_command_digest(
+                command=assignment_command(allocation_ratio=Decimal("0.25")),
+                authorization=authorization,
+            )
+        self.assertRegex(digest, r"^[0-9a-f]{64}$")
 
 
 if __name__ == "__main__":
