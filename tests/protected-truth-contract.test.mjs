@@ -42,10 +42,22 @@ test('protected buyer truth is positively pinned for recently integrated capabil
     'README must not demote protected capabilities to active-PR truth'
   );
 
+  assert.doesNotMatch(
+    readme,
+    /GET-only People API/i,
+    'README must not describe the protected People API as GET-only after governed mutations integrated'
+  );
+  assert.match(
+    readme,
+    /governed People mutation/i,
+    'README must positively describe protected governed People mutation capability'
+  );
+
   for (const requirement of [
     'Bitemporal workforce-composition evidence',
     'Governed requisition review evidence',
-    'Governed human selection review evidence'
+    'Governed human selection review evidence',
+    'Governed People writes and confirmed-hire materialization'
   ]) {
     const row = traceabilityRow(traceability, requirement);
     assert.ok(row, `missing traceability row: ${requirement}`);
