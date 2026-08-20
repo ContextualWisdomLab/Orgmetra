@@ -7,7 +7,6 @@ import json
 import pytest
 
 from orgmetra_interview_plan import (
-    StructuredInterviewActivationReceipt,
     StructuredInterviewActivationVerification,
     activate_structured_interview_plan,
     build_structured_interview_plan,
