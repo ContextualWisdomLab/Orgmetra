@@ -19,6 +19,7 @@ _LLM_OUTPUT_AUTHORITY: Final = "untrusted_draft_evidence"
 _MAX_UUID_INT: Final = (1 << 128) - 1
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _GOVERNED_CODE_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,127}$")
+_CREDENTIAL_PREFIXES: Final = ("sk-", "ghp_", "github_pat_", "nvapi-", "bearer")
 _NEXT_ACTION: Final = (
     "Within tenant_record_id, re-resolve validation_study_reference, requested_by_actor_reference, "
     "tepp_workspace_id, and tepp_snapshot_id; prove the workspace and immutable snapshot belong to "
@@ -74,11 +75,13 @@ def _canonical_rfc3339(value: datetime) -> str:
 
 
 def _validate_opaque_identifier(value: str, field_name: str, maximum_length: int = 256) -> None:
-    """Require a bounded printable opaque identifier with no whitespace or control bytes."""
+    """Require a bounded printable opaque identifier with no whitespace, controls, or credential shape."""
     if not isinstance(value, str) or not 1 <= len(value) <= maximum_length:
         raise ValueError(f"{field_name} must be a bounded opaque identifier")
     if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
         raise ValueError(f"{field_name} must contain only visible ASCII without whitespace")
+    if value.lower().startswith(_CREDENTIAL_PREFIXES):
+        raise ValueError(f"{field_name} must not contain a credential-shaped value")
 
 
 def _validate_idempotency_key(value: str) -> None:
@@ -206,11 +209,13 @@ class TeppAnalysisRequestPacket:
         )
 
     def governance_evidence(self) -> dict[str, object]:
-        """Return value-minimized Orgmetra evidence for durable audit/outbox correlation."""
+        """Return purpose-minimized Orgmetra evidence for durable audit/outbox correlation."""
         return {
             "tenant_record_id": self.tenant_record_id,
             "validation_study_reference": self.validation_study_reference,
             "requested_by_actor_reference": self.requested_by_actor_reference,
+            "tepp_workspace_id": self.tepp_workspace_id,
+            "tepp_snapshot_id": self.tepp_snapshot_id,
             "snapshot_digest": self.snapshot_digest,
             "evidence_version": self.evidence_version,
             "generated_at": _canonical_rfc3339(self.generated_at),
