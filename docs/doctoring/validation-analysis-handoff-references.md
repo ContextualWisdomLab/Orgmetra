@@ -1,6 +1,6 @@
 # Validation-analysis handoff references
 
-Material decisions for ADR 0025 were checked against the following primary/authoritative sources on 2026-08-21.
+Material decisions for ADR 0027 were checked against the following primary/authoritative sources on 2026-08-21.
 
 ## APA 7 references
 
