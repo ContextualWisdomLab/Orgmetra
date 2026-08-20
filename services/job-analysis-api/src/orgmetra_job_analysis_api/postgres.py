@@ -42,10 +42,14 @@ WITH idempotency_lock AS MATERIALIZED (
         pg_catalog.hashtextextended(pg_catalog.concat(%s, ':', %s), 0)
     )
 )
-SELECT command_record.request_digest_sha256, command_record.analysis_record_id
+SELECT
+    command_record.request_digest_sha256,
+    command_record.analysis_record_id,
+    command_record.actor_reference,
+    command_record.purpose_code
 FROM idempotency_lock
 LEFT JOIN LATERAL (
-    SELECT request_digest_sha256, analysis_record_id
+    SELECT request_digest_sha256, analysis_record_id, actor_reference, purpose_code
     FROM public.job_analysis_write_command
     WHERE tenant_record_id = %s
       AND idempotency_key = %s
@@ -229,8 +233,9 @@ class PostgresJobAnalysisPort:
         """Insert one snapshot or replay an identical Idempotency-Key command.
 
         The Idempotency-Key is written to ``job_analysis_write_command``. A
-        reused key with a different digest is rejected. ``record_audit_outbox_event``
-        runs only for a new write, inside the same transaction.
+        reused key with a different digest, actor, or purpose is rejected.
+        ``record_audit_outbox_event`` runs only for a new write, inside the same
+        transaction.
         """
         if not isinstance(snapshot, JobAnalysisSnapshot):
             raise TypeError("snapshot must be a JobAnalysisSnapshot")
@@ -259,11 +264,21 @@ class PostgresJobAnalysisPort:
                 )
                 existing = cursor.fetchone()
                 if existing is not None and existing[0] is not None:
-                    stored_digest, stored_analysis_id = existing
+                    stored_digest, stored_analysis_id, *stored_authority = existing
                     if stored_digest != request_digest:
                         raise JobAnalysisIdempotencyConflict(
                             "idempotency key is bound to a different snapshot digest"
                         )
+                    if stored_authority:
+                        stored_actor_reference, stored_purpose_code = stored_authority
+                        if stored_actor_reference != actor_reference:
+                            raise JobAnalysisIdempotencyConflict(
+                                "idempotency key is bound to a different actor"
+                            )
+                        if stored_purpose_code != purpose_code:
+                            raise JobAnalysisIdempotencyConflict(
+                                "idempotency key is bound to a different purpose"
+                            )
                     replayed = self._load_snapshot(
                         cursor,
                         tenant_record_id=snapshot.tenant_record_id,
