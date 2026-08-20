@@ -185,9 +185,12 @@ class EmploymentMutationCommand:
             _validate_operational_uuid(field_name, getattr(self, field_name))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
-        if self.employment_status_code not in _EMPLOYMENT_STATUSES:
+        if not isinstance(self.employment_status_code, str) or self.employment_status_code not in _EMPLOYMENT_STATUSES:
             raise ValueError("employment_status_code must be active, leave, or terminated.")
-        if self.employment_concurrency_code not in _CONCURRENCY_CODES:
+        if (
+            not isinstance(self.employment_concurrency_code, str)
+            or self.employment_concurrency_code not in _CONCURRENCY_CODES
+        ):
             raise ValueError("employment_concurrency_code must be exclusive or concurrent.")
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
@@ -225,7 +228,7 @@ class PositionMutationCommand:
             _validate_operational_uuid(field_name, getattr(self, field_name))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
-        if self.position_status_code not in _POSITION_STATUSES:
+        if not isinstance(self.position_status_code, str) or self.position_status_code not in _POSITION_STATUSES:
             raise ValueError("position_status_code must be a staffable or closed seat status.")
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
