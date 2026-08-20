@@ -119,6 +119,7 @@ async def _send_json(
             "support_reference": support_reference,
         },
         extra_headers=extra_headers,
+        support_reference=support_reference,
     )
 
 
