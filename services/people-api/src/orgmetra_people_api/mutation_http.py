@@ -234,6 +234,8 @@ class PeopleMutationAsgiApp:
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
             principal = await self.authenticator.authenticate(bearer_token)
+            if not isinstance(principal, AuthenticatedPrincipal):
+                raise TypeError("authenticator returned an invalid principal")
         except AuthenticationFailed:
             await _send_error(
                 send,
