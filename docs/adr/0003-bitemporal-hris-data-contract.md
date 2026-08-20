@@ -27,14 +27,17 @@ High-impact decisions and their evidence are immutable event records rather than
 
 Operators reconstruct history by naming the tenant, the effective day or interval, and the knowledge cutoff. A correction closes the open recorded interval and inserts a replacement fact. In-place business mutation of a recorded fact is rejected. Adjacent half-open intervals may meet; overlapping single-valued versions are a conflict, not a merge.
 
+A deterministic organization-hierarchy evidence view must use that same coordinate instead of reading an implicit current tree. `OrganizationHierarchySnapshot` resolves one visible parent link per tenant organization unit, rejects contradictory visible versions and cycles, preserves an opaque parent anchor that is not visible at the requested coordinate rather than silently rewriting it as a root, and binds the exact effective date and knowledge cutoff into canonical evidence bytes. The snapshot does not infer names, headcount, managerial/legal authority, worker allocation, or employment decisions.
+
 ## Consequences
 
 - Historical organization, job, manager, assignment, and person-name states remain reconstructable at a stated effective time and knowledge cutoff.
 - Late corrections do not destroy what the system previously knew; an auditor can compare the original knowledge with the later correction.
 - Stable identity does not duplicate mutable descriptive attributes.
+- Deterministic organization-hierarchy snapshots can be correlated to the exact bitemporal coordinate without creating a second organization system of record.
 - Decision and evidence history remains append-only, so a validity case can export the exact decision the human confirmed.
 - Queries and tests are more complex but auditable. Operators must supply a knowledge cutoff instead of reading an implicit “current” snapshot when reconstructing a past decision.
-- This ADR does not replace Jensen and Snodgrass or Allen with a new temporal model. Later assignment, exclusivity, and hierarchy rules compose on top of this contract.
+- This ADR does not replace Jensen and Snodgrass or Allen with a new temporal model. Later assignment, exclusivity, hierarchy, and reporting rules compose on top of this contract.
 
 ## References
 
