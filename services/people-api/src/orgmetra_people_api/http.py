@@ -137,6 +137,16 @@ class PeopleAsgiApp:
                 extra_headers=((b"www-authenticate", b"Bearer"),),
             )
             return
+        except Exception:  # noqa: BLE001 - identity backend failures must remain client-safe.
+            await _send_json(
+                send,
+                status=500,
+                payload={
+                    "error": "internal_error",
+                    "message": "Retry later or contact an Orgmetra operator with non-secret request metadata; never include the bearer token.",
+                },
+            )
+            return
 
         try:
             view = read_worker_people_record(
