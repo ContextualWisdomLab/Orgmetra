@@ -9,9 +9,11 @@ import pytest
 
 from orgmetra_selection_monitoring import build_selection_outcome_monitoring_plan
 
+UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+
 
 def _build(**overrides):
-    """Build a valid packet using canonical UUID-backed opaque references."""
+    """Build a valid packet using canonical UUIDv4-backed opaque references."""
     values = {
         "tenant_record_id": "11111111-1111-4111-8111-111111111111",
         "monitoring_plan_reference": "selection_monitoring_plan:10000000-0000-4000-8000-000000000001",
@@ -83,3 +85,31 @@ def test_references_reject_value_bearing_sentinel_and_noncanonical_suffixes(
     packet = _build()
     with pytest.raises(ValueError, match=message):
         replace(packet, **{field_name: value})
+
+
+@pytest.mark.parametrize(
+    ("field_name", "prefix"),
+    [
+        ("monitoring_plan_reference", "selection_monitoring_plan"),
+        ("job_profile_reference", "job_profile"),
+        ("selection_process_reference", "selection_process"),
+        ("population_snapshot_reference", "population_snapshot"),
+        ("outcome_snapshot_reference", "selection_outcome_snapshot"),
+        ("protected_attribute_policy_reference", "protected_attribute_policy"),
+        ("small_sample_policy_reference", "small_sample_policy"),
+        ("statistical_plan_reference", "statistical_plan"),
+        ("actor_reference", "actor"),
+        ("reviewer_reference", "actor"),
+    ],
+)
+def test_uuid1_trust_reference_is_rejected_by_builder_and_replace(
+    field_name: str,
+    prefix: str,
+) -> None:
+    """UUIDv1 timestamp/node metadata must never enter an aggregate trust-reference field."""
+    value = f"{prefix}:{UUID1_ID}"
+    with pytest.raises(ValueError, match=field_name):
+        _build(**{field_name: value})
+
+    with pytest.raises(ValueError, match=field_name):
+        replace(_build(), **{field_name: value})
