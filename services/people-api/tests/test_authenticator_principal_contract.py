@@ -49,8 +49,10 @@ class AuthenticatorPrincipalContractTests(unittest.IsolatedAsyncioTestCase):
     ) -> tuple[int, dict[str, object]]:
         try:
             return await _SUPPORT.invoke_without_body_read(app, scope=scope)
-        except Exception as error:  # noqa: BLE001 - convert escaped boundary exceptions into an explicit RED failure.
-            self.fail(f"malformed authenticator result escaped ASGI boundary as {type(error).__name__}")
+        except Exception as error:  # noqa: BLE001 - escaped boundary failures are the regression under test.
+            raise AssertionError(
+                f"malformed authenticator result escaped ASGI boundary as {type(error).__name__}"
+            ) from error
 
     def _assert_sanitized_failure(
         self,
