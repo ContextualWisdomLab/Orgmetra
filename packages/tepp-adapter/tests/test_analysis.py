@@ -37,6 +37,18 @@ def build_valid() -> TeppAnalysisRequestPacket:
     return build_tepp_analysis_request_packet(**values())
 
 
+def test_tenant_identity_accepts_protected_core_operational_uuid_contract() -> None:
+    """Keep this leaf interoperable with authoritative Orgmetra tenant UUIDs."""
+    tenant_uuid7 = "10000000-0000-7000-8000-000000000001"
+    kwargs = values()
+    kwargs["tenant_record_id"] = tenant_uuid7
+
+    packet = build_tepp_analysis_request_packet(**kwargs)
+
+    assert packet.tenant_record_id == tenant_uuid7
+    assert replace(build_valid(), tenant_record_id=tenant_uuid7).tenant_record_id == tenant_uuid7
+
+
 def test_request_matches_exact_tepp_v1_wire_shape_and_is_deterministic() -> None:
     packet = build_valid()
     request = packet.tepp_request()
@@ -119,9 +131,10 @@ def test_repr_and_immutability_protect_correlation_values() -> None:
 @pytest.mark.parametrize(
     ("field_name", "value", "message"),
     [
-        ("tenant_record_id", str(uuid1()), "UUIDv4"),
-        ("tenant_record_id", "11111111-1111-4111-8111-11111111111A", "UUIDv4"),
-        ("tenant_record_id", 1, "UUIDv4"),
+        ("tenant_record_id", "00000000-0000-0000-0000-000000000000", "UUID"),
+        ("tenant_record_id", "ffffffff-ffff-ffff-ffff-ffffffffffff", "UUID"),
+        ("tenant_record_id", "11111111-1111-4111-8111-11111111111A", "UUID"),
+        ("tenant_record_id", 1, "UUID"),
         ("validation_study_reference", "wrong:22222222-2222-4222-8222-222222222222", "validation_study"),
         ("validation_study_reference", f"validation_study:{uuid1()}", "UUIDv4"),
         ("requested_by_actor_reference", "actor:not-a-uuid", "UUIDv4"),
