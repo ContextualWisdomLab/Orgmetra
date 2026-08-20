@@ -5,6 +5,7 @@ Status: **active PR / proposed capability**, not protected-main truth.
 | Buyer requirement | Executable evidence | Contract outcome |
 | --- | --- | --- |
 | Exact selected-candidate scope | `test_rejects_bad_opaque_references`; canonical JSON test | Candidate is correlated only by a bounded opaque `candidate_profile:` reference. |
+| Opaque trust-reference privacy | `test_rejects_uuid1_trust_references_through_direct_and_replace` | Every namespaced packet reference requires a canonical non-sentinel UUIDv4 suffix; UUIDv1 timestamp/node correlation and other UUID versions fail closed through direct construction and replacement. |
 | Separate Job and Position | valid packet + optional-Position test | Job is mandatory; Position is separately named and optional rather than collapsed into Job. |
 | Reviewed selection evidence | digest/reference validation tests | Selection decision identity and SHA-256 evidence are required. |
 | Compensation/terms provenance without value duplication | value-free canonical JSON test; digest/reference validation tests | Package and terms are exact reference+digest pairs; salary/benefit values are absent. |
