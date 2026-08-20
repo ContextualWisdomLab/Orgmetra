@@ -66,6 +66,14 @@ CREATE TABLE job_analysis_snapshot (
         CHECK (criterion_blueprint_id IS NULL OR is_operational_uuid(criterion_blueprint_id))
 );
 
+CREATE INDEX job_analysis_snapshot_position_idx
+    ON job_analysis_snapshot (tenant_record_id, position_record_id)
+    WHERE position_record_id IS NOT NULL;
+
+CREATE INDEX job_analysis_snapshot_criterion_idx
+    ON job_analysis_snapshot (tenant_record_id, criterion_blueprint_id)
+    WHERE criterion_blueprint_id IS NOT NULL;
+
 CREATE TABLE job_analysis_task_item (
     tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
     analysis_record_id uuid NOT NULL,
@@ -84,8 +92,6 @@ CREATE TABLE job_analysis_task_item (
     CONSTRAINT job_analysis_task_snapshot_tenant_fk
         FOREIGN KEY (tenant_record_id, analysis_record_id)
         REFERENCES job_analysis_snapshot(tenant_record_id, analysis_record_id),
-    CONSTRAINT job_analysis_task_item_identity_unique
-        UNIQUE (tenant_record_id, task_record_id, analysis_record_id),
     CONSTRAINT job_analysis_task_importance_level_check
         CHECK (importance_level BETWEEN 1 AND 5),
     CONSTRAINT job_analysis_task_difficulty_level_check
@@ -119,8 +125,6 @@ CREATE TABLE job_analysis_ksao_item (
     CONSTRAINT job_analysis_ksao_snapshot_tenant_fk
         FOREIGN KEY (tenant_record_id, analysis_record_id)
         REFERENCES job_analysis_snapshot(tenant_record_id, analysis_record_id),
-    CONSTRAINT job_analysis_ksao_item_identity_unique
-        UNIQUE (tenant_record_id, ksao_record_id, analysis_record_id),
     CONSTRAINT job_analysis_ksao_category_code_check
         CHECK (category_code IN (
             'knowledge_requirement',
@@ -196,6 +200,9 @@ CREATE TABLE job_analysis_write_command (
     CONSTRAINT job_analysis_write_command_analysis_operational_uuid_check
         CHECK (is_operational_uuid(analysis_record_id))
 );
+
+CREATE INDEX job_analysis_write_command_analysis_idx
+    ON job_analysis_write_command (tenant_record_id, analysis_record_id);
 
 CREATE TRIGGER job_analysis_snapshot_append_only_guard
 BEFORE UPDATE OR DELETE ON job_analysis_snapshot
