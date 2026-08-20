@@ -426,7 +426,7 @@ def persist_job_analysis_snapshot(
         reason_code="snapshot_persisted",
         evidence_version_code=snapshot.analysis_version_code,
         result_code="recorded",
-        occurred_at=snapshot.recorded_at.astimezone(timezone.utc),
+        occurred_at=datetime.now(timezone.utc),
         high_impact=False,
     )
     persisted = write_port.persist_snapshot(
