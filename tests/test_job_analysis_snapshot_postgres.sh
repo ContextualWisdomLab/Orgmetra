@@ -21,6 +21,7 @@ for migration in \
 done
 
 TENANT_ID="10000000-0000-7000-8000-000000000001"
+OTHER_TENANT_ID="20000000-0000-7000-8000-000000000002"
 JOB_ID="00000000-0000-7000-8000-000000000021"
 ANALYSIS_ID="00000000-0000-7000-8000-000000000081"
 TASK_ID="00000000-0000-7000-8000-000000000082"
@@ -31,6 +32,7 @@ CRITERION_ID="00000000-0000-7000-8000-000000000086"
 COMMAND_ID="00000000-0000-7000-8000-000000000087"
 AUDIT_ID="00000000-0000-4000-8000-000000000088"
 OUTBOX_ID="00000000-0000-4000-8000-000000000089"
+
 
 tenant_psql() {
     PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" command psql "$@"
@@ -256,6 +258,38 @@ update_status=$?
 set -e
 if [[ ${update_status} -eq 0 || "${update_output}" != *"append-only"* ]]; then
     echo "job-analysis snapshot was mutable: ${update_output}" >&2
+    exit 1
+fi
+
+set +e
+delete_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
+    "DELETE FROM job_analysis_snapshot WHERE analysis_record_id = '${ANALYSIS_ID}'::uuid;" ; } 2>&1)"
+delete_status=$?
+set -e
+if [[ ${delete_status} -eq 0 || "${delete_output}" != *"append-only"* ]]; then
+    echo "job-analysis snapshot was deletable: ${delete_output}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+DO $role$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orgmetra_job_analysis_reader') THEN
+        CREATE ROLE orgmetra_job_analysis_reader NOLOGIN NOSUPERUSER NOBYPASSRLS;
+    END IF;
+END
+$role$;
+GRANT USAGE ON SCHEMA public TO orgmetra_job_analysis_reader;
+GRANT SELECT ON job_analysis_snapshot TO orgmetra_job_analysis_reader;
+SQL
+
+other_tenant_rows="$(
+    PGOPTIONS="-c orgmetra.tenant_record_id=${OTHER_TENANT_ID}" \
+        psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc \
+        "SET ROLE orgmetra_job_analysis_reader; SELECT count(*) FROM job_analysis_snapshot;"
+)"
+if [[ "${other_tenant_rows}" != "0" ]]; then
+    echo "row-level security leaked job-analysis rows across tenants: ${other_tenant_rows}" >&2
     exit 1
 fi
 
