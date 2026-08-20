@@ -24,3 +24,7 @@ Jensen and Snodgrass (1999) require an explicit knowledge cutoff for temporal re
 - Historical queries can reconstruct what was true and what was known.
 - Assignments cannot detach from employment coverage.
 - Multiple concurrent assignments remain legal when their allocations stay at or below 1.0000 for one employment.
+
+## References
+
+See `docs/doctoring/REFERENCES.md` for the APA 7th records cited above, including Jensen and Snodgrass (1999), Snodgrass (1999), Robinson (1950), and Diez-Roux (1998).
