@@ -48,6 +48,7 @@ _RFC3339_FULL_DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", flags=re.ASCII)
 _MAX_UUID_INT = (1 << 128) - 1
 _MAX_BODY_BYTES = 65536
 _MAX_BODY_FRAMES = 1024
+_MAX_JSON_NESTING_DEPTH = 128
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 _REQUIRED_BODY_KEYS = frozenset(
     {
@@ -431,7 +432,7 @@ def _require_json_content_type(scope: Mapping[str, object]) -> None:
 
 
 async def _read_json_object(receive: AsgiReceive) -> dict[str, object]:
-    """Read one byte- and frame-bounded JSON object across ASGI request messages."""
+    """Read one byte-, frame-, and nesting-bounded JSON object across ASGI messages."""
     body = bytearray()
     frame_count = 0
     while True:
@@ -455,9 +456,25 @@ async def _read_json_object(receive: AsgiReceive) -> dict[str, object]:
         payload = json.loads(bytes(body), object_pairs_hook=_reject_duplicate_keys)
     except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, TypeError, ValueError) as error:
         raise _InvalidHttpRequest("request body must be one JSON object") from error
+    _require_bounded_json_nesting(payload)
     if not isinstance(payload, dict):
         raise _InvalidHttpRequest("request body must be one JSON object")
     return payload
+
+
+def _require_bounded_json_nesting(payload: object) -> None:
+    """Reject JSON whose logical nesting exceeds the stable HTTP parsing budget."""
+    stack: list[tuple[object, int]] = [(payload, 0)]
+    while stack:
+        value, depth = stack.pop()
+        if depth > _MAX_JSON_NESTING_DEPTH:
+            raise _InvalidHttpRequest("request body must be one JSON object")
+        if isinstance(value, dict):
+            for child in value.values():
+                stack.append((child, depth + 1))
+        elif isinstance(value, list):
+            for child in value:
+                stack.append((child, depth + 1))
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
