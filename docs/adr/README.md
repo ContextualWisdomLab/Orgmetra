@@ -11,3 +11,8 @@
 | [0007](0007-governed-job-analysis-evidence.md) | Governed job-analysis evidence snapshots | Accepted on stacked implementation branch |
 | [0008](0008-purpose-bound-pii-authorization.md) | Purpose-bound PII authorization | Accepted on protected `develop` |
 | [0009](0009-performance-criterion-observation-scope.md) | Performance criterion observations require worker-job scope | Accepted on active implementation branch |
+| [0010](0010-naruon-calendar-intent-boundary.md) | Naruon calendar intent boundary | Accepted on protected `develop` |
+| [0011](0011-bitemporal-workforce-composition.md) | Bitemporal workforce composition | Accepted on protected `develop` |
+| [0012](0012-governed-migration-handoff.md) | Governed migration handoff | Accepted on protected `develop` |
+| [0013](0013-governed-requisition-review-packet.md) | Governed requisition review packet | Accepted on protected `develop` |
+| [0015](0015-product-technical-gap-baseline.md) | Product and technical gap baseline | Accepted on active development branch |

@@ -48,3 +48,13 @@ Each interactive component requires at least these stories where applicable:
 - Every evidence citation opens a keyboard-accessible drawer.
 - High-impact actions require preview, reason, actor, purpose, and confirmation.
 - Missing evidence is shown as `unknown`, not `failed`.
+
+## Local executable slice
+
+`apps/hr-workspace/` is the first dependency-free executable slice of the
+Employee Profile and HR Home experience. It consumes the shared CSS tokens,
+keeps the Figma node IDs in the markup, and exercises evidence review,
+purpose-bound permission denial, high-impact confirmation, exact allocation
+values, and English/Korean labels. It is fixture mode: it does not claim a
+connected API or a deployed Storybook runtime. A full Storybook runner is
+deferred until a second workspace justifies extracting shared components.

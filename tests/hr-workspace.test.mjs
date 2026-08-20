@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+import { isPurposeAuthorized, nextLocale } from '../apps/hr-workspace/app.js';
+
+const html = readFileSync(new URL('../apps/hr-workspace/index.html', import.meta.url), 'utf8');
+const css = readFileSync(new URL('../apps/hr-workspace/styles.css', import.meta.url), 'utf8');
+
+test('workspace exposes the Figma role slice and existing design tokens', () => {
+  assert.match(html, /packages\/design-tokens\/tokens\.css/);
+  assert.match(html, /data-node-id="1:10"/);
+  assert.match(html, /data-node-id="1:28"/);
+  assert.match(html, /data-view-link="hr-home"/);
+  assert.match(html, /data-view-link="employee-profile"/);
+  assert.match(css, /var\(--orgmetra-action-review\)/);
+  assert.match(css, /var\(--orgmetra-focus-ring\)/);
+});
+
+test('workspace includes keyboard-accessible review and high-impact states', () => {
+  assert.match(html, /id="evidence-dialog"/);
+  assert.match(html, /id="confirmation-dialog"/);
+  assert.match(html, /role="alert"/);
+  assert.match(html, /role="status"/);
+  assert.match(html, /aria-label="Close"/);
+  assert.match(html, /required rows="3"/);
+  assert.match(html, /Exact assignment allocation values/);
+});
+
+test('purpose and locale transitions preserve the trust boundary', () => {
+  assert.equal(isPurposeAuthorized('hr_operations'), true);
+  assert.equal(isPurposeAuthorized('recruiting'), false);
+  assert.equal(nextLocale('en'), 'ko');
+  assert.equal(nextLocale('ko'), 'en');
+  assert.match(readFileSync(new URL('../apps/hr-workspace/app.js', import.meta.url), 'utf8'), /no API mutation was sent/);
+  assert.doesNotMatch(html, /password|passkey_value|private_key/i);
+});

@@ -35,3 +35,4 @@ secrets/
 artifacts/
 reports/
 *.log
+/.codegraph/

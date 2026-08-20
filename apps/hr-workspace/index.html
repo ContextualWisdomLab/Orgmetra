@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en" data-locale="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Orgmetra HR Home and Employee Profile workspace fixture">
+    <title>Orgmetra HR workspace</title>
+    <link rel="stylesheet" href="../../packages/design-tokens/tokens.css">
+    <link rel="stylesheet" href="./styles.css">
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Orgmetra navigation">
+        <a class="brand" href="#hr-home" data-view-link="hr-home">Orgmetra</a>
+        <p class="eyebrow" data-i18n="productLabel">Evidence-centered HRIS</p>
+        <nav class="nav-list" aria-label="Workspace views">
+          <button class="nav-item is-active" type="button" data-view-link="hr-home" aria-current="page"><span data-i18n="hrHome">HR Home</span></button>
+          <button class="nav-item" type="button" data-view-link="employee-profile"><span data-i18n="employeeProfile">Employee Profile</span></button>
+        </nav>
+        <div class="sidebar-note"><span class="status-dot" aria-hidden="true"></span><span data-i18n="fixtureMode">Local fixture mode</span></div>
+      </aside>
+
+      <main class="main-content" id="main-content" tabindex="-1">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" data-i18n="workspaceLabel">People workspace</p>
+            <p class="topbar-status" data-i18n="apiBoundary">Protected People API boundary: not connected in this fixture</p>
+          </div>
+          <button class="button button-secondary" id="locale-toggle" type="button" aria-label="Change language">한국어</button>
+        </header>
+
+        <section class="view" id="view-hr-home" data-view="hr-home" aria-labelledby="hr-home-title">
+          <div class="view-heading">
+            <div><p class="breadcrumb" data-i18n="hrHomeBreadcrumb">Orgmetra / HR Home</p><h1 id="hr-home-title" data-i18n="hrHome">HR Home</h1></div>
+            <span class="badge badge-fixture" data-i18n="fixtureBadge">Fixture evidence</span>
+          </div>
+          <div class="summary-card" data-node-id="1:10">
+            <p class="summary-lead" data-i18n="today">Today</p>
+            <ul class="summary-list">
+              <li><strong>3</strong> <span data-i18n="hiringReview">hiring decisions need evidence review</span></li>
+              <li><strong>2</strong> <span data-i18n="positionChanges">position changes effective next week</span></li>
+              <li><strong>1</strong> <span data-i18n="validationApproval">validation study needs approval</span></li>
+            </ul>
+          </div>
+          <div class="section-grid">
+            <section class="panel panel-accent-review" aria-labelledby="next-actions-title">
+              <div class="panel-heading"><div><p class="eyebrow" data-i18n="workQueue">Work queue</p><h2 id="next-actions-title" data-i18n="nextActions">Next actions</h2></div><span class="count-badge">3</span></div>
+              <div class="action-list">
+                <button class="action-row" type="button" data-open-dialog="evidence-dialog"><span><strong data-i18n="reviewEvidence">Review evidence</strong><small data-i18n="reviewEvidenceDetail">Approve or return a decision packet</small></span><span aria-hidden="true">→</span></button>
+                <button class="action-row" type="button" data-view-link="employee-profile"><span><strong data-i18n="effectiveConflicts">Effective-date conflicts</strong><small data-i18n="effectiveConflictsDetail">Inspect the employee history timeline</small></span><span aria-hidden="true">→</span></button>
+                <button class="action-row" type="button" data-open-dialog="evidence-dialog"><span><strong data-i18n="validityStudy">Open validity study</strong><small data-i18n="validityStudyDetail">Review the supporting evidence versions</small></span><span aria-hidden="true">→</span></button>
+              </div>
+            </section>
+            <section class="panel" aria-labelledby="evidence-state-title">
+              <div class="panel-heading"><div><p class="eyebrow" data-i18n="evidenceState">Evidence state</p><h2 id="evidence-state-title" data-i18n="readyForReview">Ready for human review</h2></div><span class="badge badge-review" data-i18n="reviewState">Review</span></div>
+              <p class="panel-copy" data-i18n="reviewCopy">Orgmetra keeps the actor, purpose, reason, and evidence versions visible before a high-impact action.</p>
+              <div class="fact-list"><div><span data-i18n="actor">Actor</span><strong>HR operations reviewer</strong></div><div><span data-i18n="purpose">Purpose</span><strong>HR operations</strong></div><div><span data-i18n="source">Source</span><strong>Protected People API contract</strong></div></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view is-hidden" id="view-employee-profile" data-view="employee-profile" aria-labelledby="employee-profile-title" hidden>
+          <div class="view-heading">
+            <div><p class="breadcrumb" data-i18n="employeeProfileBreadcrumb">Orgmetra / Employee Profile</p><h1 id="employee-profile-title" data-i18n="employeeProfile">Employee Profile</h1></div>
+            <span class="badge badge-fixture" data-i18n="fixtureBadge">Fixture evidence</span>
+          </div>
+          <section class="profile-card" data-node-id="1:28" aria-labelledby="profile-summary-title">
+            <div class="profile-heading"><div><p class="eyebrow" data-i18n="personSummary">Person summary</p><h2 id="profile-summary-title" data-i18n="sampleEmployee">Sample employee</h2><p class="muted" data-i18n="syntheticRecord">Synthetic record for local interaction proof</p></div><span class="badge badge-authorized" data-i18n="authorized">HR operations access</span></div>
+            <div class="concept-grid">
+              <div class="concept-card"><span data-i18n="person">Person</span><strong>person_record</strong><small data-i18n="personValue">Identity and name facts</small></div>
+              <div class="concept-card"><span data-i18n="employment">Employment</span><strong>employment_record</strong><small data-i18n="employmentValue">Worker relationship</small></div>
+              <div class="concept-card"><span data-i18n="position">Position</span><strong>position_record</strong><small data-i18n="positionValue">AI Product Architect</small></div>
+              <div class="concept-card"><span data-i18n="assignment">Assignment</span><strong>assignment_record</strong><small data-i18n="assignmentValue">Platform 60% · Governance 40%</small></div>
+            </div>
+          </section>
+          <div class="profile-toolbar">
+            <label class="field-label" for="access-purpose"><span data-i18n="accessPurpose">Access purpose</span><select id="access-purpose" class="select-field"><option value="hr_operations" data-i18n="hrOperations">HR operations</option><option value="recruiting" data-i18n="recruiting">Recruiting</option></select></label>
+            <div class="toolbar-actions"><button class="button button-secondary" type="button" data-action="view-personal-details" data-i18n="viewPersonalDetails">View personal details</button><button class="button button-review" type="button" data-action="correct-history" data-i18n="correctHistory">Correct history</button></div>
+          </div>
+          <div id="permission-panel" class="notice notice-danger" role="alert" hidden><strong data-i18n="permissionDenied">Permission denied</strong><span data-i18n="permissionDeniedCopy">This purpose does not authorize personal details. Choose a permitted HR purpose or request access.</span></div>
+          <div id="details-panel" class="notice notice-success" role="status" hidden><strong data-i18n="detailsVisible">Personal details visible</strong><span data-i18n="detailsVisibleCopy">Purpose-bound access was evaluated for this fixture and recorded for audit.</span></div>
+          <section class="panel" aria-labelledby="history-title">
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="bitemporalHistory">Bitemporal history</p><h2 id="history-title" data-i18n="historyTitle">Effective vs recorded time</h2></div><span class="badge badge-neutral" data-i18n="readOnly">Read-only snapshot</span></div>
+            <div class="table-wrap"><table><caption class="sr-only" data-i18n="historyCaption">Employee history with effective and recorded time</caption><thead><tr><th scope="col" data-i18n="record">Record</th><th scope="col" data-i18n="effectiveTime">Effective time</th><th scope="col" data-i18n="recordedTime">Recorded time</th><th scope="col" data-i18n="state">State</th></tr></thead><tbody><tr><th scope="row" data-i18n="position">Position</th><td>2026-09-01 → open</td><td>2026-08-18 09:14 KST</td><td><span class="badge badge-authorized" data-i18n="active">Active</span></td></tr><tr><th scope="row" data-i18n="assignment">Assignment</th><td>2026-09-01 → open</td><td>2026-08-18 09:16 KST</td><td><span class="badge badge-review" data-i18n="pendingReview">Pending review</span></td></tr></tbody></table></div>
+          </section>
+          <section class="panel" aria-labelledby="assignment-title">
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="assignmentSplit">Assignment split</p><h2 id="assignment-title" data-i18n="capacityTitle">Visible allocation capacity</h2></div><span class="badge badge-authorized">100.00%</span></div>
+            <div class="table-wrap"><table><caption class="sr-only" data-i18n="assignmentCaption">Exact assignment allocation values</caption><thead><tr><th scope="col" data-i18n="assignmentName">Assignment</th><th scope="col" data-i18n="allocation">Allocation</th><th scope="col" data-i18n="nextAction">Next action</th></tr></thead><tbody><tr><th scope="row">Platform</th><td>60.00%</td><td data-i18n="noAction">No action required</td></tr><tr><th scope="row">Governance</th><td>40.00%</td><td data-i18n="noAction">No action required</td></tr></tbody></table></div>
+            <p class="helper-text"><strong data-i18n="credentialBoundary">Credential boundary</strong> · <span data-i18n="credentialCopy">No identity credential or passkey is stored in the person record.</span></p>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="evidence-dialog" class="dialog" aria-labelledby="evidence-dialog-title">
+      <div class="dialog-heading"><div><p class="eyebrow" data-i18n="evidenceDrawer">Evidence drawer</p><h2 id="evidence-dialog-title" data-i18n="evidenceTitle">Decision packet evidence</h2></div><button class="dialog-close" type="button" data-close-dialog="evidence-dialog" aria-label="Close">×</button></div>
+      <p class="panel-copy" data-i18n="evidenceCopy">These references are reviewable inputs. They do not make an autonomous employment decision.</p>
+      <ul class="evidence-list"><li><strong>EV-2026-014</strong><span data-i18n="evidenceOne">Structured interview criterion ratings</span></li><li><strong>EV-2026-021</strong><span data-i18n="evidenceTwo">SME-approved job profile version 4</span></li><li><strong>EV-2026-027</strong><span data-i18n="evidenceThree">Human reviewer reason and purpose record</span></li></ul>
+      <div class="dialog-actions"><button class="button button-secondary" type="button" data-close-dialog="evidence-dialog" data-i18n="close">Close</button><button class="button button-review" type="button" data-close-dialog="evidence-dialog" data-i18n="requestEvidence">Request more evidence</button></div>
+    </dialog>
+
+    <dialog id="confirmation-dialog" class="dialog" aria-labelledby="confirmation-dialog-title">
+      <form method="dialog" id="confirmation-form">
+        <div class="dialog-heading"><div><p class="eyebrow" data-i18n="highImpactConfirmation">High-impact confirmation</p><h2 id="confirmation-dialog-title" data-i18n="correctHistoryTitle">Correct history</h2></div><button class="dialog-close" type="submit" value="cancel" aria-label="Close">×</button></div>
+        <p class="panel-copy" data-i18n="confirmationCopy">A correction remains a draft until a human confirms the actor, purpose, reason, and evidence context.</p>
+        <div class="form-grid"><label class="field-label" for="confirmation-actor"><span data-i18n="actor">Actor</span><input id="confirmation-actor" value="HR operations reviewer" readonly></label><label class="field-label" for="confirmation-purpose"><span data-i18n="purpose">Purpose</span><input id="confirmation-purpose" value="HR operations" readonly></label><label class="field-label field-wide" for="confirmation-reason"><span data-i18n="reason">Reason</span><textarea id="confirmation-reason" required rows="3" placeholder="Required" data-i18n-placeholder="reasonPlaceholder"></textarea></label></div>
+        <div id="confirmation-status" class="notice notice-success" role="status" hidden data-i18n="draftConfirmed">Draft correction confirmed for local fixture evidence; no API mutation was sent.</div>
+        <div class="dialog-actions"><button class="button button-secondary" type="submit" value="cancel" data-i18n="cancel">Cancel</button><button class="button button-review" id="confirm-correction" type="submit" value="confirm" data-i18n="confirm">Confirm correction</button></div>
+      </form>
+    </dialog>
+  </body>
+</html>

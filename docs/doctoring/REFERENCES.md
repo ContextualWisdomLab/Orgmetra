@@ -67,3 +67,19 @@ U.S. Office of Personnel Management. (n.d.). *Job analysis*. Retrieved August 17
 World Wide Web Consortium. (2013). *PROV-O: The PROV ontology*. https://www.w3.org/TR/prov-o/
 
 World Wide Web Consortium. (2023, October 5). *Web Content Accessibility Guidelines (WCAG) 2.2*. https://www.w3.org/TR/WCAG22/
+
+## Product and technical gap baseline sources
+
+American Institute of Certified Public Accountants. (2023). *2017 trust services criteria (with revised points of focus—2022).* https://www.aicpa-cima.com/resources/download/2017-trust-services-criteria-with-revised-points-of-focus-2022
+
+Fugu Team, Sakana AI. (2026). *Sakana Fugu technical report* (arXiv:2606.21228). arXiv. https://arxiv.org/abs/2606.21228
+
+International Organization for Standardization. (2023). *ISO 30405:2023: Human resource management—Guidelines on recruitment* (2nd ed.). https://www.iso.org/standard/79488.html
+
+National Institute of Standards and Technology. (2023). *Artificial intelligence risk management framework (AI RMF 1.0)* (NIST AI 100-1). U.S. Department of Commerce. https://doi.org/10.6028/NIST.AI.100-1
+
+Nielsen, S., Cetin, E., Schwendeman, P., Sun, Q., Xu, J., & Tang, Y. (2025). *Learning to orchestrate agents in natural language with the Conductor* (arXiv:2512.04388). arXiv. https://arxiv.org/abs/2512.04388
+
+Sakana AI. (2026). *TRINITY: An evolved LLM coordinator* (arXiv:2512.04695). arXiv. https://arxiv.org/abs/2512.04695
+
+World Wide Web Consortium. (2024, December 12). *Web Content Accessibility Guidelines (WCAG) 2.2*. https://www.w3.org/TR/2024/REC-WCAG22-20241212/

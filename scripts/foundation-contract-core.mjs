@@ -20,6 +20,9 @@ export const REQUIRED_FILES = Object.freeze([
   'NOTICE',
   'manifest.json',
   'package.json',
+  'apps/hr-workspace/index.html',
+  'apps/hr-workspace/styles.css',
+  'apps/hr-workspace/app.js',
   '.github/workflows/foundation-ci.yml',
   'docs/PRD.md',
   'docs/TRD.md',
@@ -36,6 +39,7 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/TEST_STRATEGY.md',
   'docs/OPERABILITY.md',
   'docs/TRACEABILITY.md',
+  'docs/product-technical-gap-baseline.md',
   'docs/adr/README.md',
   'docs/adr/0001-orgmetra-authoritative-hris-record.md',
   'docs/adr/0002-federated-cwl-integration-boundaries.md',
@@ -45,6 +49,7 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0006-governed-audit-outbox-envelope.md',
   'docs/adr/0008-purpose-bound-pii-authorization.md',
   'docs/adr/0009-performance-criterion-observation-scope.md',
+  'docs/adr/0015-product-technical-gap-baseline.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
@@ -67,6 +72,7 @@ export const REQUIRED_FILES = Object.freeze([
   'scripts/foundation-contract.mjs',
   'tests/dispatcher-inventory.test.mjs',
   'tests/foundation-contract.test.mjs',
+  'tests/hr-workspace.test.mjs',
   'tests/openapi-contract.test.mjs',
   'tests/test_bitemporal_postgres.sh',
   'tests/test_tenant_isolation_postgres.sh',
@@ -85,6 +91,7 @@ export const REQUIRED_FILES = Object.freeze([
 
 /** Exact maturity vocabulary accepted by traceability tables. */
 export const MATURITY_VALUES = Object.freeze(new Set([
+  'implemented_on_protected_develop',
   'implemented_on_protected_main',
   'implemented_on_active_pr',
   'accepted_architecture',

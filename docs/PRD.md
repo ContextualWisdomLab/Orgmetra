@@ -59,6 +59,11 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 - Employee profile with bitemporal assignment history.
 - Validation dashboard shell.
 
+The checkout also contains a local fixture slice at `apps/hr-workspace/` for
+HR Home and Employee Profile. It is an interaction and accessibility contract
+for the protected People API boundary, not a connected or deployed customer
+workflow until its API and browser E2E evidence are merged and released.
+
 ### P2 scale
 
 - HRIS migration pipelines.
