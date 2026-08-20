@@ -49,8 +49,8 @@ test('protected buyer truth is positively pinned for recently integrated capabil
   );
   assert.match(
     readme,
-    /governed People mutation/i,
-    'README must positively describe protected governed People mutation capability'
+    /purpose-bound People mutation/i,
+    'README must positively describe the protected purpose-bound People mutation capability'
   );
 
   for (const requirement of [
