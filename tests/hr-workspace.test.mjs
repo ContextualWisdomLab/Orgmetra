@@ -5,6 +5,9 @@ import { isPurposeAuthorized, nextLocale } from '../apps/hr-workspace/app.js';
 
 const html = readFileSync(new URL('../apps/hr-workspace/index.html', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../apps/hr-workspace/styles.css', import.meta.url), 'utf8');
+const story = readFileSync(new URL('../apps/hr-workspace/workspace.stories.js', import.meta.url), 'utf8');
+const storybookConfig = readFileSync(new URL('../.storybook/main.js', import.meta.url), 'utf8');
+const storybookPreview = readFileSync(new URL('../.storybook/preview.js', import.meta.url), 'utf8');
 
 test('workspace exposes the Figma role slice and existing design tokens', () => {
   assert.match(html, /packages\/design-tokens\/tokens\.css/);
@@ -24,6 +27,17 @@ test('workspace includes keyboard-accessible review and high-impact states', () 
   assert.match(html, /aria-label="Close"/);
   assert.match(html, /required rows="3"/);
   assert.match(html, /Exact assignment allocation values/);
+});
+
+test('Storybook exposes tokenized workspace states without claiming API connectivity', () => {
+  assert.match(storybookConfig, /@storybook\/web-components-vite/);
+  assert.match(storybookPreview, /design-tokens\/tokens\.css/);
+  for (const storyName of ['ActionButtons', 'FieldStates', 'PermissionDenied', 'EvidenceDrawer', 'HighRiskConfirmation', 'AssignmentSplit']) {
+    assert.match(story, new RegExp(`export const ${storyName}`));
+  }
+  assert.match(story, /orgmetra-action-request-evidence/);
+  assert.match(story, /Exact assignment allocation values/);
+  assert.match(story, /aria-invalid="true"/);
 });
 
 test('purpose and locale transitions preserve the trust boundary', () => {

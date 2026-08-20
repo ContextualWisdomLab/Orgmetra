@@ -19,7 +19,7 @@ This document is the buyer-facing work queue. It separates what a customer can u
 
 ## Executive finding
 
-Orgmetra is an evidence-centered HRIS foundation with a protected People mutation and confirmed-hire implementation, not yet a complete commercial HCM product. The protected branch provides durable PostgreSQL integrity contracts, a Python HRIS decision kernel, purpose-bound authorization, governed candidate-to-worker lineage, and executable People read/write boundaries. The largest buyer-visible gap is now the missing browser product surface: the repository has contracts and service code, but no runnable Employee Profile, HR Home, recruiting, or validation workspace with browser evidence.
+Orgmetra is an evidence-centered HRIS foundation with a protected People mutation and confirmed-hire implementation, not yet a complete commercial HCM product. The protected branch provides durable PostgreSQL integrity contracts, a Python HRIS decision kernel, purpose-bound authorization, governed candidate-to-worker lineage, and executable People read/write boundaries. The largest buyer-visible gap remains the missing connected browser product surface: the current checkout has an active-PR HR Home/Employee Profile fixture and local Storybook state runtime, but protected truth has no connected or browser-verified workspace.
 
 The next highest-leverage gaps are one canonical persisted Job Analysis case/API and actual statistical validity estimation. Existing contracts are useful foundations, but they do not substitute for a running customer path or a released deployment.
 
@@ -49,7 +49,7 @@ flowchart LR
 | Job-analysis persistence/API | PR #38 is the current canonical persistence lane, rebuilt on protected `39d3c15`; PR #30 is closed as superseded | `implemented_on_active_pr` | A buyer cannot yet create, approve, version, or retrieve one canonical persisted Job Analysis case. |
 | Performance criterion scope and validity-study case integrity | Migration `0010`/`0011`; PostgreSQL contracts | `implemented_on_protected_develop` | Invalid worker-Job/time links are rejected, but no statistical validity estimate is produced. |
 | Statistical validity estimation | Traceability explicitly says estimation is subsequent; no Rust workspace or estimator exists in this repository | `planned` | Customers cannot measure prediction, bias, RMSE/MAE, uncertainty, convergence, temporal effects, or multiple membership. |
-| Role workspaces and Storybook runtime | Figma wireframes, design tokens, and Storybook inventory only; no web application package or stories | `planned` | There is no buyer-clickable HR Home, Employee Profile, recruiting, validation, or admin workflow in this checkout. |
+| Role workspaces and Storybook runtime | Protected `develop` still has no customer UI; active PR #53 has the HR Home/Employee Profile fixture plus a local Storybook `10.5.10` build | `planned` | The local component/state runtime is reviewable, but there is no connected or released buyer workflow in protected truth. |
 | Naruon calendar adapter | `packages/naruon-adapter` package tests; traceability says planned integration | `accepted_architecture` | Calendar intent is contract-tested, not an integrated customer scheduling workflow. |
 | TEPP adapter | PR #52 is a non-executing request boundary; no transport contract is established | `implemented_on_active_pr` | Temporal analysis can be prepared as governed evidence but is not executed by Orgmetra. |
 | Contextual Orchestrator/OpenCode model path | Named in architecture; no Orgmetra adapter or evidence-backed model evaluation in protected code | `planned` | LLM assistance cannot yet be invoked through an Orgmetra-owned, auditable draft-evidence boundary. |
@@ -65,16 +65,17 @@ and Employee Profile fixture based on Figma nodes `1:10` and `1:28`. It uses
 the shared design tokens and proves navigation, focus-visible styling,
 keyboard-accessible evidence and confirmation dialogs, purpose-bound
 permission denial, exact allocation values, and English/Korean labels. The
-fixture explicitly displays that the protected People API is not connected;
-it is not browser E2E, hosted release, protected-develop truth, or evidence of
-completed Storybook runtime integration. The artifact must be reviewed,
-checked, and merged independently before P0-1 can change maturity.
+fixture explicitly displays that the protected People API is not connected.
+The same active PR includes a local Storybook runtime with tokenized stories;
+`npm run build-storybook` is a build check, not browser E2E, hosted release, or
+protected-develop truth. The artifact must be reviewed, checked, and merged
+independently before P0-1 can change maturity.
 
 ## Buyer gap backlog
 
 | ID | Priority and owner | Gap and smallest acceptable closure evidence | Dependency |
 |---|---|---|---|
-| P0-1 | Product / Web | Review and merge the active HR Home + Employee Profile fixture, then connect it to the protected People API and prove keyboard/focus/permission/confirmation states, exact-value tables, i18n, and browser E2E. | Protected People API evidence |
+| P0-1 | Product / Web | Review and merge the active HR Home + Employee Profile fixture and local Storybook states, then connect it to the protected People API and prove keyboard/focus/permission/confirmation states, exact-value tables, i18n, and browser E2E. | Protected People API evidence |
 | P0-2 | Job Architecture | Merge and verify PR #38 as one persisted Job Analysis case: one migration owner, one ADR, versioned source evidence, SME approval, retrieval API, and protected PostgreSQL acceptance test. | Protected People API evidence |
 | P0-3 | Workforce Validation / scientific owner | Add a Rust-first estimator boundary or a versioned adapter to `fast-mlsirm`/TEPP. Publish true-parameter recovery, bias, MAE, RMSE, coverage, convergence, temporal, multilevel, multiple-membership, CPU reference, and material GPU parity evidence. | P0-2 and external contract re-resolution |
 | P0-4 | Release / Platform | Produce a deployable release with version, changelog, migration inventory, rollback/recovery evidence, support runbook, and exact commit provenance. | P0-1 through P0-3 |

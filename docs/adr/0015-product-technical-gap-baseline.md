@@ -18,7 +18,7 @@ The product baseline also uses a Figma wireframe source and repeated HR actions.
 4. The authoritative People mutation and confirmed-hire paths are now the first protected integration lane. They remain the dependency for browser workflows and must preserve tenant authorization, idempotency, bitemporal history, human confirmation, audit, and outbox atomicity.
 5. Job-analysis persistence/API work now converges on the single current PR #38 model, with migration 0013 and its own ADR; a second Task/FJA/KSAO store must not be introduced.
 6. Statistical validity computation remains a separate scientific boundary. Integrity linkage is necessary evidence hygiene, not a validity result. Any future numerical kernel is Rust-first and must publish CPU reference, multilevel/multiple-membership, temporal, uncertainty, convergence, and GPU-parity evidence where GPU execution is material.
-7. Figma and Storybook remain design-system inputs, not evidence that a customer UI exists. A release claim requires executable UI, keyboard/accessibility checks, interaction tests, and browser evidence for the owning workflow.
+7. Figma remains a design-system input, while the local Storybook runtime is executable component/state evidence rather than evidence of a connected customer UI. A release claim requires executable UI, keyboard/accessibility checks, interaction tests, and browser evidence for the owning workflow.
 
 ## Consequences
 

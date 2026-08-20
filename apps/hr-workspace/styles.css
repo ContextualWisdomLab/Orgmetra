@@ -90,6 +90,11 @@ tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
 .field-wide { grid-column: 1 / -1; }
 textarea { resize: vertical; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.storybook-preview { width: min(100%, 860px); padding: var(--orgmetra-space-lg); background: var(--orgmetra-surface-page); color: var(--orgmetra-text-primary); }
+.storybook-frame { display: grid; gap: var(--orgmetra-space-lg); min-width: min(100%, 640px); }
+.storybook-state-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--orgmetra-space-lg); }
+.storybook-state-grid > div { display: grid; gap: var(--orgmetra-space-sm); align-content: start; }
+.storybook-state-grid .eyebrow { margin-bottom: 0; }
 
 @media (max-width: 820px) {
   .app-shell { display: block; }
@@ -108,4 +113,5 @@ textarea { resize: vertical; }
   .topbar, .view-heading, .profile-heading, .panel-heading { align-items: flex-start; flex-direction: column; }
   .form-grid { grid-template-columns: 1fr; }
   .field-wide { grid-column: auto; }
+  .storybook-state-grid { grid-template-columns: 1fr; }
 }

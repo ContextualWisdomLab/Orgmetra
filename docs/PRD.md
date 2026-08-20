@@ -60,9 +60,10 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 - Validation dashboard shell.
 
 The checkout also contains a local fixture slice at `apps/hr-workspace/` for
-HR Home and Employee Profile. It is an interaction and accessibility contract
-for the protected People API boundary, not a connected or deployed customer
-workflow until its API and browser E2E evidence are merged and released.
+HR Home and Employee Profile, with a local Storybook runtime for its tokenized
+states. It is an interaction and accessibility contract for the protected
+People API boundary, not a connected or deployed customer workflow until its
+API and browser E2E evidence are merged and released.
 
 ### P2 scale
 

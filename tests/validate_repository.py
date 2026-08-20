@@ -23,9 +23,13 @@ REQUIRED = [
     "NOTICE",
     "manifest.json",
     "package.json",
+    "package-lock.json",
+    ".storybook/main.js",
+    ".storybook/preview.js",
     "apps/hr-workspace/index.html",
     "apps/hr-workspace/styles.css",
     "apps/hr-workspace/app.js",
+    "apps/hr-workspace/workspace.stories.js",
     ".github/workflows/foundation-ci.yml",
     "docs/PRD.md",
     "docs/TRD.md",
@@ -543,6 +547,8 @@ def _validate_openapi_contract() -> None:
 def _validate_markdown() -> None:
     """Reject explicit unfinished-work markers with exact path/line and malformed fences."""
     for path in ROOT.rglob("*.md"):
+        if {"node_modules", "storybook-static"}.intersection(path.parts):
+            continue
         text = path.read_text(encoding="utf-8")
         for line_number, line in enumerate(text.splitlines(), start=1):
             if UNFINISHED_MARKER_LINE_PATTERN.fullmatch(line):

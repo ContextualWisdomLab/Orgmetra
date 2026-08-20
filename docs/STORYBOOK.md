@@ -56,5 +56,19 @@ Employee Profile and HR Home experience. It consumes the shared CSS tokens,
 keeps the Figma node IDs in the markup, and exercises evidence review,
 purpose-bound permission denial, high-impact confirmation, exact allocation
 values, and English/Korean labels. It is fixture mode: it does not claim a
-connected API or a deployed Storybook runtime. A full Storybook runner is
-deferred until a second workspace justifies extracting shared components.
+connected API or a deployed customer workflow.
+
+## Local Storybook runtime
+
+The repository uses Storybook `10.5.10` with
+`@storybook/web-components-vite` and native HTML/CSS stories in
+`apps/hr-workspace/workspace.stories.js`. The stories cover tokenized action
+states, read-only and validation-error fields, purpose-bound denial, the
+keyboard-accessible evidence drawer, high-impact confirmation, and exact
+assignment values. Shared design tokens and workspace CSS are imported by
+`.storybook/preview.js`.
+
+Run `npm run storybook` for the local development UI or
+`npm run build-storybook` for the static build. This is local component and
+state evidence; it does not replace connected People API or browser E2E
+evidence.

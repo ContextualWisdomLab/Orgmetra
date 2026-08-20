@@ -11,9 +11,21 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "f4963e79205b896f527dab402a0b6ef455bd44ed5f948d9d6126a6bb20c8b5a3",
-      "bytes": 388,
-      "lines": 38
+      "sha256": "80c3bfec4d01d6992e41ac1dc63d1656e72279273764a42f70174838f09ff2cd",
+      "bytes": 406,
+      "lines": 39
+    },
+    {
+      "path": ".storybook/main.js",
+      "sha256": "210d8108637ccea90d2c52e2eec793a9215cc512012a2292ab4abf50983a134d",
+      "bytes": 253,
+      "lines": 8
+    },
+    {
+      "path": ".storybook/preview.js",
+      "sha256": "0f02687d3c76745afea6402607b06b893a0e88f8414dba4d79e39f50f4d17817",
+      "bytes": 336,
+      "lines": 13
     },
     {
       "path": "AGENTS.md",
@@ -29,9 +41,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "15bfd1a01653f4c2f654f91c0a75e1e8124f0050ff031f86eb3dc73b16ac7d1e",
-      "bytes": 16770,
-      "lines": 77
+      "sha256": "3e175e662a9052837fa75a524ca00ab8aeb7a624f6255420f4b2f2cb6156b8e4",
+      "bytes": 17092,
+      "lines": 78
     },
     {
       "path": "CLAUDE.md",
@@ -71,9 +83,15 @@
     },
     {
       "path": "apps/hr-workspace/styles.css",
-      "sha256": "f352dde5dcffccbed2f96ea0ab7c3198f945a16a0aba4d9c59e55aec6b618ef2",
-      "bytes": 9424,
-      "lines": 111
+      "sha256": "fb44828e958e164e515da587256966f805ea115b172e4b584c4fef8e6b26322a",
+      "bytes": 10013,
+      "lines": 117
+    },
+    {
+      "path": "apps/hr-workspace/workspace.stories.js",
+      "sha256": "2a01f2846485fe9501877da2a8e45ad4363312bfc45ab51d9b57e520250cd689",
+      "bytes": 5372,
+      "lines": 88
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
@@ -173,9 +191,9 @@
     },
     {
       "path": "docs/PRD.md",
-      "sha256": "b1c271bcbfc8885e275c43fee1a0516e87a655016fd11412abcfd8ea3037f34a",
-      "bytes": 5795,
-      "lines": 116
+      "sha256": "bf73c0ae68f19a24beebd8a43b2e2888ad2e6844697aab8ab5ada59f6c8d87d5",
+      "bytes": 5852,
+      "lines": 117
     },
     {
       "path": "docs/SECURITY.md",
@@ -191,9 +209,9 @@
     },
     {
       "path": "docs/STORYBOOK.md",
-      "sha256": "264d2d3afc303feb35743928fc9c964921504185b789d73cb68d55e37700aef8",
-      "bytes": 1937,
-      "lines": 60
+      "sha256": "ddfbddea1a4cb82936ee72cd489195e271cc01556516f00d1ab369d8e372f388",
+      "bytes": 2511,
+      "lines": 74
     },
     {
       "path": "docs/TEST_STRATEGY.md",
@@ -209,8 +227,8 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "c3e9e94816069a90eac7677b13cd6961e19c2a088c76c560638edca0c78ec857",
-      "bytes": 11761,
+      "sha256": "0452bd2bd28e1e236b622742de745afb7ae9b886f5cb1517e3a603a46e7fd84b",
+      "bytes": 11873,
       "lines": 42
     },
     {
@@ -287,8 +305,8 @@
     },
     {
       "path": "docs/adr/0015-product-technical-gap-baseline.md",
-      "sha256": "9d4227bd712a12c4dd7b0d3d408a3e1b464d535816bebb28cba6797cf62fdbb0",
-      "bytes": 3037,
+      "sha256": "49430c953798c23c453ac71e41705e216c95b737f9488c934f6329b46e6ae6ff",
+      "bytes": 3107,
       "lines": 32
     },
     {
@@ -305,9 +323,9 @@
     },
     {
       "path": "docs/product-technical-gap-baseline.md",
-      "sha256": "12eba2c4a8390d29beb7ed61fabab34ac4a64fa2adb0be9565d5a27eb2225ec2",
-      "bytes": 19359,
-      "lines": 148
+      "sha256": "32cb5d4a0d5b2522ac22c090e2d5952dc36679e2725a26e67668b8d6c0a00f31",
+      "bytes": 19531,
+      "lines": 149
     },
     {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -322,10 +340,16 @@
       "lines": 187
     },
     {
+      "path": "package-lock.json",
+      "sha256": "69089cfedb463784e053e70ec1af456bb4a0f2bbbd5c8cb7c79e75e90c279e81",
+      "bytes": 105932,
+      "lines": 3220
+    },
+    {
       "path": "package.json",
-      "sha256": "e73b544d08bbf619305d972b811f9b0c541992258e247874517c97a115d2b3e5",
-      "bytes": 501,
-      "lines": 11
+      "sha256": "94d134e202416fc50298fed8812aed02fb59f9023458da32dbf2b5208ae5da54",
+      "bytes": 691,
+      "lines": 17
     },
     {
       "path": "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
@@ -347,9 +371,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "1ff70813bba29fb426f38d81a499e32adc7ab429b1788d1da3a30dd52b0e4d73",
-      "bytes": 25659,
-      "lines": 649
+      "sha256": "3c575fa99f3f4b0303d8586cdfd1cfbcf2ab4902dcc31b610ca6a17acba1f1c5",
+      "bytes": 25777,
+      "lines": 653
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -371,9 +395,9 @@
     },
     {
       "path": "tests/hr-workspace.test.mjs",
-      "sha256": "857dae13d6c70d42bfd19971b4f0354c078c88965a693cb016055fd0af142e77",
-      "bytes": 1718,
-      "lines": 36
+      "sha256": "ff233f8228c1cc80bc54cfc8c030bff79334e461eadcd3497f5a632b2b3c5e67",
+      "bytes": 2634,
+      "lines": 50
     },
     {
       "path": "tests/openapi-contract.test.mjs",
@@ -455,9 +479,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "eeccebdf6a5d07340571a1ecc42e21dd2fb241b59e614fed4b4151e8e43810c1",
-      "bytes": 24612,
-      "lines": 584
+      "sha256": "b0fcbd17ae7f2ba0a9112e6f5045f68b1508de3ff15ad3cfffc4eaac901d26d1",
+      "bytes": 24833,
+      "lines": 590
     }
   ]
 }
