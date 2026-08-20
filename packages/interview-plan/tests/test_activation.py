@@ -77,6 +77,7 @@ class AllowingAuthority:
     """Host fixture that returns evidence only after its authoritative checks succeed."""
 
     def __init__(self, verification):
+        """Store the verification fixture and initialize the call audit list."""
         self.verification = verification
         self.calls = []
 
@@ -137,8 +138,12 @@ def test_authority_rejection_blocks_activation():
 
 def test_activation_rejects_non_verification_result():
     """Reject adapters that do not return the published verification contract."""
+
     class WrongAuthority:
+        """Fixture that violates the published authority return type."""
+
         def verify_activation(self, *, plan, approving_actor_reference):
+            """Return a non-contract object to prove type fail-closure."""
             return object()
 
     with pytest.raises(TypeError, match="StructuredInterviewActivationVerification"):
