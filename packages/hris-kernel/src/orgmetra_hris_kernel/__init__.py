@@ -50,6 +50,10 @@ from orgmetra_hris_kernel.workforce import (
     WorkforceCompositionSnapshot,
     build_workforce_composition_snapshot,
 )
+from orgmetra_hris_kernel.workforce_change import (
+    WorkforceCompositionChangeSnapshot,
+    build_workforce_composition_change_snapshot,
+)
 
 __all__ = [
     "AssignmentFact",
@@ -76,7 +80,9 @@ __all__ = [
     "SingleValuedFactError",
     "TaskEvidence",
     "TaskKSAOLink",
+    "WorkforceCompositionChangeSnapshot",
     "WorkforceCompositionSnapshot",
+    "build_workforce_composition_change_snapshot",
     "build_workforce_composition_snapshot",
     "close_recorded_interval",
     "resolve_bitemporal_facts",
