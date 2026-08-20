@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 import hashlib
 import json
@@ -123,7 +123,7 @@ def build_workforce_composition_change_snapshot(
     tenant_record_id: UUID,
     from_effective_on: date,
     to_effective_on: date,
-    known_at,
+    known_at: datetime,
 ) -> WorkforceCompositionChangeSnapshot:
     """Build one same-cutoff aggregate workforce comparison from HRIS truth.
 
