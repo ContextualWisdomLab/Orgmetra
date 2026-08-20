@@ -8,10 +8,19 @@ import re
 import unittest
 
 from orgmetra_job_analysis_api.http import JobAnalysisAsgiApp
-from fixtures import TENANT, read_policy, write_policy
+from fixtures import ANALYSIS, TENANT, read_policy, write_policy
 from test_http_route import FakeAuthenticator, FakeReadPort, FakeWritePort, _api_principal
 
 _SUPPORT_REFERENCE = re.compile(r"^err_[A-Za-z0-9_-]{20,80}$")
+
+
+class ExplodingAuthenticator:
+    """Model an unavailable identity backend with a secret-bearing exception."""
+
+    async def authenticate(self, bearer_token: str) -> object:
+        """Fail after receiving a syntactically valid bearer token."""
+        del bearer_token
+        raise RuntimeError("oidc client_secret=do-not-leak")
 
 
 class JobAnalysisHttpErrorContractTests(unittest.IsolatedAsyncioTestCase):
@@ -58,6 +67,48 @@ class JobAnalysisHttpErrorContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertRegex(payload["support_reference"], _SUPPORT_REFERENCE)
         self.assertNotIn(str(TENANT), json.dumps(payload))
         self.assertNotIn("trace", payload["support_reference"].lower())
+
+    async def test_authentication_backend_failure_is_normalized_before_protected_ports(self) -> None:
+        """Keep identity-provider failures client-safe and deny downstream data access."""
+        write_port = FakeWritePort()
+        read_port = FakeReadPort(None)
+        app = JobAnalysisAsgiApp(
+            authenticator=ExplodingAuthenticator(),
+            write_policy=write_policy(),
+            read_policy=read_policy(),
+            write_port=write_port,
+            read_port=read_port,
+        )
+        messages: list[dict[str, object]] = []
+
+        async def receive() -> dict[str, object]:
+            raise AssertionError("GET authentication failure must not read a request body")
+
+        async def send(message: dict[str, object]) -> None:
+            messages.append(message)
+
+        await app(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": f"/v1/tenants/{TENANT}/job-analysis-snapshots/{ANALYSIS}",
+                "query_string": b"",
+                "headers": [(b"authorization", b"Bearer opaque-token")],
+            },
+            receive,
+            send,
+        )
+
+        start, body = messages
+        payload = json.loads(bytes(body["body"]))
+        serialized = json.dumps(payload)
+        self.assertEqual((start["status"], payload["error_code"]), (500, "internal_error"))
+        self.assertEqual(payload["error"], payload["error_code"])
+        self.assertRegex(payload["support_reference"], _SUPPORT_REFERENCE)
+        self.assertNotIn("client_secret", serialized)
+        self.assertNotIn("do-not-leak", serialized)
+        self.assertEqual(write_port.calls, [])
+        self.assertEqual(read_port.calls, [])
 
     def test_openapi_allows_the_deprecated_error_alias_without_weakening_required_fields(self) -> None:
         """Preserve current clients while requiring the governed four-field envelope."""
