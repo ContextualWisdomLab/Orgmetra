@@ -37,6 +37,15 @@ class FakeAuthenticator:
         return self.principal
 
 
+class ExplodingAuthenticator:
+    """Model an unexpected identity-provider outage without leaking its details."""
+
+    async def authenticate(self, bearer_token: str) -> AuthenticatedPrincipal:
+        if bearer_token != "opaque-token":
+            raise AssertionError("unexpected bearer token")
+        raise RuntimeError("identity provider secret=must-not-leak")
+
+
 class FailingHirePort:
     """Fail after authorization so the HTTP boundary must expose a lookup token."""
 
@@ -93,6 +102,25 @@ async def invoke(app: object, *, scope: dict[str, object], body: bytes) -> tuple
     return int(start["status"]), json.loads(bytes(response["body"]))
 
 
+async def invoke_without_body_read(
+    app: object,
+    *,
+    scope: dict[str, object],
+) -> tuple[int, dict[str, object]]:
+    """Invoke one ASGI request and fail if authentication outage handling reads the body."""
+    messages: list[dict[str, object]] = []
+
+    async def receive() -> dict[str, object]:
+        raise AssertionError("request body was read during authentication failure")
+
+    async def send(message: dict[str, object]) -> None:
+        messages.append(message)
+
+    await app(scope, receive, send)  # type: ignore[operator]
+    start, response = messages
+    return int(start["status"]), json.loads(bytes(response["body"]))
+
+
 class SupportReferenceCorrelationTests(unittest.IsolatedAsyncioTestCase):
     """Require every buyer-visible 500 lookup token to join its root-cause log."""
 
@@ -105,18 +133,58 @@ class SupportReferenceCorrelationTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
+    def _hire_policy(self) -> PurposeBoundAccessPolicy:
+        """Return the exact confirmed-hire policy used by transport regressions."""
+        return PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="people-hire-v1",
+            resource_kind="selection_decision",
+            purpose_code="candidate_hire",
+            operation_code="materialize_worker",
+            required_scope_code="orgmetra.people.materialize_worker",
+            permitted_fields=frozenset({"candidate_worker_conversion"}),
+        )
+
+    def _employment_policy(self) -> PurposeBoundAccessPolicy:
+        """Return the employment policy used by People mutation regressions."""
+        return PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="people-mutation-v1",
+            resource_kind="employment_record",
+            purpose_code="workforce_admin",
+            operation_code="create_record",
+            required_scope_code="orgmetra.people.write",
+            permitted_fields=frozenset({"employment_record"}),
+        )
+
+    def _position_policy(self) -> PurposeBoundAccessPolicy:
+        """Return the position policy used by People mutation regressions."""
+        return PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="people-mutation-v1",
+            resource_kind="position_record",
+            purpose_code="job_architecture_admin",
+            operation_code="create_record",
+            required_scope_code="orgmetra.job_architecture.write",
+            permitted_fields=frozenset({"position_record"}),
+        )
+
+    def _assignment_policy(self) -> PurposeBoundAccessPolicy:
+        """Return the assignment policy used by People mutation regressions."""
+        return PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="people-mutation-v1",
+            resource_kind="assignment_record",
+            purpose_code="workforce_admin",
+            operation_code="create_record",
+            required_scope_code="orgmetra.people.write",
+            permitted_fields=frozenset({"assignment_record"}),
+        )
+
     async def test_confirmed_hire_500_support_reference_matches_error_log(self) -> None:
         app = HireAcceptanceAsgiApp(
             authenticator=FakeAuthenticator(self.principal),
-            policy=PurposeBoundAccessPolicy(
-                tenant_record_id=TENANT,
-                policy_version_code="people-hire-v1",
-                resource_kind="selection_decision",
-                purpose_code="candidate_hire",
-                operation_code="materialize_worker",
-                required_scope_code="orgmetra.people.materialize_worker",
-                permitted_fields=frozenset({"candidate_worker_conversion"}),
-            ),
+            policy=self._hire_policy(),
             mutation_port=FailingHirePort(),
         )
         payload = {
@@ -157,33 +225,9 @@ class SupportReferenceCorrelationTests(unittest.IsolatedAsyncioTestCase):
     async def test_people_mutation_500_support_reference_matches_error_log(self) -> None:
         app = PeopleMutationAsgiApp(
             authenticator=FakeAuthenticator(self.principal),
-            employment_policy=PurposeBoundAccessPolicy(
-                tenant_record_id=TENANT,
-                policy_version_code="people-mutation-v1",
-                resource_kind="employment_record",
-                purpose_code="workforce_admin",
-                operation_code="create_record",
-                required_scope_code="orgmetra.people.write",
-                permitted_fields=frozenset({"employment_record"}),
-            ),
-            position_policy=PurposeBoundAccessPolicy(
-                tenant_record_id=TENANT,
-                policy_version_code="people-mutation-v1",
-                resource_kind="position_record",
-                purpose_code="job_architecture_admin",
-                operation_code="create_record",
-                required_scope_code="orgmetra.job_architecture.write",
-                permitted_fields=frozenset({"position_record"}),
-            ),
-            assignment_policy=PurposeBoundAccessPolicy(
-                tenant_record_id=TENANT,
-                policy_version_code="people-mutation-v1",
-                resource_kind="assignment_record",
-                purpose_code="workforce_admin",
-                operation_code="create_record",
-                required_scope_code="orgmetra.people.write",
-                permitted_fields=frozenset({"assignment_record"}),
-            ),
+            employment_policy=self._employment_policy(),
+            position_policy=self._position_policy(),
+            assignment_policy=self._assignment_policy(),
             mutation_port=FailingPeopleMutationPort(),
             id_factory=SequentialIdFactory(),
         )
@@ -221,6 +265,64 @@ class SupportReferenceCorrelationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(captured.records), 1)
         self.assertEqual(captured.records[0].support_reference, response["support_reference"])
         self.assertNotIn("must-not-leak", " ".join(captured.output))
+
+    async def test_confirmed_hire_authenticator_outage_is_sanitized_without_body_read(self) -> None:
+        app = HireAcceptanceAsgiApp(
+            authenticator=ExplodingAuthenticator(),
+            policy=self._hire_policy(),
+            mutation_port=FailingHirePort(),
+        )
+        with self.assertLogs("orgmetra_people_api.hire_http", level="ERROR") as captured:
+            status, response = await invoke_without_body_read(
+                app,
+                scope={
+                    "type": "http",
+                    "method": "POST",
+                    "path": f"/v1/tenants/{TENANT}/candidate-worker-conversions",
+                    "query_string": b"purpose=candidate_hire",
+                    "headers": [(b"authorization", b"Bearer opaque-token")],
+                },
+            )
+        self.assertEqual(status, 500)
+        self.assertEqual(response["error_code"], "internal_error")
+        self.assertEqual(len(captured.records), 1)
+        self.assertEqual(captured.records[0].support_reference, response["support_reference"])
+        self.assertNotIn("must-not-leak", " ".join(captured.output))
+        self.assertNotIn("opaque-token", " ".join(captured.output))
+
+    async def test_people_mutation_authenticator_outage_is_sanitized_without_body_read(self) -> None:
+        app = PeopleMutationAsgiApp(
+            authenticator=ExplodingAuthenticator(),
+            employment_policy=self._employment_policy(),
+            position_policy=self._position_policy(),
+            assignment_policy=self._assignment_policy(),
+            mutation_port=FailingPeopleMutationPort(),
+            id_factory=SequentialIdFactory(),
+        )
+        with self.assertLogs("orgmetra_people_api.mutation_http", level="ERROR") as captured:
+            status, response = await invoke_without_body_read(
+                app,
+                scope={
+                    "type": "http",
+                    "method": "POST",
+                    "path": "/v1/employment-records",
+                    "query_string": b"",
+                    "headers": [
+                        (b"authorization", b"Bearer opaque-token"),
+                        (b"content-type", b"application/json"),
+                        (b"idempotency-key", b"support-reference-auth-99"),
+                        (b"x-tenant-reference", str(TENANT).encode("ascii")),
+                        (b"x-actor-reference", b"keyverse_subject:operator-99"),
+                        (b"x-purpose-code", b"workforce_admin"),
+                    ],
+                },
+            )
+        self.assertEqual(status, 500)
+        self.assertEqual(response["error_code"], "internal_error")
+        self.assertEqual(len(captured.records), 1)
+        self.assertEqual(captured.records[0].support_reference, response["support_reference"])
+        self.assertNotIn("must-not-leak", " ".join(captured.output))
+        self.assertNotIn("opaque-token", " ".join(captured.output))
 
 
 if __name__ == "__main__":
