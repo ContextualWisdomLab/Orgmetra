@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import {
   DATABASE_OBJECT_NAMES,
+  MIGRATION_BACKED_DATABASE_OBJECT_NAMES,
   MATURITY_VALUES,
   REQUIRED_FILES,
   collectMarkdownFiles,
@@ -40,6 +41,20 @@ function pythonRequiredFiles() {
   return [...match[1].matchAll(/^\s+"([^"]+)",$/gm)].map((item) => item[1]);
 }
 
+function writeMigrationBackedTables(root) {
+  write(
+    root,
+    'database/migrations/0013_job_analysis_snapshot.sql',
+    [
+      'CREATE TABLE job_analysis_snapshot (tenant_record_id uuid NOT NULL);',
+      'CREATE TABLE job_analysis_task_item (tenant_record_id uuid NOT NULL);',
+      'CREATE TABLE job_analysis_ksao_item (tenant_record_id uuid NOT NULL);',
+      'CREATE TABLE job_analysis_task_ksao_link (tenant_record_id uuid NOT NULL);',
+      'CREATE TABLE job_analysis_write_command (tenant_record_id uuid NOT NULL);'
+    ].join('\n') + '\n'
+  );
+}
+
 function makeMinimalValidFoundation(root) {
   for (const filePath of REQUIRED_FILES) write(root, filePath);
   write(
@@ -47,6 +62,7 @@ function makeMinimalValidFoundation(root) {
     'database/migrations/0012_people_mutation_idempotency.sql',
     'CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid NOT NULL);\n'
   );
+  writeMigrationBackedTables(root);
   write(
     root,
     'schemas/openapi.yaml',
@@ -123,6 +139,7 @@ test('migration-backed database object validation detects table rename', () => {
       'database/migrations/0012_people_mutation_idempotency.sql',
       'CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid NOT NULL);\n'
     );
+    writeMigrationBackedTables(root);
     assert.deepEqual(validateMigrationBackedDatabaseObjectNames(root), []);
     write(
       root,
@@ -155,6 +172,7 @@ test('migration-backed validation ignores fake CREATE TABLE text in comments and
         'SELECT $payload$CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid);$payload$;'
       ].join('\n')
     );
+    writeMigrationBackedTables(root);
     assert.deepEqual(validateMigrationBackedDatabaseObjectNames(root), [
       'Migration-backed database object is missing from migrations: people_mutation_idempotency_record'
     ]);
@@ -284,7 +302,7 @@ test('foundation validator reports every missing artifact', () => {
   const root = temporaryDirectory();
   try {
     const errors = validateFoundation(root);
-    assert.equal(errors.length, REQUIRED_FILES.length + 1);
+    assert.equal(errors.length, REQUIRED_FILES.length + MIGRATION_BACKED_DATABASE_OBJECT_NAMES.length);
     assert.match(errors[0], /Missing required foundation artifact/);
     assert.ok(errors.some((error) => /Migration-backed database object is missing/.test(error)));
   } finally {
