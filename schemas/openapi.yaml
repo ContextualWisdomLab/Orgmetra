@@ -348,7 +348,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: '#/components/responses/InvalidCommand'
+          $ref: '#/components/responses/SnapshotNotFound'
 components:
   securitySchemes:
     keyverse_oidc:
@@ -674,6 +674,146 @@ components:
         assignment_record_id:
           type: string
           format: uuid
+    JobAnalysisEvidenceSource:
+      type: object
+      additionalProperties: false
+      required:
+        - source_uri
+        - source_title
+        - source_version_code
+        - retrieved_at
+        - content_digest_sha256
+        - origin_code
+      properties:
+        source_uri:
+          type: string
+          format: uri
+          pattern: '^https://'
+        source_title:
+          type: string
+          minLength: 3
+        source_version_code:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+        retrieved_at:
+          type: string
+          format: date-time
+        content_digest_sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        origin_code:
+          type: string
+          enum:
+            - authoritative_occupation_source
+            - job_incumbent
+            - supervisor_sme
+            - occupational_expert
+            - web_research
+            - llm_draft
+    JobAnalysisTaskEvidence:
+      type: object
+      additionalProperties: false
+      required:
+        - task_record_id
+        - task_statement
+        - importance_level
+        - difficulty_level
+        - source
+      properties:
+        task_record_id:
+          type: string
+          format: uuid
+        task_statement:
+          type: string
+          minLength: 10
+        importance_level:
+          type: integer
+          minimum: 1
+          maximum: 5
+        difficulty_level:
+          type: integer
+          minimum: 1
+          maximum: 5
+        source:
+          $ref: '#/components/schemas/JobAnalysisEvidenceSource'
+    JobAnalysisKSAORequirement:
+      type: object
+      additionalProperties: false
+      required:
+        - ksao_record_id
+        - category_code
+        - requirement_statement
+        - importance_level
+        - proficiency_level
+        - source
+      properties:
+        ksao_record_id:
+          type: string
+          format: uuid
+        category_code:
+          type: string
+          enum:
+            - knowledge_requirement
+            - skill_requirement
+            - ability_requirement
+            - other_characteristic
+        requirement_statement:
+          type: string
+          minLength: 10
+        importance_level:
+          type: integer
+          minimum: 1
+          maximum: 5
+        proficiency_level:
+          type: integer
+          minimum: 1
+          maximum: 5
+        source:
+          $ref: '#/components/schemas/JobAnalysisEvidenceSource'
+    JobAnalysisTaskKSAOLink:
+      type: object
+      additionalProperties: false
+      required:
+        - task_record_id
+        - ksao_record_id
+        - relationship_strength
+        - essential_for_task
+      properties:
+        task_record_id:
+          type: string
+          format: uuid
+        ksao_record_id:
+          type: string
+          format: uuid
+        relationship_strength:
+          type: integer
+          minimum: 1
+          maximum: 5
+        essential_for_task:
+          type: boolean
+    FunctionalJobAnalysisProfile:
+      type: object
+      additionalProperties: false
+      required:
+        - data_function_code
+        - people_function_code
+        - things_function_code
+        - source
+      properties:
+        data_function_code:
+          type: integer
+          minimum: 0
+          maximum: 6
+        people_function_code:
+          type: integer
+          minimum: 0
+          maximum: 8
+        things_function_code:
+          type: integer
+          minimum: 0
+          maximum: 7
+        source:
+          $ref: '#/components/schemas/JobAnalysisEvidenceSource'
     PersistJobAnalysisSnapshotCommand:
       type: object
       additionalProperties: false
@@ -728,14 +868,23 @@ components:
         tasks:
           type: array
           minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/JobAnalysisTaskEvidence'
         ksao_requirements:
           type: array
           minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/JobAnalysisKSAORequirement'
         task_ksao_links:
           type: array
           minItems: 1
+          maxItems: 5000
+          items:
+            $ref: '#/components/schemas/JobAnalysisTaskKSAOLink'
         fja_profile:
-          type: object
+          $ref: '#/components/schemas/FunctionalJobAnalysisProfile'
     JobAnalysisSnapshotDocument:
       type: object
       additionalProperties: false
@@ -763,8 +912,11 @@ components:
           format: uuid
         analysis_version_code:
           type: string
+          minLength: 1
+          maxLength: 100
         status_code:
           type: string
+          pattern: '^(analysis_draft|analysis_validated)$'
         effective_from:
           type: string
           format: date
@@ -773,17 +925,31 @@ components:
           format: date-time
         reviewed_by_reference:
           type: string
+          minLength: 1
+          maxLength: 300
         reviewed_at:
           type: string
           format: date-time
         tasks:
           type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/JobAnalysisTaskEvidence'
         ksao_requirements:
           type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/JobAnalysisKSAORequirement'
         task_ksao_links:
           type: array
+          minItems: 1
+          maxItems: 5000
+          items:
+            $ref: '#/components/schemas/JobAnalysisTaskKSAOLink'
         fja_profile:
-          type: object
+          $ref: '#/components/schemas/FunctionalJobAnalysisProfile'
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -841,6 +1007,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     InsufficientEvidence:
       description: The high-impact command lacks sufficient versioned evidence.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    SnapshotNotFound:
+      description: The authorized job-analysis snapshot target does not exist.
       content:
         application/json:
           schema:
