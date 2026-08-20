@@ -132,6 +132,7 @@ const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|
 const ADR_STATUS_PATTERN = /^\|\s*\[\d{4}\]\(([^)]+)\)\s*\|.*\|\s*(Proposed|Accepted|Superseded|Rejected)\s*\|$/;
 const LOCAL_LINK_PATTERN = /\[[^\]]+\]\((?!https?:\/\/|mailto:|#)([^)]+)\)/g;
 const CREATE_TABLE_PATTERN = /\bCREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)/gi;
+const DOLLAR_QUOTE_START_PATTERN = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/;
 
 /** Recursively collect Markdown files in stable lexical order. */
 export function collectMarkdownFiles(directoryPath) {
@@ -183,10 +184,110 @@ export function validateDatabaseObjectNames(objectNames = DATABASE_OBJECT_NAMES)
     .map((objectName) => `Invalid database object name: ${objectName}`);
 }
 
-/** Extract created table names from one SQL document. */
+function maskedSqlCharacter(character) {
+  return character === '\n' || character === '\r' ? character : ' ';
+}
+
+/**
+ * Mask PostgreSQL comments and literal bodies while preserving code positions.
+ *
+ * Migration inventory is intentionally lexical and dependency-free, but it must
+ * never treat DDL-shaped prose as executable SQL. PostgreSQL permits nested block
+ * comments, ordinary/escape strings, quoted identifiers, and dollar-quoted
+ * bodies; masking those regions prevents false CREATE TABLE evidence while
+ * preserving actual unquoted lower-snake-case DDL for the naming contract.
+ */
+export function maskPostgresNonCode(sqlText) {
+  if (typeof sqlText !== 'string') throw new TypeError('sqlText must be a string');
+  let output = '';
+  let index = 0;
+
+  const maskThrough = (endIndex) => {
+    while (index < endIndex) {
+      output += maskedSqlCharacter(sqlText[index]);
+      index += 1;
+    }
+  };
+
+  while (index < sqlText.length) {
+    if (sqlText.startsWith('--', index)) {
+      while (index < sqlText.length && sqlText[index] !== '\n' && sqlText[index] !== '\r') {
+        output += ' ';
+        index += 1;
+      }
+      continue;
+    }
+
+    if (sqlText.startsWith('/*', index)) {
+      let depth = 0;
+      while (index < sqlText.length) {
+        if (sqlText.startsWith('/*', index)) {
+          depth += 1;
+          maskThrough(index + 2);
+          continue;
+        }
+        if (sqlText.startsWith('*/', index)) {
+          depth -= 1;
+          maskThrough(index + 2);
+          if (depth === 0) break;
+          continue;
+        }
+        output += maskedSqlCharacter(sqlText[index]);
+        index += 1;
+      }
+      continue;
+    }
+
+    if (sqlText[index] === "'" || sqlText[index] === '"') {
+      const delimiter = sqlText[index];
+      output += ' ';
+      index += 1;
+      while (index < sqlText.length) {
+        if (sqlText[index] === '\\') {
+          maskThrough(Math.min(index + 2, sqlText.length));
+          continue;
+        }
+        if (sqlText[index] === delimiter) {
+          if (sqlText[index + 1] === delimiter) {
+            maskThrough(index + 2);
+            continue;
+          }
+          output += ' ';
+          index += 1;
+          break;
+        }
+        output += maskedSqlCharacter(sqlText[index]);
+        index += 1;
+      }
+      continue;
+    }
+
+    if (sqlText[index] === '$') {
+      const delimiterMatch = sqlText.slice(index).match(DOLLAR_QUOTE_START_PATTERN);
+      if (delimiterMatch) {
+        const delimiter = delimiterMatch[0];
+        maskThrough(index + delimiter.length);
+        const closingIndex = sqlText.indexOf(delimiter, index);
+        if (closingIndex < 0) {
+          maskThrough(sqlText.length);
+          continue;
+        }
+        maskThrough(closingIndex + delimiter.length);
+        continue;
+      }
+    }
+
+    output += sqlText[index];
+    index += 1;
+  }
+  return output;
+}
+
+/** Extract created table names from executable regions of one SQL document. */
 export function extractCreatedTableNames(sqlText) {
   CREATE_TABLE_PATTERN.lastIndex = 0;
-  return new Set([...sqlText.matchAll(CREATE_TABLE_PATTERN)].map((match) => match[1].toLowerCase()));
+  const executableSql = maskPostgresNonCode(sqlText);
+  return new Set([...executableSql.matchAll(CREATE_TABLE_PATTERN)].map((match) => match[1].toLowerCase()));
 }
 
 /**
