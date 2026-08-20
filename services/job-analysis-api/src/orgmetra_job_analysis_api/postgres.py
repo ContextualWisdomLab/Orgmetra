@@ -29,7 +29,7 @@ from orgmetra_job_analysis_api.snapshot import (
     JobAnalysisIdempotencyConflict,
     JobAnalysisIntegrityError,
     JobAnalysisScopeMissing,
-    _validate_operational_uuid,
+    validate_operational_uuid,
 )
 
 PostgresConnectionFactory = Callable[[], AbstractContextManager[Any]]
@@ -238,12 +238,12 @@ class PostgresJobAnalysisPort:
             raise TypeError("audit_event must be an AuditOutboxEvent")
         if not isinstance(idempotency_key, str):
             raise ValueError("idempotency_key must reach the write port as a string.")
-        _validate_operational_uuid("write_command_id", write_command_id)
-        _validate_operational_uuid("outbox_delivery_record_id", outbox_delivery_record_id)
+        validate_operational_uuid("write_command_id", write_command_id)
+        validate_operational_uuid("outbox_delivery_record_id", outbox_delivery_record_id)
         if position_record_id is not None:
-            _validate_operational_uuid("position_record_id", position_record_id)
+            validate_operational_uuid("position_record_id", position_record_id)
         if criterion_blueprint_id is not None:
-            _validate_operational_uuid("criterion_blueprint_id", criterion_blueprint_id)
+            validate_operational_uuid("criterion_blueprint_id", criterion_blueprint_id)
 
         with self.connection_factory() as connection:
             with connection.cursor() as cursor:
@@ -407,8 +407,8 @@ class PostgresJobAnalysisPort:
         analysis_record_id: UUID,
     ) -> JobAnalysisSnapshot | None:
         """Read one snapshot under forced tenant RLS and reconstruct the kernel document."""
-        _validate_operational_uuid("tenant_record_id", tenant_record_id)
-        _validate_operational_uuid("analysis_record_id", analysis_record_id)
+        validate_operational_uuid("tenant_record_id", tenant_record_id)
+        validate_operational_uuid("analysis_record_id", analysis_record_id)
         with self.connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
