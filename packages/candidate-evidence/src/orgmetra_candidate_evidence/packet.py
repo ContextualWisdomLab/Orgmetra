@@ -102,10 +102,10 @@ class CandidateEvidenceIntakePacket:
     purpose_code: str
     reason_code: str
     collected_at: datetime
-    evidence_version: int = 1
     human_confirmation_required: bool = True
     review_state: str = _REVIEW_STATE
     next_action: str = _NEXT_ACTION
+    evidence_version: int = 1
 
     def __repr__(self) -> str:
         """Return a representation that never emits candidate correlation evidence."""

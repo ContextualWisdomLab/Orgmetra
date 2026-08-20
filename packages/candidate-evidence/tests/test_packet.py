@@ -86,6 +86,19 @@ def test_builds_reference_only_deterministic_packet() -> None:
     assert packet == CandidateEvidenceIntakePacket(**values())
 
 
+def test_existing_positional_optional_arguments_retain_meaning() -> None:
+    """Keep existing positional callers bound to review controls after versioning."""
+    packet = CandidateEvidenceIntakePacket(
+        *values().values(),
+        True,
+        "requires_human_review",
+        EXPECTED_NEXT_ACTION,
+    )
+    assert packet.human_confirmation_required is True
+    assert packet.review_state == "requires_human_review"
+    assert packet.evidence_version == 1
+
+
 @pytest.mark.parametrize(
     "field,bad",
     [
