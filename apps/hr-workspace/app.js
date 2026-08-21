@@ -96,14 +96,30 @@ Object.assign(translations.ko, {
   peopleApiNoValues: '불러온 보호된 People API 값이 없습니다.',
 });
 
+/**
+ * Return whether the selected purpose is allowed to reveal personal details.
+ * @param {string} purpose Purpose code selected by the reviewer.
+ * @returns {boolean} True only for the fixture's HR-operations purpose.
+ */
 export function isPurposeAuthorized(purpose) {
   return purpose === 'hr_operations';
 }
 
+/**
+ * Return the alternate supported workspace locale.
+ * @param {string} locale Current locale code.
+ * @returns {'en'|'ko'} The other supported locale; unknown values fall back to English.
+ */
 export function nextLocale(locale) {
   return locale === 'en' ? 'ko' : 'en';
 }
 
+/**
+ * Build the protected Job Analysis snapshot URL after validating required identifiers.
+ * @param {{baseUrl: string, tenantRecordId: string, analysisRecordId: string}} config Request coordinates.
+ * @returns {string} Encoded snapshot URL.
+ * @throws {Error} If the base URL, tenant record ID, or analysis record ID is missing.
+ */
 export function jobAnalysisSnapshotUrl(config) {
   if (!config || typeof config.baseUrl !== 'string' || !config.baseUrl.trim()) {
     throw new Error('Job Analysis API base URL is not configured.');
@@ -117,6 +133,14 @@ export function jobAnalysisSnapshotUrl(config) {
   return `${config.baseUrl.replace(/\/$/, '')}/v1/tenants/${encodeURIComponent(config.tenantRecordId)}/job-analysis-snapshots/${encodeURIComponent(config.analysisRecordId)}`;
 }
 
+/**
+ * Read one protected Job Analysis snapshot using a host-provided short-lived credential.
+ * The credential is used only for this request and is never persisted by the workspace.
+ * @param {{getAuthorization: Function, purposeCode?: string} & Record<string, unknown>} config Protected-read configuration.
+ * @param {typeof fetch} fetchImpl Fetch implementation, injectable for tests.
+ * @returns {Promise<object>} Parsed snapshot payload.
+ * @throws {Error} For missing authorization providers/credentials, unavailable fetch, denied access, or failed requests.
+ */
 export async function fetchJobAnalysisSnapshot(config, fetchImpl = globalThis.fetch) {
   if (typeof config?.getAuthorization !== 'function') {
     throw new Error('Job Analysis API authorization provider is not configured.');
@@ -138,6 +162,12 @@ export async function fetchJobAnalysisSnapshot(config, fetchImpl = globalThis.fe
   return response.json();
 }
 
+/**
+ * Build the protected People-record URL after validating required read coordinates.
+ * @param {{baseUrl: string, tenantRecordId: string, personRecordId: string, effectiveOn: string, purposeCode?: string, requestedFields?: string[]}} config Request coordinates.
+ * @returns {string} Encoded People API URL with effective-date, purpose, and field query parameters.
+ * @throws {Error} If required coordinates or requested fields are invalid.
+ */
 export function peopleRecordUrl(config) {
   if (!config || typeof config.baseUrl !== 'string' || !config.baseUrl.trim()) {
     throw new Error('People API base URL is not configured.');
@@ -163,6 +193,14 @@ export function peopleRecordUrl(config) {
   return `${config.baseUrl.replace(/\/$/, '')}/v1/tenants/${encodeURIComponent(config.tenantRecordId)}/people/${encodeURIComponent(config.personRecordId)}?${query}`;
 }
 
+/**
+ * Read one protected People record using a host-provided short-lived credential.
+ * The credential is used only for this request and is never persisted by the workspace.
+ * @param {{getAuthorization: Function} & Record<string, unknown>} config Protected-read configuration.
+ * @param {typeof fetch} fetchImpl Fetch implementation, injectable for tests.
+ * @returns {Promise<object>} Parsed People record payload.
+ * @throws {Error} For missing authorization providers/credentials, unavailable fetch, denied access, or failed requests.
+ */
 export async function fetchPeopleRecord(config, fetchImpl = globalThis.fetch) {
   if (typeof config?.getAuthorization !== 'function') {
     throw new Error('People API authorization provider is not configured.');
@@ -240,6 +278,17 @@ function setJobAnalysisStatus(key, state = 'idle') {
   status.textContent = jobAnalysisMessage(key);
 }
 
+function clearJobAnalysisSnapshot() {
+  document.getElementById('job-analysis-result').hidden = true;
+  document.getElementById('job-analysis-analysis-id').textContent = 'unknown';
+  document.getElementById('job-analysis-state').textContent = 'unknown';
+  document.getElementById('job-analysis-effective').textContent = 'unknown';
+  document.getElementById('job-analysis-recorded').textContent = 'unknown';
+  document.getElementById('job-analysis-digest').textContent = 'unknown';
+  document.getElementById('job-analysis-task-count').textContent = '0';
+  document.getElementById('job-analysis-ksao-count').textContent = '0';
+}
+
 function renderJobAnalysisSnapshot(snapshot) {
   const result = document.getElementById('job-analysis-result');
   const tasks = Array.isArray(snapshot?.tasks) ? snapshot.tasks : [];
@@ -265,6 +314,12 @@ function setPeopleApiStatus(key, state = 'idle') {
   status.textContent = peopleApiMessage(key);
 }
 
+function clearPeopleRecord() {
+  document.getElementById('people-api-result').hidden = true;
+  document.getElementById('people-api-display-name').textContent = 'unknown';
+  document.getElementById('people-api-employment-status').textContent = 'unknown';
+}
+
 function renderPeopleRecord(payload) {
   const fields = payload?.fields;
   if (!fields || typeof fields !== 'object') throw new Error('PEOPLE_REQUEST_FAILED');
@@ -275,6 +330,8 @@ function renderPeopleRecord(payload) {
 
 if (typeof document !== 'undefined') {
   let locale = 'en';
+  let jobAnalysisRequestVersion = 0;
+  let peopleApiRequestVersion = 0;
   document.querySelectorAll('[data-view-link]').forEach((link) => link.addEventListener('click', () => activateView(link.dataset.viewLink)));
   document.getElementById('locale-toggle').addEventListener('click', () => {
     locale = nextLocale(locale);
@@ -311,6 +368,8 @@ if (typeof document !== 'undefined') {
   }
   jobAnalysisForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const requestVersion = ++jobAnalysisRequestVersion;
+    clearJobAnalysisSnapshot();
     const config = {
       ...(jobAnalysisConfig || {}),
       tenantRecordId: document.getElementById('job-analysis-tenant').value,
@@ -320,9 +379,12 @@ if (typeof document !== 'undefined') {
     setJobAnalysisStatus('jobAnalysisLoading', 'loading');
     try {
       const snapshot = await fetchJobAnalysisSnapshot(config);
+      if (requestVersion !== jobAnalysisRequestVersion) return;
       renderJobAnalysisSnapshot(snapshot);
       setJobAnalysisStatus('jobAnalysisLoaded', 'loaded');
     } catch (error) {
+      if (requestVersion !== jobAnalysisRequestVersion) return;
+      clearJobAnalysisSnapshot();
       setJobAnalysisStatus(error.message === 'JOB_ANALYSIS_ACCESS_DENIED' ? 'jobAnalysisDenied' : 'jobAnalysisFailed', 'error');
     }
   });
@@ -340,6 +402,8 @@ if (typeof document !== 'undefined') {
   }
   peopleApiForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const requestVersion = ++peopleApiRequestVersion;
+    clearPeopleRecord();
     const config = {
       ...(peopleApiConfig || {}),
       tenantRecordId: document.getElementById('people-api-tenant').value,
@@ -350,9 +414,13 @@ if (typeof document !== 'undefined') {
     };
     setPeopleApiStatus('peopleApiLoading', 'loading');
     try {
-      renderPeopleRecord(await fetchPeopleRecord(config));
+      const record = await fetchPeopleRecord(config);
+      if (requestVersion !== peopleApiRequestVersion) return;
+      renderPeopleRecord(record);
       setPeopleApiStatus('peopleApiLoaded', 'loaded');
     } catch (error) {
+      if (requestVersion !== peopleApiRequestVersion) return;
+      clearPeopleRecord();
       setPeopleApiStatus(error.message === 'PEOPLE_ACCESS_DENIED' ? 'peopleApiDenied' : 'peopleApiFailed', 'error');
     }
   });
