@@ -173,6 +173,18 @@ def activate_structured_interview_plan(
     if type(verification) is not StructuredInterviewActivationVerification:
         raise TypeError("authority must return StructuredInterviewActivationVerification")
 
+    _validate_operational_uuid(verification.tenant_record_id, "tenant_record_id")
+    _validate_reference(
+        verification.interview_plan_reference,
+        "interview_plan",
+        "interview_plan_reference",
+    )
+    _validate_digest(verification.plan_digest, "plan_digest")
+    _validate_reference(
+        verification.approving_actor_reference,
+        "actor",
+        "approving_actor_reference",
+    )
     _validate_reference(
         verification.authority_evidence_reference,
         "activation_verification",
