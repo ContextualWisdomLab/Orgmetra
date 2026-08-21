@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { isPurposeAuthorized, nextLocale } from '../apps/hr-workspace/app.js';
+import {
+  fetchJobAnalysisSnapshot,
+  isPurposeAuthorized,
+  jobAnalysisSnapshotUrl,
+  nextLocale,
+} from '../apps/hr-workspace/app.js';
 
 const html = readFileSync(new URL('../apps/hr-workspace/index.html', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../apps/hr-workspace/styles.css', import.meta.url), 'utf8');
@@ -16,6 +21,7 @@ test('workspace exposes the Figma role slice and existing design tokens', () => 
   assert.match(html, /data-node-id="1:28"/);
   assert.match(html, /data-view-link="hr-home"/);
   assert.match(html, /data-view-link="employee-profile"/);
+  assert.match(html, /data-view-link="job-analysis"/);
   assert.match(css, /var\(--orgmetra-action-review\)/);
   assert.match(css, /var\(--orgmetra-focus-ring\)/);
 });
@@ -63,4 +69,29 @@ test('purpose and locale transitions preserve the trust boundary', () => {
   assert.equal(nextLocale('ko'), 'en');
   assert.match(app, /no API mutation was sent/);
   assert.doesNotMatch(html, /password|passkey_value|private_key/i);
+});
+
+test('Job Analysis uses a host authorization provider without persisting bearer material', async () => {
+  const config = {
+    baseUrl: 'https://job-analysis.example.test/',
+    tenantRecordId: 'tenant/alpha',
+    analysisRecordId: 'analysis-1',
+    purposeCode: 'job_analysis_read',
+    getAuthorization: async () => 'Bearer host-provided-token',
+  };
+  assert.equal(
+    jobAnalysisSnapshotUrl(config),
+    'https://job-analysis.example.test/v1/tenants/tenant%2Falpha/job-analysis-snapshots/analysis-1',
+  );
+  let request;
+  const snapshot = await fetchJobAnalysisSnapshot(config, async (url, options) => {
+    request = { url, options };
+    return { ok: true, status: 200, json: async () => ({ analysis_record_id: 'analysis-1' }) };
+  });
+  assert.deepEqual(snapshot, { analysis_record_id: 'analysis-1' });
+  assert.equal(request.url, jobAnalysisSnapshotUrl(config));
+  assert.equal(request.options.credentials, 'omit');
+  assert.equal(request.options.headers.Authorization, 'Bearer host-provided-token');
+  assert.equal(request.options.headers['X-Purpose-Code'], 'job_analysis_read');
+  assert.doesNotMatch(html, /localStorage|sessionStorage|authorization.*input/i);
 });

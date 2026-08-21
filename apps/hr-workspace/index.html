@@ -17,6 +17,7 @@
         <nav class="nav-list" aria-label="Workspace views">
           <button class="nav-item is-active" type="button" data-view-link="hr-home" aria-current="page"><span data-i18n="hrHome">HR Home</span></button>
           <button class="nav-item" type="button" data-view-link="employee-profile"><span data-i18n="employeeProfile">Employee Profile</span></button>
+          <button class="nav-item" type="button" data-view-link="job-analysis"><span data-i18n="jobAnalysis">Job Analysis</span></button>
         </nav>
         <div class="sidebar-note"><span class="status-dot" aria-hidden="true"></span><span data-i18n="fixtureMode">Local fixture mode</span></div>
       </aside>
@@ -88,6 +89,36 @@
             <div class="panel-heading"><div><p class="eyebrow" data-i18n="assignmentSplit">Assignment split</p><h2 id="assignment-title" data-i18n="capacityTitle">Visible allocation capacity</h2></div><span class="badge badge-authorized">100.00%</span></div>
             <div class="table-wrap"><table><caption class="sr-only" data-i18n="assignmentCaption">Exact assignment allocation values</caption><thead><tr><th scope="col" data-i18n="assignmentName">Assignment</th><th scope="col" data-i18n="allocation">Allocation</th><th scope="col" data-i18n="nextAction">Next action</th></tr></thead><tbody><tr><th scope="row">Platform</th><td>60.00%</td><td data-i18n="noAction">No action required</td></tr><tr><th scope="row">Governance</th><td>40.00%</td><td data-i18n="noAction">No action required</td></tr></tbody></table></div>
             <p class="helper-text"><strong data-i18n="credentialBoundary">Credential boundary</strong> · <span data-i18n="credentialCopy">No identity credential or passkey is stored in the person record.</span></p>
+          </section>
+        </section>
+
+        <section class="view is-hidden" id="view-job-analysis" data-view="job-analysis" aria-labelledby="job-analysis-title" hidden>
+          <div class="view-heading">
+            <div><p class="breadcrumb" data-i18n="jobAnalysisBreadcrumb">Orgmetra / Job Analysis</p><h1 id="job-analysis-title" data-i18n="jobAnalysisTitle">Job Analysis snapshot</h1></div>
+            <span class="badge badge-authorized" data-i18n="jobAnalysisBadge">API-bound read</span>
+          </div>
+          <section class="panel" aria-labelledby="job-analysis-request-title">
+            <h2 id="job-analysis-request-title" data-i18n="jobAnalysisTitle">Job Analysis snapshot</h2>
+            <p class="panel-copy" data-i18n="jobAnalysisCopy">Read one governed, bitemporal job-analysis snapshot from the protected API.</p>
+            <form id="job-analysis-form" class="form-grid" novalidate>
+              <label class="field-label" for="job-analysis-tenant"><span data-i18n="jobAnalysisTenant">Tenant record ID</span><input id="job-analysis-tenant" name="tenant_record_id" required maxlength="36" autocomplete="off"></label>
+              <label class="field-label" for="job-analysis-record"><span data-i18n="jobAnalysisRecord">Analysis record ID</span><input id="job-analysis-record" name="analysis_record_id" required maxlength="36" autocomplete="off"></label>
+              <label class="field-label" for="job-analysis-purpose"><span data-i18n="jobAnalysisPurpose">Purpose code</span><input id="job-analysis-purpose" name="purpose_code" value="job_analysis_read" required maxlength="80" autocomplete="off"></label>
+              <div class="dialog-actions field-wide"><button class="button button-review" type="submit" data-i18n="jobAnalysisLoad">Load snapshot</button></div>
+            </form>
+            <div id="job-analysis-status" class="notice notice-neutral" role="status" aria-live="polite" data-state="not-configured"></div>
+          </section>
+          <section id="job-analysis-result" class="panel" aria-labelledby="job-analysis-summary-title" hidden>
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="jobAnalysisSummary">Snapshot evidence</p><h2 id="job-analysis-summary-title" data-i18n="jobAnalysisTitle">Job Analysis snapshot</h2></div><span class="badge badge-neutral" data-i18n="readOnly">Read-only snapshot</span></div>
+            <div class="table-wrap"><table><caption class="sr-only" data-i18n="jobAnalysisSummary">Snapshot evidence</caption><tbody>
+              <tr><th scope="row" data-i18n="jobAnalysisAnalysisId">Analysis record</th><td id="job-analysis-analysis-id">unknown</td></tr>
+              <tr><th scope="row" data-i18n="jobAnalysisStatus">Status</th><td id="job-analysis-state">unknown</td></tr>
+              <tr><th scope="row" data-i18n="jobAnalysisEffective">Effective from</th><td id="job-analysis-effective">unknown</td></tr>
+              <tr><th scope="row" data-i18n="jobAnalysisRecorded">Recorded at</th><td id="job-analysis-recorded">unknown</td></tr>
+              <tr><th scope="row" data-i18n="jobAnalysisDigest">Content digest</th><td id="job-analysis-digest">unknown</td></tr>
+              <tr><th scope="row" data-i18n="jobAnalysisTasks">Tasks</th><td id="job-analysis-task-count">0</td></tr>
+              <tr><th scope="row" data-i18n="jobAnalysisKsaos">KSAO requirements</th><td id="job-analysis-ksao-count">0</td></tr>
+            </tbody></table></div>
           </section>
         </section>
       </main>

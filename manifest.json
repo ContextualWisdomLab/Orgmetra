@@ -77,21 +77,21 @@
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "d2c069ebeaccbd344b10af52960f7ae23dbffb2a3c9d7650c6c26bee12022c38",
-      "bytes": 10978,
-      "lines": 93
+      "sha256": "72f86f3a1e092ba3279607532fa0878807c140918fb6cb79d73536b20df65d13",
+      "bytes": 18374,
+      "lines": 232
     },
     {
       "path": "apps/hr-workspace/index.html",
-      "sha256": "fc0e31865d114834d214a86fc1b16e7d4f424ceb8f4919a2fc6700bb19bcfb8c",
-      "bytes": 13504,
-      "lines": 113
+      "sha256": "43067618b6cb0ba60599c49b74bb269ac814f2d2d504939382ae002959fbbbfc",
+      "bytes": 17110,
+      "lines": 144
     },
     {
       "path": "apps/hr-workspace/styles.css",
-      "sha256": "fb44828e958e164e515da587256966f805ea115b172e4b584c4fef8e6b26322a",
-      "bytes": 10013,
-      "lines": 117
+      "sha256": "09349ad43a12d015d7f6eee30fa45d794c4b66e813efbd741dd23bf35de5360b",
+      "bytes": 10110,
+      "lines": 118
     },
     {
       "path": "apps/hr-workspace/workspace.stories.js",
@@ -221,9 +221,9 @@
     },
     {
       "path": "docs/STORYBOOK.md",
-      "sha256": "ddfbddea1a4cb82936ee72cd489195e271cc01556516f00d1ab369d8e372f388",
-      "bytes": 2511,
-      "lines": 74
+      "sha256": "86a6fc47f41709ad014aa3562b00a3f3ccc55daa6eee0ab14906abfd88123f45",
+      "bytes": 2818,
+      "lines": 77
     },
     {
       "path": "docs/TEST_STRATEGY.md",
@@ -443,9 +443,9 @@
     },
     {
       "path": "tests/hr-workspace.test.mjs",
-      "sha256": "03d395e3f62ab9178e7d9f9979926b186ca0f224c71e4368b23beffb9aecd940",
-      "bytes": 3206,
-      "lines": 66
+      "sha256": "52fc7ccc7cd8fec27e138c024a89eaf58ce781207010c705fa1f48af990d82ee",
+      "bytes": 4499,
+      "lines": 97
     },
     {
       "path": "tests/openapi-contract.test.mjs",

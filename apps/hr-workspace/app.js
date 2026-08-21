@@ -7,12 +7,99 @@ const translations = {
   }
 };
 
+Object.assign(translations.en, {
+  jobAnalysis: 'Job Analysis',
+  jobAnalysisBadge: 'API-bound read',
+  jobAnalysisBreadcrumb: 'Orgmetra / Job Analysis',
+  jobAnalysisTitle: 'Job Analysis snapshot',
+  jobAnalysisCopy: 'Read one governed, bitemporal job-analysis snapshot from the protected API.',
+  jobAnalysisTenant: 'Tenant record ID',
+  jobAnalysisRecord: 'Analysis record ID',
+  jobAnalysisPurpose: 'Purpose code',
+  jobAnalysisLoad: 'Load snapshot',
+  jobAnalysisReady: 'Ready to request a protected snapshot.',
+  jobAnalysisNotConfigured: 'Not connected: the host must provide an API base URL and authorization provider.',
+  jobAnalysisLoading: 'Loading governed snapshot…',
+  jobAnalysisLoaded: 'Snapshot loaded from the protected Job Analysis API.',
+  jobAnalysisDenied: 'The protected API denied this request. Verify the purpose and host authorization.',
+  jobAnalysisFailed: 'The protected API could not return this snapshot. No local fallback was used.',
+  jobAnalysisSummary: 'Snapshot evidence',
+  jobAnalysisAnalysisId: 'Analysis record',
+  jobAnalysisStatus: 'Status',
+  jobAnalysisEffective: 'Effective from',
+  jobAnalysisRecorded: 'Recorded at',
+  jobAnalysisDigest: 'Content digest',
+  jobAnalysisTasks: 'Tasks',
+  jobAnalysisKsaos: 'KSAO requirements',
+  jobAnalysisNoValues: 'No snapshot values loaded.',
+});
+Object.assign(translations.ko, {
+  jobAnalysis: '직무 분석',
+  jobAnalysisBadge: 'API 연결 읽기',
+  jobAnalysisBreadcrumb: 'Orgmetra / 직무 분석',
+  jobAnalysisTitle: '직무 분석 스냅샷',
+  jobAnalysisCopy: '보호된 API에서 하나의 거버넌스 적용 이중 시간 직무 분석 스냅샷을 읽습니다.',
+  jobAnalysisTenant: '테넌트 레코드 ID',
+  jobAnalysisRecord: '분석 레코드 ID',
+  jobAnalysisPurpose: '목적 코드',
+  jobAnalysisLoad: '스냅샷 불러오기',
+  jobAnalysisReady: '보호된 스냅샷을 요청할 준비가 되었습니다.',
+  jobAnalysisNotConfigured: '연결되지 않음: 호스트가 API 기본 URL과 인증 제공자를 제공해야 합니다.',
+  jobAnalysisLoading: '거버넌스 적용 스냅샷을 불러오는 중…',
+  jobAnalysisLoaded: '보호된 직무 분석 API에서 스냅샷을 불러왔습니다.',
+  jobAnalysisDenied: '보호된 API가 요청을 거부했습니다. 목적과 호스트 인증을 확인하세요.',
+  jobAnalysisFailed: '보호된 API에서 이 스냅샷을 반환하지 못했습니다. 로컬 대체 데이터는 사용하지 않았습니다.',
+  jobAnalysisSummary: '스냅샷 근거',
+  jobAnalysisAnalysisId: '분석 레코드',
+  jobAnalysisStatus: '상태',
+  jobAnalysisEffective: '효력 시작일',
+  jobAnalysisRecorded: '기록 시각',
+  jobAnalysisDigest: '콘텐츠 다이제스트',
+  jobAnalysisTasks: '과업',
+  jobAnalysisKsaos: 'KSAO 요구사항',
+  jobAnalysisNoValues: '불러온 스냅샷 값이 없습니다.',
+});
+
 export function isPurposeAuthorized(purpose) {
   return purpose === 'hr_operations';
 }
 
 export function nextLocale(locale) {
   return locale === 'en' ? 'ko' : 'en';
+}
+
+export function jobAnalysisSnapshotUrl(config) {
+  if (!config || typeof config.baseUrl !== 'string' || !config.baseUrl.trim()) {
+    throw new Error('Job Analysis API base URL is not configured.');
+  }
+  if (typeof config.tenantRecordId !== 'string' || !config.tenantRecordId.trim()) {
+    throw new Error('Tenant record ID is required.');
+  }
+  if (typeof config.analysisRecordId !== 'string' || !config.analysisRecordId.trim()) {
+    throw new Error('Analysis record ID is required.');
+  }
+  return `${config.baseUrl.replace(/\/$/, '')}/v1/tenants/${encodeURIComponent(config.tenantRecordId)}/job-analysis-snapshots/${encodeURIComponent(config.analysisRecordId)}`;
+}
+
+export async function fetchJobAnalysisSnapshot(config, fetchImpl = globalThis.fetch) {
+  if (typeof config?.getAuthorization !== 'function') {
+    throw new Error('Job Analysis API authorization provider is not configured.');
+  }
+  if (typeof fetchImpl !== 'function') throw new Error('Fetch is unavailable.');
+  const authorization = await config.getAuthorization();
+  if (typeof authorization !== 'string' || !authorization.trim()) {
+    throw new Error('Job Analysis API authorization provider returned no credential.');
+  }
+  const response = await fetchImpl(jobAnalysisSnapshotUrl(config), {
+    headers: {
+      Authorization: authorization,
+      'X-Purpose-Code': config.purposeCode || 'job_analysis_read',
+    },
+    credentials: 'omit',
+  });
+  if (response.status === 401 || response.status === 403) throw new Error('JOB_ANALYSIS_ACCESS_DENIED');
+  if (!response.ok) throw new Error('JOB_ANALYSIS_REQUEST_FAILED');
+  return response.json();
 }
 
 function setLocale(locale) {
@@ -63,6 +150,31 @@ function closeDialog(id) {
   else dialog.hidden = true;
 }
 
+function jobAnalysisMessage(key) {
+  return translations[document.documentElement.dataset.locale || 'en'][key];
+}
+
+function setJobAnalysisStatus(key, state = 'idle') {
+  const status = document.getElementById('job-analysis-status');
+  status.dataset.i18n = key;
+  status.dataset.state = state;
+  status.textContent = jobAnalysisMessage(key);
+}
+
+function renderJobAnalysisSnapshot(snapshot) {
+  const result = document.getElementById('job-analysis-result');
+  const tasks = Array.isArray(snapshot?.tasks) ? snapshot.tasks : [];
+  const ksaos = Array.isArray(snapshot?.ksao_requirements) ? snapshot.ksao_requirements : [];
+  document.getElementById('job-analysis-analysis-id').textContent = snapshot?.analysis_record_id || 'unknown';
+  document.getElementById('job-analysis-state').textContent = snapshot?.status_code || 'unknown';
+  document.getElementById('job-analysis-effective').textContent = snapshot?.effective_from || 'unknown';
+  document.getElementById('job-analysis-recorded').textContent = snapshot?.recorded_at || 'unknown';
+  document.getElementById('job-analysis-digest').textContent = snapshot?.content_digest_sha256 || 'unknown';
+  document.getElementById('job-analysis-task-count').textContent = String(tasks.length);
+  document.getElementById('job-analysis-ksao-count').textContent = String(ksaos.length);
+  result.hidden = false;
+}
+
 if (typeof document !== 'undefined') {
   let locale = 'en';
   document.querySelectorAll('[data-view-link]').forEach((link) => link.addEventListener('click', () => activateView(link.dataset.viewLink)));
@@ -88,6 +200,33 @@ if (typeof document !== 'undefined') {
     }
     event.preventDefault();
     document.getElementById('confirmation-status').hidden = false;
+  });
+  const jobAnalysisForm = document.getElementById('job-analysis-form');
+  const jobAnalysisConfig = globalThis.__ORGMETRA_JOB_ANALYSIS__;
+  if (jobAnalysisConfig?.tenantRecordId) document.getElementById('job-analysis-tenant').value = jobAnalysisConfig.tenantRecordId;
+  if (jobAnalysisConfig?.analysisRecordId) document.getElementById('job-analysis-record').value = jobAnalysisConfig.analysisRecordId;
+  if (jobAnalysisConfig?.purposeCode) document.getElementById('job-analysis-purpose').value = jobAnalysisConfig.purposeCode;
+  if (!jobAnalysisConfig?.baseUrl || typeof jobAnalysisConfig?.getAuthorization !== 'function') {
+    setJobAnalysisStatus('jobAnalysisNotConfigured', 'not-configured');
+  } else {
+    setJobAnalysisStatus('jobAnalysisReady');
+  }
+  jobAnalysisForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const config = {
+      ...(jobAnalysisConfig || {}),
+      tenantRecordId: document.getElementById('job-analysis-tenant').value,
+      analysisRecordId: document.getElementById('job-analysis-record').value,
+      purposeCode: document.getElementById('job-analysis-purpose').value,
+    };
+    setJobAnalysisStatus('jobAnalysisLoading', 'loading');
+    try {
+      const snapshot = await fetchJobAnalysisSnapshot(config);
+      renderJobAnalysisSnapshot(snapshot);
+      setJobAnalysisStatus('jobAnalysisLoaded', 'loaded');
+    } catch (error) {
+      setJobAnalysisStatus(error.message === 'JOB_ANALYSIS_ACCESS_DENIED' ? 'jobAnalysisDenied' : 'jobAnalysisFailed', 'error');
+    }
   });
   setLocale(locale);
 }
