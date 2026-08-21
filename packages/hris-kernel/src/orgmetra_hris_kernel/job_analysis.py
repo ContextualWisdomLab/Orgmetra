@@ -100,8 +100,8 @@ def _validate_level(value: object, field_name: str) -> int:
 
 
 def _validate_aware_datetime(value: object, field_name: str) -> datetime:
-    """Return an offset-aware instant suitable for evidence ordering."""
-    if not isinstance(value, datetime):
+    """Return an exact offset-aware instant suitable for immutable evidence ordering."""
+    if type(value) is not datetime:
         raise ValueError(f"{field_name} must be a datetime")
     if value.tzinfo is None:
         raise ValueError(f"{field_name} must be timezone-aware")
@@ -294,7 +294,7 @@ class JobAnalysisSnapshot:
         _validate_code(self.status_code, "status_code")
         if self.status_code not in _ALLOWED_STATUS_CODES:
             raise ValueError("status_code is not an allowed analysis status")
-        if not isinstance(self.effective_from, date) or isinstance(self.effective_from, datetime):
+        if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a date")
         recorded_at = _validate_aware_datetime(self.recorded_at, "recorded_at")
         if not isinstance(self.tasks, tuple) or not self.tasks:
