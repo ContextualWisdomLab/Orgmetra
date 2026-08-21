@@ -95,6 +95,19 @@ class RejectingAuthority:
         raise PermissionError("authoritative activation checks failed")
 
 
+class SwitchingVerification(StructuredInterviewActivationVerification):
+    """Hostile result that can change valid authority evidence between attribute reads."""
+
+    def __getattribute__(self, name):
+        """Swap one format-valid authority reference after its first validation read."""
+        if name == "authority_evidence_reference":
+            reads = object.__getattribute__(self, "_authority_reference_reads")
+            object.__setattr__(self, "_authority_reference_reads", reads + 1)
+            if reads:
+                return "activation_verification:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        return super().__getattribute__(name)
+
+
 def test_activation_executes_authority_and_returns_immutable_human_receipt():
     """Bind human confirmation to the exact plan and authoritative verification evidence."""
     candidate_plan = plan()
@@ -166,6 +179,29 @@ def test_activation_rejects_non_verification_result():
         activate_structured_interview_plan(
             plan=plan(),
             authority=WrongAuthority(),
+            approving_actor_reference=APPROVER,
+            approved_at=APPROVED_AT,
+        )
+
+
+def test_activation_rejects_verification_subclass_before_evidence_reads_can_diverge():
+    """Reject subclassed host evidence that can change canonical audit fields between reads."""
+    candidate_plan = plan()
+    base = verification_for(candidate_plan)
+    verification = SwitchingVerification(
+        tenant_record_id=base.tenant_record_id,
+        interview_plan_reference=base.interview_plan_reference,
+        plan_digest=base.plan_digest,
+        approving_actor_reference=base.approving_actor_reference,
+        authority_evidence_reference=base.authority_evidence_reference,
+        authority_evidence_digest=base.authority_evidence_digest,
+    )
+    object.__setattr__(verification, "_authority_reference_reads", 0)
+
+    with pytest.raises(TypeError, match="StructuredInterviewActivationVerification"):
+        activate_structured_interview_plan(
+            plan=candidate_plan,
+            authority=AllowingAuthority(verification),
             approving_actor_reference=APPROVER,
             approved_at=APPROVED_AT,
         )
