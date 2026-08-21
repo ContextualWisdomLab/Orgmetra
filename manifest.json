@@ -53,9 +53,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "df3376407270f599cc00a285851fad865b6b4574fe8c3c9a060e13b36d0d0282",
-      "bytes": 17985,
-      "lines": 81
+      "sha256": "b4deda1ada56860fa3862782a2234081a068c3bf93da0fb12083b16b56ddaad3",
+      "bytes": 18223,
+      "lines": 82
     },
     {
       "path": "CLAUDE.md",
@@ -233,9 +233,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "9a57c561c0576683c307b9dd019615a85237d6436691b22f7d61890f39dc409f",
-      "bytes": 17096,
-      "lines": 149
+      "sha256": "2e9572f730a03f7aacd09f240834ec9a67e489979e965bc6add56575d20b8a50",
+      "bytes": 17454,
+      "lines": 151
     },
     {
       "path": "docs/THREAT_MODEL.md",

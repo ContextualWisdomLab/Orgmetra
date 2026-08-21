@@ -12,6 +12,8 @@ npm run validate
 
 The command runs Python repository-integrity validation, the dependency-free Node foundation validator, Node regression tests, and mutation-style OpenAPI operation-contract tests. It must fail on a missing required artifact, manifest mismatch, invalid database name, missing tenant/evidence/audit/temporal DDL contract, incomplete high-risk OpenAPI operation context, empty OpenID Connect scope requirement, internal trace identifier in a client error schema, explicit unfinished-work marker, unbalanced Markdown fence, or incomplete Apache-2.0 license. Ordinary explanatory prose may contain words such as `placeholder`; only explicit TODO/TBD/FIXME marker forms are treated as unfinished work.
 
+Python service tests use each service's project metadata and local `uv` source mappings. The canonical Job Analysis command is `uv run --project services/job-analysis-api --extra test pytest services/job-analysis-api/tests`; it resolves the owned HRIS kernel and Keyverse adapter from the repository and does not depend on a manually supplied `PYTHONPATH`.
+
 ## Foundation test matrix
 
 | Evidence | Execution command |
