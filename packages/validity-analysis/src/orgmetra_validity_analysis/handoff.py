@@ -96,8 +96,8 @@ def _validate_kernel_revision(value: str) -> None:
 
 
 def _canonical_timestamp(value: datetime) -> str:
-    """Render an aware instant as precision-preserving UTC RFC 3339 text."""
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+    """Render an exact built-in aware instant as precision-preserving UTC RFC 3339 text."""
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("requested_at must be timezone-aware")
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
