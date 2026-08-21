@@ -56,6 +56,13 @@ test('human-review workspace states remain keyboard-accessible and localized', a
   await page.locator('#confirm-correction').click();
   await expect(page.locator('#confirmation-status')).toBeVisible();
   await expect(page.locator('#confirmation-status')).toContainText('정정 초안을 확인');
+
+  await page.getByRole('button', { name: '취소' }).click();
+  await expect(confirmationDialog).toBeHidden();
+  await page.locator('[data-action="correct-history"]').click();
+  await expect(confirmationDialog).toBeVisible();
+  await expect(page.locator('#confirmation-status')).toBeHidden();
+  await expect(page.locator('#confirmation-reason')).toHaveValue('');
 });
 
 test('connected read views use host authorization and render API evidence', async ({ page }) => {
