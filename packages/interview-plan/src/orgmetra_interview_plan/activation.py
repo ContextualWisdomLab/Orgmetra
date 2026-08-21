@@ -9,7 +9,7 @@ Any failed authoritative check must raise instead of returning verification evid
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from hashlib import sha256
 import json
@@ -28,6 +28,7 @@ _PURPOSE_CODE = "structured_interview_activation"
 _REASON_CODE = "human_approved_plan_activation"
 _ACTIVATION_STATE = "approved_for_use"
 _MAX_EVIDENCE_VERSION = 2_147_483_647
+_ACTIVATION_RECEIPT_ISSUANCE_TOKEN = object()
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,9 +72,15 @@ class StructuredInterviewActivationReceipt:
     evidence_version: int = 1
     human_confirmation: bool = True
     activation_state: str = _ACTIVATION_STATE
+    _issuance_token: object = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        """Reject forged, ambiguous, or weakened activation evidence."""
+        """Reject forged, ambiguous, weakened, or non-authoritatively issued evidence."""
+        if self._issuance_token is not _ACTIVATION_RECEIPT_ISSUANCE_TOKEN:
+            raise TypeError(
+                "StructuredInterviewActivationReceipt can only be issued by "
+                "activate_structured_interview_plan"
+            )
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.interview_plan_reference,
@@ -192,4 +199,5 @@ def activate_structured_interview_plan(
         authority_evidence_reference=verification.authority_evidence_reference,
         authority_evidence_digest=verification.authority_evidence_digest,
         approved_at=approved_at,
+        _issuance_token=_ACTIVATION_RECEIPT_ISSUANCE_TOKEN,
     )
