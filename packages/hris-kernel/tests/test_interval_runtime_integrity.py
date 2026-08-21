@@ -31,6 +31,22 @@ class _OffsetlessZone(tzinfo):
         return "offsetless"
 
 
+class _ExplodingZone(tzinfo):
+    """A hostile timezone implementation that raises during offset resolution."""
+
+    def utcoffset(self, _value: datetime | None) -> timedelta | None:
+        """Raise instead of returning a usable offset."""
+        raise RuntimeError("hostile timezone")
+
+    def dst(self, _value: datetime | None) -> timedelta | None:
+        """Return no daylight-saving adjustment."""
+        return None
+
+    def tzname(self, _value: datetime | None) -> str:
+        """Return a stable diagnostic name for the test-only zone."""
+        return "exploding"
+
+
 def test_date_interval_rejects_date_subclasses_in_stored_bounds() -> None:
     """Stored business-time bounds must be exact built-in dates, not polymorphic input."""
     forged = _ForgedDate(2026, 8, 22)
@@ -84,3 +100,11 @@ def test_recorded_interval_requires_a_real_utc_offset_not_only_tzinfo_presence()
     )
     with pytest.raises(IntervalError, match="timezone-aware"):
         interval.contains(offsetless)
+
+
+def test_recorded_interval_normalizes_hostile_timezone_failures() -> None:
+    """Unexpected tzinfo execution failures become stable interval errors."""
+    hostile = datetime(2026, 8, 22, 3, 0, tzinfo=_ExplodingZone())
+
+    with pytest.raises(IntervalError, match="timezone-aware"):
+        RecordedInterval(start=hostile)
