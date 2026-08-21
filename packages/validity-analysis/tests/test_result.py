@@ -105,7 +105,11 @@ def test_gpu_and_nonconverged_result_are_explicitly_typed() -> None:
         {"missing_predictor_observations": 13},
         {"missing_criterion_observations": 13},
         {"complete_observations": 12, "missing_predictor_observations": 1},
-        {"complete_observations": 12, "missing_criterion_observations": 1},
+        {
+            "complete_observations": 12,
+            "missing_predictor_observations": 0,
+            "missing_criterion_observations": 1,
+        },
     ],
 )
 def test_missingness_rejects_invalid_counts(bad: dict[str, object]) -> None:
