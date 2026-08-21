@@ -206,20 +206,36 @@ class TeppAnalysisRequestPacket:
         """Return SHA-256 over the exact canonical TEPP request body."""
         return hashlib.sha256(self.canonical_tepp_json().encode("utf-8")).hexdigest()
 
+    def governance_scope_digest(self) -> str:
+        """Return SHA-256 over local governance fields that must remain stable on retry."""
+        payload = {
+            "evidence_version": self.evidence_version,
+            "requested_by_actor_reference": self.requested_by_actor_reference,
+            "snapshot_digest": self.snapshot_digest,
+            "tenant_record_id": self.tenant_record_id,
+            "validation_study_reference": self.validation_study_reference,
+        }
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
     def is_idempotent_retry_of(self, other: "TeppAnalysisRequestPacket") -> bool:
-        """Return whether another packet is the same exact-key TEPP request retry."""
+        """Return whether another packet replays the same key, TEPP body, and local scope."""
         return (
-            isinstance(other, TeppAnalysisRequestPacket)
+            type(other) is TeppAnalysisRequestPacket
             and self.idempotency_key == other.idempotency_key
             and self.request_digest() == other.request_digest()
+            and self.governance_scope_digest() == other.governance_scope_digest()
         )
 
     def idempotency_conflicts_with(self, other: "TeppAnalysisRequestPacket") -> bool:
-        """Return whether one key has been rebound to different TEPP request semantics."""
+        """Return whether one key has been rebound to different TEPP or governance semantics."""
         return (
-            isinstance(other, TeppAnalysisRequestPacket)
+            type(other) is TeppAnalysisRequestPacket
             and self.idempotency_key == other.idempotency_key
-            and self.request_digest() != other.request_digest()
+            and (
+                self.request_digest() != other.request_digest()
+                or self.governance_scope_digest() != other.governance_scope_digest()
+            )
         )
 
     def governance_evidence(self) -> dict[str, object]:
