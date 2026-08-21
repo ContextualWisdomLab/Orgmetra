@@ -86,8 +86,8 @@ def _validate_business_date(value: date, field_name: str) -> None:
 
 
 def _validate_reason_code(value: str) -> None:
-    """Require a closed, reviewed reason code so free-form PII cannot enter evidence."""
-    if not isinstance(value, str) or value not in _ALLOWED_REASON_CODES:
+    """Require exact built-in text from the closed reviewed reason vocabulary."""
+    if type(value) is not str or value not in _ALLOWED_REASON_CODES:
         raise ValueError("reason_code must be an authorized performance-review reason code")
 
 
@@ -179,7 +179,7 @@ class PerformanceReviewPacket:
             )
             _validate_digest(self.development_plan_digest, "development_plan_digest")
         _validate_reference(self.reviewer_reference, "actor", "reviewer_reference")
-        if self.purpose_code != _PURPOSE_CODE:
+        if type(self.purpose_code) is not str or self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain performance_review")
         _validate_reason_code(self.reason_code)
         _validate_business_date(self.review_period_start, "review_period_start")
@@ -198,15 +198,15 @@ class PerformanceReviewPacket:
             raise ValueError("performance review packet must not contain free-form model output")
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory before performance rating")
-        if self.decision_authority != _DECISION_AUTHORITY:
+        if type(self.decision_authority) is not str or self.decision_authority != _DECISION_AUTHORITY:
             raise ValueError("decision_authority must remain human_review_only")
-        if self.review_state != _REVIEW_STATE:
+        if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_review")
-        if self.scope_verification_state != _SCOPE_VERIFICATION_STATE:
+        if type(self.scope_verification_state) is not str or self.scope_verification_state != _SCOPE_VERIFICATION_STATE:
             raise ValueError(
                 "scope_verification_state must remain requires_authoritative_resolution"
             )
-        if self.next_action != _NEXT_ACTION:
+        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed performance-review instruction")
 
     def canonical_json(self) -> str:
