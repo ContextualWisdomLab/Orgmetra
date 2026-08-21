@@ -96,6 +96,14 @@ def test_date_interval_rejects_date_subclasses_in_query_coordinate() -> None:
         interval.contains(_ForgedDate(2026, 8, 22))
 
 
+def test_date_interval_rejects_non_interval_overlap_operand() -> None:
+    """Effective-time overlap never delegates field access to an arbitrary object."""
+    interval = DateInterval(start=date(2026, 8, 1), end=date(2026, 9, 1))
+
+    with pytest.raises(IntervalError, match="exact DateInterval"):
+        interval.overlaps(object())  # type: ignore[arg-type]
+
+
 def test_recorded_interval_rejects_datetime_subclasses_in_stored_bounds() -> None:
     """System-recorded bounds must be exact built-in datetimes before timezone checks."""
     forged = _ForgedDateTime(2026, 8, 22, 3, 0, tzinfo=timezone.utc)
@@ -116,6 +124,17 @@ def test_recorded_interval_rejects_datetime_subclasses_in_query_coordinate() -> 
 
     with pytest.raises(IntervalError, match="built-in datetime"):
         interval.contains(_ForgedDateTime(2026, 8, 22, 3, 0, tzinfo=timezone.utc))
+
+
+def test_recorded_interval_rejects_non_interval_overlap_operand() -> None:
+    """System-time overlap never delegates field access to an arbitrary object."""
+    interval = RecordedInterval(
+        start=datetime(2026, 8, 22, 0, 0, tzinfo=timezone.utc),
+        end=None,
+    )
+
+    with pytest.raises(IntervalError, match="exact RecordedInterval"):
+        interval.overlaps(object())  # type: ignore[arg-type]
 
 
 def test_recorded_interval_requires_a_real_utc_offset_not_only_tzinfo_presence() -> None:
@@ -155,3 +174,17 @@ def test_recorded_interval_detaches_validated_custom_timezone_code() -> None:
     query_zone = _OneShotZone()
     assert interval.contains(datetime(2026, 8, 22, 2, 0, tzinfo=query_zone)) is True
     assert query_zone.offset_reads == 1
+
+
+def test_recorded_interval_preserves_nonzero_fixed_offset_without_custom_code() -> None:
+    """Canonicalization keeps the supplied offset while replacing timezone implementation code."""
+    plus_nine = timezone(timedelta(hours=9))
+    interval = RecordedInterval(
+        start=datetime(2026, 8, 22, 9, 0, tzinfo=plus_nine),
+        end=datetime(2026, 8, 22, 18, 0, tzinfo=plus_nine),
+    )
+
+    assert interval.start.utcoffset() == timedelta(hours=9)
+    assert interval.end is not None
+    assert interval.end.utcoffset() == timedelta(hours=9)
+    assert interval.contains(datetime(2026, 8, 22, 12, 0, tzinfo=plus_nine)) is True
