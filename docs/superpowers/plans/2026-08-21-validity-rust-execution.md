@@ -51,13 +51,13 @@
 
 **Interfaces:**
 - CLI: `uv run --project packages/validity-analysis --extra test python packages/validity-analysis/scripts/run_fast_mlsirm_recovery_evidence.py --fast-mlsirm-path /private/tmp/orgmetra-fast-mlsirm-04d0 --design-code nested_multilevel`.
-- The runner verifies a clean `git -C <path>` checkout and exact `HEAD`, invokes `uv run --frozen --no-editable --project <path> python -c ...` with external uv/Cargo build directories, requests `backend="rust"` and `rust_device="cpu"`, uses a deterministic seed and small bounded sample, and emits only canonical aggregate evidence JSON.
+- The runner verifies a clean `git -C <path>` checkout and exact `HEAD`, invokes `uv run --frozen --no-editable --project <path> python -c ...` with external uv/Cargo build directories and a 180-second timeout, requests `backend="rust"` and `rust_device="cpu"`, uses a deterministic seed and small bounded sample, and emits only canonical aggregate evidence JSON.
 - The worker uses `cluster_id` for nested multilevel evidence and records `max_iter_reached` explicitly when the bounded smoke run does not converge.
 - The runner does not invoke unsupported multiple-membership or longitudinal designs and exits with an actionable non-zero error.
 
 - [x] **Step 1: Write a contract test that checks the CLI exposes the exact revision/path/design arguments and rejects an unpinned checkout without running model code.**
 - [x] **Step 2: Run the focused script-contract test with `--no-cov` and confirm the two contract tests pass.**
-- [x] **Step 3: Implement the bounded subprocess runner with no shell interpolation of untrusted path data, exact clean-revision verification before and after execution, minimal environment forwarding, external uv/Cargo build directories, and JSON-only stdout.**
+- [x] **Step 3: Implement the bounded subprocess runner with no shell interpolation of untrusted path data, exact clean-revision verification before and after execution, minimal environment forwarding, external uv/Cargo build directories, an explicit timeout, and JSON-only stdout.**
 - [x] **Step 4: Run the real runner against a clean sparse worktree of revision `04d0bc21a2a20693bcf16108cd76d394fe844d23` and preserve the observed output as a local verification artifact, distinguishing bounded smoke evidence from estimator acceptance.**
 - [x] **Step 5: Document the command, observed Rust CPU evidence, unsupported design boundaries, and the unrun GPU parity requirement.**
 

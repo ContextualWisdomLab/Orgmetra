@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -55,6 +56,7 @@ def test_parser_and_dataset_digest_are_stable() -> None:
     parser = runner.build_parser()
     parsed = parser.parse_args(request_arguments())
     assert parsed.design_code == "nested_multilevel"
+    assert parsed.timeout_seconds == 180
     first = runner.dataset_digest(
         design_code="nested_multilevel", persons=48, items_per_dim=3, clusters=4, seed=42
     )
@@ -144,12 +146,35 @@ def test_run_worker_uses_external_runtime_and_parses_object(
     assert isinstance(environment, dict)
     assert str(environment["UV_PROJECT_ENVIRONMENT"]).endswith("/venv")
     assert str(environment["CARGO_TARGET_DIR"]).endswith("/cargo-target")
+    assert captured["timeout"] == 180
 
 
 def test_run_worker_rejects_missing_uv(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fail before subprocess invocation when uv is unavailable."""
     monkeypatch.setattr(runner.shutil, "which", lambda name: None)
     with pytest.raises(RuntimeError, match="uv is required"):
+        runner.run_worker(
+            repository=REPOSITORY,
+            design_code="nested_multilevel",
+            rust_device="cpu",
+            persons=48,
+            items_per_dim=3,
+            clusters=4,
+            seed=42,
+            worker_count=4,
+        )
+
+
+def test_run_worker_rejects_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bound a hung external worker instead of waiting indefinitely."""
+    monkeypatch.setattr(runner.shutil, "which", lambda name: "/usr/local/bin/uv")
+
+    def timeout(*args: object, **kwargs: object) -> None:
+        """Raise the subprocess timeout sentinel for the runner boundary."""
+        raise subprocess.TimeoutExpired(cmd="uv", timeout=180)
+
+    monkeypatch.setattr(runner.subprocess, "run", timeout)
+    with pytest.raises(RuntimeError, match="timed out"):
         runner.run_worker(
             repository=REPOSITORY,
             design_code="nested_multilevel",
@@ -214,6 +239,25 @@ def test_main_emits_cross_sectional_evidence(
     payload = json.loads(capsys.readouterr().out)
     assert payload["design_code"] == "cross_sectional"
     assert payload["cluster_count"] is None
+
+
+def test_main_rechecks_checkout_when_worker_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Always perform the post-worker integrity check, including failure paths."""
+    calls: list[Path] = []
+
+    def resolve(repository: Path) -> None:
+        """Record each integrity check without touching a foreign checkout."""
+        calls.append(repository)
+
+    def fail_worker(**kwargs: object) -> dict[str, object]:
+        """Simulate a worker failure after the initial integrity check."""
+        raise RuntimeError("worker failed")
+
+    monkeypatch.setattr(runner, "resolve_revision", resolve)
+    monkeypatch.setattr(runner, "run_worker", fail_worker)
+    with pytest.raises(RuntimeError, match="worker failed"):
+        runner.main(request_arguments())
+    assert calls == [REPOSITORY.resolve(), REPOSITORY.resolve()]
 
 
 @pytest.mark.parametrize("design_code", ["multiple_membership", "longitudinal"])

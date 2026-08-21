@@ -19,10 +19,10 @@ uv run --project packages/validity-analysis --extra test \
   python packages/validity-analysis/scripts/run_fast_mlsirm_recovery_evidence.py \
   --fast-mlsirm-path /private/tmp/orgmetra-fast-mlsirm-04d0 \
   --handoff-digest <sha256> --design-code nested_multilevel \
-  --rust-device cpu --worker-count 4
+  --rust-device cpu --worker-count 4 --timeout-seconds 180
 ```
 
-The bounded run uses `backend="rust"`, a deterministic seed, a small synthetic matrix, and `RAYON_NUM_THREADS=4`. It emits only canonical aggregate JSON. A `max_iter_reached` result remains explicit recovery evidence and is not estimator acceptance.
+The bounded run uses `backend="rust"`, a deterministic seed, a small synthetic matrix, `RAYON_NUM_THREADS=4`, and a 180-second subprocess timeout. It emits only canonical aggregate JSON. A `max_iter_reached` result remains explicit recovery evidence and is not estimator acceptance.
 
 ## What it does not do
 

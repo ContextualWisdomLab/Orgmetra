@@ -95,6 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--clusters", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--worker-count", type=int, default=4)
+    parser.add_argument("--timeout-seconds", type=int, default=180)
     return parser
 
 
@@ -160,45 +161,50 @@ def run_worker(
     clusters: int,
     seed: int,
     worker_count: int,
+    timeout_seconds: int = 180,
 ) -> dict[str, object]:
     """Invoke the external public API in a temporary environment and parse JSON."""
     uv = shutil.which("uv")
     if uv is None:
         raise RuntimeError("uv is required to run the pinned fast-mlsirm worker")
-    with tempfile.TemporaryDirectory(prefix="orgmetra-fast-mlsirm-run-") as runtime_root:
-        runtime_path = Path(runtime_root)
-        environment = {
-            "PATH": os.environ.get("PATH", ""),
-            "TMPDIR": os.environ.get("TMPDIR", ""),
-            "ORGMETRA_DESIGN_CODE": design_code,
-            "ORGMETRA_PERSONS": str(persons),
-            "ORGMETRA_ITEMS_PER_DIM": str(items_per_dim),
-            "ORGMETRA_CLUSTER_COUNT": str(clusters),
-            "ORGMETRA_SEED": str(seed),
-            "ORGMETRA_RUST_DEVICE": rust_device,
-            "RAYON_NUM_THREADS": str(worker_count),
-            "PYTHONDONTWRITEBYTECODE": "1",
-            "UV_PROJECT_ENVIRONMENT": str(runtime_path / "venv"),
-            "CARGO_TARGET_DIR": str(runtime_path / "cargo-target"),
-        }
-        completed = subprocess.run(
-            [
-                uv,
-                "run",
-                "--frozen",
-                "--no-editable",
-                "--project",
-                str(repository),
-                "python",
-                "-c",
-                _WORKER_CODE,
-            ],
-            cwd=repository,
-            env=environment,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+    try:
+        with tempfile.TemporaryDirectory(prefix="orgmetra-fast-mlsirm-run-") as runtime_root:
+            runtime_path = Path(runtime_root)
+            environment = {
+                "PATH": os.environ.get("PATH", ""),
+                "TMPDIR": os.environ.get("TMPDIR", ""),
+                "ORGMETRA_DESIGN_CODE": design_code,
+                "ORGMETRA_PERSONS": str(persons),
+                "ORGMETRA_ITEMS_PER_DIM": str(items_per_dim),
+                "ORGMETRA_CLUSTER_COUNT": str(clusters),
+                "ORGMETRA_SEED": str(seed),
+                "ORGMETRA_RUST_DEVICE": rust_device,
+                "RAYON_NUM_THREADS": str(worker_count),
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "UV_PROJECT_ENVIRONMENT": str(runtime_path / "venv"),
+                "CARGO_TARGET_DIR": str(runtime_path / "cargo-target"),
+            }
+            completed = subprocess.run(
+                [
+                    uv,
+                    "run",
+                    "--frozen",
+                    "--no-editable",
+                    "--project",
+                    str(repository),
+                    "python",
+                    "-c",
+                    _WORKER_CODE,
+                ],
+                cwd=repository,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=timeout_seconds,
+            )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("fast-mlsirm worker timed out") from exc
     if completed.returncode != 0:
         detail = completed.stderr.strip() or completed.stdout.strip()
         raise RuntimeError(f"fast-mlsirm worker failed: {detail}")
@@ -239,17 +245,20 @@ def main(argv: list[str] | None = None) -> int:
         rust_device=args.rust_device,
     )
     request.require_runnable()
-    output = run_worker(
-        repository=repository,
-        design_code=args.design_code,
-        rust_device=args.rust_device,
-        persons=args.persons,
-        items_per_dim=args.items_per_dim,
-        clusters=args.clusters,
-        seed=args.seed,
-        worker_count=args.worker_count,
-    )
-    resolve_revision(repository)
+    try:
+        output = run_worker(
+            repository=repository,
+            design_code=args.design_code,
+            rust_device=args.rust_device,
+            persons=args.persons,
+            items_per_dim=args.items_per_dim,
+            clusters=args.clusters,
+            seed=args.seed,
+            worker_count=args.worker_count,
+            timeout_seconds=args.timeout_seconds,
+        )
+    finally:
+        resolve_revision(repository)
     evidence = build_rust_recovery_evidence(
         request,
         output,
