@@ -1,6 +1,6 @@
 # ADR-0024: Workforce composition change uses one recorded-time cutoff
 
-**Status:** Proposed on active PR  
+**Status:** Proposed on active PR
 **Decision owner:** Orgmetra
 
 ## Context
