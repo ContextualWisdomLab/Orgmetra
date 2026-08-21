@@ -38,7 +38,8 @@ _REQUIRED_RESULT_EVIDENCE = (
 _NEXT_ACTION = (
     "Within tenant_record_id, re-resolve the validation study, Job, predictor, criterion, "
     "population, decision-policy, analysis-plan, requester, and reviewer references; prove "
-    "the predictor/criterion/population cases belong to the exact study and Job; then let an "
+    "requester and reviewer resolve to distinct authoritative actor identities; prove the "
+    "predictor/criterion/population cases belong to the exact study and Job; then let an "
     "approved offline validation worker invoke only the pinned fast-mlsirm revision. Preserve "
     "the resulting model/provenance diagnostics as draft scientific evidence for an "
     "accountable human reviewer; never convert the result directly into an employment decision."
