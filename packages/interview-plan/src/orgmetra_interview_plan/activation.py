@@ -165,11 +165,19 @@ def activate_structured_interview_plan(
     if approved_at < plan.generated_at:
         raise ValueError("approved_at must not precede plan generated_at")
     _validate_reference(approving_actor_reference, "actor", "approving_actor_reference")
+
+    plan_canonical_json = plan.canonical_json()
+    plan_digest = sha256(plan_canonical_json.encode("utf-8")).hexdigest()
+    plan_tenant_record_id = plan.tenant_record_id
+    interview_plan_reference = plan.interview_plan_reference
+
     verification = authority.verify_activation(
         plan=plan,
         approving_actor_reference=approving_actor_reference,
         approved_at=approved_at,
     )
+    if plan.canonical_json() != plan_canonical_json:
+        raise ValueError("plan changed during authority verification")
     if type(verification) is not StructuredInterviewActivationVerification:
         raise TypeError("authority must return StructuredInterviewActivationVerification")
 
@@ -193,9 +201,9 @@ def activate_structured_interview_plan(
     _validate_digest(verification.authority_evidence_digest, "authority_evidence_digest")
 
     expected_scope = (
-        plan.tenant_record_id,
-        plan.interview_plan_reference,
-        plan.sha256_digest(),
+        plan_tenant_record_id,
+        interview_plan_reference,
+        plan_digest,
         approving_actor_reference,
     )
     verified_scope = (
@@ -208,9 +216,9 @@ def activate_structured_interview_plan(
         raise ValueError("activation authority returned evidence for a different plan or actor")
 
     receipt = StructuredInterviewActivationReceipt(
-        tenant_record_id=plan.tenant_record_id,
-        interview_plan_reference=plan.interview_plan_reference,
-        plan_digest=plan.sha256_digest(),
+        tenant_record_id=plan_tenant_record_id,
+        interview_plan_reference=interview_plan_reference,
+        plan_digest=plan_digest,
         approving_actor_reference=approving_actor_reference,
         authority_evidence_reference=verification.authority_evidence_reference,
         authority_evidence_digest=verification.authority_evidence_digest,
