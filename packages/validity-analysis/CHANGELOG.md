@@ -6,3 +6,4 @@
 - Pin the reviewed read-only fast-mlsirm dependency revision.
 - Require separate requester/reviewer references and authoritative tenant-scoped re-resolution proving they resolve to distinct actor identities before execution.
 - Require deterministic canonical evidence and 100% owned production statement/branch coverage.
+- Validate a digest-linked Rust CPU/GPU result envelope with finite estimates, aggregate missingness, and explicit convergence or nonconvergence diagnostics.

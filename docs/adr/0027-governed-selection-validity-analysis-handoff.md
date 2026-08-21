@@ -26,6 +26,8 @@ Orgmetra adds a leaf `orgmetra_validity_analysis` package whose `ValidationAnaly
 - remains `not_executed`, `scientific_evidence_only`, and human-review-required;
 - produces deterministic canonical JSON and a SHA-256 digest for audit/result correlation.
 
+The same package also validates `ValidationAnalysisResult` envelopes returned by the approved offline worker. A result must link to the handoff digest and the same pinned revision, identify a Rust CPU or GPU backend and precision, provide finite effect and interval values, match its sample size to aggregate missingness counts, and include explicit convergence diagnostics. A nonconverged result remains typed scientific evidence requiring human review; it cannot be treated as a valid selection procedure or an employment decision.
+
 The package does not invoke fast-mlsirm. An approved offline worker is the later execution boundary. Before execution, the Orgmetra host must re-resolve every reference inside the tenant, verify exact study/Job membership and evidence provenance, and prove requester/reviewer identities are distinct authoritative actors.
 
 ## Consequences
@@ -41,7 +43,7 @@ The package does not invoke fast-mlsirm. An approved offline worker is the later
 
 - This slice does not execute a statistical model, estimate validity, correct for measurement error/range restriction, evaluate adverse impact, or assert legal compliance.
 - Sampling design, estimator choice, missing-data treatment, reliability evidence, multiplicity, transportability, fairness analysis, and model diagnostics must be encoded in the referenced analysis plan and reviewed before execution.
-- A future execution/result adapter must validate the returned model/provenance schema before any result is attached to an Orgmetra study.
+- The package validates the result envelope, but a future execution adapter must still re-resolve the handoff references, verify the result provenance artifact, and attach evidence only after accountable human review.
 
 ## Verification
 

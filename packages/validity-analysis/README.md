@@ -1,6 +1,6 @@
 # Orgmetra validity-analysis handoff
 
-This package creates an immutable **selection-validity analysis handoff**. It is the boundary between Orgmetra's authoritative validation-study evidence and numerical work owned by `ContextualWisdomLab/fast-mlsirm`.
+This package creates an immutable **selection-validity analysis handoff** and validates the matching numerical result envelope. It is the boundary between Orgmetra's authoritative validation-study evidence and numerical work owned by `ContextualWisdomLab/fast-mlsirm`.
 
 ## What it does
 
@@ -8,9 +8,12 @@ This package creates an immutable **selection-validity analysis handoff**. It is
 
 The resulting canonical JSON is digest-addressable, contains no raw person-level predictor or criterion values, and remains `not_executed`. Required result evidence is explicit: effect estimate, uncertainty interval, sample size, missingness summary, and convergence diagnostics.
 
+`ValidationAnalysisResult` accepts only a result linked to the handoff digest and the same reviewed fast-mlsirm revision. It records the Rust CPU/GPU backend, precision, aggregate missingness counts, finite effect and interval values, and explicit convergence or nonconvergence diagnostics. It never promotes a result to an employment decision; human review remains mandatory.
+
 ## What it does not do
 
 - It does **not** run statistics.
+- It does **not** run or reproduce the fast-mlsirm numerical kernel.
 - It does **not** query fast-mlsirm or any other CWL application's database.
 - It does **not** claim that a selection procedure is valid.
 - It does **not** interpret adverse impact.
