@@ -183,9 +183,9 @@ class ValidationAnalysisResult:
         if not lower <= estimate <= upper:
             raise ValueError("effect_estimate must be inside the uncertainty interval")
         _validate_positive_integer(self.sample_size, "sample_size")
-        if not isinstance(self.missingness_summary, MissingnessSummary):
+        if type(self.missingness_summary) is not MissingnessSummary:
             raise ValueError("missingness_summary must be a MissingnessSummary")
-        if not isinstance(self.convergence_diagnostics, ConvergenceDiagnostics):
+        if type(self.convergence_diagnostics) is not ConvergenceDiagnostics:
             raise ValueError("convergence_diagnostics must be ConvergenceDiagnostics")
         if self.sample_size != self.missingness_summary.total_observations:
             raise ValueError("sample_size must match total_observations")
