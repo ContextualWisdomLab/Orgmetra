@@ -51,6 +51,8 @@ _NEXT_ACTION = (
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
     """Require canonical non-sentinel UUID text owned by the authoritative HRIS."""
+    if type(value) is not str:
+        raise ValueError(f"{field_name} must be canonical UUID text")
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as exc:
@@ -63,7 +65,7 @@ def _validate_reference(value: str, prefix: str, field_name: str) -> None:
     """Require the expected namespace plus a canonical opaque UUIDv4 suffix."""
     message = f"{field_name} must be an opaque {prefix}: reference"
     if (
-        not isinstance(value, str)
+        type(value) is not str
         or len(value) > 160
         or not _REFERENCE_PATTERN.fullmatch(value)
         or not value.startswith(f"{prefix}:")
