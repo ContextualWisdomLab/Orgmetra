@@ -33,7 +33,7 @@ _NEXT_ACTION: Final = (
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
     """Require canonical non-sentinel UUID text for an authoritative Orgmetra identity."""
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ValueError(f"{field_name} must be canonical UUID text")
     try:
         parsed = UUID(value)
@@ -44,7 +44,9 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
 
 
 def _validate_uuid4(value: str, field_name: str) -> None:
-    """Require one canonical, non-sentinel UUIDv4 string from a validated namespace suffix."""
+    """Require one exact canonical, non-sentinel UUIDv4 string."""
+    if type(value) is not str:
+        raise ValueError(f"{field_name} must be a canonical UUIDv4 string")
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as error:
@@ -55,14 +57,14 @@ def _validate_uuid4(value: str, field_name: str) -> None:
 
 def _validate_reference(value: str, namespace: str, field_name: str) -> None:
     """Require one namespaced opaque UUIDv4 reference owned by Orgmetra."""
-    if not isinstance(value, str) or not value.startswith(f"{namespace}:"):
+    if type(value) is not str or not value.startswith(f"{namespace}:"):
         raise ValueError(f"{field_name} must use the {namespace}:<uuidv4> namespace")
     _validate_uuid4(value.removeprefix(f"{namespace}:"), field_name)
 
 
 def _validate_digest(value: str, field_name: str) -> None:
     """Require one lowercase SHA-256 evidence digest."""
-    if not isinstance(value, str) or _SHA256_PATTERN.fullmatch(value) is None:
+    if type(value) is not str or _SHA256_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be a lowercase SHA-256 digest")
 
 
@@ -85,8 +87,8 @@ def _canonical_rfc3339(value: datetime) -> str:
 
 
 def _validate_opaque_identifier(value: str, field_name: str, maximum_length: int = 256) -> None:
-    """Require a bounded printable opaque identifier with no whitespace, controls, or credential shape."""
-    if not isinstance(value, str) or not 1 <= len(value) <= maximum_length:
+    """Require exact bounded printable text with no whitespace, controls, or credential shape."""
+    if type(value) is not str or not 1 <= len(value) <= maximum_length:
         raise ValueError(f"{field_name} must be a bounded opaque identifier")
     if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
         raise ValueError(f"{field_name} must contain only visible ASCII without whitespace")
@@ -95,8 +97,8 @@ def _validate_opaque_identifier(value: str, field_name: str, maximum_length: int
 
 
 def _validate_idempotency_key(value: str) -> None:
-    """Require a durable-correlation-safe idempotency key stronger than TEPP's nonempty minimum."""
-    if not isinstance(value, str) or not 16 <= len(value) <= 128:
+    """Require an exact durable-correlation-safe idempotency key."""
+    if type(value) is not str or not 16 <= len(value) <= 128:
         raise ValueError("idempotency_key must contain 16 through 128 visible ASCII characters")
     if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
         raise ValueError("idempotency_key must contain 16 through 128 visible ASCII characters")
@@ -105,8 +107,8 @@ def _validate_idempotency_key(value: str) -> None:
 
 
 def _validate_governed_code(value: str, field_name: str) -> None:
-    """Require a bounded machine code rather than free-form narrative."""
-    if not isinstance(value, str) or _GOVERNED_CODE_PATTERN.fullmatch(value) is None:
+    """Require exact bounded machine-code text rather than free-form narrative."""
+    if type(value) is not str or _GOVERNED_CODE_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be a bounded governed machine code")
 
 
