@@ -224,3 +224,28 @@ def test_builder_rejects_two_visible_parent_versions_for_one_unit() -> None:
             effective_on=date(2024, 6, 1),
             known_at=utc(2024, 6, 1),
         )
+
+
+def test_snapshot_rejects_parent_anchor_known_only_in_another_tenant() -> None:
+    """A known foreign organization identity cannot leak through a tenant hierarchy edge."""
+    versions = [
+        _unit(
+            version_id="53000000-0000-7000-8000-000000000001",
+            unit_id=UNIT_CHILD,
+            parent_id=UNIT_FOREIGN,
+        ),
+        _unit(
+            version_id="53000000-0000-7000-8000-000000000002",
+            unit_id=UNIT_FOREIGN,
+            parent_id=None,
+            tenant_id=TENANT_BETA,
+        ),
+    ]
+
+    with pytest.raises(OrganizationHierarchyError, match="another tenant"):
+        build_organization_hierarchy_snapshot(
+            versions,
+            tenant_record_id=TENANT_ALPHA,
+            effective_on=date(2024, 6, 1),
+            known_at=utc(2024, 6, 1),
+        )
