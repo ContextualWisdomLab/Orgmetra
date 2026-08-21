@@ -35,8 +35,8 @@ class HireDecisionIntegrityError(RuntimeError):
 
 
 def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require a real UUID outside Orgmetra's reserved protocol sentinels."""
-    if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
+    """Require an exact UUID outside Orgmetra's reserved protocol sentinels."""
+    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
 
 
@@ -147,7 +147,7 @@ def accept_confirmed_hire(
     ``materialize_worker`` operation and ``candidate_worker_conversion`` field;
     possession of an identity token or purpose string alone is insufficient.
     """
-    if not isinstance(command, HireAcceptanceCommand):
+    if type(command) is not HireAcceptanceCommand:
         raise TypeError("command must be a HireAcceptanceCommand")
     if not isinstance(mutation_port, HireAcceptancePort):
         raise TypeError("mutation_port must implement HireAcceptancePort")
@@ -164,6 +164,6 @@ def accept_confirmed_hire(
         policy=policy,
     )
     result = mutation_port.accept_hire(command=command, authorization=authorization)
-    if not isinstance(result, HireAcceptanceResult):
+    if type(result) is not HireAcceptanceResult:
         raise TypeError("mutation_port must return HireAcceptanceResult")
     return result
