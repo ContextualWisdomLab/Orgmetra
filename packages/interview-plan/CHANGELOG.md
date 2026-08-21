@@ -18,6 +18,7 @@
 - Replace prose-only activation assurance with executable fail-closed orchestration: the injected host authority must reject failed tenant/relationship/provenance/panel checks, and returned evidence must match the exact tenant, interview-plan reference, plan digest, and approving actor before a receipt can exist.
 - Validate `approved_at` before authoritative activation work, reject approval evidence that predates the reviewed plan's `generated_at`, and pass that exact instant into `StructuredInterviewActivationAuthority.verify_activation(...)` so receipt chronology cannot be minted from a timestamp the authoritative adapter never reviewed.
 - Require the exact governed `StructuredInterviewPlan` runtime type before any activation authority work, preventing duck-typed or subclassed plan-shaped objects from bypassing construction invariants and producing approval evidence.
+- Snapshot the exact canonical plan evidence before calling the injected activation authority, reject any plan mutation observed across that call, and build verification scope plus the activation receipt from the pre-call snapshot so authority-time in-memory rewriting cannot become approved audit evidence.
 
 ### Security and privacy
 
