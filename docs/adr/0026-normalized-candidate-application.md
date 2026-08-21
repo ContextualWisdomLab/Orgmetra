@@ -58,6 +58,7 @@ Rejected because those values can imply high-impact employment outcomes. Orgmetr
 
 ## Evidence
 
-- `tests/test_candidate_application_postgres.sh` is the RED-first PostgreSQL regression. It proves multiple applications per candidate, cross-tenant FK rejection, Position↔Job consistency, duplicate requisition rejection, bitemporal stage exclusion/correction, prohibition on a `hired` workflow stage, forced RLS and TRUNCATE protection.
-- `.github/workflows/candidate-application-quality.yml` checks out the exact PR head and runs that contract against pinned PostgreSQL 16.14.
+- `tests/test_candidate_application_postgres.sh` is the RED-first PostgreSQL regression. It proves multiple applications per candidate, cross-tenant FK rejection, Position↔Job consistency, duplicate requisition rejection, bitemporal stage exclusion/correction, prohibition on a `hired` workflow stage, forced RLS metadata and TRUNCATE protection.
+- `tests/test_candidate_application_rls_postgres.sh` continues from the same fixture under a `NOBYPASSRLS` reader and proves fail-closed missing-context reads plus exact Alpha/Beta tenant visibility for application and stage history.
+- `.github/workflows/candidate-application-quality.yml` checks out the exact PR head and runs both contracts against pinned PostgreSQL 16.14.
 - Primary-source review and APA 7 references are recorded in `docs/doctoring/candidate-application-references.md`.
