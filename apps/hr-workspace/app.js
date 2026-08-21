@@ -267,6 +267,11 @@ function closeDialog(id) {
   else dialog.hidden = true;
 }
 
+function resetConfirmationState() {
+  document.getElementById('confirmation-reason').value = '';
+  document.getElementById('confirmation-status').hidden = true;
+}
+
 function jobAnalysisMessage(key) {
   return translations[document.documentElement.dataset.locale || 'en'][key];
 }
@@ -344,7 +349,10 @@ if (typeof document !== 'undefined') {
     document.getElementById('permission-panel').hidden = authorized;
     document.getElementById('details-panel').hidden = !authorized;
   });
-  document.querySelector('[data-action="correct-history"]').addEventListener('click', () => openDialog('confirmation-dialog'));
+  document.querySelector('[data-action="correct-history"]').addEventListener('click', () => {
+    resetConfirmationState();
+    openDialog('confirmation-dialog');
+  });
   document.getElementById('confirmation-form').addEventListener('submit', (event) => {
     if (event.submitter?.value !== 'confirm') return;
     const reason = document.getElementById('confirmation-reason');
