@@ -77,15 +77,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "bc6ea6939bb94841c59c238a720b2540724305435915f06f7f754260e85e759c",
-      "bytes": 3933,
+      "sha256": "8c4d750a3815d86fb2a8d33eb1c905b014c16740a99130a94ff53954574c5caf",
+      "bytes": 4046,
       "lines": 82
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "4488e4b6e07a50a64f2819a681b75fb9923ccb53ee04be555830a04a2e0e4a16",
-      "bytes": 25482,
-      "lines": 360
+      "sha256": "ceab0c623d1bf24353d5479ef0adcd1c5d9210da59d87b6bdde759458c6601d8",
+      "bytes": 29469,
+      "lines": 436
     },
     {
       "path": "apps/hr-workspace/index.html",
@@ -95,8 +95,8 @@
     },
     {
       "path": "apps/hr-workspace/styles.css",
-      "sha256": "26af2180e3fb170a28809f3bb03f6c74f09ec703c604c5d16838efa271122149",
-      "bytes": 10149,
+      "sha256": "8932d491b2aed9eac0ec312aa9520052a8833d14b6d91bc2f609c7b7a65ea30f",
+      "bytes": 10156,
       "lines": 119
     },
     {
@@ -311,8 +311,8 @@
     },
     {
       "path": "docs/adr/0007-governed-job-analysis-evidence.md",
-      "sha256": "abdff206a700018b5997acce49d5c66eddcf2f9d76cb3446e964749011c8f2da",
-      "bytes": 5638,
+      "sha256": "cef54d7af2b97c495f52ad2cdfce1cb6c05362f1da367b11287c821da252d830",
+      "bytes": 5626,
       "lines": 57
     },
     {
@@ -353,8 +353,8 @@
     },
     {
       "path": "docs/adr/0014-job-analysis-snapshot-persistence.md",
-      "sha256": "a7ab6fee50aaa63f7f407516a4cb39885faeb0fc6e5035ee8fc352ed73430105",
-      "bytes": 5365,
+      "sha256": "1881f042821abd24e39c99d6dd136bbcef2fe09278041c7cefce0f1aa7325c6b",
+      "bytes": 5354,
       "lines": 49
     },
     {
@@ -365,9 +365,9 @@
     },
     {
       "path": "docs/adr/README.md",
-      "sha256": "a03dac39c365e21c6fc7273a4cd483239d9f765f1472a6dfb7480ab60541f539",
-      "bytes": 2043,
-      "lines": 20
+      "sha256": "cee313705860ef3aa08b6124c1629343784ebbbaf7c699ed2d196b1aeb3118bb",
+      "bytes": 2156,
+      "lines": 21
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
@@ -449,9 +449,9 @@
     },
     {
       "path": "tests/e2e/hr-workspace.spec.mjs",
-      "sha256": "b473341c8e50901a375722142bf8896d5b1fd92ed8887af4375d3a06ffcfe9a0",
-      "bytes": 6420,
-      "lines": 142
+      "sha256": "7631b2b8788c3111421ffa119f2bc7db02b19ddcd1f7deb81a9e6e3eb66cc408",
+      "bytes": 10055,
+      "lines": 226
     },
     {
       "path": "tests/foundation-contract.test.mjs",
