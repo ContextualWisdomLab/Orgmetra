@@ -21,6 +21,29 @@ class ForgedGovernanceText(str):
         return hash("selected_candidate_offer_review")
 
 
+class ForgedOperationalUuid(str):
+    """Return safe parser input while retaining different tenant audit text."""
+
+    def replace(self, old: str, new: str, count: int = -1) -> str:
+        return "11111111111141118111111111111111"
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+
+class ForgedReference(str):
+    """Return a reviewed UUID suffix while retaining value-bearing reference text."""
+
+    def startswith(self, prefix: str, *args: object) -> bool:
+        return True
+
+    def split(self, separator: str | None = None, maxsplit: int = -1) -> list[str]:
+        return ["candidate_profile", "10000000-0000-4000-8000-000000000002"]
+
+
 def valid_kwargs() -> dict[str, object]:
     """Return one otherwise-valid value-free offer approval request."""
     return {
@@ -62,6 +85,26 @@ def test_rejects_forged_governance_text_before_canonical_evidence(
     """Caller-defined string comparison behavior must not forge reviewed evidence."""
     kwargs = valid_kwargs()
     kwargs[field_name] = ForgedGovernanceText(forged_text)
+
+    with pytest.raises(ValueError):
+        build_offer_approval_packet(**kwargs)
+
+
+def test_rejects_forged_tenant_uuid_parser_behavior() -> None:
+    """Tenant identity validation must never execute caller-defined string methods."""
+    kwargs = valid_kwargs()
+    kwargs["tenant_record_id"] = ForgedOperationalUuid("employee_jane_doe")
+
+    with pytest.raises(ValueError):
+        build_offer_approval_packet(**kwargs)
+
+
+def test_rejects_forged_reference_parser_behavior() -> None:
+    """Opaque reference validation must bind the exact serialized string value."""
+    kwargs = valid_kwargs()
+    kwargs["candidate_profile_reference"] = ForgedReference(
+        "candidate_profile:employee_jane_doe"
+    )
 
     with pytest.raises(ValueError):
         build_offer_approval_packet(**kwargs)
