@@ -36,8 +36,8 @@ class RecordingAuthority:
         """Initialize the authority call counter."""
         self.calls = 0
 
-    def verify_activation(self, *, plan, approving_actor_reference):
-        """Return evidence matching whatever plan object the boundary supplied."""
+    def verify_activation(self, *, plan, approving_actor_reference, approved_at):
+        """Return evidence matching whatever validated activation request was supplied."""
         self.calls += 1
         return StructuredInterviewActivationVerification(
             tenant_record_id=plan.tenant_record_id,
