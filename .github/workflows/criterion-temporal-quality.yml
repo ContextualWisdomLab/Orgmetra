@@ -52,6 +52,38 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
       - name: Prove recorded-time and UTC boundaries
         run: bash tests/test_criterion_observation_scope_postgres.sh
+      - name: Reject observations recorded before they occurred
+        env:
+          PGOPTIONS: -c orgmetra.tenant_record_id=10000000-0000-7000-8000-000000000101
+        run: |
+          set +e
+          output="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL' 2>&1
+          INSERT INTO criterion_observation (
+              tenant_record_id, criterion_observation_id, criterion_blueprint_id,
+              performance_cycle_id, person_record_id, observed_value,
+              observed_at, recorded_from
+          ) VALUES (
+              '10000000-0000-7000-8000-000000000101',
+              '10000000-0000-7000-8000-000000000134',
+              '10000000-0000-7000-8000-000000000110',
+              '10000000-0000-7000-8000-000000000109',
+              '10000000-0000-7000-8000-000000000102',
+              4.8,
+              TIMESTAMPTZ '2026-08-18 12:00:00+00',
+              TIMESTAMPTZ '2026-08-17 12:00:00+00'
+          );
+          SQL
+          )"
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            echo "criterion observation accepted an observed_at after its system-recorded time" >&2
+            exit 1
+          fi
+          if [[ "$output" != *"criterion observation cannot be recorded before it was observed"* ]]; then
+            echo "future criterion observation failed for an unexpected reason: $output" >&2
+            exit 1
+          fi
       - name: Require clean checkout
         run: |
           git diff --exit-code
