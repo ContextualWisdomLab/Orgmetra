@@ -4,7 +4,7 @@
 -- application status when the same candidate pursues multiple openings. This
 -- migration adds a durable candidate application anchor plus bitemporal workflow
 -- stage history. Final employer outcomes remain authoritative selection_decision
--- evidence; workflow stages deliberately cannot encode "hired" or "rejected".
+-- evidence; workflow stages deliberately cannot encode employer terminal outcomes.
 
 BEGIN;
 
@@ -96,8 +96,7 @@ CREATE TABLE candidate_application_stage_record (
                 'assessment',
                 'interview',
                 'offer_pending',
-                'withdrawn',
-                'closed'
+                'withdrawn'
             )
         ),
     CONSTRAINT candidate_application_stage_effective_period_check
