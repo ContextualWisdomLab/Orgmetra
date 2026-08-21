@@ -329,9 +329,9 @@
     },
     {
       "path": "docs/product-technical-gap-baseline.md",
-      "sha256": "4609b2d6fcc52c490f7271cef163c3c58bbb280125ce8330ce7a5757fcff33fd",
-      "bytes": 21552,
-      "lines": 154
+      "sha256": "fe3ec42c234fb051053d06d466f5a63859da78dd253e87e3db33b72bfca277bb",
+      "bytes": 21941,
+      "lines": 156
     },
     {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
