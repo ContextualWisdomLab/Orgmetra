@@ -1,4 +1,4 @@
-"""Temporal runtime-type integrity for canonical job-analysis evidence."""
+"""Runtime-type integrity for canonical job-analysis evidence."""
 
 from __future__ import annotations
 
@@ -22,6 +22,14 @@ ANALYSIS_ID = UUID("00000000-0000-4000-8000-000000002003")
 TASK_ID = UUID("00000000-0000-4000-8000-000000002004")
 KSAO_ID = UUID("00000000-0000-4000-8000-000000002005")
 RECORDED_AT = datetime(2026, 8, 21, 5, 15, tzinfo=timezone.utc)
+
+
+class _ForgedUUID(UUID):
+    """Attempt to forge an identity written into canonical job-analysis evidence."""
+
+    def __str__(self) -> str:
+        """Render a different identity from the underlying UUID value."""
+        return "00000000-0000-4000-8000-ffffffffffff"
 
 
 class _ForgedDate(date):
@@ -109,6 +117,18 @@ def _snapshot(*, effective_from: date, recorded_at: datetime, reviewed_at: datet
         reviewed_by_reference="keyverse_subject:01JIOPSYCH",
         reviewed_at=reviewed_at,
     )
+
+
+def test_job_analysis_rejects_uuid_subclasses_before_identity_canonicalization() -> None:
+    """Caller-controlled UUID rendering cannot rewrite task/link evidence identity."""
+    forged = _ForgedUUID("00000000-0000-4000-8000-000000002004")
+    with pytest.raises(ValueError, match="task_record_id must be a UUID"):
+        TaskKSAOLink(
+            task_record_id=forged,
+            ksao_record_id=KSAO_ID,
+            relationship_strength=5,
+            essential_for_task=True,
+        )
 
 
 def test_evidence_source_rejects_datetime_subclass_before_provenance_canonicalization() -> None:
