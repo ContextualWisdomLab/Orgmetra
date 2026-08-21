@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from orgmetra_offer_approval import build_offer_approval_packet
+from orgmetra_offer_approval import OfferApprovalPacket, build_offer_approval_packet
 
 
 class ForgedGovernanceText(str):
@@ -87,7 +87,7 @@ def test_rejects_forged_governance_text_before_canonical_evidence(
     kwargs[field_name] = ForgedGovernanceText(forged_text)
 
     with pytest.raises(ValueError):
-        build_offer_approval_packet(**kwargs)
+        OfferApprovalPacket(**kwargs)
 
 
 def test_rejects_forged_tenant_uuid_parser_behavior() -> None:
