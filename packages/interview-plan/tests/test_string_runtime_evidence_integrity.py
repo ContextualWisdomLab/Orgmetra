@@ -32,16 +32,27 @@ class ForgedTenantUUIDText(str):
         return canonical.replace(old, new, *args)
 
     def __eq__(self, other):  # type: ignore[no-untyped-def]
-        """Claim canonical equality while keeping the original hostile payload."""
         if other is None:
             return False
         return True
 
     def __ne__(self, other):  # type: ignore[no-untyped-def]
-        """Keep UUID constructor sentinel checks working while defeating canonicality."""
         if other is None:
             return True
         return False
+
+
+class ForgedGovernanceCode(str):
+    """String subclass that forges fixed-code equality and allow-list membership."""
+
+    def __eq__(self, other):  # type: ignore[no-untyped-def]
+        return True
+
+    def __ne__(self, other):  # type: ignore[no-untyped-def]
+        return False
+
+    def __hash__(self) -> int:
+        return hash("approved_requisition_interview")
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -75,18 +86,28 @@ def valid_kwargs() -> dict[str, object]:
 
 
 def test_rejects_reference_string_subclass_that_can_forge_namespace_validation() -> None:
-    """Canonical evidence must never retain text that only pretended to match a namespace."""
     kwargs = valid_kwargs()
     kwargs["interview_plan_reference"] = ForgedReference("attacker-controlled-reference-data")
-
     with pytest.raises(ValueError, match="interview_plan_reference"):
         build_structured_interview_plan(**kwargs)
 
 
 def test_rejects_tenant_string_subclass_that_can_forge_uuid_validation() -> None:
-    """Authoritative tenant identity must be exact built-in text before UUID parsing."""
     kwargs = valid_kwargs()
     kwargs["tenant_record_id"] = ForgedTenantUUIDText("not-a-tenant-uuid")
-
     with pytest.raises(ValueError, match="tenant_record_id"):
+        build_structured_interview_plan(**kwargs)
+
+
+def test_rejects_purpose_code_string_subclass_that_can_forge_fixed_code_check() -> None:
+    kwargs = valid_kwargs()
+    kwargs["purpose_code"] = ForgedGovernanceCode("attacker_controlled_purpose")
+    with pytest.raises(ValueError, match="purpose_code"):
+        build_structured_interview_plan(**kwargs)
+
+
+def test_rejects_reason_code_string_subclass_that_can_forge_allow_list_check() -> None:
+    kwargs = valid_kwargs()
+    kwargs["reason_code"] = ForgedGovernanceCode("attacker_controlled_reason")
+    with pytest.raises(ValueError, match="reason_code"):
         build_structured_interview_plan(**kwargs)
