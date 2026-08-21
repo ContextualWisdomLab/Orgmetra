@@ -23,5 +23,6 @@
 
 - Reject timestamp/node-bearing UUIDv1 values in package-owned trust references as well as human-readable/value-bearing reference metadata before serialization; tenant UUID generation/privacy policy remains owned by the authoritative HRIS boundary.
 - Close plan `reason_code` to `approved_requisition_interview` and activation governance to fixed `structured_interview_activation` / `human_approved_plan_activation` codes.
+- Require exact built-in tuple containers for competency/panel reference collections and exact built-in strings for fixed `review_state` / `next_action` evidence before canonicalization, preventing caller-controlled runtime subclasses from passing validation and later switching serialized immutable evidence.
 - Redact both `StructuredInterviewPlan` and `StructuredInterviewActivationReceipt` representations so routine logs and assertion failures do not expose sensitive correlations or evidence digests.
 - State explicitly that UUID/digest correlation, reference-string inequality, and the authority protocol do not by themselves prove tenant ownership, authoritative relationship validity, actor identity separation, scientific validity, fairness, or legal compliance.
