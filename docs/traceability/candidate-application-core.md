@@ -10,7 +10,7 @@
 | Separate candidate identity from application lifecycle | `0014_candidate_application_core.sql` creates one durable application identity per candidate/requisition and bitemporal stage facts; the legacy profile status is retained only for compatibility |
 | Support one candidate pursuing multiple openings | PostgreSQL regression inserts two current application identities for one candidate against two distinct requisition/Job/Position contexts and requires both to remain visible |
 | Preserve Job, Position and application semantics | Application stores the Job explicitly; optional Position uses tenant-qualified `(tenant_record_id, position_record_id, job_profile_id)` FK so a seat cannot be paired with another Job |
-| Preserve tenant isolation structurally and at runtime | Composite tenant FKs reject foreign candidate/Job/Position identities; both application relations force PostgreSQL RLS through `current_tenant_record_id()` |
+| Preserve tenant isolation structurally and at runtime | Composite tenant FKs reject foreign candidate/Job/Position identities; both application relations force PostgreSQL RLS through `current_tenant_record_id()`. `test_candidate_application_rls_postgres.sh` then uses a `NOBYPASSRLS` reader to prove missing context exposes zero rows, tenant Alpha sees exactly its application/stage history, and tenant Beta cannot observe Alpha history |
 | Use opaque public/correlation identifiers | Application and stage IDs are operational UUIDs with nil/max sentinels rejected; requisition correlation is a bounded canonical `requisition:<uuid>` reference and contains no human-readable requisition title |
 | Preserve effective/business and system-recorded time | Application anchors preserve submission time plus recorded interval; stage facts preserve effective and recorded half-open intervals with strict non-empty checks |
 | Prevent contradictory historical stage truth | `candidate_application_stage_bitemporal_exclusion` rejects simultaneous effective+recorded overlap for one application; the regression exercises the exclusion |
@@ -19,7 +19,7 @@
 | Prevent bulk history erasure | Both relations have BEFORE TRUNCATE guards, public TRUNCATE revocation and row-level mutation guards; regression proves stage history cannot be truncated |
 | Minimize PII | New persistence stores candidate/application/requisition/Job/Position identifiers and workflow metadata only; it does not copy names, contact data, demographic fields, assessment values, résumé content or model output |
 | Preserve requisition ownership boundary | `requisition_reference` correlates to the governed Orgmetra requisition-review contract but does not reach into another service or treat a packet as mutable application state |
-| Verify exact PR head | `.github/workflows/candidate-application-quality.yml` pins checkout action, proves `git rev-parse HEAD`, runs the PostgreSQL regression on pinned PostgreSQL 16.14, then proves the validation left the tree unchanged |
+| Verify exact PR head | `.github/workflows/candidate-application-quality.yml` pins checkout action, proves `git rev-parse HEAD`, runs the core and `NOBYPASSRLS` PostgreSQL regressions on pinned PostgreSQL 16.14, then proves the validation left the tree unchanged |
 
 ## Standards/research decision evidence
 
