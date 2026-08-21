@@ -77,15 +77,15 @@
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "72f86f3a1e092ba3279607532fa0878807c140918fb6cb79d73536b20df65d13",
-      "bytes": 18374,
-      "lines": 232
+      "sha256": "4488e4b6e07a50a64f2819a681b75fb9923ccb53ee04be555830a04a2e0e4a16",
+      "bytes": 25482,
+      "lines": 360
     },
     {
       "path": "apps/hr-workspace/index.html",
-      "sha256": "43067618b6cb0ba60599c49b74bb269ac814f2d2d504939382ae002959fbbbfc",
-      "bytes": 17110,
-      "lines": 144
+      "sha256": "2c6ca469a5b055b990aa8b391627e90222943bd169a8fc2bac585f8e1eb9f9f5",
+      "bytes": 19622,
+      "lines": 158
     },
     {
       "path": "apps/hr-workspace/styles.css",
@@ -221,9 +221,9 @@
     },
     {
       "path": "docs/STORYBOOK.md",
-      "sha256": "86a6fc47f41709ad014aa3562b00a3f3ccc55daa6eee0ab14906abfd88123f45",
-      "bytes": 2818,
-      "lines": 77
+      "sha256": "caabfc4958894768a065e30ab3907344d728772a65446512cbca2f0061b1deaf",
+      "bytes": 2896,
+      "lines": 78
     },
     {
       "path": "docs/TEST_STRATEGY.md",
@@ -371,7 +371,7 @@
     },
     {
       "path": "docs/product-technical-gap-baseline.md",
-      "sha256": "67636c43190e1d99e55edb2fedf5248c68dea5cd4591ec1cfdc8833f0b4e18be",
+      "sha256": "53b7eef39549d788b710ce9d5aa209ca8b882370bb9ea3324324db22c7bacc11",
       "bytes": 23864,
       "lines": 160
     },
@@ -443,9 +443,9 @@
     },
     {
       "path": "tests/hr-workspace.test.mjs",
-      "sha256": "52fc7ccc7cd8fec27e138c024a89eaf58ce781207010c705fa1f48af990d82ee",
-      "bytes": 4499,
-      "lines": 97
+      "sha256": "fdfdf8914dafc1b85bf673be94599d678cdcb45771c7e04210ae270d8ad627dd",
+      "bytes": 5886,
+      "lines": 126
     },
     {
       "path": "tests/openapi-contract.test.mjs",

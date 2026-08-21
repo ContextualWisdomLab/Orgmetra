@@ -3,9 +3,11 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   fetchJobAnalysisSnapshot,
+  fetchPeopleRecord,
   isPurposeAuthorized,
   jobAnalysisSnapshotUrl,
   nextLocale,
+  peopleRecordUrl,
 } from '../apps/hr-workspace/app.js';
 
 const html = readFileSync(new URL('../apps/hr-workspace/index.html', import.meta.url), 'utf8');
@@ -22,6 +24,7 @@ test('workspace exposes the Figma role slice and existing design tokens', () => 
   assert.match(html, /data-view-link="hr-home"/);
   assert.match(html, /data-view-link="employee-profile"/);
   assert.match(html, /data-view-link="job-analysis"/);
+  assert.match(html, /id="people-api-form"/);
   assert.match(css, /var\(--orgmetra-action-review\)/);
   assert.match(css, /var\(--orgmetra-focus-ring\)/);
 });
@@ -93,5 +96,31 @@ test('Job Analysis uses a host authorization provider without persisting bearer 
   assert.equal(request.options.credentials, 'omit');
   assert.equal(request.options.headers.Authorization, 'Bearer host-provided-token');
   assert.equal(request.options.headers['X-Purpose-Code'], 'job_analysis_read');
+  assert.doesNotMatch(html, /localStorage|sessionStorage|authorization.*input/i);
+});
+
+test('People API uses host authorization and an explicit no-storage read boundary', async () => {
+  const config = {
+    baseUrl: 'https://people.example.test/',
+    tenantRecordId: 'tenant/alpha',
+    personRecordId: 'person-1',
+    effectiveOn: '2026-08-21',
+    purposeCode: 'people_read',
+    requestedFields: ['display_name', 'employment_status_code'],
+    getAuthorization: async () => 'Bearer host-provided-token',
+  };
+  assert.equal(
+    peopleRecordUrl(config),
+    'https://people.example.test/v1/tenants/tenant%2Falpha/people/person-1?effective_on=2026-08-21&purpose=people_read&fields=display_name%2Cemployment_status_code',
+  );
+  let request;
+  const record = await fetchPeopleRecord(config, async (url, options) => {
+    request = { url, options };
+    return { ok: true, status: 200, json: async () => ({ fields: { display_name: 'Authorized worker', employment_status_code: 'active' } }) };
+  });
+  assert.deepEqual(record.fields, { display_name: 'Authorized worker', employment_status_code: 'active' });
+  assert.equal(request.url, peopleRecordUrl(config));
+  assert.equal(request.options.credentials, 'omit');
+  assert.equal(request.options.headers.Authorization, 'Bearer host-provided-token');
   assert.doesNotMatch(html, /localStorage|sessionStorage|authorization.*input/i);
 });

@@ -90,6 +90,20 @@
             <div class="table-wrap"><table><caption class="sr-only" data-i18n="assignmentCaption">Exact assignment allocation values</caption><thead><tr><th scope="col" data-i18n="assignmentName">Assignment</th><th scope="col" data-i18n="allocation">Allocation</th><th scope="col" data-i18n="nextAction">Next action</th></tr></thead><tbody><tr><th scope="row">Platform</th><td>60.00%</td><td data-i18n="noAction">No action required</td></tr><tr><th scope="row">Governance</th><td>40.00%</td><td data-i18n="noAction">No action required</td></tr></tbody></table></div>
             <p class="helper-text"><strong data-i18n="credentialBoundary">Credential boundary</strong> · <span data-i18n="credentialCopy">No identity credential or passkey is stored in the person record.</span></p>
           </section>
+          <section class="panel" aria-labelledby="people-api-title">
+            <div class="panel-heading"><div><p class="eyebrow" data-i18n="peopleApiBadge">API-bound read</p><h2 id="people-api-title" data-i18n="peopleApiTitle">Protected People record</h2></div><span class="badge badge-authorized" data-i18n="peopleApiBadge">API-bound read</span></div>
+            <p class="panel-copy" data-i18n="peopleApiCopy">Read one authorized worker record from the protected People API.</p>
+            <form id="people-api-form" class="form-grid" novalidate>
+              <label class="field-label" for="people-api-tenant"><span data-i18n="peopleApiTenant">Tenant record ID</span><input id="people-api-tenant" name="tenant_record_id" required maxlength="36" autocomplete="off"></label>
+              <label class="field-label" for="people-api-person"><span data-i18n="peopleApiPerson">Person record ID</span><input id="people-api-person" name="person_record_id" required maxlength="36" autocomplete="off"></label>
+              <label class="field-label" for="people-api-effective"><span data-i18n="peopleApiEffective">Effective date</span><input id="people-api-effective" name="effective_on" type="date" required></label>
+              <label class="field-label" for="people-api-purpose"><span data-i18n="peopleApiPurpose">Purpose code</span><input id="people-api-purpose" name="purpose" value="people_read" required maxlength="80" autocomplete="off"></label>
+              <label class="field-label field-wide" for="people-api-fields"><span data-i18n="peopleApiFields">Requested fields</span><input id="people-api-fields" name="fields" value="display_name,employment_status_code" required autocomplete="off"></label>
+              <div class="dialog-actions field-wide"><button class="button button-review" type="submit" data-i18n="peopleApiLoad">Load worker record</button></div>
+            </form>
+            <div id="people-api-status" class="notice notice-neutral" role="status" aria-live="polite" data-state="not-configured"></div>
+            <div id="people-api-result" class="table-wrap" hidden><table><caption class="sr-only" data-i18n="peopleApiTitle">Protected People record</caption><tbody><tr><th scope="row" data-i18n="peopleApiDisplayName">Authorized display name</th><td id="people-api-display-name">unknown</td></tr><tr><th scope="row" data-i18n="peopleApiEmploymentStatus">Employment status</th><td id="people-api-employment-status">unknown</td></tr></tbody></table></div>
+          </section>
         </section>
 
         <section class="view is-hidden" id="view-job-analysis" data-view="job-analysis" aria-labelledby="job-analysis-title" hidden>

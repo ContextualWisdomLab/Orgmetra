@@ -32,6 +32,24 @@ Object.assign(translations.en, {
   jobAnalysisTasks: 'Tasks',
   jobAnalysisKsaos: 'KSAO requirements',
   jobAnalysisNoValues: 'No snapshot values loaded.',
+  peopleApiBadge: 'API-bound read',
+  peopleApiTitle: 'Protected People record',
+  peopleApiCopy: 'Read one authorized worker record from the protected People API.',
+  peopleApiTenant: 'Tenant record ID',
+  peopleApiPerson: 'Person record ID',
+  peopleApiEffective: 'Effective date',
+  peopleApiPurpose: 'Purpose code',
+  peopleApiFields: 'Requested fields',
+  peopleApiLoad: 'Load worker record',
+  peopleApiReady: 'Ready to request a protected worker record.',
+  peopleApiNotConfigured: 'Not connected: the host must provide a People API URL and authorization provider.',
+  peopleApiLoading: 'Loading the authorized worker record…',
+  peopleApiLoaded: 'Worker record loaded from the protected People API.',
+  peopleApiDenied: 'The protected People API denied this request. Verify purpose and authorization.',
+  peopleApiFailed: 'The protected People API could not return this record. No local fallback was used.',
+  peopleApiDisplayName: 'Authorized display name',
+  peopleApiEmploymentStatus: 'Employment status',
+  peopleApiNoValues: 'No protected People API values loaded.',
 });
 Object.assign(translations.ko, {
   jobAnalysis: '직무 분석',
@@ -58,6 +76,24 @@ Object.assign(translations.ko, {
   jobAnalysisTasks: '과업',
   jobAnalysisKsaos: 'KSAO 요구사항',
   jobAnalysisNoValues: '불러온 스냅샷 값이 없습니다.',
+  peopleApiBadge: 'API 연결 읽기',
+  peopleApiTitle: '보호된 People 레코드',
+  peopleApiCopy: '보호된 People API에서 권한이 부여된 근로자 레코드 하나를 읽습니다.',
+  peopleApiTenant: '테넌트 레코드 ID',
+  peopleApiPerson: '사람 레코드 ID',
+  peopleApiEffective: '효력 기준일',
+  peopleApiPurpose: '목적 코드',
+  peopleApiFields: '요청 필드',
+  peopleApiLoad: '근로자 레코드 불러오기',
+  peopleApiReady: '보호된 근로자 레코드를 요청할 준비가 되었습니다.',
+  peopleApiNotConfigured: '연결되지 않음: 호스트가 People API URL과 인증 제공자를 제공해야 합니다.',
+  peopleApiLoading: '권한이 부여된 근로자 레코드를 불러오는 중…',
+  peopleApiLoaded: '보호된 People API에서 근로자 레코드를 불러왔습니다.',
+  peopleApiDenied: '보호된 People API가 요청을 거부했습니다. 목적과 인증을 확인하세요.',
+  peopleApiFailed: '보호된 People API에서 레코드를 반환하지 못했습니다. 로컬 대체 데이터는 사용하지 않았습니다.',
+  peopleApiDisplayName: '권한이 부여된 표시 이름',
+  peopleApiEmploymentStatus: '고용 상태',
+  peopleApiNoValues: '불러온 보호된 People API 값이 없습니다.',
 });
 
 export function isPurposeAuthorized(purpose) {
@@ -99,6 +135,49 @@ export async function fetchJobAnalysisSnapshot(config, fetchImpl = globalThis.fe
   });
   if (response.status === 401 || response.status === 403) throw new Error('JOB_ANALYSIS_ACCESS_DENIED');
   if (!response.ok) throw new Error('JOB_ANALYSIS_REQUEST_FAILED');
+  return response.json();
+}
+
+export function peopleRecordUrl(config) {
+  if (!config || typeof config.baseUrl !== 'string' || !config.baseUrl.trim()) {
+    throw new Error('People API base URL is not configured.');
+  }
+  if (typeof config.tenantRecordId !== 'string' || !config.tenantRecordId.trim()) {
+    throw new Error('Tenant record ID is required.');
+  }
+  if (typeof config.personRecordId !== 'string' || !config.personRecordId.trim()) {
+    throw new Error('Person record ID is required.');
+  }
+  if (typeof config.effectiveOn !== 'string' || !config.effectiveOn.trim()) {
+    throw new Error('Effective date is required.');
+  }
+  const fields = Array.isArray(config.requestedFields) ? config.requestedFields : ['display_name', 'employment_status_code'];
+  if (!fields.length || fields.some((field) => typeof field !== 'string' || !field.trim())) {
+    throw new Error('At least one requested People API field is required.');
+  }
+  const query = new URLSearchParams({
+    effective_on: config.effectiveOn,
+    purpose: config.purposeCode || 'people_read',
+    fields: fields.join(','),
+  });
+  return `${config.baseUrl.replace(/\/$/, '')}/v1/tenants/${encodeURIComponent(config.tenantRecordId)}/people/${encodeURIComponent(config.personRecordId)}?${query}`;
+}
+
+export async function fetchPeopleRecord(config, fetchImpl = globalThis.fetch) {
+  if (typeof config?.getAuthorization !== 'function') {
+    throw new Error('People API authorization provider is not configured.');
+  }
+  if (typeof fetchImpl !== 'function') throw new Error('Fetch is unavailable.');
+  const authorization = await config.getAuthorization();
+  if (typeof authorization !== 'string' || !authorization.trim()) {
+    throw new Error('People API authorization provider returned no credential.');
+  }
+  const response = await fetchImpl(peopleRecordUrl(config), {
+    headers: { Authorization: authorization },
+    credentials: 'omit',
+  });
+  if (response.status === 401 || response.status === 403) throw new Error('PEOPLE_ACCESS_DENIED');
+  if (!response.ok) throw new Error('PEOPLE_REQUEST_FAILED');
   return response.json();
 }
 
@@ -175,6 +254,25 @@ function renderJobAnalysisSnapshot(snapshot) {
   result.hidden = false;
 }
 
+function peopleApiMessage(key) {
+  return translations[document.documentElement.dataset.locale || 'en'][key];
+}
+
+function setPeopleApiStatus(key, state = 'idle') {
+  const status = document.getElementById('people-api-status');
+  status.dataset.i18n = key;
+  status.dataset.state = state;
+  status.textContent = peopleApiMessage(key);
+}
+
+function renderPeopleRecord(payload) {
+  const fields = payload?.fields;
+  if (!fields || typeof fields !== 'object') throw new Error('PEOPLE_REQUEST_FAILED');
+  document.getElementById('people-api-display-name').textContent = fields.display_name || 'unknown';
+  document.getElementById('people-api-employment-status').textContent = fields.employment_status_code || 'unknown';
+  document.getElementById('people-api-result').hidden = false;
+}
+
 if (typeof document !== 'undefined') {
   let locale = 'en';
   document.querySelectorAll('[data-view-link]').forEach((link) => link.addEventListener('click', () => activateView(link.dataset.viewLink)));
@@ -226,6 +324,36 @@ if (typeof document !== 'undefined') {
       setJobAnalysisStatus('jobAnalysisLoaded', 'loaded');
     } catch (error) {
       setJobAnalysisStatus(error.message === 'JOB_ANALYSIS_ACCESS_DENIED' ? 'jobAnalysisDenied' : 'jobAnalysisFailed', 'error');
+    }
+  });
+  const peopleApiForm = document.getElementById('people-api-form');
+  const peopleApiConfig = globalThis.__ORGMETRA_PEOPLE__;
+  if (peopleApiConfig?.tenantRecordId) document.getElementById('people-api-tenant').value = peopleApiConfig.tenantRecordId;
+  if (peopleApiConfig?.personRecordId) document.getElementById('people-api-person').value = peopleApiConfig.personRecordId;
+  if (peopleApiConfig?.effectiveOn) document.getElementById('people-api-effective').value = peopleApiConfig.effectiveOn;
+  if (peopleApiConfig?.purposeCode) document.getElementById('people-api-purpose').value = peopleApiConfig.purposeCode;
+  if (Array.isArray(peopleApiConfig?.requestedFields)) document.getElementById('people-api-fields').value = peopleApiConfig.requestedFields.join(',');
+  if (!peopleApiConfig?.baseUrl || typeof peopleApiConfig?.getAuthorization !== 'function') {
+    setPeopleApiStatus('peopleApiNotConfigured', 'not-configured');
+  } else {
+    setPeopleApiStatus('peopleApiReady');
+  }
+  peopleApiForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const config = {
+      ...(peopleApiConfig || {}),
+      tenantRecordId: document.getElementById('people-api-tenant').value,
+      personRecordId: document.getElementById('people-api-person').value,
+      effectiveOn: document.getElementById('people-api-effective').value,
+      purposeCode: document.getElementById('people-api-purpose').value,
+      requestedFields: document.getElementById('people-api-fields').value.split(',').map((field) => field.trim()),
+    };
+    setPeopleApiStatus('peopleApiLoading', 'loading');
+    try {
+      renderPeopleRecord(await fetchPeopleRecord(config));
+      setPeopleApiStatus('peopleApiLoaded', 'loaded');
+    } catch (error) {
+      setPeopleApiStatus(error.message === 'PEOPLE_ACCESS_DENIED' ? 'peopleApiDenied' : 'peopleApiFailed', 'error');
     }
   });
   setLocale(locale);

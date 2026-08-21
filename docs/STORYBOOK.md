@@ -55,10 +55,11 @@ Each interactive component requires at least these stories where applicable:
 Employee Profile and HR Home experience. It consumes the shared CSS tokens,
 keeps the Figma node IDs in the markup, and exercises evidence review,
 purpose-bound permission denial, high-impact confirmation, exact allocation
-values, and English/Korean labels. The Job Analysis view is an API-bound read
-surface: a host may inject an API base URL and short-lived authorization
-provider through `globalThis.__ORGMETRA_JOB_ANALYSIS__`; the fixture has no such
-provider and therefore makes no connected-data claim or local-data fallback.
+values, and English/Korean labels. The Job Analysis and Employee Profile People
+views are API-bound read surfaces: a host may inject an API base URL and
+short-lived authorization provider through `globalThis.__ORGMETRA_JOB_ANALYSIS__`
+and `globalThis.__ORGMETRA_PEOPLE__`. The fixture has no such provider and
+therefore makes no connected-data claim or local-data fallback.
 
 ## Local Storybook runtime
 
@@ -73,5 +74,5 @@ assignment values. Shared design tokens and workspace CSS are imported by
 Run `npm run storybook` for the local development UI or
 `npm run build-storybook` for the static build. This is local component and
 state evidence; it does not replace connected People API or browser E2E
-evidence. The Job Analysis read surface also requires a real protected API
-runtime before it can be called connected or released.
+evidence. The Job Analysis and People read surfaces each require a real
+protected API runtime before they can be called connected or released.
