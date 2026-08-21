@@ -235,3 +235,22 @@ def test_direct_receipt_construction_fails_closed(field, bad, match):
     )
     with pytest.raises(ValueError, match=match):
         replace(receipt, **{field: bad})
+
+
+def test_authority_verification_repr_redacts_correlation_evidence():
+    """Keep tenant, plan, actor, and evidence correlation identifiers out of routine logs."""
+    candidate_plan = plan()
+    verification = verification_for(candidate_plan)
+
+    text = repr(verification)
+
+    assert text == "StructuredInterviewActivationVerification(<redacted>)"
+    for sensitive_value in (
+        TENANT,
+        INTERVIEW_PLAN,
+        candidate_plan.sha256_digest(),
+        APPROVER,
+        AUTHORITY_EVIDENCE,
+        DIGEST_E,
+    ):
+        assert sensitive_value not in text
