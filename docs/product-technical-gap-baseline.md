@@ -95,7 +95,7 @@ The following is the current GitHub inventory checked on 2026-08-21. All listed 
 
 | PR | Head branch / exact head | Scope | Current state | Next action |
 |---:|---|---|---|---|
-| 57 | `feat/validation-analysis-handoff` / `a872938b508a42a7010c059789e012beffd5ef60` | Governed selection-validity analysis handoff | Draft; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Review the handoff boundary and keep estimator claims separate until exact-head checks and independent approval exist. |
+| 57 | `feat/validation-analysis-handoff` / `f0c30c5e6cfd6cb90afcbef1efd0ba8825f3fd52` | Governed selection-validity analysis handoff | Draft; mergeable; base `33eff43`; `REVIEW_REQUIRED`; current workflow runs queued/pending | Review the handoff boundary and keep estimator claims separate until exact-head checks and independent approval exist. |
 | 56 | `feat/organization-hierarchy-snapshot` / `95e6ce7f5d4a07322129635b2adfd0f890b61d2b` | Bitemporal organization hierarchy snapshot evidence | Draft; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify tenant/time semantics and current-head checks before independent approval. |
 | 55 | `fix/people-read-auth-backend-failure` / `a650d5b8040f3c8a0a11b516b99c814d89508d57` | People-read error normalization and pre-auth resource budgets | Draft; mergeable; base `33eff43`; `REVIEW_REQUIRED`; current workflows queued | Reproduce any review finding on this exact head, then wait for terminal People API/security/recovery checks and independent approval. |
 | 54 | `feat/workforce-composition-change` / `8d4958e4215ba5c168b93b820bed9b384d87f0cf` | Same-cutoff workforce composition change evidence | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Re-fetch exact head, terminal checks, resolved threads, and qualifying independent approval before merge. |
@@ -109,7 +109,7 @@ The following is the current GitHub inventory checked on 2026-08-21. All listed 
 | 44 | `feat/governed-performance-review` / `b867f4cf1efdec198f34199e7e8c382338e94505` | Performance review packet | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify criterion scope and human confirmation before protected merge. |
 | 43 | `feat/governed-offer-approval` / `8af2e3bf31bb9352033bded6530b9357405782af` | Offer approval packet | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify evidence-backed offer approval and audit/outbox behavior before protected merge. |
 | 42 | `feat/selection-outcome-monitoring-plan` / `a306d8199be475ba07682e31c1f9b4d9c701a50b` | Selection outcome monitoring | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify monitoring scope and temporal cohort semantics before protected merge. |
-| 40 | `feat/structured-interview-plan` / `eddc92bf059b2ecb7f286754325b801e93a2042a` | Governed structured interview plan | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify human review, evidence versioning, and current-head checks before protected merge. |
+| 40 | `feat/structured-interview-plan` / `6e6cc4f6b9c1356773cb3d89a52bcbf4bdfcadba` | Governed structured interview plan | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify human review, evidence versioning, and current-head checks before protected merge. |
 
 No open GitHub Issue was returned by the current `gh issue list` query. This does not mean product work is exhausted: the backlog above is derived from protected runtime gaps and is intentionally independent of issue presence.
 
