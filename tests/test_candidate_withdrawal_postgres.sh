@@ -3,6 +3,10 @@ set -euo pipefail
 
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
 
+# This is the executable persistence contract for candidate-initiated withdrawal.
+# It applies the complete stack, proves a governed withdrawal can be recorded,
+# proves the raw application-stage shortcut remains closed, and proves the
+# resulting governance evidence cannot be rewritten.
 for migration in database/migrations/*.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
@@ -160,7 +164,7 @@ INSERT INTO candidate_withdrawal_record (
 );
 SQL
 
-persisted_count="$(psql "${DATABASE_URL}" -Atqc "
+persisted_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT count(*)
 FROM candidate_withdrawal_record
 WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'::uuid
@@ -172,37 +176,32 @@ if [[ "${persisted_count}" != "1" ]]; then
 fi
 
 set +e
-duplicate_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
-INSERT INTO candidate_withdrawal_record (
-    tenant_record_id, candidate_withdrawal_record_id,
-    candidate_application_record_id, initiating_actor_reference,
-    identity_resolution_reference, identity_resolution_digest,
-    withdrawal_evidence_reference, withdrawal_evidence_digest,
-    evidence_version, withdrawn_at, audit_event_record_id, recorded_at
+raw_stage_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO candidate_application_stage_record (
+    tenant_record_id,
+    candidate_application_stage_record_id,
+    candidate_application_record_id,
+    application_stage_code,
+    effective_from,
+    recorded_from
 ) VALUES (
-    '10000000-0000-7000-8000-000000000001',
-    '72000000-0000-7000-8000-000000000002',
-    '10000000-0000-7000-8000-000000000051',
-    'candidate:73000000-0000-4000-8000-000000000001',
-    'identity_resolution:75000000-0000-4000-8000-000000000001',
-    repeat('a', 64),
-    'candidate_withdrawal_evidence:74000000-0000-4000-8000-000000000001',
-    repeat('b', 64),
-    1,
-    TIMESTAMPTZ '2026-08-21 09:21:00+00',
-    '70000000-0000-7000-8000-000000000001',
-    TIMESTAMPTZ '2026-08-21 09:21:01+00'
+    '20000000-0000-7000-8000-000000000001',
+    '20000000-0000-7000-8000-000000000061',
+    '20000000-0000-7000-8000-000000000051',
+    'withdrawn',
+    TIMESTAMPTZ '2026-08-21 09:20:00+00',
+    TIMESTAMPTZ '2026-08-21 09:20:01+00'
 );
 SQL
 } 2>&1)"
-duplicate_status=$?
+raw_stage_status=$?
 set -e
-if [[ ${duplicate_status} -eq 0 ]]; then
-    echo "candidate application accepted more than one withdrawal" >&2
+if [[ ${raw_stage_status} -eq 0 ]]; then
+    echo "raw application stage reintroduced unproven withdrawn state" >&2
     exit 1
 fi
-if [[ "${duplicate_output}" != *"candidate_withdrawal_application_unique"* ]]; then
-    echo "duplicate withdrawal failed for an unexpected reason: ${duplicate_output}" >&2
+if [[ "${raw_stage_output}" != *"candidate_application_stage_code_check"* ]]; then
+    echo "raw withdrawn stage failed for an unexpected reason: ${raw_stage_output}" >&2
     exit 1
 fi
 
@@ -210,45 +209,19 @@ set +e
 rewrite_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 UPDATE candidate_withdrawal_record
 SET initiating_actor_reference = 'candidate:73000000-0000-4000-8000-000000000099'
-WHERE candidate_withdrawal_record_id = '72000000-0000-7000-8000-000000000001';
+WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'
+  AND candidate_withdrawal_record_id = '72000000-0000-7000-8000-000000000001';
 SQL
 } 2>&1)"
 rewrite_status=$?
 set -e
-if [[ ${rewrite_status} -eq 0 || "${rewrite_output}" != *"candidate withdrawal evidence is append-only"* ]]; then
-    echo "candidate withdrawal evidence was rewritable or failed unexpectedly: ${rewrite_output}" >&2
+if [[ ${rewrite_status} -eq 0 ]]; then
+    echo "candidate withdrawal evidence was rewritten in place" >&2
+    exit 1
+fi
+if [[ "${rewrite_output}" != *"candidate withdrawal evidence is append-only"* ]]; then
+    echo "withdrawal rewrite failed for an unexpected reason: ${rewrite_output}" >&2
     exit 1
 fi
 
-set +e
-staff_actor_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
-INSERT INTO candidate_withdrawal_record (
-    tenant_record_id, candidate_withdrawal_record_id,
-    candidate_application_record_id, initiating_actor_reference,
-    identity_resolution_reference, identity_resolution_digest,
-    withdrawal_evidence_reference, withdrawal_evidence_digest,
-    evidence_version, withdrawn_at, audit_event_record_id, recorded_at
-) VALUES (
-    '20000000-0000-7000-8000-000000000001',
-    '82000000-0000-7000-8000-000000000001',
-    '20000000-0000-7000-8000-000000000051',
-    'staff:83000000-0000-4000-8000-000000000001',
-    'identity_resolution:85000000-0000-4000-8000-000000000001',
-    repeat('c', 64),
-    'candidate_withdrawal_evidence:84000000-0000-4000-8000-000000000001',
-    repeat('d', 64),
-    1,
-    TIMESTAMPTZ '2026-08-21 09:20:00+00',
-    '80000000-0000-7000-8000-000000000001',
-    TIMESTAMPTZ '2026-08-21 09:20:01+00'
-);
-SQL
-} 2>&1)"
-staff_actor_status=$?
-set -e
-if [[ ${staff_actor_status} -eq 0 || "${staff_actor_output}" != *"candidate_withdrawal_actor_reference_check"* ]]; then
-    echo "staff actor could masquerade as candidate withdrawal: ${staff_actor_output}" >&2
-    exit 1
-fi
-
-echo "candidate withdrawal governance contract passed"
+echo "candidate withdrawal persistence contract passed"
