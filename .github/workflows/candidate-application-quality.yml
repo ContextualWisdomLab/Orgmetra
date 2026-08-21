@@ -7,6 +7,7 @@ on:
     paths:
       - "database/migrations/**"
       - "tests/test_candidate_application_postgres.sh"
+      - "tests/test_candidate_application_rls_postgres.sh"
       - ".github/workflows/candidate-application-quality.yml"
       - "docs/adr/0026-normalized-candidate-application.md"
       - "docs/traceability/candidate-application-core.md"
@@ -52,9 +53,11 @@ jobs:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
       - name: Prove test syntax
-        run: bash -n tests/test_candidate_application_postgres.sh
+        run: bash -n tests/test_candidate_application_postgres.sh tests/test_candidate_application_rls_postgres.sh
       - name: Prove normalized application persistence
         run: bash tests/test_candidate_application_postgres.sh
+      - name: Prove forced tenant RLS behavior
+        run: bash tests/test_candidate_application_rls_postgres.sh
       - name: Prove validation is read-only
         run: |
           git diff --exit-code
