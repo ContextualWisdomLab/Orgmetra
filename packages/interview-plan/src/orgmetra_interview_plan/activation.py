@@ -170,7 +170,7 @@ def activate_structured_interview_plan(
         approving_actor_reference=approving_actor_reference,
         approved_at=approved_at,
     )
-    if not isinstance(verification, StructuredInterviewActivationVerification):
+    if type(verification) is not StructuredInterviewActivationVerification:
         raise TypeError("authority must return StructuredInterviewActivationVerification")
 
     _validate_reference(
