@@ -15,12 +15,13 @@
 | Preserve effective/business and system-recorded time | Application anchors preserve submission time plus recorded interval; stage facts preserve effective and recorded half-open intervals with strict non-empty checks |
 | Prevent contradictory historical stage truth | `candidate_application_stage_bitemporal_exclusion` rejects simultaneous effective+recorded overlap for one application; the regression exercises the exclusion |
 | Preserve correction evidence instead of rewriting history | Existing `protect_bitemporal_history()` guards both relations; regression proves stage mutation fails, closes one recorded interval, then appends replacement knowledge at the boundary |
-| Keep high-impact employment outcomes human-governed | Stage vocabulary excludes employer-terminal `hired`, `rejected`, and ambiguous `closed`; core regression proves `hired` is rejected and `test_candidate_application_decision_boundary_postgres.sh` proves `closed` is rejected. Candidate-driven `withdrawn` remains allowed. Final employer outcome remains the existing `selection_decision` human-confirmation/evidence boundary |
+| Keep high-impact employment outcomes human-governed | Raw stage vocabulary contains only `received`, `screening`, `assessment`, `interview`, and `offer_pending`; core regression proves `hired` is rejected and `test_candidate_application_decision_boundary_postgres.sh` proves ambiguous `closed` is rejected. Final employer outcome remains the existing `selection_decision` human-confirmation/evidence boundary |
+| Require provenance before treating withdrawal as candidate-driven | Bare `withdrawn` is rejected by `test_candidate_application_decision_boundary_postgres.sh`; the slice has no authoritative initiating-actor/withdrawal-evidence field yet, so it fails closed rather than allowing staff to encode a shadow rejection as candidate withdrawal |
 | Keep administrative opening closure out of candidate outcomes | Generic `closed` is not a candidate stage; requisition/opening closure belongs to the opening lifecycle so it cannot masquerade as candidate-specific rejection without governed selection evidence |
 | Prevent bulk history erasure | Both relations have BEFORE TRUNCATE guards, public TRUNCATE revocation and row-level mutation guards; regression proves stage history cannot be truncated |
 | Minimize PII | New persistence stores candidate/application/requisition/Job/Position identifiers and workflow metadata only; it does not copy names, contact data, demographic fields, assessment values, résumé content or model output |
 | Preserve requisition ownership boundary | `requisition_reference` correlates to the governed Orgmetra requisition-review contract but does not reach into another service or treat a packet as mutable application state |
-| Verify exact PR head | `.github/workflows/candidate-application-quality.yml` pins checkout action, proves `git rev-parse HEAD`, runs the core, high-impact decision-boundary, and `NOBYPASSRLS` PostgreSQL regressions on pinned PostgreSQL 16.14, then proves the validation left the tree unchanged |
+| Verify exact PR head | `.github/workflows/candidate-application-quality.yml` pins checkout action, proves `git rev-parse HEAD`, runs the core, decision/withdrawal-boundary, and `NOBYPASSRLS` PostgreSQL regressions on pinned PostgreSQL 16.14, then proves the validation left the tree unchanged |
 
 ## Standards/research decision evidence
 
@@ -28,4 +29,4 @@ The modeling decision is informed by the current published ISO 30201:2026 HR man
 
 ## Claims intentionally not made
 
-This active PR does **not** claim protected-main availability, a complete applicant-tracking product, final requisition persistence, candidate-facing UI, selection-decision-to-application persistence, migrated legacy profile statuses, deployed API behavior, certification to ISO 30201/30405, or any HR Open Standards certification. Those remain separate acceptance surfaces.
+This active PR does **not** claim protected-main availability, a complete applicant-tracking product, final requisition persistence, candidate-facing UI, selection-decision-to-application persistence, a governed candidate-withdrawal event, migrated legacy profile statuses, deployed API behavior, certification to ISO 30201/30405, or any HR Open Standards certification. Those remain separate acceptance surfaces.
