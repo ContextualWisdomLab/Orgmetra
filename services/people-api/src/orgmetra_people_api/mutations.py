@@ -47,8 +47,8 @@ class PeopleMutationIntegrityError(RuntimeError):
 
 
 def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require a real UUID outside Orgmetra's reserved protocol sentinels."""
-    if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
+    """Require an exact UUID outside Orgmetra's reserved protocol sentinels."""
+    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
 
 
@@ -83,11 +83,11 @@ def command_route(
     command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
 ) -> str:
     """Return the durable route that scopes one People mutation idempotency key."""
-    if isinstance(command, EmploymentMutationCommand):
+    if type(command) is EmploymentMutationCommand:
         return "employment-records"
-    if isinstance(command, PositionMutationCommand):
+    if type(command) is PositionMutationCommand:
         return "position-records"
-    if isinstance(command, AssignmentMutationCommand):
+    if type(command) is AssignmentMutationCommand:
         return "assignment-records"
     raise TypeError("command must be a governed People mutation command")
 
@@ -99,6 +99,7 @@ def idempotency_record_id(
     idempotency_key: str,
 ) -> UUID:
     """Derive a stable operational identity for one tenant/route/key binding."""
+    _validate_operational_uuid("tenant_record_id", tenant_record_id)
     return uuid5(
         _IDEMPOTENCY_NAMESPACE,
         f"{tenant_record_id}:{command_route_value}:{idempotency_key}",
@@ -115,9 +116,9 @@ def mutation_command_digest(
     Generated record identifiers are excluded so a retry that allocates fresh
     UUIDs still matches the first committed command.
     """
-    if not isinstance(authorization, AuthorizationDecision):
+    if type(authorization) is not AuthorizationDecision:
         raise TypeError("authorization must be an AuthorizationDecision")
-    if isinstance(command, EmploymentMutationCommand):
+    if type(command) is EmploymentMutationCommand:
         route = "employment-records"
         semantic_command: dict[str, object] = {
             "confirmation_reference": command.confirmation_reference,
@@ -127,7 +128,7 @@ def mutation_command_digest(
             "evidence_version_code": command.evidence_version_code,
             "person_record_id": str(command.person_record_id),
         }
-    elif isinstance(command, PositionMutationCommand):
+    elif type(command) is PositionMutationCommand:
         route = "position-records"
         semantic_command = {
             "confirmation_reference": command.confirmation_reference,
@@ -137,7 +138,7 @@ def mutation_command_digest(
             "organization_unit_id": str(command.organization_unit_id),
             "position_status_code": command.position_status_code,
         }
-    elif isinstance(command, AssignmentMutationCommand):
+    elif type(command) is AssignmentMutationCommand:
         route = "assignment-records"
         semantic_command = {
             "allocation_ratio": _canonical_allocation_ratio(command.allocation_ratio),
@@ -272,7 +273,7 @@ class AssignmentMutationCommand:
             _validate_operational_uuid(field_name, getattr(self, field_name))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.allocation_ratio, Decimal):
+        if type(self.allocation_ratio) is not Decimal:
             raise ValueError("allocation_ratio must be a Decimal.")
         if not self.allocation_ratio.is_finite():
             raise ValueError("allocation_ratio must be finite.")
@@ -363,7 +364,7 @@ def create_employment_record(
     mutation_port: PeopleMutationPort,
 ) -> EmploymentMutationResult:
     """Authorize the exact employment target before persisting worker employment truth."""
-    if not isinstance(command, EmploymentMutationCommand):
+    if type(command) is not EmploymentMutationCommand:
         raise TypeError("command must be an EmploymentMutationCommand")
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
@@ -378,7 +379,7 @@ def create_employment_record(
         policy=policy,
     )
     result = port.create_employment(command=command, authorization=authorization)
-    if not isinstance(result, EmploymentMutationResult):
+    if type(result) is not EmploymentMutationResult:
         raise TypeError("mutation_port must return EmploymentMutationResult")
     return result
 
@@ -392,7 +393,7 @@ def create_position_record(
     mutation_port: PeopleMutationPort,
 ) -> PositionMutationResult:
     """Authorize the exact position target before persisting a staffable seat."""
-    if not isinstance(command, PositionMutationCommand):
+    if type(command) is not PositionMutationCommand:
         raise TypeError("command must be a PositionMutationCommand")
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
@@ -407,7 +408,7 @@ def create_position_record(
         policy=policy,
     )
     result = port.create_position(command=command, authorization=authorization)
-    if not isinstance(result, PositionMutationResult):
+    if type(result) is not PositionMutationResult:
         raise TypeError("mutation_port must return PositionMutationResult")
     return result
 
@@ -421,7 +422,7 @@ def create_assignment_record(
     mutation_port: PeopleMutationPort,
 ) -> AssignmentMutationResult:
     """Authorize the exact assignment target before persisting seat allocation."""
-    if not isinstance(command, AssignmentMutationCommand):
+    if type(command) is not AssignmentMutationCommand:
         raise TypeError("command must be an AssignmentMutationCommand")
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
@@ -436,7 +437,7 @@ def create_assignment_record(
         policy=policy,
     )
     result = port.create_assignment(command=command, authorization=authorization)
-    if not isinstance(result, AssignmentMutationResult):
+    if type(result) is not AssignmentMutationResult:
         raise TypeError("mutation_port must return AssignmentMutationResult")
     return result
 
