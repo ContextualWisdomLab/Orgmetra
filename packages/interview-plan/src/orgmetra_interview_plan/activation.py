@@ -10,6 +10,7 @@ verification evidence.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from hashlib import sha256
 import json
 from typing import Protocol
@@ -137,7 +138,7 @@ def activate_structured_interview_plan(
     plan: StructuredInterviewPlan,
     authority: StructuredInterviewActivationAuthority,
     approving_actor_reference: str,
-    approved_at: object,
+    approved_at: datetime,
 ) -> StructuredInterviewActivationReceipt:
     """Activate one exact plan only after authoritative host verification succeeds.
 
@@ -147,6 +148,9 @@ def activate_structured_interview_plan(
     value-minimized immutable human-approval receipt only for the exact verified
     scope.
     """
+    _canonical_timestamp(approved_at)
+    if approved_at < plan.generated_at:
+        raise ValueError("approved_at must not precede plan generated_at")
     _validate_reference(approving_actor_reference, "actor", "approving_actor_reference")
     verification = authority.verify_activation(
         plan=plan,
