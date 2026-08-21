@@ -1,0 +1,67 @@
+"""Adversarial runtime-integrity tests for governed offer-approval text evidence."""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+import pytest
+
+from orgmetra_offer_approval import build_offer_approval_packet
+
+
+class ForgedGovernanceText(str):
+    """Preserve unsafe serialized text while forging reviewed comparisons."""
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+    def __hash__(self) -> int:
+        return hash("selected_candidate_offer_review")
+
+
+def valid_kwargs() -> dict[str, object]:
+    """Return one otherwise-valid value-free offer approval request."""
+    return {
+        "tenant_record_id": "11111111-1111-4111-8111-111111111111",
+        "offer_approval_reference": "offer_approval:10000000-0000-4000-8000-000000000001",
+        "candidate_profile_reference": "candidate_profile:10000000-0000-4000-8000-000000000002",
+        "requisition_reference": "requisition:10000000-0000-4000-8000-000000000003",
+        "job_profile_reference": "job_profile:10000000-0000-4000-8000-000000000004",
+        "position_record_reference": "position_record:10000000-0000-4000-8000-000000000005",
+        "selection_decision_reference": "selection_decision:10000000-0000-4000-8000-000000000006",
+        "selection_decision_digest": "a" * 64,
+        "compensation_package_reference": "compensation_package:10000000-0000-4000-8000-000000000007",
+        "compensation_package_digest": "b" * 64,
+        "offer_terms_reference": "offer_terms:10000000-0000-4000-8000-000000000008",
+        "offer_terms_digest": "c" * 64,
+        "requester_reference": "actor:10000000-0000-4000-8000-000000000009",
+        "approver_reference": "actor:10000000-0000-4000-8000-00000000000a",
+        "purpose_code": "offer_approval_review",
+        "reason_code": "selected_candidate_offer_review",
+        "generated_at": datetime(2026, 8, 19, 5, 10, tzinfo=timezone.utc),
+    }
+
+
+@pytest.mark.parametrize(
+    ("field_name", "forged_text"),
+    [
+        ("purpose_code", "shadow_offer_review"),
+        ("reason_code", "employee_jane_doe"),
+        ("decision_authority", "model_decision_allowed"),
+        ("review_state", "approved_without_human"),
+        ("delivery_state", "authorized_to_send"),
+        ("next_action", "send_offer_without_authoritative_resolution"),
+    ],
+)
+def test_rejects_forged_governance_text_before_canonical_evidence(
+    field_name: str,
+    forged_text: str,
+) -> None:
+    """Caller-defined string comparison behavior must not forge reviewed evidence."""
+    kwargs = valid_kwargs()
+    kwargs[field_name] = ForgedGovernanceText(forged_text)
+
+    with pytest.raises(ValueError):
+        build_offer_approval_packet(**kwargs)
