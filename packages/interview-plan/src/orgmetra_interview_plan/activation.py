@@ -31,7 +31,7 @@ _MAX_EVIDENCE_VERSION = 2_147_483_647
 _ACTIVATION_RECEIPT_ISSUANCE_TOKEN = object()
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class StructuredInterviewActivationVerification:
     """Authoritative host evidence returned only after all activation checks pass."""
 
@@ -41,6 +41,10 @@ class StructuredInterviewActivationVerification:
     approving_actor_reference: str
     authority_evidence_reference: str
     authority_evidence_digest: str
+
+    def __repr__(self) -> str:
+        """Return a redacted representation suitable for routine logs and failures."""
+        return "StructuredInterviewActivationVerification(<redacted>)"
 
 
 class StructuredInterviewActivationAuthority(Protocol):
