@@ -1,10 +1,15 @@
 """Regression tests for authoritative structured-interview receipt issuance."""
 
+from dataclasses import replace
 from datetime import datetime, timezone
 
 import pytest
 
-from orgmetra_interview_plan import StructuredInterviewActivationReceipt
+from orgmetra_interview_plan import (
+    StructuredInterviewActivationReceipt,
+    activate_structured_interview_plan,
+)
+from test_activation import APPROVED_AT, APPROVER, AllowingAuthority, plan, verification_for
 
 
 def test_activation_receipt_cannot_be_minted_without_verified_factory_path():
@@ -21,3 +26,17 @@ def test_activation_receipt_cannot_be_minted_without_verified_factory_path():
             authority_evidence_digest="e" * 64,
             approved_at=datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc),
         )
+
+
+def test_issued_activation_receipt_cannot_be_replaced_with_unverified_scope():
+    """Reject dataclass replacement that would reuse issuance proof for changed scope."""
+    candidate_plan = plan()
+    receipt = activate_structured_interview_plan(
+        plan=candidate_plan,
+        authority=AllowingAuthority(verification_for(candidate_plan)),
+        approving_actor_reference=APPROVER,
+        approved_at=APPROVED_AT,
+    )
+
+    with pytest.raises(TypeError, match="activate_structured_interview_plan"):
+        replace(receipt, plan_digest="b" * 64)
