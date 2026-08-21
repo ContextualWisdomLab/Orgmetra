@@ -4,6 +4,8 @@ This package creates **value-free, fail-closed migration handoff evidence** befo
 
 Use it when an operator has already inspected a source through the published MHTML ETL Gateway contract and has an approved mapping for one bounded Orgmetra HRIS batch. The package binds that evidence to an Orgmetra tenant, accountable actor, approval, purpose, mapping digest, source digest, target HRIS object families, and exact reviewed dependency revisions.
 
+Trust-bearing primitive fields are fail-closed runtime evidence. The adapter accepts exact built-in strings for identifiers, references, codes, digests, dependency revisions, and fixed envelope states; exact built-in integers for bounded counts and sizes; and an exact tuple of exact string target codes. Caller-defined subclasses are rejected before reviewed equality, hashed allow-list membership, numeric bounds, or canonical JSON serialization can run, so custom Python comparison/hash methods cannot make accepted governance differ from the immutable evidence that is recorded.
+
 It deliberately does **not**:
 
 - parse MHTML or copy the MHTML ETL Gateway implementation;
