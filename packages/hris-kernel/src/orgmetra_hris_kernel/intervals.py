@@ -17,6 +17,40 @@ def _require_ordered(start: date | datetime, end: date | datetime | None) -> Non
         )
 
 
+def _require_builtin_date(value: date | None, *, field_name: str) -> None:
+    """Require exact built-in dates before business-time comparison."""
+    if value is not None and type(value) is not date:
+        raise IntervalError(
+            f"{field_name} must be a built-in date.",
+            next_action="Convert the value to an exact Python date, then retry.",
+        )
+
+
+def _require_builtin_datetime(value: datetime | None, *, field_name: str) -> None:
+    """Require exact built-in datetimes before system-time comparison."""
+    if value is not None and type(value) is not datetime:
+        raise IntervalError(
+            f"{field_name} must be a built-in datetime.",
+            next_action="Convert the value to an exact Python datetime, then retry.",
+        )
+
+
+def _require_timezone_aware(value: datetime, *, field_name: str) -> None:
+    """Require a usable UTC offset instead of trusting non-null ``tzinfo`` alone."""
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:
+        raise IntervalError(
+            f"{field_name} must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC before recording or querying.",
+        ) from exc
+    if offset is None:
+        raise IntervalError(
+            f"{field_name} must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC before recording or querying.",
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class DateInterval:
     """Half-open effective date range: start inclusive, end exclusive."""
@@ -26,10 +60,13 @@ class DateInterval:
 
     def __post_init__(self) -> None:
         """Validate the effective period as soon as HR enters it."""
+        _require_builtin_date(self.start, field_name="Date interval start")
+        _require_builtin_date(self.end, field_name="Date interval end")
         _require_ordered(self.start, self.end)
 
     def contains(self, day: date) -> bool:
-        """Return whether `day` is inside this effective period."""
+        """Return whether ``day`` is inside this effective period."""
+        _require_builtin_date(day, field_name="Effective-date query coordinate")
         if day < self.start:
             return False
         return self.end is None or day < self.end
@@ -53,21 +90,18 @@ class RecordedInterval:
     end: datetime | None = None
 
     def __post_init__(self) -> None:
-        """Require timezone-aware knowledge cutoffs so reconstructions stay honest."""
-        if self.start.tzinfo is None or (self.end is not None and self.end.tzinfo is None):
-            raise IntervalError(
-                "Recorded timestamps must be timezone-aware.",
-                next_action="Convert the knowledge cutoff to UTC before recording or querying.",
-            )
+        """Require canonical, timezone-aware knowledge bounds before reconstruction."""
+        _require_builtin_datetime(self.start, field_name="Recorded interval start")
+        _require_builtin_datetime(self.end, field_name="Recorded interval end")
+        _require_timezone_aware(self.start, field_name="Recorded interval start")
+        if self.end is not None:
+            _require_timezone_aware(self.end, field_name="Recorded interval end")
         _require_ordered(self.start, self.end)
 
     def contains(self, instant: datetime) -> bool:
-        """Return whether Orgmetra already knew this fact at `instant`."""
-        if instant.tzinfo is None:
-            raise IntervalError(
-                "Recorded timestamps must be timezone-aware.",
-                next_action="Convert the knowledge cutoff to UTC before recording or querying.",
-            )
+        """Return whether Orgmetra already knew this fact at ``instant``."""
+        _require_builtin_datetime(instant, field_name="Knowledge-cutoff query coordinate")
+        _require_timezone_aware(instant, field_name="Knowledge-cutoff query coordinate")
         if instant < self.start:
             return False
         return self.end is None or instant < self.end
