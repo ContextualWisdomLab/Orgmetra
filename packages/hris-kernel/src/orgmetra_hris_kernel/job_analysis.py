@@ -44,7 +44,7 @@ _ALLOWED_STATUS_CODES = frozenset({"analysis_draft", "analysis_validated"})
 
 def _validate_uuid(value: object, field_name: str) -> UUID:
     """Return a durable UUID or reject type-confused and sentinel identities."""
-    if not isinstance(value, UUID):
+    if type(value) is not UUID:
         raise ValueError(f"{field_name} must be a UUID")
     if value.int == 0:
         raise ValueError(f"{field_name} must not be the nil UUID")
