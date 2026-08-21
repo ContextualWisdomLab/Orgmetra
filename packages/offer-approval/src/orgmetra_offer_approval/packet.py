@@ -46,8 +46,8 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
 
 
 def _validate_code(value: str, field_name: str) -> None:
-    """Require a bounded descriptive lower snake_case governance code."""
-    if not isinstance(value, str) or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
+    """Require exact built-in bounded descriptive lower snake_case governance text."""
+    if type(value) is not str or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be bounded two-or-more-word lower snake_case")
 
 
@@ -87,6 +87,12 @@ def _validate_evidence_version(value: int) -> None:
     """Require a bounded positive integer version for high-impact offer-review evidence."""
     if type(value) is not int or value < 1 or value > 2_147_483_647:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
+
+
+def _validate_fixed_text(value: str, expected: str, field_name: str) -> None:
+    """Require exact built-in text for immutable fixed governance evidence."""
+    if type(value) is not str or value != expected:
+        raise ValueError(f"{field_name} must remain {expected}")
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -163,8 +169,7 @@ class OfferApprovalPacket:
         if self.requester_reference == self.approver_reference:
             raise ValueError("approver_reference must identify a different accountable actor")
         _validate_code(self.purpose_code, "purpose_code")
-        if self.purpose_code != _PURPOSE_CODE:
-            raise ValueError("purpose_code must remain offer_approval_review")
+        _validate_fixed_text(self.purpose_code, _PURPOSE_CODE, "purpose_code")
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive offer reason")
@@ -176,14 +181,10 @@ class OfferApprovalPacket:
             raise ValueError("offer approval packet must not contain compensation values")
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory before offer approval")
-        if self.decision_authority != _DECISION_AUTHORITY:
-            raise ValueError("decision_authority must remain human_approval_only")
-        if self.review_state != _REVIEW_STATE:
-            raise ValueError("review_state must remain requires_human_approval")
-        if self.delivery_state != _DELIVERY_STATE:
-            raise ValueError("delivery_state must remain not_authorized_to_send")
-        if self.next_action != _NEXT_ACTION:
-            raise ValueError("next_action must remain the governed offer-approval instruction")
+        _validate_fixed_text(self.decision_authority, _DECISION_AUTHORITY, "decision_authority")
+        _validate_fixed_text(self.review_state, _REVIEW_STATE, "review_state")
+        _validate_fixed_text(self.delivery_state, _DELIVERY_STATE, "delivery_state")
+        _validate_fixed_text(self.next_action, _NEXT_ACTION, "next_action")
 
     def canonical_json(self) -> str:
         """Return deterministic canonical JSON for immutable audit correlation."""
