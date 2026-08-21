@@ -8,9 +8,15 @@ on:
       - "packages/requisition-review/**"
       - ".github/requirements/foundation-test.txt"
       - ".github/workflows/requisition-review-quality.yml"
+      - ".github/workflows/candidate-application-quality.yml"
+      - "database/migrations/0014_candidate_application_core.sql"
+      - "tests/test_candidate_application_postgres.sh"
       - "docs/adr/0013-governed-requisition-review-packet.md"
+      - "docs/adr/0026-normalized-candidate-application.md"
       - "docs/doctoring/requisition-review-references.md"
+      - "docs/doctoring/candidate-application-references.md"
       - "docs/traceability/requisition-review.md"
+      - "docs/traceability/candidate-application-core.md"
       - "docs/TRACEABILITY.md"
       - "CHANGELOG.md"
   workflow_dispatch:
@@ -53,6 +59,45 @@ jobs:
           PYTHONPATH: packages/requisition-review/src
           COVERAGE_FILE: /tmp/orgmetra-requisition-review.coverage
         run: python -m pytest -c packages/requisition-review/pyproject.toml packages/requisition-review/tests
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+  candidate_application_postgres:
+    name: Candidate application PostgreSQL contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: orgmetra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d orgmetra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Prove candidate application test syntax
+        run: bash -n tests/test_candidate_application_postgres.sh
+      - name: Prove normalized candidate application persistence
+        run: bash tests/test_candidate_application_postgres.sh
       - name: Require clean checkout
         run: |
           git diff --exit-code
