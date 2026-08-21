@@ -32,8 +32,8 @@ class PeopleRecordIntegrityError(RuntimeError):
 
 
 def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require a UUID that is not one of Orgmetra's reserved protocol sentinels."""
-    if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
+    """Require an exact UUID outside Orgmetra's reserved protocol sentinels."""
+    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
 
 
@@ -131,7 +131,7 @@ def read_worker_people_record(
     """
     _validate_operational_uuid("tenant_record_id", tenant_record_id)
     _validate_operational_uuid("person_record_id", person_record_id)
-    if not isinstance(effective_on, date):
+    if type(effective_on) is not date:
         raise ValueError("effective_on must be a business date.")
 
     resource_reference = f"person_record:{person_record_id.hex}"
@@ -154,6 +154,8 @@ def read_worker_people_record(
     )
     if record is None:
         raise PeopleRecordNotFound("worker record is unavailable")
+    if type(record) is not WorkerPeopleRecord:
+        raise PeopleRecordIntegrityError("resolved worker must be a governed WorkerPeopleRecord")
     if record.tenant_record_id != tenant_record_id or record.person_record_id != person_record_id:
         raise PeopleRecordIntegrityError("resolved worker does not match authorized target")
 
