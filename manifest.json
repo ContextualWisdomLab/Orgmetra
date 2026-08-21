@@ -10,6 +10,12 @@
       "lines": 127
     },
     {
+      "path": ".github/workflows/hr-workspace-browser-e2e.yml",
+      "sha256": "62be846657a26725f0381cf8c8c679b5d5da7996b25636230ce11ef6f1805740",
+      "bytes": 1788,
+      "lines": 57
+    },
+    {
       "path": ".github/workflows/job-analysis-api-quality.yml",
       "sha256": "352dc78931dd94afea3e88912d38dcc4b562a004112f199f3d7a12d22b6d637a",
       "bytes": 4159,
@@ -17,9 +23,9 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "80c3bfec4d01d6992e41ac1dc63d1656e72279273764a42f70174838f09ff2cd",
-      "bytes": 406,
-      "lines": 39
+      "sha256": "251c57f25b9fd862b3a914aa52987474ec5bc9660d8071d1aa7f1141ea103ca1",
+      "bytes": 439,
+      "lines": 41
     },
     {
       "path": ".storybook/main.js",
@@ -47,9 +53,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "19fdfe972e27b94f8c43b4ddaf3f1878c699218117015f0186798f6bcd0c47c8",
-      "bytes": 17677,
-      "lines": 80
+      "sha256": "df3376407270f599cc00a285851fad865b6b4574fe8c3c9a060e13b36d0d0282",
+      "bytes": 17985,
+      "lines": 81
     },
     {
       "path": "CLAUDE.md",
@@ -89,9 +95,9 @@
     },
     {
       "path": "apps/hr-workspace/styles.css",
-      "sha256": "09349ad43a12d015d7f6eee30fa45d794c4b66e813efbd741dd23bf35de5360b",
-      "bytes": 10110,
-      "lines": 118
+      "sha256": "26af2180e3fb170a28809f3bb03f6c74f09ec703c604c5d16838efa271122149",
+      "bytes": 10149,
+      "lines": 119
     },
     {
       "path": "apps/hr-workspace/workspace.stories.js",
@@ -221,15 +227,15 @@
     },
     {
       "path": "docs/STORYBOOK.md",
-      "sha256": "caabfc4958894768a065e30ab3907344d728772a65446512cbca2f0061b1deaf",
-      "bytes": 2896,
-      "lines": 78
+      "sha256": "2157edf98a525323f3368d4459ec7f0f6c5b030b814e33753bc9cb7b0660f64c",
+      "bytes": 3067,
+      "lines": 80
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "d0a0bc3b54ed0fc7973747987f1afb117d6144c390b51ed9370eb571972a33f8",
-      "bytes": 16534,
-      "lines": 135
+      "sha256": "9a57c561c0576683c307b9dd019615a85237d6436691b22f7d61890f39dc409f",
+      "bytes": 17096,
+      "lines": 149
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -239,8 +245,8 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "0452bd2bd28e1e236b622742de745afb7ae9b886f5cb1517e3a603a46e7fd84b",
-      "bytes": 11873,
+      "sha256": "7a1301871485181875cd1ef86711659bef575d55267ca74769677bd860dff474",
+      "bytes": 11987,
       "lines": 42
     },
     {
@@ -389,15 +395,15 @@
     },
     {
       "path": "package-lock.json",
-      "sha256": "69089cfedb463784e053e70ec1af456bb4a0f2bbbd5c8cb7c79e75e90c279e81",
-      "bytes": 105932,
-      "lines": 3220
+      "sha256": "7f737a6adf592e4b9370abbe7de08599a7038e234f8db13aba020fbc0ba80734",
+      "bytes": 107967,
+      "lines": 3284
     },
     {
       "path": "package.json",
-      "sha256": "94d134e202416fc50298fed8812aed02fb59f9023458da32dbf2b5208ae5da54",
-      "bytes": 691,
-      "lines": 17
+      "sha256": "38b16090f937da29531dbe3c5d5f4392c4a8dc2d485b95e43d9bbdf26c7a9a07",
+      "bytes": 761,
+      "lines": 19
     },
     {
       "path": "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
@@ -412,6 +418,12 @@
       "lines": 200
     },
     {
+      "path": "playwright.config.mjs",
+      "sha256": "dd0dc60b82e7cc620b74e3e7649ccf94e6046fc0150c28ee6be7f3d4f5ddd3e3",
+      "bytes": 920,
+      "lines": 34
+    },
+    {
       "path": "schemas/openapi.yaml",
       "sha256": "09c1e43486779198574fe31b8bcabbd1c1f74beec7bf86245ae578061619838f",
       "bytes": 29503,
@@ -419,9 +431,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "7f15517490390e4460e23e4f8ff689cf9bc33efd681b79b1d350fb16990dfa41",
-      "bytes": 28557,
-      "lines": 700
+      "sha256": "fe743c4e9e1589b3c99c28e4c05aeedfa8433017061664d63fa57606a651f8c3",
+      "bytes": 28673,
+      "lines": 703
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -434,6 +446,12 @@
       "sha256": "09f5e64410e6b7a26bf8d6ce61c50b737da2ea85d955f91eba63aa21f1537261",
       "bytes": 1597,
       "lines": 34
+    },
+    {
+      "path": "tests/e2e/hr-workspace.spec.mjs",
+      "sha256": "b473341c8e50901a375722142bf8896d5b1fd92ed8887af4375d3a06ffcfe9a0",
+      "bytes": 6420,
+      "lines": 142
     },
     {
       "path": "tests/foundation-contract.test.mjs",
@@ -533,9 +551,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "e3934e3ce7fb3b2e053d21556c495e84112253b985d5082f8f44a6513c87c930",
-      "bytes": 27695,
-      "lines": 650
+      "sha256": "4b1ab51c21bd8eadd36c9aad03797c081fdd324c3550b63cda37e10a6ec14cea",
+      "bytes": 27817,
+      "lines": 653
     }
   ]
 }

@@ -73,6 +73,8 @@ assignment values. Shared design tokens and workspace CSS are imported by
 
 Run `npm run storybook` for the local development UI or
 `npm run build-storybook` for the static build. This is local component and
-state evidence; it does not replace connected People API or browser E2E
-evidence. The Job Analysis and People read surfaces each require a real
-protected API runtime before they can be called connected or released.
+state evidence. Run `npm run test:e2e` for the Chromium browser contract, which
+proves the human-review, permission, locale, host-injected read, authorization,
+and no-fallback error states against a local static runtime. This still does
+not prove a protected deployment: the Job Analysis and People read surfaces
+require a real protected API runtime before they can be called released.

@@ -34,7 +34,7 @@ The command runs Python repository-integrity validation, the dependency-free Nod
 | Tenant/actor/purpose authorization matrix and negative high-impact commands | service-specific unit and integration test commands recorded in each service package |
 | AsyncAPI/CloudEvents envelope compatibility | provider and consumer contract test commands recorded beside the versioned event schema |
 | External adapter timeout, malformed response, tenant mismatch, and unavailable-state handling | fake-server tests in each adapter package |
-| Role-workspace keyboard, focus, exact-value, permission-denied, and confirmation states | Storybook interaction/a11y tests plus browser E2E for the owning workspace |
+| Role-workspace keyboard, focus, exact-value, permission-denied, and confirmation states | Storybook interaction/a11y tests plus `npm run test:e2e` for the owning workspace |
 
 The PostgreSQL scripts apply the checked-in migration chain required by the contract under test to a fresh database. The bitemporal and evidence-sealing tests execute concurrency regressions with an observable database barrier instead of a fixed scheduling assumption. The tenant-isolation test proves both read and write enforcement with unprivileged `NOLOGIN NOBYPASSRLS` roles, so table-owner/superuser bypass cannot manufacture a passing tenant result. The evidence-sealing test compares database output with independently precomputed canonical SHA-256 fixtures and forces a membership transaction to hold the evidence-set row lock before finalization, proving the digest snapshot includes evidence that committed first. The audit/outbox contract stores exact `AuditOutboxEvent.canonical_json()` bytes, independently verifies their SHA-256 digest in PostgreSQL, rejects extra top-level PII fields even when a caller recomputes the digest, and exercises outbox lifecycle invariants separately from immutable audit facts. The outbox-claim contract proves an already-expired lease cannot be created, verifies deterministic tenant-scoped claims return the immutable event/digest while live leases are excluded, then lets a valid one-second lease expire and requires atomic takeover of that same row with attempt count 2, a new future lease, and explicit `lease_expired` evidence. The dead-letter contract applies migrations 0001 through 0007, proves the dispatcher cannot select its own terminal attempt budget, rejects direct terminal DML before matching immutable escalation evidence and the stored budget are satisfied, exercises the real retry/claim path through the database-owned default fifth attempt, rejects retry at attempt five, lets the final lease expire, proves a replacement worker cannot create attempt six, proves the row remains bound to the recorded worker identity, rejects a foreign finalizer, permits that exact recorded identity to append terminal evidence after expiry, and rejects fabricated escalation evidence for nonterminal work. The People mutation idempotency contract applies the authoritative migration chain through 0012, verifies the replay record is written in the same transaction as its authoritative fact and audit/outbox evidence, proves rollback leaves no false replay marker, and uses concurrent exact-key sessions to prove one canonical committed identity wins without duplicate business facts. Foundation CI executes every matrix entry independently; a cancelled, skipped, queued, absent, neutral, failed, stale, predecessor-head, status-only, or model-only matrix result is not database evidence for the current head.
 
@@ -133,3 +133,17 @@ A model that omits evidence for a structural feature it uses is not eligible for
 - Permission-denied and Keyverse-unavailable states.
 - High-risk review, confirmation, recording, and audit states.
 - Narrow viewport, 200% zoom/reflow, reduced-motion, and high-contrast review.
+
+The current HR workspace browser contract runs Chromium against the static
+workspace with Playwright. It covers the Employee Profile permission boundary,
+English/Korean accessible labels, required-reason focus behavior, host-injected
+People and Job Analysis reads, authorization/purpose request data, and denied
+read errors without fixture fallback. Run it with:
+
+```text
+npm run test:e2e
+```
+
+The browser contract is executable local/CI evidence; it does not promote the
+fixture to a connected production deployment or authorize an employment
+decision.

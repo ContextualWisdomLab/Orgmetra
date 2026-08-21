@@ -20,6 +20,8 @@ dist/
 coverage/
 .turbo/
 storybook-static/
+playwright-report/
+test-results/
 
 # Rust
 /target/

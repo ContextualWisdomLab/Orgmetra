@@ -23,6 +23,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--orgmetra-space-md); max-width: 1180px; margin: 0 auto 48px; }
 .topbar-status { margin: 2px 0 0; color: var(--orgmetra-text-muted); font-size: 13px; }
 .view { max-width: 1180px; margin: 0 auto; }
+[hidden] { display: none !important; }
 .view.is-hidden { display: none; }
 .view-heading, .profile-heading, .panel-heading, .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--orgmetra-space-md); }
 h1, h2, p { margin-top: 0; }
