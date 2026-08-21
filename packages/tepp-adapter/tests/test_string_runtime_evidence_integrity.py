@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from orgmetra_tepp_adapter import build_tepp_analysis_request_packet
+from orgmetra_tepp_adapter.analysis import _validate_uuid4
 
 
 class ForgedReference(str):
@@ -58,6 +59,7 @@ def values() -> dict[str, object]:
 
 
 def test_rejects_reference_string_subclass_that_can_forge_namespace_validation() -> None:
+    """Reject subclassed references before namespace helpers can be overridden."""
     kwargs = values()
     kwargs["validation_study_reference"] = ForgedReference("evil-reference")
     with pytest.raises(ValueError, match="validation_study_reference"):
@@ -65,13 +67,21 @@ def test_rejects_reference_string_subclass_that_can_forge_namespace_validation()
 
 
 def test_rejects_tenant_string_subclass_that_can_forge_uuid_validation() -> None:
+    """Reject subclassed authoritative tenant text before UUID canonicalization."""
     kwargs = values()
     kwargs["tenant_record_id"] = ForgedTenantUUIDText("not-a-tenant-uuid")
     with pytest.raises(ValueError, match="tenant_record_id"):
         build_tepp_analysis_request_packet(**kwargs)
 
 
+def test_uuid4_validator_rejects_string_subclass_before_uuid_parsing() -> None:
+    """Keep the shared UUIDv4 validator independently fail-closed for future callers."""
+    with pytest.raises(ValueError, match="probe_reference"):
+        _validate_uuid4(ForgedTenantUUIDText("22222222-2222-4222-8222-222222222222"), "probe_reference")
+
+
 def test_rejects_opaque_string_subclass_that_can_hide_credential_shape() -> None:
+    """Reject subclassed opaque identifiers before credential-shape inspection."""
     kwargs = values()
     kwargs["tepp_workspace_id"] = ForgedOpaqueIdentifier("sk-secret-workspace")
     with pytest.raises(ValueError, match="tepp_workspace_id"):
@@ -79,6 +89,7 @@ def test_rejects_opaque_string_subclass_that_can_hide_credential_shape() -> None
 
 
 def test_rejects_idempotency_string_subclass_that_can_hide_credential_shape() -> None:
+    """Reject subclassed idempotency keys before credential-shape inspection."""
     kwargs = values()
     kwargs["idempotency_key"] = ForgedOpaqueIdentifier("sk-secret-idempotency-key")
     with pytest.raises(ValueError, match="idempotency_key"):
