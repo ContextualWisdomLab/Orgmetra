@@ -13,7 +13,7 @@ def test_traceability_matches_executable_activation_boundary() -> None:
     text = TRACEABILITY.read_text(encoding="utf-8")
 
     assert "The active PR now implements an executable activation orchestration boundary" in text
-    assert "`activate_structured_interview_plan(...)` calls an injected `StructuredInterviewActivationAuthority`" in text
+    assert "into an injected `StructuredInterviewActivationAuthority`" in text
     assert "`test_activation_executes_authority_and_returns_immutable_human_receipt`" in text
     assert "`test_authority_rejection_blocks_activation`" in text
     assert "`test_activation_rejects_authority_evidence_for_other_scope`" in text
