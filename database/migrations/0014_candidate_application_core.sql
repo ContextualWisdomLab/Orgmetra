@@ -3,8 +3,9 @@
 -- candidate_profile is a durable candidate identity and cannot safely carry one
 -- application status when the same candidate pursues multiple openings. This
 -- migration adds a durable candidate application anchor plus bitemporal workflow
--- stage history. Final employer outcomes remain authoritative selection_decision
--- evidence; workflow stages deliberately cannot encode employer terminal outcomes.
+-- stage history. Candidate-specific terminal outcomes remain outside this raw
+-- workflow stage vocabulary until their authoritative decision/withdrawal evidence
+-- can be proven at a governed boundary.
 
 BEGIN;
 
@@ -95,8 +96,7 @@ CREATE TABLE candidate_application_stage_record (
                 'screening',
                 'assessment',
                 'interview',
-                'offer_pending',
-                'withdrawn'
+                'offer_pending'
             )
         ),
     CONSTRAINT candidate_application_stage_effective_period_check
