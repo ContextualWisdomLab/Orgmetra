@@ -15,6 +15,14 @@ DECLARE
     observation_effective_date date;
     criterion_job_profile_id uuid;
 BEGIN
+    -- An immutable performance observation cannot truthfully enter system time
+    -- before the event it claims to have observed. Reject impossible chronology
+    -- before using the claimed observation instant for any scope lookup.
+    IF NEW.recorded_from < NEW.observed_at THEN
+        RAISE EXCEPTION 'criterion observation cannot be recorded before it was observed'
+            USING ERRCODE = '23514';
+    END IF;
+
     -- Effective periods in the current foundation are date-granular. Convert
     -- the evidence instant through UTC explicitly so session TimeZone cannot
     -- move an observation across a date boundary and bypass temporal checks.
