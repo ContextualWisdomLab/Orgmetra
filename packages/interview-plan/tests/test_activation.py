@@ -80,8 +80,9 @@ class AllowingAuthority:
         self.verification = verification
         self.calls = []
 
-    def verify_activation(self, *, plan, approving_actor_reference):
-        """Record the exact requested plan/actor and return authoritative evidence."""
+    def verify_activation(self, *, plan, approving_actor_reference, approved_at):
+        """Review the approval instant, record plan/actor scope, and return evidence."""
+        assert approved_at == APPROVED_AT
         self.calls.append((plan, approving_actor_reference))
         return self.verification
 
@@ -89,7 +90,7 @@ class AllowingAuthority:
 class RejectingAuthority:
     """Host fixture representing a failed tenant/job/provenance/panel verification."""
 
-    def verify_activation(self, *, plan, approving_actor_reference):
+    def verify_activation(self, *, plan, approving_actor_reference, approved_at):
         """Fail closed instead of producing activation evidence."""
         raise PermissionError("authoritative activation checks failed")
 
@@ -157,7 +158,7 @@ def test_activation_rejects_non_verification_result():
     class WrongAuthority:
         """Fixture that violates the published authority return type."""
 
-        def verify_activation(self, *, plan, approving_actor_reference):
+        def verify_activation(self, *, plan, approving_actor_reference, approved_at):
             """Return a non-contract object to prove type fail-closure."""
             return object()
 
