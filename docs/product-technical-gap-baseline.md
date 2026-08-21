@@ -1,7 +1,7 @@
 # Orgmetra product and technical gap baseline
 
 **Snapshot:** 2026-08-21, Asia/Seoul
-**Evidence base:** protected `develop` at `9e3e4847510e1e612b48474ba42b177b8ed824df`; current workspace PR #53 at `b83e4a96db9be304ac19884ac8104b0d62e8291e` immediately before this documentation snapshot commit; current GitHub PR metadata and exact-head workflow state observed on 2026-08-21.
+**Evidence base:** protected `develop` at `9e3e4847510e1e612b48474ba42b177b8ed824df`; current workspace PR #53 at `14622adda1564411afdcc0d6d70384e824230d08` immediately before this documentation snapshot commit; current GitHub PR metadata and exact-head workflow state observed on 2026-08-21.
 
 This document is the buyer-facing work queue. It separates what a customer can use from what exists only in an active PR or architecture document. It is updated when a protected merge, exact-head check, review, release, or runtime test changes the evidence boundary.
 
@@ -151,10 +151,11 @@ The complete APA 7 bibliography is in `docs/doctoring/REFERENCES.md`.
 | Check | Result |
 |---|---|
 | Protected `develop` contents | `git ls-tree` at `9e3e4847510e1e612b48474ba42b177b8ed824df` contains migration `0013`, Job Analysis API, ADR `0014`, candidate-evidence package, ADR `0025`, the protected offer-approval package, and their quality workflows. This proves repository presence, not deployment. |
-| `npm run validate` on active PR #53 | Passed: foundation validation and 62 Node tests on exact local head `d66c7e8ba58193060d8ec42d367bdfe54cf02561`. |
-| Python package matrix on active PR #53 | Exact local head `c2d3a6c2804ab5a3e17e454312eddc2f96f2a72f`: HRIS kernel 171 passed; Job Analysis API 69 passed; People API 146 passed; candidate-evidence 75 passed; offer-approval 84 passed. All owned statement and branch coverage reports were 100%. |
+| `npm run validate` on active PR #53 | Passed: foundation validation and 62 Node tests on exact local head `14622adda1564411afdcc0d6d70384e824230d08`. |
+| Earlier Python package matrix | Exact local head `c2d3a6c2804ab5a3e17e454312eddc2f96f2a72f`: HRIS kernel 171 passed; candidate-evidence 75 passed; offer-approval 84 passed. All owned statement and branch coverage reports were 100%. Current exact-head service results are listed below. |
 | Storybook and browser fixture | Storybook `10.5.10` production build passed on exact local head `d66c7e8ba58193060d8ec42d367bdfe54cf02561`; prior local browser smoke covered four action states, exact allocation values, locale switching, localized accessible names, and zero console/page errors. The current People API host-boundary path has Node contract coverage but no current browser E2E or protected deployment evidence. |
 | External pinned validity smoke | At exact read-only `fast-mlsirm` revision `04d0bc21a2a20693bcf16108cd76d394fe844d23`, a local simulation→Rust fit returned `MLS2PLM`, shape `(500, 16)`, backend `rust`, device `auto`, `max_iter_reached` at 101 iterations, and nontrivial recovery error (`parameter_rmse_mean` 2.9606; `gamma_abs_error` 0.9058). This is exploratory external evidence only: no Orgmetra estimator, acceptance study, GPU parity, or protected runtime is claimed. |
+| Current exact-head service and PostgreSQL validation | On `14622adda1564411afdcc0d6d70384e824230d08`, People API passed 146 tests and Job Analysis API passed 69 tests, each with 100% owned statement and branch coverage. Disposable PostgreSQL `16.14` runs passed `test_job_analysis_snapshot_postgres.sh` and `test_people_mutation_idempotency_postgres.sh`; these are local contract evidence, not hosted terminal gates or deployment proof. |
 | Protected-tree preservation | `git diff --name-status origin/develop..HEAD --diff-filter=D` returned zero deleted paths; protected Job Analysis migration/API/OpenAPI/quality-contract files remain present on the active PR branch. |
 | PostgreSQL contracts | `tests/test_job_analysis_snapshot_postgres.sh` passed on exact local head `c2d3a6c2804ab5a3e17e454312eddc2f96f2a72f` against disposable PostgreSQL `16.14`; the full hosted PostgreSQL matrix remains the authoritative release gate. |
 
