@@ -26,7 +26,7 @@ Orgmetra adds a leaf `orgmetra_validity_analysis` package whose `ValidationAnaly
 - remains `not_executed`, `scientific_evidence_only`, and human-review-required;
 - produces deterministic canonical JSON and a SHA-256 digest for audit/result correlation.
 
-The same package also validates `ValidationAnalysisResult` envelopes returned by the approved offline worker. A result must link to the handoff digest and the same pinned revision, identify a Rust CPU or GPU backend and precision, provide finite effect and interval values, match its sample size to aggregate missingness counts, and include explicit convergence diagnostics. A nonconverged result remains typed scientific evidence requiring human review; it cannot be treated as a valid selection procedure or an employment decision.
+The same package also validates `ValidationAnalysisResult` envelopes returned by the approved offline worker. A result must link to the handoff digest and the same pinned revision, identify a Rust CPU or GPU backend and precision, provide finite effect and interval values, match its sample size to aggregate missingness counts, reject impossible complete-versus-missing count combinations, and include explicit convergence diagnostics. The canonicalization boundary accepts only the exact governed `MissingnessSummary` and `ConvergenceDiagnostics` runtime types so subclass method overrides cannot add unreviewed or person-level fields to immutable result evidence. A nonconverged result remains typed scientific evidence requiring human review; it cannot be treated as a valid selection procedure or an employment decision.
 
 The package does not invoke fast-mlsirm. An approved offline worker is the later execution boundary. Before execution, the Orgmetra host must re-resolve every reference inside the tenant, verify exact study/Job membership and evidence provenance, and prove requester/reviewer identities are distinct authoritative actors.
 
@@ -36,6 +36,8 @@ The package does not invoke fast-mlsirm. An approved offline worker is the later
 
 - Statistical work cannot silently drift to an unreviewed fast-mlsirm revision.
 - A buyer or auditor can identify exactly which governed study evidence a result was supposed to analyze without copying raw worker data into the handoff.
+- Aggregate missingness evidence cannot claim all observations are complete while simultaneously reporting predictor- or criterion-missing observations.
+- Result canonicalization cannot be extended by an unreviewed subclass to serialize extra decision-like or person-level fields.
 - Human interpretation remains explicit and separate from numerical output.
 - The dedicated-writer boundary remains intact: Orgmetra consumes only a pinned foreign revision/contract boundary and never mutates fast-mlsirm.
 
@@ -47,7 +49,7 @@ The package does not invoke fast-mlsirm. An approved offline worker is the later
 
 ## Verification
 
-The package regression suite starts RED when the public handoff contract is absent and covers canonical operational tenant UUIDs, opaque UUIDv4 references, exact evidence digests, distinct human actors, exact dependency pinning, timezone-aware event time, immutable governance constants, value minimization, deterministic canonicalization, SHA-256 correlation, and 100% owned production statement/branch coverage. The repository-wide ADR numbering regression also fails closed if integration reuses an existing decision number.
+The package regression suite starts RED when the public handoff contract is absent and covers canonical operational tenant UUIDs, opaque UUIDv4 references, exact evidence digests, distinct human actors, exact dependency pinning, timezone-aware event time, immutable governance constants, value minimization, deterministic canonicalization, SHA-256 correlation, impossible aggregate missingness rejection, exact governed aggregate-evidence runtime types, and 100% owned production statement/branch coverage. The repository-wide ADR numbering regression also fails closed if integration reuses an existing decision number.
 
 ## References
 
