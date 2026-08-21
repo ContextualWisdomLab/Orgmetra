@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timezone
 
 import pytest
@@ -27,14 +28,23 @@ class ForgedTenantUUIDText(str):
         return canonical.replace(old, new, *args)
 
     def __eq__(self, other):  # type: ignore[no-untyped-def]
-        if other is None:
-            return False
+        return other is not None
+
+    def __ne__(self, other):  # type: ignore[no-untyped-def]
+        return other is None
+
+
+class ForgedGovernanceText(str):
+    """String subclass that forges fixed equality and allow-list membership."""
+
+    def __eq__(self, other):  # type: ignore[no-untyped-def]
         return True
 
     def __ne__(self, other):  # type: ignore[no-untyped-def]
-        if other is None:
-            return True
         return False
+
+    def __hash__(self) -> int:
+        return hash("annual_compensation_review")
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -80,3 +90,32 @@ def test_rejects_tenant_string_subclass_that_can_forge_uuid_validation() -> None
     kwargs["tenant_record_id"] = ForgedTenantUUIDText("not-a-tenant-uuid")
     with pytest.raises(ValueError, match="tenant_record_id"):
         build_compensation_change_review_packet(**kwargs)
+
+
+def test_rejects_forged_purpose_and_reason_codes() -> None:
+    purpose_kwargs = valid_kwargs()
+    purpose_kwargs["purpose_code"] = ForgedGovernanceText("attacker_controlled_purpose")
+    with pytest.raises(ValueError, match="purpose_code"):
+        build_compensation_change_review_packet(**purpose_kwargs)
+
+    reason_kwargs = valid_kwargs()
+    reason_kwargs["reason_code"] = ForgedGovernanceText("attacker_controlled_reason")
+    with pytest.raises(ValueError, match="reason_code"):
+        build_compensation_change_review_packet(**reason_kwargs)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    (
+        "decision_authority",
+        "review_state",
+        "scope_verification_state",
+        "mutation_state",
+        "external_execution_state",
+        "next_action",
+    ),
+)
+def test_rejects_forged_direct_construction_constant_text(field_name: str) -> None:
+    packet = build_compensation_change_review_packet(**valid_kwargs())
+    with pytest.raises(ValueError, match=field_name):
+        replace(packet, **{field_name: ForgedGovernanceText("attacker_controlled_text")})
