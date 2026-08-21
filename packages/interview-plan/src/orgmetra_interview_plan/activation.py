@@ -3,9 +3,9 @@
 The authority adapter is owned by the Orgmetra host. It MUST return verification
 only after re-resolving the plan inside the exact tenant, proving the
 requisition-to-Job-to-job-analysis binding, verifying question/mapping/rating
-provenance, resolving distinct panel actors, and confirming panel eligibility
-and training. Any failed authoritative check must raise instead of returning
-verification evidence.
+provenance, resolving distinct panel actors, confirming panel eligibility and
+training, and reviewing the exact approval instant carried into the receipt.
+Any failed authoritative check must raise instead of returning verification evidence.
 """
 from __future__ import annotations
 
@@ -50,8 +50,9 @@ class StructuredInterviewActivationAuthority(Protocol):
         *,
         plan: StructuredInterviewPlan,
         approving_actor_reference: str,
+        approved_at: datetime,
     ) -> StructuredInterviewActivationVerification:
-        """Return exact-scope evidence only after authoritative checks succeed."""
+        """Return exact-scope evidence only after reviewing the exact approval instant."""
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -142,10 +143,10 @@ def activate_structured_interview_plan(
     """Activate one exact plan only after authoritative host verification succeeds.
 
     The authority implementation is responsible for the actual tenant-scoped
-    re-resolution and relationship/provenance/panel checks. This function rejects
-    a non-contract result or evidence bound to a different plan/actor and emits a
-    value-minimized immutable human-approval receipt only for the exact verified
-    scope.
+    re-resolution, relationship/provenance/panel checks, and review of the exact
+    approval instant. This function rejects a non-contract result or evidence bound
+    to a different plan/actor and emits a value-minimized immutable human-approval
+    receipt only for the exact verified scope.
     """
     if type(plan) is not StructuredInterviewPlan:
         raise TypeError("plan must be a StructuredInterviewPlan")
@@ -156,6 +157,7 @@ def activate_structured_interview_plan(
     verification = authority.verify_activation(
         plan=plan,
         approving_actor_reference=approving_actor_reference,
+        approved_at=approved_at,
     )
     if not isinstance(verification, StructuredInterviewActivationVerification):
         raise TypeError("authority must return StructuredInterviewActivationVerification")
