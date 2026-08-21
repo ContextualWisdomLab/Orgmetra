@@ -179,14 +179,17 @@ EXECUTE FUNCTION public.reject_candidate_application_truncate();
 REVOKE TRUNCATE ON public.candidate_application_record FROM PUBLIC;
 REVOKE TRUNCATE ON public.candidate_application_stage_record FROM PUBLIC;
 
-ALTER TABLE public.candidate_application_record ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.candidate_application_record FORCE ROW LEVEL SECURITY;
+-- Keep these FORCE statements unqualified after SET LOCAL search_path so the
+-- repository's foundation validator can independently discover every tenant
+-- table's forced-RLS contract by owned relation name.
+ALTER TABLE candidate_application_record ENABLE ROW LEVEL SECURITY;
+ALTER TABLE candidate_application_record FORCE ROW LEVEL SECURITY;
 CREATE POLICY candidate_application_scope_policy ON public.candidate_application_record
 USING (tenant_record_id = public.current_tenant_record_id())
 WITH CHECK (tenant_record_id = public.current_tenant_record_id());
 
-ALTER TABLE public.candidate_application_stage_record ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.candidate_application_stage_record FORCE ROW LEVEL SECURITY;
+ALTER TABLE candidate_application_stage_record ENABLE ROW LEVEL SECURITY;
+ALTER TABLE candidate_application_stage_record FORCE ROW LEVEL SECURITY;
 CREATE POLICY candidate_application_stage_scope_policy
 ON public.candidate_application_stage_record
 USING (tenant_record_id = public.current_tenant_record_id())
