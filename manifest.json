@@ -53,8 +53,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b4deda1ada56860fa3862782a2234081a068c3bf93da0fb12083b16b56ddaad3",
-      "bytes": 18223,
+      "sha256": "cd03d52e56a7281e98a09f4ebc6114b5e974aab42ead83b4155e596a3b800180",
+      "bytes": 18246,
       "lines": 82
     },
     {
@@ -233,8 +233,8 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "2e9572f730a03f7aacd09f240834ec9a67e489979e965bc6add56575d20b8a50",
-      "bytes": 17454,
+      "sha256": "3fd9e7c058d473f9a6ba236ef77265e388b0e3ab07358fd68414136cdb9b78ec",
+      "bytes": 17473,
       "lines": 151
     },
     {
@@ -377,8 +377,8 @@
     },
     {
       "path": "docs/product-technical-gap-baseline.md",
-      "sha256": "9f26be9de4aa032b36d2e9f2c4520377db125b4890e32fdadbfd30a4a04c5c08",
-      "bytes": 25209,
+      "sha256": "70acfa001c59eef400ea29b0e6cffadef04f0638a3ae5eb346c719dfeeed9818",
+      "bytes": 25424,
       "lines": 162
     },
     {
