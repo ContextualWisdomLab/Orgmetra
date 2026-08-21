@@ -82,8 +82,8 @@ def _validate_requirements_version_code(value: str) -> None:
 
 def _canonical_timestamp(value: datetime) -> str:
     """Render an aware instant as deterministic UTC RFC 3339 text without precision loss."""
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("generated_at must be timezone-aware")
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
