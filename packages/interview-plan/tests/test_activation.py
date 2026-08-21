@@ -108,6 +108,20 @@ class SwitchingVerification(StructuredInterviewActivationVerification):
         return super().__getattribute__(name)
 
 
+class ForgedScopeText(str):
+    """String subclass that makes foreign scope evidence compare equal to expected scope."""
+
+    def __eq__(self, other):
+        """Pretend to equal any string so tuple scope comparison can be forged."""
+        return isinstance(other, str)
+
+    def __ne__(self, other):
+        """Pretend not to differ from any string so fail-closed comparison is bypassed."""
+        return not isinstance(other, str)
+
+    __hash__ = str.__hash__
+
+
 def test_activation_executes_authority_and_returns_immutable_human_receipt():
     """Bind human confirmation to the exact plan and authoritative verification evidence."""
     candidate_plan = plan()
@@ -202,6 +216,32 @@ def test_activation_rejects_verification_subclass_before_evidence_reads_can_dive
         activate_structured_interview_plan(
             plan=candidate_plan,
             authority=AllowingAuthority(verification),
+            approving_actor_reference=APPROVER,
+            approved_at=APPROVED_AT,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "forged_value"),
+    [
+        ("tenant_record_id", ForgedScopeText("20000000-0000-7000-8000-000000000001")),
+        (
+            "interview_plan_reference",
+            ForgedScopeText("interview_plan:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+        ),
+        ("plan_digest", ForgedScopeText("f" * 64)),
+        ("approving_actor_reference", ForgedScopeText(PANEL_A)),
+    ],
+)
+def test_activation_rejects_forged_scope_string_subclasses(field, forged_value):
+    """Validate exact verification scope types before equality can approve foreign evidence."""
+    candidate_plan = plan()
+    authority = AllowingAuthority(verification_for(candidate_plan, **{field: forged_value}))
+
+    with pytest.raises(ValueError, match=field):
+        activate_structured_interview_plan(
+            plan=candidate_plan,
+            authority=authority,
             approving_actor_reference=APPROVER,
             approved_at=APPROVED_AT,
         )
