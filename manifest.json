@@ -304,16 +304,22 @@
       "lines": 57
     },
     {
-      "path": "docs/adr/0015-product-technical-gap-baseline.md",
-      "sha256": "49430c953798c23c453ac71e41705e216c95b737f9488c934f6329b46e6ae6ff",
-      "bytes": 3107,
+      "path": "docs/adr/0014-job-analysis-snapshot-persistence.md",
+      "sha256": "a7ab6fee50aaa63f7f407516a4cb39885faeb0fc6e5035ee8fc352ed73430105",
+      "bytes": 5365,
+      "lines": 49
+    },
+    {
+      "path": "docs/adr/0026-product-technical-gap-baseline.md",
+      "sha256": "8e5e4fdd3bdd0a3a2e29517de8346148bb4780cfb7c568844bc034a9593aab6d",
+      "bytes": 3162,
       "lines": 32
     },
     {
       "path": "docs/adr/README.md",
-      "sha256": "54c0930cedb31b0a227eed46ccfe220975a37ede79939c4fafc6e9bacc0a9120",
-      "bytes": 1791,
-      "lines": 18
+      "sha256": "a03dac39c365e21c6fc7273a4cd483239d9f765f1472a6dfb7480ab60541f539",
+      "bytes": 2043,
+      "lines": 20
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
@@ -371,9 +377,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "3c575fa99f3f4b0303d8586cdfd1cfbcf2ab4902dcc31b610ca6a17acba1f1c5",
-      "bytes": 25777,
-      "lines": 653
+      "sha256": "2bfbe6f00aa5246c9ccbc973b0858e7b950bc835d64b039b516f442592802f18",
+      "bytes": 25833,
+      "lines": 654
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -479,9 +485,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "b0fcbd17ae7f2ba0a9112e6f5045f68b1508de3ff15ad3cfffc4eaac901d26d1",
-      "bytes": 24833,
-      "lines": 590
+      "sha256": "546485bb47e18f7dc0b0090f401b0c4491183529ea08489bf993cb13fcbd6796",
+      "bytes": 24891,
+      "lines": 591
     }
   ]
 }
