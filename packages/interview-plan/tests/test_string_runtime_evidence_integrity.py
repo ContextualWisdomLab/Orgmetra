@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 
 import pytest
@@ -58,6 +59,28 @@ class ForgedGovernanceCode(str):
     def __hash__(self) -> int:
         """Return the hash of an allowed reason code to probe set membership defenses."""
         return hash("approved_requisition_interview")
+
+
+class SwitchingReferenceTuple(tuple):
+    """Tuple subclass that changes references after validation has already completed."""
+
+    def __new__(
+        cls,
+        values: tuple[str, ...],
+        forged_values: tuple[str, ...],
+    ) -> "SwitchingReferenceTuple":
+        """Store valid tuple payload plus later forged references for canonicalization."""
+        instance = super().__new__(cls, values)
+        instance._forged_values = forged_values
+        instance._iteration_count = 0
+        return instance
+
+    def __iter__(self):  # type: ignore[no-untyped-def]
+        """Yield valid references twice, then substitute forged references on later reads."""
+        self._iteration_count += 1
+        if self._iteration_count >= 3:
+            return iter(self._forged_values)
+        return tuple.__iter__(self)
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -119,4 +142,53 @@ def test_rejects_reason_code_string_subclass_that_can_forge_allow_list_check() -
     kwargs = valid_kwargs()
     kwargs["reason_code"] = ForgedGovernanceCode("attacker_controlled_reason")
     with pytest.raises(ValueError, match="reason_code"):
+        build_structured_interview_plan(**kwargs)
+
+
+@pytest.mark.parametrize(
+    ("field", "forged_value"),
+    [
+        ("review_state", ForgedGovernanceCode("attacker_controlled_review_state")),
+        ("next_action", ForgedGovernanceCode("attacker_controlled_next_action")),
+    ],
+)
+def test_rejects_fixed_governance_text_subclasses_after_plan_construction(
+    field: str,
+    forged_value: ForgedGovernanceCode,
+) -> None:
+    """Reject replacement-time string subclasses before immutable governance text can be forged."""
+    candidate_plan = build_structured_interview_plan(**valid_kwargs())
+    with pytest.raises(ValueError, match=field):
+        replace(candidate_plan, **{field: forged_value})
+
+
+@pytest.mark.parametrize(
+    ("field", "forged_values"),
+    [
+        (
+            "competency_references",
+            (
+                "competency:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "competency:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            ),
+        ),
+        (
+            "panel_actor_references",
+            (
+                "actor:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "actor:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            ),
+        ),
+    ],
+)
+def test_rejects_reference_tuple_subclasses_before_iteration_can_switch_evidence(
+    field: str,
+    forged_values: tuple[str, ...],
+) -> None:
+    """Reject tuple subclasses that can change canonical references after validation."""
+    kwargs = valid_kwargs()
+    original_values = kwargs[field]
+    assert type(original_values) is tuple
+    kwargs[field] = SwitchingReferenceTuple(original_values, forged_values)
+    with pytest.raises(ValueError, match=field):
         build_structured_interview_plan(**kwargs)
