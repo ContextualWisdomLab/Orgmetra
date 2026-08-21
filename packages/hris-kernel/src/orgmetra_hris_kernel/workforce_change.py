@@ -32,7 +32,11 @@ class WorkforceCompositionChangeSnapshot:
     closing_snapshot: WorkforceCompositionSnapshot
 
     def __post_init__(self) -> None:
-        """Fail closed when the two aggregate coordinates are not comparable."""
+        """Fail closed when endpoint evidence or coordinates are not comparable."""
+        if type(self.opening_snapshot) is not WorkforceCompositionSnapshot:
+            raise TypeError("opening_snapshot must be an exact WorkforceCompositionSnapshot")
+        if type(self.closing_snapshot) is not WorkforceCompositionSnapshot:
+            raise TypeError("closing_snapshot must be an exact WorkforceCompositionSnapshot")
         if self.opening_snapshot.tenant_record_id != self.closing_snapshot.tenant_record_id:
             raise IdentityScopeError(
                 "Workforce change snapshots must belong to the same tenant.",
