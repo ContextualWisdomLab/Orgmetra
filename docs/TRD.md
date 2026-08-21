@@ -85,7 +85,7 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 | `keyverse_adapter` | Keyverse OIDC/SCIM contract | `integration_hub` |
 | `naruon_adapter` | Naruon communication-intent contract | `integration_hub` |
 | `psychometrics_commons_adapter` | immutable response/result snapshot contract pinned to `cc5850a0d1eacbbf16d03075534fce460a8286e6` | `workforce_validation` |
-| `fast_mlsirm_adapter` | `orgmetra.fast_mlsirm.v1`, repository `ContextualWisdomLab/fast-mlsirm` pinned to `fb67ced09d8ee00542c05d56374537a9a7239751`; online role workspaces consume it through Psychometrics Commons, while direct calls are limited to an approved offline validation worker | `workforce_validation` |
+| `fast_mlsirm_adapter` | `orgmetra.fast_mlsirm.v1`, repository `ContextualWisdomLab/fast-mlsirm` pinned to `04d0bc21a2a20693bcf16108cd76d394fe844d23`; online role workspaces consume it through Psychometrics Commons, while direct calls are limited to an approved offline validation worker | `workforce_validation` |
 | `tepp_adapter` | `orgmetra.tepp.v1`, repository `ContextualWisdomLab/TEPP` pinned to `40adac9a26a8af85147ffa2795fb548ea243e0e5` | `workforce_validation` |
 | `semantic_data_portal_adapter` | versioned ontology and data-catalog contract | `job_architecture` |
 | `contextual_orchestrator_adapter` | schema-bound draft and verification operations; no authoritative writes | `job_architecture` and `integration_hub` |

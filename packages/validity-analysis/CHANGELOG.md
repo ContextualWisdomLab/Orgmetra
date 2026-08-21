@@ -10,3 +10,5 @@
 - Reject impossible aggregate missingness where complete observations overlap either predictor-missing or criterion-missing counts beyond the sample total.
 - Require exact governed missingness/convergence runtime types so subclass method overrides cannot inject unreviewed or person-level fields into canonical result evidence.
 - Make the package-local `uv` and pytest source configuration canonical so the quality workflow does not depend on a manually supplied `PYTHONPATH`.
+- Add fail-closed cross-sectional, nested multilevel, multiple-membership, and longitudinal execution contracts plus aggregate Rust recovery evidence.
+- Add an exact-revision read-only runner for bounded fast-mlsirm Rust CPU recovery smoke evidence; recovery metrics remain separate from criterion-related validity results.
