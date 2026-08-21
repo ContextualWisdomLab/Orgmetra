@@ -47,6 +47,37 @@ class _ExplodingZone(tzinfo):
         return "exploding"
 
 
+class _OneShotZone(tzinfo):
+    """Return one valid offset, then fail if the trusted boundary keeps the object."""
+
+    def __init__(self) -> None:
+        """Track UTC-offset reads made by the interval boundary."""
+        self.offset_reads = 0
+
+    def utcoffset(self, _value: datetime | None) -> timedelta | None:
+        """Return UTC once, then prove later comparisons re-enter hostile code."""
+        self.offset_reads += 1
+        if self.offset_reads > 1:
+            raise RuntimeError("timezone reused after validation")
+        return timedelta(0)
+
+    def dst(self, _value: datetime | None) -> timedelta | None:
+        """Return no daylight-saving adjustment."""
+        return None
+
+    def tzname(self, _value: datetime | None) -> str:
+        """Return a stable diagnostic name for the test-only zone."""
+        return "one_shot"
+
+
+def test_interval_runtime_types_cannot_be_subclassed() -> None:
+    """Domain facts must not receive interval objects with overridden visibility methods."""
+    with pytest.raises(TypeError, match="must not be subclassed"):
+        type("ForgedDateInterval", (DateInterval,), {})
+    with pytest.raises(TypeError, match="must not be subclassed"):
+        type("ForgedRecordedInterval", (RecordedInterval,), {})
+
+
 def test_date_interval_rejects_date_subclasses_in_stored_bounds() -> None:
     """Stored business-time bounds must be exact built-in dates, not polymorphic input."""
     forged = _ForgedDate(2026, 8, 22)
@@ -108,3 +139,19 @@ def test_recorded_interval_normalizes_hostile_timezone_failures() -> None:
 
     with pytest.raises(IntervalError, match="timezone-aware"):
         RecordedInterval(start=hostile)
+
+
+def test_recorded_interval_detaches_validated_custom_timezone_code() -> None:
+    """A timezone object cannot regain control during later stored/query comparisons."""
+    stored_zone = _OneShotZone()
+    interval = RecordedInterval(
+        start=datetime(2026, 8, 22, 0, 0, tzinfo=stored_zone),
+        end=None,
+    )
+    assert interval.start.tzinfo is timezone.utc
+    assert interval.contains(datetime(2026, 8, 22, 1, 0, tzinfo=timezone.utc)) is True
+    assert stored_zone.offset_reads == 1
+
+    query_zone = _OneShotZone()
+    assert interval.contains(datetime(2026, 8, 22, 2, 0, tzinfo=query_zone)) is True
+    assert query_zone.offset_reads == 1
