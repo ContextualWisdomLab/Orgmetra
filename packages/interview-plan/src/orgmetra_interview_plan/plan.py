@@ -119,13 +119,13 @@ class StructuredInterviewPlan:
         _validate_digest(self.question_competency_map_digest, "question_competency_map_digest")
         _validate_reference(self.rating_anchor_reference, "rating_anchor", "rating_anchor_reference")
         _validate_digest(self.rating_anchor_digest, "rating_anchor_digest")
-        if not isinstance(self.competency_references, tuple) or not 1 <= len(self.competency_references) <= 12:
+        if type(self.competency_references) is not tuple or not 1 <= len(self.competency_references) <= 12:
             raise ValueError("competency_references must be a tuple containing 1 through 12 competencies")
         for reference in self.competency_references:
             _validate_reference(reference, "competency", "competency_references")
         if tuple(sorted(set(self.competency_references))) != self.competency_references:
             raise ValueError("competency_references must be sorted and unique")
-        if not isinstance(self.panel_actor_references, tuple) or not 2 <= len(self.panel_actor_references) <= 8:
+        if type(self.panel_actor_references) is not tuple or not 2 <= len(self.panel_actor_references) <= 8:
             raise ValueError("panel_actor_references must be a tuple containing 2 through 8 actors")
         for reference in self.panel_actor_references:
             _validate_reference(reference, "actor", "panel_actor_references")
@@ -146,9 +146,9 @@ class StructuredInterviewPlan:
             raise ValueError("evidence_version must be an integer from 1 through 2147483647")
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for interview-plan approval")
-        if self.review_state != _REVIEW_STATE:
+        if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_approval")
-        if self.next_action != _NEXT_ACTION:
+        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed interview-plan instruction")
 
     def __repr__(self) -> str:
