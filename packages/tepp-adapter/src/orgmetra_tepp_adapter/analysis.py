@@ -73,8 +73,8 @@ def _validate_evidence_version(value: int) -> None:
 
 
 def _validate_aware_datetime(value: datetime, field_name: str) -> None:
-    """Require a datetime with a real UTC offset."""
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+    """Require an exact built-in datetime with a real UTC offset."""
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{field_name} must be a timezone-aware datetime")
 
 
