@@ -19,10 +19,11 @@ ALTER TABLE public.position_record
 ADD CONSTRAINT position_record_tenant_position_job_unique
 UNIQUE (tenant_record_id, position_record_id, job_profile_id);
 
--- CREATE TABLE stays search-path-qualified rather than schema-qualified because
--- the repository foundation validator applies the same descriptive two-word
--- snake_case rule to an explicit schema token. SET LOCAL search_path above keeps
--- these objects owned by public without weakening that repository-wide check.
+-- The table declarations stay search-path-qualified rather than schema-qualified
+-- because the repository foundation validator applies the same descriptive
+-- two-word snake_case rule to an explicit schema token. SET LOCAL search_path
+-- above keeps these objects owned by public without weakening that repository-wide
+-- check.
 CREATE TABLE candidate_application_record (
     tenant_record_id uuid NOT NULL REFERENCES public.tenant_record(tenant_record_id),
     candidate_application_record_id uuid PRIMARY KEY,
