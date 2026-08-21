@@ -39,6 +39,22 @@ function manifestPaths() {
   return new Set(manifest.files.map((entry) => entry.path));
 }
 
+function discoveredAdrFiles() {
+  return Object.freeze(
+    readdirSync(new URL('../docs/adr/', import.meta.url))
+      .filter((name) => /^\d{4}-[a-z0-9-]+\.md$/.test(name))
+      .sort()
+  );
+}
+
+function indexedAdrFiles() {
+  const index = readFileSync(new URL('../docs/adr/README.md', import.meta.url), 'utf8');
+  return new Set(
+    [...index.matchAll(/\[\d{4}\]\((\d{4}-[a-z0-9-]+\.md)\)/g)]
+      .map((match) => match[1])
+  );
+}
+
 function traceabilityRow(markdown, requirement) {
   return markdown
     .split('\n')
@@ -66,6 +82,15 @@ test('every Node test invoked by validate is provenance-required and integrity-m
     assert.equal(nodeRequired.has(filePath), true, `Node inventory omitted validate-invoked test ${filePath}`);
     assert.equal(pythonRequired.has(filePath), true, `Python inventory omitted validate-invoked test ${filePath}`);
     assert.equal(manifested.has(filePath), true, `manifest omitted validate-invoked test ${filePath}`);
+  }
+});
+
+test('every ADR document is represented in the canonical ADR index', () => {
+  const indexed = indexedAdrFiles();
+  const discovered = discoveredAdrFiles();
+  assert.ok(discovered.length > 0, 'ADR discovery returned no documents');
+  for (const fileName of discovered) {
+    assert.equal(indexed.has(fileName), true, `ADR index omitted ${fileName}`);
   }
 });
 
