@@ -124,6 +124,20 @@ def test_activation_executes_authority_and_returns_immutable_human_receipt():
     assert repr(receipt) == "StructuredInterviewActivationReceipt(<redacted>)"
 
 
+def test_activation_rejects_approval_before_plan_generation():
+    """Reject audit evidence claiming a plan was approved before that plan existed."""
+    candidate_plan = plan()
+    authority = AllowingAuthority(verification_for(candidate_plan))
+
+    with pytest.raises(ValueError, match="approved_at must not precede plan generated_at"):
+        activate_structured_interview_plan(
+            plan=candidate_plan,
+            authority=authority,
+            approving_actor_reference=APPROVER,
+            approved_at=datetime(2026, 8, 21, 4, 29, 59, tzinfo=timezone.utc),
+        )
+
+
 def test_authority_rejection_blocks_activation():
     """Propagate authoritative rejection so no activation receipt can be manufactured."""
     with pytest.raises(PermissionError, match="authoritative activation checks failed"):
