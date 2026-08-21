@@ -33,3 +33,14 @@ def test_same_tepp_request_key_cannot_replay_across_governance_scope(
     assert packet.request_digest() == rebound.request_digest()
     assert not packet.is_idempotent_retry_of(rebound)
     assert packet.idempotency_conflicts_with(rebound)
+
+
+def test_governance_evidence_carries_the_key_required_for_durable_retry_control() -> None:
+    """Keep the durable audit/outbox evidence self-sufficient for retry/conflict checks."""
+    packet = build_valid()
+
+    evidence = packet.governance_evidence()
+
+    assert evidence["idempotency_key"] == packet.idempotency_key
+    assert evidence["tepp_request_digest"] == packet.request_digest()
+    assert evidence["governance_scope_digest"] == packet.governance_scope_digest()
