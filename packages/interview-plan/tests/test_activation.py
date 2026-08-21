@@ -137,6 +137,8 @@ def test_activation_rejects_approval_before_plan_generation():
             approved_at=datetime(2026, 8, 21, 4, 29, 59, tzinfo=timezone.utc),
         )
 
+    assert authority.calls == []
+
 
 def test_authority_rejection_blocks_activation():
     """Propagate authoritative rejection so no activation receipt can be manufactured."""
