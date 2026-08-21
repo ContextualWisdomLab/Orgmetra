@@ -96,7 +96,7 @@ class ValidatedCalendarIntent:
 
 def _require_uuid(value: object, label: str) -> str:
     """Return one canonical UUID string or reject malformed/non-canonical input."""
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ContractViolation(f"{label} must be a canonical UUID")
     try:
         parsed = UUID(value)
@@ -110,21 +110,21 @@ def _require_uuid(value: object, label: str) -> str:
 
 def _require_token(value: object, label: str) -> str:
     """Return a bounded printable token suitable for contract metadata."""
-    if not isinstance(value, str) or not _TOKEN_PATTERN.fullmatch(value):
+    if type(value) is not str or not _TOKEN_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} must be a bounded opaque token")
     return value
 
 
 def _require_code(value: object, label: str) -> str:
     """Return a bounded lowercase machine code used for purpose/reason metadata."""
-    if not isinstance(value, str) or not _CODE_PATTERN.fullmatch(value):
+    if type(value) is not str or not _CODE_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} must be a bounded lowercase code")
     return value
 
 
 def _require_resource_reference(value: object) -> str:
     """Validate an Orgmetra opaque record reference without dereferencing PII."""
-    if not isinstance(value, str) or value.count(":") != 1:
+    if type(value) is not str or value.count(":") != 1:
         raise ContractViolation("resource_reference must be a namespaced UUID reference")
     namespace, identifier = value.split(":", 1)
     if namespace not in _RESOURCE_NAMESPACES:
@@ -134,15 +134,18 @@ def _require_resource_reference(value: object) -> str:
 
 def _validate_context(context: CalendarIntentContext) -> tuple[str, str | None]:
     """Validate all local authorization/audit evidence before building an intent."""
+    if type(context) is not CalendarIntentContext:
+        raise ContractViolation("calendar intent context must be the governed context type")
     _require_uuid(context.tenant_record_id, "tenant_record_id")
     _require_resource_reference(context.resource_reference)
     _require_token(context.actor_reference, "actor_reference")
     _require_code(context.purpose_code, "purpose_code")
     _require_code(context.reason_code, "reason_code")
     _require_token(context.evidence_version, "evidence_version")
+    action_kind = _require_code(context.action_kind, "action kind")
     if context.human_confirmed is not True:
         raise ContractViolation("calendar intent requires explicit human confirmation")
-    summary = _ACTION_SUMMARIES.get(context.action_kind)
+    summary = _ACTION_SUMMARIES.get(action_kind)
     if summary is None:
         raise ContractViolation("calendar intent action kind is not supported")
     target_source_id = (
