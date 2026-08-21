@@ -32,11 +32,13 @@ class ForgedTenantUUIDText(str):
         return canonical.replace(old, new, *args)
 
     def __eq__(self, other):  # type: ignore[no-untyped-def]
+        """Pretend hostile tenant text equals every non-null comparison target."""
         if other is None:
             return False
         return True
 
     def __ne__(self, other):  # type: ignore[no-untyped-def]
+        """Pretend hostile tenant text differs only from a null comparison target."""
         if other is None:
             return True
         return False
@@ -46,12 +48,15 @@ class ForgedGovernanceCode(str):
     """String subclass that forges fixed-code equality and allow-list membership."""
 
     def __eq__(self, other):  # type: ignore[no-untyped-def]
+        """Pretend hostile governance text equals every comparison target."""
         return True
 
     def __ne__(self, other):  # type: ignore[no-untyped-def]
+        """Pretend hostile governance text never differs from a comparison target."""
         return False
 
     def __hash__(self) -> int:
+        """Return the hash of an allowed reason code to probe set membership defenses."""
         return hash("approved_requisition_interview")
 
 
@@ -86,6 +91,7 @@ def valid_kwargs() -> dict[str, object]:
 
 
 def test_rejects_reference_string_subclass_that_can_forge_namespace_validation() -> None:
+    """Reject reference subclasses before forged namespace behavior can affect evidence."""
     kwargs = valid_kwargs()
     kwargs["interview_plan_reference"] = ForgedReference("attacker-controlled-reference-data")
     with pytest.raises(ValueError, match="interview_plan_reference"):
@@ -93,6 +99,7 @@ def test_rejects_reference_string_subclass_that_can_forge_namespace_validation()
 
 
 def test_rejects_tenant_string_subclass_that_can_forge_uuid_validation() -> None:
+    """Reject tenant-text subclasses before forged UUID behavior can affect identity evidence."""
     kwargs = valid_kwargs()
     kwargs["tenant_record_id"] = ForgedTenantUUIDText("not-a-tenant-uuid")
     with pytest.raises(ValueError, match="tenant_record_id"):
@@ -100,6 +107,7 @@ def test_rejects_tenant_string_subclass_that_can_forge_uuid_validation() -> None
 
 
 def test_rejects_purpose_code_string_subclass_that_can_forge_fixed_code_check() -> None:
+    """Reject purpose-code subclasses before forged equality can bypass the closed code."""
     kwargs = valid_kwargs()
     kwargs["purpose_code"] = ForgedGovernanceCode("attacker_controlled_purpose")
     with pytest.raises(ValueError, match="purpose_code"):
@@ -107,6 +115,7 @@ def test_rejects_purpose_code_string_subclass_that_can_forge_fixed_code_check() 
 
 
 def test_rejects_reason_code_string_subclass_that_can_forge_allow_list_check() -> None:
+    """Reject reason-code subclasses before forged equality or hashing can bypass policy."""
     kwargs = valid_kwargs()
     kwargs["reason_code"] = ForgedGovernanceCode("attacker_controlled_reason")
     with pytest.raises(ValueError, match="reason_code"):
