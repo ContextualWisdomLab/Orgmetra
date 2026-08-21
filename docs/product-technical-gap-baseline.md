@@ -1,7 +1,7 @@
 # Orgmetra product and technical gap baseline
 
 **Snapshot:** 2026-08-21, Asia/Seoul
-**Evidence base:** protected `develop` at `9e3e4847510e1e612b48474ba42b177b8ed824df`; current workspace PR #53 at `14622adda1564411afdcc0d6d70384e824230d08` immediately before this documentation snapshot commit; current GitHub PR metadata and exact-head workflow state observed on 2026-08-21.
+**Evidence base:** protected `develop` at `9e3e4847510e1e612b48474ba42b177b8ed824df`; current workspace PR #53 at `76759e6185318010564acfcc59fed4a576aa1339` immediately before this documentation snapshot commit; current GitHub PR metadata and exact-head workflow state observed on 2026-08-21.
 
 This document is the buyer-facing work queue. It separates what a customer can use from what exists only in an active PR or architecture document. It is updated when a protected merge, exact-head check, review, release, or runtime test changes the evidence boundary.
 
@@ -54,7 +54,7 @@ flowchart LR
 | Workforce composition change evidence | Active PR #54 adds same-cutoff bitemporal composition-change evidence | `implemented_on_active_pr` | Buyers can review a proposed workforce change only after the exact PR earns checks and independent approval; it is not protected truth yet. |
 | Organization hierarchy snapshot evidence | Active PR #56 adds bitemporal organization hierarchy snapshot evidence | `implemented_on_active_pr` | Organizational reporting remains an active integration lane, not a protected or released buyer workflow. |
 | Selection-validity analysis handoff | Active PR #57 adds the governed handoff boundary for later validity estimation | `implemented_on_active_pr` | The handoff is not a statistical estimator and does not yet produce validity, bias, RMSE, coverage, or convergence evidence. |
-| Role workspaces and Storybook runtime | Active PR #53 has the HR Home/Employee Profile fixture, host-injected People and Job Analysis API-bound read views, and a local Storybook `10.5.10` build; protected `develop` still has no customer UI | `implemented_on_active_pr` | The component/state runtime and host-injected API boundaries are reviewable, but there is no connected or released buyer workflow in protected truth. |
+| Role workspaces, Storybook runtime, and browser contract | Active PR #53 has the HR Home/Employee Profile fixture, host-injected People and Job Analysis API-bound read views, Storybook `10.5.10`, and a Chromium Playwright browser contract; protected `develop` still has no customer UI | `implemented_on_active_pr` | The component/state runtime, browser states, and host-injected API boundaries are reviewable, but there is no connected or released buyer workflow in protected truth. |
 | Naruon calendar adapter | `packages/naruon-adapter` package tests; traceability says planned integration | `accepted_architecture` | Calendar intent is contract-tested, not an integrated customer scheduling workflow. |
 | TEPP adapter | PR #52 is a non-executing request boundary; no transport contract is established | `implemented_on_active_pr` | Temporal analysis can be prepared as governed evidence but is not executed by Orgmetra. |
 | Contextual Orchestrator/OpenCode model path | Named in architecture; no Orgmetra adapter or evidence-backed model evaluation in protected code | `planned` | LLM assistance cannot yet be invoked through an Orgmetra-owned, auditable draft-evidence boundary. |
@@ -74,11 +74,11 @@ permission denial, exact allocation values, and English/Korean labels. The
 fixture explicitly displays that the protected People API is not connected.
 The Job Analysis view requires a host-injected API base URL and authorization
 provider, sends the existing purpose header, and has no synthetic fallback or
-browser credential storage. The same active PR includes a local Storybook runtime with tokenized stories;
-the current head has a passed Storybook build and local Playwright browser
-smoke, but neither is connected People API integration, hosted deployment, or
-protected-develop truth. The artifact must be reviewed, checked, and merged
-independently before P0-1 can change maturity.
+browser credential storage. The same active PR includes a local Storybook runtime with tokenized stories and a three-test Chromium Playwright contract;
+the current head passed the Storybook build and browser contract, but those
+tests intercept host-injected reads and do not prove a connected People API,
+hosted deployment, or protected-develop truth. The artifact must be reviewed,
+checked, and merged independently before P0-1 can change maturity.
 
 ## Buyer gap backlog
 
@@ -99,11 +99,11 @@ The following is the current GitHub inventory checked on 2026-08-21. All listed 
 
 | PR | Head branch / exact head | Scope | Current state | Next action |
 |---:|---|---|---|---|
-| 57 | `feat/validation-analysis-handoff` / `c38151852d95ff1256012d31c179a898bbc1c11e` | Governed selection-validity analysis handoff | Draft; merge state `BLOCKED`; `REVIEW_REQUIRED`; no submitted review; current workflows queued | Review the handoff boundary and keep estimator claims separate until exact-head checks and independent approval exist. |
+| 57 | `feat/validation-analysis-handoff` / `081942a723c2ae2cb9bb98a8ffd0b33b72a8bd74` | Governed selection-validity analysis handoff | Draft; merge state `BLOCKED`; `REVIEW_REQUIRED`; no submitted review; current workflows queued | Review the handoff boundary and keep estimator claims separate until exact-head checks and independent approval exist. |
 | 56 | `feat/organization-hierarchy-snapshot` / `0eaa8c940842b3ba0d491f72ca57d4333c2c4d12` | Bitemporal organization hierarchy snapshot evidence | Draft; merge state `BLOCKED`; `REVIEW_REQUIRED`; no submitted review; current workflows queued | Verify tenant/time semantics and current-head checks before independent approval. |
 | 55 | `fix/people-read-auth-backend-failure` / `f22225700723b46625372844a06205c3dc9b46e4` | People-read error normalization and pre-auth resource budgets | Draft; merge state `BLOCKED`; `REVIEW_REQUIRED`; current workflows queued | Strix's valid MEDIUM hire-route resource-boundary finding is repaired on this head; await terminal People API/security/recovery checks and independent approval. |
 | 54 | `feat/workforce-composition-change` / `7d50e77d55bd908975754739f7f5f7e9422334c5` | Same-cutoff workforce composition change evidence | Ready; merge state `BLOCKED`; historical review threads resolved/outdated; no qualifying approval; current workflows queued | Re-fetch exact head, terminal checks, and qualifying independent approval before protected merge. |
-| 53 | `codex/product-gap-baseline-workspace` / `d66c7e8ba58193060d8ec42d367bdfe54cf02561` | HR Home + Employee Profile fixture, host-injected People and Job Analysis API-bound read views, Storybook, offer-approval integration, and baseline repair | Draft; merge state `BLOCKED`; `REVIEW_REQUIRED`; no submitted review; current workflows queued/pending | Keep the fixture/API boundaries explicit, wait for all current-head checks, obtain independent approval, then decide whether to merge the product-surface slice. |
+| 53 | `codex/product-gap-baseline-workspace` / `76759e6185318010564acfcc59fed4a576aa1339` | HR Home + Employee Profile fixture, host-injected People and Job Analysis API-bound read views, Storybook, Chromium browser contract, offer-approval integration, and baseline repair | Draft; merge state `BLOCKED`; `REVIEW_REQUIRED`; no submitted review; current workflows queued | Keep the fixture/API boundaries explicit, wait for all current-head checks, obtain independent approval, then decide whether to merge the product-surface slice. |
 | 52 | `feat/tepp-analysis-adapter` / `3690e11516443ee82be88e69b042b5e0dbec80f5` | Governed TEPP analysis request boundary | Ready; merge state `BLOCKED`; `REVIEW_REQUIRED`; historical review thread resolved/outdated; current workflows queued | Keep non-executing and evidence-bound; merge only after exact-head checks and qualifying review. |
 | 51 | `docs/protected-truth-refresh` / `b67a658cc98d58347db4995aba4858f0547ffccc` | Protected product-truth documentation repair | Ready; merge state `BLOCKED`; `REVIEW_REQUIRED`; historical review threads resolved/outdated; current workflows queued | Reconcile documentation with protected runtime truth, then use current-head checks and independent review. |
 | 48 | `feat/governed-compensation-change-review` / `4d40a0d75cb3bba14e388f88bb418404540970b3` | Compensation review packet | Ready; merge state `BLOCKED`; `REVIEW_REQUIRED`; no current review thread; current workflows queued | Verify high-impact confirmation/evidence boundaries, then merge only with terminal checks and independent approval. |
@@ -151,12 +151,12 @@ The complete APA 7 bibliography is in `docs/doctoring/REFERENCES.md`.
 | Check | Result |
 |---|---|
 | Protected `develop` contents | `git ls-tree` at `9e3e4847510e1e612b48474ba42b177b8ed824df` contains migration `0013`, Job Analysis API, ADR `0014`, candidate-evidence package, ADR `0025`, the protected offer-approval package, and their quality workflows. This proves repository presence, not deployment. |
-| `npm run validate` on active PR #53 | Passed: foundation validation and 62 Node tests on exact local head `14622adda1564411afdcc0d6d70384e824230d08`. |
+| `npm run validate` on active PR #53 | Passed: foundation validation and 62 Node tests on exact local head `76759e6185318010564acfcc59fed4a576aa1339`. |
 | Earlier Python package matrix | Exact local head `c2d3a6c2804ab5a3e17e454312eddc2f96f2a72f`: HRIS kernel 171 passed; candidate-evidence 75 passed; offer-approval 84 passed. All owned statement and branch coverage reports were 100%. Current exact-head service results are listed below. |
-| Storybook and browser fixture | Storybook `10.5.10` production build passed on exact local head `d66c7e8ba58193060d8ec42d367bdfe54cf02561`; prior local browser smoke covered four action states, exact allocation values, locale switching, localized accessible names, and zero console/page errors. The current People API host-boundary path has Node contract coverage but no current browser E2E or protected deployment evidence. |
+| Storybook and browser fixture | Storybook `10.5.10` production build and `npm run test:e2e` passed on exact local head `76759e6185318010564acfcc59fed4a576aa1339`; Chromium `1.62.1` covered human-review/permission/confirmation/i18n states, host-injected People and Job Analysis reads, authorization/purpose request data, and denied-read no-fallback behavior. Routes are locally intercepted, so connected protected deployment evidence remains open. |
 | External pinned validity smoke | At exact read-only `fast-mlsirm` revision `04d0bc21a2a20693bcf16108cd76d394fe844d23`, a local simulation→Rust fit returned `MLS2PLM`, shape `(500, 16)`, backend `rust`, device `auto`, `max_iter_reached` at 101 iterations, and nontrivial recovery error (`parameter_rmse_mean` 2.9606; `gamma_abs_error` 0.9058). This is exploratory external evidence only: no Orgmetra estimator, acceptance study, GPU parity, or protected runtime is claimed. |
-| Current exact-head service and PostgreSQL validation | On `14622adda1564411afdcc0d6d70384e824230d08`, People API passed 146 tests and Job Analysis API passed 69 tests, each with 100% owned statement and branch coverage. Disposable PostgreSQL `16.14` runs passed `test_job_analysis_snapshot_postgres.sh` and `test_people_mutation_idempotency_postgres.sh`; these are local contract evidence, not hosted terminal gates or deployment proof. |
+| Current exact-head service and PostgreSQL validation | Service paths are unchanged from exact head `14622adda1564411afdcc0d6d70384e824230d08`: People API passed 146 tests and Job Analysis API passed 69 tests, each with 100% owned statement and branch coverage. Disposable PostgreSQL `16.14` runs passed `test_job_analysis_snapshot_postgres.sh` and `test_people_mutation_idempotency_postgres.sh`; these are local contract evidence, not hosted terminal gates or deployment proof. |
 | Protected-tree preservation | `git diff --name-status origin/develop..HEAD --diff-filter=D` returned zero deleted paths; protected Job Analysis migration/API/OpenAPI/quality-contract files remain present on the active PR branch. |
 | PostgreSQL contracts | `tests/test_job_analysis_snapshot_postgres.sh` passed on exact local head `c2d3a6c2804ab5a3e17e454312eddc2f96f2a72f` against disposable PostgreSQL `16.14`; the full hosted PostgreSQL matrix remains the authoritative release gate. |
 
-These results prove the current foundation contracts. They do not prove that open PRs are merged, that a browser UI exists, that a statistical estimator exists, or that Orgmetra is certified under CSAP/SOC 2.
+These results prove the current foundation contracts and a local browser contract. They do not prove that open PRs are merged, that a connected or released browser UI exists, that a statistical estimator exists, or that Orgmetra is certified under CSAP/SOC 2.
