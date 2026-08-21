@@ -171,10 +171,37 @@ def test_result_invariants_cannot_be_weakened(field: str, bad: object, match: st
 
 
 def test_result_requires_canonical_timestamp_and_aggregate_types() -> None:
-    """Reject a naive completion time and non-summary diagnostic objects."""
+    """Reject naive times, non-contract objects, and subclass method overrides."""
+
+    class LeakyMissingnessSummary(MissingnessSummary):
+        def to_dict(self) -> dict[str, object]:
+            return {**super().to_dict(), "person_record": "must-not-serialize"}
+
+    class LeakyConvergenceDiagnostics(ConvergenceDiagnostics):
+        def to_dict(self) -> dict[str, object]:
+            return {**super().to_dict(), "employment_decision": "auto_reject"}
+
     with pytest.raises(ValueError, match="requested_at"):
         result(completed_at=datetime(2026, 8, 21, 7, 10))
     with pytest.raises(ValueError, match="missingness_summary"):
         result(missingness_summary=object())
     with pytest.raises(ValueError, match="convergence_diagnostics"):
         result(convergence_diagnostics=object())
+    with pytest.raises(ValueError, match="missingness_summary"):
+        result(
+            missingness_summary=LeakyMissingnessSummary(
+                total_observations=12,
+                complete_observations=10,
+                missing_predictor_observations=1,
+                missing_criterion_observations=1,
+            )
+        )
+    with pytest.raises(ValueError, match="convergence_diagnostics"):
+        result(
+            convergence_diagnostics=LeakyConvergenceDiagnostics(
+                converged=True,
+                iterations=42,
+                objective_value=-12.5,
+                maximum_gradient=0.0001,
+            )
+        )
