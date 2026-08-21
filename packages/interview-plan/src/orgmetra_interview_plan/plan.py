@@ -31,6 +31,8 @@ _MAX_EVIDENCE_VERSION = 2_147_483_647
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
     """Require canonical non-sentinel UUID text owned by the authoritative HRIS."""
+    if type(value) is not str:
+        raise ValueError(f"{field_name} must be canonical UUID text")
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as exc:
@@ -48,7 +50,7 @@ def _validate_code(value: str, field_name: str) -> None:
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
     """Require the expected namespace plus a canonical non-sentinel UUIDv4 suffix."""
     namespace = f"{prefix}:"
-    if not isinstance(value, str) or len(value) > 160 or not value.startswith(namespace):
+    if type(value) is not str or len(value) > 160 or not value.startswith(namespace):
         raise ValueError(f"{field_name} must be an opaque {prefix}:<canonical-uuid> reference")
     suffix = value[len(namespace) :]
     try:
