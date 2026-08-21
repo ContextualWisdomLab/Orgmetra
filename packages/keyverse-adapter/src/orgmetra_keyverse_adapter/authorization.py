@@ -42,8 +42,8 @@ _DENIAL_NEXT_ACTION = {
 
 
 def _validate_uuid(field_name: str, value: object) -> None:
-    """Require a real UUID and reject protocol-reserved Nil/Max sentinels."""
-    if not isinstance(value, UUID):
+    """Require an exact UUID and reject protocol-reserved Nil/Max sentinels."""
+    if type(value) is not UUID:
         raise ValueError(f"{field_name} must be a UUID.")
     if value.int in (0, _MAX_UUID_INT):
         raise ValueError(f"{field_name} must not use a reserved UUID sentinel.")
@@ -247,6 +247,10 @@ def evaluate_purpose_bound_access(
     purpose header is insufficient when the operation scope or requested field
     set is not explicitly authorized.
     """
+    if type(request) is not PurposeBoundAccessRequest:
+        raise TypeError("request must be a PurposeBoundAccessRequest")
+    if type(policy) is not PurposeBoundAccessPolicy:
+        raise TypeError("policy must be a PurposeBoundAccessPolicy")
     if (
         request.tenant_record_id != policy.tenant_record_id
         or request.actor_tenant_record_id != policy.tenant_record_id
