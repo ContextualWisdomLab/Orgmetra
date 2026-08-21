@@ -76,11 +76,6 @@ class StructuredInterviewActivationReceipt:
 
     def __post_init__(self) -> None:
         """Reject forged, ambiguous, weakened, or non-authoritatively issued evidence."""
-        if self._issuance_token is not _ACTIVATION_RECEIPT_ISSUANCE_TOKEN:
-            raise TypeError(
-                "StructuredInterviewActivationReceipt can only be issued by "
-                "activate_structured_interview_plan"
-            )
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.interview_plan_reference,
@@ -112,6 +107,11 @@ class StructuredInterviewActivationReceipt:
             raise ValueError("human confirmation is mandatory for interview-plan activation")
         if self.activation_state != _ACTIVATION_STATE:
             raise ValueError("activation_state must remain approved_for_use")
+        if self._issuance_token is not _ACTIVATION_RECEIPT_ISSUANCE_TOKEN:
+            raise TypeError(
+                "StructuredInterviewActivationReceipt can only be issued by "
+                "activate_structured_interview_plan"
+            )
 
     def __repr__(self) -> str:
         """Return a redacted representation suitable for routine logs."""
@@ -191,7 +191,7 @@ def activate_structured_interview_plan(
     if verified_scope != expected_scope:
         raise ValueError("activation authority returned evidence for a different plan or actor")
 
-    return StructuredInterviewActivationReceipt(
+    receipt = StructuredInterviewActivationReceipt(
         tenant_record_id=plan.tenant_record_id,
         interview_plan_reference=plan.interview_plan_reference,
         plan_digest=plan.sha256_digest(),
@@ -201,3 +201,5 @@ def activate_structured_interview_plan(
         approved_at=approved_at,
         _issuance_token=_ACTIVATION_RECEIPT_ISSUANCE_TOKEN,
     )
+    object.__setattr__(receipt, "_issuance_token", None)
+    return receipt
