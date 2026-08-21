@@ -78,8 +78,8 @@ def _validate_digest(value: str, field_name: str) -> None:
 
 def _canonical_timestamp(value: datetime) -> str:
     """Render an aware instant as precision-preserving UTC RFC 3339 text."""
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("generated_at must be timezone-aware")
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
@@ -167,9 +167,9 @@ class SelectionOutcomeMonitoringPlan:
         _validate_reference(self.reviewer_reference, "actor", "reviewer_reference")
         if self.actor_reference == self.reviewer_reference:
             raise ValueError("reviewer_reference must identify a different accountable actor")
-        if not isinstance(self.monitoring_start, date) or isinstance(self.monitoring_start, datetime):
+        if type(self.monitoring_start) is not date:
             raise ValueError("monitoring_start must be a calendar date")
-        if not isinstance(self.monitoring_end, date) or isinstance(self.monitoring_end, datetime):
+        if type(self.monitoring_end) is not date:
             raise ValueError("monitoring_end must be a calendar date")
         if self.monitoring_end < self.monitoring_start:
             raise ValueError("monitoring_end must not precede monitoring_start")
