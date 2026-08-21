@@ -107,33 +107,6 @@ def test_direct_snapshot_rejects_boolean_aggregate_counts() -> None:
         )
 
 
-def test_direct_snapshot_rejects_non_decimal_staffed_fte() -> None:
-    """Direct evidence must reject numeric lookalikes instead of raising an attribute error."""
-    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
-        _direct_snapshot(
-            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
-            staffed_fte=0.0,  # type: ignore[arg-type]
-        )
-
-
-def test_direct_snapshot_rejects_boolean_status_count() -> None:
-    """Boolean status counts must not pass because bool is an int subclass."""
-    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
-        _direct_snapshot(
-            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
-            employment_status_counts=(("active", True),),
-        )
-
-
-def test_direct_snapshot_rejects_negative_status_count_even_when_total_reconciles() -> None:
-    """A negative status bucket cannot be offset by a larger positive bucket."""
-    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
-        _direct_snapshot(
-            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
-            employment_status_counts=(("active", -1), ("leave", 2)),
-        )
-
-
 def test_direct_snapshot_rejects_unassigned_count_above_headcount() -> None:
     """Unassigned people cannot exceed the distinct people represented."""
     with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
@@ -149,6 +122,33 @@ def test_direct_snapshot_rejects_nonfinite_staffed_fte() -> None:
         _direct_snapshot(
             known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
             staffed_fte=Decimal("NaN"),
+        )
+
+
+def test_direct_snapshot_rejects_non_decimal_staffed_fte() -> None:
+    """FTE evidence must remain Decimal so finite and canonical formatting are guaranteed."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            staffed_fte=0,  # type: ignore[arg-type]
+        )
+
+
+def test_direct_snapshot_rejects_boolean_status_counts() -> None:
+    """Boolean values must not serialize as employment counts."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_status_counts=(("active", True),),  # type: ignore[tuple-item]
+        )
+
+
+def test_direct_snapshot_rejects_negative_status_counts() -> None:
+    """Negative per-status counts cannot reconcile a workforce aggregate."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_status_counts=(("active", -1), ("leave", 2)),
         )
 
 
@@ -233,4 +233,4 @@ def test_empty_snapshot_has_deterministic_empty_status_evidence() -> None:
 
     assert snapshot.person_headcount == 0
     assert snapshot.staffed_fte == Decimal("0.0000")
-    assert '\"employment_status_counts\":[]' in snapshot.canonical_json()
+    assert '"employment_status_counts":[]' in snapshot.canonical_json()

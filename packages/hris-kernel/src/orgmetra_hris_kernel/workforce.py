@@ -82,10 +82,14 @@ class WorkforceCompositionSnapshot:
                     "non-negative integer."
                 ),
             )
-        if type(self.staffed_fte) is not Decimal or not self.staffed_fte.is_finite() or self.staffed_fte < _ZERO_FTE:
+        if (
+            type(self.staffed_fte) is not Decimal
+            or not self.staffed_fte.is_finite()
+            or self.staffed_fte < _ZERO_FTE
+        ):
             raise SingleValuedFactError(
                 "Workforce snapshot aggregate values are internally inconsistent.",
-                next_action="Rebuild the snapshot from authoritative HRIS facts with a finite non-negative Decimal FTE.",
+                next_action="Rebuild the snapshot from authoritative HRIS facts with a finite non-negative FTE.",
             )
         if not all(
             type(count) is int and count >= 0
@@ -93,10 +97,7 @@ class WorkforceCompositionSnapshot:
         ):
             raise SingleValuedFactError(
                 "Workforce snapshot aggregate values are internally inconsistent.",
-                next_action=(
-                    "Rebuild the snapshot from authoritative HRIS facts so every per-status count is a "
-                    "non-negative integer."
-                ),
+                next_action="Rebuild the snapshot with non-negative integer employment status counts.",
             )
         if self.person_headcount > self.employment_count or self.unassigned_person_count > self.person_headcount:
             raise SingleValuedFactError(
@@ -159,24 +160,27 @@ def _visible_employments(
     """Resolve one current version per tenant employment and keep reportable statuses."""
     employment_ids = sorted(
         {
-            item.employment_record_id
-            for item in employment_versions
-            if item.tenant_record_id == tenant_record_id
+            version.employment_record_id
+            for version in employment_versions
+            if version.tenant_record_id == tenant_record_id
         },
         key=str,
     )
     visible: list[EmploymentVersion] = []
     for employment_record_id in employment_ids:
-        fact = resolve_single_valued_fact(
+        version = resolve_single_valued_fact(
             employment_versions,
             tenant_record_id=tenant_record_id,
-            logical_id=employment_record_id,
+            identity_of="employment_record_id",
+            identity_value=employment_record_id,
             effective_on=effective_on,
             known_at=known_at,
-            logical_id_getter=lambda item: item.employment_record_id,
         )
-        if fact is not None and fact.employment_status_code in _WORKFORCE_INCLUDED_STATUSES:
-            visible.append(fact)
+        if version is None:
+            continue
+        if version.employment_status_code not in _WORKFORCE_INCLUDED_STATUSES:
+            continue
+        visible.append(version)
     return visible
 
 
@@ -187,28 +191,51 @@ def _visible_assignments(
     effective_on: date,
     known_at: datetime,
 ) -> list[AssignmentFact]:
-    """Resolve one current version per tenant assignment at the report coordinate."""
-    assignment_ids = sorted(
-        {
-            item.assignment_record_id
-            for item in assignments
-            if item.tenant_record_id == tenant_record_id
-        },
-        key=str,
-    )
-    visible: list[AssignmentFact] = []
-    for assignment_record_id in assignment_ids:
-        fact = resolve_single_valued_fact(
-            assignments,
-            tenant_record_id=tenant_record_id,
-            logical_id=assignment_record_id,
-            effective_on=effective_on,
-            known_at=known_at,
-            logical_id_getter=lambda item: item.assignment_record_id,
-        )
-        if fact is not None:
-            visible.append(fact)
+    """Return current tenant assignments while rejecting duplicate visible identities."""
+    visible = [
+        fact
+        for fact in assignments
+        if fact.tenant_record_id == tenant_record_id
+        and fact.effective.contains(effective_on)
+        and fact.recorded.contains(known_at)
+    ]
+    seen: set[UUID] = set()
+    for fact in visible:
+        if fact.assignment_record_id in seen:
+            raise SingleValuedFactError(
+                "One assignment identity resolved to more than one visible assignment fact.",
+                next_action=(
+                    "Close the superseded recorded assignment interval, then rebuild the workforce snapshot."
+                ),
+            )
+        seen.add(fact.assignment_record_id)
     return visible
+
+
+def _validate_visible_employment_portfolios(
+    employment_versions: list[EmploymentVersion],
+    *,
+    tenant_record_id: UUID,
+    effective_on: date,
+    known_at: datetime,
+) -> None:
+    """Reject invalid concurrency for people represented at this report coordinate."""
+    coordinate_versions = [
+        version
+        for version in employment_versions
+        if version.tenant_record_id == tenant_record_id
+        and version.effective.contains(effective_on)
+        and version.recorded.contains(known_at)
+    ]
+    for person_record_id in sorted(
+        {version.person_record_id for version in coordinate_versions}, key=str
+    ):
+        validate_person_employment_exclusivity(
+            coordinate_versions,
+            tenant_record_id=tenant_record_id,
+            person_record_id=person_record_id,
+            known_at=known_at,
+        )
 
 
 def build_workforce_composition_snapshot(
@@ -219,66 +246,110 @@ def build_workforce_composition_snapshot(
     effective_on: date,
     known_at: datetime,
 ) -> WorkforceCompositionSnapshot:
-    """Build aggregate workforce evidence after enforcing authoritative HRIS invariants."""
+    """Build one auditable tenant workforce-composition snapshot.
+
+    ``active`` and ``leave`` are reportable because they are the same statuses
+    permitted to carry active assignments in the HRIS kernel. Headcount counts
+    distinct people, so valid concurrent employments never double-count a worker;
+    employment count and staffed FTE deliberately retain the portfolio shape.
+
+    The function fails closed when source truth is contradictory, a worker has
+    an impossible exclusive-employment portfolio, one position seat is overfilled,
+    or an assignment violates the existing employment-coverage/allocation rules.
+    Correct the authoritative HRIS facts first, then rebuild the snapshot rather
+    than publishing a metric from inconsistent source data.
+
+    Args:
+        employment_versions: Bitemporal employment facts, including other tenants.
+        assignments: Bitemporal assignment facts, including other tenants.
+        tenant_record_id: Tenant namespace whose workforce is being reported.
+        effective_on: Business date represented by the workforce report.
+        known_at: Timezone-aware system-knowledge cutoff used for reconstruction.
+
+    Returns:
+        Aggregate workforce counts and deterministic evidence without row-level PII.
+
+    Raises:
+        IntervalError: ``known_at`` is timezone-naive or has no usable UTC offset.
+        SingleValuedFactError: One employment or assignment has contradictory
+            visible versions, or direct aggregate evidence is inconsistent.
+        EmploymentExclusivityError: A worker has malformed or overlapping
+            exclusive employment at the report coordinate.
+        EmploymentCoverageError: Existing assignment integrity rejects a worker link.
+        AssignmentPortfolioError: Existing allocation integrity rejects visible FTE.
+        PositionSeatError: Existing position-capacity integrity rejects visible FTE.
+    """
     if known_at.utcoffset() is None:
         raise IntervalError(
-            "Workforce composition knowledge cutoff must be timezone-aware.",
-            next_action="Convert the knowledge cutoff to UTC, then request the report again.",
+            "Workforce snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
         )
 
-    validate_person_employment_exclusivity(employment_versions)
-    validate_assignment_employment_coverage(assignments, employment_versions)
-    validate_assignment_portfolio(assignments, employment_versions)
-    validate_position_seat_capacity(assignments)
-
+    _validate_visible_employment_portfolios(
+        employment_versions,
+        tenant_record_id=tenant_record_id,
+        effective_on=effective_on,
+        known_at=known_at,
+    )
     visible_employments = _visible_employments(
         employment_versions,
         tenant_record_id=tenant_record_id,
         effective_on=effective_on,
         known_at=known_at,
     )
-    visible_employment_ids = {
-        item.employment_record_id
-        for item in visible_employments
-    }
-    visible_person_ids = {
-        item.person_record_id
-        for item in visible_employments
-    }
-    visible_assignments = [
-        item
-        for item in _visible_assignments(
-            assignments,
+    visible_assignments = _visible_assignments(
+        assignments,
+        tenant_record_id=tenant_record_id,
+        effective_on=effective_on,
+        known_at=known_at,
+    )
+
+    portfolio_keys: set[tuple[UUID, UUID]] = set()
+    position_record_ids: set[UUID] = set()
+    staffed_people: set[UUID] = set()
+    staffed_fte = _ZERO_FTE
+    staffed_assignment_count = 0
+
+    for assignment in visible_assignments:
+        validate_assignment_employment_coverage(
+            assignment,
+            employment_versions,
+            known_at=known_at,
+        )
+        portfolio_keys.add((assignment.person_record_id, assignment.employment_record_id))
+        position_record_ids.add(assignment.position_record_id)
+        staffed_people.add(assignment.person_record_id)
+        staffed_fte += assignment.allocation_ratio
+        staffed_assignment_count += 1
+
+    for person_record_id, employment_record_id in portfolio_keys:
+        validate_assignment_portfolio(
+            visible_assignments,
             tenant_record_id=tenant_record_id,
+            person_record_id=person_record_id,
+            employment_record_id=employment_record_id,
             effective_on=effective_on,
             known_at=known_at,
         )
-        if item.employment_record_id in visible_employment_ids
-    ]
-    assigned_person_ids = {
-        employment.person_record_id
-        for employment in visible_employments
-        if any(
-            assignment.employment_record_id == employment.employment_record_id
-            for assignment in visible_assignments
+    for position_record_id in position_record_ids:
+        validate_position_seat_capacity(
+            visible_assignments,
+            tenant_record_id=tenant_record_id,
+            position_record_id=position_record_id,
+            effective_on=effective_on,
+            known_at=known_at,
         )
-    }
-    status_counts = Counter(
-        employment.employment_status_code
-        for employment in visible_employments
-    )
 
+    workforce_people = {version.person_record_id for version in visible_employments}
+    status_counts = Counter(version.employment_status_code for version in visible_employments)
     return WorkforceCompositionSnapshot(
         tenant_record_id=tenant_record_id,
         effective_on=effective_on,
         known_at=known_at,
-        person_headcount=len(visible_person_ids),
+        person_headcount=len(workforce_people),
         employment_count=len(visible_employments),
-        staffed_assignment_count=len(visible_assignments),
-        staffed_fte=sum(
-            (assignment.allocation_fraction for assignment in visible_assignments),
-            start=_ZERO_FTE,
-        ),
-        unassigned_person_count=len(visible_person_ids - assigned_person_ids),
+        staffed_assignment_count=staffed_assignment_count,
+        staffed_fte=staffed_fte,
+        unassigned_person_count=len(workforce_people - staffed_people),
         employment_status_counts=tuple(sorted(status_counts.items())),
     )
