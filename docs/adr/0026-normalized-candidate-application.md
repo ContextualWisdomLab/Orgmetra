@@ -17,9 +17,9 @@ ISO 30405:2023 treats recruitment as a process with distinct phases and stakehol
 Migration `0014_candidate_application_core.sql` introduces two tenant-owned relations:
 
 1. `candidate_application_record` is a durable application identity. It binds one candidate profile to one Job, an optional Position that must structurally belong to that same Job, and one opaque requisition reference. A candidate may have multiple application identities, but only one application for the same requisition reference within a tenant.
-2. `candidate_application_stage_record` stores bitemporal operational pipeline stages for one application. The closed vocabulary is intentionally limited to non-outcome workflow stages: `received`, `screening`, `assessment`, `interview`, `offer_pending`, `withdrawn`, and `closed`.
+2. `candidate_application_stage_record` stores bitemporal operational pipeline stages for one application. The closed vocabulary is intentionally limited to non-outcome workflow stages: `received`, `screening`, `assessment`, `interview`, `offer_pending`, and candidate-driven `withdrawn`.
 
-`hired` and `rejected` are deliberately **not** application-stage values. Employer high-impact outcomes continue to require the existing `selection_decision` boundary with accountable human confirmation, purpose/reason/evidence versioning and sealed evidence. An operational stage must not become a shadow employment decision.
+Generic employer-terminal values such as `hired`, `rejected`, or ambiguous `closed` are deliberately **not** application-stage values. Employer high-impact outcomes continue to require the existing `selection_decision` boundary with accountable human confirmation, purpose/reason/evidence versioning and sealed evidence. An operational stage must not become a shadow employment decision. Administrative opening closure belongs to the requisition/opening lifecycle rather than being encoded as a candidate-specific adverse stage.
 
 The migration adds a tenant-qualified `(tenant_record_id, position_record_id, job_profile_id)` candidate key on `position_record`. An optional application Position uses that exact composite key, so a seat from another Job cannot be attached by application code or stale caller state.
 
@@ -39,6 +39,7 @@ The new relations contain no candidate name, email, demographic field, assessmen
 - Position-specific recruiting cannot silently target a seat whose durable Job differs from the application Job.
 - Historical stage reconstruction becomes bitemporal and correction-safe.
 - Final selection outcomes remain centralized in the existing high-impact decision model instead of being smuggled into workflow codes.
+- Candidate-driven withdrawal remains representable without conflating it with employer rejection or administrative opening closure.
 - Existing readers of `candidate_profile.application_status_code` continue to work during migration, but that field is legacy and cannot represent the normalized source of truth.
 - A later bounded slice may bind `selection_decision` directly to `candidate_application_record` and provide governed application command/API surfaces; this ADR does not claim those are implemented.
 
@@ -52,13 +53,14 @@ Rejected because candidate identity and application lifecycle have different car
 
 Rejected because a review packet is immutable approval/correlation evidence, not the operational HRIS application lifecycle. Treating the packet as mutable process state would blur governance evidence and authoritative HR data.
 
-### Encode `hired` or `rejected` as ordinary workflow stages
+### Encode terminal employer outcomes as ordinary workflow stages
 
-Rejected because those values can imply high-impact employment outcomes. Orgmetra already has a stricter `selection_decision` evidence boundary and must not create a second, weaker decision path.
+Rejected because values such as `hired`, `rejected`, or ambiguous `closed` can imply high-impact employment outcomes. Orgmetra already has a stricter `selection_decision` evidence boundary and must not create a second, weaker decision path. Administrative requisition closure belongs to the requisition/opening lifecycle, not candidate-stage evidence.
 
 ## Evidence
 
 - `tests/test_candidate_application_postgres.sh` is the RED-first PostgreSQL regression. It proves multiple applications per candidate, cross-tenant FK rejection, Position↔Job consistency, duplicate requisition rejection, bitemporal stage exclusion/correction, prohibition on a `hired` workflow stage, forced RLS metadata and TRUNCATE protection.
+- `tests/test_candidate_application_decision_boundary_postgres.sh` proves the candidate workflow cannot encode an ambiguous terminal `closed` stage outside the governed `selection_decision` boundary.
 - `tests/test_candidate_application_rls_postgres.sh` continues from the same fixture under a `NOBYPASSRLS` reader and proves fail-closed missing-context reads plus exact Alpha/Beta tenant visibility for application and stage history.
-- `.github/workflows/candidate-application-quality.yml` checks out the exact PR head and runs both contracts against pinned PostgreSQL 16.14.
+- `.github/workflows/candidate-application-quality.yml` checks out the exact PR head and runs all three contracts against pinned PostgreSQL 16.14.
 - Primary-source review and APA 7 references are recorded in `docs/doctoring/candidate-application-references.md`.
