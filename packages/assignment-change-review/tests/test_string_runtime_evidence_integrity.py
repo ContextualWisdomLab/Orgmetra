@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timezone
 
 import pytest
@@ -13,11 +14,9 @@ class ForgedReference(str):
     """String subclass that forges namespace and UUID suffix validation."""
 
     def startswith(self, prefix, *args):  # type: ignore[no-untyped-def]
-        """Pretend the hostile value carries every requested namespace."""
         return True
 
     def split(self, sep=None, maxsplit=-1):  # type: ignore[no-untyped-def]
-        """Feed validation a canonical UUIDv4 suffix instead of stored text."""
         return ["evil", "22222222-2222-4222-8222-222222222222"]
 
 
@@ -25,21 +24,27 @@ class ForgedTenantUUIDText(str):
     """String subclass that forges UUID parsing and canonical-equality checks."""
 
     def replace(self, old, new, *args):  # type: ignore[no-untyped-def]
-        """Feed UUID() canonical text instead of the stored hostile tenant text."""
         canonical = "11111111-1111-4111-8111-111111111111"
         return canonical.replace(old, new, *args)
 
     def __eq__(self, other):  # type: ignore[no-untyped-def]
-        """Claim canonical equality while retaining the hostile underlying text."""
-        if other is None:
-            return False
+        return other is not None
+
+    def __ne__(self, other):  # type: ignore[no-untyped-def]
+        return other is None
+
+
+class ForgedGovernanceText(str):
+    """String subclass that forges equality and closed-vocabulary membership."""
+
+    def __eq__(self, other):  # type: ignore[no-untyped-def]
         return True
 
     def __ne__(self, other):  # type: ignore[no-untyped-def]
-        """Keep UUID constructor sentinel checks working while defeating canonicality."""
-        if other is None:
-            return True
         return False
+
+    def __hash__(self) -> int:
+        return hash("workforce_reallocation")
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -74,18 +79,36 @@ def valid_kwargs() -> dict[str, object]:
 
 
 def test_rejects_reference_string_subclass_that_can_forge_namespace_validation() -> None:
-    """Canonical evidence must not retain text that only pretended to match a namespace."""
     kwargs = valid_kwargs()
     kwargs["assignment_change_review_reference"] = ForgedReference("evil:payload")
-
     with pytest.raises(ValueError, match="assignment_change_review_reference"):
         build_assignment_change_review_packet(**kwargs)
 
 
 def test_rejects_tenant_string_subclass_that_can_forge_uuid_validation() -> None:
-    """Authoritative tenant identity must be exact built-in text before UUID parsing."""
     kwargs = valid_kwargs()
     kwargs["tenant_record_id"] = ForgedTenantUUIDText("not-a-tenant-uuid")
-
     with pytest.raises(ValueError, match="tenant_record_id"):
         build_assignment_change_review_packet(**kwargs)
+
+
+def test_rejects_forged_purpose_and_reason_codes() -> None:
+    purpose_kwargs = valid_kwargs()
+    purpose_kwargs["purpose_code"] = ForgedGovernanceText("attacker_controlled_purpose")
+    with pytest.raises(ValueError, match="purpose_code"):
+        build_assignment_change_review_packet(**purpose_kwargs)
+
+    reason_kwargs = valid_kwargs()
+    reason_kwargs["reason_code"] = ForgedGovernanceText("attacker_controlled_reason")
+    with pytest.raises(ValueError, match="reason_code"):
+        build_assignment_change_review_packet(**reason_kwargs)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ("decision_authority", "review_state", "scope_verification_state", "mutation_state", "next_action"),
+)
+def test_rejects_forged_direct_construction_constant_text(field_name: str) -> None:
+    packet = build_assignment_change_review_packet(**valid_kwargs())
+    with pytest.raises(ValueError, match=field_name):
+        replace(packet, **{field_name: ForgedGovernanceText("attacker_controlled_text")})
