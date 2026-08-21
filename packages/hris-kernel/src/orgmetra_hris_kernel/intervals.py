@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from orgmetra_hris_kernel.errors import IntervalError
 
@@ -26,17 +26,13 @@ def _require_builtin_date(value: date | None, *, field_name: str) -> None:
         )
 
 
-def _require_builtin_datetime(value: datetime | None, *, field_name: str) -> None:
-    """Require exact built-in datetimes before system-time comparison."""
-    if value is not None and type(value) is not datetime:
+def _canonical_datetime(value: datetime, *, field_name: str) -> datetime:
+    """Detach one exact datetime from caller-controlled timezone behavior."""
+    if type(value) is not datetime:
         raise IntervalError(
             f"{field_name} must be a built-in datetime.",
             next_action="Convert the value to an exact Python datetime, then retry.",
         )
-
-
-def _require_timezone_aware(value: datetime, *, field_name: str) -> None:
-    """Require a usable UTC offset instead of trusting non-null ``tzinfo`` alone."""
     try:
         offset = value.utcoffset()
     except Exception as exc:
@@ -49,6 +45,8 @@ def _require_timezone_aware(value: datetime, *, field_name: str) -> None:
             f"{field_name} must be timezone-aware.",
             next_action="Convert the knowledge cutoff to UTC before recording or querying.",
         )
+    fixed_zone = timezone.utc if offset == timezone.utc.utcoffset(None) else timezone(offset)
+    return value.replace(tzinfo=fixed_zone)
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +55,10 @@ class DateInterval:
 
     start: date
     end: date | None = None
+
+    def __init_subclass__(cls, **_kwargs: object) -> None:
+        """Reject polymorphic interval objects at authoritative HRIS boundaries."""
+        raise TypeError("DateInterval must not be subclassed.")
 
     def __post_init__(self) -> None:
         """Validate the effective period as soon as HR enters it."""
@@ -73,6 +75,11 @@ class DateInterval:
 
     def overlaps(self, other: DateInterval) -> bool:
         """Return whether two effective periods share at least one day."""
+        if type(other) is not DateInterval:
+            raise IntervalError(
+                "Date interval comparison requires an exact DateInterval.",
+                next_action="Build a governed DateInterval, then compare the effective periods.",
+            )
         self_end = self.end
         other_end = other.end
         if self_end is not None and self_end <= other.start:
@@ -89,25 +96,39 @@ class RecordedInterval:
     start: datetime
     end: datetime | None = None
 
+    def __init_subclass__(cls, **_kwargs: object) -> None:
+        """Reject polymorphic interval objects at authoritative HRIS boundaries."""
+        raise TypeError("RecordedInterval must not be subclassed.")
+
     def __post_init__(self) -> None:
         """Require canonical, timezone-aware knowledge bounds before reconstruction."""
-        _require_builtin_datetime(self.start, field_name="Recorded interval start")
-        _require_builtin_datetime(self.end, field_name="Recorded interval end")
-        _require_timezone_aware(self.start, field_name="Recorded interval start")
-        if self.end is not None:
-            _require_timezone_aware(self.end, field_name="Recorded interval end")
-        _require_ordered(self.start, self.end)
+        canonical_start = _canonical_datetime(self.start, field_name="Recorded interval start")
+        canonical_end = (
+            None
+            if self.end is None
+            else _canonical_datetime(self.end, field_name="Recorded interval end")
+        )
+        object.__setattr__(self, "start", canonical_start)
+        object.__setattr__(self, "end", canonical_end)
+        _require_ordered(canonical_start, canonical_end)
 
     def contains(self, instant: datetime) -> bool:
         """Return whether Orgmetra already knew this fact at ``instant``."""
-        _require_builtin_datetime(instant, field_name="Knowledge-cutoff query coordinate")
-        _require_timezone_aware(instant, field_name="Knowledge-cutoff query coordinate")
-        if instant < self.start:
+        canonical_instant = _canonical_datetime(
+            instant,
+            field_name="Knowledge-cutoff query coordinate",
+        )
+        if canonical_instant < self.start:
             return False
-        return self.end is None or instant < self.end
+        return self.end is None or canonical_instant < self.end
 
     def overlaps(self, other: RecordedInterval) -> bool:
         """Return whether two recorded periods share at least one instant."""
+        if type(other) is not RecordedInterval:
+            raise IntervalError(
+                "Recorded interval comparison requires an exact RecordedInterval.",
+                next_action="Build a governed RecordedInterval, then compare the system-time periods.",
+            )
         if self.end is not None and self.end <= other.start:
             return False
         if other.end is not None and other.end <= self.start:
