@@ -8,6 +8,7 @@ on:
     paths:
       - "database/migrations/**"
       - "tests/test_candidate_withdrawal_postgres.sh"
+      - "tests/test_candidate_withdrawal_security_postgres.sh"
       - ".github/workflows/candidate-withdrawal-quality.yml"
       - "docs/adr/0027-governed-candidate-withdrawal.md"
       - "docs/traceability/candidate-withdrawal.md"
@@ -53,9 +54,14 @@ jobs:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
       - name: Prove test syntax
-        run: bash -n tests/test_candidate_withdrawal_postgres.sh
+        run: >-
+          bash -n
+          tests/test_candidate_withdrawal_postgres.sh
+          tests/test_candidate_withdrawal_security_postgres.sh
       - name: Prove governed candidate withdrawal persistence
         run: bash tests/test_candidate_withdrawal_postgres.sh
+      - name: Prove anti-forgery and tenant isolation
+        run: bash tests/test_candidate_withdrawal_security_postgres.sh
       - name: Prove validation is read-only
         run: |
           git diff --exit-code
