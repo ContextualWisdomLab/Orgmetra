@@ -17,6 +17,20 @@ from orgmetra_hris_kernel.facts import OrganizationUnitVersion
 from orgmetra_hris_kernel.resolution import resolve_single_valued_fact
 
 
+def _validate_hierarchy_temporal_coordinate(effective_on: date, known_at: datetime) -> None:
+    """Require exact built-in business and recorded-time values before hierarchy use."""
+    if type(effective_on) is not date:
+        raise IntervalError(
+            "Organization hierarchy snapshot effective date must be a calendar date.",
+            next_action="Provide an exact business date, then rebuild the hierarchy snapshot.",
+        )
+    if type(known_at) is not datetime or known_at.utcoffset() is None:
+        raise IntervalError(
+            "Organization hierarchy snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the hierarchy snapshot.",
+        )
+
+
 def _visible_parent_links(
     organization_versions: list[OrganizationUnitVersion],
     *,
@@ -25,6 +39,7 @@ def _visible_parent_links(
     known_at: datetime,
 ) -> tuple[tuple[UUID, UUID | None], ...]:
     """Resolve one visible parent link per tenant organization unit in stable order."""
+    _validate_hierarchy_temporal_coordinate(effective_on, known_at)
     scoped = [
         version
         for version in organization_versions
@@ -95,8 +110,8 @@ class OrganizationHierarchySnapshot:
     coordinate; the opaque anchor is retained rather than silently rewritten into
     a root. Direct construction snapshots caller-owned link containers before
     validation so later caller mutation cannot rewrite canonical evidence. It also
-    requires canonical ordering, unique unit identities, an aware knowledge cutoff,
-    and an acyclic visible graph.
+    requires canonical ordering, unique unit identities, exact built-in temporal
+    coordinate types, and an acyclic visible graph.
     """
 
     tenant_record_id: UUID
@@ -106,11 +121,7 @@ class OrganizationHierarchySnapshot:
 
     def __post_init__(self) -> None:
         """Detach caller-owned containers and reject ambiguous hierarchy evidence."""
-        if self.known_at.utcoffset() is None:
-            raise IntervalError(
-                "Organization hierarchy snapshot knowledge cutoff must be timezone-aware.",
-                next_action="Convert the knowledge cutoff to UTC, then rebuild the hierarchy snapshot.",
-            )
+        _validate_hierarchy_temporal_coordinate(self.effective_on, self.known_at)
         object.__setattr__(
             self,
             "parent_links",
@@ -189,10 +200,11 @@ def validate_organization_hierarchy(
     Args:
         organization_versions: Candidate parent-link versions, including other tenants.
         tenant_record_id: Tenant namespace whose organization chart is reviewed.
-        effective_on: Business day represented by the chart.
-        known_at: System knowledge cutoff used to reconstruct it.
+        effective_on: Exact built-in business date represented by the chart.
+        known_at: Exact built-in timezone-aware system knowledge cutoff used to reconstruct it.
 
     Raises:
+        IntervalError: The temporal coordinate is not an exact supported date/datetime pair.
         SingleValuedFactError: One unit has two visible versions at the coordinate.
         OrganizationHierarchyError: Visible parent links contain a cycle or a known foreign-tenant anchor.
     """
@@ -225,22 +237,17 @@ def build_organization_hierarchy_snapshot(
     Args:
         organization_versions: Candidate organization parent-link versions, including other tenants.
         tenant_record_id: Tenant namespace whose organization structure is reconstructed.
-        effective_on: Business date represented by the structure.
-        known_at: Timezone-aware system-knowledge cutoff used for reconstruction.
+        effective_on: Exact built-in business date represented by the structure.
+        known_at: Exact built-in timezone-aware system-knowledge cutoff used for reconstruction.
 
     Returns:
         Canonically ordered hierarchy evidence suitable for authorized reporting and audit correlation.
 
     Raises:
-        IntervalError: ``known_at`` is timezone-naive or has no usable UTC offset.
+        IntervalError: The temporal coordinate is not an exact supported date/datetime pair.
         SingleValuedFactError: One unit has contradictory visible versions.
         OrganizationHierarchyError: Visible parent links contain a cycle or a known foreign-tenant anchor.
     """
-    if known_at.utcoffset() is None:
-        raise IntervalError(
-            "Organization hierarchy snapshot knowledge cutoff must be timezone-aware.",
-            next_action="Convert the knowledge cutoff to UTC, then rebuild the hierarchy snapshot.",
-        )
     return OrganizationHierarchySnapshot(
         tenant_record_id=tenant_record_id,
         effective_on=effective_on,
