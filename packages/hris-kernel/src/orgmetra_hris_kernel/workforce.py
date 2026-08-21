@@ -29,6 +29,20 @@ _WORKFORCE_INCLUDED_STATUSES = frozenset({"active", "leave"})
 _ZERO_FTE = Decimal("0.0000")
 
 
+def _validate_snapshot_temporal_coordinate(effective_on: date, known_at: datetime) -> None:
+    """Require exact built-in business and recorded-time values before evidence use."""
+    if type(effective_on) is not date:
+        raise IntervalError(
+            "Workforce snapshot effective date must be a calendar date.",
+            next_action="Provide an exact business date, then rebuild the snapshot.",
+        )
+    if type(known_at) is not datetime or known_at.utcoffset() is None:
+        raise IntervalError(
+            "Workforce snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class WorkforceCompositionSnapshot:
     """One aggregate workforce view at an effective day and knowledge cutoff.
@@ -51,11 +65,7 @@ class WorkforceCompositionSnapshot:
 
     def __post_init__(self) -> None:
         """Reject non-canonical or internally inconsistent evidence before export."""
-        if self.known_at.utcoffset() is None:
-            raise IntervalError(
-                "Workforce snapshot knowledge cutoff must be timezone-aware.",
-                next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
-            )
+        _validate_snapshot_temporal_coordinate(self.effective_on, self.known_at)
         status_codes = tuple(status for status, _count in self.employment_status_counts)
         if len(status_codes) != len(set(status_codes)):
             raise SingleValuedFactError(
@@ -270,7 +280,8 @@ def build_workforce_composition_snapshot(
         Aggregate workforce counts and deterministic evidence without row-level PII.
 
     Raises:
-        IntervalError: ``known_at`` is timezone-naive or has no usable UTC offset.
+        IntervalError: ``effective_on`` is not an exact calendar date, or ``known_at``
+            is not an exact timezone-aware datetime with a usable UTC offset.
         SingleValuedFactError: One employment or assignment has contradictory
             visible versions, or direct aggregate evidence is inconsistent.
         EmploymentExclusivityError: A worker has malformed or overlapping
@@ -279,11 +290,7 @@ def build_workforce_composition_snapshot(
         AssignmentPortfolioError: Existing allocation integrity rejects visible FTE.
         PositionSeatError: Existing position-capacity integrity rejects visible FTE.
     """
-    if known_at.utcoffset() is None:
-        raise IntervalError(
-            "Workforce snapshot knowledge cutoff must be timezone-aware.",
-            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
-        )
+    _validate_snapshot_temporal_coordinate(effective_on, known_at)
 
     _validate_visible_employment_portfolios(
         employment_versions,
