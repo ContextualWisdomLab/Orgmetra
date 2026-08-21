@@ -75,8 +75,10 @@ class OrganizationHierarchySnapshot:
     visible parent anchors. A parent anchor may be absent from the visible unit set
     when that parent was not yet known or was outside the requested business-time
     coordinate; the opaque anchor is retained rather than silently rewritten into
-    a root. Direct construction still requires canonical ordering, unique unit
-    identities, an aware knowledge cutoff, and an acyclic visible graph.
+    a root. Direct construction snapshots caller-owned link containers before
+    validation so later caller mutation cannot rewrite canonical evidence. It also
+    requires canonical ordering, unique unit identities, an aware knowledge cutoff,
+    and an acyclic visible graph.
     """
 
     tenant_record_id: UUID
@@ -85,12 +87,17 @@ class OrganizationHierarchySnapshot:
     parent_links: tuple[tuple[UUID, UUID | None], ...]
 
     def __post_init__(self) -> None:
-        """Reject ambiguous or non-canonical hierarchy evidence before export."""
+        """Detach caller-owned containers and reject ambiguous hierarchy evidence."""
         if self.known_at.utcoffset() is None:
             raise IntervalError(
                 "Organization hierarchy snapshot knowledge cutoff must be timezone-aware.",
                 next_action="Convert the knowledge cutoff to UTC, then rebuild the hierarchy snapshot.",
             )
+        object.__setattr__(
+            self,
+            "parent_links",
+            tuple(tuple(parent_link) for parent_link in self.parent_links),
+        )
         unit_ids = tuple(unit_id for unit_id, _parent_id in self.parent_links)
         if len(unit_ids) != len(set(unit_ids)):
             raise SingleValuedFactError(
