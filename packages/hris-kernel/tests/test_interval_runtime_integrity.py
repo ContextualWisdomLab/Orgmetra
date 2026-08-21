@@ -1,6 +1,6 @@
 """Adversarial runtime-type tests for authoritative bitemporal coordinates."""
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -13,6 +13,22 @@ class _ForgedDate(date):
 
 class _ForgedDateTime(datetime):
     """A caller-controlled datetime subtype that must not become system-time evidence."""
+
+
+class _OffsetlessZone(tzinfo):
+    """A non-null tzinfo object that still represents no usable UTC offset."""
+
+    def utcoffset(self, _value: datetime | None) -> timedelta | None:
+        """Return no offset so Python treats the timestamp as offset-naive."""
+        return None
+
+    def dst(self, _value: datetime | None) -> timedelta | None:
+        """Return no daylight-saving adjustment."""
+        return None
+
+    def tzname(self, _value: datetime | None) -> str:
+        """Return a stable diagnostic name for the test-only zone."""
+        return "offsetless"
 
 
 def test_date_interval_rejects_date_subclasses_in_stored_bounds() -> None:
@@ -53,3 +69,18 @@ def test_recorded_interval_rejects_datetime_subclasses_in_query_coordinate() -> 
 
     with pytest.raises(IntervalError, match="built-in datetime"):
         interval.contains(_ForgedDateTime(2026, 8, 22, 3, 0, tzinfo=timezone.utc))
+
+
+def test_recorded_interval_requires_a_real_utc_offset_not_only_tzinfo_presence() -> None:
+    """A non-null tzinfo with no UTC offset is still naive system-time evidence."""
+    offsetless = datetime(2026, 8, 22, 3, 0, tzinfo=_OffsetlessZone())
+
+    with pytest.raises(IntervalError, match="timezone-aware"):
+        RecordedInterval(start=offsetless)
+
+    interval = RecordedInterval(
+        start=datetime(2026, 8, 22, 0, 0, tzinfo=timezone.utc),
+        end=None,
+    )
+    with pytest.raises(IntervalError, match="timezone-aware"):
+        interval.contains(offsetless)
