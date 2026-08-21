@@ -34,6 +34,12 @@ def _visible_parent_links(
         {version.organization_unit_id for version in scoped},
         key=str,
     )
+    scoped_unit_ids = set(unit_ids)
+    foreign_unit_ids = {
+        version.organization_unit_id
+        for version in organization_versions
+        if version.tenant_record_id != tenant_record_id
+    }
     parent_links: list[tuple[UUID, UUID | None]] = []
     for unit_id in unit_ids:
         visible = resolve_single_valued_fact(
@@ -45,7 +51,19 @@ def _visible_parent_links(
             known_at=known_at,
         )
         if visible is not None:
-            parent_links.append((unit_id, visible.parent_organization_unit_id))
+            parent_id = visible.parent_organization_unit_id
+            if (
+                parent_id is not None
+                and parent_id not in scoped_unit_ids
+                and parent_id in foreign_unit_ids
+            ):
+                raise OrganizationHierarchyError(
+                    "Visible organization parent anchor resolves only to another tenant.",
+                    next_action=(
+                        "Correct the parent organization unit to one owned by this tenant, then rebuild the hierarchy snapshot."
+                    ),
+                )
+            parent_links.append((unit_id, parent_id))
     return tuple(parent_links)
 
 
@@ -158,13 +176,15 @@ def validate_organization_hierarchy(
     effective_on: date,
     known_at: datetime,
 ) -> None:
-    """Reject a visible parent cycle inside one tenant at one bitemporal coordinate.
+    """Reject invalid visible parent links inside one tenant at one bitemporal coordinate.
 
     Each durable unit is first resolved through the normal single-valued
     bitemporal rule, so two simultaneously visible versions fail closed before
     graph traversal. Parent anchors without a visible version terminate the
     currently known chain rather than importing facts from another tenant or a
-    future knowledge state.
+    future knowledge state. A parent identity that is absent from this tenant's
+    history but is known in another supplied tenant fails closed instead of
+    leaking a foreign organization identity into this tenant's hierarchy.
 
     Args:
         organization_versions: Candidate parent-link versions, including other tenants.
@@ -174,7 +194,7 @@ def validate_organization_hierarchy(
 
     Raises:
         SingleValuedFactError: One unit has two visible versions at the coordinate.
-        OrganizationHierarchyError: Visible parent links contain a cycle.
+        OrganizationHierarchyError: Visible parent links contain a cycle or a known foreign-tenant anchor.
     """
     parent_links = _visible_parent_links(
         organization_versions,
@@ -195,10 +215,12 @@ def build_organization_hierarchy_snapshot(
     """Build deterministic tenant organization structure at one effective/recorded coordinate.
 
     The builder reuses the authoritative single-valued bitemporal resolution and
-    cycle rules. It does not infer names, headcount, managerial authority, legal
-    reporting lines, or employment decisions. Downstream consumers receive only
-    the tenant identity, opaque unit/parent identities, the exact business date,
-    and the exact system-knowledge cutoff needed to reproduce the structure.
+    cycle rules. It fails closed when supplied source truth proves that a visible
+    parent anchor belongs only to another tenant. It does not infer names,
+    headcount, managerial authority, legal reporting lines, or employment
+    decisions. Downstream consumers receive only the tenant identity, opaque
+    unit/parent identities, the exact business date, and the exact system-knowledge
+    cutoff needed to reproduce the structure.
 
     Args:
         organization_versions: Candidate organization parent-link versions, including other tenants.
@@ -212,7 +234,7 @@ def build_organization_hierarchy_snapshot(
     Raises:
         IntervalError: ``known_at`` is timezone-naive or has no usable UTC offset.
         SingleValuedFactError: One unit has contradictory visible versions.
-        OrganizationHierarchyError: Visible parent links contain a cycle.
+        OrganizationHierarchyError: Visible parent links contain a cycle or a known foreign-tenant anchor.
     """
     if known_at.utcoffset() is None:
         raise IntervalError(
