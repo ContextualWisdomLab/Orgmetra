@@ -16,6 +16,7 @@
 - Revalidate evidence-version changes through direct construction and `dataclasses.replace(...)`; changing the version changes canonical SHA-256 correlation.
 - Keep package-owned trust-bearing reference suffixes canonical non-sentinel UUIDv4, while `tenant_record_id` follows Orgmetra's authoritative canonical non-sentinel operational UUID contract so valid core tenant identities are not rejected by this leaf package.
 - Replace prose-only activation assurance with executable fail-closed orchestration: the injected host authority must reject failed tenant/relationship/provenance/panel checks, and returned evidence must match the exact tenant, interview-plan reference, plan digest, and approving actor before a receipt can exist.
+- Validate `approved_at` before authoritative activation work and reject approval evidence that predates the reviewed plan's `generated_at`, preventing impossible audit chronology from reaching the host authority.
 
 ### Security and privacy
 
