@@ -42,6 +42,19 @@ class ForgedTenantUUIDText(str):
         return False
 
 
+class ForgedGovernanceCode(str):
+    """String subclass that can satisfy closed-code comparisons with hostile text."""
+
+    def __eq__(self, other):  # type: ignore[no-untyped-def]
+        return True
+
+    def __ne__(self, other):  # type: ignore[no-untyped-def]
+        return False
+
+    def __hash__(self) -> int:
+        return hash("quarterly_selection_governance")
+
+
 def valid_kwargs() -> dict[str, object]:
     """Return one otherwise valid monitoring-plan input."""
     return {
@@ -84,4 +97,22 @@ def test_rejects_tenant_string_subclass_that_can_forge_uuid_validation() -> None
     kwargs["tenant_record_id"] = ForgedTenantUUIDText("not-a-tenant-uuid")
 
     with pytest.raises(ValueError, match="tenant_record_id"):
+        build_selection_outcome_monitoring_plan(**kwargs)
+
+
+def test_rejects_purpose_code_string_subclass_that_can_forge_closed_code_check() -> None:
+    """Purpose evidence must be exact built-in text before fixed-code comparison."""
+    kwargs = valid_kwargs()
+    kwargs["purpose_code"] = ForgedGovernanceCode("attacker_controlled_purpose")
+
+    with pytest.raises(ValueError, match="purpose_code"):
+        build_selection_outcome_monitoring_plan(**kwargs)
+
+
+def test_rejects_reason_code_string_subclass_that_can_forge_closed_code_membership() -> None:
+    """Reason evidence must be exact built-in text before allow-list membership."""
+    kwargs = valid_kwargs()
+    kwargs["reason_code"] = ForgedGovernanceCode("attacker_controlled_reason")
+
+    with pytest.raises(ValueError, match="reason_code"):
         build_selection_outcome_monitoring_plan(**kwargs)
