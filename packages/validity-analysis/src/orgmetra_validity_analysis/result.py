@@ -78,6 +78,14 @@ class MissingnessSummary:
             raise ValueError("missing_predictor_observations cannot exceed total_observations")
         if self.missing_criterion_observations > self.total_observations:
             raise ValueError("missing_criterion_observations cannot exceed total_observations")
+        if self.complete_observations + self.missing_predictor_observations > self.total_observations:
+            raise ValueError(
+                "complete_observations and missing_predictor_observations cannot overlap"
+            )
+        if self.complete_observations + self.missing_criterion_observations > self.total_observations:
+            raise ValueError(
+                "complete_observations and missing_criterion_observations cannot overlap"
+            )
 
     def to_dict(self) -> dict[str, int]:
         """Return deterministic count fields for the canonical result JSON."""
