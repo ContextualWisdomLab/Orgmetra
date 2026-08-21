@@ -184,7 +184,8 @@ class OfferApprovalPacket:
         _validate_fixed_text(self.decision_authority, _DECISION_AUTHORITY, "decision_authority")
         _validate_fixed_text(self.review_state, _REVIEW_STATE, "review_state")
         _validate_fixed_text(self.delivery_state, _DELIVERY_STATE, "delivery_state")
-        _validate_fixed_text(self.next_action, _NEXT_ACTION, "next_action")
+        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
+            raise ValueError("next_action must remain the governed offer-approval instruction")
 
     def canonical_json(self) -> str:
         """Return deterministic canonical JSON for immutable audit correlation."""
