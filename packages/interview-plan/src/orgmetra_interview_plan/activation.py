@@ -92,7 +92,7 @@ class StructuredInterviewActivationReceipt:
             "authority_evidence_reference",
         )
         _validate_digest(self.authority_evidence_digest, "authority_evidence_digest")
-        _canonical_timestamp(self.approved_at)
+        _canonical_timestamp(self.approved_at, "approved_at")
         _validate_code(self.purpose_code, "purpose_code")
         if self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain structured_interview_activation")
@@ -114,7 +114,7 @@ class StructuredInterviewActivationReceipt:
         """Return deterministic canonical JSON for immutable audit correlation."""
         payload = {
             "activation_state": self.activation_state,
-            "approved_at": _canonical_timestamp(self.approved_at),
+            "approved_at": _canonical_timestamp(self.approved_at, "approved_at"),
             "approving_actor_reference": self.approving_actor_reference,
             "authority_evidence_digest": self.authority_evidence_digest,
             "authority_evidence_reference": self.authority_evidence_reference,
@@ -150,7 +150,7 @@ def activate_structured_interview_plan(
     """
     if type(plan) is not StructuredInterviewPlan:
         raise TypeError("plan must be a StructuredInterviewPlan")
-    _canonical_timestamp(approved_at)
+    _canonical_timestamp(approved_at, "approved_at")
     if approved_at < plan.generated_at:
         raise ValueError("approved_at must not precede plan generated_at")
     _validate_reference(approving_actor_reference, "actor", "approving_actor_reference")
