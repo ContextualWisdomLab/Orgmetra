@@ -19,7 +19,7 @@ This document is the buyer-facing work queue. It separates what a customer can u
 
 ## Executive finding
 
-Orgmetra is an evidence-centered HRIS foundation with protected Job Analysis, candidate-evidence, People mutation, and confirmed-hire boundaries, not yet a complete commercial HCM product. The protected branch provides durable PostgreSQL integrity contracts, a Python HRIS decision kernel, purpose-bound authorization, governed candidate-to-worker lineage, and executable Job Analysis and People read/write boundaries. The largest buyer-visible gap remains the missing connected browser product surface: the current checkout has an active-PR HR Home/Employee Profile fixture and local Storybook state runtime, but protected truth has no connected or released workspace.
+Orgmetra is an evidence-centered HRIS foundation with protected Job Analysis, candidate-evidence, People mutation, and confirmed-hire boundaries, not yet a complete commercial HCM product. The protected branch provides durable PostgreSQL integrity contracts, a Python HRIS decision kernel, purpose-bound authorization, governed candidate-to-worker lineage, and executable Job Analysis and People read/write boundaries. The largest buyer-visible gap remains the missing connected browser product surface: the current checkout has an active-PR HR Home/Employee Profile fixture plus an API-bound Job Analysis read surface and local Storybook state runtime, but protected truth has no connected or released workspace.
 
 The next highest-leverage gaps are a connected/released buyer path over the now-protected Job Analysis API and actual statistical validity estimation. Existing contracts are useful foundations, but they do not substitute for a running customer path or a released deployment.
 
@@ -54,7 +54,7 @@ flowchart LR
 | Workforce composition change evidence | Active PR #54 adds same-cutoff bitemporal composition-change evidence | `implemented_on_active_pr` | Buyers can review a proposed workforce change only after the exact PR earns checks and independent approval; it is not protected truth yet. |
 | Organization hierarchy snapshot evidence | Active PR #56 adds bitemporal organization hierarchy snapshot evidence | `implemented_on_active_pr` | Organizational reporting remains an active integration lane, not a protected or released buyer workflow. |
 | Selection-validity analysis handoff | Active PR #57 adds the governed handoff boundary for later validity estimation | `implemented_on_active_pr` | The handoff is not a statistical estimator and does not yet produce validity, bias, RMSE, coverage, or convergence evidence. |
-| Role workspaces and Storybook runtime | Active PR #53 has the HR Home/Employee Profile fixture plus a local Storybook `10.5.10` build; protected `develop` still has no customer UI | `implemented_on_active_pr` | The local component/state runtime is reviewable, but there is no connected or released buyer workflow in protected truth. |
+| Role workspaces and Storybook runtime | Active PR #53 has the HR Home/Employee Profile fixture, an API-bound read-only Job Analysis view, and a local Storybook `10.5.10` build; protected `develop` still has no customer UI | `implemented_on_active_pr` | The component/state runtime and host-injected API boundary are reviewable, but there is no connected or released buyer workflow in protected truth. |
 | Naruon calendar adapter | `packages/naruon-adapter` package tests; traceability says planned integration | `accepted_architecture` | Calendar intent is contract-tested, not an integrated customer scheduling workflow. |
 | TEPP adapter | PR #52 is a non-executing request boundary; no transport contract is established | `implemented_on_active_pr` | Temporal analysis can be prepared as governed evidence but is not executed by Orgmetra. |
 | Contextual Orchestrator/OpenCode model path | Named in architecture; no Orgmetra adapter or evidence-backed model evaluation in protected code | `planned` | LLM assistance cannot yet be invoked through an Orgmetra-owned, auditable draft-evidence boundary. |
@@ -66,12 +66,15 @@ flowchart LR
 ## Local candidate artifact outside protected truth
 
 The current checkout contains `apps/hr-workspace/`, a dependency-free HR Home
-and Employee Profile fixture based on Figma nodes `1:10` and `1:28`. It uses
+and Employee Profile fixture based on Figma nodes `1:10` and `1:28`, plus an
+API-bound read-only Job Analysis snapshot view. It uses
 the shared design tokens and proves navigation, focus-visible styling,
 keyboard-accessible evidence and confirmation dialogs, purpose-bound
 permission denial, exact allocation values, and English/Korean labels. The
 fixture explicitly displays that the protected People API is not connected.
-The same active PR includes a local Storybook runtime with tokenized stories;
+The Job Analysis view requires a host-injected API base URL and authorization
+provider, sends the existing purpose header, and has no synthetic fallback or
+browser credential storage. The same active PR includes a local Storybook runtime with tokenized stories;
 the current head has a passed Storybook build and local Playwright browser
 smoke, but neither is connected People API integration, hosted deployment, or
 protected-develop truth. The artifact must be reviewed, checked, and merged
@@ -82,7 +85,7 @@ independently before P0-1 can change maturity.
 | ID | Priority and owner | Gap and smallest acceptable closure evidence | Dependency |
 |---|---|---|---|
 | P0-1 | Product / Web | Review and merge the active HR Home + Employee Profile fixture and local Storybook states, then connect it to the protected People API and prove keyboard/focus/permission/confirmation states, exact-value tables, i18n, and browser E2E. | Protected People API evidence |
-| P0-2 | Job Architecture | Protected `develop` now contains PR #38's persisted Job Analysis case/API, migration owner, ADR, versioned source evidence, and PostgreSQL acceptance tests. Connect it to the buyer workflow, SME approval path, deployment, and browser evidence. | Protected People API evidence; active workspace path |
+| P0-2 | Job Architecture | Protected `develop` now contains PR #38's persisted Job Analysis case/API, migration owner, ADR, versioned source evidence, and PostgreSQL acceptance tests. Active PR #53 adds the host-injected read-only browser boundary; connect it to a real API runtime, SME approval path, deployment, and browser evidence. | Protected People API evidence; active workspace path |
 | P0-3 | Workforce Validation / scientific owner | Advance active PR #57 into a Rust-first estimator boundary or versioned adapter to `fast-mlsirm`/TEPP. Publish true-parameter recovery, bias, MAE, RMSE, coverage, convergence, temporal, multilevel, multiple-membership, CPU reference, and material GPU parity evidence. | Protected P0-2 and external contract re-resolution |
 | P0-4 | Release / Platform | Produce a deployable release with version, changelog, migration inventory, rollback/recovery evidence, support runbook, and exact commit provenance. | P0-1 through P0-3 |
 | P1-1 | Integration Hub | Implement contextual-orchestrator adapter for draft evidence only. Pin model/provider/config/evidence digests, use `NVIDIA_NIM_API_KEY` for model-backed development, and record ablations for single-route versus multi-agent depth/access lists. | P0-2; external runtime contract |
