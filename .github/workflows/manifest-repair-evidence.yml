@@ -6,6 +6,11 @@ on:
       - codex/product-gap-baseline-workspace
     paths:
       - ".github/workflows/manifest-repair-evidence.yml"
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - ".github/workflows/manifest-repair-evidence.yml"
 
 permissions:
   contents: read
@@ -19,9 +24,11 @@ jobs:
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Prove exact candidate checkout
-        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
       - name: Print deterministic manifest repair data
         run: python tests/validate_repository.py --print-manifest
