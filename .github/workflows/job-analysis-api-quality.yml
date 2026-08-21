@@ -1,29 +1,37 @@
-name: Foundation CI
+name: Job-Analysis API Quality
 
 on:
   pull_request:
     branches:
       - develop
-      - bootstrap
-      - main
-      - feat/foundation-product-baseline
-  push:
-    branches:
-      - bootstrap
-      - main
-      - feat/audit-outbox-envelope
+    paths:
+      - "services/job-analysis-api/**"
+      - "packages/hris-kernel/**"
+      - "packages/keyverse-adapter/**"
+      - "database/migrations/0013_job_analysis_snapshot.sql"
+      - "tests/test_job_analysis_snapshot_postgres.sh"
+      - "tests/test_job_analysis_snapshot_schema_hardening.sh"
+      - "tests/validate_repository.py"
+      - "scripts/foundation-contract-core.mjs"
+      - "schemas/openapi.yaml"
+      - "manifest.json"
+      - "docs/adr/0007-governed-job-analysis-evidence.md"
+      - "docs/adr/0014-job-analysis-snapshot-persistence.md"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/foundation-ci.yml"
+      - ".github/workflows/job-analysis-api-quality.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: foundation-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: job-analysis-api-quality-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Foundation validation
+  unit:
+    name: Job-analysis API contract and 100% coverage
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -41,58 +49,26 @@ jobs:
         with:
           python-version: "3.14"
           check-latest: false
-      - name: Set up Node.js LTS
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: "24"
-          check-latest: false
-      - name: Compile validation code
-        run: python -m compileall -q tests
-      - name: Validate foundation pack
-        run: npm run validate
-      - name: Install Node dependencies
-        run: npm ci
-      - name: Build Storybook
-        run: npm run build-storybook
-      - name: Prove Foundation CI dependency hygiene
-        run: bash tests/test_foundation_ci_dependency_hygiene.sh
-      - name: Prove HRIS kernel
-        env:
-          PYTHONPATH: packages/hris-kernel/src:packages/keyverse-adapter/src
+      - name: Install reviewed test toolchain
         run: |
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
-          python -m pytest packages/hris-kernel/tests
-          python -m pytest packages/keyverse-adapter/tests
-      - name: Print exact manifest repair data
-        if: failure()
-        run: python tests/validate_repository.py --print-manifest
-      - name: Prove validation is read-only
+      - name: Compile job-analysis API boundary
+        run: python -m compileall -q services/job-analysis-api/src packages/hris-kernel/src packages/keyverse-adapter/src services/job-analysis-api/tests
+      - name: Test governed job-analysis contracts with exact statement and branch coverage
+        env:
+          PYTHONPATH: services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src
+          COVERAGE_FILE: /tmp/orgmetra-job-analysis-api.coverage
+        run: python -m pytest -c services/job-analysis-api/pyproject.toml services/job-analysis-api/tests
+      - name: Require clean checkout
         run: |
           git diff --exit-code
           test -z "$(git status --porcelain)"
 
-  postgres_contract:
-    name: PostgreSQL integrity contracts
+  postgres:
+    name: Job-analysis PostgreSQL integration
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        contract:
-          - test_bitemporal_postgres.sh
-          - test_tenant_isolation_postgres.sh
-          - test_evidence_sealing_postgres.sh
-          - test_operational_uuid_postgres.sh
-          - test_audit_outbox_postgres.sh
-          - test_outbox_claim_postgres.sh
-          - test_outbox_dead_letter_postgres.sh
-          - test_audit_outbox_hardening_postgres.sh
-          - test_candidate_worker_conversion_postgres.sh
-          - test_validity_study_case_postgres.sh
-          - test_criterion_observation_scope_postgres.sh
-          - test_people_mutation_idempotency_postgres.sh
-          - test_job_analysis_snapshot_postgres.sh
+    timeout-minutes: 12
     services:
       postgres:
         image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
@@ -119,9 +95,11 @@ jobs:
         env:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
-      - name: Run PostgreSQL contract
-        run: bash "tests/${{ matrix.contract }}"
-      - name: Prove test is read-only
+      - name: Run persisted job-analysis PostgreSQL contract
+        run: |
+          bash tests/test_job_analysis_snapshot_postgres.sh
+          bash tests/test_job_analysis_snapshot_schema_hardening.sh
+      - name: Require clean checkout
         run: |
           git diff --exit-code
           test -z "$(git status --porcelain)"

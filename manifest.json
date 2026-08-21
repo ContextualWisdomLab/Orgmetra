@@ -5,9 +5,15 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "76e9707b902946d9f3953e76aa647b87f572273be3c222df9b82c47ca022688b",
-      "bytes": 4455,
-      "lines": 126
+      "sha256": "7f664425d1307c21f7d26bea40553426b434d141fa2fedaf5ea25e798247878d",
+      "bytes": 4506,
+      "lines": 127
+    },
+    {
+      "path": ".github/workflows/job-analysis-api-quality.yml",
+      "sha256": "352dc78931dd94afea3e88912d38dcc4b562a004112f199f3d7a12d22b6d637a",
+      "bytes": 4159,
+      "lines": 105
     },
     {
       "path": ".gitignore",
@@ -166,6 +172,12 @@
       "lines": 76
     },
     {
+      "path": "database/migrations/0013_job_analysis_snapshot.sql",
+      "sha256": "b6553a5a4c94c4aa9f341a474e13bbe34db63044eda2446b3ebee178995977ee",
+      "bytes": 12713,
+      "lines": 260
+    },
+    {
       "path": "docs/API_CONTRACT.md",
       "sha256": "63533dff785da62b89e585d742a158e2aeb05913644f2bf9fb6486f281c2e589",
       "bytes": 4555,
@@ -292,6 +304,12 @@
       "lines": 66
     },
     {
+      "path": "docs/adr/0007-governed-job-analysis-evidence.md",
+      "sha256": "abdff206a700018b5997acce49d5c66eddcf2f9d76cb3446e964749011c8f2da",
+      "bytes": 5638,
+      "lines": 57
+    },
+    {
       "path": "docs/adr/0008-purpose-bound-pii-authorization.md",
       "sha256": "c5157d3bc58f3d8d29e03104dd15eb2911cc1bb66e2c92a935b26d7164648dc7",
       "bytes": 5988,
@@ -302,6 +320,30 @@
       "sha256": "1ac10bb2747b0a5b4d62f627825cfd7f978f3fa88d7575bffc23d56371240a64",
       "bytes": 7057,
       "lines": 57
+    },
+    {
+      "path": "docs/adr/0010-naruon-calendar-intent-boundary.md",
+      "sha256": "3e1050a964cc4ed76a1a0cf1e699ae5080acf8c9336f0decdd6d5229359db3c9",
+      "bytes": 3917,
+      "lines": 35
+    },
+    {
+      "path": "docs/adr/0011-bitemporal-workforce-composition.md",
+      "sha256": "1656ef8b57c836ef7936a8e9cb6a824681eb7563157a1ab0a29deb25849a457b",
+      "bytes": 5568,
+      "lines": 53
+    },
+    {
+      "path": "docs/adr/0012-governed-migration-handoff.md",
+      "sha256": "713855d670001d3964ecb36cc653830502fb1d82a58b9e39f564b6992dd2bd80",
+      "bytes": 5965,
+      "lines": 59
+    },
+    {
+      "path": "docs/adr/0013-governed-requisition-review-packet.md",
+      "sha256": "70bf2cbdf903a8793d6d8bc116a08331931090118341f42010236e09c6cc1802",
+      "bytes": 4693,
+      "lines": 46
     },
     {
       "path": "docs/adr/0014-job-analysis-snapshot-persistence.md",
@@ -371,15 +413,15 @@
     },
     {
       "path": "schemas/openapi.yaml",
-      "sha256": "3e4e5d3f896a874eb152fe7252672cd576e993c0755fb33ec303d5dc4a317f01",
-      "bytes": 18988,
-      "lines": 644
+      "sha256": "09c1e43486779198574fe31b8bcabbd1c1f74beec7bf86245ae578061619838f",
+      "bytes": 29503,
+      "lines": 1020
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "2bfbe6f00aa5246c9ccbc973b0858e7b950bc835d64b039b516f442592802f18",
-      "bytes": 25833,
-      "lines": 654
+      "sha256": "7f15517490390e4460e23e4f8ff689cf9bc33efd681b79b1d350fb16990dfa41",
+      "bytes": 28557,
+      "lines": 700
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -395,9 +437,9 @@
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "e9633d28ff7d66db2930b6c6e199dd9aaaacbae48c4b9aa939029f2a19fbacac",
-      "bytes": 14101,
-      "lines": 368
+      "sha256": "960306fd7cda7b982a52c4428a432d10a4f570430a5d39fb23aeca0b2ede0615",
+      "bytes": 14860,
+      "lines": 386
     },
     {
       "path": "tests/hr-workspace.test.mjs",
@@ -448,6 +490,12 @@
       "lines": 370
     },
     {
+      "path": "tests/test_job_analysis_snapshot_postgres.sh",
+      "sha256": "ca9c323a1dd68cfc520277efbbb7495e37fb3ca027890928c8624e5b4f57403f",
+      "bytes": 13542,
+      "lines": 296
+    },
+    {
       "path": "tests/test_operational_uuid_postgres.sh",
       "sha256": "7378f98f0d4b3000e8ea641d8701f1540dbad71410b3637d81d799969e0f6ff7",
       "bytes": 3346,
@@ -485,9 +533,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "546485bb47e18f7dc0b0090f401b0c4491183529ea08489bf993cb13fcbd6796",
-      "bytes": 24891,
-      "lines": 591
+      "sha256": "e3934e3ce7fb3b2e053d21556c495e84112253b985d5082f8f44a6513c87c930",
+      "bytes": 27695,
+      "lines": 650
     }
   ]
 }
