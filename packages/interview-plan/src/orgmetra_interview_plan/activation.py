@@ -148,6 +148,8 @@ def activate_structured_interview_plan(
     value-minimized immutable human-approval receipt only for the exact verified
     scope.
     """
+    if type(plan) is not StructuredInterviewPlan:
+        raise TypeError("plan must be a StructuredInterviewPlan")
     _canonical_timestamp(approved_at)
     if approved_at < plan.generated_at:
         raise ValueError("approved_at must not precede plan generated_at")
