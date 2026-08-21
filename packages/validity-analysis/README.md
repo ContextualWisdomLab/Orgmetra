@@ -8,7 +8,7 @@ This package creates an immutable **selection-validity analysis handoff** and va
 
 The resulting canonical JSON is digest-addressable, contains no raw person-level predictor or criterion values, and remains `not_executed`. Required result evidence is explicit: effect estimate, uncertainty interval, sample size, missingness summary, and convergence diagnostics.
 
-`ValidationAnalysisResult` accepts only a result linked to the handoff digest and the same reviewed fast-mlsirm revision. It records the Rust CPU/GPU backend, precision, aggregate missingness counts, finite effect and interval values, and explicit convergence or nonconvergence diagnostics. It never promotes a result to an employment decision; human review remains mandatory.
+`ValidationAnalysisResult` accepts only a result linked to the handoff digest and the same reviewed fast-mlsirm revision. It records the Rust CPU/GPU backend, precision, aggregate missingness counts, finite effect and interval values, and explicit convergence or nonconvergence diagnostics. Missingness counts must be internally possible: complete observations cannot overlap either predictor-missing or criterion-missing observations beyond the declared sample total. The result envelope accepts only the exact governed `MissingnessSummary` and `ConvergenceDiagnostics` runtime types, preventing subclass method overrides from adding unreviewed or person-level fields to canonical audit evidence. It never promotes a result to an employment decision; human review remains mandatory.
 
 ## What it does not do
 
