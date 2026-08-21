@@ -61,9 +61,9 @@ class AuditOutboxEvent:
 
     def __post_init__(self) -> None:
         """Reject envelopes that cannot provide accountable, portable audit evidence."""
-        if not isinstance(self.event_id, UUID):
+        if type(self.event_id) is not UUID:
             raise ValueError("event_id must be a UUID.")
-        if not isinstance(self.tenant_record_id, UUID):
+        if type(self.tenant_record_id) is not UUID:
             raise ValueError("tenant_record_id must be a UUID.")
         if self.event_id.int == 0:
             raise ValueError("event_id must not be the reserved nil UUID.")
@@ -73,7 +73,7 @@ class AuditOutboxEvent:
             raise ValueError("event_id must not be the reserved max UUID.")
         if self.tenant_record_id.int == _MAX_UUID_INT:
             raise ValueError("tenant_record_id must not be the reserved max UUID.")
-        if not isinstance(self.occurred_at, datetime):
+        if type(self.occurred_at) is not datetime:
             raise ValueError("occurred_at must be a datetime.")
         if type(self.high_impact) is not bool:
             raise ValueError("high_impact must be a boolean.")
