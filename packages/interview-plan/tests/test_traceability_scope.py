@@ -17,6 +17,8 @@ def test_traceability_matches_executable_activation_boundary() -> None:
     assert "`test_activation_executes_authority_and_returns_immutable_human_receipt`" in text
     assert "`test_authority_rejection_blocks_activation`" in text
     assert "`test_activation_rejects_authority_evidence_for_other_scope`" in text
+    assert "`test_activation_rejects_plan_mutation_during_authority_verification`" in text
+    assert "pre-call snapshot" in text
     assert "A concrete production adapter remains responsible" in text
     assert "do **not** prove that a particular deployed adapter already performs database/API resolution correctly" in text
     assert "No host activation path is implemented in this slice." not in text
