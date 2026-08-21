@@ -69,8 +69,8 @@
 - Modify: `manifest.json`
 
 - [x] **Step 1: Run the package gate, repository validator, root npm validation, `git diff --check`, and CodeGraph status from the isolated worktree.**
-- [ ] **Step 2: Re-check the exact branch head and PR #58 state without bypassing protection or manufacturing approval.**
-- [ ] **Step 3: Request independent review evidence when the hosted review path is available; keep the PR unmerged while checks/review are queued or missing.**
+- [x] **Step 2: Re-check the exact branch head and PR #58 state without bypassing protection or manufacturing approval.**
+- [x] **Step 3: Request independent review evidence; the local independent review completed, while hosted review/checks remain queued, so the PR stays unmerged.**
 - [x] **Step 4: Update the active plan and handoff notes with observed, inferred, and still-open evidence separately.**
 
 ## Self-review checklist
