@@ -184,17 +184,17 @@ class SelectionOutcomeMonitoringPlan:
         _canonical_timestamp(self.generated_at)
         if type(self.evidence_version) is not int or not 1 <= self.evidence_version <= 2_147_483_647:
             raise ValueError("evidence_version must be an integer from 1 through 2147483647")
-        if self.analysis_scope != _ANALYSIS_SCOPE:
+        if type(self.analysis_scope) is not str or self.analysis_scope != _ANALYSIS_SCOPE:
             raise ValueError("analysis_scope must remain total_selection_process_by_job")
         if self.contains_individual_records is not False:
             raise ValueError("monitoring plan must remain aggregate-only")
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory before monitoring use")
-        if self.decision_authority != _DECISION_AUTHORITY:
+        if type(self.decision_authority) is not str or self.decision_authority != _DECISION_AUTHORITY:
             raise ValueError("decision_authority must remain human_review_only")
-        if self.review_state != _REVIEW_STATE:
+        if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_review")
-        if self.next_action != _NEXT_ACTION:
+        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed monitoring instruction")
 
     def __repr__(self) -> str:
