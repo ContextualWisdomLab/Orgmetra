@@ -9,3 +9,4 @@
 - Validate a digest-linked Rust CPU/GPU result envelope with finite estimates, aggregate missingness, and explicit convergence or nonconvergence diagnostics.
 - Reject impossible aggregate missingness where complete observations overlap either predictor-missing or criterion-missing counts beyond the sample total.
 - Require exact governed missingness/convergence runtime types so subclass method overrides cannot inject unreviewed or person-level fields into canonical result evidence.
+- Make the package-local `uv` and pytest source configuration canonical so the quality workflow does not depend on a manually supplied `PYTHONPATH`.

@@ -30,8 +30,8 @@ Before an approved offline validation worker executes the handoff, the Orgmetra 
 Run:
 
 ```bash
-PYTHONPATH=packages/validity-analysis/src \
-python -m pytest -c packages/validity-analysis/pyproject.toml packages/validity-analysis/tests
+uv run --project packages/validity-analysis --extra test \
+  pytest packages/validity-analysis/tests
 ```
 
 The package gate requires exact 100% owned production statement and branch coverage.
