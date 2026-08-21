@@ -140,3 +140,80 @@ test('denied protected reads show an actionable error without local fallback', a
   await expect(page.locator('#people-api-result')).toBeHidden();
   await expect(page.locator('#people-api-display-name')).toHaveText('unknown');
 });
+
+test('a denied People reread removes previously authorized fields before the response settles', async ({ page }) => {
+  await injectProtectedReadConfig(page);
+  let requestCount = 0;
+  await page.route('**/v1/tenants/**/people/**', async (route) => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ fields: { display_name: 'Previously authorized worker', employment_status_code: 'active' } }),
+      });
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await route.fulfill({
+      status: 403,
+      contentType: 'application/json',
+      body: JSON.stringify({ error_code: 'access_denied', message: 'denied' }),
+    });
+  });
+
+  await page.goto(workspacePath);
+  await page.locator('[data-view-link="employee-profile"]').first().click();
+  const loadButton = page.getByRole('button', { name: 'Load worker record' });
+  await loadButton.click();
+  await expect(page.locator('#people-api-result')).toBeVisible();
+  await expect(page.locator('#people-api-display-name')).toHaveText('Previously authorized worker');
+
+  await loadButton.click();
+  await expect(page.locator('#people-api-result')).toBeHidden();
+  await expect(page.locator('#people-api-display-name')).toHaveText('unknown');
+  await expect(page.locator('#people-api-status')).toHaveAttribute('data-state', 'error');
+  await expect(page.locator('#people-api-result')).toBeHidden();
+});
+
+test('only the latest People read may render when responses complete out of order', async ({ page }) => {
+  await injectProtectedReadConfig(page);
+  let requestCount = 0;
+  let markFirstRequestSeen;
+  const firstRequestSeen = new Promise((resolve) => {
+    markFirstRequestSeen = resolve;
+  });
+  await page.route('**/v1/tenants/**/people/**', async (route) => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      markFirstRequestSeen();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ fields: { display_name: 'Stale worker', employment_status_code: 'inactive' } }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ fields: { display_name: 'Latest worker', employment_status_code: 'active' } }),
+    });
+  });
+
+  await page.goto(workspacePath);
+  await page.locator('[data-view-link="employee-profile"]').first().click();
+  const loadButton = page.getByRole('button', { name: 'Load worker record' });
+  await loadButton.click();
+  await firstRequestSeen;
+  await page.locator('#people-api-person').fill('person-latest');
+  await loadButton.click();
+
+  await expect(page.locator('#people-api-status')).toHaveAttribute('data-state', 'loaded');
+  await expect(page.locator('#people-api-display-name')).toHaveText('Latest worker');
+  await expect(page.locator('#people-api-employment-status')).toHaveText('active');
+  await page.waitForTimeout(250);
+  await expect(page.locator('#people-api-display-name')).toHaveText('Latest worker');
+  await expect(page.locator('#people-api-employment-status')).toHaveText('active');
+});
