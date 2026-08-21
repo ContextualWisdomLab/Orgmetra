@@ -16,3 +16,5 @@
 | [0012](0012-governed-migration-handoff.md) | Governed HRIS migration uses a value-free handoff envelope | Accepted |
 | [0013](0013-governed-requisition-review-packet.md) | Governed requisition review packet | Accepted |
 | [0014](0014-job-analysis-snapshot-persistence.md) | Persist governed job-analysis snapshots | Accepted |
+| [0017](0017-governed-offer-approval.md) | Governed offer approval evidence | Proposed |
+| [0025](0025-governed-candidate-evidence-intake.md) | Govern candidate evidence intake as reference-only evidence | Proposed |
