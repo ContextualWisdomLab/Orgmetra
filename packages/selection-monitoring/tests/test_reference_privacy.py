@@ -7,15 +7,18 @@ from datetime import date, datetime, timezone
 
 import pytest
 
-from orgmetra_selection_monitoring import build_selection_outcome_monitoring_plan
+from orgmetra_selection_monitoring import (
+    SelectionOutcomeMonitoringPlan,
+    build_selection_outcome_monitoring_plan,
+)
 
 UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 UUID7_TENANT = "10000000-0000-7000-8000-000000000001"
 
 
-def _build(**overrides):
-    """Build a valid packet using canonical UUIDv4-backed opaque references."""
-    values = {
+def _valid_values(**overrides) -> dict[str, object]:
+    """Return valid constructor values for every governed monitoring field."""
+    values: dict[str, object] = {
         "tenant_record_id": "11111111-1111-4111-8111-111111111111",
         "monitoring_plan_reference": "selection_monitoring_plan:10000000-0000-4000-8000-000000000001",
         "job_profile_reference": "job_profile:10000000-0000-4000-8000-000000000002",
@@ -39,16 +42,28 @@ def _build(**overrides):
         "generated_at": datetime(2026, 4, 2, 8, 30, tzinfo=timezone.utc),
     }
     values.update(overrides)
-    return build_selection_outcome_monitoring_plan(**values)
+    return values
 
 
-def test_authoritative_uuid7_tenant_identity_is_accepted_by_builder_and_replace() -> None:
+def _build(**overrides) -> SelectionOutcomeMonitoringPlan:
+    """Build a valid packet through the public builder."""
+    return build_selection_outcome_monitoring_plan(**_valid_values(**overrides))  # type: ignore[arg-type]
+
+
+def _direct(**overrides) -> SelectionOutcomeMonitoringPlan:
+    """Construct a packet directly to prove dataclass invariants cannot be bypassed."""
+    return SelectionOutcomeMonitoringPlan(**_valid_values(**overrides))  # type: ignore[arg-type]
+
+
+def test_authoritative_uuid7_tenant_identity_is_accepted_by_all_construction_paths() -> None:
     """The monitoring leaf must accept tenant UUIDs already valid in authoritative core."""
     packet = _build(tenant_record_id=UUID7_TENANT)
     replaced = replace(_build(), tenant_record_id=UUID7_TENANT)
+    direct = _direct(tenant_record_id=UUID7_TENANT)
 
     assert packet.tenant_record_id == UUID7_TENANT
     assert replaced.tenant_record_id == UUID7_TENANT
+    assert direct.tenant_record_id == UUID7_TENANT
 
 
 @pytest.mark.parametrize(
@@ -88,13 +103,16 @@ def test_references_reject_value_bearing_sentinel_and_noncanonical_suffixes(
     value: object,
     message: str,
 ) -> None:
-    """Reject reference suffixes that can leak values or evade opaque-ID rules."""
+    """Reject unsafe reference suffixes through builder, replace, and direct construction."""
     with pytest.raises(ValueError, match=message):
         _build(**{field_name: value})
 
     packet = _build()
     with pytest.raises(ValueError, match=message):
         replace(packet, **{field_name: value})
+
+    with pytest.raises(ValueError, match=message):
+        _direct(**{field_name: value})
 
 
 @pytest.mark.parametrize(
@@ -112,7 +130,7 @@ def test_references_reject_value_bearing_sentinel_and_noncanonical_suffixes(
         ("reviewer_reference", "actor"),
     ],
 )
-def test_uuid1_trust_reference_is_rejected_by_builder_and_replace(
+def test_uuid1_trust_reference_is_rejected_by_all_construction_paths(
     field_name: str,
     prefix: str,
 ) -> None:
@@ -123,3 +141,6 @@ def test_uuid1_trust_reference_is_rejected_by_builder_and_replace(
 
     with pytest.raises(ValueError, match=field_name):
         replace(_build(), **{field_name: value})
+
+    with pytest.raises(ValueError, match=field_name):
+        _direct(**{field_name: value})
