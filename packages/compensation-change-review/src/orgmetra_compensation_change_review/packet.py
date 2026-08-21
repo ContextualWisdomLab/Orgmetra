@@ -1,57 +1,72 @@
-"""Governed pre-mutation compensation-change review evidence."""
+"""Governed, value-minimized pre-mutation compensation-change review evidence.
 
+The packet correlates one proposed compensation change to authoritative worker scope and
+exact reviewed policy/evidence artifacts without copying pay amounts, protected-attribute
+values, narrative case material, credentials, or model output into the review envelope.
+Opaque worker and evidence references remain sensitive correlating metadata. Authoritative
+scope resolution, human approval, HRIS mutation, and payroll execution remain outside this
+package and must occur through their published owner boundaries.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-import hashlib
+from hashlib import sha256
 import json
 import re
-from typing import Final
 from uuid import UUID
 
-_DIGEST_PATTERN: Final = re.compile(r"[0-9a-f]{64}")
-_CODE_PATTERN: Final = re.compile(r"[a-z][a-z0-9_]{0,63}")
-_MAX_REFERENCE_LENGTH: Final = 160
-_SENTINEL_UUIDS: Final = {0, (1 << 128) - 1}
-_ALLOWED_REASON_CODES: Final = frozenset(
+_DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_REFERENCE_PATTERN = re.compile(
+    r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
+)
+_PURPOSE_CODE = "compensation_change_review"
+_ALLOWED_REASON_CODES = frozenset(
     {
         "annual_compensation_review",
-        "promotion_adjustment",
-        "market_adjustment",
-        "internal_equity_adjustment",
-        "approved_retention_adjustment",
+        "promotion_compensation_review",
+        "market_adjustment_review",
+        "retention_adjustment_review",
+        "role_change_compensation_review",
     }
 )
-_NEXT_ACTION: Final = (
-    "Re-resolve every packet reference in tenant_record_id, prove requester and reviewer "
-    "resolve to distinct authoritative actor identities, prove the Person-to-Employment and "
-    "active Assignment/Job/Position scope, then verify exact current/proposed compensation, "
-    "policy, pay-equity review, budget authorization, effective date, and payroll handoff "
-    "provenance before human approval or any People mutation."
+_DECISION_AUTHORITY = "human_review_only"
+_REVIEW_STATE = "requires_human_review"
+_SCOPE_VERIFICATION_STATE = "requires_authoritative_resolution"
+_MUTATION_STATE = "not_authorized_to_apply"
+_EXTERNAL_EXECUTION_STATE = "not_authorized_to_execute"
+_NEXT_ACTION = (
+    "Re-resolve every packet reference within tenant_record_id; specifically re-resolve "
+    "requester_reference and reviewer_reference within tenant_record_id and verify their "
+    "resolved actor identities are distinct, then prove the Person-to-Employment binding "
+    "and active Assignment/Job/Position scope represented by the snapshot, then verify the "
+    "current compensation snapshot, proposed compensation plan, exact compensation policy, "
+    "pay-equity review, budget authorization, proposed effective date, and payroll-handoff "
+    "provenance without copying compensation or protected-attribute values into this packet; "
+    "then record accountable human approval, apply any authorized HRIS change only through "
+    "the authoritative Orgmetra People boundary, and execute payroll only through its "
+    "published owner contract."
 )
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
-    """Require a canonical non-sentinel operational UUID accepted by core HRIS."""
-    if not isinstance(value, str):
-        raise ValueError(f"{field_name} must be canonical UUID text")
+    """Require canonical non-sentinel UUID text owned by the authoritative HRIS."""
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as exc:
         raise ValueError(f"{field_name} must be canonical UUID text") from exc
-    if str(parsed) != value or parsed.int in _SENTINEL_UUIDS:
+    if str(parsed) != value or parsed.int in (0, (1 << 128) - 1):
         raise ValueError(f"{field_name} must be a canonical operational UUID")
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require a value-minimized canonical non-sentinel UUIDv4 namespaced reference."""
+    """Require the expected namespace plus a canonical opaque UUIDv4 suffix."""
     message = f"{field_name} must be an opaque {prefix}: reference"
-    namespace = f"{prefix}:"
     if (
         not isinstance(value, str)
-        or len(value) > _MAX_REFERENCE_LENGTH
-        or not value.startswith(namespace)
+        or len(value) > 160
+        or not _REFERENCE_PATTERN.fullmatch(value)
+        or not value.startswith(f"{prefix}:")
     ):
         raise ValueError(message)
     suffix = value.split(":", 1)[1]
@@ -59,7 +74,7 @@ def _validate_reference(value: str, prefix: str, field_name: str) -> None:
         parsed = UUID(suffix)
     except (ValueError, AttributeError, TypeError) as exc:
         raise ValueError(message) from exc
-    if str(parsed) != suffix or parsed.version != 4 or parsed.int in _SENTINEL_UUIDS:
+    if str(parsed) != suffix or parsed.version != 4 or parsed.int in (0, (1 << 128) - 1):
         raise ValueError(message)
 
 
@@ -88,9 +103,9 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class CompensationChangeReviewPacket:
-    """Value-minimized evidence envelope for human compensation-change review."""
+    """Immutable compensation-review evidence that cannot authorize mutation or payroll."""
 
     tenant_record_id: str
     compensation_review_reference: str
@@ -112,70 +127,129 @@ class CompensationChangeReviewPacket:
     payroll_handoff_plan_digest: str
     requester_reference: str
     reviewer_reference: str
-    proposed_effective_on: date
     purpose_code: str
     reason_code: str
-    evidence_version: int
+    proposed_effective_on: date
     generated_at: datetime
-    review_state: str = "requires_human_review"
-    mutation_authorized: bool = False
-    scope_verification_state: str = "requires_authoritative_resolution"
+    evidence_version: int = 1
+    contains_personal_data: bool = True
+    contains_compensation_values: bool = False
+    contains_protected_attribute_values: bool = False
+    contains_free_form_case_narrative: bool = False
+    contains_free_form_model_output: bool = False
+    human_confirmation_required: bool = True
+    decision_authority: str = _DECISION_AUTHORITY
+    review_state: str = _REVIEW_STATE
+    scope_verification_state: str = _SCOPE_VERIFICATION_STATE
+    mutation_state: str = _MUTATION_STATE
+    external_execution_state: str = _EXTERNAL_EXECUTION_STATE
     next_action: str = _NEXT_ACTION
 
+    def __repr__(self) -> str:
+        """Return a representation that never emits sensitive correlation evidence."""
+        return "CompensationChangeReviewPacket(<redacted>)"
+
     def __post_init__(self) -> None:
-        """Validate privacy, scope-correlation, timing, and high-impact review invariants."""
+        """Fail closed when direct construction drifts from the governed contract."""
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
-        reference_prefixes = {
-            "compensation_review_reference": "compensation_change_review",
-            "person_record_reference": "person_record",
-            "employment_record_reference": "employment_record",
-            "active_assignment_snapshot_reference": "active_assignment_snapshot",
-            "current_compensation_snapshot_reference": "compensation_snapshot",
-            "proposed_compensation_plan_reference": "compensation_plan",
-            "compensation_policy_reference": "compensation_policy",
-            "pay_equity_review_reference": "pay_equity_review",
-            "budget_authorization_reference": "budget_authorization",
-            "payroll_handoff_plan_reference": "payroll_handoff_plan",
-            "requester_reference": "actor",
-            "reviewer_reference": "actor",
-        }
-        for field_name, prefix in reference_prefixes.items():
-            _validate_reference(getattr(self, field_name), prefix, field_name)
-
-        if self.requester_reference == self.reviewer_reference:
-            raise ValueError("requester_reference and reviewer_reference must be different actor references")
-
-        digest_fields = (
-            "active_assignment_snapshot_digest",
-            "current_compensation_snapshot_digest",
-            "proposed_compensation_plan_digest",
-            "compensation_policy_digest",
-            "pay_equity_review_digest",
-            "budget_authorization_digest",
-            "payroll_handoff_plan_digest",
+        _validate_reference(
+            self.compensation_review_reference,
+            "compensation_change_review",
+            "compensation_review_reference",
         )
-        for field_name in digest_fields:
-            _validate_digest(getattr(self, field_name), field_name)
-
-        _validate_business_date(self.proposed_effective_on, "proposed_effective_on")
-        if self.purpose_code != "compensation_change_review":
+        _validate_reference(self.person_record_reference, "person_record", "person_record_reference")
+        _validate_reference(
+            self.employment_record_reference,
+            "employment_record",
+            "employment_record_reference",
+        )
+        _validate_reference(
+            self.active_assignment_snapshot_reference,
+            "active_assignment_snapshot",
+            "active_assignment_snapshot_reference",
+        )
+        _validate_digest(self.active_assignment_snapshot_digest, "active_assignment_snapshot_digest")
+        _validate_reference(
+            self.current_compensation_snapshot_reference,
+            "compensation_snapshot",
+            "current_compensation_snapshot_reference",
+        )
+        _validate_digest(
+            self.current_compensation_snapshot_digest,
+            "current_compensation_snapshot_digest",
+        )
+        _validate_reference(
+            self.proposed_compensation_plan_reference,
+            "compensation_plan",
+            "proposed_compensation_plan_reference",
+        )
+        _validate_digest(
+            self.proposed_compensation_plan_digest,
+            "proposed_compensation_plan_digest",
+        )
+        _validate_reference(
+            self.compensation_policy_reference,
+            "compensation_policy",
+            "compensation_policy_reference",
+        )
+        _validate_digest(self.compensation_policy_digest, "compensation_policy_digest")
+        _validate_reference(
+            self.pay_equity_review_reference,
+            "pay_equity_review",
+            "pay_equity_review_reference",
+        )
+        _validate_digest(self.pay_equity_review_digest, "pay_equity_review_digest")
+        _validate_reference(
+            self.budget_authorization_reference,
+            "budget_authorization",
+            "budget_authorization_reference",
+        )
+        _validate_digest(self.budget_authorization_digest, "budget_authorization_digest")
+        _validate_reference(
+            self.payroll_handoff_plan_reference,
+            "payroll_handoff_plan",
+            "payroll_handoff_plan_reference",
+        )
+        _validate_digest(self.payroll_handoff_plan_digest, "payroll_handoff_plan_digest")
+        _validate_reference(self.requester_reference, "actor", "requester_reference")
+        _validate_reference(self.reviewer_reference, "actor", "reviewer_reference")
+        if self.requester_reference == self.reviewer_reference:
+            raise ValueError("requester and reviewer must be different actor references")
+        if self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain compensation_change_review")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must be an approved non-sensitive compensation-review category")
-        _validate_evidence_version(self.evidence_version)
+        _validate_business_date(self.proposed_effective_on, "proposed_effective_on")
         _canonical_timestamp(self.generated_at)
-        if self.review_state != "requires_human_review":
+        _validate_evidence_version(self.evidence_version)
+        if self.contains_personal_data is not True:
+            raise ValueError("compensation review packet must acknowledge sensitive personal-data correlation")
+        if self.contains_compensation_values is not False:
+            raise ValueError("compensation review packet must not contain compensation values")
+        if self.contains_protected_attribute_values is not False:
+            raise ValueError("compensation review packet must not contain protected-attribute values")
+        if self.contains_free_form_case_narrative is not False:
+            raise ValueError("compensation review packet must not contain free-form case narrative")
+        if self.contains_free_form_model_output is not False:
+            raise ValueError("compensation review packet must not contain free-form model output")
+        if self.human_confirmation_required is not True:
+            raise ValueError("human confirmation is mandatory before a compensation change")
+        if self.decision_authority != _DECISION_AUTHORITY:
+            raise ValueError("decision_authority must remain human_review_only")
+        if self.review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_review")
-        if type(self.mutation_authorized) is not bool or self.mutation_authorized:
-            raise ValueError("mutation_authorized must remain false")
-        if self.scope_verification_state != "requires_authoritative_resolution":
+        if self.scope_verification_state != _SCOPE_VERIFICATION_STATE:
             raise ValueError("scope_verification_state must remain requires_authoritative_resolution")
+        if self.mutation_state != _MUTATION_STATE:
+            raise ValueError("mutation_state must remain not_authorized_to_apply")
+        if self.external_execution_state != _EXTERNAL_EXECUTION_STATE:
+            raise ValueError("external_execution_state must remain not_authorized_to_execute")
         if self.next_action != _NEXT_ACTION:
-            raise ValueError("next_action must remain the governed approval instruction")
+            raise ValueError("next_action must remain the governed compensation-change instruction")
 
-    def to_dict(self) -> dict[str, object]:
-        """Return canonical value-minimized audit evidence without compensation values."""
-        return {
+    def canonical_json(self) -> str:
+        """Return deterministic canonical JSON for immutable audit correlation."""
+        payload = {
             "active_assignment_snapshot_digest": self.active_assignment_snapshot_digest,
             "active_assignment_snapshot_reference": self.active_assignment_snapshot_reference,
             "budget_authorization_digest": self.budget_authorization_digest,
@@ -183,12 +257,20 @@ class CompensationChangeReviewPacket:
             "compensation_policy_digest": self.compensation_policy_digest,
             "compensation_policy_reference": self.compensation_policy_reference,
             "compensation_review_reference": self.compensation_review_reference,
+            "contains_compensation_values": self.contains_compensation_values,
+            "contains_free_form_case_narrative": self.contains_free_form_case_narrative,
+            "contains_free_form_model_output": self.contains_free_form_model_output,
+            "contains_personal_data": self.contains_personal_data,
+            "contains_protected_attribute_values": self.contains_protected_attribute_values,
             "current_compensation_snapshot_digest": self.current_compensation_snapshot_digest,
             "current_compensation_snapshot_reference": self.current_compensation_snapshot_reference,
+            "decision_authority": self.decision_authority,
             "employment_record_reference": self.employment_record_reference,
             "evidence_version": self.evidence_version,
+            "external_execution_state": self.external_execution_state,
             "generated_at": _canonical_timestamp(self.generated_at),
-            "mutation_authorized": self.mutation_authorized,
+            "human_confirmation_required": self.human_confirmation_required,
+            "mutation_state": self.mutation_state,
             "next_action": self.next_action,
             "pay_equity_review_digest": self.pay_equity_review_digest,
             "pay_equity_review_reference": self.pay_equity_review_reference,
@@ -206,25 +288,66 @@ class CompensationChangeReviewPacket:
             "scope_verification_state": self.scope_verification_state,
             "tenant_record_id": self.tenant_record_id,
         }
-
-    def canonical_json(self) -> str:
-        """Return deterministic JSON suitable for immutable audit correlation."""
-        return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
     def sha256_digest(self) -> str:
-        """Return SHA-256 over the exact canonical JSON evidence."""
-        return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
-
-    def __repr__(self) -> str:
-        """Return a correlation-free representation suitable for routine logs."""
-        return (
-            "CompensationChangeReviewPacket("
-            f"review_state={self.review_state!r}, "
-            f"mutation_authorized={self.mutation_authorized!r}, "
-            f"scope_verification_state={self.scope_verification_state!r})"
-        )
+        """Return SHA-256 over the exact canonical UTF-8 compensation-review packet."""
+        return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
-def build_compensation_change_review_packet(**values: object) -> CompensationChangeReviewPacket:
-    """Build a validated compensation-change review packet from explicit governed fields."""
-    return CompensationChangeReviewPacket(**values)  # type: ignore[arg-type]
+def build_compensation_change_review_packet(
+    *,
+    tenant_record_id: str,
+    compensation_review_reference: str,
+    person_record_reference: str,
+    employment_record_reference: str,
+    active_assignment_snapshot_reference: str,
+    active_assignment_snapshot_digest: str,
+    current_compensation_snapshot_reference: str,
+    current_compensation_snapshot_digest: str,
+    proposed_compensation_plan_reference: str,
+    proposed_compensation_plan_digest: str,
+    compensation_policy_reference: str,
+    compensation_policy_digest: str,
+    pay_equity_review_reference: str,
+    pay_equity_review_digest: str,
+    budget_authorization_reference: str,
+    budget_authorization_digest: str,
+    payroll_handoff_plan_reference: str,
+    payroll_handoff_plan_digest: str,
+    requester_reference: str,
+    reviewer_reference: str,
+    purpose_code: str,
+    reason_code: str,
+    proposed_effective_on: date,
+    generated_at: datetime,
+    evidence_version: int = 1,
+) -> CompensationChangeReviewPacket:
+    """Build a value-minimized compensation packet pending authoritative human approval."""
+    return CompensationChangeReviewPacket(
+        tenant_record_id=tenant_record_id,
+        compensation_review_reference=compensation_review_reference,
+        person_record_reference=person_record_reference,
+        employment_record_reference=employment_record_reference,
+        active_assignment_snapshot_reference=active_assignment_snapshot_reference,
+        active_assignment_snapshot_digest=active_assignment_snapshot_digest,
+        current_compensation_snapshot_reference=current_compensation_snapshot_reference,
+        current_compensation_snapshot_digest=current_compensation_snapshot_digest,
+        proposed_compensation_plan_reference=proposed_compensation_plan_reference,
+        proposed_compensation_plan_digest=proposed_compensation_plan_digest,
+        compensation_policy_reference=compensation_policy_reference,
+        compensation_policy_digest=compensation_policy_digest,
+        pay_equity_review_reference=pay_equity_review_reference,
+        pay_equity_review_digest=pay_equity_review_digest,
+        budget_authorization_reference=budget_authorization_reference,
+        budget_authorization_digest=budget_authorization_digest,
+        payroll_handoff_plan_reference=payroll_handoff_plan_reference,
+        payroll_handoff_plan_digest=payroll_handoff_plan_digest,
+        requester_reference=requester_reference,
+        reviewer_reference=reviewer_reference,
+        purpose_code=purpose_code,
+        reason_code=reason_code,
+        proposed_effective_on=proposed_effective_on,
+        generated_at=generated_at,
+        evidence_version=evidence_version,
+    )
