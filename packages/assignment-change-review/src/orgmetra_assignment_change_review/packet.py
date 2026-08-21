@@ -61,8 +61,8 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
 
 
 def _validate_code(value: str, field_name: str) -> None:
-    """Require a bounded descriptive lower snake_case governance code."""
-    if not isinstance(value, str) or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
+    """Require exact bounded descriptive lower snake_case governance text."""
+    if type(value) is not str or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be bounded two-or-more-word lower snake_case")
 
 
@@ -230,7 +230,7 @@ class AssignmentChangeReviewPacket:
         _validate_reference(self.reviewer_reference, "actor", "reviewer_reference")
         if self.requester_reference == self.reviewer_reference:
             raise ValueError("requester and reviewer must be different actors")
-        if self.purpose_code != _PURPOSE_CODE:
+        if type(self.purpose_code) is not str or self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain assignment_change_review")
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
@@ -246,17 +246,17 @@ class AssignmentChangeReviewPacket:
             raise ValueError("assignment change review packet must not contain free-form model output")
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory before assignment change")
-        if self.decision_authority != _DECISION_AUTHORITY:
+        if type(self.decision_authority) is not str or self.decision_authority != _DECISION_AUTHORITY:
             raise ValueError("decision_authority must remain human_review_only")
-        if self.review_state != _REVIEW_STATE:
+        if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_review")
-        if self.scope_verification_state != _SCOPE_VERIFICATION_STATE:
+        if type(self.scope_verification_state) is not str or self.scope_verification_state != _SCOPE_VERIFICATION_STATE:
             raise ValueError(
                 "scope_verification_state must remain requires_authoritative_resolution"
             )
-        if self.mutation_state != _MUTATION_STATE:
+        if type(self.mutation_state) is not str or self.mutation_state != _MUTATION_STATE:
             raise ValueError("mutation_state must remain not_authorized_to_apply")
-        if self.next_action != _NEXT_ACTION:
+        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed assignment-change instruction")
 
     def canonical_json(self) -> str:
