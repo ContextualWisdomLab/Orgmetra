@@ -1,7 +1,7 @@
 # Orgmetra product and technical gap baseline
 
 **Snapshot:** 2026-08-21, Asia/Seoul
-**Evidence base:** protected `develop` at `33eff439df5c2ef58805c975108d156fd73799df`; current workspace PR #53 at `9fccfd22717ee7f037cae34bce2f3086e7c61be0`; current GitHub PR metadata and exact-head workflow state observed on 2026-08-21.
+**Evidence base:** protected `develop` at `33eff439df5c2ef58805c975108d156fd73799df`; current workspace PR #53 at `1d66f40778cc9900fd21df51a28b9109c600b754` immediately before this documentation snapshot commit; current GitHub PR metadata and exact-head workflow state observed on 2026-08-21.
 
 This document is the buyer-facing work queue. It separates what a customer can use from what exists only in an active PR or architecture document. It is updated when a protected merge, exact-head check, review, release, or runtime test changes the evidence boundary.
 
@@ -99,7 +99,7 @@ The following is the current GitHub inventory checked on 2026-08-21. All listed 
 | 56 | `feat/organization-hierarchy-snapshot` / `95e6ce7f5d4a07322129635b2adfd0f890b61d2b` | Bitemporal organization hierarchy snapshot evidence | Draft; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify tenant/time semantics and current-head checks before independent approval. |
 | 55 | `fix/people-read-auth-backend-failure` / `a650d5b8040f3c8a0a11b516b99c814d89508d57` | People-read error normalization and pre-auth resource budgets | Draft; mergeable; base `33eff43`; `REVIEW_REQUIRED`; current workflows queued | Reproduce any review finding on this exact head, then wait for terminal People API/security/recovery checks and independent approval. |
 | 54 | `feat/workforce-composition-change` / `db4ea77221e0318dc2ab1be26543e338683d7678` | Same-cutoff workforce composition change evidence | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED`; current workflows queued | Re-fetch exact head, terminal checks, resolved threads, and qualifying independent approval before merge. |
-| 53 | `codex/product-gap-baseline-workspace` / `9fccfd22717ee7f037cae34bce2f3086e7c61be0` | HR Home + Employee Profile fixture, Storybook, and baseline repair | Draft; mergeable; base `33eff43`; `REVIEW_REQUIRED`; current workflows queued/pending | Keep the fixture/API boundary explicit, wait for all current-head checks, obtain independent approval, then decide whether to merge the product-surface slice. |
+| 53 | `codex/product-gap-baseline-workspace` / `1d66f40778cc9900fd21df51a28b9109c600b754` | HR Home + Employee Profile fixture, Storybook, and baseline repair | Draft; mergeable; base `33eff43`; `REVIEW_REQUIRED`; current workflows queued/pending | Keep the fixture/API boundary explicit, wait for all current-head checks, obtain independent approval, then decide whether to merge the product-surface slice. |
 | 52 | `feat/tepp-analysis-adapter` / `fcbd800513c3605b78347daa283ec58291f0bc28` | Governed TEPP analysis request boundary | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Keep non-executing and evidence-bound; merge only after exact-head checks and qualifying review. |
 | 51 | `docs/protected-truth-refresh` / `fa3b6e9c9cd449f577cf0b493aad561fb7376327` | Protected product-truth documentation repair | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Reconcile documentation with protected runtime truth, then use current-head checks and independent review. |
 | 48 | `feat/governed-compensation-change-review` / `f6cefeb64d214e020ed82840b64d7d0cca70ec6e` | Compensation review packet | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify high-impact confirmation/evidence boundaries, then merge only with terminal checks and independent approval. |
@@ -109,7 +109,7 @@ The following is the current GitHub inventory checked on 2026-08-21. All listed 
 | 44 | `feat/governed-performance-review` / `b867f4cf1efdec198f34199e7e8c382338e94505` | Performance review packet | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify criterion scope and human confirmation before protected merge. |
 | 43 | `feat/governed-offer-approval` / `8af2e3bf31bb9352033bded6530b9357405782af` | Offer approval packet | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify evidence-backed offer approval and audit/outbox behavior before protected merge. |
 | 42 | `feat/selection-outcome-monitoring-plan` / `a306d8199be475ba07682e31c1f9b4d9c701a50b` | Selection outcome monitoring | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify monitoring scope and temporal cohort semantics before protected merge. |
-| 40 | `feat/structured-interview-plan` / `6e6cc4f6b9c1356773cb3d89a52bcbf4bdfcadba` | Governed structured interview plan | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify human review, evidence versioning, and current-head checks before protected merge. |
+| 40 | `feat/structured-interview-plan` / `1f30abbd076a2844d9c0fa6cf053555baadfc591` | Governed structured interview plan | Ready; mergeable; base `33eff43`; `REVIEW_REQUIRED` | Verify human review, evidence versioning, and current-head checks before protected merge. |
 
 No open GitHub Issue was returned by the current `gh issue list` query. This does not mean product work is exhausted: the backlog above is derived from protected runtime gaps and is intentionally independent of issue presence.
 
@@ -148,9 +148,10 @@ The complete APA 7 bibliography is in `docs/doctoring/REFERENCES.md`.
 | Check | Result |
 |---|---|
 | Protected `develop` contents | `git ls-tree` at `33eff439df5c2ef58805c975108d156fd73799df` contains migration `0013`, Job Analysis API, ADR `0014`, candidate-evidence package, ADR `0025`, and their quality workflows. This proves repository presence, not deployment. |
-| `npm run validate` on active PR #53 | Passed: foundation validation and 60 Node tests on exact local head `eedcf1c34bd6dc6e94fc0c70802c6f7d43090034`. |
-| `packages/candidate-evidence` on active PR #53 | 75 passed; owned statement and branch coverage 100%. |
-| Storybook and browser fixture | Storybook `10.5.10` production build passed; Playwright browser smoke passed for four action states, exact allocation values, locale switching, localized accessible names, and zero console/page errors. This is local fixture evidence, not protected deployment or People API integration. |
-| PostgreSQL and full Python package matrix | Protected-branch contract evidence remains recorded in the merged package/workflow artifacts; a complete fresh matrix was not rerun in this documentation-only update and must be required by the corresponding hosted workflows. |
+| `npm run validate` on active PR #53 | Passed: foundation validation and 60 Node tests on exact local head `1d66f40778cc9900fd21df51a28b9109c600b754`. |
+| Python package matrix on active PR #53 | `packages/hris-kernel`: 171 passed; Job Analysis API: 69 passed plus 72 subtests; People API: 146 passed plus 235 subtests; candidate-evidence: 75 passed. All owned statement and branch coverage reports were 100%. |
+| Storybook and browser fixture | Storybook `10.5.10` production build passed on exact local head `1d66f40778cc9900fd21df51a28b9109c600b754`. Prior local browser smoke covered four action states, exact allocation values, locale switching, localized accessible names, and zero console/page errors; this remains local fixture evidence, not current protected deployment, People API integration, or released browser E2E. |
+| Protected-tree preservation | `git diff --name-status origin/develop..HEAD --diff-filter=D` returned zero deleted paths; protected Job Analysis migration/API/OpenAPI/quality-contract files remain present on the active PR branch. |
+| PostgreSQL contracts | Current hosted workflows remain the authoritative exact-head PostgreSQL evidence; no fresh local database contract run is claimed in this snapshot. |
 
 These results prove the current foundation contracts. They do not prove that open PRs are merged, that a browser UI exists, that a statistical estimator exists, or that Orgmetra is certified under CSAP/SOC 2.
