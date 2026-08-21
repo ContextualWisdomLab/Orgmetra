@@ -194,9 +194,10 @@ test('structural OpenAPI gate rejects an empty-scope OIDC requirement', () => {
   assert.ok(errors.some((error) => /empty-scope OIDC/.test(error)), errors.join('\n'));
 });
 
-test('buyer-facing changelog and README preserve protected People mutation truth', () => {
+test('buyer-facing docs preserve protected People mutation truth', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+  const security = readFileSync(new URL('../docs/SECURITY.md', import.meta.url), 'utf8');
   const mutationLine = changelog
     .split('\n')
     .find((line) => line.includes('`POST /v1/employment-records`'));
@@ -221,5 +222,15 @@ test('buyer-facing changelog and README preserve protected People mutation truth
     mutationLine,
     /contract-only|non-shipped runtime/i,
     'protected People mutations must not be mislabeled as non-shipped'
+  );
+  assert.doesNotMatch(
+    security,
+    /executable People mutation handlers added on this branch/i,
+    'SECURITY must not describe already-integrated People mutation handlers as branch-only work'
+  );
+  assert.match(
+    security,
+    /Protected `develop` implements employment, position, and assignment creation/i,
+    'SECURITY must identify the integrated People mutation runtime as protected develop truth'
   );
 });
