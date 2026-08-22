@@ -55,7 +55,7 @@ def _validate_uuid(value: object, field_name: str) -> UUID:
 
 def _validate_code(value: object, field_name: str) -> str:
     """Return a two-or-more-word lower snake_case contract code."""
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ValueError(f"{field_name} must be a string")
     if not _CODE_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be a two-or-more-word snake_case code")
@@ -92,7 +92,7 @@ def _validate_text(value: object, field_name: str, *, minimum: int = 1) -> str:
 
 def _validate_level(value: object, field_name: str) -> int:
     """Return an ordinal 1..5 job-analysis rating."""
-    if isinstance(value, bool) or not isinstance(value, int):
+    if type(value) is not int:
         raise ValueError(f"{field_name} must be an integer")
     if not 1 <= value <= 5:
         raise ValueError(f"{field_name} must be between 1 and 5")
@@ -236,7 +236,7 @@ class FunctionalJobAnalysisProfile:
             (self.people_function_code, "people_function_code", 8),
             (self.things_function_code, "things_function_code", 7),
         ):
-            if isinstance(value, bool) or not isinstance(value, int):
+            if type(value) is not int:
                 raise ValueError(f"{field_name} must be an integer")
             if not 0 <= value <= maximum:
                 raise ValueError(f"{field_name} must be between 0 and {maximum}")
