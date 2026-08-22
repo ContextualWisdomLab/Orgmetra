@@ -284,6 +284,23 @@ test('ADR index reports missing files and status mismatch', () => {
   }
 });
 
+test('ADR index rejects non-canonical status cells instead of silently skipping them', () => {
+  const root = temporaryDirectory();
+  try {
+    write(
+      root,
+      'docs/adr/README.md',
+      '# Index\n| ADR | Title | Status |\n|---|---|---|\n| [0001](0001.md) | A | Accepted on protected `develop` |\n'
+    );
+    write(root, 'docs/adr/0001.md', '# ADR\n\nStatus: Accepted\n');
+    const errors = validateAdrIndex(root);
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /non-canonical ADR status/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('ADR validation is empty when the index is absent', () => {
   const root = temporaryDirectory();
   try {

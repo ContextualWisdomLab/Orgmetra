@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted on this active PR only. This is not protected-`develop` product truth until the owning PR integrates.
+Status: Accepted
+
+This ADR describes the governed migration-handoff boundary integrated on protected `develop`; downstream ETL execution and reconciliation remain separate owner boundaries.
 
 ## Context
 
