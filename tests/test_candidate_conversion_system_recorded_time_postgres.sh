@@ -12,7 +12,8 @@ for migration in \
     database/migrations/0006_outbox_delivery_dead_letter.sql \
     database/migrations/0007_outbox_retry_exhaustion.sql \
     database/migrations/0008_audit_outbox_review_hardening.sql \
-    database/migrations/0009_candidate_worker_conversion_governance.sql; do
+    database/migrations/0009_candidate_worker_conversion_governance.sql \
+    database/migrations/0017_candidate_conversion_system_recorded_time.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
