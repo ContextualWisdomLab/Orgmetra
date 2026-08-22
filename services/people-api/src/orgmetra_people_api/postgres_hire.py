@@ -176,7 +176,7 @@ def _is_aware_datetime(value: object) -> bool:
 def _validate_authorization(command: HireAcceptanceCommand, authorization: object) -> AuthorizationDecision:
     """Require an exact allow decision for this immutable selection decision."""
     expected_reference = f"selection_decision:{command.selection_decision_id.hex}"
-    if not isinstance(authorization, AuthorizationDecision):
+    if type(authorization) is not AuthorizationDecision:
         raise HireDecisionIntegrityError("hire mutation requires a typed authorization decision")
     if (
         not authorization.allowed
@@ -304,7 +304,7 @@ class PostgresHireAcceptancePort:
         authority. Tenant/route/key advisory serialization prevents concurrent
         retries from racing the unique idempotency binding.
         """
-        if not isinstance(command, HireAcceptanceCommand):
+        if type(command) is not HireAcceptanceCommand:
             raise TypeError("command must be a HireAcceptanceCommand")
         decision = _validate_authorization(command, authorization)
 
