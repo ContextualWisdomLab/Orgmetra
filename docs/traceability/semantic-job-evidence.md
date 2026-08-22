@@ -13,12 +13,14 @@
 | Minimize HR/audit exposure | query term, response and source catalog represented only by SHA-256 digests | no raw query/response, PII, credential, score, or decision in canonical evidence |
 | Preserve exact source provenance | foreign revision, API operation, source-system/trust-state, evidence version, UTC recorded time | provider drift fails closed |
 | Prevent runtime evidence forgery | exact built-in primitives, UUID/reference/digest validation, final runtime type | adversarial subclass regressions |
-| Prevent post-issuance rewrite | creation-time HMAC seal plus issuance marker, live-field revalidation before canonical export | mutation/replace/seal-reset regressions |
+| Prevent post-issuance rewrite | packet consistency seal plus lock-protected process-local authoritative issuance seal, live-field revalidation before canonical export | payload-only, seal-only, payload+recomputed-seal, replace, and marker-tamper regressions |
 | Maintain exact owned production coverage | dedicated `Semantic Job Evidence Adapter Quality` workflow | 100% statement and branch coverage required |
 
 ## Test mapping
 
 `packages/semantic-job-evidence-adapter/tests/test_envelope.py` verifies canonical value minimization, reviewed trust states, tenant/reference validity, requester/reviewer separation, source revision/API binding, bounded evidence versions, exact UTC recorded time, hostile runtime subclasses, post-construction mutation, dataclass replacement/seal reset, marker/seal tampering, redacted repr, and final runtime type.
+
+`packages/semantic-job-evidence-adapter/tests/test_creation_seal_integrity.py` proves that rewriting a valid trust-bearing field together with a freshly recomputed packet-owned HMAC cannot authorize changed evidence because the authoritative creation seal is stored outside envelope-writable slots.
 
 ## Non-claims
 
