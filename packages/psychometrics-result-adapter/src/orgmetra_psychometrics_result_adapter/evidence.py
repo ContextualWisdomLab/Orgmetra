@@ -238,17 +238,29 @@ class PsychometricsResultEvidenceEnvelope:
             raise ValueError("requested_output_schema_version must match reviewed owner schema version 1")
         if type(self.result_created_at_unix_ms) is not int or self.result_created_at_unix_ms <= 0:
             raise ValueError("result_created_at_unix_ms must be an exact positive integer")
-        _validate_optional_foreign_reference(
+        supersedes = _validate_optional_foreign_reference(
             self.supersedes_result_snapshot_reference,
             "supersedes_result_snapshot_reference",
         )
+        if supersedes == self.result_snapshot_reference:
+            raise ValueError("result_snapshot_reference cannot supersede itself")
+
+        recorded_at = _validate_recorded_at(self.recorded_at)
+        epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        recorded_delta = recorded_at - epoch
+        recorded_at_unix_ms = (
+            recorded_delta.days * 86_400_000
+            + recorded_delta.seconds * 1_000
+            + recorded_delta.microseconds // 1_000
+        )
+        if recorded_at_unix_ms < self.result_created_at_unix_ms:
+            raise ValueError("recorded_at cannot precede the source result creation time")
 
         revision = _require_text(self.psychometrics_commons_revision, "psychometrics_commons_revision")
         if revision != _PSYCHOMETRICS_COMMONS_REVISION:
             raise ValueError("psychometrics_commons_revision must match the reviewed dependency revision")
         if type(self.evidence_version) is not int or not 1 <= self.evidence_version <= 1_000_000:
             raise ValueError("evidence_version must be an exact positive bounded integer")
-        _validate_recorded_at(self.recorded_at)
 
     def _payload(self) -> dict[str, object]:
         """Return canonical governance evidence without foreign participant or score values."""
