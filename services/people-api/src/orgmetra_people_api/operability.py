@@ -55,8 +55,8 @@ class PostgresReadinessProbe:
                 cursor.execute(_READ_ONLY_SQL)
                 cursor.execute(_READINESS_SQL)
                 row = cursor.fetchone()
-        if row != (1,):
-            raise RuntimeError("owned PostgreSQL readiness query returned an unexpected result")
+        if row is None:
+            raise RuntimeError("owned PostgreSQL readiness query returned no result")
 
 
 @dataclass(frozen=True, slots=True)
