@@ -57,7 +57,8 @@ jobs:
           mkdir -p /tmp/orgmetra-psychometrics-result-dist
           python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-psychometrics-result-dist /tmp/orgmetra-psychometrics-result-build
           test "$(find /tmp/orgmetra-psychometrics-result-dist -maxdepth 1 -type f -name '*.whl' | wc -l)" -eq 1
-          python -m venv --system-site-packages /tmp/orgmetra-psychometrics-result-venv
+          python -m venv /tmp/orgmetra-psychometrics-result-venv
+          /tmp/orgmetra-psychometrics-result-venv/bin/python -m pip install --require-hashes --no-deps --only-binary=:all: -r "$GITHUB_WORKSPACE/.github/requirements/foundation-test.txt"
           wheel_path="$(find /tmp/orgmetra-psychometrics-result-dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
           wheel_sha="$(sha256sum "$wheel_path" | awk '{print $1}')"
           printf 'orgmetra-psychometrics-result-adapter[test] @ file://%s --hash=sha256:%s\n' "$wheel_path" "$wheel_sha" > /tmp/orgmetra-psychometrics-result-install.txt
@@ -66,12 +67,21 @@ jobs:
           /tmp/orgmetra-psychometrics-result-venv/bin/python - <<'PY'
           from importlib.metadata import metadata
           from pathlib import Path
+          import coverage
+          import pytest
+          import pytest_cov
           import orgmetra_psychometrics_result_adapter
 
-          module_path = Path(orgmetra_psychometrics_result_adapter.__file__).resolve()
           venv_root = Path("/tmp/orgmetra-psychometrics-result-venv").resolve()
+          module_path = Path(orgmetra_psychometrics_result_adapter.__file__).resolve()
           if not module_path.is_relative_to(venv_root):
               raise SystemExit(f"package imported outside isolated environment: {module_path}")
+          for module in (coverage, pytest, pytest_cov):
+              dependency_path = Path(module.__file__).resolve()
+              if not dependency_path.is_relative_to(venv_root):
+                  raise SystemExit(
+                      f"test dependency imported outside isolated environment: {dependency_path}"
+                  )
           if "test" not in (metadata("orgmetra-psychometrics-result-adapter").get_all("Provides-Extra") or []):
               raise SystemExit("built distribution does not expose the reviewed test extra")
           PY
