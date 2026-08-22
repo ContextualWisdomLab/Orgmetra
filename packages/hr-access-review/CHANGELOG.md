@@ -9,3 +9,4 @@
 - Keep every packet non-enforcing with authoritative re-resolution required before any access mutation.
 - Reject hostile runtime subclasses and post-construction evidence rewrite.
 - Add exact-head CI requiring an installable package artifact, 100% owned statement and branch coverage, and a clean checkout.
+- Run installed-wheel tests in a fully isolated virtual environment whose pytest/coverage toolchain is installed from the reviewed hash-pinned repository dependency set; fail closed if the package or those test dependencies resolve outside that environment.
