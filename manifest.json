@@ -83,9 +83,9 @@
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "ceab0c623d1bf24353d5479ef0adcd1c5d9210da59d87b6bdde759458c6601d8",
-      "bytes": 29469,
-      "lines": 436
+      "sha256": "40525ba82b4f47ab9de918465c9775dd40b243085c09e70da4d41f4a2e456ae0",
+      "bytes": 29910,
+      "lines": 446
     },
     {
       "path": "apps/hr-workspace/index.html",
@@ -449,9 +449,9 @@
     },
     {
       "path": "tests/e2e/hr-workspace.spec.mjs",
-      "sha256": "7631b2b8788c3111421ffa119f2bc7db02b19ddcd1f7deb81a9e6e3eb66cc408",
-      "bytes": 10055,
-      "lines": 226
+      "sha256": "5e8abce5949105cd4ebe3f8481b74e7511ddd06aca8d9a6cb8d4506d0b251c82",
+      "bytes": 11294,
+      "lines": 246
     },
     {
       "path": "tests/foundation-contract.test.mjs",
