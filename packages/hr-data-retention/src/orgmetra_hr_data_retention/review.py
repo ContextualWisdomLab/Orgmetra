@@ -136,6 +136,10 @@ class HrDataRetentionReviewPacket:
     evidence_version: int
     recorded_at: datetime
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Keep trust-bearing derived authority from being overridden by subclasses."""
+        raise TypeError("HrDataRetentionReviewPacket is final and cannot be subclassed")
+
     def __post_init__(self) -> None:
         """Fail closed on malformed scope, contradictory hold evidence, or review chronology."""
         self._assert_integrity()
