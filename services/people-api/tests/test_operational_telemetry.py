@@ -92,6 +92,9 @@ def test_classifies_only_known_low_cardinality_people_routes() -> None:
     assert classify_people_http_route("/v1/position-records") == "/v1/position-records"
     assert classify_people_http_route("/v1/assignment-records") == "/v1/assignment-records"
     assert classify_people_http_route(f"/v1/tenants/{tenant}/secret/{person}") is None
+    assert classify_people_http_route("/v1/tenants//people/value") is None
+    assert classify_people_http_route("/v1/tenants//candidate-worker-conversions") is None
+    assert classify_people_http_route("/v1/not-a-people-route") is None
     assert classify_people_http_route("/" + "x" * 300) is None
     assert classify_people_http_route(123) is None
 
@@ -113,8 +116,23 @@ def test_normalizes_unknown_or_runtime_subclass_methods_to_other() -> None:
     assert normalize_http_method("GET") == "GET"
     assert normalize_http_method("POST") == "POST"
     assert normalize_http_method("BREW") == "_OTHER"
+    assert normalize_http_method("_OTHER") == "_OTHER"
     assert normalize_http_method(ForgedMethod("BREW")) == "_OTHER"
     assert normalize_http_method(None) == "_OTHER"
+
+
+def test_rejects_unusable_middleware_dependencies_before_traffic() -> None:
+    """Fail fast when the wrapped app, sink, or monotonic clock cannot be called."""
+    sink = _RecordingSink()
+
+    with pytest.raises(TypeError, match="app"):
+        PeopleHttpTelemetryMiddleware(app=None, sink=sink)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="sink"):
+        PeopleHttpTelemetryMiddleware(app=_success_app(), sink=object())  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="clock"):
+        PeopleHttpTelemetryMiddleware(
+            app=_success_app(), sink=sink, clock=None  # type: ignore[arg-type]
+        )
 
 
 def test_emits_duration_without_identifying_request_values() -> None:
@@ -181,6 +199,28 @@ def test_unknown_route_never_uses_raw_path_as_metric_route() -> None:
     measurement = sink.measurements[0]
     assert measurement.route_template is None
     assert raw_path not in repr(measurement)
+
+
+def test_ignores_invalid_and_duplicate_response_start_statuses() -> None:
+    """Measure the first valid status without trusting bools or later duplicate starts."""
+    sink = _RecordingSink()
+
+    async def unusual_app(scope: Any, receive: Any, send: Any) -> None:
+        """Emit an invalid status, then the first valid status, then a duplicate start."""
+        del scope, receive
+        await send({"type": "http.response.start", "status": True, "headers": []})
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.start", "status": 503, "headers": []})
+        await send({"type": "http.response.body", "body": b"", "more_body": False})
+
+    app = PeopleHttpTelemetryMiddleware(
+        app=unusual_app, sink=sink, clock=_Clock([6.0, 6.2])
+    )
+
+    _run(app, _scope())
+
+    assert sink.measurements[0].status_code == 204
+    assert sink.measurements[0].error_type is None
 
 
 def test_unhandled_exception_is_measured_then_reraised() -> None:
@@ -264,7 +304,9 @@ def test_non_http_scope_passes_through_without_measurement() -> None:
         ({"route_template": "/raw/customer/123"}, "route_template"),
         ({"status_code": 99}, "status_code"),
         ({"duration_seconds": -0.1}, "duration_seconds"),
+        ({"error_type": 503}, "error_type"),
         ({"error_type": "database-secret"}, "error_type"),
+        ({"status_code": 200, "error_type": "503"}, "error_type"),
     ],
 )
 def test_measurement_rejects_unbounded_or_noncanonical_dimensions(
