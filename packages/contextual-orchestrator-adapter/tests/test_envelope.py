@@ -207,6 +207,20 @@ def test_seal_rewrite_fails_closed() -> None:
         envelope.canonical_json()
 
 
+def test_direct_constructor_rejects_caller_supplied_creation_seal() -> None:
+    """Reject caller-supplied private seals before any new issuance can be completed."""
+    with pytest.raises(ValueError, match="changed after construction"):
+        DraftEvidenceEnvelope(**values(), _creation_seal="forged")
+
+
+def test_issuance_marker_rewrite_fails_closed() -> None:
+    """Reject rewriting the process-local issuance marker before serialization."""
+    envelope = build()
+    object.__setattr__(envelope, "_issuance_marker", object())
+    with pytest.raises(ValueError, match="changed after construction"):
+        envelope.canonical_json()
+
+
 def test_replacement_cannot_bypass_creation_evidence() -> None:
     """Reject dataclass replacement because it is a new issuance boundary."""
     envelope = build()
