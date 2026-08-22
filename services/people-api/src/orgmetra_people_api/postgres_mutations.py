@@ -534,7 +534,7 @@ class PostgresPeopleMutationPort:
         authorization: AuthorizationDecision,
     ) -> EmploymentMutationResult:
         """Persist one employment after conversion and exclusivity checks."""
-        if not isinstance(command, EmploymentMutationCommand):
+        if type(command) is not EmploymentMutationCommand:
             raise TypeError("command must be an EmploymentMutationCommand")
         decision = _require_authorization(
             authorization=authorization,
@@ -637,7 +637,7 @@ class PostgresPeopleMutationPort:
         authorization: AuthorizationDecision,
     ) -> PositionMutationResult:
         """Persist one position after organization and job parent checks."""
-        if not isinstance(command, PositionMutationCommand):
+        if type(command) is not PositionMutationCommand:
             raise TypeError("command must be a PositionMutationCommand")
         decision = _require_authorization(
             authorization=authorization,
@@ -727,7 +727,7 @@ class PostgresPeopleMutationPort:
         authorization: AuthorizationDecision,
     ) -> AssignmentMutationResult:
         """Persist one assignment after conversion and kernel coverage checks."""
-        if not isinstance(command, AssignmentMutationCommand):
+        if type(command) is not AssignmentMutationCommand:
             raise TypeError("command must be an AssignmentMutationCommand")
         decision = _require_authorization(
             authorization=authorization,
