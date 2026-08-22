@@ -42,8 +42,8 @@ CREATE UNIQUE INDEX outbox_retry_policy_active_target_index
 ON public.outbox_retry_policy_record (tenant_record_id, delivery_target_code)
 WHERE recorded_to IS NULL;
 
-ALTER TABLE public.outbox_retry_policy_record ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.outbox_retry_policy_record FORCE ROW LEVEL SECURITY;
+ALTER TABLE outbox_retry_policy_record ENABLE ROW LEVEL SECURITY;
+ALTER TABLE outbox_retry_policy_record FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY outbox_retry_policy_tenant_isolation
 ON public.outbox_retry_policy_record
