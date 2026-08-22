@@ -34,9 +34,11 @@ def values() -> dict[str, object]:
         "resource_scope_digest": SCOPE_DIGEST,
         "authorization_policy_digest": POLICY_DIGEST,
         "entitlement_snapshot_digest": ENTITLEMENT_DIGEST,
+        "reviewer_identity_evidence_digest": REVIEWER_IDENTITY_DIGEST,
         "review_reason_code": "periodic_access_review",
         "review_recommendation_code": "retain_existing_access",
         "reviewed_at": REVIEWED_AT,
+        "recorded_at": RECORDED_AT,
         "evidence_version": 1,
     }
 
@@ -59,6 +61,7 @@ def test_builds_value_minimized_non_enforcing_access_review_evidence() -> None:
     assert document["contains_hr_data"] is False
     assert document["contains_credentials"] is False
     assert document["reviewed_at"] == "2026-08-23T00:30:00Z"
+    assert document["recorded_at"] == "2026-08-23T00:31:00Z"
     assert len(packet.sha256_digest()) == 64
     assert repr(packet) == "HrAccessReviewPacket(<redacted>)"
     assert "password" not in packet.canonical_json().lower()
@@ -81,10 +84,7 @@ def test_binds_reviewer_identity_evidence_and_system_recorded_time() -> None:
     assert document["reviewer_identity_evidence_digest"] == REVIEWER_IDENTITY_DIGEST
     assert document["recorded_at"] == "2026-08-23T00:31:00Z"
     with pytest.raises(ValueError, match="recorded_at"):
-        build(
-            reviewer_identity_evidence_digest=REVIEWER_IDENTITY_DIGEST,
-            recorded_at=REVIEWED_AT - timedelta(seconds=1),
-        )
+        build(recorded_at=REVIEWED_AT - timedelta(seconds=1))
 
 
 def test_supports_reviewed_reduction_and_removal_without_execution_authority() -> None:
@@ -152,7 +152,15 @@ def test_rejects_malformed_actor_references(actor: str) -> None:
         build(subject_actor_reference=actor)
 
 
-@pytest.mark.parametrize("field", ["resource_scope_digest", "authorization_policy_digest", "entitlement_snapshot_digest"])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "resource_scope_digest",
+        "authorization_policy_digest",
+        "entitlement_snapshot_digest",
+        "reviewer_identity_evidence_digest",
+    ],
+)
 def test_rejects_invalid_evidence_digests(field: str) -> None:
     """Require lowercase SHA-256 evidence for every reviewed scope snapshot."""
     with pytest.raises(ValueError, match=field):
@@ -166,12 +174,16 @@ def test_rejects_invalid_evidence_versions(version: object) -> None:
         build(evidence_version=version)
 
 
-def test_requires_exact_utc_recorded_review_time() -> None:
-    """Keep review evidence on a deterministic UTC system-time representation."""
+def test_requires_exact_utc_review_and_recorded_times() -> None:
+    """Keep both human-review and system-recorded evidence on deterministic UTC primitives."""
     with pytest.raises(ValueError, match="reviewed_at"):
         build(reviewed_at=datetime(2026, 8, 23, 0, 30))
     with pytest.raises(ValueError, match="reviewed_at"):
         build(reviewed_at=datetime(2026, 8, 23, 9, 30, tzinfo=timezone(timedelta(hours=9))))
+    with pytest.raises(ValueError, match="recorded_at"):
+        build(recorded_at=datetime(2026, 8, 23, 0, 31))
+    with pytest.raises(ValueError, match="recorded_at"):
+        build(recorded_at=datetime(2026, 8, 23, 9, 31, tzinfo=timezone(timedelta(hours=9))))
 
 
 class ForgedText(str):
@@ -199,6 +211,8 @@ def test_rejects_hostile_runtime_string_subclasses() -> None:
 def test_rejects_direct_governance_state_drift() -> None:
     """Keep high-impact fixed states fail-closed under direct construction."""
     payload = values()
+    with pytest.raises(ValueError, match="purpose_code"):
+        HrAccessReviewPacket(**payload, purpose_code="access_expansion")
     with pytest.raises(ValueError, match="enforcement_state"):
         HrAccessReviewPacket(**payload, enforcement_state="access_revoked")
     with pytest.raises(ValueError, match="contains_hr_data"):
