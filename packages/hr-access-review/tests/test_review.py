@@ -163,11 +163,13 @@ class ForgedText(str):
 
 
 def test_rejects_hostile_runtime_string_subclasses() -> None:
-    """Validate canonical built-in text before equality, lookup, or serialization."""
+    """Validate canonical built-in text before equality, lookup, parsing, or serialization."""
     with pytest.raises(ValueError, match="review_recommendation_code"):
         build(review_recommendation_code=ForgedText("grant_new_access"))
     with pytest.raises(ValueError, match="subject_actor_reference"):
         build(subject_actor_reference=ForgedText(SUBJECT))
+    with pytest.raises(ValueError, match="tenant_record_id"):
+        build(tenant_record_id=ForgedText(TENANT))
 
 
 def test_rejects_direct_governance_state_drift() -> None:
