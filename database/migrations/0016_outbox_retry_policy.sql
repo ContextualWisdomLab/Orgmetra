@@ -70,8 +70,8 @@ BEGIN
 
     IF TG_OP = 'INSERT' THEN
         IF NEW.recorded_to IS NOT NULL
-           OR NEW.recorded_from > transaction_timestamp() THEN
-            RAISE EXCEPTION 'new outbox retry policy versions must be current system-recorded evidence'
+           OR NEW.recorded_from IS DISTINCT FROM transaction_timestamp() THEN
+            RAISE EXCEPTION 'outbox retry policy recorded_from must equal current transaction time and begin open'
                 USING ERRCODE = '22023';
         END IF;
 
