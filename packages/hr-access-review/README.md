@@ -8,13 +8,15 @@ This package creates a **value-minimized review artifact for existing HR access*
 
 - the authoritative Orgmetra tenant;
 - one opaque `access_review:` reference;
-- the reviewed subject, requester, and independent reviewer as opaque `actor:` references;
+- the reviewed subject, requester, and independent reviewer as packet-local pseudonymous `actor:` UUIDv4 correlations;
 - SHA-256 evidence for the reviewed resource scope, authorization policy, entitlement snapshot, and reviewer identity-resolution evidence;
 - the fixed governance purpose `hr_access_recertification`, a bounded review reason, and a non-expanding recommendation;
 - the human review instant and a distinct later-or-equal system-recorded instant, both as exact UTC evidence;
 - a bounded positive evidence version.
 
-The packet does **not** contain HR field values, passwords, tokens, raw entitlement lists, free-form reviewer notes, or credentials. Its representation is redacted.
+The packet does **not** contain HR field values, passwords, tokens, raw entitlement lists, free-form reviewer notes, credentials, names, employee numbers, or raw identity-provider subject identifiers. Its representation is redacted.
+
+The packet-local `actor:` UUIDv4 values are **not a Keyverse identifier contract** and are not authentication evidence. The Orgmetra host must derive or allocate these pseudonymous correlations only after resolving the live identity through the approved identity boundary, and must keep the identity-resolution evidence independently bound by digest. This deliberately avoids imposing UUID semantics on a foreign identity provider while preventing direct person identifiers from being copied into durable access-review evidence.
 
 ## What the packet cannot do
 
@@ -28,7 +30,7 @@ Before enforcing any recommendation, the host must re-resolve the exact tenant, 
 
 ## Independence and evidence integrity
 
-The reviewer must differ from both the requester and the reviewed subject. A reviewer identity-evidence digest is bound alongside the reviewer reference so the review event is not represented by a bare actor label alone. Trust-bearing text uses exact built-in runtime primitives before parsing, membership tests, equality, or serialization. Canonical export revalidates the live packet and compares it with a process-local creation digest so a rewritten frozen object or an unregistered shallow copy fails closed.
+The reviewer must differ from both the requester and the reviewed subject. A reviewer identity-evidence digest is bound alongside the packet-local reviewer correlation so the review event is not represented by a bare actor label alone. Trust-bearing text uses exact built-in runtime primitives before parsing, membership tests, equality, or serialization. Canonical export revalidates the live packet and compares it with a process-local creation digest so a rewritten frozen object or an unregistered shallow copy fails closed.
 
 The process-local digest is in-process tamper evidence, not durable non-repudiation. Durable evidence begins only after the verified canonical document enters Orgmetra's immutable audit/outbox boundary.
 
@@ -38,4 +40,4 @@ This package deliberately does not hard-code annual, quarterly, or another revie
 
 ## Developer check
 
-The dedicated `HR Access Review Quality` workflow executes the package tests on the exact pull-request head and requires exactly 100% owned statement and branch coverage plus a clean checkout.
+The dedicated `HR Access Review Quality` workflow executes the package tests on the exact pull-request head, builds and installs the package artifact outside the source tree, and requires exactly 100% owned statement and branch coverage plus a clean checkout.
