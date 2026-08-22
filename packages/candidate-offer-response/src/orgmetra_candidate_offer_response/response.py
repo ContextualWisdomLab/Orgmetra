@@ -9,7 +9,7 @@ candidate identity and exact offer scope before taking any consequential action.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 import re
@@ -80,8 +80,6 @@ def _freeze_timestamp(value: datetime, field_name: str) -> datetime:
     except Exception:
         raise ValueError(f"{field_name} must have a valid timezone offset") from None
     if offset is None:
-        raise ValueError(f"{field_name} must have a valid timezone offset")
-    if not isinstance(offset, timedelta):
         raise ValueError(f"{field_name} must have a valid timezone offset")
     utc_naive = value.replace(tzinfo=None) - offset
     return utc_naive.replace(tzinfo=timezone.utc)
