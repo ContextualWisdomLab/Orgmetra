@@ -15,6 +15,23 @@ const actionButton = ({ action, label, disabled = false, loading = false, autofo
   return `<button class="button" style="background: var(${colorToken}); color: white" type="button"${disabled ? ' disabled' : ''}${autofocus ? ' autofocus' : ''} aria-busy="${loading}">${loading ? 'Loading…' : label}</button>`;
 };
 
+const protectedReadNotConnected = ({ title, boundary }) => frame(`
+  <section class="panel" data-figma-node-id="2:2" aria-labelledby="protected-read-not-connected-title">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">API-bound read</p>
+        <h2 id="protected-read-not-connected-title">${title}</h2>
+      </div>
+      <span class="badge badge-neutral">Not connected</span>
+    </div>
+    <div class="notice notice-neutral" role="status" aria-live="polite">
+      <strong>Connect the host before loading protected data.</strong>
+      <span>Provide the API base URL and a short-lived authorization provider, then load the protected record.</span>
+    </div>
+    <p class="helper-text">${boundary} No local fallback is used and this UI does not store the request credential.</p>
+  </section>
+`);
+
 export default {
   title: 'Orgmetra/HR Workspace',
   tags: ['autodocs']
@@ -85,4 +102,20 @@ export const AssignmentSplit = {
       <div class="table-wrap"><table><caption class="sr-only">Exact assignment allocation values</caption><thead><tr><th scope="col">Assignment</th><th scope="col">Allocation</th><th scope="col">Next action</th></tr></thead><tbody><tr><th scope="row">Platform</th><td>60.00%</td><td>No action required</td></tr><tr><th scope="row">Governance</th><td>40.00%</td><td>No action required</td></tr></tbody></table></div>
     </section>
   `)
+};
+
+export const PeopleNotConnected = {
+  name: 'People API — not connected',
+  render: () => protectedReadNotConnected({
+    title: 'Protected People record',
+    boundary: 'The host owns connection and authorization setup.'
+  })
+};
+
+export const JobAnalysisNotConnected = {
+  name: 'Job Analysis API — not connected',
+  render: () => protectedReadNotConnected({
+    title: 'Job Analysis snapshot',
+    boundary: 'The host owns connection and authorization setup.'
+  })
 };

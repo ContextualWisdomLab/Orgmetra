@@ -57,12 +57,24 @@ test('locale-sensitive icon controls translate their accessible names', () => {
 test('Storybook exposes tokenized workspace states without claiming API connectivity', () => {
   assert.match(storybookConfig, /@storybook\/web-components-vite/);
   assert.match(storybookPreview, /design-tokens\/tokens\.css/);
-  for (const storyName of ['ActionButtons', 'FieldStates', 'PermissionDenied', 'EvidenceDrawer', 'HighRiskConfirmation', 'AssignmentSplit']) {
+  for (const storyName of [
+    'ActionButtons',
+    'FieldStates',
+    'PermissionDenied',
+    'EvidenceDrawer',
+    'HighRiskConfirmation',
+    'AssignmentSplit',
+    'PeopleNotConnected',
+    'JobAnalysisNotConnected',
+  ]) {
     assert.match(story, new RegExp(`export const ${storyName}`));
   }
   assert.match(story, /orgmetra-action-request-evidence/);
   assert.match(story, /Exact assignment allocation values/);
   assert.match(story, /aria-invalid="true"/);
+  assert.match(story, /data-figma-node-id="2:2"/);
+  assert.match(story, /Connect the host before loading protected data/);
+  assert.match(story, /No local fallback is used/);
 });
 
 test('purpose and locale transitions preserve the trust boundary', () => {
