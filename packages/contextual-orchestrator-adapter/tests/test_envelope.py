@@ -79,6 +79,7 @@ def test_canonical_json_is_deterministic() -> None:
         ("reviewing_actor_reference", "employee:abc", "reviewing_actor_reference"),
         ("draft_use_code", "hire_candidate", "draft_use_code"),
         ("requested_model", "model with spaces", "requested_model"),
+        ("requested_model", "", "requested_model"),
         ("input_evidence_digest", "A" * 64, "input_evidence_digest"),
         ("response_evidence_digest", "b" * 63, "response_evidence_digest"),
         ("provenance_evidence_digest", "g" * 64, "provenance_evidence_digest"),
@@ -94,6 +95,31 @@ def test_rejects_invalid_governance_evidence(field_name: str, bad_value: object,
     kwargs[field_name] = bad_value
     with pytest.raises(ValueError, match=message):
         DraftEvidenceEnvelope(**kwargs)
+
+
+def test_rejects_noncanonical_and_sentinel_tenants() -> None:
+    """Reject correlating noncanonical or reserved tenant UUID representations."""
+    for bad_tenant in (TENANT.upper(), "00000000-0000-0000-0000-000000000000"):
+        kwargs = values()
+        kwargs["tenant_record_id"] = bad_tenant
+        with pytest.raises(ValueError, match="tenant_record_id"):
+            DraftEvidenceEnvelope(**kwargs)
+
+
+def test_rejects_malformed_noncanonical_and_non_v4_request_references() -> None:
+    """Exercise every bounded UUIDv4 reference failure boundary."""
+    bad_references = (
+        "x" * 181,
+        "orchestration_request",
+        "orchestration_request:not-a-uuid",
+        "orchestration_request:9D0C8C0F-C217-4CB5-A91D-36E8D5091190",
+        "orchestration_request:6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    )
+    for bad_reference in bad_references:
+        kwargs = values()
+        kwargs["orchestration_request_reference"] = bad_reference
+        with pytest.raises(ValueError, match="orchestration_request_reference"):
+            DraftEvidenceEnvelope(**kwargs)
 
 
 def test_requires_requester_reviewer_separation() -> None:
@@ -161,6 +187,14 @@ def test_post_construction_rewrite_fails_closed() -> None:
     """Prevent object-level rewriting from minting a new reviewed evidence document."""
     envelope = build()
     object.__setattr__(envelope, "response_evidence_digest", "d" * 64)
+    with pytest.raises(ValueError, match="changed after construction"):
+        envelope.canonical_json()
+
+
+def test_seal_rewrite_fails_closed() -> None:
+    """Reject removal of the process-local creation seal before evidence serialization."""
+    envelope = build()
+    object.__setattr__(envelope, "_creation_seal", None)
     with pytest.raises(ValueError, match="changed after construction"):
         envelope.canonical_json()
 
