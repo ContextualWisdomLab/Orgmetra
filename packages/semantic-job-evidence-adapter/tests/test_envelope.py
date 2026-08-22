@@ -1,6 +1,7 @@
 from dataclasses import replace
 from datetime import datetime, timezone
 from hashlib import sha256
+import json
 from uuid import uuid1, uuid4
 
 import pytest
@@ -15,6 +16,7 @@ DIGEST_C = "c" * 64
 
 
 def values() -> dict[str, object]:
+    """Return one valid value-minimized ontology source-evidence fixture."""
     return {
         "tenant_record_id": str(uuid4()),
         "job_analysis_reference": f"job_analysis:{uuid4()}",
@@ -33,6 +35,7 @@ def values() -> dict[str, object]:
 
 
 def test_canonical_evidence_is_value_minimized_and_deterministic() -> None:
+    """Canonical evidence contains governance/provenance only and has stable bytes."""
     packet = SemanticJobEvidenceEnvelope(**values())
     document = packet.canonical_document()
 
@@ -44,8 +47,9 @@ def test_canonical_evidence_is_value_minimized_and_deterministic() -> None:
     assert "query_term" not in document
     assert "response" not in document
     assert "person" not in document
-    assert packet.evidence_digest() == sha256(packet.canonical_json().encode("utf-8")).hexdigest()
-    assert packet.canonical_json() == SemanticJobEvidenceEnvelope(**values()).canonical_json() if False else packet.canonical_json()
+    expected_json = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    assert packet.canonical_json() == expected_json
+    assert packet.evidence_digest() == sha256(expected_json.encode("utf-8")).hexdigest()
     assert repr(packet) == "SemanticJobEvidenceEnvelope(<redacted>)"
 
 
@@ -54,8 +58,10 @@ def test_canonical_evidence_is_value_minimized_and_deterministic() -> None:
     [
         ("tenant_record_id", "00000000-0000-0000-0000-000000000000"),
         ("tenant_record_id", "not-a-uuid"),
+        ("tenant_record_id", str(uuid4()).upper()),
         ("job_analysis_reference", f"job_analysis:{uuid1()}"),
         ("job_analysis_reference", f"person:{uuid4()}"),
+        ("job_analysis_reference", "job_analysis:" + "a" * 181),
         ("ontology_request_reference", f"ontology_request:{uuid1()}"),
         ("ontology_request_reference", "ontology_request:not-a-uuid"),
         ("requesting_actor_reference", "staff:analyst"),
@@ -65,6 +71,7 @@ def test_canonical_evidence_is_value_minimized_and_deterministic() -> None:
         ("source_catalog_digest", "not-a-digest"),
         ("semantic_data_portal_revision", "0" * 40),
         ("api_operation", "POST /search/semantic"),
+        ("api_operation", ""),
         ("resolution_use_code", "automated_job_decision"),
         ("evidence_version", 0),
         ("evidence_version", 1_000_001),
@@ -73,6 +80,7 @@ def test_canonical_evidence_is_value_minimized_and_deterministic() -> None:
     ],
 )
 def test_rejects_invalid_governance_evidence(field_name: str, bad_value: object) -> None:
+    """Malformed, unsafe, or unreviewed evidence fails closed at construction."""
     candidate = values()
     candidate[field_name] = bad_value
     with pytest.raises(ValueError):
@@ -80,6 +88,7 @@ def test_rejects_invalid_governance_evidence(field_name: str, bad_value: object)
 
 
 def test_rejects_same_requester_and_reviewer() -> None:
+    """One actor cannot self-review ontology evidence for Job Analysis."""
     candidate = values()
     candidate["reviewing_actor_reference"] = candidate["requesting_actor_reference"]
     with pytest.raises(ValueError, match="must differ"):
@@ -87,35 +96,47 @@ def test_rejects_same_requester_and_reviewer() -> None:
 
 
 class ForgedText(str):
+    """Simulate caller text that lies during reviewed equality/hash operations."""
+
     def __eq__(self, other: object) -> bool:
+        """Pretend every comparison is equal."""
         return True
 
     def __ne__(self, other: object) -> bool:
+        """Pretend every comparison is not unequal."""
         return False
 
     def __hash__(self) -> int:
+        """Pretend to hash like an approved use code."""
         return hash("job_analysis_source_evidence")
 
 
 class ForgedInt(int):
+    """Simulate caller numeric evidence that lies during bounds checks."""
+
     def __le__(self, other: object) -> bool:
+        """Forge less-than-or-equal comparisons."""
         return True
 
     def __ge__(self, other: object) -> bool:
+        """Forge greater-than-or-equal comparisons."""
         return True
 
     def __lt__(self, other: object) -> bool:
+        """Forge strict less-than comparisons."""
         return False
 
     def __gt__(self, other: object) -> bool:
+        """Forge strict greater-than comparisons."""
         return False
 
 
 class ForgedDateTime(datetime):
-    pass
+    """Represent caller-executable temporal behavior at the trust boundary."""
 
 
 def test_rejects_runtime_subclasses_before_governance_comparison() -> None:
+    """Caller-defined primitives cannot forge reviewed state or canonical evidence."""
     for field_name, bad_value in (
         ("resolution_use_code", ForgedText("automated_job_decision")),
         ("api_operation", ForgedText("POST /search/semantic")),
@@ -129,6 +150,7 @@ def test_rejects_runtime_subclasses_before_governance_comparison() -> None:
 
 
 def test_rejects_post_construction_rewrite() -> None:
+    """Valid-looking field replacement cannot rewrite already-issued evidence."""
     packet = SemanticJobEvidenceEnvelope(**values())
     object.__setattr__(packet, "response_evidence_digest", "d" * 64)
     with pytest.raises(ValueError, match="changed after construction"):
@@ -136,12 +158,14 @@ def test_rejects_post_construction_rewrite() -> None:
 
 
 def test_replace_cannot_reseal_changed_evidence() -> None:
+    """Dataclass replacement cannot reset the issuance seal and create new authority."""
     packet = SemanticJobEvidenceEnvelope(**values())
     with pytest.raises(ValueError, match="changed after construction"):
         replace(packet, response_evidence_digest="d" * 64, _creation_seal=None)
 
 
 def test_rejects_caller_supplied_seal_and_marker_rewrite() -> None:
+    """Private seal and issuance marker fields remain fail-closed under hostile access."""
     candidate = values()
     candidate["_creation_seal"] = "0" * 64
     with pytest.raises(ValueError, match="changed after construction"):
@@ -153,7 +177,16 @@ def test_rejects_caller_supplied_seal_and_marker_rewrite() -> None:
         packet.canonical_document()
 
 
+def test_rejects_creation_seal_rewrite_even_when_payload_is_unchanged() -> None:
+    """The authoritative in-process seal cannot be replaced independently."""
+    packet = SemanticJobEvidenceEnvelope(**values())
+    object.__setattr__(packet, "_creation_seal", object())
+    with pytest.raises(ValueError, match="changed after construction"):
+        packet.canonical_json()
+
+
 def test_runtime_type_is_final() -> None:
+    """Subclasses cannot override derived trust state on the governed envelope."""
     with pytest.raises(TypeError, match="final"):
         class DerivedEnvelope(SemanticJobEvidenceEnvelope):
-            pass
+            """Attempt to extend the final evidence boundary."""
