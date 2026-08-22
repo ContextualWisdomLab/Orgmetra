@@ -150,6 +150,10 @@ class HrDataDispositionExecutionRequest:
     upstream_retention_window_state: str = "requires_authoritative_disposition_review"
     upstream_disposition_authorization_state: str = "not_authorized_to_delete"
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Keep derived execution authority from being overridden by subclasses."""
+        raise TypeError("HrDataDispositionExecutionRequest is final and cannot be subclassed")
+
     def __post_init__(self) -> None:
         """Fail closed on stale retention state, legal holds, chronology, or malformed scope."""
         self._assert_integrity()
