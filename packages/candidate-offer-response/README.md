@@ -17,6 +17,8 @@ This package records a **candidate-originated response to one exact reviewed off
 
 The packet normalizes caller timestamps to built-in UTC values at construction, rejects caller-defined subclasses at trust-bearing scalar boundaries, redacts routine `repr`, and seals its canonical construction digest so later field rewriting is rejected before serialization.
 
+Orgmetra-owned packet/evidence references keep their reviewed canonical UUIDv4 suffix contract. `candidate_actor_reference` is different: it is an opaque actor correlation supplied by the approved identity boundary, so this package validates the exact `candidate:` namespace and a bounded opaque token without inventing a UUID version requirement. The authoritative identity boundary must still re-resolve the actor before consequential use.
+
 ## What it deliberately does not do
 
 An accepted response is **not** authorization to hire, create employment, create an assignment, convert a candidate to a worker, send another offer, execute compensation, or mutate Keyverse. The packet therefore always carries `employment_effect=not_authorized_to_hire` and `scope_verification_state=requires_authoritative_resolution`.
@@ -43,7 +45,7 @@ packet = build_candidate_offer_response(
     offer_approval_digest="a" * 64,
     offer_terms_reference="offer_terms:6ba7b813-9dad-4b11-80b4-00c04fd430c8",
     offer_terms_digest="b" * 64,
-    candidate_actor_reference="candidate:6ba7b814-9dad-4b11-80b4-00c04fd430c8",
+    candidate_actor_reference="candidate:AItOawmwtWwcT0k51BayewNvutrJUqsvl6qs7A4",
     identity_resolution_reference="identity_resolution:6ba7b815-9dad-4b11-80b4-00c04fd430c8",
     identity_resolution_digest="c" * 64,
     response_code="offer_accepted",
