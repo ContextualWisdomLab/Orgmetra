@@ -87,8 +87,10 @@ def test_requires_distinct_human_reviewer() -> None:
 @pytest.mark.parametrize(
     ("field_name", "bad_value"),
     [
+        ("tenant_record_id", "not-a-uuid"),
         ("tenant_record_id", "00000000-0000-0000-0000-000000000000"),
         ("tenant_record_id", "ffffffff-ffff-ffff-ffff-ffffffffffff"),
+        ("result_evidence_reference", f"wrong_namespace:{uuid4()}"),
         ("result_evidence_reference", "psych_result_evidence:not-a-uuid"),
         ("candidate_evidence_reference", f"candidate_evidence:{uuid4().hex}"),
         ("requesting_actor_reference", "actor:alice_smith"),
