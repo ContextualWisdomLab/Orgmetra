@@ -12,14 +12,16 @@ TEST_ROOT = PACKAGE_ROOT / "tests"
 
 
 def _python_files() -> tuple[Path, ...]:
-    """Return every owned Python source/test file in deterministic order."""
-    return tuple(sorted((*SOURCE_ROOT.glob("*.py"), *TEST_ROOT.glob("*.py"))))
+    """Return every owned Python source/test file recursively in deterministic order."""
+    return tuple(sorted({*SOURCE_ROOT.rglob("*.py"), *TEST_ROOT.rglob("*.py")}))
 
 
 def test_owned_python_modules_and_callables_are_documented() -> None:
     """Require beginner-readable docstrings on every owned module, class, and callable."""
+    paths = _python_files()
+    assert paths, f"No owned Python files discovered under {SOURCE_ROOT} or {TEST_ROOT}"
     missing: list[str] = []
-    for path in _python_files():
+    for path in paths:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         if ast.get_docstring(tree, clean=False) is None:
             missing.append(f"{path.relative_to(PACKAGE_ROOT)}:<module>")
