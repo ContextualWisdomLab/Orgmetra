@@ -1,12 +1,12 @@
 # ADR: Govern identity deprovisioning as a non-executing review packet
 
-Status: Accepted on active PR; not protected-main truth until merged.
+Status: Accepted on active PR; protected default branch `develop` does not contain this boundary until merged.
 
 ## Context
 
 Orgmetra owns employment truth and domain authorization; Keyverse owns identity provisioning and account state. The foundation architecture identifies Keyverse OIDC/SCIM as the first external identity adapter, but directly translating an HR lifecycle observation into a Keyverse deactivation would collapse the service boundary and make stale or unreviewed HR evidence capable of removing access.
 
-Keyverse `main@ce207dfd42975db61c82a5963e206fc1db14ac2b` exposes an inbound SCIM v2 `PATCH /Users/{user_id}` path that deactivates when `active=false`. That repository is a dedicated-writer dependency and remains read-only here.
+Keyverse `main@ce207dfd42975db61c82a5963e206fc1db14ac2b` exposes the SCIM v2 public path `PATCH /scim/v2/Users/{user_id}` and deactivates when `active=false`. That repository is a dedicated-writer dependency and remains read-only here.
 
 ## Decision
 
