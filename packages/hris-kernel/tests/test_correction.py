@@ -22,8 +22,16 @@ class _ForeignRecordedFact:
 class _ForgedDateTime(datetime):
     """Datetime subtype that lies about ordering to bypass chronology checks."""
 
+    def __lt__(self, other: object) -> bool:
+        """Pretend the forged close time is never earlier than another instant."""
+        return False
+
     def __le__(self, other: object) -> bool:
         """Pretend every candidate close time is later than the recorded start."""
+        return False
+
+    def __gt__(self, other: object) -> bool:
+        """Keep strict ordering adversarial and consistent for the regression."""
         return False
 
 
