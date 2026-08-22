@@ -54,7 +54,7 @@ def test_handoff_rejects_datetime_subclass_that_can_forge_requested_at() -> None
 
 def test_result_rejects_datetime_subclass_that_can_forge_completed_at() -> None:
     """Result canonical evidence must not invoke caller-overridable datetime methods."""
-    with pytest.raises(ValueError, match="requested_at"):
+    with pytest.raises(ValueError, match="completed_at"):
         ValidationAnalysisResult(
             tenant_record_id="10000000-0000-7000-8000-000000000001",
             result_reference="validation_analysis_result:11111111-1111-4111-8111-111111111111",
