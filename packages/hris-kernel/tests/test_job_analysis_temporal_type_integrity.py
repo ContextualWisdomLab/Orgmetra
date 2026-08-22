@@ -92,6 +92,14 @@ class _ForgedLevel(int):
         """Forge the upper-bound comparison used by the level validator."""
         return True
 
+    def __lt__(self, other: object) -> bool:
+        """Keep adversarial ordering behavior internally consistent."""
+        return True
+
+    def __gt__(self, other: object) -> bool:
+        """Keep adversarial ordering behavior internally consistent."""
+        return True
+
 
 def _source(retrieved_at: datetime) -> EvidenceSource:
     """Build one governed source record."""
