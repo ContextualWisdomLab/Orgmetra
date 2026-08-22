@@ -9,7 +9,7 @@ without copying candidate or employee PII.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
@@ -82,11 +82,24 @@ def _validate_requirements_version_code(value: str) -> None:
         )
 
 
-def _canonical_timestamp(value: datetime) -> str:
-    """Render an aware instant as deterministic UTC RFC 3339 text without precision loss."""
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+def _freeze_timestamp(value: datetime) -> datetime:
+    """Detach caller-controlled timezone behavior and store one immutable UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
         raise ValueError("generated_at must be an exact timezone-aware datetime")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
+    if type(offset) is not timedelta:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+
+
+def _canonical_timestamp(value: datetime) -> str:
+    """Render only a previously detached built-in UTC instant as RFC 3339 text."""
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -156,7 +169,7 @@ class RequisitionReviewPacket:
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive requisition reason")
-        _canonical_timestamp(self.generated_at)
+        object.__setattr__(self, "generated_at", _freeze_timestamp(self.generated_at))
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for requisition approval")
         if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
