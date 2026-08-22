@@ -35,6 +35,7 @@ _ROUTE_PREFIX = ("v1", "tenants")
 _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _MAX_UUID_INT = (1 << 128) - 1
 _MAX_REQUEST_BODY_BYTES = 1 << 20
+_MAX_REQUEST_PATH_CHARACTERS = 256
 _MAX_REQUEST_HEADERS = 64
 _MAX_REQUEST_HEADER_BYTES = 16384
 _ERROR_NEXT_ACTION = {
@@ -293,7 +294,9 @@ class JobAnalysisAsgiApp:
 
 
 def _looks_like_snapshot_route(path: str) -> bool:
-    """Recognize collection or item snapshot routes before parsing identifiers."""
+    """Recognize only one bounded collection or item snapshot route."""
+    if len(path) > _MAX_REQUEST_PATH_CHARACTERS:
+        return False
     parts = path.strip("/").split("/")
     if len(parts) not in {4, 5}:
         return False
