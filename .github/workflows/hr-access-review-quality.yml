@@ -54,7 +54,8 @@ jobs:
           mkdir -p /tmp/orgmetra-hr-access-review-dist
           python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-hr-access-review-dist /tmp/orgmetra-hr-access-review-build
           test "$(find /tmp/orgmetra-hr-access-review-dist -maxdepth 1 -type f -name '*.whl' | wc -l)" -eq 1
-          python -m venv --system-site-packages /tmp/orgmetra-hr-access-review-venv
+          python -m venv /tmp/orgmetra-hr-access-review-venv
+          /tmp/orgmetra-hr-access-review-venv/bin/python -m pip install --require-hashes --no-deps --only-binary=:all: -r "$GITHUB_WORKSPACE/.github/requirements/foundation-test.txt"
           wheel_path="$(find /tmp/orgmetra-hr-access-review-dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
           wheel_sha="$(sha256sum "$wheel_path" | awk '{print $1}')"
           printf 'orgmetra-hr-access-review[test] @ file://%s --hash=sha256:%s\n' "$wheel_path" "$wheel_sha" > /tmp/orgmetra-hr-access-review-install.txt
@@ -63,12 +64,21 @@ jobs:
           /tmp/orgmetra-hr-access-review-venv/bin/python - <<'PY'
           from importlib.metadata import metadata
           from pathlib import Path
+          import coverage
+          import pytest
+          import pytest_cov
           import orgmetra_hr_access_review
 
-          module_path = Path(orgmetra_hr_access_review.__file__).resolve()
           venv_root = Path("/tmp/orgmetra-hr-access-review-venv").resolve()
+          module_path = Path(orgmetra_hr_access_review.__file__).resolve()
           if not module_path.is_relative_to(venv_root):
               raise SystemExit(f"package imported outside isolated environment: {module_path}")
+          for module in (coverage, pytest, pytest_cov):
+              dependency_path = Path(module.__file__).resolve()
+              if not dependency_path.is_relative_to(venv_root):
+                  raise SystemExit(
+                      f"test dependency imported outside isolated environment: {dependency_path}"
+                  )
           if "test" not in (metadata("orgmetra-hr-access-review").get_all("Provides-Extra") or []):
               raise SystemExit("built distribution does not expose the reviewed test extra")
           PY
