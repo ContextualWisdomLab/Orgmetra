@@ -101,9 +101,9 @@
     },
     {
       "path": "apps/hr-workspace/workspace.stories.js",
-      "sha256": "2a01f2846485fe9501877da2a8e45ad4363312bfc45ab51d9b57e520250cd689",
-      "bytes": 5372,
-      "lines": 88
+      "sha256": "7f30c56ca15a41541fdd44376aeb3b7cba9f39d76d00c05edd1f9934c884f35b",
+      "bytes": 6670,
+      "lines": 121
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
@@ -461,9 +461,9 @@
     },
     {
       "path": "tests/hr-workspace.test.mjs",
-      "sha256": "fdfdf8914dafc1b85bf673be94599d678cdcb45771c7e04210ae270d8ad627dd",
-      "bytes": 5886,
-      "lines": 126
+      "sha256": "20c20e565c6634d2f6875d459ff639b0e174d463ed59e46c862df88b4e6327a8",
+      "bytes": 6148,
+      "lines": 138
     },
     {
       "path": "tests/openapi-contract.test.mjs",
