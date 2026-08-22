@@ -100,3 +100,46 @@ class HireHttpErrorSchemaTests(unittest.IsolatedAsyncioTestCase):
             str(_TENANT),
             " ".join(str(value) for value in vars(record).values()),
         )
+
+    async def test_hire_rejection_is_not_misattributed_as_people_read_failure(self) -> None:
+        """Emit exactly one route-correct rejection log for a malformed hire request."""
+        app = HireAcceptanceAsgiApp(
+            authenticator=_UnusedAuthenticator(),
+            policy=PurposeBoundAccessPolicy(
+                tenant_record_id=_TENANT,
+                policy_version_code="people-hire-v1",
+                resource_kind="selection_decision",
+                purpose_code="candidate_hire",
+                operation_code="materialize_worker",
+                required_scope_code="orgmetra.people.materialize_worker",
+                permitted_fields=frozenset({"candidate_worker_conversion"}),
+            ),
+            mutation_port=_UnusedHirePort(),
+        )
+        messages: list[dict[str, object]] = []
+
+        async def receive() -> dict[str, object]:
+            """Prove route rejection never consumes a request body."""
+            raise AssertionError("malformed route body was read")
+
+        async def send(message: dict[str, object]) -> None:
+            """Capture the ASGI response while logging behavior is asserted."""
+            messages.append(message)
+
+        with self.assertLogs("orgmetra_people_api", level="INFO") as captured:
+            await app(
+                {
+                    "type": "http",
+                    "method": "POST",
+                    "path": "/v1/not-the-hire-route",
+                    "query_string": b"purpose=candidate_hire",
+                    "headers": (),
+                },
+                receive,
+                send,
+            )
+
+        rejection_messages = [record.getMessage() for record in captured.records]
+        self.assertEqual(rejection_messages, ["Confirmed-hire request rejected"])
+        self.assertNotIn("People read request rejected", rejection_messages)
+        self.assertEqual(len(messages), 2)
