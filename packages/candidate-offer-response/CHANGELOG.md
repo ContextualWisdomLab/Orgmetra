@@ -9,3 +9,4 @@
 - Exclude candidate PII, compensation values, free-form decline reasons, credentials, and model output from the evidence packet.
 - Normalize recorded/responded instants to detached built-in UTC values, reject trust-bearing runtime subclasses, redact `repr`, and detect post-construction evidence rewriting.
 - Add exact 100% statement/branch coverage and exact-head CI for the owned package.
+- Build a wheel and execute the quality suite against the SHA-256-bound installed artifact in a fully isolated virtual environment; install the reviewed hash-pinned pytest/coverage toolchain inside that environment and fail closed if package or test-tool imports resolve outside it.
