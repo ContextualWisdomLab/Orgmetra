@@ -376,6 +376,11 @@ if (typeof document !== 'undefined') {
   }
   jobAnalysisForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!jobAnalysisConfig?.baseUrl || typeof jobAnalysisConfig?.getAuthorization !== 'function') {
+      clearJobAnalysisSnapshot();
+      setJobAnalysisStatus('jobAnalysisNotConfigured', 'not-configured');
+      return;
+    }
     const requestVersion = ++jobAnalysisRequestVersion;
     clearJobAnalysisSnapshot();
     const config = {
@@ -410,6 +415,11 @@ if (typeof document !== 'undefined') {
   }
   peopleApiForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!peopleApiConfig?.baseUrl || typeof peopleApiConfig?.getAuthorization !== 'function') {
+      clearPeopleRecord();
+      setPeopleApiStatus('peopleApiNotConfigured', 'not-configured');
+      return;
+    }
     const requestVersion = ++peopleApiRequestVersion;
     clearPeopleRecord();
     const config = {
