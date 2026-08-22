@@ -58,14 +58,14 @@ def test_retention_window_requires_continued_retention_and_never_authorizes_dele
     assert review.human_review_required is True
     assert review.purpose_code == "hr_data_retention_review"
     assert review.requested_action == "review_disposition_eligibility"
-    assert "retain the record" in review.next_action
+    assert "Retain the record" in review.next_action
 
 
 def test_elapsed_retention_date_requires_authoritative_disposition_review() -> None:
     """A passed policy date is only a review trigger, never deletion authority."""
     review = packet(retention_due_on=date(2026, 8, 21))
     assert review.retention_window_state == "requires_authoritative_disposition_review"
-    assert "re-resolve the authoritative retention policy" in review.next_action
+    assert "Re-resolve the authoritative retention policy" in review.next_action
     assert review.disposition_authorization_state == "not_authorized_to_delete"
 
 
