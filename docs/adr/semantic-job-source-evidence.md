@@ -26,7 +26,7 @@ The canonical evidence always records `external_source_evidence`, `requires_huma
 
 Semantic Data Portal remains read-only to this Orgmetra lane. No foreign application table is queried. Provider revision/API drift fails closed until explicitly reviewed. Raw ontology content, PII, credentials, scores, and decisions stay outside this value-minimized envelope.
 
-Trust-bearing runtime primitives are accepted only as exact built-in types before caller-overridable equality, hashing, comparison, parsing, or serialization can run. Creation-time evidence is sealed in process and is revalidated before canonical export so valid-looking post-construction rewrites fail closed.
+Trust-bearing runtime primitives are accepted only as exact built-in types before caller-overridable equality, hashing, comparison, parsing, or serialization can run. Creation-time evidence is sealed in process and its authoritative seal is held in a lock-protected issuance registry outside envelope-writable slots. Canonical export revalidates live fields against that external seal, so changing the payload together with a recomputed packet-owned seal still fails closed.
 
 ## Consequences
 
