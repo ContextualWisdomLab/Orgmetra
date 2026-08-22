@@ -4,12 +4,13 @@ import pytest
 
 import orgmetra_semantic_job_evidence_adapter.envelope as envelope_module
 from orgmetra_semantic_job_evidence_adapter import SemanticJobEvidenceEnvelope
-from test_envelope import values
 
 
-def test_recomputed_packet_owned_seal_cannot_authorize_rewritten_evidence() -> None:
+def test_recomputed_packet_owned_seal_cannot_authorize_rewritten_evidence(
+    semantic_values: dict[str, object],
+) -> None:
     """Rewriting payload plus its packet-owned seal must still fail closed."""
-    packet = SemanticJobEvidenceEnvelope(**values())
+    packet = SemanticJobEvidenceEnvelope(**semantic_values)
     object.__setattr__(packet, "response_evidence_digest", "d" * 64)
     forged_seal = envelope_module._seal(packet._canonical_payload_json())
     object.__setattr__(packet, "_creation_seal", forged_seal)
