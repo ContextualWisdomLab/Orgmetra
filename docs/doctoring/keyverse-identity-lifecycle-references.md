@@ -1,6 +1,6 @@
 # Keyverse identity lifecycle references
 
-Reviewed: 2026-08-23.
+Reviewed: 2026-08-22 UTC (2026-08-23 Asia/Seoul).
 
 ## Primary technical sources
 
