@@ -68,7 +68,7 @@
     {"path":"scripts/foundation-contract-core.mjs","sha256":"91391e9f0c8001a9501a7b36e278016848f7b2e2e50e8519ced34e284162cdec","bytes":28674,"lines":700},
     {"path":"scripts/foundation-contract.mjs","sha256":"5242dcdbe0935775edf074462c82600e9bc4927d9fdc50c47727af915fd4b23a","bytes":218,"lines":6},
     {"path":"tests/dispatcher-inventory.test.mjs","sha256":"26215a75fe4f721fa57bea9cab9dfd43b7fef0a9091d8bbe054c71e3458e9b3b","bytes":7782,"lines":197},
-    {"path":"tests/foundation-contract.test.mjs","sha256":"4e4c90cb0706acea7a046fe698a6726d8dd4b88025d3ddfb69882265a2ba7742","bytes":15456,"lines":403},
+    {"path":"tests/foundation-contract.test.mjs","sha256":"d010fdf3db0b0953028b61c3de675066d8d5b58175de50875eb250da7c195128","bytes":15618,"lines":408},
     {"path":"tests/openapi-contract.test.mjs","sha256":"09f0504e1bb517e6abde1bf6114337ab5d3e6a773215e858b1c2027cf5c70f83","bytes":7981,"lines":236},
     {"path":"tests/test_audit_outbox_hardening_postgres.sh","sha256":"518ba2f37ba6292943e5abe22c2599452b2f031a42e453b2493aedf8714421a0","bytes":13396,"lines":333},
     {"path":"tests/test_audit_outbox_postgres.sh","sha256":"e57a04920a0ba97fa6a06752d15ea150016ab8d44099e998c5c4f4067592b4d2","bytes":13443,"lines":357},
