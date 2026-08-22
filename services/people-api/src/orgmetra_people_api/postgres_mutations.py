@@ -322,7 +322,7 @@ def _require_authorization(
     requested_fields: frozenset[str],
 ) -> AuthorizationDecision:
     """Require an exact allow decision for the intended mutation target."""
-    if not isinstance(authorization, AuthorizationDecision):
+    if type(authorization) is not AuthorizationDecision:
         raise PeopleMutationIntegrityError("people mutation requires a typed authorization decision")
     if (
         not authorization.allowed
