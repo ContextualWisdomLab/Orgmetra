@@ -188,7 +188,7 @@ class ValidationAnalysisResult:
             raise ValueError("convergence_diagnostics must be ConvergenceDiagnostics")
         if self.sample_size != self.missingness_summary.total_observations:
             raise ValueError("sample_size must match total_observations")
-        _canonical_timestamp(self.completed_at)
+        _canonical_timestamp(self.completed_at, "completed_at")
         if self.result_authority != _RESULT_AUTHORITY:
             raise ValueError("result_authority must remain scientific_evidence_only")
         if self.execution_state != _EXECUTION_STATE:
@@ -208,7 +208,7 @@ class ValidationAnalysisResult:
         """Return deterministic, non-person-level JSON for audit correlation."""
         payload = {
             "backend": self.backend,
-            "completed_at": _canonical_timestamp(self.completed_at),
+            "completed_at": _canonical_timestamp(self.completed_at, "completed_at"),
             "contains_raw_person_level_values": self.contains_raw_person_level_values,
             "convergence_diagnostics": self.convergence_diagnostics.to_dict(),
             "effect_estimate": float(self.effect_estimate),
