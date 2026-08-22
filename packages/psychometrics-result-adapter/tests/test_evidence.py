@@ -134,6 +134,12 @@ def test_foreign_references_must_arrive_canonical_and_control_free(field_name: s
         valid_envelope(**{field_name: "owner\nref"})
 
 
+def test_accepts_foreign_reference_normalized_by_the_pinned_owner() -> None:
+    owner_normalized_reference = "result\u200dsnapshot"
+    envelope = valid_envelope(result_snapshot_reference=owner_normalized_reference)
+    assert envelope.canonical_document()["result_snapshot_reference"] == owner_normalized_reference
+
+
 def test_optional_foreign_references_are_validated_when_present() -> None:
     with pytest.raises(ValueError):
         valid_envelope(norm_version_reference=" ")
