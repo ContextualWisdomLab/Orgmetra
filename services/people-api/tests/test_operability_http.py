@@ -119,6 +119,15 @@ class PeopleOperabilityHttpTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(RuntimeError, "readiness query"):
             bad_probe.check_ready()
 
+    def test_postgres_probe_accepts_mapping_row_factory(self) -> None:
+        """Treat an equivalent mapping row as healthy instead of coupling readiness to tuple rows."""
+        cursor = FakeCursor(row={"readiness_value": 1})
+        probe = PostgresReadinessProbe(connection_factory=lambda: FakeConnection(cursor))
+
+        probe.check_ready()
+
+        self.assertEqual(cursor.executed, ["SET TRANSACTION READ ONLY", "SELECT 1"])
+
     def test_canonical_operability_doc_describes_the_probe_contract(self) -> None:
         """Keep the canonical operator runbook aligned with the executable probe surface."""
         repository_root = Path(__file__).resolve().parents[3]
