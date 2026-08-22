@@ -22,7 +22,8 @@ def valid_envelope(**overrides: object) -> PsychometricsResultEvidenceEnvelope:
     values: dict[str, object] = {
         "tenant_record_id": str(uuid4()),
         "result_evidence_reference": _ref("psych_result_evidence"),
-        "candidate_evidence_reference": _ref("candidate_evidence"),
+        "candidate_evidence_intake_reference": _ref("candidate_evidence_intake"),
+        "candidate_evidence_intake_digest": HEX_B,
         "requesting_actor_reference": _ref("actor"),
         "reviewing_actor_reference": _ref("actor"),
         "result_snapshot_reference": "result_snapshot_alpha",
@@ -59,6 +60,8 @@ def test_canonical_evidence_is_value_minimized_and_non_authorizing() -> None:
     assert document["score_handling_state"] == "score_values_not_stored"
     assert document["psychometrics_commons_revision"] == OWNER_REVISION
     assert document["requested_output_schema_version"] == 1
+    assert document["candidate_evidence_intake_reference"].startswith("candidate_evidence_intake:")
+    assert document["candidate_evidence_intake_digest"] == HEX_B
     assert "participant_ref" not in document
     assert "score_observations" not in document
     assert "consent_snapshot_refs" not in document
@@ -92,7 +95,8 @@ def test_requires_distinct_human_reviewer() -> None:
         ("tenant_record_id", "ffffffff-ffff-ffff-ffff-ffffffffffff"),
         ("result_evidence_reference", f"wrong_namespace:{uuid4()}"),
         ("result_evidence_reference", "psych_result_evidence:not-a-uuid"),
-        ("candidate_evidence_reference", f"candidate_evidence:{uuid4().hex}"),
+        ("candidate_evidence_intake_reference", f"candidate_evidence_intake:{uuid4().hex}"),
+        ("candidate_evidence_intake_digest", "A" * 64),
         ("requesting_actor_reference", "actor:alice_smith"),
         ("reviewing_actor_reference", "actor:employee-123"),
         ("participant_binding_digest", "A" * 64),
