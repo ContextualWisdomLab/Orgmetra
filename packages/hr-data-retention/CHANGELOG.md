@@ -7,4 +7,5 @@
 - Fail closed under active holds and unexpired retention windows, and treat an elapsed due date only as a trigger for authoritative disposition review.
 - Keep every packet explicitly `not_authorized_to_delete`; no automatic deletion, cross-service SQL, or foreign repository mutation is introduced.
 - Revalidate all trust-bearing fields immediately before canonical audit serialization so low-level post-construction mutation cannot emit contradictory legal-hold or noncanonical recorded-time evidence.
-- Add adversarial runtime-type, namespace, UUID, digest, chronology, separation-of-duties, replacement, serialization-time integrity, canonicalization, and exact 100% statement/branch coverage regressions.
+- Make the trust-bearing packet runtime-final so a caller cannot subclass it and override derived non-authorizing state before canonical serialization.
+- Add adversarial runtime-type, namespace, UUID, digest, chronology, separation-of-duties, replacement, serialization-time integrity, subclass-forgery, canonicalization, and exact 100% statement/branch coverage regressions.
