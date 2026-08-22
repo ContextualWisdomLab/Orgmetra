@@ -8,7 +8,7 @@ sensitive correlating metadata and are redacted from the ordinary object represe
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
@@ -73,11 +73,24 @@ def _validate_digest(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
-def _canonical_timestamp(value: datetime) -> str:
-    """Render an aware instant as precision-preserving UTC RFC 3339 text."""
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+def _freeze_timestamp(value: datetime) -> datetime:
+    """Detach caller-controlled timezone behavior and store one immutable UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
         raise ValueError("collected_at must be an exact timezone-aware datetime")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise ValueError("collected_at must be an exact timezone-aware datetime") from exc
+    if type(offset) is not timedelta:
+        raise ValueError("collected_at must be an exact timezone-aware datetime")
+    return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+
+
+def _canonical_timestamp(value: datetime) -> str:
+    """Render only a previously detached built-in UTC instant as RFC 3339 text."""
+    if type(value) is not datetime or type(value.tzinfo) is not timezone:
+        raise ValueError("collected_at must be an exact timezone-aware datetime")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -117,38 +130,18 @@ class CandidateEvidenceIntakePacket:
         """Fail closed when direct construction drifts from the governed contract."""
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(self.intake_reference, "candidate_evidence_intake", "intake_reference")
-        _validate_reference(
-            self.candidate_profile_reference,
-            "candidate_profile",
-            "candidate_profile_reference",
-        )
+        _validate_reference(self.candidate_profile_reference, "candidate_profile", "candidate_profile_reference")
         _validate_reference(self.requisition_reference, "requisition", "requisition_reference")
         _validate_reference(self.job_profile_reference, "job_profile", "job_profile_reference")
-        _validate_reference(
-            self.job_requirements_reference,
-            "job_requirements",
-            "job_requirements_reference",
-        )
+        _validate_reference(self.job_requirements_reference, "job_requirements", "job_requirements_reference")
         _validate_digest(self.job_requirements_digest, "job_requirements_digest")
         _validate_reference(self.evidence_set_reference, "evidence_set", "evidence_set_reference")
         _validate_digest(self.evidence_set_digest, "evidence_set_digest")
-        _validate_reference(
-            self.source_provenance_reference,
-            "source_provenance",
-            "source_provenance_reference",
-        )
+        _validate_reference(self.source_provenance_reference, "source_provenance", "source_provenance_reference")
         _validate_digest(self.source_provenance_digest, "source_provenance_digest")
-        _validate_reference(
-            self.handling_policy_reference,
-            "handling_policy",
-            "handling_policy_reference",
-        )
+        _validate_reference(self.handling_policy_reference, "handling_policy", "handling_policy_reference")
         _validate_digest(self.handling_policy_digest, "handling_policy_digest")
-        _validate_reference(
-            self.retention_policy_reference,
-            "retention_policy",
-            "retention_policy_reference",
-        )
+        _validate_reference(self.retention_policy_reference, "retention_policy", "retention_policy_reference")
         _validate_digest(self.retention_policy_digest, "retention_policy_digest")
         _validate_reference(self.actor_reference, "actor", "actor_reference")
         if type(self.evidence_item_count) is not int or not 1 <= self.evidence_item_count <= 100:
@@ -159,7 +152,7 @@ class CandidateEvidenceIntakePacket:
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive candidate-evidence reason")
-        _canonical_timestamp(self.collected_at)
+        object.__setattr__(self, "collected_at", _freeze_timestamp(self.collected_at))
         if type(self.evidence_version) is not int or not 1 <= self.evidence_version <= 2_147_483_647:
             raise ValueError("evidence_version must be an integer from 1 through 2147483647")
         if self.human_confirmation_required is not True:
