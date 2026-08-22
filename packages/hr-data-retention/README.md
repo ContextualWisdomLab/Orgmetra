@@ -14,7 +14,9 @@ This package creates **review evidence**, not deletion authority. It helps an au
 - distinct requester and reviewer actor references;
 - evidence version and exact UTC system-recorded time.
 
-The packet deliberately carries no employee/candidate name, email, salary, assessment score, free-form HR content, or copied policy text. `repr(...)` is redacted. The packet is also runtime-final: callers cannot subclass it to replace derived governance properties such as `disposition_authorization_state` with forged authority before canonical serialization.
+The packet deliberately carries no employee/candidate name, email, salary, assessment score, free-form HR content, or copied policy text. `repr(...)` is redacted. The packet is runtime-final, so callers cannot subclass it to replace derived governance properties such as `disposition_authorization_state` with forged authority before canonical serialization.
+
+Construction also seals the exact canonical evidence digest. Canonicalization first revalidates the live fields and then verifies that the well-formed current evidence still matches that creation-time seal. This means low-level replacement of a policy digest, reviewer, reviewed date, or coherent legal-hold evidence is rejected rather than silently becoming a second audit fact. A legitimate correction must create a new governed packet/evidence version and flow through the durable append-only audit boundary; it does not rewrite an already-issued in-memory review artifact.
 
 ## Fail-closed disposition states
 
