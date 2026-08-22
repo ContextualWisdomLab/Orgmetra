@@ -6,9 +6,11 @@ Status: **active PR only**. This document does not describe protected-main truth
 
 | Requirement | Implementation | Regression / evidence |
 | --- | --- | --- |
-| Periodically or eventfully review existing HR access without exposing HR values | `HrAccessReviewPacket` stores opaque references plus scope/policy/entitlement digests only | `test_builds_value_minimized_non_enforcing_access_review_evidence` |
+| Periodically or eventfully review existing HR access without exposing HR values | `HrAccessReviewPacket` stores opaque references plus scope/policy/entitlement/reviewer-identity digests only | `test_builds_value_minimized_non_enforcing_access_review_evidence` |
+| Bind the governance purpose explicitly | Canonical evidence fixes `purpose_code=hr_access_recertification` rather than inferring purpose from packet type | `test_binds_explicit_access_review_purpose`, direct governance-state drift regression |
 | Preserve least privilege without making review evidence an enforcement command | Closed recommendations are retain/reduce/remove existing access; fixed enforcement state is `not_authorized_to_modify_access` | `test_supports_reviewed_reduction_and_removal_without_execution_authority`, rejection of expansion vocabulary |
-| Require accountable human separation | Reviewer must differ from requester and reviewed subject | `test_requires_independent_reviewer` |
+| Require accountable human separation and identity provenance | Reviewer must differ from requester and reviewed subject, and reviewer identity-resolution evidence is SHA-256 bound | `test_requires_independent_reviewer`, `test_binds_reviewer_identity_evidence_and_system_recorded_time` |
+| Preserve human-review time separately from system-recorded time | Both are exact UTC primitives and `recorded_at` may not precede `reviewed_at` | `test_binds_reviewer_identity_evidence_and_system_recorded_time`, `test_requires_exact_utc_review_and_recorded_times` |
 | Re-resolve live identity and authorization state before enforcement | Fixed `scope_verification_state=requires_authoritative_resolution` and action-oriented next step | canonical-document assertions |
 | Preserve audit correlation without HR PII or credentials | Tenant/review/actor references and SHA-256 evidence only; redacted repr | value-minimization regression |
 | Fail closed on runtime-polymorphism attacks | Trust-bearing strings, integer versions, timestamps and fixed states require exact built-in primitives | hostile runtime and invalid primitive regressions |
@@ -17,9 +19,11 @@ Status: **active PR only**. This document does not describe protected-main truth
 
 ## Ownership boundary
 
-This lane writes only Orgmetra. It does not mutate Keyverse, central `.github`, or another dedicated-writer repository. `actor:` references are opaque correlation for later authoritative identity resolution; they are not credentials or proof that the named actor is currently authenticated.
+This lane writes only Orgmetra. It does not mutate Keyverse, central `.github`, or another dedicated-writer repository. `actor:` references are opaque correlation for later authoritative identity resolution; they are not credentials or proof that the named actor is currently authenticated. The reviewer identity digest binds upstream identity-resolution evidence without copying identity payloads into this packet.
 
-The packet is not an access-grant/revoke API, does not write foreign application tables, and does not claim that a review recommendation has been enforced. A downstream access mutation must independently re-resolve actor, tenant, purpose, resource scope, policy, current entitlement state, and reviewer authority, then emit its own immutable audit/outbox evidence.
+The packet is not an access-grant/revoke API, does not write foreign application tables, and does not claim that a review recommendation has been enforced. A downstream access mutation must independently re-resolve actor, tenant, purpose, resource scope, policy, current entitlement state, reviewer identity evidence and reviewer authority, then emit its own immutable audit/outbox evidence.
+
+`reviewed_at` is the human review event time. `recorded_at` is the later-or-equal system-recorded evidence time supplied at this application boundary. Durable database transaction time is not claimed until canonical evidence enters Orgmetra's immutable audit/outbox persistence boundary.
 
 ## Standards interpretation
 
