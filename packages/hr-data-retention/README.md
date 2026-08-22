@@ -14,7 +14,7 @@ This package creates **review evidence**, not deletion authority. It helps an au
 - distinct requester and reviewer actor references;
 - evidence version and exact UTC system-recorded time.
 
-The packet deliberately carries no employee/candidate name, email, salary, assessment score, free-form HR content, or copied policy text. `repr(...)` is redacted.
+The packet deliberately carries no employee/candidate name, email, salary, assessment score, free-form HR content, or copied policy text. `repr(...)` is redacted. The packet is also runtime-final: callers cannot subclass it to replace derived governance properties such as `disposition_authorization_state` with forged authority before canonical serialization.
 
 ## Fail-closed disposition states
 
