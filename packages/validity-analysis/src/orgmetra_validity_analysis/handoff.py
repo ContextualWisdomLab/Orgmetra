@@ -95,10 +95,10 @@ def _validate_kernel_revision(value: str) -> None:
         raise ValueError("fast_mlsirm_revision must equal the reviewed immutable revision")
 
 
-def _canonical_timestamp(value: datetime) -> str:
-    """Render an exact built-in aware instant as precision-preserving UTC RFC 3339 text."""
+def _canonical_timestamp(value: datetime, field_name: str) -> str:
+    """Render an exact built-in aware instant with field-correct diagnostics."""
     if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("requested_at must be timezone-aware")
+        raise ValueError(f"{field_name} must be timezone-aware")
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
@@ -164,7 +164,7 @@ class ValidationAnalysisHandoff:
         if self.actor_reference == self.reviewer_reference:
             raise ValueError("reviewer_reference must identify a different accountable actor")
         _validate_kernel_revision(self.fast_mlsirm_revision)
-        _canonical_timestamp(self.requested_at)
+        _canonical_timestamp(self.requested_at, "requested_at")
         _validate_code(self.purpose_code, "purpose_code")
         if self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain selection_validity_analysis")
@@ -222,7 +222,7 @@ class ValidationAnalysisHandoff:
             "predictor_snapshot_reference": self.predictor_snapshot_reference,
             "purpose_code": self.purpose_code,
             "reason_code": self.reason_code,
-            "requested_at": _canonical_timestamp(self.requested_at),
+            "requested_at": _canonical_timestamp(self.requested_at, "requested_at"),
             "required_result_evidence": list(self.required_result_evidence),
             "result_authority": self.result_authority,
             "reviewer_reference": self.reviewer_reference,
