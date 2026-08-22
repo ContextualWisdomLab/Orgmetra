@@ -1,3 +1,5 @@
+"""Adversarial contract tests for governed Semantic Data Portal source evidence."""
+
 from dataclasses import replace
 from datetime import datetime, timezone
 from hashlib import sha256
