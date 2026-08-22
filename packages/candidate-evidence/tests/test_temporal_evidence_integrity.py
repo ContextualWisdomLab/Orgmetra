@@ -39,6 +39,20 @@ class _MutableOffset(tzinfo):
         return timedelta(0)
 
 
+class _ExplodingOffset(tzinfo):
+    """Raise arbitrary provider behavior while an offset is resolved."""
+
+    def utcoffset(self, value):  # type: ignore[no-untyped-def]
+        """Raise an implementation detail the boundary must normalize."""
+        del value
+        raise RuntimeError("provider details must not escape")
+
+    def dst(self, value):  # type: ignore[no-untyped-def]
+        """Keep daylight saving fixed if queried."""
+        del value
+        return timedelta(0)
+
+
 def _build(collected_at: datetime):
     """Build one otherwise-valid packet around the supplied evidence instant."""
     return build_candidate_evidence_intake_packet(
@@ -84,3 +98,17 @@ def test_candidate_evidence_detaches_mutable_timezone_state() -> None:
     assert packet.collected_at.tzinfo is timezone.utc
     assert packet.canonical_json() == first_json
     assert packet.sha256_digest() == first_digest
+
+
+def test_candidate_evidence_normalizes_timezone_provider_exceptions() -> None:
+    """Do not leak arbitrary timezone-provider exceptions from packet construction."""
+    with pytest.raises(ValueError, match="collected_at"):
+        _build(datetime(2026, 8, 21, 5, 0, tzinfo=_ExplodingOffset()))
+
+
+def test_candidate_evidence_rejects_postconstruction_timezone_reinjection() -> None:
+    """Fail closed if low-level mutation reintroduces executable timezone behavior."""
+    packet = _build(datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc))
+    object.__setattr__(packet, "collected_at", datetime(2026, 8, 21, 5, 0, tzinfo=_MutableOffset()))
+    with pytest.raises(ValueError, match="collected_at"):
+        packet.canonical_json()
