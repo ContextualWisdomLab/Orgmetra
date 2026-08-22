@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 
 from orgmetra_job_analysis_api.auth import AuthenticationFailed
-from orgmetra_job_analysis_api.http import _typed_headers
+from orgmetra_job_analysis_api.http import _looks_like_snapshot_route, _typed_headers
 
 
 class JobAnalysisHttpRequestBudgetTests(unittest.TestCase):
@@ -24,6 +24,12 @@ class JobAnalysisHttpRequestBudgetTests(unittest.TestCase):
 
         with self.assertRaises(AuthenticationFailed):
             _typed_headers({"headers": headers})
+
+    def test_rejects_excessive_route_path_before_split_or_uuid_parsing(self) -> None:
+        """Reject an oversized route-shaped path before allocating split segments."""
+        path = f"/v1/tenants/{'x' * 257}/job-analysis-snapshots"
+
+        self.assertFalse(_looks_like_snapshot_route(path))
 
 
 if __name__ == "__main__":
