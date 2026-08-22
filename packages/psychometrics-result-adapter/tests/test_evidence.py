@@ -38,7 +38,7 @@ def valid_envelope(**overrides: object) -> PsychometricsResultEvidenceEnvelope:
         "engine_artifact_digest": f"sha256:{HEX_A}",
         "result_snapshot_digest": HEX_B,
         "requested_output_schema_version": 1,
-        "result_created_at_unix_ms": 1_788_000_000_000,
+        "result_created_at_unix_ms": 1_787_000_000_000,
         "supersedes_result_snapshot_reference": None,
         "psychometrics_commons_revision": OWNER_REVISION,
         "evidence_version": 1,
@@ -135,6 +135,14 @@ def test_optional_foreign_references_are_validated_when_present() -> None:
         valid_envelope(norm_version_reference=" ")
     with pytest.raises(ValueError):
         valid_envelope(supersedes_result_snapshot_reference="bad\tref")
+
+
+def test_rejects_self_supersession_and_future_source_result() -> None:
+    envelope = valid_envelope()
+    with pytest.raises(ValueError, match="cannot supersede itself"):
+        valid_envelope(supersedes_result_snapshot_reference=envelope.result_snapshot_reference)
+    with pytest.raises(ValueError, match="cannot precede"):
+        valid_envelope(result_created_at_unix_ms=2_000_000_000_000)
 
 
 def test_exact_runtime_primitives_are_required() -> None:
