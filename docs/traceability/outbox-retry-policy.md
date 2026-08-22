@@ -27,6 +27,8 @@ PR #51 (`docs/protected-truth-refresh`) is the dependency parent for canonical b
 
 PR #82 introduces `outbox_retry_policy_record`, a capped exponential delay calculator, a database transition guard that rejects caller-selected retry timing, and `retry_outbox_delivery_with_policy(...)`. A raw legacy retry call cannot bypass policy because the actual leased-to-pending state transition is checked at the database owner boundary.
 
+The new delay policy does not replace the protected `maximum_attempt_count` budget. Attempt exhaustion remains governed by the existing durable delivery record; this PR governs only when a nonterminal retry may become eligible again.
+
 The active PR does **not** claim that asynchronous delivery is fully production-ready. It does not add downstream receipt verification, transport-specific producer configuration, or jitter. Those remain separate release-readiness concerns.
 
 ## Verification
