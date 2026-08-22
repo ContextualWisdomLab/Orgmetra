@@ -1,6 +1,6 @@
 """Retroactive correction tests: close recorded time, then insert a replacement."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 from uuid import UUID
 
@@ -83,6 +83,19 @@ def test_close_recorded_interval_rejects_foreign_dataclass_with_recorded_shape()
     with pytest.raises(CorrectionError, match="kernel fact"):
         close_recorded_interval(
             foreign_fact,
+            recorded_to=utc(2024, 6, 15, 9),
+        )
+
+
+def test_close_recorded_interval_rejects_malformed_kernel_recorded_history(
+    jordan_active_employment,
+) -> None:
+    """An exact kernel fact cannot carry a caller-owned recorded-history object."""
+    malformed_fact = replace(jordan_active_employment, recorded=object())
+
+    with pytest.raises(CorrectionError, match="RecordedInterval"):
+        close_recorded_interval(
+            malformed_fact,
             recorded_to=utc(2024, 6, 15, 9),
         )
 
