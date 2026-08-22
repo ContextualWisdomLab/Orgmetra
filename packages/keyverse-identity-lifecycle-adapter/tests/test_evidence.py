@@ -1,7 +1,7 @@
 """Behavioral and adversarial contract tests for Keyverse deprovision handoff evidence."""
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from uuid import UUID, uuid4
 
@@ -37,7 +37,7 @@ def values() -> dict[str, object]:
         "requester_actor_reference": ref("actor"),
         "keyverse_revision": REVIEWED_KEYVERSE_REVISION,
         "evidence_version": 1,
-        "recorded_at": datetime(2026, 8, 23, 3, 1, tzinfo=timezone.utc),
+        "recorded_at": datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
     }
 
 
@@ -113,13 +113,21 @@ def test_rejects_invalid_evidence_versions(version: object) -> None:
 def test_requires_exact_utc_recorded_time() -> None:
     """Reject naive and non-canonical UTC runtime evidence."""
     for value in (
-        datetime(2026, 8, 23, 3, 1),
-        datetime(2026, 8, 23, 3, 1, tzinfo=ZoneInfo("UTC")),
+        datetime(2026, 1, 1, 12, 0),
+        datetime(2026, 1, 1, 12, 0, tzinfo=ZoneInfo("UTC")),
     ):
         payload = values()
         payload["recorded_at"] = value
         with pytest.raises(ValueError):
             KeyverseIdentityDeprovisionReviewPacket(**payload)
+
+
+def test_rejects_future_system_recorded_time() -> None:
+    """Do not seal system-recorded evidence whose issuance time has not occurred yet."""
+    payload = values()
+    payload["recorded_at"] = datetime.now(timezone.utc) + timedelta(minutes=5)
+    with pytest.raises(ValueError, match="must not be in the future"):
+        KeyverseIdentityDeprovisionReviewPacket(**payload)
 
 
 def test_rejects_non_uuid_or_reserved_tenant_identity() -> None:
