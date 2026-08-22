@@ -9,8 +9,10 @@ import hmac
 import json
 import re
 import secrets
+from threading import RLock
 from typing import ClassVar
 from uuid import UUID
+from weakref import finalize
 
 
 _SEMANTIC_DATA_PORTAL_REVISION = "e48aa13c4af7a4875d4b53e6a60b50405c265a2f"
@@ -20,6 +22,28 @@ _USED_ISSUANCE_MARKER = object()
 _DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}")
 _ACTOR_PATTERN = re.compile(r"actor:[A-Za-z0-9._~-]{1,128}")
 _ALLOWED_RESOLUTION_USES = frozenset({"job_analysis_source_evidence"})
+_CREATION_SEALS: dict[int, str] = {}
+_CREATION_SEALS_LOCK = RLock()
+
+
+def _discard_creation_seal(envelope_id: int) -> None:
+    """Discard the process-local authoritative seal when its envelope is collected."""
+    with _CREATION_SEALS_LOCK:
+        _CREATION_SEALS.pop(envelope_id, None)
+
+
+def _register_creation_seal(envelope: object, seal: str) -> None:
+    """Bind one live envelope identity to creation evidence outside writable slots."""
+    envelope_id = id(envelope)
+    with _CREATION_SEALS_LOCK:
+        _CREATION_SEALS[envelope_id] = seal
+    finalize(envelope, _discard_creation_seal, envelope_id)
+
+
+def _authoritative_creation_seal(envelope: object) -> str | None:
+    """Return process-local creation evidence without trusting packet-owned state."""
+    with _CREATION_SEALS_LOCK:
+        return _CREATION_SEALS.get(id(envelope))
 
 
 def _require_text(value: object, field_name: str) -> str:
@@ -90,7 +114,7 @@ def _seal(payload_json: str) -> str:
     return hmac.new(_PROCESS_SEAL_KEY, payload_json.encode("utf-8"), "sha256").hexdigest()
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class SemanticJobEvidenceEnvelope:
     """Bind ontology source provenance without granting Job or employment decision authority."""
 
@@ -126,8 +150,10 @@ class SemanticJobEvidenceEnvelope:
         if self._creation_seal is not None:
             raise ValueError("semantic job evidence changed after construction")
         self._validate_fields()
-        object.__setattr__(self, "_creation_seal", _seal(self._canonical_payload_json()))
+        seal = _seal(self._canonical_payload_json())
+        object.__setattr__(self, "_creation_seal", seal)
         object.__setattr__(self, "_issuance_marker", _USED_ISSUANCE_MARKER)
+        _register_creation_seal(self, seal)
 
     def _validate_fields(self) -> None:
         """Fail closed on scope, source provenance, actor separation, and reviewed state."""
@@ -185,8 +211,15 @@ class SemanticJobEvidenceEnvelope:
         self._validate_fields()
         if self._issuance_marker is not _USED_ISSUANCE_MARKER:
             raise ValueError("semantic job evidence changed after construction")
-        seal = self._creation_seal
-        if type(seal) is not str or not hmac.compare_digest(seal, _seal(self._canonical_payload_json())):
+        packet_seal = self._creation_seal
+        authoritative_seal = _authoritative_creation_seal(self)
+        live_seal = _seal(self._canonical_payload_json())
+        if (
+            type(packet_seal) is not str
+            or type(authoritative_seal) is not str
+            or not hmac.compare_digest(packet_seal, authoritative_seal)
+            or not hmac.compare_digest(live_seal, authoritative_seal)
+        ):
             raise ValueError("semantic job evidence changed after construction")
 
     def canonical_document(self) -> dict[str, object]:
