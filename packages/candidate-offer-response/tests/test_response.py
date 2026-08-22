@@ -275,8 +275,7 @@ def test_canonicalization_rejects_post_construction_timestamp_reinjection() -> N
 
 def test_packet_runtime_is_final() -> None:
     with pytest.raises(TypeError, match="final"):
-        class _ForgedPacket(CandidateOfferResponsePacket):
-            pass
+        type("ForgedPacket", (CandidateOfferResponsePacket,), {})
 
 
 def test_direct_construction_cannot_weaken_fixed_governance() -> None:
