@@ -18,7 +18,9 @@ REVIEWER = "actor:security-reviewer-789"
 SCOPE_DIGEST = "1" * 64
 POLICY_DIGEST = "2" * 64
 ENTITLEMENT_DIGEST = "3" * 64
+REVIEWER_IDENTITY_DIGEST = "4" * 64
 REVIEWED_AT = datetime(2026, 8, 23, 0, 30, tzinfo=timezone.utc)
+RECORDED_AT = datetime(2026, 8, 23, 0, 31, tzinfo=timezone.utc)
 
 
 def values() -> dict[str, object]:
@@ -61,6 +63,28 @@ def test_builds_value_minimized_non_enforcing_access_review_evidence() -> None:
     assert repr(packet) == "HrAccessReviewPacket(<redacted>)"
     assert "password" not in packet.canonical_json().lower()
     assert "employee_name" not in packet.canonical_json().lower()
+
+
+def test_binds_explicit_access_review_purpose() -> None:
+    """Make the governance purpose explicit in immutable evidence rather than implicit in type."""
+    document = build().canonical_document()
+    assert document["purpose_code"] == "hr_access_recertification"
+
+
+def test_binds_reviewer_identity_evidence_and_system_recorded_time() -> None:
+    """Separate the human review instant from the later system-recorded evidence instant."""
+    packet = build(
+        reviewer_identity_evidence_digest=REVIEWER_IDENTITY_DIGEST,
+        recorded_at=RECORDED_AT,
+    )
+    document = packet.canonical_document()
+    assert document["reviewer_identity_evidence_digest"] == REVIEWER_IDENTITY_DIGEST
+    assert document["recorded_at"] == "2026-08-23T00:31:00Z"
+    with pytest.raises(ValueError, match="recorded_at"):
+        build(
+            reviewer_identity_evidence_digest=REVIEWER_IDENTITY_DIGEST,
+            recorded_at=REVIEWED_AT - timedelta(seconds=1),
+        )
 
 
 def test_supports_reviewed_reduction_and_removal_without_execution_authority() -> None:
