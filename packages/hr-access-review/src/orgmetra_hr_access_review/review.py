@@ -75,14 +75,8 @@ def _validate_packet_reference(value: str, prefix: str, field_name: str) -> None
 
 
 def _validate_actor_reference(value: str, field_name: str) -> None:
-    """Require bounded opaque actor text for later authoritative identity resolution."""
-    if (
-        type(value) is not str
-        or len(value) > 160
-        or not _OPAQUE_REFERENCE_PATTERN.fullmatch(value)
-        or not value.startswith("actor:")
-    ):
-        raise ValueError(f"{field_name} must be a bounded opaque actor: reference")
+    """Require packet-local opaque UUIDv4 actor correlation for later identity resolution."""
+    _validate_packet_reference(value, "actor", field_name)
 
 
 def _validate_digest(value: str, field_name: str) -> None:
