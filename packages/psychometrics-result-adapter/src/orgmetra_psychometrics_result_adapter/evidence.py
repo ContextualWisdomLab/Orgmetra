@@ -153,7 +153,8 @@ class PsychometricsResultEvidenceEnvelope:
 
     tenant_record_id: str
     result_evidence_reference: str
-    candidate_evidence_reference: str
+    candidate_evidence_intake_reference: str
+    candidate_evidence_intake_digest: str
     requesting_actor_reference: str
     reviewing_actor_reference: str
     result_snapshot_reference: str
@@ -206,9 +207,13 @@ class PsychometricsResultEvidenceEnvelope:
             "psych_result_evidence",
         )
         _validate_owned_reference(
-            self.candidate_evidence_reference,
-            "candidate_evidence_reference",
-            "candidate_evidence",
+            self.candidate_evidence_intake_reference,
+            "candidate_evidence_intake_reference",
+            "candidate_evidence_intake",
+        )
+        _validate_digest(
+            self.candidate_evidence_intake_digest,
+            "candidate_evidence_intake_digest",
         )
         requester = _validate_actor_reference(
             self.requesting_actor_reference,
@@ -267,7 +272,8 @@ class PsychometricsResultEvidenceEnvelope:
         return {
             "assessment_spec_reference": self.assessment_spec_reference,
             "calibration_reference": self.calibration_reference,
-            "candidate_evidence_reference": self.candidate_evidence_reference,
+            "candidate_evidence_intake_digest": self.candidate_evidence_intake_digest,
+            "candidate_evidence_intake_reference": self.candidate_evidence_intake_reference,
             "consent_snapshot_set_digest": self.consent_snapshot_set_digest,
             "decision_authority_state": self.DECISION_AUTHORITY_STATE,
             "engine_artifact_digest": self.engine_artifact_digest,
