@@ -42,7 +42,7 @@ def values() -> dict[str, object]:
 
 
 def build() -> DraftEvidenceEnvelope:
-    """Build one valid envelope through the public constructor."""
+    """Build one valid, PII-free envelope through the public constructor."""
     return DraftEvidenceEnvelope(**values())
 
 
@@ -212,3 +212,14 @@ def test_replacement_cannot_bypass_creation_evidence() -> None:
     envelope = build()
     with pytest.raises(ValueError, match="changed after construction"):
         replace(envelope, response_evidence_digest="d" * 64).canonical_json()
+
+
+def test_replacement_cannot_reset_private_seal_and_mint_new_evidence() -> None:
+    """Reject explicit reset of the private seal during dataclass replacement."""
+    envelope = build()
+    with pytest.raises(ValueError, match="changed after construction"):
+        replace(
+            envelope,
+            response_evidence_digest="d" * 64,
+            _creation_seal=None,
+        ).canonical_json()
