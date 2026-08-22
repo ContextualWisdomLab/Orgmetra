@@ -87,14 +87,19 @@ def _payload(envelope: "KeyverseIdentityDeprovisionReviewPacket") -> dict[str, o
     }
 
 
-def _canonical_payload_json(envelope: "KeyverseIdentityDeprovisionReviewPacket") -> str:
-    """Serialize canonical payload bytes deterministically."""
+def _canonical_json_from_payload(payload: dict[str, object]) -> str:
+    """Serialize one already-captured canonical payload deterministically."""
     return json.dumps(
-        _payload(envelope),
+        payload,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
     )
+
+
+def _canonical_payload_json(envelope: "KeyverseIdentityDeprovisionReviewPacket") -> str:
+    """Capture and serialize the canonical payload deterministically."""
+    return _canonical_json_from_payload(_payload(envelope))
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
@@ -169,26 +174,29 @@ class KeyverseIdentityDeprovisionReviewPacket:
             )
         _validate_timestamp_shape("recorded_at", self.recorded_at)
 
-    def _assert_integrity(self) -> None:
-        """Fail closed on changed structure or bytes without re-running issuance freshness."""
+    def _assert_integrity(self) -> tuple[dict[str, object], str]:
+        """Return the exact verified payload and JSON snapshot or fail closed."""
         self._validate_fields()
-        live_digest = sha256(_canonical_payload_json(self).encode("utf-8")).hexdigest()
+        payload = _payload(self)
+        canonical_json = _canonical_json_from_payload(payload)
+        live_digest = sha256(canonical_json.encode("utf-8")).hexdigest()
         with _SEAL_LOCK:
             issued_digest = _SEALS.get(id(self))
         if issued_digest is None or live_digest != issued_digest:
             raise ValueError(
                 "identity deprovision handoff evidence changed after construction."
             )
+        return payload, canonical_json
 
     def canonical_document(self) -> dict[str, object]:
-        """Return PII-minimized canonical evidence after integrity verification."""
-        self._assert_integrity()
-        return _payload(self)
+        """Return the exact PII-minimized payload snapshot verified against the issuance seal."""
+        payload, _ = self._assert_integrity()
+        return payload
 
     def canonical_json(self) -> str:
-        """Return deterministic canonical evidence JSON after integrity verification."""
-        self._assert_integrity()
-        return _canonical_payload_json(self)
+        """Return the exact deterministic JSON snapshot verified against the issuance seal."""
+        _, canonical_json = self._assert_integrity()
+        return canonical_json
 
     def evidence_digest(self) -> str:
         """Return SHA-256 over the deterministic canonical evidence JSON."""
