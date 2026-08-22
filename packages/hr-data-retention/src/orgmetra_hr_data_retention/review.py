@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 import hashlib
 import json
@@ -94,6 +94,21 @@ def _validate_recorded_at(value: object) -> datetime:
     return value
 
 
+def _canonical_json(document: dict[str, object]) -> str:
+    """Serialize one canonical evidence document with stable ordering and separators."""
+    return json.dumps(
+        document,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _canonical_digest(document: dict[str, object]) -> str:
+    """Hash one canonical evidence document with SHA-256."""
+    return hashlib.sha256(_canonical_json(document).encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True, slots=True, repr=False)
 class HrDataRetentionReviewPacket:
     """Bind one HR retention review while remaining explicitly unauthorized to delete data."""
@@ -135,17 +150,23 @@ class HrDataRetentionReviewPacket:
     reviewer_actor_reference: str
     evidence_version: int
     recorded_at: datetime
+    _creation_evidence_digest: str = field(init=False, repr=False, compare=False)
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         """Keep trust-bearing derived authority from being overridden by subclasses."""
         raise TypeError("HrDataRetentionReviewPacket is final and cannot be subclassed")
 
     def __post_init__(self) -> None:
-        """Fail closed on malformed scope, contradictory hold evidence, or review chronology."""
-        self._assert_integrity()
+        """Validate fields and seal the exact creation-time canonical evidence digest."""
+        self._validate_fields()
+        object.__setattr__(
+            self,
+            "_creation_evidence_digest",
+            _canonical_digest(self._render_canonical_document()),
+        )
 
-    def _assert_integrity(self) -> None:
-        """Revalidate all trust-bearing evidence at construction and canonicalization time."""
+    def _validate_fields(self) -> None:
+        """Validate every trust-bearing field without relying on creation-time state."""
         _validate_tenant(self.tenant_record_id)
         _validate_reference(
             self.retention_review_reference,
@@ -195,6 +216,12 @@ class HrDataRetentionReviewPacket:
         recorded_at = _validate_recorded_at(self.recorded_at)
         if recorded_at.date() < reviewed_on:
             raise ValueError("recorded_at cannot precede reviewed_on")
+
+    def _assert_integrity(self) -> None:
+        """Reject malformed fields or valid-looking evidence changed after construction."""
+        self._validate_fields()
+        if _canonical_digest(self._render_canonical_document()) != self._creation_evidence_digest:
+            raise ValueError("retention review evidence changed after construction")
 
     @property
     def purpose_code(self) -> str:
@@ -250,9 +277,8 @@ class HrDataRetentionReviewPacket:
             "human-approved disposition execution."
         )
 
-    def canonical_document(self) -> dict[str, object]:
-        """Return deterministic governance evidence after revalidating the live object state."""
-        self._assert_integrity()
+    def _render_canonical_document(self) -> dict[str, object]:
+        """Render the current fields without performing validation or seal comparison."""
         return {
             "tenant_record_id": self.tenant_record_id,
             "retention_review_reference": self.retention_review_reference,
@@ -279,17 +305,17 @@ class HrDataRetentionReviewPacket:
             "next_action": self.next_action,
         }
 
+    def canonical_document(self) -> dict[str, object]:
+        """Return creation-bound canonical evidence after live integrity verification."""
+        self._assert_integrity()
+        return self._render_canonical_document()
+
     def canonical_json(self) -> str:
-        """Serialize the packet with stable ordering and no whitespace ambiguity."""
-        return json.dumps(
-            self.canonical_document(),
-            ensure_ascii=True,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
+        """Serialize the creation-bound packet with stable ordering and separators."""
+        return _canonical_json(self.canonical_document())
 
     def evidence_digest(self) -> str:
-        """Hash the exact canonical review evidence with SHA-256."""
+        """Hash the exact creation-bound canonical review evidence with SHA-256."""
         return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
     def __repr__(self) -> str:
