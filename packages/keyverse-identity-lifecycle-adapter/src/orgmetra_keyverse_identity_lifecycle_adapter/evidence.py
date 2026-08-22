@@ -50,9 +50,11 @@ def _validate_digest(field_name: str, value: object) -> None:
 
 
 def _validate_timestamp(field_name: str, value: object) -> None:
-    """Require exact built-in UTC system evidence time."""
+    """Require exact built-in UTC system evidence time that has already occurred."""
     if type(value) is not datetime or value.tzinfo is not timezone.utc:
         raise ValueError(f"{field_name} must be an exact timezone.utc datetime.")
+    if value > datetime.now(timezone.utc):
+        raise ValueError(f"{field_name} must not be in the future.")
 
 
 def _payload(envelope: "KeyverseIdentityDeprovisionReviewPacket") -> dict[str, object]:
