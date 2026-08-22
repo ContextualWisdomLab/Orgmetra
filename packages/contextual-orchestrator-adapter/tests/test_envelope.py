@@ -153,6 +153,14 @@ class ForgedInt(int):
         """Pretend to satisfy every upper bound."""
         return True
 
+    def __lt__(self, other: object) -> bool:
+        """Pretend every strict upper-bound comparison succeeds."""
+        return True
+
+    def __gt__(self, other: object) -> bool:
+        """Pretend every strict lower-bound comparison succeeds."""
+        return True
+
 
 def test_rejects_runtime_subclasses_before_reviewed_operations() -> None:
     """Reject hostile string and integer subclasses before equality or bounds checks."""
