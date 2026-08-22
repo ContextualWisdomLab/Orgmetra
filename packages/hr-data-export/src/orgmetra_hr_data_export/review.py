@@ -2,7 +2,7 @@
 
 This module deliberately does not read protected HR fields or construct an export.
 It records the exact tenant/resource/field scope that a human reviewer may ask the
-authoritative People boundary to re-resolve.  Keyverse remains the identity owner;
+authoritative People boundary to re-resolve. Keyverse remains the identity owner;
 Orgmetra remains the HR authorization and export-control owner.
 """
 
@@ -124,8 +124,6 @@ def _freeze_timestamp(value: object) -> datetime:
         raise ValueError("generated_at timezone offset could not be resolved safely") from exc
     if type(offset) is not timedelta:
         raise ValueError("generated_at must provide one concrete UTC offset")
-    if not (-timedelta(hours=24) < offset < timedelta(hours=24)):
-        raise ValueError("generated_at UTC offset must be less than 24 hours")
     naive_value = value.replace(tzinfo=None)
     return (naive_value - offset).replace(tzinfo=timezone.utc)
 
@@ -162,7 +160,7 @@ def _validate_fixed_text(value: object, expected_value: str, field_name: str) ->
 class HrDataExportReviewPacket:
     """Immutable, value-minimized pre-export review evidence.
 
-    The packet is deliberately not an export authorization.  It carries only
+    The packet is deliberately not an export authorization. It carries only
     correlation, reviewed field names, provenance, and human-review metadata.
     The authoritative People boundary must re-resolve scope before any HR value
     leaves its owning service.
