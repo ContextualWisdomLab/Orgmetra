@@ -17,6 +17,7 @@ import hashlib
 import io
 import json
 from pathlib import Path, PurePosixPath
+import platform
 import re
 import subprocess
 import tarfile
@@ -27,6 +28,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 _REPOSITORY_URL = "https://github.com/ContextualWisdomLab/Orgmetra"
 _REPOSITORY_GIT_URI = "git+https://github.com/ContextualWisdomLab/Orgmetra.git"
+_EXPECTED_PYTHON_RUNTIME = "3.14.7"
 _SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _PYTHON_REQUIREMENT_PATTERN = re.compile(
     r"^\s*(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]+\])?\s*(?P<constraint>[^;]*)"
@@ -58,6 +60,16 @@ def _run_git(arguments: list[str]) -> bytes:
 def _repository_root() -> Path:
     """Return the repository root containing this checked-in builder."""
     return Path(__file__).resolve().parents[1]
+
+
+def _validate_runtime() -> None:
+    """Require the exact CPython patch runtime that defines evidence bytes."""
+    observed_runtime = platform.python_version()
+    if observed_runtime != _EXPECTED_PYTHON_RUNTIME:
+        raise ReleaseEvidenceError(
+            "release evidence runtime mismatch: "
+            f"expected={_EXPECTED_PYTHON_RUNTIME}, observed={observed_runtime}"
+        )
 
 
 def _validate_source_sha(source_sha: str) -> None:
@@ -395,7 +407,7 @@ def _build_provenance(
                     "archiveFormat": "tar+gzip",
                     "archiveMtime": 0,
                     "cycloneDxSpecVersion": "1.7",
-                    "pythonRuntime": "3.14",
+                    "pythonRuntime": _EXPECTED_PYTHON_RUNTIME,
                 },
                 "resolvedDependencies": [
                     {
@@ -428,6 +440,7 @@ def _write_file(output_directory: Path, name: str, content: bytes) -> None:
 
 def build_release_candidate_evidence(output_directory: Path, source_sha: str) -> None:
     """Generate deterministic source, SBOM, and unsigned provenance evidence."""
+    _validate_runtime()
     _validate_source_sha(source_sha)
     entries = _tree_entries(source_sha)
     tree_content = {path: _blob_bytes(object_id) for path, _mode, _kind, object_id in entries}
