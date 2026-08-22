@@ -101,11 +101,14 @@ INSERT INTO selection_decision (
 );
 SQL
 
-backdated_event="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+build_event() {
+    local event_id="$1"
+    local subject_id="$2"
+    tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT pg_catalog.jsonb_build_object(
     'data', pg_catalog.jsonb_build_object('high_impact', true, 'result_code', 'worker_created'),
     'datacontenttype', 'application/json',
-    'id', '00000000-0000-7000-8000-000000000061',
+    'id', '${event_id}',
     'orgmetraactor', 'keyverse_subject:01JHIRINGMANAGER',
     'orgmetraconfirmation', 'confirmation:01JHUMANCONFIRM',
     'orgmetraevidence', 'decision_evidence_set:00000000-0000-7000-8000-000000000041',
@@ -114,11 +117,16 @@ SELECT pg_catalog.jsonb_build_object(
     'orgmetratenant', '${TENANT_ID}',
     'source', 'urn:orgmetra:talent_core',
     'specversion', '1.0',
-    'subject', 'candidate_worker_conversion_record:00000000-0000-7000-8000-000000000081',
+    'subject', 'candidate_worker_conversion_record:${subject_id}',
     'time', pg_catalog.to_char(pg_catalog.transaction_timestamp() - INTERVAL '3 minutes', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'),
     'type', 'orgmetra.candidate.worker_converted'
 )::text;
-"; } )"
+"
+}
+
+backdated_event="$(build_event \
+    '00000000-0000-7000-8000-000000000061' \
+    '00000000-0000-7000-8000-000000000081')"
 
 tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v canonical_event="${backdated_event}" <<'SQL'
 SELECT record_audit_outbox_event(
@@ -159,6 +167,43 @@ if [[ ${backdated_status} -eq 0 ]]; then
 fi
 if [[ "${backdated_output}" != *"candidate worker conversion recorded_from must equal system transaction time"* ]]; then
     echo "backdated candidate conversion failed for an unexpected reason: ${backdated_output}" >&2
+    exit 1
+fi
+
+good_event="$(build_event \
+    '00000000-0000-7000-8000-000000000062' \
+    '00000000-0000-7000-8000-000000000082')"
+
+tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v canonical_event="${good_event}" <<'SQL'
+SELECT record_audit_outbox_event(
+    '10000000-0000-7000-8000-000000000001'::uuid,
+    '00000000-0000-7000-8000-000000000062'::uuid,
+    '00000000-0000-7000-8000-000000000072'::uuid,
+    :'canonical_event',
+    encode(digest(convert_to(:'canonical_event', 'UTF8'), 'sha256'), 'hex'),
+    'talent_event_sink'
+);
+SQL
+
+system_time_match="$(tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+INSERT INTO candidate_worker_conversion_record (
+    tenant_record_id, candidate_worker_conversion_record_id, candidate_profile_id,
+    person_record_id, employment_record_id, selection_decision_id,
+    audit_event_record_id, effective_from
+) VALUES (
+    '${TENANT_ID}',
+    '00000000-0000-7000-8000-000000000082',
+    '00000000-0000-7000-8000-000000000031',
+    '00000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000011',
+    '00000000-0000-7000-8000-000000000051',
+    '00000000-0000-7000-8000-000000000062',
+    CURRENT_DATE
+)
+RETURNING recorded_from = pg_catalog.transaction_timestamp();
+")"
+if [[ "${system_time_match}" != "t" ]]; then
+    echo "server-authored candidate conversion did not persist transaction system time" >&2
     exit 1
 fi
 
