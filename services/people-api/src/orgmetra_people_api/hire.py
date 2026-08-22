@@ -83,7 +83,7 @@ class HireAcceptanceCommand:
             _validate_operational_uuid(field_name, getattr(self, field_name))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.display_name, str):
+        if type(self.display_name) is not str:
             raise ValueError("display_name must be a string.")
         try:
             self.display_name.encode("utf-8")
