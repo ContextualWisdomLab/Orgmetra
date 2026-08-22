@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orgmetra-contextual-orchestrator-adapter"
+version = "0.1.0"
+description = "Fail-closed draft-evidence boundary for Contextual Orchestrator outputs used by Orgmetra."
+requires-python = ">=3.12"
+
+[project.optional-dependencies]
+test = ["pytest>=8.3", "pytest-cov>=5.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+  "--cov=orgmetra_contextual_orchestrator_adapter",
+  "--cov-branch",
+  "--cov-report=term-missing",
+  "--cov-fail-under=100",
+]
