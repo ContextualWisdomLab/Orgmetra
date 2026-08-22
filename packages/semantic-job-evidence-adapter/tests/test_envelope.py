@@ -187,6 +187,29 @@ def test_rejects_creation_seal_rewrite_even_when_payload_is_unchanged() -> None:
         packet.canonical_json()
 
 
+def test_canonical_export_reuses_the_exact_integrity_checked_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A mutation after the checked snapshot cannot leak different canonical evidence."""
+    packet = SemanticJobEvidenceEnvelope(**values())
+    expected_json = packet.canonical_json()
+    original_payload = SemanticJobEvidenceEnvelope._payload
+    mutated = False
+
+    def mutate_after_snapshot(self: SemanticJobEvidenceEnvelope) -> dict[str, object]:
+        """Mutate the live packet immediately after returning one payload snapshot."""
+        nonlocal mutated
+        payload = original_payload(self)
+        if not mutated:
+            mutated = True
+            object.__setattr__(self, "response_evidence_digest", "d" * 64)
+        return payload
+
+    monkeypatch.setattr(SemanticJobEvidenceEnvelope, "_payload", mutate_after_snapshot)
+
+    assert packet.canonical_json() == expected_json
+    with pytest.raises(ValueError, match="changed after construction"):
+        packet.canonical_json()
+
+
 def test_runtime_type_is_final() -> None:
     """Subclasses cannot override derived trust state on the governed envelope."""
     with pytest.raises(TypeError, match="final"):
