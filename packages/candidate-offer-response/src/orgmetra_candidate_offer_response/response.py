@@ -18,9 +18,7 @@ from uuid import UUID
 from weakref import finalize
 
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
-_REFERENCE_PATTERN = re.compile(
-    r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
-)
+_REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _ALLOWED_RESPONSE_CODES = frozenset({"offer_accepted", "offer_declined"})
 _DECISION_AUTHORITY = "candidate_response_only"
 _SCOPE_VERIFICATION_STATE = "requires_authoritative_resolution"
@@ -70,16 +68,26 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be a canonical operational UUID")
 
 
-def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require an exact namespace and an opaque canonical UUIDv4 suffix."""
-    error_message = f"{field_name} must be an opaque {prefix}: UUIDv4 reference"
+def _validate_reference(
+    value: str,
+    prefix: str,
+    field_name: str,
+    *,
+    require_uuid4: bool = True,
+) -> None:
+    """Require one bounded namespace and UUIDv4 only when Orgmetra owns that contract."""
+    max_length = 160 if require_uuid4 else 288
+    reference_kind = "UUIDv4" if require_uuid4 else "opaque"
+    error_message = f"{field_name} must be a bounded {prefix}: {reference_kind} reference"
     if (
         type(value) is not str
-        or len(value) > 160
+        or len(value) > max_length
         or not _REFERENCE_PATTERN.fullmatch(value)
         or not value.startswith(f"{prefix}:")
     ):
         raise ValueError(error_message)
+    if not require_uuid4:
+        return
     suffix = value.split(":", 1)[1]
     try:
         parsed = UUID(suffix)
@@ -198,7 +206,12 @@ class CandidateOfferResponsePacket:
         _validate_digest(self.offer_approval_digest, "offer_approval_digest")
         _validate_reference(self.offer_terms_reference, "offer_terms", "offer_terms_reference")
         _validate_digest(self.offer_terms_digest, "offer_terms_digest")
-        _validate_reference(self.candidate_actor_reference, "candidate", "candidate_actor_reference")
+        _validate_reference(
+            self.candidate_actor_reference,
+            "candidate",
+            "candidate_actor_reference",
+            require_uuid4=False,
+        )
         _validate_reference(
             self.identity_resolution_reference,
             "identity_resolution",
