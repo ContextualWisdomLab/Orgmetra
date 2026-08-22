@@ -17,7 +17,7 @@ The request binds only governance metadata and opaque references:
 - distinct requester and reviewer actor references;
 - evidence version and exact UTC system-recorded time.
 
-No candidate/worker name, email, salary, assessment score, free-form HR payload, copied policy text, credential, or secret is part of the request.
+No candidate/worker name, email, salary, assessment score, free-form HR payload, copied policy text, credential, or secret is part of the request. The request type is runtime-final so a caller cannot subclass it and replace derived non-authorizing properties with forged execution authority before canonical serialization.
 
 ## Closed actions
 
