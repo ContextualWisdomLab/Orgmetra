@@ -31,7 +31,9 @@ _NEXT_ACTION = (
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
-    """Require canonical non-sentinel UUID text for a governance identity."""
+    """Require exact canonical non-sentinel UUID text for a governance identity."""
+    if type(value) is not str:
+        raise ValueError(f"{field_name} must be canonical UUID text")
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as exc:
@@ -41,9 +43,9 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
 
 
 def _validate_code(value: str, field_name: str) -> None:
-    """Require a bounded descriptive lower snake_case governance code."""
+    """Require exact bounded descriptive lower snake_case governance text."""
     if (
-        not isinstance(value, str)
+        type(value) is not str
         or len(value) > 64
         or not _CODE_PATTERN.fullmatch(value)
     ):
@@ -53,9 +55,9 @@ def _validate_code(value: str, field_name: str) -> None:
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require an expected namespace plus a canonical non-sentinel UUID suffix."""
+    """Require exact text with the expected namespace and operational UUID suffix."""
     namespace = f"{prefix}:"
-    if not isinstance(value, str) or len(value) > 160 or not value.startswith(namespace):
+    if type(value) is not str or len(value) > 160 or not value.startswith(namespace):
         raise ValueError(
             f"{field_name} must be an opaque {prefix}:<canonical-uuid> reference"
         )
@@ -157,9 +159,9 @@ class RequisitionReviewPacket:
         _canonical_timestamp(self.generated_at)
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for requisition approval")
-        if self.review_state != _REVIEW_STATE:
+        if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_approval")
-        if self.next_action != _NEXT_ACTION:
+        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed requisition-review instruction")
 
     def __repr__(self) -> str:
