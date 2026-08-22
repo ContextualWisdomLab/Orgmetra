@@ -138,6 +138,10 @@ class HrDataRetentionReviewPacket:
 
     def __post_init__(self) -> None:
         """Fail closed on malformed scope, contradictory hold evidence, or review chronology."""
+        self._assert_integrity()
+
+    def _assert_integrity(self) -> None:
+        """Revalidate all trust-bearing evidence at construction and canonicalization time."""
         _validate_tenant(self.tenant_record_id)
         _validate_reference(
             self.retention_review_reference,
@@ -243,7 +247,8 @@ class HrDataRetentionReviewPacket:
         )
 
     def canonical_document(self) -> dict[str, object]:
-        """Return deterministic, value-minimized governance evidence for immutable auditing."""
+        """Return deterministic governance evidence after revalidating the live object state."""
+        self._assert_integrity()
         return {
             "tenant_record_id": self.tenant_record_id,
             "retention_review_reference": self.retention_review_reference,
