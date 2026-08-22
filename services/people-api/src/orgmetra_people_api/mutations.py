@@ -66,7 +66,7 @@ def _validate_evidence_version(value: object) -> None:
 
 def validate_idempotency_key(value: object) -> str:
     """Require the same visible-ASCII Idempotency-Key contract as the HTTP boundary."""
-    if not isinstance(value, str) or not (_IDEMPOTENCY_MIN <= len(value) <= _IDEMPOTENCY_MAX):
+    if type(value) is not str or not (_IDEMPOTENCY_MIN <= len(value) <= _IDEMPOTENCY_MAX):
         raise ValueError("idempotency_key must be 16 to 200 visible ASCII characters.")
     if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
         raise ValueError("idempotency_key must be 16 to 200 visible ASCII characters.")
@@ -192,10 +192,10 @@ class EmploymentMutationCommand:
             _validate_operational_uuid(field_name, getattr(self, field_name))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.employment_status_code, str) or self.employment_status_code not in _EMPLOYMENT_STATUSES:
+        if type(self.employment_status_code) is not str or self.employment_status_code not in _EMPLOYMENT_STATUSES:
             raise ValueError("employment_status_code must be active, leave, or terminated.")
         if (
-            not isinstance(self.employment_concurrency_code, str)
+            type(self.employment_concurrency_code) is not str
             or self.employment_concurrency_code not in _CONCURRENCY_CODES
         ):
             raise ValueError("employment_concurrency_code must be exclusive or concurrent.")
@@ -235,7 +235,7 @@ class PositionMutationCommand:
             _validate_operational_uuid(field_name, getattr(self, field_name))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.position_status_code, str) or self.position_status_code not in _POSITION_STATUSES:
+        if type(self.position_status_code) is not str or self.position_status_code not in _POSITION_STATUSES:
             raise ValueError("position_status_code must be a staffable or closed seat status.")
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
