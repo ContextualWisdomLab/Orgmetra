@@ -27,8 +27,16 @@ Orgmetra does not read Semantic Data Portal application tables. The foreign serv
 
 Trust-bearing text, integers, and timestamps must be exact built-in runtime types before equality, membership, bounds, UUID parsing, or serialization. Packet-owned references use canonical UUIDv4 suffixes; the tenant ID follows Orgmetra's canonical non-sentinel operational UUID contract. The envelope is final and detects post-construction rewriting before canonical evidence leaves the boundary. Its packet-owned HMAC is only a consistency value: the authoritative creation seal is held in a lock-protected process-local issuance registry outside envelope-writable slots, so rewriting both payload and packet seal still fails closed.
 
+Canonical export returns the exact payload snapshot whose seal was verified; it does not re-read live fields after the integrity decision. This closes a same-process mutation window in which the checked bytes and emitted bytes could otherwise diverge.
+
+The issuance registry and process seal key are intentionally process-local tamper evidence, not durable cryptographic attestation. Copy/deepcopy, pickle/unpickle, worker-process transfer, or process restart does not recreate issuance authority; a restored envelope fails closed. If durable evidence is needed, persist the already-emitted `canonical_json()` bytes and `evidence_digest()` in Orgmetra's immutable audit/outbox boundary rather than serializing the live envelope object. A future requirement for independent long-term envelope revalidation would need a separately governed managed/rotatable signing or MAC key boundary; this package does not claim one.
+
+## Python compatibility
+
+The package currently declares and tests Python `>=3.12,<3.15`. Hosted quality evidence runs the installed wheel and its reviewed test toolchain on Python 3.12, 3.13, and 3.14. A new Python minor must be added to the hosted compatibility matrix before the public support range is widened.
+
 ## Testing
 
-The dedicated quality lane runs the package tests with exact 100% owned production statement and branch coverage and requires a clean checkout. Adversarial regressions cover malformed references/digests, self-review, runtime-subclass forgery, invalid dependency revision/API use, payload-only mutation, packet-seal mutation, payload plus recomputed-seal forgery, replacement/seal reset, and runtime-type extension.
+The dedicated quality lane runs the package tests with exact 100% owned production statement and branch coverage and requires a clean checkout. Adversarial regressions cover malformed references/digests, self-review, runtime-subclass forgery, invalid dependency revision/API use, payload-only mutation, packet-seal mutation, payload plus recomputed-seal forgery, checked-snapshot export, replacement/seal reset, and runtime-type extension.
 
 See `docs/traceability/semantic-job-evidence.md`, `docs/adr/semantic-job-source-evidence.md`, and `docs/doctoring/semantic-job-evidence-references.md` for the governed rationale and evidence map.
