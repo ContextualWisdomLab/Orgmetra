@@ -190,5 +190,4 @@ def test_rejects_creation_seal_rewrite_even_when_payload_is_unchanged() -> None:
 def test_runtime_type_is_final() -> None:
     """Subclasses cannot override derived trust state on the governed envelope."""
     with pytest.raises(TypeError, match="final"):
-        class DerivedEnvelope(SemanticJobEvidenceEnvelope):
-            """Attempt to extend the final evidence boundary."""
+        type("DerivedEnvelope", (SemanticJobEvidenceEnvelope,), {})
