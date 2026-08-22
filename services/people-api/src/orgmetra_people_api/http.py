@@ -359,9 +359,16 @@ async def _send_json(
     extra_headers: tuple[tuple[bytes, bytes], ...] = (),
     support_reference: str | None = None,
 ) -> None:
-    """Emit deterministic no-store JSON and governed correlation for failures."""
+    """Emit deterministic no-store JSON and avoid relogging pre-enriched route failures."""
     response_payload = dict(payload)
     error_code = response_payload.get("error")
+    route_failure_already_logged = (
+        isinstance(error_code, str)
+        and support_reference is not None
+        and response_payload.get("error_code") == error_code
+        and response_payload.get("next_action") == response_payload.get("message")
+        and response_payload.get("support_reference") == support_reference
+    )
     if isinstance(error_code, str):
         if support_reference is None:
             support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
@@ -372,14 +379,15 @@ async def _send_json(
                 "support_reference": support_reference,
             }
         )
-        _LOGGER.info(
-            "People read request rejected",
-            extra={
-                "error_code": error_code,
-                "http_status": status,
-                "support_reference": support_reference,
-            },
-        )
+        if not route_failure_already_logged:
+            _LOGGER.info(
+                "People read request rejected",
+                extra={
+                    "error_code": error_code,
+                    "http_status": status,
+                    "support_reference": support_reference,
+                },
+            )
     body = json.dumps(response_payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
     headers = (
         (b"content-type", b"application/json"),
