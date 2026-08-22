@@ -11,34 +11,11 @@ import pytest
 from orgmetra_semantic_job_evidence_adapter import SemanticJobEvidenceEnvelope
 
 
-SDP_REVISION = "e48aa13c4af7a4875d4b53e6a60b50405c265a2f"
-DIGEST_A = "a" * 64
-DIGEST_B = "b" * 64
-DIGEST_C = "c" * 64
-
-
-def values() -> dict[str, object]:
-    """Return one valid value-minimized ontology source-evidence fixture."""
-    return {
-        "tenant_record_id": str(uuid4()),
-        "job_analysis_reference": f"job_analysis:{uuid4()}",
-        "ontology_request_reference": f"ontology_request:{uuid4()}",
-        "requesting_actor_reference": "actor:hr-analyst",
-        "reviewing_actor_reference": "actor:job-analysis-reviewer",
-        "resolution_use_code": "job_analysis_source_evidence",
-        "query_term_digest": DIGEST_A,
-        "response_evidence_digest": DIGEST_B,
-        "source_catalog_digest": DIGEST_C,
-        "semantic_data_portal_revision": SDP_REVISION,
-        "api_operation": "POST /ontology/resolve",
-        "evidence_version": 1,
-        "recorded_at": datetime(2026, 8, 22, 14, 50, 12, 123456, tzinfo=timezone.utc),
-    }
-
-
-def test_canonical_evidence_is_value_minimized_and_deterministic() -> None:
+def test_canonical_evidence_is_value_minimized_and_deterministic(
+    semantic_values: dict[str, object],
+) -> None:
     """Canonical evidence contains governance/provenance only and has stable bytes."""
-    packet = SemanticJobEvidenceEnvelope(**values())
+    packet = SemanticJobEvidenceEnvelope(**semantic_values)
     document = packet.canonical_document()
 
     assert document["source_system"] == "semantic-data-portal"
@@ -81,17 +58,19 @@ def test_canonical_evidence_is_value_minimized_and_deterministic() -> None:
         ("recorded_at", datetime(2026, 8, 22, 14, 50, 12)),
     ],
 )
-def test_rejects_invalid_governance_evidence(field_name: str, bad_value: object) -> None:
+def test_rejects_invalid_governance_evidence(
+    semantic_values: dict[str, object], field_name: str, bad_value: object
+) -> None:
     """Malformed, unsafe, or unreviewed evidence fails closed at construction."""
-    candidate = values()
+    candidate = semantic_values.copy()
     candidate[field_name] = bad_value
     with pytest.raises(ValueError):
         SemanticJobEvidenceEnvelope(**candidate)
 
 
-def test_rejects_same_requester_and_reviewer() -> None:
+def test_rejects_same_requester_and_reviewer(semantic_values: dict[str, object]) -> None:
     """One actor cannot self-review ontology evidence for Job Analysis."""
-    candidate = values()
+    candidate = semantic_values.copy()
     candidate["reviewing_actor_reference"] = candidate["requesting_actor_reference"]
     with pytest.raises(ValueError, match="must differ"):
         SemanticJobEvidenceEnvelope(**candidate)
@@ -137,7 +116,9 @@ class ForgedDateTime(datetime):
     """Represent caller-executable temporal behavior at the trust boundary."""
 
 
-def test_rejects_runtime_subclasses_before_governance_comparison() -> None:
+def test_rejects_runtime_subclasses_before_governance_comparison(
+    semantic_values: dict[str, object],
+) -> None:
     """Caller-defined primitives cannot forge reviewed state or canonical evidence."""
     for field_name, bad_value in (
         ("resolution_use_code", ForgedText("automated_job_decision")),
@@ -145,51 +126,57 @@ def test_rejects_runtime_subclasses_before_governance_comparison() -> None:
         ("evidence_version", ForgedInt(1)),
         ("recorded_at", ForgedDateTime(2026, 8, 22, tzinfo=timezone.utc)),
     ):
-        candidate = values()
+        candidate = semantic_values.copy()
         candidate[field_name] = bad_value
         with pytest.raises(ValueError):
             SemanticJobEvidenceEnvelope(**candidate)
 
 
-def test_rejects_post_construction_rewrite() -> None:
+def test_rejects_post_construction_rewrite(semantic_values: dict[str, object]) -> None:
     """Valid-looking field replacement cannot rewrite already-issued evidence."""
-    packet = SemanticJobEvidenceEnvelope(**values())
+    packet = SemanticJobEvidenceEnvelope(**semantic_values)
     object.__setattr__(packet, "response_evidence_digest", "d" * 64)
     with pytest.raises(ValueError, match="changed after construction"):
         packet.canonical_json()
 
 
-def test_replace_cannot_reseal_changed_evidence() -> None:
+def test_replace_cannot_reseal_changed_evidence(semantic_values: dict[str, object]) -> None:
     """Dataclass replacement cannot reset the issuance seal and create new authority."""
-    packet = SemanticJobEvidenceEnvelope(**values())
+    packet = SemanticJobEvidenceEnvelope(**semantic_values)
     with pytest.raises(ValueError, match="changed after construction"):
         replace(packet, response_evidence_digest="d" * 64, _creation_seal=None)
 
 
-def test_rejects_caller_supplied_seal_and_marker_rewrite() -> None:
+def test_rejects_caller_supplied_seal_and_marker_rewrite(
+    semantic_values: dict[str, object],
+) -> None:
     """Private seal and issuance marker fields remain fail-closed under hostile access."""
-    candidate = values()
+    candidate = semantic_values.copy()
     candidate["_creation_seal"] = "0" * 64
     with pytest.raises(ValueError, match="changed after construction"):
         SemanticJobEvidenceEnvelope(**candidate)
 
-    packet = SemanticJobEvidenceEnvelope(**values())
+    packet = SemanticJobEvidenceEnvelope(**semantic_values)
     object.__setattr__(packet, "_issuance_marker", object())
     with pytest.raises(ValueError, match="changed after construction"):
         packet.canonical_document()
 
 
-def test_rejects_creation_seal_rewrite_even_when_payload_is_unchanged() -> None:
+def test_rejects_creation_seal_rewrite_even_when_payload_is_unchanged(
+    semantic_values: dict[str, object],
+) -> None:
     """The authoritative in-process seal cannot be replaced independently."""
-    packet = SemanticJobEvidenceEnvelope(**values())
+    packet = SemanticJobEvidenceEnvelope(**semantic_values)
     object.__setattr__(packet, "_creation_seal", object())
     with pytest.raises(ValueError, match="changed after construction"):
         packet.canonical_json()
 
 
-def test_canonical_export_reuses_the_exact_integrity_checked_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_canonical_export_reuses_the_exact_integrity_checked_snapshot(
+    semantic_values: dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A mutation after the checked snapshot cannot leak different canonical evidence."""
-    packet = SemanticJobEvidenceEnvelope(**values())
+    packet = SemanticJobEvidenceEnvelope(**semantic_values)
     expected_json = packet.canonical_json()
     original_payload = SemanticJobEvidenceEnvelope._payload
     mutated = False
