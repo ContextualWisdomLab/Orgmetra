@@ -99,7 +99,7 @@ def _validate_foreign_reference(value: object, field_name: str) -> str:
     if (
         len(text) > 256
         or text != text.strip()
-        or any(unicodedata.category(character).startswith("C") for character in text)
+        or any(unicodedata.category(character) == "Cc" for character in text)
         or _is_numeric_like(text)
     ):
         raise ValueError(f"{field_name} must be a canonical bounded foreign opaque reference")
