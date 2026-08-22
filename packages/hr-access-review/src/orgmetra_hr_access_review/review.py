@@ -29,6 +29,7 @@ _ALLOWED_REASON_CODES = frozenset(
 _ALLOWED_RECOMMENDATIONS = frozenset(
     {"retain_existing_access", "reduce_existing_access", "remove_existing_access"}
 )
+_PURPOSE_CODE = "hr_access_recertification"
 _REVIEW_STATE = "human_review_recorded"
 _ENFORCEMENT_STATE = "not_authorized_to_modify_access"
 _SCOPE_VERIFICATION_STATE = "requires_authoritative_resolution"
@@ -112,10 +113,10 @@ def _validate_recommendation(value: str) -> None:
         )
 
 
-def _validate_reviewed_at(value: datetime) -> None:
-    """Require exact built-in UTC datetime evidence to avoid executable timezone semantics."""
+def _validate_utc_timestamp(value: datetime, field_name: str) -> None:
+    """Require exact built-in UTC datetime evidence without executable timezone semantics."""
     if type(value) is not datetime or value.tzinfo is not timezone.utc:
-        raise ValueError("reviewed_at must be an exact built-in UTC datetime")
+        raise ValueError(f"{field_name} must be an exact built-in UTC datetime")
 
 
 def _validate_evidence_version(value: int) -> None:
@@ -148,10 +149,13 @@ class HrAccessReviewPacket:
     resource_scope_digest: str
     authorization_policy_digest: str
     entitlement_snapshot_digest: str
+    reviewer_identity_evidence_digest: str
     review_reason_code: str
     review_recommendation_code: str
     reviewed_at: datetime
+    recorded_at: datetime
     evidence_version: int = 1
+    purpose_code: str = _PURPOSE_CODE
     contains_hr_data: bool = False
     contains_credentials: bool = False
     human_confirmation_required: bool = True
@@ -189,10 +193,17 @@ class HrAccessReviewPacket:
         _validate_digest(self.resource_scope_digest, "resource_scope_digest")
         _validate_digest(self.authorization_policy_digest, "authorization_policy_digest")
         _validate_digest(self.entitlement_snapshot_digest, "entitlement_snapshot_digest")
+        _validate_digest(
+            self.reviewer_identity_evidence_digest, "reviewer_identity_evidence_digest"
+        )
         _validate_reason_code(self.review_reason_code)
         _validate_recommendation(self.review_recommendation_code)
-        _validate_reviewed_at(self.reviewed_at)
+        _validate_utc_timestamp(self.reviewed_at, "reviewed_at")
+        _validate_utc_timestamp(self.recorded_at, "recorded_at")
+        if self.recorded_at < self.reviewed_at:
+            raise ValueError("recorded_at must be at or after reviewed_at")
         _validate_evidence_version(self.evidence_version)
+        _require_fixed_text(self.purpose_code, _PURPOSE_CODE, "purpose_code")
         _require_fixed_bool(self.contains_hr_data, False, "contains_hr_data")
         _require_fixed_bool(self.contains_credentials, False, "contains_credentials")
         _require_fixed_bool(
@@ -219,6 +230,8 @@ class HrAccessReviewPacket:
             "evidence_version": self.evidence_version,
             "human_confirmation_required": self.human_confirmation_required,
             "next_action": self.next_action,
+            "purpose_code": self.purpose_code,
+            "recorded_at": self.recorded_at.isoformat().replace("+00:00", "Z"),
             "requester_actor_reference": self.requester_actor_reference,
             "resource_scope_digest": self.resource_scope_digest,
             "review_reason_code": self.review_reason_code,
@@ -226,6 +239,7 @@ class HrAccessReviewPacket:
             "review_state": self.review_state,
             "reviewed_at": self.reviewed_at.isoformat().replace("+00:00", "Z"),
             "reviewer_actor_reference": self.reviewer_actor_reference,
+            "reviewer_identity_evidence_digest": self.reviewer_identity_evidence_digest,
             "scope_verification_state": self.scope_verification_state,
             "subject_actor_reference": self.subject_actor_reference,
             "tenant_record_id": self.tenant_record_id,
@@ -280,9 +294,11 @@ def build_hr_access_review_packet(
     resource_scope_digest: str,
     authorization_policy_digest: str,
     entitlement_snapshot_digest: str,
+    reviewer_identity_evidence_digest: str,
     review_reason_code: str,
     review_recommendation_code: str,
     reviewed_at: datetime,
+    recorded_at: datetime,
     evidence_version: int = 1,
 ) -> HrAccessReviewPacket:
     """Build non-enforcing access-review evidence for authoritative downstream confirmation."""
@@ -295,8 +311,10 @@ def build_hr_access_review_packet(
         resource_scope_digest=resource_scope_digest,
         authorization_policy_digest=authorization_policy_digest,
         entitlement_snapshot_digest=entitlement_snapshot_digest,
+        reviewer_identity_evidence_digest=reviewer_identity_evidence_digest,
         review_reason_code=review_reason_code,
         review_recommendation_code=review_recommendation_code,
         reviewed_at=reviewed_at,
+        recorded_at=recorded_at,
         evidence_version=evidence_version,
     )
