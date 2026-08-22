@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from uuid import UUID
 
@@ -50,6 +51,46 @@ class _ForgedDateTime(datetime):
     def isoformat(self, sep="T", timespec="auto") -> str:  # noqa: ARG002
         """Render a different recorded instant from the underlying value."""
         return "2099-01-01T00:00:00+00:00"
+
+
+class _ForgedStatusCode(str):
+    """Masquerade an ungoverned status as an allow-listed draft status."""
+
+    def __hash__(self) -> int:
+        """Route membership lookup to the allowed draft-status bucket."""
+        return hash("analysis_draft")
+
+    def __eq__(self, other: object) -> bool:
+        """Claim equality with the allowed draft status despite different text."""
+        if other == "analysis_draft":
+            return True
+        return str.__eq__(self, other)
+
+
+class _ForgedOriginCode(str):
+    """Masquerade ungoverned provenance as an allow-listed evidence origin."""
+
+    def __hash__(self) -> int:
+        """Route membership lookup to the authoritative-origin bucket."""
+        return hash("authoritative_occupation_source")
+
+    def __eq__(self, other: object) -> bool:
+        """Claim equality with an authoritative origin despite different text."""
+        if other == "authoritative_occupation_source":
+            return True
+        return str.__eq__(self, other)
+
+
+class _ForgedLevel(int):
+    """Masquerade an out-of-range ordinal as an allowed job-analysis level."""
+
+    def __ge__(self, other: object) -> bool:
+        """Forge the lower-bound comparison used by the level validator."""
+        return True
+
+    def __le__(self, other: object) -> bool:
+        """Forge the upper-bound comparison used by the level validator."""
+        return True
 
 
 def _source(retrieved_at: datetime) -> EvidenceSource:
@@ -157,4 +198,37 @@ def test_snapshot_rejects_temporal_subclasses_before_canonicalization(
             effective_from=effective_from,
             recorded_at=recorded_at,
             reviewed_at=reviewed_at,
+        )
+
+
+def test_snapshot_rejects_status_subclass_that_forges_allow_list_membership() -> None:
+    """An ungoverned status cannot masquerade as draft while serializing different text."""
+    snapshot = _snapshot(
+        effective_from=date(2026, 8, 1),
+        recorded_at=RECORDED_AT,
+        reviewed_at=RECORDED_AT,
+    )
+    with pytest.raises(ValueError, match="status_code must be a string"):
+        replace(snapshot, status_code=_ForgedStatusCode("shadow_state"))
+
+
+def test_evidence_source_rejects_origin_subclass_that_forges_allow_list_membership() -> None:
+    """Provenance classification cannot pass as authoritative under different serialized text."""
+    source = _source(datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc))
+    with pytest.raises(ValueError, match="origin_code must be a string"):
+        replace(source, origin_code=_ForgedOriginCode("shadow_origin"))
+
+
+def test_task_rejects_integer_subclass_that_forges_level_bounds() -> None:
+    """Out-of-range ordinal evidence cannot override comparisons and serialize as valid."""
+    source = _source(datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc))
+    with pytest.raises(ValueError, match="importance_level must be an integer"):
+        TaskEvidence(
+            tenant_record_id=TENANT_ID,
+            job_record_id=JOB_ID,
+            task_record_id=TASK_ID,
+            task_statement="Analyze governed workforce evidence and document findings.",
+            importance_level=_ForgedLevel(99),
+            difficulty_level=4,
+            source=source,
         )
