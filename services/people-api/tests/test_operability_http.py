@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import unittest
 
 from orgmetra_people_api.operability import PeopleOperabilityAsgiApp, PostgresReadinessProbe
@@ -117,6 +118,18 @@ class PeopleOperabilityHttpTests(unittest.IsolatedAsyncioTestCase):
         bad_probe = PostgresReadinessProbe(connection_factory=lambda: FakeConnection(bad_cursor))
         with self.assertRaisesRegex(RuntimeError, "readiness query"):
             bad_probe.check_ready()
+
+    def test_canonical_operability_doc_describes_the_probe_contract(self) -> None:
+        """Keep the canonical operator runbook aligned with the executable probe surface."""
+        repository_root = Path(__file__).resolve().parents[3]
+        operability_text = (repository_root / "docs" / "OPERABILITY.md").read_text(encoding="utf-8")
+
+        self.assertIn("### People API liveness and readiness", operability_text)
+        self.assertIn("`GET /health`", operability_text)
+        self.assertIn("`GET /ready`", operability_text)
+        self.assertIn("must not call PostgreSQL", operability_text)
+        self.assertIn("`SELECT 1`", operability_text)
+        self.assertIn("503", operability_text)
 
     async def test_health_is_live_without_touching_owned_dependencies(self) -> None:
         """Keep liveness independent from PostgreSQL so orchestration avoids restart loops."""
