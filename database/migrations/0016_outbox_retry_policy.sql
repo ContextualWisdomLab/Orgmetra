@@ -3,7 +3,7 @@
 -- owned by outbox_delivery_record; this migration only governs when retry work
 -- becomes eligible again. Missing policy fails closed.
 
-CREATE TABLE public.outbox_retry_policy_record (
+CREATE TABLE outbox_retry_policy_record (
     tenant_record_id uuid NOT NULL
         REFERENCES public.tenant_record(tenant_record_id),
     outbox_retry_policy_record_id uuid NOT NULL,
