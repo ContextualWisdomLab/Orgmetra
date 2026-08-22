@@ -25,10 +25,10 @@ Orgmetra does not read Semantic Data Portal application tables. The foreign serv
 
 ## Evidence integrity
 
-Trust-bearing text, integers, and timestamps must be exact built-in runtime types before equality, membership, bounds, UUID parsing, or serialization. Packet-owned references use canonical UUIDv4 suffixes; the tenant ID follows Orgmetra's canonical non-sentinel operational UUID contract. The envelope is final and detects post-construction payload/seal rewriting before canonical evidence leaves the boundary.
+Trust-bearing text, integers, and timestamps must be exact built-in runtime types before equality, membership, bounds, UUID parsing, or serialization. Packet-owned references use canonical UUIDv4 suffixes; the tenant ID follows Orgmetra's canonical non-sentinel operational UUID contract. The envelope is final and detects post-construction rewriting before canonical evidence leaves the boundary. Its packet-owned HMAC is only a consistency value: the authoritative creation seal is held in a lock-protected process-local issuance registry outside envelope-writable slots, so rewriting both payload and packet seal still fails closed.
 
 ## Testing
 
-The dedicated quality lane runs the package tests with exact 100% owned production statement and branch coverage and requires a clean checkout. Adversarial regressions cover malformed references/digests, self-review, runtime-subclass forgery, invalid dependency revision/API use, and post-issuance evidence rewriting.
+The dedicated quality lane runs the package tests with exact 100% owned production statement and branch coverage and requires a clean checkout. Adversarial regressions cover malformed references/digests, self-review, runtime-subclass forgery, invalid dependency revision/API use, payload-only mutation, packet-seal mutation, payload plus recomputed-seal forgery, replacement/seal reset, and runtime-type extension.
 
 See `docs/traceability/semantic-job-evidence.md`, `docs/adr/semantic-job-source-evidence.md`, and `docs/doctoring/semantic-job-evidence-references.md` for the governed rationale and evidence map.
