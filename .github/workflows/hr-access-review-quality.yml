@@ -56,7 +56,9 @@ jobs:
           test "$(find /tmp/orgmetra-hr-access-review-dist -maxdepth 1 -type f -name '*.whl' | wc -l)" -eq 1
           python -m venv --system-site-packages /tmp/orgmetra-hr-access-review-venv
           wheel_path="$(find /tmp/orgmetra-hr-access-review-dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
-          /tmp/orgmetra-hr-access-review-venv/bin/python -m pip install --no-deps "${wheel_path}[test]"
+          wheel_sha="$(sha256sum "$wheel_path" | awk '{print $1}')"
+          printf 'orgmetra-hr-access-review[test] @ file://%s --hash=sha256:%s\n' "$wheel_path" "$wheel_sha" > /tmp/orgmetra-hr-access-review-install.txt
+          /tmp/orgmetra-hr-access-review-venv/bin/python -m pip install --require-hashes --no-deps -r /tmp/orgmetra-hr-access-review-install.txt
           /tmp/orgmetra-hr-access-review-venv/bin/python -m pip check
           /tmp/orgmetra-hr-access-review-venv/bin/python - <<'PY'
           from importlib.metadata import metadata
