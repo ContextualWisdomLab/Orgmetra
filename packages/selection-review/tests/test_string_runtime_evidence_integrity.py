@@ -19,6 +19,10 @@ PROVENANCE_UUID = "66666666-6666-4666-8666-666666666666"
 NOW = datetime.fromisoformat("2026-08-18T02:30:00+00:00")
 
 
+class OpaqueTextSubclass(str):
+    """Represent semantically valid text through an untrusted runtime subclass."""
+
+
 class ForgedGovernanceText(str):
     """Expose unsafe audit text while pretending to equal one reviewed value."""
 
@@ -83,6 +87,12 @@ def _model_packet():
         model_provenance_reference=f"model_provenance:{PROVENANCE_UUID}",
         model_provenance_digest="2" * 64,
     )
+
+
+def test_rejects_tenant_text_subclass_before_uuid_parsing():
+    """Ensure authoritative tenant text cannot carry caller-defined runtime behavior."""
+    with pytest.raises(ValueError):
+        _packet(tenant_record_id=OpaqueTextSubclass(TENANT))
 
 
 @pytest.mark.parametrize(
