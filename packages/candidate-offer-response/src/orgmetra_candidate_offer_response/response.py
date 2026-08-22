@@ -13,7 +13,9 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import json
 import re
+from threading import RLock
 from uuid import UUID
+from weakref import finalize
 
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(
@@ -30,6 +32,28 @@ _NEXT_ACTION = (
     "the authoritative candidate response before any communication, hire, employment, or "
     "candidate-to-worker conversion action."
 )
+_CREATION_EVIDENCE_SEALS: dict[int, str] = {}
+_CREATION_EVIDENCE_SEALS_LOCK = RLock()
+
+
+def _discard_creation_evidence_seal(packet_id: int) -> None:
+    """Discard the process-local issuance seal when its packet is collected."""
+    with _CREATION_EVIDENCE_SEALS_LOCK:
+        _CREATION_EVIDENCE_SEALS.pop(packet_id, None)
+
+
+def _register_creation_evidence_seal(packet: object, digest: str) -> None:
+    """Bind one packet identity to its creation-time evidence outside writable slots."""
+    packet_id = id(packet)
+    with _CREATION_EVIDENCE_SEALS_LOCK:
+        _CREATION_EVIDENCE_SEALS[packet_id] = digest
+    finalize(packet, _discard_creation_evidence_seal, packet_id)
+
+
+def _creation_evidence_seal(packet: object) -> str:
+    """Return the authoritative process-local seal for a live governed packet."""
+    with _CREATION_EVIDENCE_SEALS_LOCK:
+        return _CREATION_EVIDENCE_SEALS[id(packet)]
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -108,7 +132,7 @@ def _validate_fixed_text(value: str, expected: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must remain {expected}")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class CandidateOfferResponsePacket:
     """Immutable candidate-originated offer response awaiting authoritative re-resolution."""
 
@@ -149,7 +173,9 @@ class CandidateOfferResponsePacket:
         object.__setattr__(self, "responded_at", _freeze_timestamp(self.responded_at, "responded_at"))
         object.__setattr__(self, "recorded_at", _freeze_timestamp(self.recorded_at, "recorded_at"))
         self._validate_live()
-        object.__setattr__(self, "_creation_evidence_digest", self._raw_sha256_digest())
+        creation_digest = self._raw_sha256_digest()
+        object.__setattr__(self, "_creation_evidence_digest", creation_digest)
+        _register_creation_evidence_seal(self, creation_digest)
 
     def _validate_live(self) -> None:
         """Fail closed if direct construction or later rewriting drifts from the contract."""
@@ -241,7 +267,11 @@ class CandidateOfferResponsePacket:
     def _assert_integrity(self) -> None:
         """Reject any post-construction rewrite before evidence leaves this boundary."""
         self._validate_live()
-        if self._raw_sha256_digest() != self._creation_evidence_digest:
+        authoritative_seal = _creation_evidence_seal(self)
+        if (
+            self._raw_sha256_digest() != authoritative_seal
+            or self._creation_evidence_digest != authoritative_seal
+        ):
             raise ValueError("candidate offer response evidence changed after construction")
 
     def canonical_json(self) -> str:
