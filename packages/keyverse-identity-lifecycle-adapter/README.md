@@ -2,6 +2,8 @@
 
 This package creates a **non-executing deprovision review packet** for an Orgmetra employment-driven identity lifecycle action. It exists so HR operations can queue a reviewable next action without turning an HR record, an LLM suggestion, or a caller-supplied Keyverse identifier into identity-mutation authority.
 
+Status: **active PR only**. Protected default branch `develop` does not contain this adapter boundary until the PR is merged.
+
 ## Current contract
 
 `KeyverseIdentityDeprovisionReviewPacket` binds only:
@@ -31,6 +33,6 @@ The standards basis is RFC 7644 (SCIM Protocol) and RFC 7643 (SCIM Core Schema).
 
 ## Integrity
 
-Owned references use canonical namespaced UUIDv4 correlation identifiers; tenant identity accepts the authoritative non-sentinel UUID object contract. Digests are lowercase SHA-256. The reviewed Keyverse revision is exact. Evidence runtime types fail closed, routine `repr` is redacted, and canonical export checks a process-local construction seal so post-construction rewriting cannot silently alter an existing packet.
+Owned references use canonical namespaced UUIDv4 correlation identifiers; tenant identity accepts the authoritative non-sentinel UUID object contract. Digests are lowercase SHA-256. The reviewed Keyverse revision is exact. System-recorded evidence must be an exact built-in `timezone.utc` datetime that is not in the future. Evidence runtime types fail closed, routine `repr` is redacted, and canonical export checks a process-local construction seal so post-construction rewriting cannot silently alter an existing packet.
 
 A copied packet is a new **non-authorizing** review packet, not proof of review or execution. Durable services must persist it under their normal append-only audit/idempotency constraints.
