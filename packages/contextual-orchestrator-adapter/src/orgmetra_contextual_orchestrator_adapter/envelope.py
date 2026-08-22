@@ -15,6 +15,8 @@ from uuid import UUID
 
 _CONTEXTUAL_ORCHESTRATOR_REVISION = "e226e1197bdfc890c9d8e5b9b648c78857d7e465"
 _PROCESS_SEAL_KEY = secrets.token_bytes(32)
+_NEW_ISSUANCE_MARKER = object()
+_USED_ISSUANCE_MARKER = object()
 _DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}")
 _MODEL_PATTERN = re.compile(r"[A-Za-z0-9._:/-]{1,128}")
 _ACTOR_PATTERN = re.compile(r"actor:[A-Za-z0-9._~-]{1,128}")
@@ -133,6 +135,7 @@ class DraftEvidenceEnvelope:
     evidence_version: int
     recorded_at: datetime
     _creation_seal: str | None = field(default=None, repr=False, compare=False)
+    _issuance_marker: object = field(default=_NEW_ISSUANCE_MARKER, repr=False, compare=False)
 
     API_CONTRACT_ID: ClassVar[str] = "contextual-orchestrator.openapi.v0.1.0"
     OUTPUT_TRUST_STATE: ClassVar[str] = "untrusted_draft"
@@ -145,11 +148,14 @@ class DraftEvidenceEnvelope:
 
     def __post_init__(self) -> None:
         """Validate the reviewed boundary and seal its exact creation-time evidence."""
+        if self._issuance_marker is not _NEW_ISSUANCE_MARKER:
+            raise ValueError("draft evidence changed after construction")
         if self._creation_seal is not None:
             raise ValueError("draft evidence changed after construction")
         self._validate_fields()
         payload_json = self._canonical_payload_json()
         object.__setattr__(self, "_creation_seal", _seal(payload_json))
+        object.__setattr__(self, "_issuance_marker", _USED_ISSUANCE_MARKER)
 
     def _validate_fields(self) -> None:
         """Fail closed on scope, provenance, actor-separation, and immutable-state evidence."""
@@ -215,6 +221,8 @@ class DraftEvidenceEnvelope:
     def _assert_integrity(self) -> None:
         """Reject any post-construction rewrite before evidence can leave the boundary."""
         self._validate_fields()
+        if self._issuance_marker is not _USED_ISSUANCE_MARKER:
+            raise ValueError("draft evidence changed after construction")
         seal = self._creation_seal
         if type(seal) is not str or not hmac.compare_digest(seal, _seal(self._canonical_payload_json())):
             raise ValueError("draft evidence changed after construction")
