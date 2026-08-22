@@ -185,7 +185,7 @@ def test_result_requires_canonical_timestamp_and_aggregate_types() -> None:
         def to_dict(self) -> dict[str, object]:
             return {**super().to_dict(), "employment_decision": "auto_reject"}
 
-    with pytest.raises(ValueError, match="requested_at"):
+    with pytest.raises(ValueError, match="completed_at"):
         result(completed_at=datetime(2026, 8, 21, 7, 10))
     with pytest.raises(ValueError, match="missingness_summary"):
         result(missingness_summary=object())
