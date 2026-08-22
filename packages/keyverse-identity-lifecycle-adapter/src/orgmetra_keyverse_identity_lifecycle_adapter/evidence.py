@@ -49,10 +49,15 @@ def _validate_digest(field_name: str, value: object) -> None:
         raise ValueError(f"{field_name} must be a lowercase SHA-256 digest.")
 
 
-def _validate_timestamp(field_name: str, value: object) -> None:
-    """Require exact built-in UTC system evidence time that has already occurred."""
+def _validate_timestamp_shape(field_name: str, value: object) -> None:
+    """Require exact built-in UTC timestamp structure without consulting wall-clock time."""
     if type(value) is not datetime or value.tzinfo is not timezone.utc:
         raise ValueError(f"{field_name} must be an exact timezone.utc datetime.")
+
+
+def _validate_timestamp(field_name: str, value: object) -> None:
+    """Require exact UTC issuance time that has already occurred."""
+    _validate_timestamp_shape(field_name, value)
     if value > datetime.now(timezone.utc):
         raise ValueError(f"{field_name} must not be in the future.")
 
@@ -113,16 +118,17 @@ class KeyverseIdentityDeprovisionReviewPacket:
         raise TypeError("KeyverseIdentityDeprovisionReviewPacket is final.")
 
     def __post_init__(self) -> None:
-        """Validate and seal the exact deprovision review packet."""
-        self._validate()
+        """Validate issuance-time state and seal the exact deprovision review packet."""
+        self._validate_fields()
+        _validate_timestamp("recorded_at", self.recorded_at)
         digest = sha256(_canonical_payload_json(self).encode("utf-8")).hexdigest()
         object_id = id(self)
         with _SEAL_LOCK:
             _SEALS[object_id] = digest
         finalize(self, _discard_seal, object_id)
 
-    def _validate(self) -> None:
-        """Reject ambiguous identity, scope, provenance, actor, or recorded-time evidence."""
+    def _validate_fields(self) -> None:
+        """Reject ambiguous identity, scope, provenance, actor, or timestamp structure."""
         if type(self.tenant_record_id) is not UUID or self.tenant_record_id.int in (
             0,
             _MAX_UUID_INT,
@@ -161,11 +167,11 @@ class KeyverseIdentityDeprovisionReviewPacket:
             raise ValueError(
                 "evidence_version must be an integer from 1 through 1000000."
             )
-        _validate_timestamp("recorded_at", self.recorded_at)
+        _validate_timestamp_shape("recorded_at", self.recorded_at)
 
     def _assert_integrity(self) -> None:
-        """Fail closed if the review packet changed after construction."""
-        self._validate()
+        """Fail closed on changed structure or bytes without re-running issuance freshness."""
+        self._validate_fields()
         live_digest = sha256(_canonical_payload_json(self).encode("utf-8")).hexdigest()
         with _SEAL_LOCK:
             issued_digest = _SEALS.get(id(self))
