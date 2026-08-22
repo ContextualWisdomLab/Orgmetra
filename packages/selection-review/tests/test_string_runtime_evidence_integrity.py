@@ -41,6 +41,20 @@ class MutableOffset(tzinfo):
         return timedelta(0)
 
 
+class ExplodingOffset(tzinfo):
+    """Model a timezone provider that raises while its offset is resolved."""
+
+    def utcoffset(self, value):  # type: ignore[no-untyped-def]
+        """Raise provider behavior that must normalize to a stable ValueError."""
+        del value
+        raise RuntimeError("provider details must not escape")
+
+    def dst(self, value):  # type: ignore[no-untyped-def]
+        """Return a fixed daylight-saving offset if queried."""
+        del value
+        return timedelta(0)
+
+
 class ForgedGovernanceText(str):
     """Expose unsafe audit text while pretending to equal one reviewed value."""
 
@@ -116,14 +130,8 @@ def test_rejects_tenant_text_subclass_before_uuid_parsing():
 @pytest.mark.parametrize(
     ("field", "forged"),
     [
-        (
-            "purpose_code",
-            ForgedGovernanceText("shadow_decision", "selection_review"),
-        ),
-        (
-            "reason_code",
-            ForgedGovernanceText("employee_jane_doe", "candidate_assessment"),
-        ),
+        ("purpose_code", ForgedGovernanceText("shadow_decision", "selection_review")),
+        ("reason_code", ForgedGovernanceText("employee_jane_doe", "candidate_assessment")),
     ],
 )
 def test_rejects_forged_governance_code_before_canonical_evidence(field, forged):
@@ -178,6 +186,24 @@ def test_detaches_mutable_timezone_before_immutable_evidence_is_stored():
     assert packet.generated_at.tzinfo is timezone.utc
     assert packet.canonical_json() == first_json
     assert packet.sha256_digest() == first_digest
+
+
+def test_timezone_provider_exception_is_normalized_at_construction():
+    """Do not leak arbitrary timezone-provider exceptions from the trust boundary."""
+    with pytest.raises(ValueError, match="generated_at"):
+        _packet(generated_at=datetime(2026, 8, 18, 2, 30, tzinfo=ExplodingOffset()))
+
+
+def test_canonicalization_rejects_postconstruction_timezone_reinjection():
+    """Fail closed if low-level mutation reintroduces executable timezone behavior."""
+    packet = _packet()
+    object.__setattr__(
+        packet,
+        "generated_at",
+        datetime(2026, 8, 18, 2, 30, tzinfo=MutableOffset()),
+    )
+    with pytest.raises(ValueError, match="generated_at"):
+        packet.canonical_json()
 
 
 def test_valid_packet_still_serializes_reviewed_governance_values():
