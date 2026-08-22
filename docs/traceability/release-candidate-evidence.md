@@ -4,7 +4,7 @@
 
 Protected-main truth at the branch point provides deterministic repository-source integrity, exact-head CI, security scanning, and a real PostgreSQL restore rehearsal. It does not yet provide a release-candidate evidence bundle that binds one exact Git revision to a reproducible source artifact, a software bill of materials, and structured provenance. This active PR adds that bounded evidence surface. It does **not** create a Git tag, GitHub Release, deployable container, signed attestation, SLSA level claim, certification claim, or permission to release.
 
-The evidence builder reads immutable Git blobs from the exact checked-out commit rather than copying mutable working-tree bytes. It rejects a requested revision that differs from `HEAD`, rejects unsupported tree object modes, normalizes archive ownership/mode/time metadata, and builds twice in isolated temporary directories during CI. The two source archives, SBOMs, and provenance statements must be byte-identical.
+The evidence builder reads immutable Git blobs from the exact checked-out commit rather than copying mutable working-tree bytes. It rejects a requested revision that differs from `HEAD`, rejects unsupported tree object modes, requires the exact CPython 3.14.7 runtime used by the checked-in workflow, normalizes archive ownership/mode/time metadata, and builds twice in isolated temporary directories during CI. The two source archives, SBOMs, and provenance statements must be byte-identical.
 
 ## Build type v1
 
@@ -23,7 +23,7 @@ The builder emits exactly three candidate artifacts:
 2. `orgmetra.cdx.json` — deterministic CycloneDX 1.7 JSON inventory for the source application, checked-in Python/npm package metadata, and declared dependency relationships discoverable from those package manifests;
 3. `orgmetra.provenance.json` — an in-toto Statement v1 using the SLSA provenance v1 predicate type, whose subjects bind the source archive and SBOM SHA-256 digests and whose resolved source dependency binds the exact Git commit.
 
-The build has no network dependency after checkout. It uses only Git, CPython 3.14 standard-library modules, and Node.js 24 for the verification contract. The quality workflow pins checkout/setup actions by immutable commit SHA and proves that checkout `HEAD` equals the pull-request event SHA before executing the contract.
+The build has no network dependency after checkout. It uses only Git and CPython 3.14.7 standard-library modules to construct evidence, with Node.js 24 executing the verification contract. The quality workflow pins checkout/setup actions by immutable commit SHA, pins CPython to the exact 3.14.7 patch release, and proves that checkout `HEAD` equals the pull-request event SHA before executing the contract. The builder independently refuses to construct candidate evidence under another Python patch runtime so provenance cannot claim a runtime different from the implementation that affected archive bytes.
 
 ## Assurance boundary
 
@@ -36,6 +36,7 @@ The SLSA-shaped provenance is intentionally **unsigned candidate provenance gene
 | Requirement | Evidence | Expected result | Maturity |
 |---|---|---|---|
 | Exact source binding | workflow checkout proof plus builder `HEAD == --source-sha` guard | another commit cannot be labeled as the requested source | implemented_on_active_pr |
+| Exact build-runtime binding | exact CPython 3.14.7 workflow pin, builder runtime guard, and provenance assertion | a different Python patch cannot emit evidence labeled as the canonical build runtime | implemented_on_active_pr |
 | Source archive reproducibility | two independent temporary-directory builds | source archive SHA-256 is byte-identical | implemented_on_active_pr |
 | SBOM reproducibility | two independent temporary-directory builds | `orgmetra.cdx.json` SHA-256 is byte-identical | implemented_on_active_pr |
 | Stable final SBOM profile | `tests/release-candidate-evidence.test.mjs` | CycloneDX 1.7 identifiers, unique component references, product component, and declared components are present | implemented_on_active_pr |
@@ -46,6 +47,6 @@ The SLSA-shaped provenance is intentionally **unsigned candidate provenance gene
 
 ## Buyer and operator interpretation
 
-A GREEN exact-head run proves that this repository revision can deterministically produce the three candidate evidence artifacts under the defined build type. It is useful for acquisition diligence, artifact-review automation, incident reconstruction, and future protected release automation. It does not mean Orgmetra has shipped, that a binary/container is reproducible, that the SBOM has registry-resolved every transitive dependency, or that the provenance is cryptographically authenticated.
+A GREEN exact-head run proves that this repository revision can deterministically produce the three candidate evidence artifacts under the defined build type and exact declared Python patch runtime. It is useful for acquisition diligence, artifact-review automation, incident reconstruction, and future protected release automation. It does not mean Orgmetra has shipped, that a binary/container is reproducible, that the SBOM has registry-resolved every transitive dependency, or that the provenance is cryptographically authenticated.
 
 Primary technical sources and APA 7 references are recorded in `docs/doctoring/release-candidate-evidence-references.md`.
