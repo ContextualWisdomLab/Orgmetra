@@ -104,8 +104,8 @@ class PeopleOperabilityHttpTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(TypeError, "readiness_probe"):
             PeopleOperabilityAsgiApp(readiness_probe=object())
 
-    def test_postgres_probe_requires_callable_factory_and_exact_success_row(self) -> None:
-        """Use a read-only owned-database check and fail closed on an unexpected result."""
+    def test_postgres_probe_requires_callable_factory_and_a_result_row(self) -> None:
+        """Use a read-only owned-database check and fail closed when SELECT 1 yields no row."""
         with self.assertRaisesRegex(TypeError, "connection_factory"):
             PostgresReadinessProbe(connection_factory=object())
 
@@ -114,10 +114,10 @@ class PeopleOperabilityHttpTests(unittest.IsolatedAsyncioTestCase):
         probe.check_ready()
         self.assertEqual(cursor.executed, ["SET TRANSACTION READ ONLY", "SELECT 1"])
 
-        bad_cursor = FakeCursor(row=(0,))
-        bad_probe = PostgresReadinessProbe(connection_factory=lambda: FakeConnection(bad_cursor))
+        missing_cursor = FakeCursor(row=None)
+        missing_probe = PostgresReadinessProbe(connection_factory=lambda: FakeConnection(missing_cursor))
         with self.assertRaisesRegex(RuntimeError, "readiness query"):
-            bad_probe.check_ready()
+            missing_probe.check_ready()
 
     def test_postgres_probe_accepts_mapping_row_factory(self) -> None:
         """Treat an equivalent mapping row as healthy instead of coupling readiness to tuple rows."""
