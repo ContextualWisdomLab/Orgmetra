@@ -17,4 +17,4 @@ The PostgreSQL 16 documentation defines `transaction_timestamp()` as the start t
 - A later correction creates/opens a new system-time fact through the existing governed bitemporal path rather than backdating when Orgmetra learned the fact.
 - This choice is an implementation/evidence-integrity contract, not a certification or legal-compliance claim.
 
-Reviewed against the official PostgreSQL 16 online manual on 2026-08-23. The repository's hosted PostgreSQL test image remains separately immutably pinned by workflow digest; this reference records the major-version semantic contract rather than asserting a particular patch release is certified.
+Reviewed against the official PostgreSQL 16 online manual on 2026-08-23 in Asia/Seoul (2026-08-22 UTC). The repository's hosted PostgreSQL test image remains separately immutably pinned by workflow digest; this reference records the major-version semantic contract rather than asserting a particular patch release is certified.
