@@ -11,10 +11,11 @@ Status: **active PR**. Protected `develop` does not contain this capability unti
 | Tenant and packet references are canonical opaque identifiers | `test_rejects_noncanonical_or_unreviewable_governance_values`; `test_rejects_wrong_namespace_malformed_or_non_uuid4_references` | active PR |
 | Policy evidence is immutable and versioned | `test_correlation_digest_changes_when_governed_policy_evidence_changes` | active PR |
 | Audit correlation is deterministic and value-minimized | `test_canonical_evidence_is_deterministic_value_minimized_and_redacted` | active PR |
+| Canonicalization revalidates live trust-bearing state after low-level mutation | `test_canonicalization_rejects_reinjected_contradictory_hold_state`; `test_canonicalization_rejects_reinjected_non_utc_recorded_time` | active PR |
 | System-recorded evidence cannot predate the claimed human-review business date | `test_rejects_recording_before_the_human_review_business_date` | active PR |
 | Caller-defined Python scalar behavior cannot forge trust-bearing evidence | `test_rejects_noncanonical_or_unreviewable_governance_values` | active PR |
 | Owned production code remains fully executable under tests | `HR Data Retention Quality` workflow with exact 100% statement/branch coverage | active PR; exact-head hosted evidence required |
 
 ## Authority boundary
 
-The packet is pre-disposition evidence only. Before a later deletion/anonymization executor acts, the authoritative host must re-resolve current tenant/resource scope, applicable retention policy and jurisdiction, legal-hold state, reviewer authority, and immutable audit evidence. No foreign dedicated-writer repository is mutated and no cross-service application-table SQL is introduced by this slice.
+The packet is pre-disposition evidence only. Before a later deletion/anonymization executor acts, the authoritative host must re-resolve current tenant/resource scope, applicable retention policy and jurisdiction, legal-hold state, reviewer authority, and immutable audit evidence. Canonical audit serialization revalidates the current packet fields but does not turn an in-memory Python object into the durable audit store; append-only audit/outbox persistence remains the authoritative durability boundary. No foreign dedicated-writer repository is mutated and no cross-service application-table SQL is introduced by this slice.
