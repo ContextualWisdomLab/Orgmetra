@@ -12,9 +12,9 @@ from orgmetra_hr_access_review import HrAccessReviewPacket, build_hr_access_revi
 
 TENANT = "018f2f65-9a8b-7c6d-8e5f-1234567890ab"
 REVIEW = "access_review:12345678-1234-4234-8234-1234567890ab"
-SUBJECT = "actor:worker-123"
-REQUESTER = "actor:manager-456"
-REVIEWER = "actor:security-reviewer-789"
+SUBJECT = "actor:11111111-1111-4111-8111-111111111111"
+REQUESTER = "actor:22222222-2222-4222-8222-222222222222"
+REVIEWER = "actor:33333333-3333-4333-8333-333333333333"
 SCOPE_DIGEST = "1" * 64
 POLICY_DIGEST = "2" * 64
 ENTITLEMENT_DIGEST = "3" * 64
@@ -145,9 +145,20 @@ def test_rejects_invalid_packet_owned_review_references(reference: str) -> None:
         build(access_review_reference=reference)
 
 
-@pytest.mark.parametrize("actor", ["worker-123", "actor:", "actor:bad value", "other:worker-123"])
-def test_rejects_malformed_actor_references(actor: str) -> None:
-    """Accept only bounded opaque actor references for later authoritative resolution."""
+@pytest.mark.parametrize(
+    "actor",
+    [
+        "worker-123",
+        "actor:",
+        "actor:bad value",
+        "other:worker-123",
+        "actor:alice_smith",
+        "actor:employee-123",
+        "actor:6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    ],
+)
+def test_rejects_malformed_or_identifying_actor_references(actor: str) -> None:
+    """Keep durable actor correlation opaque rather than persisting names or employee IDs."""
     with pytest.raises(ValueError, match="subject_actor_reference"):
         build(subject_actor_reference=actor)
 
