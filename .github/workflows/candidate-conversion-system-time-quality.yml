@@ -74,6 +74,10 @@ jobs:
               )
           print(json.dumps(rows, separators=(",", ":")))
           PY
+      - name: Print exact expected foundation manifest
+        run: |
+          python tests/validate_repository.py --print-manifest \
+            | python -c 'import json,sys; print(json.dumps(json.load(sys.stdin), separators=(",", ":")))'
       - name: Run candidate conversion recorded-time regression
         run: bash tests/test_candidate_conversion_system_recorded_time_postgres.sh
       - name: Require clean checkout
