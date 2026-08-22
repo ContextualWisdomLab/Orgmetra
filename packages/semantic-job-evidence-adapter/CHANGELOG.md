@@ -8,3 +8,4 @@
 - Fail closed on malformed governance evidence, self-review, caller-defined primitive subclasses, dependency-contract drift, post-construction mutation, seal reset, and runtime type extension.
 - Repair the post-issuance integrity path so rewriting a payload together with a recomputed packet-owned seal still fails: the authoritative creation seal is held in a process-local, lock-protected issuance registry outside envelope-writable slots.
 - Add an exact-head quality workflow with exact 100% owned production statement and branch coverage plus clean-checkout enforcement.
+- Build a wheel and execute the quality suite against the SHA-256-bound installed artifact in a fully isolated virtual environment; install the reviewed hash-pinned pytest/coverage toolchain inside that environment and fail closed if package or test-tool imports resolve outside it.
