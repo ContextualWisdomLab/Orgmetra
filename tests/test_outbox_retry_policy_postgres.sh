@@ -54,7 +54,7 @@ VALUES (
     1,
     2,
     8,
-    '2026-08-17T03:00:00Z'::timestamptz
+    transaction_timestamp()
 );
 
 SELECT record_audit_outbox_event(
