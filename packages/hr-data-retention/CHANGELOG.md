@@ -6,6 +6,7 @@
 - Bind authoritative tenant/resource, retention-policy digest, due date, legal-hold evidence, distinct requester/reviewer actors, evidence version, and exact UTC recorded time.
 - Fail closed under active holds and unexpired retention windows, and treat an elapsed due date only as a trigger for authoritative disposition review.
 - Keep every packet explicitly `not_authorized_to_delete`; no automatic deletion, cross-service SQL, or foreign repository mutation is introduced.
-- Revalidate all trust-bearing fields immediately before canonical audit serialization so low-level post-construction mutation cannot emit contradictory legal-hold or noncanonical recorded-time evidence.
+- Revalidate all trust-bearing fields immediately before canonical audit serialization so low-level post-construction mutation cannot emit malformed legal-hold or noncanonical recorded-time evidence.
+- Seal the creation-time canonical evidence digest and reject later replacement even when the replacement policy digest, actor, date, or legal-hold evidence is independently well-formed.
 - Make the trust-bearing packet runtime-final so a caller cannot subclass it and override derived non-authorizing state before canonical serialization.
-- Add adversarial runtime-type, namespace, UUID, digest, chronology, separation-of-duties, replacement, serialization-time integrity, subclass-forgery, canonicalization, and exact 100% statement/branch coverage regressions.
+- Add adversarial runtime-type, namespace, UUID, digest, chronology, separation-of-duties, replacement, serialization-time integrity, creation-seal, subclass-forgery, canonicalization, and exact 100% statement/branch coverage regressions.
