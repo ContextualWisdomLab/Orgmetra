@@ -81,6 +81,37 @@ GRANT USAGE ON SCHEMA public TO orgmetra_retry_policy_reader;
 GRANT SELECT ON outbox_retry_policy_record TO orgmetra_retry_policy_reader;
 SQL
 
+set +e
+backdated_policy_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v tenant_alpha="${TENANT_ALPHA}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_alpha';
+INSERT INTO outbox_retry_policy_record (
+    tenant_record_id,
+    outbox_retry_policy_record_id,
+    delivery_target_code,
+    policy_version,
+    base_delay_seconds,
+    maximum_delay_seconds,
+    recorded_from
+)
+VALUES (
+    :'tenant_alpha'::uuid,
+    '00000000-0000-4000-8000-0000000001b1'::uuid,
+    'benefits_gateway',
+    1,
+    2,
+    8,
+    '2000-01-01T00:00:00Z'::timestamptz
+);
+SQL
+} 2>&1)"
+backdated_policy_status=$?
+set -e
+if [[ ${backdated_policy_status} -eq 0 || "${backdated_policy_output}" != *"recorded_from must equal current transaction time"* ]]; then
+    echo "retry policy accepted forged historical system-recorded time or failed for the wrong reason: ${backdated_policy_output}" >&2
+    exit 1
+fi
+
 policy_visibility="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atq \
     -v tenant_alpha="${TENANT_ALPHA}" \
     -v tenant_beta="${TENANT_BETA}" <<'SQL'
