@@ -1,7 +1,7 @@
-"""Reject caller-controlled string subclasses at selection-review trust boundaries."""
+"""Reject caller-controlled runtime evidence at selection-review trust boundaries."""
 
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta, timezone, tzinfo
 import json
 
 import pytest
@@ -21,6 +21,24 @@ NOW = datetime.fromisoformat("2026-08-18T02:30:00+00:00")
 
 class OpaqueTextSubclass(str):
     """Represent semantically valid text through an untrusted runtime subclass."""
+
+
+class MutableOffset(tzinfo):
+    """Provide caller-controlled timezone behavior that can change after construction."""
+
+    def __init__(self) -> None:
+        """Start at UTC so the first canonicalization looks ordinary."""
+        self.offset = timedelta(0)
+
+    def utcoffset(self, value):  # type: ignore[no-untyped-def]
+        """Return the mutable offset used by datetime conversion."""
+        del value
+        return self.offset
+
+    def dst(self, value):  # type: ignore[no-untyped-def]
+        """Keep daylight saving fixed while offset mutability is exercised."""
+        del value
+        return timedelta(0)
 
 
 class ForgedGovernanceText(str):
@@ -146,6 +164,20 @@ def test_rejects_forged_model_output_status_before_canonical_evidence():
     forged = ForgedGovernanceText("trusted_decision", "untrusted_draft")
     with pytest.raises(ValueError):
         replace(base, model_output_status=forged)
+
+
+def test_detaches_mutable_timezone_before_immutable_evidence_is_stored():
+    """Keep canonical JSON and its digest stable after caller timezone state mutates."""
+    zone = MutableOffset()
+    packet = _packet(generated_at=datetime(2026, 8, 18, 2, 30, tzinfo=zone))
+    first_json = packet.canonical_json()
+    first_digest = packet.sha256_digest()
+
+    zone.offset = timedelta(hours=9)
+
+    assert packet.generated_at.tzinfo is timezone.utc
+    assert packet.canonical_json() == first_json
+    assert packet.sha256_digest() == first_digest
 
 
 def test_valid_packet_still_serializes_reviewed_governance_values():
