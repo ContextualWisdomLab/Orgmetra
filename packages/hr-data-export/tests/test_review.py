@@ -39,7 +39,13 @@ class ForgedInt(int):
     def __lt__(self, other: object) -> bool:
         return False
 
+    def __le__(self, other: object) -> bool:
+        return False
+
     def __gt__(self, other: object) -> bool:
+        return False
+
+    def __ge__(self, other: object) -> bool:
         return False
 
 
@@ -284,8 +290,7 @@ def test_direct_construction_cannot_weaken_export_controls(
 def test_packet_subclassing_is_rejected() -> None:
     """A caller cannot subclass the governed packet and override trust behavior."""
     with pytest.raises(TypeError, match="must not be subclassed"):
-        class ForgedPacket(HrDataExportReviewPacket):
-            pass
+        type("ForgedPacket", (HrDataExportReviewPacket,), {})
 
 
 def test_post_construction_tampering_is_revalidated_before_canonicalization() -> None:
