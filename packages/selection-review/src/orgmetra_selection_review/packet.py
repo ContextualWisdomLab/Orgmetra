@@ -33,7 +33,9 @@ _NEXT_ACTION = (
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
-    """Require canonical non-sentinel UUID text for a governance identity."""
+    """Require exact canonical non-sentinel UUID text for a governance identity."""
+    if type(value) is not str:
+        raise ValueError(f"{field_name} must be canonical UUID text")
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as exc:
@@ -43,9 +45,9 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
 
 
 def _validate_code(value: str, field_name: str) -> None:
-    """Require a bounded, descriptive lower snake_case governance code."""
+    """Require exact bounded, descriptive lower snake_case governance text."""
     if (
-        not isinstance(value, str)
+        type(value) is not str
         or len(value) > 64
         or not _CODE_PATTERN.fullmatch(value)
     ):
@@ -70,10 +72,10 @@ def _validate_evidence_version_code(value: str) -> None:
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require the expected namespace plus a canonical operational UUID suffix."""
+    """Require exact text with the expected namespace and operational UUID suffix."""
     message = f"{field_name} must be an opaque {prefix}: reference"
     if (
-        not isinstance(value, str)
+        type(value) is not str
         or len(value) > 160
         or not _REFERENCE_PATTERN.fullmatch(value)
         or not value.startswith(f"{prefix}:")
@@ -144,9 +146,9 @@ class SelectionReviewPacket:
         _canonical_timestamp(self.generated_at)
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for selection decisions")
-        if self.review_state != _REVIEW_STATE:
+        if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_decision")
-        if self.next_action != _NEXT_ACTION:
+        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed human-review instruction")
         model_presence = (
             self.model_draft_reference is not None,
@@ -169,7 +171,10 @@ class SelectionReviewPacket:
                 "model_provenance_reference",
             )
             _validate_digest(self.model_provenance_digest, "model_provenance_digest")
-            if self.model_output_status != _MODEL_OUTPUT_STATUS:
+            if (
+                type(self.model_output_status) is not str
+                or self.model_output_status != _MODEL_OUTPUT_STATUS
+            ):
                 raise ValueError("model-backed evidence must remain untrusted_draft")
         elif self.model_output_status is not None:
             raise ValueError("model_output_status requires model draft evidence")
