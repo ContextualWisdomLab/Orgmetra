@@ -8,3 +8,4 @@
 - Require independent requester/reviewer correlations, exact owner schema version, canonical SHA-256 provenance, source-result chronology, and fail-closed supersession integrity.
 - Preserve opaque references that satisfy the pinned owner's normalization contract, including owner-valid Unicode format characters, while retaining Orgmetra's local length bound and the owner's numeric/control-character rejection rules.
 - Prevent the envelope itself from granting high-impact employment-decision authority.
+- Run installed-wheel tests in a fully isolated virtual environment whose pytest/coverage toolchain is installed from the repository's reviewed hash-pinned dependency set; fail closed if the adapter or those test dependencies resolve outside that environment.
