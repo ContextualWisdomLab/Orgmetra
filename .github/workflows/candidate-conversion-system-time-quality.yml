@@ -48,6 +48,32 @@ jobs:
         env:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Print deterministic candidate-conversion provenance
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          paths = [
+              "database/migrations/0017_candidate_conversion_system_recorded_time.sql",
+              "tests/test_candidate_conversion_system_recorded_time_postgres.sh",
+              "tests/validate_repository.py",
+              "scripts/foundation-contract-core.mjs",
+          ]
+          rows = []
+          for path_text in paths:
+              data = Path(path_text).read_bytes()
+              rows.append(
+                  {
+                      "path": path_text,
+                      "sha256": hashlib.sha256(data).hexdigest(),
+                      "bytes": len(data),
+                      "lines": len(data.decode("utf-8").splitlines()),
+                  }
+              )
+          print(json.dumps(rows, separators=(",", ":")))
+          PY
       - name: Run candidate conversion recorded-time regression
         run: bash tests/test_candidate_conversion_system_recorded_time_postgres.sh
       - name: Require clean checkout
