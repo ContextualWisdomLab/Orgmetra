@@ -9,12 +9,23 @@ import test from 'node:test';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const builderPath = join(repoRoot, 'scripts', 'build-release-candidate-evidence.py');
+const workflowPath = join(repoRoot, '.github', 'workflows', 'release-candidate-evidence-quality.yml');
 
 function gitHead() {
   const result = spawnSync('git', ['rev-parse', 'HEAD'], {
     cwd: repoRoot,
     encoding: 'utf8',
   });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+
+function pythonVersion() {
+  const result = spawnSync(
+    'python',
+    ['-c', 'import platform; print(platform.python_version())'],
+    { cwd: repoRoot, encoding: 'utf8' },
+  );
   assert.equal(result.status, 0, result.stderr);
   return result.stdout.trim();
 }
@@ -38,6 +49,7 @@ function readJson(path) {
 
 test('release candidate evidence is deterministic and binds the exact source revision', () => {
   const sourceSha = gitHead();
+  const exactPythonVersion = pythonVersion();
   const first = mkdtempSync(join(tmpdir(), 'orgmetra-release-evidence-a-'));
   const second = mkdtempSync(join(tmpdir(), 'orgmetra-release-evidence-b-'));
 
@@ -78,6 +90,16 @@ test('release candidate evidence is deterministic and binds the exact source rev
     assert.equal(
       provenance.predicate.buildDefinition.externalParameters.repository,
       'https://github.com/ContextualWisdomLab/Orgmetra',
+    );
+    assert.equal(
+      provenance.predicate.buildDefinition.internalParameters.pythonRuntime,
+      exactPythonVersion,
+      'provenance must record the exact Python runtime that can affect archive bytes',
+    );
+    assert.match(
+      readFileSync(workflowPath, 'utf8'),
+      new RegExp(`python-version: ["']${exactPythonVersion.replaceAll('.', '\\.') }["']`),
+      'workflow must pin the exact Python patch runtime recorded in provenance',
     );
     assert.equal(provenance.predicate.runDetails.builder.id.includes('release-candidate-evidence-quality.yml'), true);
   } finally {
