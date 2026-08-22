@@ -12,6 +12,7 @@ from orgmetra_keyverse_identity_lifecycle_adapter import (
     REVIEWED_KEYVERSE_OPERATION,
     REVIEWED_KEYVERSE_REVISION,
 )
+from orgmetra_keyverse_identity_lifecycle_adapter import evidence as evidence_module
 
 
 def ref(namespace: str) -> str:
@@ -130,6 +131,18 @@ def test_rejects_future_system_recorded_time() -> None:
         KeyverseIdentityDeprovisionReviewPacket(**payload)
 
 
+def test_export_does_not_reenter_issuance_time_freshness(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Already sealed evidence must not depend on later wall-clock freshness checks."""
+    handoff = KeyverseIdentityDeprovisionReviewPacket(**values())
+
+    def reject_read_time_freshness(field_name: str, value: object) -> None:
+        """Represent a wall-clock-dependent issuance validator that must not run on export."""
+        raise AssertionError(f"read path re-entered issuance validation for {field_name}: {value!r}")
+
+    monkeypatch.setattr(evidence_module, "_validate_timestamp", reject_read_time_freshness)
+    assert handoff.canonical_document()["recorded_at"] == "2026-01-01T12:00:00Z"
+
+
 def test_rejects_non_uuid_or_reserved_tenant_identity() -> None:
     """Fail closed on non-UUID and reserved tenant identity values."""
     for bad_value in (str(uuid4()), UUID(int=0), UUID(int=(1 << 128) - 1)):
@@ -164,8 +177,6 @@ def test_dataclass_replace_creates_only_a_new_non_authorizing_packet() -> None:
 def test_missing_process_local_seal_fails_closed() -> None:
     """Canonical export requires the process-local integrity seal for this exact object."""
     handoff = KeyverseIdentityDeprovisionReviewPacket(**values())
-    from orgmetra_keyverse_identity_lifecycle_adapter import evidence as evidence_module
-
     with evidence_module._SEAL_LOCK:
         evidence_module._SEALS.pop(id(handoff))
     with pytest.raises(ValueError, match="changed after construction"):
