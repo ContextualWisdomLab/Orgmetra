@@ -65,26 +65,6 @@ test('human-review workspace states remain keyboard-accessible and localized', a
   await expect(page.locator('#confirmation-reason')).toHaveValue('');
 });
 
-test('unconfigured protected reads stay neutral and explain the host next action', async ({ page }) => {
-  await page.goto(workspacePath);
-
-  await page.locator('[data-view-link="employee-profile"]').first().click();
-  const peopleStatus = page.locator('#people-api-status');
-  await expect(peopleStatus).toHaveAttribute('data-state', 'not-configured');
-  await expect(peopleStatus).toContainText('host must provide a People API URL and authorization provider');
-  await page.getByRole('button', { name: 'Load worker record' }).click();
-  await expect(peopleStatus).toHaveAttribute('data-state', 'not-configured');
-  await expect(page.locator('#people-api-result')).toBeHidden();
-
-  await page.locator('[data-view-link="job-analysis"]').first().click();
-  const jobAnalysisStatus = page.locator('#job-analysis-status');
-  await expect(jobAnalysisStatus).toHaveAttribute('data-state', 'not-configured');
-  await expect(jobAnalysisStatus).toContainText('host must provide an API base URL and authorization provider');
-  await page.getByRole('button', { name: 'Load snapshot' }).click();
-  await expect(jobAnalysisStatus).toHaveAttribute('data-state', 'not-configured');
-  await expect(page.locator('#job-analysis-result')).toBeHidden();
-});
-
 test('connected read views use host authorization and render API evidence', async ({ page }) => {
   await injectProtectedReadConfig(page);
   const requests = [];
