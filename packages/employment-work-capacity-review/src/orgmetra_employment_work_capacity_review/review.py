@@ -215,6 +215,8 @@ class EmploymentWorkCapacityReviewPacket:
         recorded_at = _validate_utc_timestamp(self.recorded_at, "recorded_at")
         if recorded_at < reviewed_at:
             raise ValueError("recorded_at cannot precede reviewed_at")
+        if recorded_at > datetime.now(timezone.utc):
+            raise ValueError("recorded_at cannot be future system-recorded time")
         if type(self.purpose_code) is not str or self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain employment_work_capacity_review")
         if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
