@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
