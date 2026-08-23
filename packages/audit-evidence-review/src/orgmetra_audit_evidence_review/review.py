@@ -19,6 +19,25 @@ _PURPOSE = "audit_evidence_review"
 _MAX_WINDOW = timedelta(days=90)
 _MAX_LIMIT = 200
 _MAX_CANONICAL_BYTES = 32768
+_BASE_EVENT_KEYS = frozenset(
+    {
+        "data",
+        "datacontenttype",
+        "id",
+        "orgmetraactor",
+        "orgmetraevidence",
+        "orgmetrapurpose",
+        "orgmetrareason",
+        "orgmetratenant",
+        "source",
+        "specversion",
+        "subject",
+        "time",
+        "type",
+    }
+)
+_CONFIRMATION_KEY = "orgmetraconfirmation"
+_DATA_KEYS = frozenset({"high_impact", "result_code"})
 
 
 def _validate_operational_uuid(name: str, value: UUID) -> None:
@@ -118,18 +137,22 @@ class PersistedAuditEvidenceRow:
     recorded_at: datetime
 
     def __post_init__(self) -> None:
-        """Verify row identity, canonical bytes, digest, and system-recorded time."""
+        """Verify row identity, exact governed envelope bytes, digest, and recorded time."""
         _validate_operational_uuid("tenant_record_id", self.tenant_record_id)
         _validate_operational_uuid("audit_event_record_id", self.audit_event_record_id)
         if type(self.canonical_event_json) is not str:
             raise ValueError("canonical_event_json must be a string.")
-        if len(self.canonical_event_json.encode("utf-8")) > _MAX_CANONICAL_BYTES:
+        try:
+            canonical_bytes = self.canonical_event_json.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError("canonical_event_json must be valid UTF-8 text.") from error
+        if len(canonical_bytes) > _MAX_CANONICAL_BYTES:
             raise ValueError("canonical_event_json exceeds the 32768-byte review budget.")
         if type(self.event_envelope_digest) is not str or _DIGEST_PATTERN.fullmatch(
             self.event_envelope_digest
         ) is None:
             raise ValueError("event_envelope_digest must be a lower-case SHA-256 digest.")
-        if sha256(self.canonical_event_json.encode("utf-8")).hexdigest() != self.event_envelope_digest:
+        if sha256(canonical_bytes).hexdigest() != self.event_envelope_digest:
             raise ValueError("audit event digest does not match persisted canonical bytes.")
         try:
             document = json.loads(self.canonical_event_json)
@@ -137,8 +160,17 @@ class PersistedAuditEvidenceRow:
             raise ValueError("canonical_event_json must contain valid UTF-8 JSON.") from error
         if type(document) is not dict:
             raise ValueError("canonical_event_json must contain one JSON object.")
-        if json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=True) != self.canonical_event_json:
+        if (
+            json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+            != self.canonical_event_json
+        ):
             raise ValueError("canonical_event_json is not in canonical Orgmetra JSON form.")
+        event_keys = frozenset(document)
+        if event_keys not in (_BASE_EVENT_KEYS, _BASE_EVENT_KEYS | {_CONFIRMATION_KEY}):
+            raise ValueError("canonical_event_json does not match the governed audit envelope shape.")
+        event_data = document.get("data")
+        if type(event_data) is not dict or frozenset(event_data) != _DATA_KEYS:
+            raise ValueError("canonical_event_json does not match the governed audit data shape.")
         if document.get("specversion") != "1.0" or document.get("datacontenttype") != "application/json":
             raise ValueError("audit event must use the governed CloudEvents 1.0 JSON contract.")
         if document.get("id") != str(self.audit_event_record_id):
