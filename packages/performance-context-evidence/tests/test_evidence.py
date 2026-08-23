@@ -1,6 +1,5 @@
 """Executable contract for privacy-minimized performance-context evidence."""
 
-from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 import json
 
@@ -215,12 +214,9 @@ def test_direct_construction_cannot_weaken_governance(field: str, value: object)
 
 
 def test_rejects_invalid_system_recorded_time() -> None:
-    """System-recorded evidence rejects naive, subclassed, and executable timezone primitives."""
+    """System-recorded evidence rejects naive and subclassed datetime primitives."""
     class ForgedDateTime(datetime):
         """Caller-defined datetime subclass used to exercise exact runtime rejection."""
-
-    class ForgedTimezone(timezone.__class__):
-        """Marker only; built-in timezone instances are required by the contract."""
 
     with pytest.raises(ValueError):
         build(generated_at=datetime(2026, 8, 23, 3, 0))
