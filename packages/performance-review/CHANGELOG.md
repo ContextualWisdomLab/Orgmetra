@@ -6,3 +6,4 @@
 - Follow Orgmetra's authoritative canonical non-sentinel operational UUID contract for `tenant_record_id`, while namespaced packet-owned trust references remain canonical non-sentinel UUIDv4 and reject UUIDv1/non-v4 suffixes.
 - Restrict `reason_code` to the reviewed closed vocabulary (`scheduled_cycle_review`) so arbitrary lower-snake-case text cannot carry PII or ungoverned decision context into canonical evidence.
 - Bind a bounded positive `evidence_version` into canonical JSON and SHA-256 correlation evidence so high-impact review evidence versions are explicit and fail closed on invalid values.
+- Freeze `generated_at` to a detached built-in UTC instant at issuance, reject future instants, normalize mutable/raising/missing timezone providers to fail-closed validation, and prevent later caller timezone behavior from rewriting canonical performance-review evidence.
