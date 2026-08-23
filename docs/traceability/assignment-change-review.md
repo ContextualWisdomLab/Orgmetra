@@ -13,7 +13,7 @@
 | Prove requester/reviewer separation at the authoritative actor boundary | identical references are rejected locally; next action requires tenant-scoped resolution of `requester_reference` and `reviewer_reference` and proof that resolved identities are distinct | `test_requester_and_reviewer_require_authoritative_actor_separation` plus existing requester/reviewer separation regression |
 | Keep high-impact assignment action under accountable human authority | human confirmation is mandatory; decision authority is `human_review_only` | direct-construction governance matrix |
 | Packet must not authorize persistence | `mutation_state=not_authorized_to_apply`; next action routes approved change to authoritative People mutation boundary | direct-construction governance matrix |
-| Keep evidence deterministic without timestamp truncation | precision-preserving UTC RFC 3339 canonicalization and SHA-256 over canonical JSON | deterministic digest and sub-second timestamp regressions |
+| Keep evidence deterministic without caller-owned timezone execution | `generated_at` is resolved once to a built-in UTC instant at issuance; future instants, missing/raising offsets, overflow and post-construction non-UTC reinjection fail closed | `tests/test_temporal_evidence_integrity.py` |
 | Reject ambiguous packet-owned governance references | namespace-specific canonical non-sentinel UUIDv4 reference grammar | reference validation matrix plus UUIDv1 packet-reference regressions |
 | Exact 100% owned statement and branch coverage | dedicated exact-head workflow uses hash-locked shared test toolchain and `--cov-fail-under=100` with branch coverage | `.github/workflows/assignment-change-review-quality.yml` |
 
