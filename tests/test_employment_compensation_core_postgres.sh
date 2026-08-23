@@ -49,40 +49,35 @@ INSERT INTO employment_record (
     );
 
 INSERT INTO employment_base_compensation_record (
-    tenant_record_id, employment_base_compensation_record_id, employment_record_id,
-    recorded_from
+    tenant_record_id, employment_base_compensation_record_id, employment_record_id
 ) VALUES
     (
         '10000000-0000-7000-8000-000000000001',
         '10000000-0000-7000-8000-000000000301',
-        '10000000-0000-7000-8000-000000000201',
-        TIMESTAMPTZ '2026-01-02 00:00:00+00'
+        '10000000-0000-7000-8000-000000000201'
     ),
     (
         '10000000-0000-7000-8000-000000000001',
         '10000000-0000-7000-8000-000000000302',
-        '10000000-0000-7000-8000-000000000202',
-        TIMESTAMPTZ '2026-01-02 00:00:00+00'
+        '10000000-0000-7000-8000-000000000202'
     );
 
 INSERT INTO employment_base_compensation_version (
     tenant_record_id, employment_base_compensation_version_id,
     employment_base_compensation_record_id, base_compensation_amount,
-    currency_code, pay_rate_period_code, effective_from, recorded_from
+    currency_code, pay_rate_period_code, effective_from
 ) VALUES
     (
         '10000000-0000-7000-8000-000000000001',
         '10000000-0000-7000-8000-000000000401',
         '10000000-0000-7000-8000-000000000301',
-        120000.0000, 'USD', 'year', DATE '2026-01-01',
-        TIMESTAMPTZ '2026-01-02 00:00:00+00'
+        120000.0000, 'USD', 'year', DATE '2026-01-01'
     ),
     (
         '10000000-0000-7000-8000-000000000001',
         '10000000-0000-7000-8000-000000000402',
         '10000000-0000-7000-8000-000000000302',
-        80.0000, 'USD', 'hour', DATE '2026-01-01',
-        TIMESTAMPTZ '2026-01-02 00:00:00+00'
+        80.0000, 'USD', 'hour', DATE '2026-01-01'
     );
 SQL
 
@@ -232,9 +227,14 @@ expect_version_failure \
     "INSERT INTO employment_base_compensation_version (tenant_record_id, employment_base_compensation_version_id, employment_base_compensation_record_id, base_compensation_amount, currency_code, pay_rate_period_code, effective_from) VALUES ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000405', '10000000-0000-7000-8000-000000000301', 1.0000, 'USD', 'annual', DATE '2027-01-01');"
 
 expect_version_failure \
+    "backdated compensation version system time" \
+    "base-compensation recorded_from must equal the current transaction timestamp" \
+    "INSERT INTO employment_base_compensation_version (tenant_record_id, employment_base_compensation_version_id, employment_base_compensation_record_id, base_compensation_amount, currency_code, pay_rate_period_code, effective_from, effective_to, recorded_from) VALUES ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000406', '10000000-0000-7000-8000-000000000301', 100000.0000, 'USD', 'year', DATE '2025-01-01', DATE '2025-12-31', TIMESTAMPTZ '2020-01-01 00:00:00+00');"
+
+expect_version_failure \
     "overlapping compensation truth" \
     "employment_base_compensation_bitemporal_exclusion" \
-    "INSERT INTO employment_base_compensation_version (tenant_record_id, employment_base_compensation_version_id, employment_base_compensation_record_id, base_compensation_amount, currency_code, pay_rate_period_code, effective_from, recorded_from) VALUES ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000406', '10000000-0000-7000-8000-000000000301', 130000.0000, 'USD', 'year', DATE '2026-06-01', TIMESTAMPTZ '2026-02-01 00:00:00+00');"
+    "INSERT INTO employment_base_compensation_version (tenant_record_id, employment_base_compensation_version_id, employment_base_compensation_record_id, base_compensation_amount, currency_code, pay_rate_period_code, effective_from) VALUES ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000407', '10000000-0000-7000-8000-000000000301', 130000.0000, 'USD', 'year', DATE '2026-06-01');"
 
 set +e
 rewrite_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
