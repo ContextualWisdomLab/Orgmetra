@@ -8,7 +8,9 @@
 
 PR #102 adds the transport-neutral `orgmetra-audit-evidence-review` boundary. The package requires authorization before store access; exact authorization scope; bounded system-recorded interval and result count; exact runtime trust primitives; SHA-256 and canonical-JSON revalidation; row/event/tenant binding; in-window tenant-only rows; and strict `(recorded_at, audit_event_record_id)` order. The package contains no HR application-table query and no employment-decision authority.
 
-The first contract head `592cd8f097cb1d45cd901b85f542b590f9ebb546` intentionally has no production package and is the test-first predecessor. Current implementation must be evaluated only on its own exact head and applicable workflows; predecessor/cancelled/queued evidence is never transferred.
+The first contract head `592cd8f097cb1d45cd901b85f542b590f9ebb546` intentionally had no production package and is the test-first predecessor. Its workflows were queued before follow-up commits, so it is not claimed as terminal hosted RED evidence and no predecessor status is transferred.
+
+Fresh self-review then found a distinct privacy-integrity defect after the first implementation: canonical JSON plus a recomputed digest could carry additional top-level HR data or extra nested `data` fields because read-time verification checked the digest, CloudEvents version, event id and tenant but not the exact existing PII-minimized envelope shape. RED regression `1aa81b250669373ffd63c2b398925773c6cf967c` requires both widened shapes to fail closed and also requires malformed unencodable text to become a stable validation failure. Root repair `fb668be543d93c2bc7a1d0a930d5f889a916fd7b` binds read-time verification to the exact protected-main audit key sets and hashes a single verified UTF-8 byte sequence. Current implementation must be evaluated only on its own exact head and applicable workflows.
 
 ## Planned host adapters
 
