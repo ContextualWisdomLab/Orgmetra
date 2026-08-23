@@ -7,7 +7,9 @@ on:
     paths:
       - "database/migrations/0018_employment_compensation_core.sql"
       - "tests/test_employment_compensation_core_postgres.sh"
+      - "tests/test_employment_compensation_review_regressions_postgres.sh"
       - "docs/adr/0099-employment-scoped-base-compensation.md"
+      - "docs/adr/README.md"
       - "docs/traceability/employment-compensation-core.md"
       - "docs/doctoring/employment-compensation-core-references.md"
       - "docs/DATA_MODEL.md"
@@ -64,6 +66,7 @@ jobs:
 
           paths = [
               "tests/test_employment_compensation_core_postgres.sh",
+              "tests/test_employment_compensation_review_regressions_postgres.sh",
               ".github/workflows/employment-compensation-core-quality.yml",
               "tests/validate_repository.py",
               "scripts/foundation-contract-core.mjs",
@@ -71,6 +74,7 @@ jobs:
           optional = [
               "database/migrations/0018_employment_compensation_core.sql",
               "docs/adr/0099-employment-scoped-base-compensation.md",
+              "docs/adr/README.md",
               "docs/traceability/employment-compensation-core.md",
               "docs/doctoring/employment-compensation-core-references.md",
               "docs/DATA_MODEL.md",
@@ -134,9 +138,21 @@ jobs:
                   "missing beginner-readable COMMENT ON FUNCTION for: "
                   + ", ".join(undocumented)
               )
+
+          adr_index = Path("docs/adr/README.md").read_text(encoding="utf-8")
+          required_adr_entry = (
+              "| [0099](0099-employment-scoped-base-compensation.md) | "
+              "Employment-scoped bitemporal base compensation | Active PR |"
+          )
+          if required_adr_entry not in adr_index:
+              raise SystemExit(
+                  "docs/adr/README.md: ADR 0099 is missing from the canonical ADR index"
+              )
           PY
       - name: Run employment compensation regression
         run: bash tests/test_employment_compensation_core_postgres.sh
+      - name: Run review-driven integrity regressions
+        run: bash tests/test_employment_compensation_review_regressions_postgres.sh
       - name: Require clean checkout
         run: |
           git diff --exit-code
