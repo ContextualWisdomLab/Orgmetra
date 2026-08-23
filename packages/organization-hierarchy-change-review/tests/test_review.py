@@ -1,5 +1,6 @@
 """Executable contract for governed Organization hierarchy-change review evidence."""
 
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 import json
 from uuid import UUID
@@ -13,6 +14,7 @@ from orgmetra_organization_hierarchy_change_review import (
 
 TENANT_UUID7 = "0195c23d-9f00-7000-8000-000000000001"
 CHANGE_UUID4 = "11111111-1111-4111-8111-111111111111"
+SECOND_CHANGE_UUID4 = "44444444-4444-4444-8444-444444444444"
 UNIT_UUID7 = "0195c23d-9f00-7000-8000-000000000002"
 CURRENT_PARENT_UUID7 = "0195c23d-9f00-7000-8000-000000000003"
 PROPOSED_PARENT_UUID7 = "0195c23d-9f00-7000-8000-000000000004"
@@ -127,7 +129,10 @@ def test_rejects_ambiguous_hierarchy_or_actor_relationships(overrides: dict[str,
 def test_allows_attach_and_detach_root_transitions() -> None:
     """Represent root attachment or detachment without inventing a sentinel parent."""
     attached = build(current_parent_organization_unit_reference=None)
-    detached = build(proposed_parent_organization_unit_reference=None)
+    detached = build(
+        organization_hierarchy_change_reference=f"organization_hierarchy_change:{SECOND_CHANGE_UUID4}",
+        proposed_parent_organization_unit_reference=None,
+    )
     assert json.loads(attached.canonical_json())["current_parent_organization_unit_reference"] is None
     assert json.loads(detached.canonical_json())["proposed_parent_organization_unit_reference"] is None
 
@@ -243,6 +248,15 @@ def test_detects_post_construction_tampering_before_evidence_export() -> None:
     object.__setattr__(packet, "reason_code", "legal_entity_restructure")
     with pytest.raises(ValueError, match="changed after issuance"):
         packet.canonical_json()
+
+
+def test_live_reference_rejects_conflicting_reissuance() -> None:
+    """Do not let one still-live review reference identify two different evidences."""
+    packet = build()
+    duplicate = replace(packet)
+    assert duplicate.canonical_json() == packet.canonical_json()
+    with pytest.raises(ValueError, match="already bound to different live evidence"):
+        replace(packet, reason_code="legal_entity_restructure")
 
 
 def test_next_action_preserves_authoritative_bitemporal_and_audit_boundary() -> None:
