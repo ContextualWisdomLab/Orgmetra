@@ -8,6 +8,7 @@ on:
       - "packages/document-record-evidence/**"
       - ".github/requirements/foundation-test.txt"
       - ".github/workflows/document-record-evidence-quality.yml"
+      - "docs/adr/0098-governed-document-record-evidence.md"
       - "docs/doctoring/document-record-evidence-references.md"
       - "docs/traceability/document-record-evidence.md"
   workflow_dispatch:
