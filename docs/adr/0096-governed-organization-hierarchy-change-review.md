@@ -10,6 +10,8 @@ Orgmetra already treats Organization Unit hierarchy as bitemporal HRIS truth. A 
 
 A pre-mutation evidence packet also needs to represent moving an Organization Unit to or from the root without inventing a sentinel parent identifier. It must preserve the requested business-effective date separately from the system-recorded review-evidence time and must not copy Person PII or worker values into durable governance evidence.
 
+The packet-owned hierarchy-change reference is itself audit correlation. Reissuing a different valid payload under the same still-live tenant-qualified reference would make that correlation ambiguous even if each individual payload passed field validation.
+
 ## Decision
 
 Introduce a bounded `OrganizationHierarchyChangeReviewPacket` that records only the reviewed change correlation and governance evidence.
@@ -23,8 +25,11 @@ The packet:
 5. binds reviewed Organization Unit and hierarchy snapshots by lowercase SHA-256 digest instead of copying HR record values;
 6. requires distinct requester and reviewer correlations, one fixed purpose, one controlled reason, and explicit evidence versioning;
 7. fixes review/scope/mutation/decision-authority states so the packet can never authorize the mutation itself;
-8. rejects caller-defined runtime subclasses at trust-bearing primitive boundaries; and
-9. uses deterministic canonical JSON, redacted routine representation, and a process-local issuance digest as defense in depth against post-construction mutation.
+8. rejects caller-defined runtime subclasses at trust-bearing primitive boundaries;
+9. uses deterministic canonical JSON, redacted routine representation, and a process-local issuance digest as defense in depth against post-construction mutation; and
+10. binds each still-live `(tenant_record_id, organization_hierarchy_change_reference)` to one canonical evidence digest while allowing exact idempotent duplicate packets to share that binding.
+
+The live-reference binding is deliberately weak/process-local: a shared binding object remains alive while any idempotent packet using that reference remains alive, so collection of one duplicate cannot erase the binding for another. Once every packet is gone or the process restarts, durable uniqueness must come from authoritative persistence rather than this leaf package.
 
 The next boundary must re-resolve the Organization Unit, current parent, proposed parent, hierarchy and accountable actors against authoritative same-tenant bitemporal HRIS truth. It must reject stale current-parent evidence, self-parenting, cycles and multiple visible parents, verify the reviewed evidence, and persist the resulting mutation with immutable audit/outbox evidence in the authoritative transaction.
 
@@ -42,5 +47,6 @@ NIST Privacy Framework 1.0 remains the current final Privacy Framework baseline;
 
 - Buyers gain an explicit review artifact for organization-structure changes instead of conflating approval evidence with mutation authority.
 - Root transitions remain representable without reserved/sentinel parent identifiers.
+- Conflicting in-process evidence cannot silently reuse a still-live hierarchy-change correlation; exact idempotent duplicates remain possible.
 - The slice stays independently deployable and does not depend on direct cross-service application-table access.
-- Process-local tamper detection is defense in depth only; durable uniqueness, authorization, concurrency control, hierarchy validation and audit remain responsibilities of authoritative persistence/orchestration boundaries.
+- Process-local tamper/reference detection is defense in depth only; durable uniqueness, authorization, concurrency control, hierarchy validation and audit remain responsibilities of authoritative persistence/orchestration boundaries.
