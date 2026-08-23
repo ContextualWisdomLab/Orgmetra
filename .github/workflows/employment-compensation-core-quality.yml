@@ -7,6 +7,7 @@ on:
     paths:
       - "database/migrations/0018_employment_compensation_core.sql"
       - "tests/test_employment_compensation_core_postgres.sh"
+      - "docs/adr/0099-employment-scoped-base-compensation.md"
       - "docs/traceability/employment-compensation-core.md"
       - "docs/doctoring/employment-compensation-core-references.md"
       - ".github/workflows/employment-compensation-core-quality.yml"
@@ -65,6 +66,7 @@ jobs:
           ]
           optional = [
               "database/migrations/0018_employment_compensation_core.sql",
+              "docs/adr/0099-employment-scoped-base-compensation.md",
               "docs/traceability/employment-compensation-core.md",
               "docs/doctoring/employment-compensation-core-references.md",
           ]
