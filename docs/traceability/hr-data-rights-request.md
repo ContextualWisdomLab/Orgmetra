@@ -19,12 +19,15 @@ An HRIS buyer needs a defensible way to record a privacy/data-rights request wit
 | No disclosure/mutation authority | fixed `not_authorized_to_disclose` and `not_authorized_to_modify_hr_data` | direct construction and canonical-evidence regressions | implemented_on_active_pr |
 | Value minimization | digests and opaque references only | canonical JSON forbidden-field regression | implemented_on_active_pr |
 | Business/system chronology | `submitted_at` and later-or-equal `recorded_at` | chronology and exact-UTC regressions | implemented_on_active_pr |
-| Runtime/canonical evidence integrity | exact primitives + issuance digest + verified snapshot export | hostile-string, copy, post-construction rewrite regressions | implemented_on_active_pr |
+| Runtime/canonical evidence integrity | exact primitives + issuance digest + verified snapshot export | hostile-string, copy, post-construction rewrite and checked-payload regressions | implemented_on_active_pr |
+| Live request-reference consistency | tenant-qualified weak live-reference evidence registry | conflicting `dataclasses.replace()` RED plus exact-idempotent duplicate regression | implemented_on_active_pr |
 | Installed-artifact evidence | exact wheel + isolated hash-pinned test toolchain | dedicated PR quality workflow | implemented_on_active_pr |
 
 ## Handoffs that remain authoritative
 
 This package records request intake only. Fulfillment must re-enter Orgmetra's authoritative People/purpose-bound authorization, export-control, retention/legal-hold/disposition, and immutable audit/outbox boundaries as applicable. Identity must be re-resolved through the published Keyverse-facing adapter contract; no identity-provider credential or raw subject is stored here. No direct table access to another CWL service is permitted.
+
+The live request-reference registry is process-local defense in depth, not a durable or distributed idempotency mechanism. A persistence host must enforce the tenant-qualified request reference/evidence binding transactionally with immutable audit/outbox evidence before replicas or restarts can be treated as authoritative.
 
 ## Standards truth
 
