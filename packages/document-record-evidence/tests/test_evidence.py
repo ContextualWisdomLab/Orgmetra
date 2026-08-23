@@ -1,7 +1,7 @@
 """Executable contract for value-minimized HR document-record evidence."""
 
 from datetime import datetime, timedelta, timezone
-from uuid import UUID, uuid4
+from uuid import UUID, uuid1, uuid4
 
 import pytest
 
@@ -59,10 +59,16 @@ def test_generates_packet_owned_reference_and_system_time() -> None:
 @pytest.mark.parametrize(
     ("field_name", "bad_value"),
     [
+        ("tenant_record_id", 7),
         ("tenant_record_id", "not-a-uuid"),
+        ("tenant_record_id", "00000000-0000-0000-0000-000000000000"),
+        ("person_record_reference", 7),
+        ("person_record_reference", f"wrong_namespace:{uuid4()}"),
+        ("person_record_reference", f"person_record:{uuid1()}"),
         ("person_record_reference", "person_record:"),
         ("employment_record_reference", "employment_record:"),
         ("uploader_actor_reference", "actor:Jane-Doe"),
+        ("document_category_code", 7),
         ("document_category_code", "free_form_category"),
         ("artifact_reference", "document_artifact:"),
         ("artifact_digest", "A" * 64),
