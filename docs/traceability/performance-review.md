@@ -14,6 +14,7 @@ Status: **active PR / proposed capability**, not protected-main truth.
 | Keep person PII, rating values, free-form feedback/model output outside packet | immutable false flags plus absence of value-bearing fields | Implemented on active PR |
 | Require accountable human review | fixed `human_confirmation_required=True`, `decision_authority=human_review_only`, `review_state=requires_human_review` | Implemented on active PR |
 | Version high-impact review evidence | bounded positive `evidence_version` is validated, serialized in canonical JSON, and changes SHA-256 correlation evidence | Implemented on active PR |
+| Preserve deterministic system-recorded chronology without caller-owned timezone behavior | `generated_at` is resolved once to a built-in UTC instant at issuance; future instants, missing/raising offsets and normalization overflow fail closed; later canonical export accepts only that frozen UTC shape | `test_temporal_evidence_integrity.py` covers datetime subclasses, mutable/raising/missing timezone providers, future time, overflow, and post-construction non-UTC reinjection |
 | Preserve deterministic immutable correlation evidence | canonical JSON plus SHA-256 | Implemented on active PR |
 | Exact 100% owned statement/branch coverage | `packages/performance-review/pyproject.toml`, `.github/workflows/performance-review-quality.yml` | Required on exact PR head |
 | Standards/research basis | ADR 0018; `docs/doctoring/performance-review-references.md` | Documented on active PR |
