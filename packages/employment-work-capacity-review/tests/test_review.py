@@ -113,6 +113,7 @@ def test_invalid_governance_inputs_fail_closed(field: str, value: object, messag
         ("current_capacity_ratio", "1.0000", "exact Decimal"),
         ("proposed_capacity_ratio", Decimal("NaN"), "finite"),
         ("proposed_capacity_ratio", Decimal("-0.0001"), "between"),
+        ("proposed_capacity_ratio", Decimal("-0.0000"), "negative zero"),
         ("proposed_capacity_ratio", Decimal("1.0001"), "between"),
         ("proposed_capacity_ratio", Decimal("0.8"), "four decimal"),
     ],
