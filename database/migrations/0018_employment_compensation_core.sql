@@ -90,6 +90,30 @@ BEFORE INSERT ON employment_base_compensation_version
 FOR EACH ROW
 EXECUTE FUNCTION enforce_employment_base_compensation_recorded_from();
 
+CREATE FUNCTION enforce_employment_base_compensation_recorded_to()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.recorded_to IS DISTINCT FROM OLD.recorded_to
+       AND NEW.recorded_to IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
+        RAISE EXCEPTION 'base-compensation recorded_to must equal the current transaction timestamp'
+            USING ERRCODE = '22023';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER employment_base_compensation_record_system_time_close_guard
+BEFORE UPDATE ON employment_base_compensation_record
+FOR EACH ROW
+EXECUTE FUNCTION enforce_employment_base_compensation_recorded_to();
+
+CREATE TRIGGER employment_base_compensation_version_system_time_close_guard
+BEFORE UPDATE ON employment_base_compensation_version
+FOR EACH ROW
+EXECUTE FUNCTION enforce_employment_base_compensation_recorded_to();
+
 CREATE TRIGGER employment_base_compensation_record_bitemporal_guard
 BEFORE UPDATE OR DELETE ON employment_base_compensation_record
 FOR EACH ROW
