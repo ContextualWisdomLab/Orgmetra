@@ -210,6 +210,43 @@ class AuditEvidenceRowReader(Protocol):
         """Return rows already constrained by tenant, time window, order, and limit."""
 
 
+def _snapshot_query(query: AuditEvidenceQuery) -> AuditEvidenceQuery:
+    """Revalidate live query fields and return a detached governed snapshot."""
+    return AuditEvidenceQuery(
+        tenant_record_id=query.tenant_record_id,
+        query_reference=query.query_reference,
+        requester_reference=query.requester_reference,
+        purpose_code=query.purpose_code,
+        recorded_from=query.recorded_from,
+        recorded_before=query.recorded_before,
+        limit=query.limit,
+    )
+
+
+def _snapshot_authorization(
+    authorization: AuditEvidenceReadAuthorization,
+) -> AuditEvidenceReadAuthorization:
+    """Revalidate authority output so post-construction mutation cannot widen permission."""
+    return AuditEvidenceReadAuthorization(
+        tenant_record_id=authorization.tenant_record_id,
+        query_reference=authorization.query_reference,
+        requester_reference=authorization.requester_reference,
+        purpose_code=authorization.purpose_code,
+        permitted=authorization.permitted,
+    )
+
+
+def _snapshot_row(row: PersistedAuditEvidenceRow) -> PersistedAuditEvidenceRow:
+    """Reverify current persisted-row fields and detach evidence from the reader object."""
+    return PersistedAuditEvidenceRow(
+        tenant_record_id=row.tenant_record_id,
+        audit_event_record_id=row.audit_event_record_id,
+        canonical_event_json=row.canonical_event_json,
+        event_envelope_digest=row.event_envelope_digest,
+        recorded_at=row.recorded_at,
+    )
+
+
 def read_audit_evidence(
     *,
     query: AuditEvidenceQuery,
@@ -219,41 +256,49 @@ def read_audit_evidence(
     """Authorize first, then verify a bounded ordered page from the immutable audit store."""
     if type(query) is not AuditEvidenceQuery:
         raise TypeError("query must be an exact AuditEvidenceQuery.")
-    authorization = authority.authorize(query)
+    verified_query = _snapshot_query(query)
+    authorization = authority.authorize(verified_query)
     if type(authorization) is not AuditEvidenceReadAuthorization:
         raise TypeError("authority must return AuditEvidenceReadAuthorization.")
+    verified_authorization = _snapshot_authorization(authorization)
     expected_scope = (
-        query.tenant_record_id,
-        query.query_reference,
-        query.requester_reference,
-        query.purpose_code,
+        verified_query.tenant_record_id,
+        verified_query.query_reference,
+        verified_query.requester_reference,
+        verified_query.purpose_code,
     )
     actual_scope = (
-        authorization.tenant_record_id,
-        authorization.query_reference,
-        authorization.requester_reference,
-        authorization.purpose_code,
+        verified_authorization.tenant_record_id,
+        verified_authorization.query_reference,
+        verified_authorization.requester_reference,
+        verified_authorization.purpose_code,
     )
-    if actual_scope != expected_scope or not authorization.permitted:
+    if actual_scope != expected_scope or not verified_authorization.permitted:
         raise PermissionError("audit evidence review is not authorized for the exact query scope.")
 
-    rows = reader.read_rows(query)
+    rows = reader.read_rows(verified_query)
     if type(rows) is not tuple:
         raise TypeError("reader must return an immutable tuple.")
-    if len(rows) > query.limit:
+    if len(rows) > verified_query.limit:
         raise ValueError("reader returned more audit rows than the authorized limit.")
 
     previous_key: tuple[datetime, int] | None = None
+    verified_rows: list[PersistedAuditEvidenceRow] = []
     for row in rows:
         if type(row) is not PersistedAuditEvidenceRow:
             raise TypeError("reader returned an ungoverned audit evidence row.")
-        if row.tenant_record_id != query.tenant_record_id:
+        verified_row = _snapshot_row(row)
+        if verified_row.tenant_record_id != verified_query.tenant_record_id:
             raise PermissionError("reader returned cross-tenant audit evidence.")
-        if not query.recorded_from <= row.recorded_at < query.recorded_before:
+        if not verified_query.recorded_from <= verified_row.recorded_at < verified_query.recorded_before:
             raise ValueError("reader returned audit evidence outside the authorized time window.")
-        key = (row.recorded_at, row.audit_event_record_id.int)
+        key = (verified_row.recorded_at, verified_row.audit_event_record_id.int)
         if previous_key is not None and key <= previous_key:
             raise ValueError("reader must return audit evidence in strict recorded-time/id order.")
         previous_key = key
+        verified_rows.append(verified_row)
 
-    return AuditEvidenceReviewPage(query_reference=query.query_reference, records=rows)
+    return AuditEvidenceReviewPage(
+        query_reference=verified_query.query_reference,
+        records=tuple(verified_rows),
+    )
