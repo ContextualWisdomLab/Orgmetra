@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -19,6 +19,34 @@ class ForgedDateTime(datetime):
     def isoformat(self, *args, **kwargs) -> str:  # type: ignore[no-untyped-def]
         """Return an instant different from the underlying evidence instant."""
         return "2099-12-31T23:59:59+00:00"
+
+
+class MutableTimezone(tzinfo):
+    """Timezone provider whose offset changes after evidence issuance."""
+
+    def __init__(self, offset: timedelta) -> None:
+        """Store one caller-controlled offset."""
+        self.offset = offset
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Return the current mutable offset."""
+        return self.offset
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Expose no daylight-saving adjustment."""
+        return timedelta(0)
+
+
+class RaisingTimezone(tzinfo):
+    """Timezone provider that raises while resolving UTC offset."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Raise caller-controlled behavior at the trust boundary."""
+        raise RuntimeError("provider failure")
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Expose no daylight-saving adjustment."""
+        return timedelta(0)
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -51,6 +79,39 @@ def test_rejects_datetime_subclasses_that_can_forge_recorded_time_evidence() -> 
     """Canonical audit evidence must not invoke caller-overridable datetime methods."""
     kwargs = valid_kwargs()
     kwargs["generated_at"] = ForgedDateTime(2026, 8, 19, 5, 15, 30, tzinfo=timezone.utc)
+
+    with pytest.raises(ValueError, match="generated_at"):
+        build_performance_review_packet(**kwargs)
+
+
+def test_detaches_mutable_timezone_from_recorded_time_evidence() -> None:
+    """A mutable timezone provider must not rewrite canonical evidence after issuance."""
+    provider = MutableTimezone(timedelta(hours=9))
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 8, 19, 14, 15, 30, tzinfo=provider)
+
+    packet = build_performance_review_packet(**kwargs)
+    before = packet.canonical_json()
+    provider.offset = timedelta(hours=-7)
+
+    assert packet.canonical_json() == before
+    assert packet.generated_at == datetime(2026, 8, 19, 5, 15, 30, tzinfo=timezone.utc)
+    assert packet.generated_at.tzinfo is timezone.utc
+
+
+def test_rejects_future_recorded_time() -> None:
+    """Do not seal performance-review evidence for a system time that has not occurred."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2099, 1, 1, tzinfo=timezone.utc)
+
+    with pytest.raises(ValueError, match="generated_at must not be in the future"):
+        build_performance_review_packet(**kwargs)
+
+
+def test_normalizes_timezone_provider_failure() -> None:
+    """Do not leak caller timezone exceptions across the review-evidence boundary."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 8, 19, 5, 15, 30, tzinfo=RaisingTimezone())
 
     with pytest.raises(ValueError, match="generated_at"):
         build_performance_review_packet(**kwargs)
