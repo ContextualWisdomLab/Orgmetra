@@ -46,6 +46,7 @@ from orgmetra_hris_kernel.job_analysis import (
 )
 from orgmetra_hris_kernel.organization import validate_organization_hierarchy
 from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts, resolve_single_valued_fact
+from orgmetra_hris_kernel.vacancy import PositionVacancySnapshot, build_position_vacancy_snapshot
 from orgmetra_hris_kernel.workforce import (
     WorkforceCompositionSnapshot,
     build_workforce_composition_snapshot,
@@ -71,12 +72,14 @@ __all__ = [
     "OrganizationUnitVersion",
     "PositionCoverageError",
     "PositionSeatError",
+    "PositionVacancySnapshot",
     "PositionVersion",
     "RecordedInterval",
     "SingleValuedFactError",
     "TaskEvidence",
     "TaskKSAOLink",
     "WorkforceCompositionSnapshot",
+    "build_position_vacancy_snapshot",
     "build_workforce_composition_snapshot",
     "close_recorded_interval",
     "resolve_bitemporal_facts",
