@@ -53,7 +53,6 @@ def test_builds_value_minimized_human_review_packet() -> None:
     """Bind reporting scope without copying Person or worker values."""
     packet = build()
     payload = json.loads(packet.canonical_json())
-
     assert payload["review_state"] == "requires_human_review"
     assert payload["scope_verification_state"] == "requires_authoritative_resolution"
     assert payload["mutation_state"] == "not_authorized_to_apply"
@@ -88,19 +87,10 @@ def payload_recorded_at(packet: PositionReportingChangeReviewPacket) -> str:
     [
         ("tenant_record_id", "not-a-uuid"),
         ("tenant_record_id", "00000000-0000-0000-0000-000000000000"),
-        (
-            "position_reporting_change_reference",
-            "position_reporting_change:6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-        ),
-        (
-            "position_reporting_change_reference",
-            "wrong:11111111-1111-4111-8111-111111111111",
-        ),
+        ("position_reporting_change_reference", "position_reporting_change:6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
+        ("position_reporting_change_reference", "wrong:11111111-1111-4111-8111-111111111111"),
         ("subordinate_position_reference", "position_record:not-a-uuid"),
-        (
-            "current_manager_position_reference",
-            "position_record:00000000-0000-0000-0000-000000000000",
-        ),
+        ("current_manager_position_reference", "position_record:00000000-0000-0000-0000-000000000000"),
         ("proposed_manager_position_reference", "x" * 161),
         ("position_scope_snapshot_digest", "A" * 64),
         ("organization_scope_snapshot_digest", "abc"),
@@ -128,9 +118,7 @@ def test_rejects_invalid_trust_evidence(field_name: str, invalid_value: object) 
         {"reviewer_reference": f"actor:{REQUESTER_UUID4}"},
     ],
 )
-def test_rejects_ambiguous_reporting_or_actor_relationships(
-    overrides: dict[str, object],
-) -> None:
+def test_rejects_ambiguous_reporting_or_actor_relationships(overrides: dict[str, object]) -> None:
     """Reject self-reporting, no-op manager changes, and same-actor reviews."""
     with pytest.raises(ValueError):
         build(**overrides)
@@ -150,9 +138,7 @@ def test_rejects_ambiguous_reporting_or_actor_relationships(
         {"next_action": "apply immediately"},
     ],
 )
-def test_direct_construction_cannot_weaken_governance(
-    overrides: dict[str, object],
-) -> None:
+def test_direct_construction_cannot_weaken_governance(overrides: dict[str, object]) -> None:
     """Fail closed when direct construction tries to weaken governance constants."""
     inputs = values()
     inputs.update(overrides)
@@ -162,16 +148,7 @@ def test_direct_construction_cannot_weaken_governance(
 
 def test_accepts_fixed_offset_timestamp_and_canonicalizes_to_utc() -> None:
     """Normalize an exact built-in fixed-offset timestamp without losing precision."""
-    recorded = datetime(
-        2026,
-        8,
-        23,
-        15,
-        0,
-        0,
-        654321,
-        tzinfo=timezone(timedelta(hours=9)),
-    )
+    recorded = datetime(2026, 8, 23, 15, 0, 0, 654321, tzinfo=timezone(timedelta(hours=9)))
     packet = build(recorded_at=recorded)
     assert payload_recorded_at(packet) == "2026-08-23T06:00:00.654321Z"
 
@@ -183,10 +160,7 @@ def test_accepts_fixed_offset_timestamp_and_canonicalizes_to_utc() -> None:
         ("recorded_at", datetime(2026, 8, 23, 6, 0, 0)),
     ],
 )
-def test_rejects_noncanonical_temporal_primitives(
-    field_name: str,
-    invalid_value: object,
-) -> None:
+def test_rejects_noncanonical_temporal_primitives(field_name: str, invalid_value: object) -> None:
     """Reject datetime-as-date and naive system-recorded timestamps."""
     with pytest.raises(ValueError):
         build(**{field_name: invalid_value})
@@ -215,8 +189,16 @@ class ForgedInt(int):
         """Pretend never to be below a lower bound."""
         return False
 
+    def __le__(self, other: object) -> bool:
+        """Pretend never to satisfy an inclusive lower comparison."""
+        return False
+
     def __gt__(self, other: object) -> bool:
         """Pretend never to exceed an upper bound."""
+        return False
+
+    def __ge__(self, other: object) -> bool:
+        """Pretend never to satisfy an inclusive upper comparison."""
         return False
 
 
@@ -237,16 +219,10 @@ class ForgedDateTime(datetime):
         ("position_reporting_change_reference", ForgedText("shadow_reference")),
         ("evidence_version", ForgedInt(99)),
         ("effective_on", ForgedDate(2026, 9, 1)),
-        (
-            "recorded_at",
-            ForgedDateTime(2026, 8, 23, 6, 0, tzinfo=timezone.utc),
-        ),
+        ("recorded_at", ForgedDateTime(2026, 8, 23, 6, 0, tzinfo=timezone.utc)),
     ],
 )
-def test_rejects_caller_defined_runtime_subclasses(
-    field_name: str,
-    invalid_value: object,
-) -> None:
+def test_rejects_caller_defined_runtime_subclasses(field_name: str, invalid_value: object) -> None:
     """Prevent caller polymorphism from changing checked-versus-emitted evidence."""
     with pytest.raises(ValueError):
         build(**{field_name: invalid_value})
