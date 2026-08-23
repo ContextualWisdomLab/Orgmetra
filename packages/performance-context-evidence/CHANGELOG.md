@@ -7,3 +7,4 @@
 - Bind opportunity-to-perform, work-context, manager-context, and membership-weight snapshots by SHA-256.
 - Require accountable human review and keep the packet unauthorized for rating or employment decisions.
 - Add exact-runtime hardening, post-issuance tamper detection, deterministic canonical evidence, hash-bound installed-wheel tests, and exact 100% owned production statement/branch coverage.
+- Keep tenant-qualified live-reference binding intact while any idempotent duplicate packet remains live, so collecting one duplicate cannot reopen the same reference for conflicting evidence.
