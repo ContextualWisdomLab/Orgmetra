@@ -136,6 +136,13 @@ def _canonical_timestamp(value: object) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _validate_issuance_timestamp(value: object) -> None:
+    """Require structurally valid system-recorded evidence that has already occurred."""
+    _canonical_timestamp(value)
+    if value > datetime.now(timezone.utc):
+        raise ValueError("recorded_at must not be in the future")
+
+
 def _payload(packet: OrganizationHierarchyChangeReviewPacket) -> dict[str, object]:
     """Snapshot all trust-bearing fields once for validation and canonical emission."""
     return {
@@ -244,7 +251,7 @@ class OrganizationHierarchyChangeReviewPacket:
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use the reviewed hierarchy-change vocabulary")
-        _canonical_timestamp(self.recorded_at)
+        _validate_issuance_timestamp(self.recorded_at)
         _validate_positive_int(self.evidence_version, "evidence_version")
         if self.contains_person_identifier is not False:
             raise ValueError("hierarchy-change evidence must not contain a person identifier")
