@@ -19,7 +19,8 @@
 | Require accountable human review | distinct requester/reviewer plus fixed purpose/reason | separation and fixed-governance tests |
 | Prevent automated high-impact decisions | fixed context-only/review/authority states and governed `next_action` | direct-construction tests |
 | Fail closed on runtime polymorphism | exact built-in strings, ints, dates, datetimes, tuples | hostile subclass and collection-subclass tests |
-| Detect evidence rewriting | process-local creation digest and live-reference registry | post-issuance mutation and conflicting reissuance tests |
+| Detect evidence rewriting | process-local creation digest | post-issuance mutation tests |
+| Preserve one live reference binding across idempotent duplicates | shared weak live-binding object retained by every live duplicate | conflicting reissuance plus duplicate-garbage-collection regression |
 | Exact owned production coverage | package quality workflow | hash-bound installed-wheel pytest with 100% statement/branch gate |
 
 ## Buyer-visible next action
