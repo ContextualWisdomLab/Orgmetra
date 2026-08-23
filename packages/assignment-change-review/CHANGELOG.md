@@ -10,6 +10,7 @@
 - Bounded positive `evidence_version` in canonical evidence so high-impact actor/purpose/reason evidence remains explicitly versioned.
 - Tenant-scoped pre-approval re-resolution of every packet reference plus Person-to-Employment-to-current-Assignment and current worker-scope verification in the governed next action.
 - Fail-closed prevention of Person PII, compensation values, free-form model output, noncanonical references, malformed evidence digests, free-form sensitive reason metadata, invalid evidence versions, and direct-construction governance bypasses.
+- Issuance-time normalization of `generated_at` to a detached built-in UTC instant, with rejection of future instants and fail-closed handling of mutable, missing, raising, or overflowing timezone providers so canonical evidence cannot change after issuance through caller-owned timezone behavior.
 
 ### Changed
 
