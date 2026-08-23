@@ -1,5 +1,6 @@
 """Public audit evidence review contracts."""
 
+from .postgres import PostgresAuditEvidenceRowReader
 from .review import (
     AuditEvidenceQuery,
     AuditEvidenceReadAuthorization,
@@ -17,5 +18,6 @@ __all__ = [
     "AuditEvidenceReviewPage",
     "AuditEvidenceRowReader",
     "PersistedAuditEvidenceRow",
+    "PostgresAuditEvidenceRowReader",
     "read_audit_evidence",
 ]
