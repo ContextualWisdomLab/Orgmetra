@@ -151,6 +151,30 @@ if [[ "${duplicate_anchor_output}" != *"employment_base_compensation_employment_
 fi
 
 set +e
+backdated_recorded_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO employment_base_compensation_record (
+    tenant_record_id, employment_base_compensation_record_id, employment_record_id,
+    recorded_from
+) VALUES (
+    '20000000-0000-7000-8000-000000000001',
+    '20000000-0000-7000-8000-000000000301',
+    '20000000-0000-7000-8000-000000000201',
+    TIMESTAMPTZ '2020-01-01 00:00:00+00'
+);
+SQL
+} 2>&1)"
+backdated_recorded_status=$?
+set -e
+if [[ ${backdated_recorded_status} -eq 0 ]]; then
+    echo "base compensation accepted caller-authored system-recorded time" >&2
+    exit 1
+fi
+if [[ "${backdated_recorded_output}" != *"base-compensation recorded_from must equal the current transaction timestamp"* ]]; then
+    echo "backdated compensation system time failed for an unexpected reason: ${backdated_recorded_output}" >&2
+    exit 1
+fi
+
+set +e
 cross_tenant_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO employment_base_compensation_record (
     tenant_record_id, employment_base_compensation_record_id, employment_record_id
