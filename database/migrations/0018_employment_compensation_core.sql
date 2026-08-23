@@ -8,6 +8,8 @@ CREATE TABLE employment_base_compensation_record (
     employment_record_id uuid NOT NULL,
     recorded_from timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
     recorded_to timestamptz,
+    CONSTRAINT employment_base_compensation_record_id_operational_check
+        CHECK (public.is_operational_uuid(employment_base_compensation_record_id)),
     CONSTRAINT employment_base_compensation_employment_tenant_fk
         FOREIGN KEY (tenant_record_id, employment_record_id)
         REFERENCES employment_record(tenant_record_id, employment_record_id),
@@ -30,6 +32,8 @@ CREATE TABLE employment_base_compensation_version (
     effective_to date,
     recorded_from timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
     recorded_to timestamptz,
+    CONSTRAINT employment_base_compensation_version_id_operational_check
+        CHECK (public.is_operational_uuid(employment_base_compensation_version_id)),
     CONSTRAINT employment_base_compensation_version_tenant_fk
         FOREIGN KEY (tenant_record_id, employment_base_compensation_record_id)
         REFERENCES employment_base_compensation_record(
@@ -37,7 +41,10 @@ CREATE TABLE employment_base_compensation_version (
             employment_base_compensation_record_id
         ),
     CONSTRAINT employment_base_compensation_amount_check
-        CHECK (base_compensation_amount >= 0),
+        CHECK (
+            base_compensation_amount <> 'NaN'::numeric
+            AND base_compensation_amount >= 0
+        ),
     CONSTRAINT employment_base_compensation_currency_check
         CHECK (currency_code ~ '^[A-Z]{3}$'),
     CONSTRAINT employment_base_compensation_rate_period_check
@@ -134,6 +141,32 @@ BEFORE UPDATE OR DELETE ON employment_base_compensation_version
 FOR EACH ROW
 EXECUTE FUNCTION protect_bitemporal_history();
 
+CREATE FUNCTION reject_employment_base_compensation_truncate()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RAISE EXCEPTION 'employment base-compensation history cannot be truncated'
+        USING ERRCODE = '55000';
+END;
+$$;
+
+COMMENT ON FUNCTION reject_employment_base_compensation_truncate() IS
+    'Rejects table-wide TRUNCATE of Employment-scoped base-compensation anchors or versions so governed history cannot bypass row-level correction guards.';
+
+CREATE TRIGGER employment_base_compensation_record_truncate_guard
+BEFORE TRUNCATE ON employment_base_compensation_record
+FOR EACH STATEMENT
+EXECUTE FUNCTION reject_employment_base_compensation_truncate();
+
+CREATE TRIGGER employment_base_compensation_version_truncate_guard
+BEFORE TRUNCATE ON employment_base_compensation_version
+FOR EACH STATEMENT
+EXECUTE FUNCTION reject_employment_base_compensation_truncate();
+
+REVOKE TRUNCATE ON employment_base_compensation_record FROM PUBLIC;
+REVOKE TRUNCATE ON employment_base_compensation_version FROM PUBLIC;
+
 CREATE FUNCTION reject_legacy_compensation_insert()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -167,6 +200,6 @@ USING (tenant_record_id = current_tenant_record_id())
 WITH CHECK (tenant_record_id = current_tenant_record_id());
 
 COMMENT ON TABLE employment_base_compensation_record IS
-    'Durable tenant-scoped base-compensation anchor owned by one Employment; system-recorded time is database-authored and legacy person-scoped compensation_record is historical-read only.';
+    'Durable tenant-scoped base-compensation anchor owned by one Employment; recorded_from is fixed to PostgreSQL transaction time, INSERT requires an open recorded interval, and closure is accepted only at the PostgreSQL transaction timestamp.';
 COMMENT ON TABLE employment_base_compensation_version IS
-    'Single-valued bitemporal base-compensation amount, currency transport code, and pay-rate period for one Employment compensation anchor; system-recorded time is database-authored.';
+    'Single-valued bitemporal base-compensation amount, currency transport code, and pay-rate period for one Employment compensation anchor; Nil/Max identities and NaN amounts are rejected, INSERT requires an open recorded interval, and closure is accepted only at the PostgreSQL transaction timestamp.';
