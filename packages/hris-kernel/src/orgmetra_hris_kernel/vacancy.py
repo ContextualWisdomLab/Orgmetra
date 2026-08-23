@@ -25,7 +25,7 @@ from orgmetra_hris_kernel.resolution import resolve_single_valued_fact
 
 _STAFFABLE_POSITION_STATUSES = frozenset({"active", "open"})
 _KNOWN_POSITION_STATUSES = frozenset({"active", "open", "closed", "frozen", "abolished"})
-_ZERO = Decimal("0")
+_ZERO = Decimal("0.0000")
 _ONE = Decimal("1.0000")
 
 
