@@ -1,6 +1,7 @@
 """Executable contract for value-minimized HR document-record evidence."""
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from uuid import UUID, uuid1, uuid4
 
 import pytest
@@ -107,3 +108,12 @@ def test_rejects_valid_value_rewrite_after_issuance() -> None:
     object.__setattr__(evidence, "document_category_code", "policy_acknowledgement")
     with pytest.raises(ValueError, match="document record evidence changed after construction"):
         evidence.canonical_json()
+
+
+def test_quality_workflow_watches_governance_adr() -> None:
+    """Ensure an ADR-only contract edit cannot bypass the dedicated package gate."""
+    repository_root = Path(__file__).resolve().parents[3]
+    workflow = (
+        repository_root / ".github" / "workflows" / "document-record-evidence-quality.yml"
+    ).read_text(encoding="utf-8")
+    assert '"docs/adr/0098-governed-document-record-evidence.md"' in workflow
