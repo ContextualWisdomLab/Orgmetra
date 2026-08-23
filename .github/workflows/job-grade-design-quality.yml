@@ -1,0 +1,57 @@
+name: Job Grade Design Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "packages/job-grade-design/**"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/job-grade-design-quality.yml"
+      - "docs/adr/0101-governed-job-grade-design-review.md"
+      - "docs/doctoring/job-grade-design-review-references.md"
+      - "docs/traceability/job-grade-design-review.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: job-grade-design-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Job grade design review contract and 100% coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Compile Job grade design package
+        run: python -m compileall -q packages/job-grade-design/src packages/job-grade-design/tests
+      - name: Test Job grade design with exact statement and branch coverage
+        env:
+          PYTHONPATH: packages/job-grade-design/src
+          COVERAGE_FILE: /tmp/orgmetra-job-grade-design.coverage
+        run: python -m pytest -c packages/job-grade-design/pyproject.toml packages/job-grade-design/tests
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
