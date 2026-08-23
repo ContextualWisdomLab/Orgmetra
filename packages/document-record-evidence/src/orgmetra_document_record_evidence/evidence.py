@@ -11,10 +11,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from hashlib import sha256
+import hmac
 import json
 import re
+from threading import RLock
 from typing import Any
 from uuid import UUID, uuid4
+from weakref import WeakKeyDictionary
 
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _ALLOWED_DOCUMENT_CATEGORIES = frozenset(
@@ -24,6 +27,8 @@ _CLASSIFICATION_CODE = "restricted_hr"
 _CONTENT_STORAGE_STATE = "artifact_reference_only"
 _DECISION_AUTHORITY_STATE = "not_authorized_for_employment_decision"
 _SCHEMA_VERSION = "orgmetra.document_record_evidence.v1"
+_ISSUANCE_LOCK = RLock()
+_ISSUANCE_DIGESTS: WeakKeyDictionary[DocumentRecordEvidence, str]
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -77,7 +82,17 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+def _canonical_json(payload: dict[str, Any]) -> str:
+    """Serialize one already-snapshotted evidence payload deterministically."""
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def _payload_digest(payload: dict[str, Any]) -> str:
+    """Return SHA-256 over one exact canonical payload snapshot."""
+    return sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True, repr=False, eq=False)
 class DocumentRecordEvidence:
     """Governed metadata evidence for one HR document artifact.
 
@@ -105,7 +120,18 @@ class DocumentRecordEvidence:
     schema_version: str = field(default=_SCHEMA_VERSION, init=False)
 
     def __post_init__(self) -> None:
-        """Validate all caller-controlled trust evidence before export."""
+        """Validate caller evidence and seal the exact issuance payload outside writable slots."""
+        self._validate()
+        payload = self._payload()
+        with _ISSUANCE_LOCK:
+            _ISSUANCE_DIGESTS[self] = _payload_digest(payload)
+
+    def __repr__(self) -> str:
+        """Avoid exposing HR document correlations in routine logs."""
+        return "DocumentRecordEvidence(<redacted>)"
+
+    def _validate(self) -> None:
+        """Fail closed when caller-controlled fields violate the reviewed evidence contract."""
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_uuid4_reference(
             self.person_record_reference, "person_record", "person_record_reference"
@@ -135,12 +161,8 @@ class DocumentRecordEvidence:
         _validate_digest(self.retention_policy_digest, "retention_policy_digest")
         _validate_received_at(self.received_at, self.recorded_at)
 
-    def __repr__(self) -> str:
-        """Avoid exposing HR document correlations in routine logs."""
-        return "DocumentRecordEvidence(<redacted>)"
-
-    def canonical_document(self) -> dict[str, Any]:
-        """Return deterministic, value-minimized document metadata evidence."""
+    def _payload(self) -> dict[str, Any]:
+        """Snapshot the exact value-minimized evidence fields once."""
         return {
             "artifact_digest": self.artifact_digest,
             "artifact_reference": self.artifact_reference,
@@ -161,18 +183,31 @@ class DocumentRecordEvidence:
             "uploader_actor_reference": self.uploader_actor_reference,
         }
 
+    def _verified_payload(self) -> dict[str, Any]:
+        """Validate and return the same payload snapshot whose issuance seal was verified."""
+        self._validate()
+        payload = self._payload()
+        actual_digest = _payload_digest(payload)
+        with _ISSUANCE_LOCK:
+            expected_digest = _ISSUANCE_DIGESTS.get(self, f"missing:{actual_digest}")
+        if not hmac.compare_digest(expected_digest, actual_digest):
+            raise ValueError("document record evidence changed after construction")
+        return payload
+
+    def canonical_document(self) -> dict[str, Any]:
+        """Return deterministic, value-minimized document metadata evidence."""
+        return self._verified_payload()
+
     def canonical_json(self) -> str:
-        """Return deterministic UTF-8-safe JSON for immutable audit correlation."""
-        return json.dumps(
-            self.canonical_document(),
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=True,
-        )
+        """Return deterministic JSON over the exact verified payload snapshot."""
+        return _canonical_json(self._verified_payload())
 
     def sha256_digest(self) -> str:
-        """Return SHA-256 over the exact canonical JSON bytes."""
+        """Return SHA-256 over the exact verified canonical JSON bytes."""
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
+
+
+_ISSUANCE_DIGESTS = WeakKeyDictionary()
 
 
 def build_document_record_evidence(
