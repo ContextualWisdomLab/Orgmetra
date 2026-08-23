@@ -14,8 +14,9 @@ U.S. Office of Personnel Management. (n.d.). *General Schedule qualification pol
 - OPM distinguishes job-analysis evidence from the ways applicants may demonstrate KSAs, including qualifying experience, education, or training.
 - Orgmetra uses that distinction only to keep Job qualification-rule provenance separate from candidate evaluation; it does not adopt federal qualification standards as a universal employer policy.
 
-Equal Employment Opportunity Commission, Department of Justice, Department of Labor, & Civil Service Commission. (1978). *Uniform Guidelines on Employee Selection Procedures*, 29 C.F.R. pt. 1607. https://www.govinfo.gov/content/pkg/CFR-2023-title29-vol4/pdf/CFR-2023-title29-vol4-part1607.pdf
+Equal Employment Opportunity Commission, Department of Justice, Department of Labor, & Civil Service Commission. (1978). *Uniform Guidelines on Employee Selection Procedures*, 29 C.F.R. pt. 1607. https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XIV/part-1607
 
+- The eCFR current-title URL is the authoritative continuously updated regulatory publication target. Automated access was rate-limited during the 2026-08-24 review, so the regulation text was cross-checked against the official GovInfo annual CFR publication at https://www.govinfo.gov/content/pkg/CFR-2023-title29-vol4/pdf/CFR-2023-title29-vol4-part1607.pdf rather than treating the older annual edition as current law.
 - The Guidelines provide a federal framework for proper use, validity evidence, and documentation of employee selection procedures.
 - This package records review provenance only. It makes no finding that a qualification rule is legally required, job-related, validated, nondiscriminatory, or appropriate for a particular jurisdiction or applicant.
 
