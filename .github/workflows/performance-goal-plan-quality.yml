@@ -8,6 +8,7 @@ on:
       - "packages/performance-goal-plan/**"
       - ".github/requirements/foundation-test.txt"
       - ".github/workflows/performance-goal-plan-quality.yml"
+      - "docs/adr/0092-governed-performance-goal-plan.md"
       - "docs/doctoring/performance-goal-plan-references.md"
       - "docs/traceability/performance-goal-plan.md"
   workflow_dispatch:
