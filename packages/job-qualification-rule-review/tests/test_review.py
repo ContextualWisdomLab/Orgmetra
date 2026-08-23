@@ -149,6 +149,7 @@ def test_rejects_requester_reviewer_overlap() -> None:
         ("tenant_record_id", "ffffffff-ffff-ffff-ffff-ffffffffffff"),
         ("tenant_record_id", "not-a-uuid"),
         ("job_record_reference", f"position_record:{JOB_ID}"),
+        ("job_record_reference", "job_record:not-a-uuid"),
         ("job_record_reference", "job_record:00000000-0000-0000-0000-000000000000"),
         ("job_analysis_snapshot_reference", f"job_analysis:{SNAPSHOT_ID}"),
         ("qualification_rule_artifact_reference", f"qualification_rule:{RULE_ARTIFACT_ID}"),
