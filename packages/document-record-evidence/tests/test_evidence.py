@@ -99,3 +99,11 @@ def test_rejects_non_utc_received_time() -> None:
     payload["received_at"] = datetime.now().replace(tzinfo=None)
     with pytest.raises(ValueError, match="received_at must be an exact built-in UTC datetime"):
         build_document_record_evidence(**payload)
+
+
+def test_rejects_valid_value_rewrite_after_issuance() -> None:
+    """Do not emit a second evidence truth after a frozen packet is forcibly rewritten."""
+    evidence = build_document_record_evidence(**values())
+    object.__setattr__(evidence, "document_category_code", "policy_acknowledgement")
+    with pytest.raises(ValueError, match="document record evidence changed after construction"):
+        evidence.canonical_json()
