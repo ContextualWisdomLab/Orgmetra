@@ -12,6 +12,8 @@ erDiagram
     person_record ||--o{ person_name_record : has_names
     person_record ||--o{ employment_record : has
     employment_record ||--o{ employment_record_version : has_versions
+    employment_record ||--o| employment_base_compensation_record : has_base_compensation
+    employment_base_compensation_record ||--o{ employment_base_compensation_version : has_versions
     organization_unit ||--o{ organization_unit_version : has_versions
     organization_unit_version }o--o| organization_unit : may_parent
     organization_unit ||--o{ position_record : contains
@@ -38,7 +40,7 @@ erDiagram
     criterion_observation ||--o{ validity_study_outcome_link : supplies_outcome
     validity_study ||--o{ validity_study_evidence_set_link : preserves_evidence
     decision_evidence_set ||--o{ validity_study_evidence_set_link : supplies_evidence
-    person_record ||--o{ compensation_record : has
+    person_record ||--o{ compensation_record : has_legacy_compensation
     employment_record ||--o{ employment_transition : changes_through
     tenant_record ||--o{ people_mutation_idempotency_record : scopes
     audit_event_record ||--o{ outbox_delivery_record : delivers_through
@@ -50,6 +52,8 @@ erDiagram
 `organization_unit`, `job_profile`, `employment_record`, and `position_record` are durable anchors. Mutable names, classifications, parent relationships, titles, families, version codes, and employment or position status live in bitemporal version rows. Positions retain stable organization/job references while retroactive corrections append or supersede version facts rather than rewriting identity. An organization version may reference another durable organization as its parent; self-parenting is rejected at the database boundary. An assignment names the employment that covers it, so a person cannot be assigned through another worker's employment. Exclusive employment versions for one person cannot overlap. An assignment day must land on an `active` or `open` position version, and visible allocations for one seat cannot exceed 1.0000.
 
 Every owned HRIS fact carries `tenant_record_id`. Relationships that cross table boundaries use tenant-qualified foreign keys, and row-level security independently filters every tenant-scoped relation. The tenant column is therefore both a referential-integrity boundary and a runtime isolation boundary, not a caller-supplied business attribute.
+
+One `employment_record` has at most one durable `employment_base_compensation_record` anchor. That anchor may have multiple bitemporal `employment_base_compensation_version` rows over business and system time, but overlapping effective/system truth for the same anchor is rejected. New compensation truth is therefore Employment-scoped rather than Person-scoped and retains an explicit pay-rate period. Legacy `compensation_record` rows remain historical Person-scoped read surfaces only; migration 0018 rejects new legacy writes rather than inventing Employment or pay-rate-period provenance.
 
 A candidate profile can be linked to at most one worker identity within its tenant. A person identity can have multiple candidate-worker links across reapplications or historical candidate profiles, so the person-side cardinality is one-to-many.
 
