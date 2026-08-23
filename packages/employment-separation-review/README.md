@@ -4,7 +4,7 @@ This package creates a **pre-mutation review packet** for employment separation.
 
 ## What the packet proves
 
-A packet binds one authoritative Orgmetra tenant and proposed employment separation to exact opaque canonical non-sentinel UUIDv4 references and SHA-256 evidence for:
+A packet binds one authoritative Orgmetra `tenant_record_id` and proposed employment separation to exact SHA-256 evidence plus opaque packet-owned namespaced trust references for:
 
 - the authoritative Person and Employment record;
 - the active Assignment/Job/Position scope snapshot to be resolved at review time;
