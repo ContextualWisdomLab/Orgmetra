@@ -21,8 +21,8 @@ REVIEWER = f"actor:{uuid4()}"
 DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
-REVIEWED = datetime(2026, 8, 24, 0, 0, tzinfo=timezone.utc)
-RECORDED = datetime(2026, 8, 24, 0, 1, tzinfo=timezone.utc)
+REVIEWED = datetime(2026, 8, 23, 0, 0, tzinfo=timezone.utc)
+RECORDED = datetime(2026, 8, 23, 0, 1, tzinfo=timezone.utc)
 
 
 def kwargs() -> dict[str, object]:
@@ -61,7 +61,7 @@ def test_canonical_evidence_is_deterministic_redacted_and_non_authoritative() ->
     assert document["review_state"] == "reviewed_for_authoritative_resolution"
     assert document["decision_authority"] == "not_authorized_to_change_employment_or_compensation"
     assert document["human_review_required"] is True
-    assert document["recorded_at"] == "2026-08-24T00:01:00Z"
+    assert document["recorded_at"] == "2026-08-23T00:01:00Z"
     assert json.loads(packet.canonical_json()) == document
     assert packet.sha256_digest() == hashlib.sha256(packet.canonical_json().encode()).hexdigest()
     assert repr(packet) == "EmploymentWorkCapacityReviewPacket(<redacted>)"
@@ -98,8 +98,8 @@ def test_all_reviewed_reason_codes_are_supported() -> None:
         ("evidence_version", True, "integer"),
         ("evidence_version", 0, "integer"),
         ("evidence_version", 2_147_483_648, "integer"),
-        ("reviewed_at", datetime(2026, 8, 24), "exact built-in UTC datetime"),
-        ("recorded_at", datetime(2026, 8, 24, 0, 1, tzinfo=timezone(timedelta(hours=9))), "exact built-in UTC datetime"),
+        ("reviewed_at", datetime(2026, 8, 23), "exact built-in UTC datetime"),
+        ("recorded_at", datetime(2026, 8, 23, 0, 1, tzinfo=timezone(timedelta(hours=9))), "exact built-in UTC datetime"),
     ],
 )
 def test_invalid_governance_inputs_fail_closed(field: str, value: object, message: str) -> None:
@@ -123,13 +123,15 @@ def test_capacity_ratio_shape_fails_closed(field: str, value: object, message: s
         build(**{field: value})
 
 
-def test_noop_and_actor_overlap_and_reverse_chronology_fail_closed() -> None:
+def test_noop_actor_overlap_reverse_chronology_and_future_system_time_fail_closed() -> None:
     with pytest.raises(ValueError, match="must differ"):
         build(proposed_capacity_ratio=Decimal("1.0000"))
     with pytest.raises(ValueError, match="different actor"):
         build(reviewer_actor_reference=REQUESTER)
     with pytest.raises(ValueError, match="cannot precede"):
         build(recorded_at=REVIEWED - timedelta(seconds=1))
+    with pytest.raises(ValueError, match="future system-recorded"):
+        build(recorded_at=datetime.now(timezone.utc) + timedelta(days=1))
 
 
 @pytest.mark.parametrize(
