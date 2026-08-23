@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -19,6 +19,46 @@ class ForgedDateTime(datetime):
     def isoformat(self, *args, **kwargs) -> str:  # type: ignore[no-untyped-def]
         """Return an instant different from the underlying review evidence."""
         return "2099-12-31T23:59:59+00:00"
+
+
+class MutableTimezone(tzinfo):
+    """Timezone provider whose offset changes after evidence issuance."""
+
+    def __init__(self, offset: timedelta) -> None:
+        """Store one caller-controlled offset."""
+        self.offset = offset
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Return the current mutable offset."""
+        return self.offset
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Expose no daylight-saving adjustment."""
+        return timedelta(0)
+
+
+class NullOffsetTimezone(tzinfo):
+    """Timezone provider without a concrete UTC offset."""
+
+    def utcoffset(self, dt: datetime | None) -> None:
+        """Return no offset."""
+        return None
+
+    def dst(self, dt: datetime | None) -> None:
+        """Return no daylight-saving offset."""
+        return None
+
+
+class RaisingTimezone(tzinfo):
+    """Timezone provider that raises while resolving UTC offset."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Raise caller-controlled behavior at the trust boundary."""
+        raise RuntimeError("provider failure")
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Expose no daylight-saving adjustment."""
+        return timedelta(0)
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -59,3 +99,67 @@ def test_rejects_datetime_subclasses_that_can_forge_recorded_time_evidence() -> 
 
     with pytest.raises(ValueError, match="generated_at"):
         build_assignment_change_review_packet(**kwargs)
+
+
+def test_detaches_mutable_timezone_from_recorded_time_evidence() -> None:
+    """A mutable timezone provider must not rewrite canonical evidence after issuance."""
+    provider = MutableTimezone(timedelta(hours=9))
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 8, 21, 13, 10, tzinfo=provider)
+
+    packet = build_assignment_change_review_packet(**kwargs)
+    before = packet.canonical_json()
+    provider.offset = timedelta(hours=-7)
+
+    assert packet.canonical_json() == before
+    assert packet.generated_at == datetime(2026, 8, 21, 4, 10, tzinfo=timezone.utc)
+    assert packet.generated_at.tzinfo is timezone.utc
+
+
+def test_rejects_future_recorded_time() -> None:
+    """Do not seal assignment-change evidence for a system time that has not occurred."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2099, 1, 1, tzinfo=timezone.utc)
+
+    with pytest.raises(ValueError, match="generated_at must not be in the future"):
+        build_assignment_change_review_packet(**kwargs)
+
+
+def test_rejects_timezone_without_concrete_offset() -> None:
+    """Reject tzinfo objects that cannot resolve a concrete UTC offset."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 8, 21, 4, 10, tzinfo=NullOffsetTimezone())
+
+    with pytest.raises(ValueError, match="generated_at"):
+        build_assignment_change_review_packet(**kwargs)
+
+
+def test_normalizes_timezone_provider_failure() -> None:
+    """Do not leak caller timezone exceptions across the review-evidence boundary."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 8, 21, 4, 10, tzinfo=RaisingTimezone())
+
+    with pytest.raises(ValueError, match="generated_at"):
+        build_assignment_change_review_packet(**kwargs)
+
+
+def test_rejects_timezone_normalization_overflow() -> None:
+    """Fail closed when a valid offset cannot be represented as a UTC datetime."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime.min.replace(tzinfo=timezone(timedelta(hours=14)))
+
+    with pytest.raises(ValueError, match="generated_at"):
+        build_assignment_change_review_packet(**kwargs)
+
+
+def test_rejects_post_construction_timezone_reinjection() -> None:
+    """Do not emit evidence after low-level replacement of the frozen UTC instant."""
+    packet = build_assignment_change_review_packet(**valid_kwargs())
+    object.__setattr__(
+        packet,
+        "generated_at",
+        datetime(2026, 8, 21, 13, 10, tzinfo=timezone(timedelta(hours=9))),
+    )
+
+    with pytest.raises(ValueError, match="generated_at"):
+        packet.canonical_json()
