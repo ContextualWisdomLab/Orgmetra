@@ -39,7 +39,7 @@ def valid_values() -> dict[str, object]:
     [
         ("tenant_record_id", "ffffffff-ffff-ffff-ffff-ffffffffffff"),
         ("job_record_reference", "job_record:not-a-uuid"),
-        ("job_record_reference", "job_record:" + "1" * 145),
+        ("job_record_reference", "job_record:" + "1" * 170),
         (
             "job_analysis_snapshot_reference",
             "job_analysis_snapshot:550E8400-E29B-41D4-A716-446655440000",
