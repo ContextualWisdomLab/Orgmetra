@@ -17,6 +17,12 @@ Supported request-intent codes are operational routing vocabulary only:
 
 Every packet remains `requires_authoritative_policy_review`, `not_authorized_to_disclose`, and `not_authorized_to_modify_hr_data`. A downstream host must re-resolve tenant, Person, requester identity/authority, applicable policy/jurisdiction, retention/legal-hold state, export scope, and immutable audit/outbox evidence before fulfillment. Existing Orgmetra export, retention/disposition, People authorization, and audit boundaries remain authoritative; this package does not bypass them.
 
+## Evidence integrity
+
+The packet snapshots and verifies the same canonical payload that it emits. Post-construction field rewrites and unregistered copies fail closed. As a defense-in-depth runtime invariant, one live `(tenant_record_id, data_rights_request_reference)` cannot be associated with two different canonical evidence digests; an exact idempotent duplicate is allowed. Tracking uses weak references so request identifiers are not retained merely because a Python packet once existed.
+
+This live-process guard is **not** a durable uniqueness or distributed idempotency authority. A persistence/fulfillment host must bind the public request reference and evidence digest transactionally in its authoritative datastore/audit boundary before commercial use across processes or replicas.
+
 ## Ownership and deployment
 
 This is an Orgmetra-local evidence contract. It does not write Keyverse or any other dedicated-writer CWL repository and performs no cross-service application-table SQL. `requester_actor_reference` is an Orgmetra-local pseudonymous correlation after identity resolution, not an identity-provider subject format.
