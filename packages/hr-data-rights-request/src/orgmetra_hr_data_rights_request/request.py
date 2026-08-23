@@ -154,9 +154,7 @@ def _release_live_request_reference(
 ) -> None:
     """Forget a dead packet without retaining used request identifiers indefinitely."""
     with _ISSUANCE_LOCK:
-        live_evidence = _LIVE_REQUEST_EVIDENCE.get(request_key)
-        if live_evidence is None:
-            return
+        live_evidence = _LIVE_REQUEST_EVIDENCE[request_key]
         live_evidence.pop(packet_reference, None)
         if not live_evidence:
             _LIVE_REQUEST_EVIDENCE.pop(request_key, None)
