@@ -120,7 +120,7 @@ def test_requires_distinct_requester_and_reviewer() -> None:
         ("purpose_code", "performance_rating_review"),
         ("reason_code", "goal_plan_auto_activation"),
         ("human_review_required", False),
-        ("review_state", "approved"),
+        ("review_state", "human_review_complete"),
         ("decision_authority", "automated_rating"),
         ("employment_decision_authority", "authorized_for_termination"),
         ("contains_goal_text", True),
@@ -178,6 +178,8 @@ class ForgedText(str):
 
 def test_rejects_hostile_runtime_string_subclasses() -> None:
     """Validation sees the exact value later serialized into canonical evidence."""
+    with pytest.raises(ValueError):
+        packet(tenant_record_id=ForgedText(TENANT))
     with pytest.raises(ValueError):
         packet(feedback_cadence_code=ForgedText("shadow_mode"))
     with pytest.raises(ValueError):
