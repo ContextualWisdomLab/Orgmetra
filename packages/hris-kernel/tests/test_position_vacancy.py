@@ -146,6 +146,19 @@ def test_overfilled_position_fails_closed() -> None:
         )
 
 
+def test_duplicate_visible_assignment_identity_fails_closed() -> None:
+    """One Assignment identity cannot be double-counted as extra seat occupancy."""
+    duplicate = assignment(P1, "0.5000")
+    with pytest.raises(SingleValuedFactError, match="more than one visible Assignment fact"):
+        build_position_vacancy_snapshot(
+            [position(P1)],
+            [duplicate, duplicate],
+            tenant_record_id=TENANT,
+            effective_on=DAY,
+            known_at=KNOWN,
+        )
+
+
 def test_naive_knowledge_cutoff_fails_before_resolution() -> None:
     """Vacancy evidence always carries an explicit system-time timezone."""
     with pytest.raises(IntervalError, match="timezone-aware"):
