@@ -22,6 +22,7 @@ export const REQUIRED_FILES = Object.freeze([
   'package.json',
   '.github/workflows/foundation-ci.yml',
   '.github/workflows/job-analysis-api-quality.yml',
+  '.github/workflows/employment-compensation-core-quality.yml',
   'docs/PRD.md',
   'docs/TRD.md',
   'docs/USER_STORIES.md',
@@ -52,7 +53,10 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0012-governed-migration-handoff.md',
   'docs/adr/0013-governed-requisition-review-packet.md',
   'docs/adr/0014-job-analysis-snapshot-persistence.md',
+  'docs/adr/0099-employment-scoped-base-compensation.md',
   'docs/doctoring/REFERENCES.md',
+  'docs/doctoring/employment-compensation-core-references.md',
+  'docs/traceability/employment-compensation-core.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
   'database/migrations/0001_foundation_schema.sql',
@@ -68,6 +72,7 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
   'database/migrations/0013_job_analysis_snapshot.sql',
+  'database/migrations/0018_employment_compensation_core.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -89,6 +94,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/test_job_analysis_snapshot_postgres.sh',
+  'tests/test_employment_compensation_core_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -122,6 +128,7 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'candidate_worker_link', 'criterion_blueprint', 'criterion_dimension',
   'criterion_indicator', 'work_opportunity', 'criterion_observation',
   'performance_cycle', 'performance_decision', 'compensation_record',
+  'employment_base_compensation_record', 'employment_base_compensation_version',
   'compensation_decision', 'validation_study', 'study_population_snapshot',
   'study_predictor_link', 'study_criterion_link', 'analysis_manifest',
   'analysis_artifact', 'policy_recommendation', 'policy_review_decision',
@@ -139,7 +146,9 @@ export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
   'job_analysis_task_item',
   'job_analysis_ksao_item',
   'job_analysis_task_ksao_link',
-  'job_analysis_write_command'
+  'job_analysis_write_command',
+  'employment_base_compensation_record',
+  'employment_base_compensation_version'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
