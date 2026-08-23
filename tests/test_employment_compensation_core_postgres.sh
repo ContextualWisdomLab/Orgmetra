@@ -170,6 +170,30 @@ if [[ "${backdated_recorded_output}" != *"base-compensation recorded_from must e
 fi
 
 set +e
+preclosed_anchor_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO employment_base_compensation_record (
+    tenant_record_id, employment_base_compensation_record_id, employment_record_id,
+    recorded_to
+) VALUES (
+    '20000000-0000-7000-8000-000000000001',
+    '20000000-0000-7000-8000-000000000302',
+    '20000000-0000-7000-8000-000000000201',
+    pg_catalog.transaction_timestamp() + INTERVAL '1 day'
+);
+SQL
+} 2>&1)"
+preclosed_anchor_status=$?
+set -e
+if [[ ${preclosed_anchor_status} -eq 0 ]]; then
+    echo "base compensation accepted a caller-preclosed anchor" >&2
+    exit 1
+fi
+if [[ "${preclosed_anchor_output}" != *"base-compensation recorded_to must be NULL on insert"* ]]; then
+    echo "preclosed compensation anchor failed for an unexpected reason: ${preclosed_anchor_output}" >&2
+    exit 1
+fi
+
+set +e
 cross_tenant_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO employment_base_compensation_record (
     tenant_record_id, employment_base_compensation_record_id, employment_record_id
@@ -230,6 +254,11 @@ expect_version_failure \
     "backdated compensation version system time" \
     "base-compensation recorded_from must equal the current transaction timestamp" \
     "INSERT INTO employment_base_compensation_version (tenant_record_id, employment_base_compensation_version_id, employment_base_compensation_record_id, base_compensation_amount, currency_code, pay_rate_period_code, effective_from, effective_to, recorded_from) VALUES ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000406', '10000000-0000-7000-8000-000000000301', 100000.0000, 'USD', 'year', DATE '2025-01-01', DATE '2025-12-31', TIMESTAMPTZ '2020-01-01 00:00:00+00');"
+
+expect_version_failure \
+    "preclosed compensation version" \
+    "base-compensation recorded_to must be NULL on insert" \
+    "INSERT INTO employment_base_compensation_version (tenant_record_id, employment_base_compensation_version_id, employment_base_compensation_record_id, base_compensation_amount, currency_code, pay_rate_period_code, effective_from, effective_to, recorded_to) VALUES ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000408', '10000000-0000-7000-8000-000000000301', 100000.0000, 'USD', 'year', DATE '2025-01-01', DATE '2025-12-31', pg_catalog.transaction_timestamp() + INTERVAL '1 day');"
 
 expect_version_failure \
     "overlapping compensation truth" \
@@ -311,6 +340,35 @@ SELECT count(*) FROM employment_base_compensation_record;
 ")"
 if [[ "${beta_context_count}" != "0" ]]; then
     echo "tenant-beta reader saw tenant-alpha compensation anchors" >&2
+    exit 1
+fi
+
+missing_version_context_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SET ROLE orgmetra_compensation_reader;
+SELECT count(*) FROM employment_base_compensation_version;
+")"
+if [[ "${missing_version_context_count}" != "0" ]]; then
+    echo "compensation version reader saw tenant rows without tenant context" >&2
+    exit 1
+fi
+
+alpha_version_context_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SET ROLE orgmetra_compensation_reader;
+SET orgmetra.tenant_record_id = '10000000-0000-7000-8000-000000000001';
+SELECT count(*) FROM employment_base_compensation_version;
+")"
+if [[ "${alpha_version_context_count}" != "2" ]]; then
+    echo "tenant-alpha reader did not see exactly its two compensation versions" >&2
+    exit 1
+fi
+
+beta_version_context_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SET ROLE orgmetra_compensation_reader;
+SET orgmetra.tenant_record_id = '20000000-0000-7000-8000-000000000001';
+SELECT count(*) FROM employment_base_compensation_version;
+")"
+if [[ "${beta_version_context_count}" != "0" ]]; then
+    echo "tenant-beta reader saw tenant-alpha compensation versions" >&2
     exit 1
 fi
 
