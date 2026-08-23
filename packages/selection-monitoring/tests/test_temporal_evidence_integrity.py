@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -27,6 +27,26 @@ class ForgedDateTime(datetime):
     def isoformat(self, *args, **kwargs) -> str:  # type: ignore[no-untyped-def]
         """Return an instant different from the underlying evidence instant."""
         return "2099-12-31T23:59:59+00:00"
+
+
+class MutableTimezone(tzinfo):
+    """Timezone provider whose offset can change after packet issuance."""
+
+    def __init__(self, offset: timedelta) -> None:
+        """Store one caller-controlled offset."""
+        self.offset = offset
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Return the current mutable offset."""
+        return self.offset
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Expose no daylight-saving adjustment."""
+        return timedelta(0)
+
+    def tzname(self, dt: datetime | None) -> str:
+        """Return a stable diagnostic timezone name."""
+        return "MutableTimezone"
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -73,3 +93,18 @@ def test_rejects_datetime_subclasses_that_can_forge_canonical_recorded_time() ->
 
     with pytest.raises(ValueError, match="timezone-aware"):
         build_selection_outcome_monitoring_plan(**kwargs)
+
+
+def test_detaches_mutable_timezone_from_immutable_generated_time() -> None:
+    """Do not let a timezone provider rewrite canonical evidence after issuance."""
+    provider = MutableTimezone(timedelta(hours=9))
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 4, 2, 17, 30, tzinfo=provider)
+
+    plan = build_selection_outcome_monitoring_plan(**kwargs)
+    before = plan.canonical_json()
+    provider.offset = timedelta(hours=-7)
+
+    assert plan.canonical_json() == before
+    assert plan.generated_at == datetime(2026, 4, 2, 8, 30, tzinfo=timezone.utc)
+    assert plan.generated_at.tzinfo is timezone.utc
