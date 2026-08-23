@@ -53,6 +53,14 @@ function writeMigrationBackedTables(root) {
       'CREATE TABLE job_analysis_write_command (tenant_record_id uuid NOT NULL);'
     ].join('\n') + '\n'
   );
+  write(
+    root,
+    'database/migrations/0018_employment_compensation_core.sql',
+    [
+      'CREATE TABLE employment_base_compensation_record (tenant_record_id uuid NOT NULL);',
+      'CREATE TABLE employment_base_compensation_version (tenant_record_id uuid NOT NULL);'
+    ].join('\n') + '\n'
+  );
 }
 
 function makeMinimalValidFoundation(root) {
