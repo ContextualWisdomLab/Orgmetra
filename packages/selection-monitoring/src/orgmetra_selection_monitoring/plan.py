@@ -8,7 +8,7 @@ does not itself compute or assert adverse impact.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
@@ -78,11 +78,30 @@ def _validate_digest(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
-def _canonical_timestamp(value: datetime) -> str:
-    """Render an aware instant as precision-preserving UTC RFC 3339 text."""
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+def _freeze_timestamp(value: datetime) -> datetime:
+    """Resolve caller timezone behavior once and store one immutable UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
         raise ValueError("generated_at must be an exact timezone-aware datetime")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
+    if type(offset) is not timedelta:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    try:
+        frozen = (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except (OverflowError, ValueError) as exc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
+    if frozen > datetime.now(timezone.utc):
+        raise ValueError("generated_at must not be in the future")
+    return frozen
+
+
+def _canonical_timestamp(value: datetime) -> str:
+    """Render one already-frozen UTC instant as precision-preserving RFC 3339 text."""
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -181,7 +200,7 @@ class SelectionOutcomeMonitoringPlan:
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive monitoring reason")
-        _canonical_timestamp(self.generated_at)
+        object.__setattr__(self, "generated_at", _freeze_timestamp(self.generated_at))
         if type(self.evidence_version) is not int or not 1 <= self.evidence_version <= 2_147_483_647:
             raise ValueError("evidence_version must be an integer from 1 through 2147483647")
         if type(self.analysis_scope) is not str or self.analysis_scope != _ANALYSIS_SCOPE:
