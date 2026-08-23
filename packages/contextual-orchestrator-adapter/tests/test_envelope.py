@@ -13,8 +13,8 @@ from orgmetra_contextual_orchestrator_adapter import DraftEvidenceEnvelope
 TENANT = "01890f62-3e1a-4db1-8b42-bf7537b88e10"
 REQUEST = "orchestration_request:9d0c8c0f-c217-4cb5-a91d-36e8d5091190"
 TARGET = "job_analysis:597f2467-d2f0-4cc3-9854-79c60854a25e"
-REQUESTER = "actor:hr-analyst-01"
-REVIEWER = "actor:job-analysis-sme-02"
+REQUESTER = "actor:7efdf9f8-c4b3-42d2-b22c-50b2f6e5950b"
+REVIEWER = "actor:8b6ef498-9589-4099-953b-bd7a9322c97d"
 DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
@@ -37,18 +37,19 @@ def values() -> dict[str, object]:
         "contextual_orchestrator_revision": REVISION,
         "api_operation": "POST /v1/responses",
         "evidence_version": 1,
-        "recorded_at": datetime(2026, 8, 22, 12, 0, tzinfo=timezone.utc),
     }
 
 
 def build() -> DraftEvidenceEnvelope:
-    """Build one valid, PII-free envelope through the public constructor."""
+    """Build one valid, PII-free envelope through the public issuance constructor."""
     return DraftEvidenceEnvelope(**values())
 
 
 def test_builds_value_minimized_untrusted_human_review_evidence() -> None:
     """Bind provenance without turning model output into an employment decision."""
+    before = datetime.now(timezone.utc)
     envelope = build()
+    after = datetime.now(timezone.utc)
     document = envelope.canonical_document()
     assert document["output_trust_state"] == "untrusted_draft"
     assert document["review_state"] == "requires_human_review"
@@ -56,6 +57,9 @@ def test_builds_value_minimized_untrusted_human_review_evidence() -> None:
     assert document["contextual_orchestrator_revision"] == REVISION
     assert document["api_contract_id"] == "contextual-orchestrator.openapi.v0.1.0"
     assert document["api_operation"] == "POST /v1/responses"
+    assert document["draft_evidence_reference"].startswith("draft_evidence:")
+    assert before <= envelope.recorded_at <= after
+    assert envelope.recorded_at.tzinfo is timezone.utc
     assert "prompt" not in document
     assert "output" not in document
     assert "candidate_name" not in document
@@ -63,10 +67,11 @@ def test_builds_value_minimized_untrusted_human_review_evidence() -> None:
     assert repr(envelope) == "DraftEvidenceEnvelope(<redacted>)"
 
 
-def test_canonical_json_is_deterministic() -> None:
-    """Render identical reviewed evidence to identical canonical bytes."""
-    assert build().canonical_json() == build().canonical_json()
-    assert build().evidence_digest() == build().evidence_digest()
+def test_canonical_json_is_deterministic_for_one_issuance() -> None:
+    """Render one reviewed issuance to identical canonical bytes on repeated reads."""
+    envelope = build()
+    assert envelope.canonical_json() == envelope.canonical_json()
+    assert envelope.evidence_digest() == envelope.evidence_digest()
 
 
 @pytest.mark.parametrize(
@@ -86,7 +91,6 @@ def test_canonical_json_is_deterministic() -> None:
         ("contextual_orchestrator_revision", "0" * 40, "contextual_orchestrator_revision"),
         ("api_operation", "POST /v1/chat/completions", "api_operation"),
         ("evidence_version", 0, "evidence_version"),
-        ("recorded_at", datetime(2026, 8, 22, 12, 0), "recorded_at"),
     ],
 )
 def test_rejects_invalid_governance_evidence(field_name: str, bad_value: object, message: str) -> None:
@@ -174,17 +178,6 @@ def test_rejects_runtime_subclasses_before_reviewed_operations() -> None:
         DraftEvidenceEnvelope(**kwargs)
 
 
-def test_rejects_non_utc_and_datetime_subclass() -> None:
-    """Keep recorded evidence on one exact non-executable UTC representation."""
-    class ForgedDateTime(datetime):
-        """Represent a caller-defined datetime implementation."""
-
-    kwargs = values()
-    kwargs["recorded_at"] = ForgedDateTime(2026, 8, 22, 12, 0, tzinfo=timezone.utc)
-    with pytest.raises(ValueError, match="recorded_at"):
-        DraftEvidenceEnvelope(**kwargs)
-
-
 def test_runtime_type_is_final() -> None:
     """Disallow subclasses that could override derived governance state."""
     with pytest.raises(TypeError, match="final"):
@@ -192,48 +185,53 @@ def test_runtime_type_is_final() -> None:
 
 
 def test_post_construction_rewrite_fails_closed() -> None:
-    """Prevent object-level rewriting from minting a new reviewed evidence document."""
+    """Detect object-level rewriting before one issuance document can be exported again."""
     envelope = build()
     object.__setattr__(envelope, "response_evidence_digest", "d" * 64)
     with pytest.raises(ValueError, match="changed after construction"):
         envelope.canonical_json()
 
 
+def test_system_recorded_time_rewrite_fails_closed() -> None:
+    """Detect any attempt to rewrite the trusted system-recorded issuance instant."""
+    envelope = build()
+    object.__setattr__(envelope, "recorded_at", datetime(2025, 1, 1, tzinfo=timezone.utc))
+    with pytest.raises(ValueError, match="changed after construction"):
+        envelope.canonical_json()
+
+
+def test_generated_evidence_reference_rewrite_fails_closed() -> None:
+    """Detect rewriting of the system-generated issuance correlation reference."""
+    envelope = build()
+    object.__setattr__(
+        envelope,
+        "draft_evidence_reference",
+        "draft_evidence:d4154329-c78f-4f35-9b04-bc6d7928ff52",
+    )
+    with pytest.raises(ValueError, match="changed after construction"):
+        envelope.canonical_json()
+
+
 def test_seal_rewrite_fails_closed() -> None:
-    """Reject removal of the process-local creation seal before evidence serialization."""
+    """Detect removal of the process-local accidental-change snapshot before export."""
     envelope = build()
     object.__setattr__(envelope, "_creation_seal", None)
     with pytest.raises(ValueError, match="changed after construction"):
         envelope.canonical_json()
 
 
-def test_direct_constructor_rejects_caller_supplied_creation_seal() -> None:
-    """Reject caller-supplied private seals before any new issuance can be completed."""
-    with pytest.raises(ValueError, match="changed after construction"):
+def test_direct_constructor_rejects_caller_supplied_creation_state() -> None:
+    """Keep system-recorded time and internal change-detection state outside constructor input."""
+    with pytest.raises(TypeError):
+        DraftEvidenceEnvelope(**values(), recorded_at=datetime.now(timezone.utc))
+    with pytest.raises(TypeError):
         DraftEvidenceEnvelope(**values(), _creation_seal="forged")
 
 
-def test_issuance_marker_rewrite_fails_closed() -> None:
-    """Reject rewriting the process-local issuance marker before serialization."""
+def test_replacement_is_a_distinct_system_recorded_issuance() -> None:
+    """Treat dataclass replacement as new evidence with new correlation and recorded time."""
     envelope = build()
-    object.__setattr__(envelope, "_issuance_marker", object())
-    with pytest.raises(ValueError, match="changed after construction"):
-        envelope.canonical_json()
-
-
-def test_replacement_cannot_bypass_creation_evidence() -> None:
-    """Reject dataclass replacement because it is a new issuance boundary."""
-    envelope = build()
-    with pytest.raises(ValueError, match="changed after construction"):
-        replace(envelope, response_evidence_digest="d" * 64).canonical_json()
-
-
-def test_replacement_cannot_reset_private_seal_and_mint_new_evidence() -> None:
-    """Reject explicit reset of the private seal during dataclass replacement."""
-    envelope = build()
-    with pytest.raises(ValueError, match="changed after construction"):
-        replace(
-            envelope,
-            response_evidence_digest="d" * 64,
-            _creation_seal=None,
-        ).canonical_json()
+    replacement = replace(envelope, response_evidence_digest="d" * 64)
+    assert replacement.draft_evidence_reference != envelope.draft_evidence_reference
+    assert replacement.recorded_at >= envelope.recorded_at
+    assert replacement.evidence_digest() != envelope.evidence_digest()
