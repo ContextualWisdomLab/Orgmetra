@@ -1,6 +1,6 @@
 """Adversarial runtime-type regressions for position-reporting evidence."""
 
-from datetime import date, datetime, timedelta, timezone, tzinfo
+from datetime import date, datetime, timezone, tzinfo
 from uuid import UUID
 
 import pytest
