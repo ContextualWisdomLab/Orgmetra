@@ -8,6 +8,8 @@ The packet is not a storage credential, legal retention determination, or employ
 
 `document_record_reference` and `recorded_at` are generated inside the Orgmetra issuance boundary so callers cannot claim a chosen system-recorded identity or timestamp. Caller-owned `received_at` remains separate business-event time and must be exact built-in UTC and no later than issuance.
 
+The Python value also keeps its creation-time canonical evidence digest in a process-local weak issuance registry outside packet-writable slots. Every export validates the live fields, snapshots them once, and compares that exact snapshot with the issuance digest before returning document or JSON evidence. This is **defense in depth against accidental or same-process post-construction rewriting**, not durable cryptographic attestation: authoritative persistence must store the already-emitted canonical evidence and digest through Orgmetra's immutable audit/outbox boundary.
+
 The closed initial document-category vocabulary is `employment_contract`, `policy_acknowledgement`, and `qualification_document`. New categories require a reviewed contract change rather than free-form metadata.
 
 This package does not fetch or mutate Clearfolio, NewsDOM, or any other dedicated-writer CWL service and introduces no cross-service application-table SQL.
