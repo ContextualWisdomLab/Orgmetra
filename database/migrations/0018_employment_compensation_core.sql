@@ -67,6 +67,29 @@ CREATE TABLE employment_base_compensation_version (
         )
 );
 
+CREATE FUNCTION enforce_employment_base_compensation_recorded_from()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.recorded_from IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
+        RAISE EXCEPTION 'base-compensation recorded_from must equal the current transaction timestamp'
+            USING ERRCODE = '22023';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER employment_base_compensation_record_system_time_guard
+BEFORE INSERT ON employment_base_compensation_record
+FOR EACH ROW
+EXECUTE FUNCTION enforce_employment_base_compensation_recorded_from();
+
+CREATE TRIGGER employment_base_compensation_version_system_time_guard
+BEFORE INSERT ON employment_base_compensation_version
+FOR EACH ROW
+EXECUTE FUNCTION enforce_employment_base_compensation_recorded_from();
+
 CREATE TRIGGER employment_base_compensation_record_bitemporal_guard
 BEFORE UPDATE OR DELETE ON employment_base_compensation_record
 FOR EACH ROW
@@ -107,6 +130,6 @@ USING (tenant_record_id = current_tenant_record_id())
 WITH CHECK (tenant_record_id = current_tenant_record_id());
 
 COMMENT ON TABLE employment_base_compensation_record IS
-    'Durable tenant-scoped base-compensation anchor owned by one Employment; legacy person-scoped compensation_record is historical-read only.';
+    'Durable tenant-scoped base-compensation anchor owned by one Employment; system-recorded time is database-authored and legacy person-scoped compensation_record is historical-read only.';
 COMMENT ON TABLE employment_base_compensation_version IS
-    'Single-valued bitemporal base-compensation amount, currency transport code, and pay-rate period for one Employment compensation anchor.';
+    'Single-valued bitemporal base-compensation amount, currency transport code, and pay-rate period for one Employment compensation anchor; system-recorded time is database-authored.';
