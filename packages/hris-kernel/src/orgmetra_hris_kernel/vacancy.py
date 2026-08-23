@@ -169,6 +169,14 @@ def build_position_vacancy_snapshot(
         and fact.effective.contains(effective_on)
         and fact.recorded.contains(known_at)
     ]
+    seen_assignment_ids: set[UUID] = set()
+    for assignment in visible_assignments:
+        if assignment.assignment_record_id in seen_assignment_ids:
+            raise SingleValuedFactError(
+                "One Assignment identity resolved to more than one visible Assignment fact.",
+                next_action="Close the superseded recorded Assignment interval, then rebuild the vacancy snapshot.",
+            )
+        seen_assignment_ids.add(assignment.assignment_record_id)
 
     allocation_by_position: dict[UUID, Decimal] = {}
     for assignment in visible_assignments:
