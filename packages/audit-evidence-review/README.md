@@ -1,6 +1,6 @@
 # Orgmetra Audit Evidence Review
 
-This package is the purpose-bound review boundary for Orgmetra's existing immutable `audit_event_record` evidence. It makes one ordering guarantee explicit: **authorization happens before any audit-store read**. It then re-verifies the exact persisted canonical JSON, SHA-256 digest, tenant/event binding, system-recorded review window, row bound, and deterministic row order before returning evidence to an authorized reviewer.
+This package is the purpose-bound review boundary for Orgmetra's existing immutable `audit_event_record` evidence. It makes one ordering guarantee explicit: **authorization happens before any audit-store read**. It then re-verifies the exact persisted canonical JSON, SHA-256 digest, governed PII-minimized envelope shape, tenant/event binding, system-recorded review window, row bound, and deterministic row order before returning evidence to an authorized reviewer.
 
 ## What it does
 
@@ -10,7 +10,7 @@ This package is the purpose-bound review boundary for Orgmetra's existing immuta
 
 `AuditEvidenceRowReader` is a read-only adapter protocol for the existing Orgmetra audit store. A production PostgreSQL adapter must use a least-privileged `NOSUPERUSER NOBYPASSRLS` application role, `SET TRANSACTION READ ONLY`, bind `orgmetra.tenant_record_id`, rely on the existing forced-RLS `audit_event_record` relation, constrain `recorded_at` to the authorized half-open interval, order by `(recorded_at, audit_event_record_id)`, and apply the authorized limit. This package deliberately does not duplicate persistence SQL or cross-service application tables.
 
-`PersistedAuditEvidenceRow` performs defense-in-depth verification after the read: exact canonical bytes must match the lower-case SHA-256 digest; the bytes must round-trip through Orgmetra's deterministic JSON form; CloudEvents `specversion`/media type must match the governed envelope; and the event id and tenant in canonical evidence must match the persisted row columns.
+`PersistedAuditEvidenceRow` performs defense-in-depth verification after the read: the canonical text must be valid UTF-8 within the byte budget; exact bytes must match the lower-case SHA-256 digest; those bytes must round-trip through Orgmetra's deterministic JSON form; the top-level and nested `data` keys must still match the existing PII-minimized audit envelope (with only the governed optional confirmation extension); CloudEvents `specversion`/media type must match the governed envelope; and event id and tenant in canonical evidence must match the persisted row columns. A privileged rewrite cannot widen the envelope with extra HR fields merely by recomputing a matching digest.
 
 ## Privacy and decision boundary
 
@@ -20,7 +20,7 @@ This package grants **no** employment-decision authority and makes no decision. 
 
 ## Failure behavior
 
-The boundary fails closed before returning evidence when authorization is absent, denied, malformed, or scope-mismatched; when the reader returns a mutable/non-tuple collection, too many rows, a non-governed row, cross-tenant evidence, out-of-window evidence, non-monotonic row order, noncanonical JSON, or a digest/identity mismatch.
+The boundary fails closed before returning evidence when authorization is absent, denied, malformed, or scope-mismatched; when the reader returns a mutable/non-tuple collection, too many rows, a non-governed row, cross-tenant evidence, out-of-window evidence, non-monotonic row order, invalid/unencodable or noncanonical JSON, a widened envelope/data shape, or a digest/identity mismatch.
 
 A storage adapter failure propagates to the host; callers must not reinterpret missing evidence as an empty successful review.
 
