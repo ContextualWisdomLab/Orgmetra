@@ -104,6 +104,34 @@ BEFORE INSERT ON employment_base_compensation_version
 FOR EACH ROW
 EXECUTE FUNCTION enforce_employment_base_compensation_recorded_from();
 
+CREATE FUNCTION enforce_employment_base_compensation_version_anchor_open()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    PERFORM 1
+    FROM public.employment_base_compensation_record AS anchor
+    WHERE anchor.tenant_record_id = NEW.tenant_record_id
+      AND anchor.employment_base_compensation_record_id = NEW.employment_base_compensation_record_id
+      AND anchor.recorded_to IS NULL
+    FOR SHARE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'base-compensation version requires an open compensation anchor'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION enforce_employment_base_compensation_version_anchor_open() IS
+    'Guards new compensation versions: locks and requires the same-tenant compensation anchor to remain open, preventing new recorded truth beneath a closed anchor.';
+
+CREATE TRIGGER employment_base_compensation_version_anchor_open_guard
+BEFORE INSERT ON employment_base_compensation_version
+FOR EACH ROW
+EXECUTE FUNCTION enforce_employment_base_compensation_version_anchor_open();
+
 CREATE FUNCTION enforce_employment_base_compensation_recorded_to()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -130,6 +158,38 @@ CREATE TRIGGER employment_base_compensation_version_system_time_close_guard
 BEFORE UPDATE ON employment_base_compensation_version
 FOR EACH ROW
 EXECUTE FUNCTION enforce_employment_base_compensation_recorded_to();
+
+CREATE FUNCTION enforce_employment_base_compensation_anchor_version_alignment()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.recorded_to IS NULL OR NEW.recorded_to IS NOT DISTINCT FROM OLD.recorded_to THEN
+        RETURN NULL;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM public.employment_base_compensation_version AS version
+        WHERE version.tenant_record_id = NEW.tenant_record_id
+          AND version.employment_base_compensation_record_id = NEW.employment_base_compensation_record_id
+          AND (version.recorded_to IS NULL OR version.recorded_to > NEW.recorded_to)
+    ) THEN
+        RAISE EXCEPTION 'cannot close base-compensation anchor while a recorded version remains open'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+COMMENT ON FUNCTION enforce_employment_base_compensation_anchor_version_alignment() IS
+    'Deferred integrity guard for anchor closure: every child version must already have a recorded_to no later than the anchor close instant before the transaction may commit.';
+
+CREATE CONSTRAINT TRIGGER employment_base_compensation_anchor_version_alignment_guard
+AFTER UPDATE ON employment_base_compensation_record
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION enforce_employment_base_compensation_anchor_version_alignment();
 
 CREATE TRIGGER employment_base_compensation_record_bitemporal_guard
 BEFORE UPDATE OR DELETE ON employment_base_compensation_record
@@ -200,6 +260,6 @@ USING (tenant_record_id = current_tenant_record_id())
 WITH CHECK (tenant_record_id = current_tenant_record_id());
 
 COMMENT ON TABLE employment_base_compensation_record IS
-    'Durable tenant-scoped base-compensation anchor owned by one Employment; recorded_from is fixed to PostgreSQL transaction time, INSERT requires an open recorded interval, and closure is accepted only at the PostgreSQL transaction timestamp.';
+    'Durable tenant-scoped base-compensation anchor owned by one Employment; recorded_from is fixed to PostgreSQL transaction time, INSERT requires an open recorded interval, and closure is accepted only at the PostgreSQL transaction timestamp after every child version is closed.';
 COMMENT ON TABLE employment_base_compensation_version IS
-    'Single-valued bitemporal base-compensation amount, currency transport code, and pay-rate period for one Employment compensation anchor; Nil/Max identities and NaN amounts are rejected, INSERT requires an open recorded interval, and closure is accepted only at the PostgreSQL transaction timestamp.';
+    'Single-valued bitemporal base-compensation amount, currency transport code, and pay-rate period for one open Employment compensation anchor; Nil/Max identities and NaN amounts are rejected, INSERT requires an open recorded interval and open parent anchor, and closure is accepted only at the PostgreSQL transaction timestamp.';

@@ -6,8 +6,9 @@ set -euo pipefail
 relation_present="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc \
     "SELECT pg_catalog.to_regclass('public.employment_base_compensation_record') IS NOT NULL;")"
 if [[ "${relation_present}" != "t" ]]; then
-    echo "employment-compensation review regression requires migration 0018" >&2
-    exit 1
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation_schema.sql
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evidence_digest.sql
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0018_employment_compensation_core.sql
 fi
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'

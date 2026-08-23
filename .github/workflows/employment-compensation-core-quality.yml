@@ -70,10 +70,10 @@ jobs:
               ".github/workflows/employment-compensation-core-quality.yml",
               "tests/validate_repository.py",
               "scripts/foundation-contract-core.mjs",
+              "docs/adr/0099-employment-scoped-base-compensation.md",
           ]
           optional = [
               "database/migrations/0018_employment_compensation_core.sql",
-              "docs/adr/0099-employment-scoped-base-compensation.md",
               "docs/adr/README.md",
               "docs/traceability/employment-compensation-core.md",
               "docs/doctoring/employment-compensation-core-references.md",
@@ -124,7 +124,9 @@ jobs:
           ).read_text(encoding="utf-8")
           required_function_docs = (
               "enforce_employment_base_compensation_recorded_from",
+              "enforce_employment_base_compensation_version_anchor_open",
               "enforce_employment_base_compensation_recorded_to",
+              "enforce_employment_base_compensation_anchor_version_alignment",
               "reject_employment_base_compensation_truncate",
               "reject_legacy_compensation_insert",
           )
@@ -140,6 +142,10 @@ jobs:
                   + ", ".join(undocumented)
               )
 
+          adr_path = Path("docs/adr/0099-employment-scoped-base-compensation.md")
+          if not adr_path.is_file():
+              raise SystemExit("ADR 0099 document is required by the compensation contract")
+
           adr_index = Path("docs/adr/README.md").read_text(encoding="utf-8")
           required_adr_entry = (
               "| [0099](0099-employment-scoped-base-compensation.md) | "
@@ -152,8 +158,12 @@ jobs:
           PY
       - name: Run employment compensation regression
         run: bash tests/test_employment_compensation_core_postgres.sh
-      - name: Run review-driven integrity regressions
-        run: bash tests/test_employment_compensation_review_regressions_postgres.sh
+      - name: Run review-driven integrity regressions in an isolated database
+        run: |
+          PGPASSWORD=orgmetra psql -h localhost -U orgmetra -d postgres -v ON_ERROR_STOP=1 \
+            -c 'CREATE DATABASE orgmetra_compensation_review'
+          DATABASE_URL=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra_compensation_review \
+            bash tests/test_employment_compensation_review_regressions_postgres.sh
       - name: Require clean checkout
         run: |
           git diff --exit-code
