@@ -118,7 +118,8 @@ def test_future_position_and_assignment_are_not_visible() -> None:
         known_at=KNOWN,
     )
     assert snapshot.staffable_position_count == 0
-    assert snapshot.staffed_fte == Decimal("0")
+    assert snapshot.staffed_fte == Decimal("0.0000")
+    assert '"staffed_fte":"0.0000"' in snapshot.canonical_json()
 
 
 def test_unknown_visible_position_status_fails_closed() -> None:
