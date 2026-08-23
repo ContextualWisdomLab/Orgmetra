@@ -32,5 +32,5 @@ Before using the packet in a validity or workforce analysis, re-resolve the refe
 - Exact built-in runtime primitives are required before UUID parsing, equality, ordering, hashing, or serialization.
 - Assignment and Organization collections are bounded, deterministic tuples.
 - Canonical evidence excludes raw context values and manager identity.
-- A process-local issuance registry detects post-construction mutation and conflicting reuse of a live tenant-qualified packet reference. Durable cross-process uniqueness still belongs to authoritative persistence/audit boundaries; this in-process registry is defense-in-depth, not a database substitute.
+- A process-local issuance registry detects post-construction mutation and conflicting reuse of a live tenant-qualified packet reference. Exact idempotent duplicates share one live binding, so garbage-collecting one duplicate cannot reopen the reference while another duplicate remains live. Durable cross-process uniqueness still belongs to authoritative persistence/audit boundaries; this in-process registry is defense-in-depth, not a database substitute.
 - The installed wheel is hash-bound and tested at exact 100% owned production statement and branch coverage by `Performance Context Evidence Quality`.
