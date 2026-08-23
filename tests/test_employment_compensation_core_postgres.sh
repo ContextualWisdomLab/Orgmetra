@@ -4,6 +4,7 @@ set -euo pipefail
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation_schema.sql
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evidence_digest.sql
 if [[ -f database/migrations/0018_employment_compensation_core.sql ]]; then
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0018_employment_compensation_core.sql
 fi
