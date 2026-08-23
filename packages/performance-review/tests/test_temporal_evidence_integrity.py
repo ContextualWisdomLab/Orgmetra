@@ -37,6 +37,18 @@ class MutableTimezone(tzinfo):
         return timedelta(0)
 
 
+class NullOffsetTimezone(tzinfo):
+    """Timezone provider with no concrete UTC offset."""
+
+    def utcoffset(self, dt: datetime | None) -> None:
+        """Return no usable offset."""
+        return None
+
+    def dst(self, dt: datetime | None) -> None:
+        """Return no daylight-saving offset."""
+        return None
+
+
 class RaisingTimezone(tzinfo):
     """Timezone provider that raises while resolving UTC offset."""
 
@@ -108,6 +120,15 @@ def test_rejects_future_recorded_time() -> None:
         build_performance_review_packet(**kwargs)
 
 
+def test_rejects_timezone_without_concrete_offset() -> None:
+    """Reject tzinfo objects that cannot resolve a concrete UTC offset."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 8, 19, 5, 15, 30, tzinfo=NullOffsetTimezone())
+
+    with pytest.raises(ValueError, match="generated_at"):
+        build_performance_review_packet(**kwargs)
+
+
 def test_normalizes_timezone_provider_failure() -> None:
     """Do not leak caller timezone exceptions across the review-evidence boundary."""
     kwargs = valid_kwargs()
@@ -115,3 +136,25 @@ def test_normalizes_timezone_provider_failure() -> None:
 
     with pytest.raises(ValueError, match="generated_at"):
         build_performance_review_packet(**kwargs)
+
+
+def test_rejects_timezone_normalization_overflow() -> None:
+    """Fail closed when a valid offset cannot be represented as a UTC datetime."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime.min.replace(tzinfo=timezone(timedelta(hours=14)))
+
+    with pytest.raises(ValueError, match="generated_at"):
+        build_performance_review_packet(**kwargs)
+
+
+def test_rejects_post_construction_timezone_reinjection() -> None:
+    """Do not emit evidence after low-level replacement of the frozen UTC instant."""
+    packet = build_performance_review_packet(**valid_kwargs())
+    object.__setattr__(
+        packet,
+        "generated_at",
+        datetime(2026, 8, 19, 14, 15, 30, tzinfo=timezone(timedelta(hours=9))),
+    )
+
+    with pytest.raises(ValueError, match="generated_at"):
+        packet.canonical_json()
