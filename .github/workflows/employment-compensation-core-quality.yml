@@ -114,6 +114,26 @@ jobs:
                       f"{path_text}: missing employment-compensation schema truth: "
                       + ", ".join(missing)
                   )
+
+          migration_text = Path(
+              "database/migrations/0018_employment_compensation_core.sql"
+          ).read_text(encoding="utf-8")
+          required_function_docs = (
+              "enforce_employment_base_compensation_recorded_from",
+              "enforce_employment_base_compensation_recorded_to",
+              "reject_legacy_compensation_insert",
+          )
+          undocumented = [
+              function_name
+              for function_name in required_function_docs
+              if f"COMMENT ON FUNCTION {function_name}() IS" not in migration_text
+          ]
+          if undocumented:
+              raise SystemExit(
+                  "database/migrations/0018_employment_compensation_core.sql: "
+                  "missing beginner-readable COMMENT ON FUNCTION for: "
+                  + ", ".join(undocumented)
+              )
           PY
       - name: Run employment compensation regression
         run: bash tests/test_employment_compensation_core_postgres.sh
