@@ -12,8 +12,8 @@ TEST_ROOT = PACKAGE_ROOT / "tests"
 
 
 def _python_files() -> tuple[Path, ...]:
-    """Return every owned Python source/test file in deterministic order."""
-    return tuple(sorted((*SOURCE_ROOT.glob("*.py"), *TEST_ROOT.glob("*.py"))))
+    """Return every owned Python source/test file recursively in deterministic order."""
+    return tuple(sorted((*SOURCE_ROOT.rglob("*.py"), *TEST_ROOT.rglob("*.py"))))
 
 
 def test_owned_python_modules_and_callables_are_documented() -> None:
