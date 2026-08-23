@@ -91,7 +91,7 @@ def test_split_assignments_that_sum_to_one_are_fully_staffed() -> None:
 
 
 def test_future_position_and_assignment_are_not_visible() -> None:
-    """Business-time and system-time coordinates prevent current-state leakage."""
+    """Future-effective staffing truth is excluded from an earlier business date."""
     future_position = PositionVersion(
         tenant_record_id=TENANT,
         position_record_id=P1,
@@ -100,14 +100,25 @@ def test_future_position_and_assignment_are_not_visible() -> None:
         effective=DateInterval(date(2027, 1, 1)),
         recorded=RecordedInterval(datetime(2026, 1, 1, tzinfo=timezone.utc)),
     )
+    future_assignment = AssignmentFact(
+        tenant_record_id=TENANT,
+        assignment_record_id=UUID(int=1001),
+        employment_record_id=UUID(int=2001),
+        person_record_id=UUID(int=3001),
+        position_record_id=P1,
+        allocation_ratio=Decimal("1.0000"),
+        effective=DateInterval(date(2027, 1, 1)),
+        recorded=RecordedInterval(datetime(2026, 1, 1, tzinfo=timezone.utc)),
+    )
     snapshot = build_position_vacancy_snapshot(
         [future_position],
-        [assignment(P1, "1.0000")],
+        [future_assignment],
         tenant_record_id=TENANT,
         effective_on=DAY,
         known_at=KNOWN,
     )
     assert snapshot.staffable_position_count == 0
+    assert snapshot.staffed_fte == Decimal("0")
 
 
 def test_unknown_visible_position_status_fails_closed() -> None:
