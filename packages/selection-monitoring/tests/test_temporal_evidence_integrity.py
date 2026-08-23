@@ -138,3 +138,25 @@ def test_normalizes_timezone_provider_failure() -> None:
 
     with pytest.raises(ValueError, match="timezone-aware"):
         build_selection_outcome_monitoring_plan(**kwargs)
+
+
+def test_rejects_timezone_normalization_overflow() -> None:
+    """Fail closed when a valid offset cannot be represented as a UTC datetime."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime.min.replace(tzinfo=timezone(timedelta(hours=14)))
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        build_selection_outcome_monitoring_plan(**kwargs)
+
+
+def test_rejects_post_construction_timezone_reinjection() -> None:
+    """Do not emit evidence after low-level replacement of the frozen UTC instant."""
+    plan = build_selection_outcome_monitoring_plan(**valid_kwargs())
+    object.__setattr__(
+        plan,
+        "generated_at",
+        datetime(2026, 4, 2, 17, 30, tzinfo=timezone(timedelta(hours=9))),
+    )
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        plan.canonical_json()
