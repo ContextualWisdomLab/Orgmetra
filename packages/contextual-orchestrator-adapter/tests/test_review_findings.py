@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime
 from inspect import signature
 
 import pytest
@@ -29,6 +30,14 @@ def test_internal_integrity_state_is_not_constructor_visible() -> None:
     parameters = signature(DraftEvidenceEnvelope).parameters
     assert "_creation_seal" not in parameters
     assert "_issuance_marker" not in parameters
+
+
+def test_rejects_invalid_post_construction_recorded_time() -> None:
+    """Fail closed if an invalid caller-controlled datetime is injected after issuance."""
+    envelope = build()
+    object.__setattr__(envelope, "recorded_at", datetime(2026, 8, 22, 12, 0))
+    with pytest.raises(ValueError, match="recorded_at"):
+        envelope.canonical_json()
 
 
 def test_replacement_is_a_new_system_recorded_evidence_issuance() -> None:
