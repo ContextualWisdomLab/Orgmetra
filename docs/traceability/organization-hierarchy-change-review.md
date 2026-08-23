@@ -13,7 +13,7 @@
 | Keep Organization Unit parent review distinct from mutation authority | `test_builds_value_minimized_human_review_packet`, fixed `mutation_state=not_authorized_to_apply` | active_pr |
 | Represent root attach/detach without a sentinel parent | `test_allows_attach_and_detach_root_transitions` | active_pr |
 | Reject self-parenting and no-op parent changes before authoritative work | `test_rejects_ambiguous_hierarchy_or_actor_relationships` | active_pr |
-| Preserve separate business and system-recorded time | `test_accepts_fixed_offset_timestamp_and_canonicalizes_to_utc`, `test_rejects_noncanonical_temporal_primitives` | active_pr |
+| Preserve separate business and system-recorded time, and reject future system-recorded issuance | `test_accepts_fixed_offset_timestamp_and_canonicalizes_to_utc`, `test_rejects_noncanonical_temporal_primitives`, `test_rejects_future_system_recorded_time` | active_pr |
 | Keep Person PII, worker values and employment decisions out of review evidence | `test_builds_value_minimized_human_review_packet`, direct-construction governance regressions | active_pr |
 | Require accountable human separation and controlled purpose/reason | relationship regression plus invalid-trust-evidence and direct-construction regressions | active_pr |
 | Preserve HRIS-owned UUID evolution while packet-owned correlations stay opaque UUIDv4 | `test_operational_organization_references_accept_uuid7`, invalid reference regressions | active_pr |
@@ -25,5 +25,7 @@
 ## Boundary note
 
 A passing packet proves only that review evidence satisfies this leaf contract. It does **not** prove that the current parent is still current, that the proposed parent is valid at the mutation coordinate, or that the resulting hierarchy is acyclic. Those facts must be re-established by the authoritative Orgmetra HRIS boundary immediately before any mutation and recorded with immutable audit/outbox evidence.
+
+`recorded_at` is checked for issuance freshness only when the packet is created. Later canonical export revalidates its exact built-in temporal shape and creation digest but does not re-enter wall-clock freshness, so a backward clock step cannot make already-issued evidence unreadable.
 
 The live-reference registry is process-local defense in depth. It prevents conflicting in-process reissuance while an idempotent packet remains alive, but it does not replace durable tenant-qualified uniqueness or immutable persistence across processes/restarts. The authoritative persistence/audit transaction owns those guarantees.
