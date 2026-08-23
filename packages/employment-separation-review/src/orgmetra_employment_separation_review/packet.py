@@ -12,7 +12,7 @@ remain at their authoritative boundaries.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
@@ -94,11 +94,30 @@ def _validate_digest(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
-def _canonical_timestamp(value: datetime) -> str:
-    """Render an aware instant as precision-preserving UTC RFC 3339 text."""
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+def _freeze_timestamp(value: datetime) -> datetime:
+    """Resolve caller timezone behavior once and store one immutable UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
         raise ValueError("generated_at must be an exact timezone-aware datetime")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
+    if type(offset) is not timedelta:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    try:
+        frozen = (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except (OverflowError, ValueError) as exc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
+    if frozen > datetime.now(timezone.utc):
+        raise ValueError("generated_at must not be in the future")
+    return frozen
+
+
+def _canonical_timestamp(value: datetime) -> str:
+    """Render one already-frozen UTC instant as precision-preserving RFC 3339 text."""
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 def _validate_business_date(value: date, field_name: str) -> None:
@@ -249,7 +268,7 @@ class EmploymentSeparationReviewPacket:
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must be an approved separation reason")
         _validate_business_date(self.proposed_separation_on, "proposed_separation_on")
-        _canonical_timestamp(self.generated_at)
+        object.__setattr__(self, "generated_at", _freeze_timestamp(self.generated_at))
         _validate_evidence_version(self.evidence_version)
         if self.contains_person_pii is not False:
             raise ValueError("employment separation review packet must not contain person PII")
