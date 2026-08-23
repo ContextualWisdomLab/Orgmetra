@@ -254,9 +254,27 @@ if [[ "${rewrite_output}" != *"bitemporal correction may only close an open reco
     exit 1
 fi
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+set +e
+caller_close_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 UPDATE employment_base_compensation_version
 SET recorded_to = TIMESTAMPTZ '2026-12-31 23:59:59+00'
+WHERE employment_base_compensation_version_id = '10000000-0000-7000-8000-000000000401';
+SQL
+} 2>&1)"
+caller_close_status=$?
+set -e
+if [[ ${caller_close_status} -eq 0 ]]; then
+    echo "base compensation accepted caller-authored recorded_to system time" >&2
+    exit 1
+fi
+if [[ "${caller_close_output}" != *"base-compensation recorded_to must equal the current transaction timestamp"* ]]; then
+    echo "caller-authored compensation recorded_to failed for an unexpected reason: ${caller_close_output}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+UPDATE employment_base_compensation_version
+SET recorded_to = pg_catalog.transaction_timestamp()
 WHERE employment_base_compensation_version_id = '10000000-0000-7000-8000-000000000401';
 SQL
 
