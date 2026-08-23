@@ -1,6 +1,7 @@
 """Executable contract for privacy-minimized performance-context evidence."""
 
 from datetime import date, datetime, timedelta, timezone
+import gc
 import json
 
 import pytest
@@ -275,6 +276,19 @@ def test_conflicting_live_packet_reference_cannot_be_reissued() -> None:
     assert duplicate.canonical_json() == packet.canonical_json()
     with pytest.raises(ValueError, match="bound to different live evidence"):
         build(work_context_digest="e" * 64)
+
+
+def test_live_reference_binding_survives_idempotent_duplicate_collection() -> None:
+    """Collecting a duplicate cannot erase another live packet's reference binding."""
+    original = build()
+    duplicate = build()
+    assert duplicate.canonical_json() == original.canonical_json()
+    del duplicate
+    gc.collect()
+
+    with pytest.raises(ValueError, match="bound to different live evidence"):
+        build(work_context_digest="e" * 64)
+    assert original.canonical_json()
 
 
 def test_packet_runtime_is_final() -> None:
