@@ -14,7 +14,7 @@ import json
 import re
 from threading import RLock
 from uuid import UUID
-from weakref import WeakKeyDictionary
+from weakref import WeakKeyDictionary, WeakValueDictionary
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -44,8 +44,23 @@ _NEXT_ACTION = (
     "authorization to mutate HRIS truth or make an employment decision."
 )
 
+
+class _LiveReferenceBinding:
+    """Keep one evidence digest alive while any idempotent packet instance is alive."""
+
+    __slots__ = ("evidence_digest", "__weakref__")
+
+    def __init__(self, evidence_digest: str) -> None:
+        """Bind one tenant-qualified hierarchy-change reference to one digest."""
+        self.evidence_digest = evidence_digest
+
+
 _REGISTRY_LOCK = RLock()
 _CREATION_DIGESTS: WeakKeyDictionary[OrganizationHierarchyChangeReviewPacket, str] = WeakKeyDictionary()
+_LIVE_REFERENCE_BINDINGS: WeakValueDictionary[tuple[str, str], _LiveReferenceBinding] = WeakValueDictionary()
+_PACKET_BINDINGS: WeakKeyDictionary[
+    OrganizationHierarchyChangeReviewPacket, _LiveReferenceBinding
+] = WeakKeyDictionary()
 
 
 def _validate_operational_uuid_text(value: object, field_name: str) -> None:
@@ -188,7 +203,7 @@ class OrganizationHierarchyChangeReviewPacket:
         return "OrganizationHierarchyChangeReviewPacket(<redacted>)"
 
     def __post_init__(self) -> None:
-        """Validate the review contract and seal its creation-time evidence."""
+        """Validate the review contract and bind its live reference to creation evidence."""
         _validate_operational_uuid_text(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.organization_hierarchy_change_reference,
@@ -256,8 +271,18 @@ class OrganizationHierarchyChangeReviewPacket:
 
         payload_json = _canonical_payload_json(_payload(self))
         creation_digest = sha256(payload_json.encode("utf-8")).hexdigest()
+        live_key = (self.tenant_record_id, self.organization_hierarchy_change_reference)
         with _REGISTRY_LOCK:
+            binding = _LIVE_REFERENCE_BINDINGS.get(live_key)
+            if binding is None:
+                binding = _LiveReferenceBinding(creation_digest)
+                _LIVE_REFERENCE_BINDINGS[live_key] = binding
+            elif binding.evidence_digest != creation_digest:
+                raise ValueError(
+                    "organization_hierarchy_change_reference is already bound to different live evidence"
+                )
             _CREATION_DIGESTS[self] = creation_digest
+            _PACKET_BINDINGS[self] = binding
 
     def canonical_json(self) -> str:
         """Return one verified snapshot of deterministic canonical audit evidence."""
