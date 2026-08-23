@@ -17,6 +17,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = [
+  "--import-mode=importlib",
   "--cov=orgmetra_employment_separation_review",
   "--cov-branch",
   "--cov-report=term-missing",
