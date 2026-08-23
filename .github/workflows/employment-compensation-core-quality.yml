@@ -125,6 +125,7 @@ jobs:
           required_function_docs = (
               "enforce_employment_base_compensation_recorded_from",
               "enforce_employment_base_compensation_recorded_to",
+              "reject_employment_base_compensation_truncate",
               "reject_legacy_compensation_insert",
           )
           undocumented = [
