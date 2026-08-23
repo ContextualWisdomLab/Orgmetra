@@ -49,6 +49,18 @@ class MutableTimezone(tzinfo):
         return "MutableTimezone"
 
 
+class RaisingTimezone(tzinfo):
+    """Timezone provider that raises while resolving its UTC offset."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Raise caller-controlled behavior at the trust boundary."""
+        raise RuntimeError("provider failure")
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Expose no daylight-saving adjustment."""
+        return timedelta(0)
+
+
 def valid_kwargs() -> dict[str, object]:
     """Return one otherwise valid aggregate-monitoring plan input."""
     return {
@@ -108,3 +120,21 @@ def test_detaches_mutable_timezone_from_immutable_generated_time() -> None:
     assert plan.canonical_json() == before
     assert plan.generated_at == datetime(2026, 4, 2, 8, 30, tzinfo=timezone.utc)
     assert plan.generated_at.tzinfo is timezone.utc
+
+
+def test_rejects_future_generated_time() -> None:
+    """Do not seal a monitoring plan for a system time that has not occurred."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2099, 1, 1, tzinfo=timezone.utc)
+
+    with pytest.raises(ValueError, match="generated_at must not be in the future"):
+        build_selection_outcome_monitoring_plan(**kwargs)
+
+
+def test_normalizes_timezone_provider_failure() -> None:
+    """Do not leak arbitrary timezone-provider exceptions across the evidence boundary."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 4, 2, 8, 30, tzinfo=RaisingTimezone())
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        build_selection_outcome_monitoring_plan(**kwargs)
