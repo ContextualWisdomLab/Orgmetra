@@ -10,6 +10,10 @@ on:
       - "docs/adr/0099-employment-scoped-base-compensation.md"
       - "docs/traceability/employment-compensation-core.md"
       - "docs/doctoring/employment-compensation-core-references.md"
+      - "docs/DATA_MODEL.md"
+      - "docs/ERD.md"
+      - "docs/TRACEABILITY.md"
+      - "CHANGELOG.md"
       - ".github/workflows/employment-compensation-core-quality.yml"
   workflow_dispatch:
 
@@ -69,6 +73,10 @@ jobs:
               "docs/adr/0099-employment-scoped-base-compensation.md",
               "docs/traceability/employment-compensation-core.md",
               "docs/doctoring/employment-compensation-core-references.md",
+              "docs/DATA_MODEL.md",
+              "docs/ERD.md",
+              "docs/TRACEABILITY.md",
+              "CHANGELOG.md",
           ]
           rows = []
           for path_text in paths + [path for path in optional if Path(path).is_file()]:
@@ -82,6 +90,30 @@ jobs:
                   }
               )
           print(json.dumps(rows, separators=(",", ":")))
+          PY
+      - name: Require canonical employment-compensation documentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          required_tables = (
+              "employment_base_compensation_record",
+              "employment_base_compensation_version",
+          )
+          canonical_docs = (
+              "docs/DATA_MODEL.md",
+              "docs/ERD.md",
+              "docs/TRACEABILITY.md",
+              "CHANGELOG.md",
+          )
+          for path_text in canonical_docs:
+              text = Path(path_text).read_text(encoding="utf-8")
+              missing = [table for table in required_tables if table not in text]
+              if missing:
+                  raise SystemExit(
+                      f"{path_text}: missing employment-compensation schema truth: "
+                      + ", ".join(missing)
+                  )
           PY
       - name: Run employment compensation regression
         run: bash tests/test_employment_compensation_core_postgres.sh
