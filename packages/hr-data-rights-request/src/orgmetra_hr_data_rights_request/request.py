@@ -18,7 +18,7 @@ import re
 from threading import RLock
 from typing import Any
 from uuid import UUID
-from weakref import WeakKeyDictionary
+from weakref import ReferenceType, WeakKeyDictionary, ref
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -43,6 +43,9 @@ _NEXT_ACTION = (
 )
 _ISSUANCE_LOCK = RLock()
 _ISSUANCE_DIGESTS: WeakKeyDictionary[HrDataRightsRequestPacket, str]
+_LIVE_REQUEST_EVIDENCE: dict[
+    tuple[str, str], dict[ReferenceType[HrDataRightsRequestPacket], str]
+]
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -145,6 +148,20 @@ def _payload_digest(payload: dict[str, Any]) -> str:
     return sha256(encoded).hexdigest()
 
 
+def _release_live_request_reference(
+    request_key: tuple[str, str],
+    packet_reference: ReferenceType[HrDataRightsRequestPacket],
+) -> None:
+    """Forget a dead packet without retaining used request identifiers indefinitely."""
+    with _ISSUANCE_LOCK:
+        live_evidence = _LIVE_REQUEST_EVIDENCE.get(request_key)
+        if live_evidence is None:
+            return
+        live_evidence.pop(packet_reference, None)
+        if not live_evidence:
+            _LIVE_REQUEST_EVIDENCE.pop(request_key, None)
+
+
 @dataclass(frozen=True, slots=True, weakref_slot=True, repr=False, eq=False)
 class HrDataRightsRequestPacket:
     """Immutable, value-minimized intake evidence for one HR data-rights request."""
@@ -174,11 +191,30 @@ class HrDataRightsRequestPacket:
     next_action: str = _NEXT_ACTION
 
     def __post_init__(self) -> None:
-        """Validate every trust-bearing field and register creation-time evidence."""
+        """Validate fields and reject conflicting live evidence for one request identity."""
         self._validate()
         payload = self._payload()
+        evidence_digest = _payload_digest(payload)
+        request_key = (self.tenant_record_id, self.data_rights_request_reference)
         with _ISSUANCE_LOCK:
-            _ISSUANCE_DIGESTS[self] = _payload_digest(payload)
+            live_evidence = _LIVE_REQUEST_EVIDENCE.get(request_key)
+            if live_evidence is not None:
+                for live_digest in live_evidence.values():
+                    if not hmac.compare_digest(live_digest, evidence_digest):
+                        raise ValueError(
+                            "data-rights request reference is already live with different evidence"
+                        )
+            else:
+                live_evidence = {}
+                _LIVE_REQUEST_EVIDENCE[request_key] = live_evidence
+            _ISSUANCE_DIGESTS[self] = evidence_digest
+            packet_reference = ref(
+                self,
+                lambda dead_reference, key=request_key: _release_live_request_reference(
+                    key, dead_reference
+                ),
+            )
+            live_evidence[packet_reference] = evidence_digest
 
     def __repr__(self) -> str:
         """Avoid disclosing tenant, Person, actor, policy, or evidence correlations in logs."""
@@ -304,6 +340,7 @@ class HrDataRightsRequestPacket:
 
 
 _ISSUANCE_DIGESTS = WeakKeyDictionary()
+_LIVE_REQUEST_EVIDENCE = {}
 
 
 def build_hr_data_rights_request_packet(
