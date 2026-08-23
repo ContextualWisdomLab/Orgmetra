@@ -10,16 +10,13 @@ import json
 import re
 import secrets
 from typing import ClassVar
-from uuid import UUID
+from uuid import UUID, uuid4
 
 
 _CONTEXTUAL_ORCHESTRATOR_REVISION = "e226e1197bdfc890c9d8e5b9b648c78857d7e465"
 _PROCESS_SEAL_KEY = secrets.token_bytes(32)
-_NEW_ISSUANCE_MARKER = object()
-_USED_ISSUANCE_MARKER = object()
 _DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}")
 _MODEL_PATTERN = re.compile(r"[A-Za-z0-9._:/-]{1,128}")
-_ACTOR_PATTERN = re.compile(r"actor:[A-Za-z0-9._~-]{1,128}")
 _ALLOWED_DRAFT_USES = frozenset(
     {
         "candidate_evidence_summary_draft",
@@ -76,11 +73,8 @@ def _validate_reference(value: object, field_name: str, allowed_prefixes: frozen
 
 
 def _validate_actor_reference(value: object, field_name: str) -> str:
-    """Require bounded opaque actor correlation without treating syntax as authentication."""
-    text = _require_text(value, field_name)
-    if _ACTOR_PATTERN.fullmatch(text) is None:
-        raise ValueError(f"{field_name} must be a bounded actor: reference")
-    return text
+    """Require one opaque tenant-scoped actor correlation with a canonical UUIDv4 suffix."""
+    return _validate_reference(value, field_name, frozenset({"actor"}))
 
 
 def _validate_digest(value: object, field_name: str) -> str:
@@ -99,6 +93,16 @@ def _validate_model(value: object) -> str:
     return text
 
 
+def _system_recorded_at() -> datetime:
+    """Return the trusted issuance boundary's current built-in UTC instant."""
+    return datetime.now(timezone.utc)
+
+
+def _new_draft_evidence_reference() -> str:
+    """Return a fresh opaque correlation for one system-recorded draft-evidence issuance."""
+    return f"draft_evidence:{uuid4()}"
+
+
 def _validate_recorded_at(value: object) -> datetime:
     """Require exact built-in UTC system-recorded time for immutable evidence."""
     if type(value) is not datetime or value.tzinfo is not timezone.utc:
@@ -112,7 +116,7 @@ def _canonical_timestamp(value: datetime) -> str:
 
 
 def _seal(payload_json: str) -> str:
-    """Bind one in-process issuance to its exact creation-time canonical payload."""
+    """Detect accidental in-process changes to one exact issuance payload."""
     return hmac.new(_PROCESS_SEAL_KEY, payload_json.encode("utf-8"), "sha256").hexdigest()
 
 
@@ -133,9 +137,9 @@ class DraftEvidenceEnvelope:
     contextual_orchestrator_revision: str
     api_operation: str
     evidence_version: int
-    recorded_at: datetime
-    _creation_seal: str | None = field(default=None, repr=False, compare=False)
-    _issuance_marker: object = field(default=_NEW_ISSUANCE_MARKER, repr=False, compare=False)
+    draft_evidence_reference: str = field(init=False)
+    recorded_at: datetime = field(init=False)
+    _creation_seal: str = field(init=False, repr=False, compare=False)
 
     API_CONTRACT_ID: ClassVar[str] = "contextual-orchestrator.openapi.v0.1.0"
     OUTPUT_TRUST_STATE: ClassVar[str] = "untrusted_draft"
@@ -147,15 +151,11 @@ class DraftEvidenceEnvelope:
         raise TypeError("DraftEvidenceEnvelope is final")
 
     def __post_init__(self) -> None:
-        """Validate the reviewed boundary and seal its exact creation-time evidence."""
-        if self._issuance_marker is not _NEW_ISSUANCE_MARKER:
-            raise ValueError("draft evidence changed after construction")
-        if self._creation_seal is not None:
-            raise ValueError("draft evidence changed after construction")
+        """Generate issuance identity/time, validate scope, and snapshot accidental-change evidence."""
+        object.__setattr__(self, "draft_evidence_reference", _new_draft_evidence_reference())
+        object.__setattr__(self, "recorded_at", _system_recorded_at())
         self._validate_fields()
-        payload_json = self._canonical_payload_json()
-        object.__setattr__(self, "_creation_seal", _seal(payload_json))
-        object.__setattr__(self, "_issuance_marker", _USED_ISSUANCE_MARKER)
+        object.__setattr__(self, "_creation_seal", _seal(self._canonical_payload_json()))
 
     def _validate_fields(self) -> None:
         """Fail closed on scope, provenance, actor-separation, and immutable-state evidence."""
@@ -169,6 +169,11 @@ class DraftEvidenceEnvelope:
             self.evidence_target_reference,
             "evidence_target_reference",
             _ALLOWED_TARGET_PREFIXES,
+        )
+        _validate_reference(
+            self.draft_evidence_reference,
+            "draft_evidence_reference",
+            frozenset({"draft_evidence"}),
         )
         requester = _validate_actor_reference(self.requesting_actor_reference, "requesting_actor_reference")
         reviewer = _validate_actor_reference(self.reviewing_actor_reference, "reviewing_actor_reference")
@@ -198,6 +203,7 @@ class DraftEvidenceEnvelope:
             "api_operation": self.api_operation,
             "contextual_orchestrator_revision": self.contextual_orchestrator_revision,
             "decision_authority_state": self.DECISION_AUTHORITY_STATE,
+            "draft_evidence_reference": self.draft_evidence_reference,
             "draft_use_code": self.draft_use_code,
             "evidence_target_reference": self.evidence_target_reference,
             "evidence_version": self.evidence_version,
@@ -215,20 +221,18 @@ class DraftEvidenceEnvelope:
         }
 
     def _canonical_payload_json(self) -> str:
-        """Serialize the live payload deterministically without consulting the creation seal."""
+        """Serialize the live payload deterministically without consulting the creation snapshot."""
         return json.dumps(self._payload(), sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
     def _assert_integrity(self) -> None:
-        """Reject any post-construction rewrite before evidence can leave the boundary."""
+        """Reject accidental post-construction rewrites before evidence leaves the boundary."""
         self._validate_fields()
-        if self._issuance_marker is not _USED_ISSUANCE_MARKER:
-            raise ValueError("draft evidence changed after construction")
         seal = self._creation_seal
         if type(seal) is not str or not hmac.compare_digest(seal, _seal(self._canonical_payload_json())):
             raise ValueError("draft evidence changed after construction")
 
     def canonical_document(self) -> dict[str, object]:
-        """Return a fresh canonical document only while creation-time evidence remains intact."""
+        """Return a fresh canonical document only while the issuance snapshot remains intact."""
         self._assert_integrity()
         return self._payload()
 
