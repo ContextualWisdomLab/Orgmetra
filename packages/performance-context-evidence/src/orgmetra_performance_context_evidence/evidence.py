@@ -36,10 +36,24 @@ _NEXT_ACTION = (
     "rating or employment decision from this packet."
 )
 
+
+class _LiveReferenceBinding:
+    """Keep one reviewed digest alive while any idempotent packet instance remains live."""
+
+    __slots__ = ("creation_digest", "__weakref__")
+
+    def __init__(self, creation_digest: str) -> None:
+        """Bind one tenant-qualified packet reference to its reviewed creation digest."""
+        self.creation_digest = creation_digest
+
+
 _REGISTRY_LOCK = RLock()
 _CREATION_DIGESTS: WeakKeyDictionary[PerformanceContextEvidencePacket, str] = WeakKeyDictionary()
+_PACKET_BINDINGS: WeakKeyDictionary[
+    PerformanceContextEvidencePacket, _LiveReferenceBinding
+] = WeakKeyDictionary()
 _LIVE_REFERENCES: WeakValueDictionary[
-    tuple[str, str], PerformanceContextEvidencePacket
+    tuple[str, str], _LiveReferenceBinding
 ] = WeakValueDictionary()
 
 
@@ -298,11 +312,14 @@ class PerformanceContextEvidencePacket:
         creation_digest = sha256(payload_json.encode("utf-8")).hexdigest()
         key = (self.tenant_record_id, self.performance_context_evidence_reference)
         with _REGISTRY_LOCK:
-            existing = _LIVE_REFERENCES.get(key)
-            if existing is not None and _CREATION_DIGESTS.get(existing) != creation_digest:
+            binding = _LIVE_REFERENCES.get(key)
+            if binding is not None and binding.creation_digest != creation_digest:
                 raise ValueError("performance context evidence reference is bound to different live evidence")
+            if binding is None:
+                binding = _LiveReferenceBinding(creation_digest)
+                _LIVE_REFERENCES[key] = binding
             _CREATION_DIGESTS[self] = creation_digest
-            _LIVE_REFERENCES[key] = self
+            _PACKET_BINDINGS[self] = binding
 
     def canonical_json(self) -> str:
         """Return one verified deterministic snapshot of the reviewed audit evidence."""
