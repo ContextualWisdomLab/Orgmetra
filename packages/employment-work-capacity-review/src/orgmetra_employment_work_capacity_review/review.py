@@ -103,6 +103,8 @@ def _validate_capacity_ratio(value: object, field_name: str) -> Decimal:
         raise ValueError(f"{field_name} must be an exact Decimal")
     if not value.is_finite() or value < _ZERO_CAPACITY or value > _ONE_CAPACITY:
         raise ValueError(f"{field_name} must be finite and between 0.0000 and 1.0000")
+    if value.is_zero() and value.is_signed():
+        raise ValueError(f"{field_name} must not use signed negative zero")
     if value.as_tuple().exponent != -4:
         raise ValueError(f"{field_name} must use exactly four decimal places")
     return value

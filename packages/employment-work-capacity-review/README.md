@@ -7,7 +7,7 @@ It is deliberately separate from Assignment allocation. Assignment says where an
 ## What the packet binds
 
 - the tenant and authoritative Employment reference;
-- current and proposed capacity ratios, both as exact four-decimal `Decimal` values from `0.0000` through `1.0000`;
+- current and proposed capacity ratios, both as exact four-decimal `Decimal` values from `0.0000` through `1.0000`; signed negative zero is rejected so zero has one canonical evidence representation;
 - the business-effective date;
 - SHA-256 evidence for reviewed employment terms, the enterprise capacity policy/definition, and reviewer identity resolution;
 - distinct requester and reviewer correlations;
@@ -22,6 +22,6 @@ Before applying a reviewed change, the authoritative Orgmetra host must re-resol
 
 ## Evidence integrity
 
-Trust-bearing text and numeric values require exact built-in runtime types before parsing or comparison. Operational HRIS identifiers reject Nil/Max UUID sentinels without forcing a leaf UUID version; packet-owned actor correlations use opaque UUIDv4 references. Canonical evidence is deterministic and routine `repr()` is fully redacted. A process-local weak issuance registry detects post-issuance field mutation before canonical export; it is defense in depth, not a durable signature or authorization system.
+Trust-bearing text and numeric values require exact built-in runtime types before parsing or comparison. Operational HRIS identifiers reject Nil/Max UUID sentinels without forcing a leaf UUID version; packet-owned actor correlations use opaque UUIDv4 references. Capacity ratios are finite, bounded, exact four-decimal non-negative representations with signed negative zero rejected. Canonical evidence is deterministic and routine `repr()` is fully redacted. A process-local weak issuance registry detects post-issuance field mutation before canonical export; it is defense in depth, not a durable signature or authorization system.
 
 The package's dedicated GitHub workflow builds the exact wheel, binds installation to the wheel SHA-256, executes the installed artifact, requires exact 100% owned statement/branch coverage, and requires a clean checkout.
