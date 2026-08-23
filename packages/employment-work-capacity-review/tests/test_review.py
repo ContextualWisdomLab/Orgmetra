@@ -22,7 +22,6 @@ DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
 REVIEWED = datetime(2026, 8, 23, 0, 0, tzinfo=timezone.utc)
-RECORDED = datetime(2026, 8, 23, 0, 1, tzinfo=timezone.utc)
 
 
 def kwargs() -> dict[str, object]:
@@ -41,7 +40,6 @@ def kwargs() -> dict[str, object]:
         "reason_code": "employee_agreed_change",
         "evidence_version": 1,
         "reviewed_at": REVIEWED,
-        "recorded_at": RECORDED,
     }
 
 
@@ -61,7 +59,8 @@ def test_canonical_evidence_is_deterministic_redacted_and_non_authoritative() ->
     assert document["review_state"] == "reviewed_for_authoritative_resolution"
     assert document["decision_authority"] == "not_authorized_to_change_employment_or_compensation"
     assert document["human_review_required"] is True
-    assert document["recorded_at"] == "2026-08-23T00:01:00Z"
+    recorded = datetime.fromisoformat(str(document["recorded_at"]).replace("Z", "+00:00"))
+    assert recorded >= REVIEWED
     assert json.loads(packet.canonical_json()) == document
     assert packet.sha256_digest() == hashlib.sha256(packet.canonical_json().encode()).hexdigest()
     assert repr(packet) == "EmploymentWorkCapacityReviewPacket(<redacted>)"
@@ -99,7 +98,6 @@ def test_all_reviewed_reason_codes_are_supported() -> None:
         ("evidence_version", 0, "integer"),
         ("evidence_version", 2_147_483_648, "integer"),
         ("reviewed_at", datetime(2026, 8, 23), "exact built-in UTC datetime"),
-        ("recorded_at", datetime(2026, 8, 23, 0, 1, tzinfo=timezone(timedelta(hours=9))), "exact built-in UTC datetime"),
     ],
 )
 def test_invalid_governance_inputs_fail_closed(field: str, value: object, message: str) -> None:
@@ -123,15 +121,13 @@ def test_capacity_ratio_shape_fails_closed(field: str, value: object, message: s
         build(**{field: value})
 
 
-def test_noop_actor_overlap_reverse_chronology_and_future_system_time_fail_closed() -> None:
+def test_noop_actor_overlap_and_future_review_fail_closed() -> None:
     with pytest.raises(ValueError, match="must differ"):
         build(proposed_capacity_ratio=Decimal("1.0000"))
     with pytest.raises(ValueError, match="different actor"):
         build(reviewer_actor_reference=REQUESTER)
     with pytest.raises(ValueError, match="cannot precede"):
-        build(recorded_at=REVIEWED - timedelta(seconds=1))
-    with pytest.raises(ValueError, match="future system-recorded"):
-        build(recorded_at=datetime.now(timezone.utc) + timedelta(days=1))
+        build(reviewed_at=datetime.now(timezone.utc) + timedelta(days=1))
 
 
 @pytest.mark.parametrize(
@@ -181,5 +177,6 @@ def test_post_issuance_mutation_fails_closed_and_document_is_detached() -> None:
 def test_replace_creates_new_non_authoritative_evidence_with_new_digest() -> None:
     packet = build()
     changed = replace(packet, proposed_capacity_ratio=Decimal("0.6000"))
+    assert changed.recorded_at >= packet.recorded_at
     assert changed.sha256_digest() != packet.sha256_digest()
     assert changed.canonical_document()["decision_authority"] == "not_authorized_to_change_employment_or_compensation"

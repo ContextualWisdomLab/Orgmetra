@@ -9,7 +9,7 @@ bitemporal mutation and immutable audit/outbox write.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from hashlib import sha256
@@ -139,6 +139,11 @@ def _validate_evidence_version(value: object) -> int:
     return value
 
 
+def _system_recorded_utc() -> datetime:
+    """Return the system-owned UTC issuance instant for this evidence object."""
+    return datetime.now(timezone.utc)
+
+
 def _canonical_timestamp(value: datetime) -> str:
     """Render a validated UTC timestamp as deterministic RFC 3339 text."""
     return value.isoformat().replace("+00:00", "Z")
@@ -166,7 +171,7 @@ class EmploymentWorkCapacityReviewPacket:
     reason_code: str
     evidence_version: int
     reviewed_at: datetime
-    recorded_at: datetime
+    recorded_at: datetime = field(init=False, default_factory=_system_recorded_utc)
     purpose_code: str = _PURPOSE_CODE
     review_state: str = _REVIEW_STATE
     decision_authority: str = _DECISION_AUTHORITY
@@ -215,8 +220,6 @@ class EmploymentWorkCapacityReviewPacket:
         recorded_at = _validate_utc_timestamp(self.recorded_at, "recorded_at")
         if recorded_at < reviewed_at:
             raise ValueError("recorded_at cannot precede reviewed_at")
-        if recorded_at > datetime.now(timezone.utc):
-            raise ValueError("recorded_at cannot be future system-recorded time")
         if type(self.purpose_code) is not str or self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain employment_work_capacity_review")
         if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
@@ -304,9 +307,8 @@ def build_employment_work_capacity_review_packet(
     reason_code: str,
     evidence_version: int,
     reviewed_at: datetime,
-    recorded_at: datetime,
 ) -> EmploymentWorkCapacityReviewPacket:
-    """Build one non-authoritative human-reviewed Employment work-capacity proposal."""
+    """Build one non-authoritative review with Orgmetra-owned system-recorded time."""
     return EmploymentWorkCapacityReviewPacket(
         tenant_record_id=tenant_record_id,
         employment_record_reference=employment_record_reference,
@@ -321,5 +323,4 @@ def build_employment_work_capacity_review_packet(
         reason_code=reason_code,
         evidence_version=evidence_version,
         reviewed_at=reviewed_at,
-        recorded_at=recorded_at,
     )

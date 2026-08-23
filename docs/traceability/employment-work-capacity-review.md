@@ -13,7 +13,7 @@
 | Keep Employment capacity distinct from Assignment allocation | `EmploymentWorkCapacityReviewPacket.current_capacity_ratio` / `proposed_capacity_ratio` | canonical evidence tests require both ratios and no Assignment mutation authority |
 | Preserve authoritative HRIS identifier ownership | canonical non-sentinel tenant UUID and `employment_record:<uuid>` reference without leaf UUID-version restriction | malformed/Nil/Max/wrong-namespace regressions |
 | Bind reviewed capacity values deterministically | exact built-in `Decimal`, finite `[0.0000, 1.0000]`, exactly four decimal places, signed negative zero rejected | type, range, NaN, signed-zero, scale and no-op regressions |
-| Preserve business time and system-recorded time separately | exact `effective_on`, `reviewed_at`, `recorded_at`; `recorded_at >= reviewed_at` and not future-dated at issuance | date/timezone/chronology/future-time regressions |
+| Preserve business, review, and system-recorded time separately | exact `effective_on`; exact UTC `reviewed_at`; `recorded_at` generated inside Orgmetra at issuance and required to be no earlier than review | date/timezone/future-review and builder-ownership regressions |
 | Require accountable human review | distinct requester/reviewer UUIDv4 correlations plus reviewer identity digest and fixed human-review state | actor-overlap, fixed-state and identity-evidence regressions |
 | Bind exact reviewed evidence | lowercase SHA-256 digests for employment terms, capacity policy/definition and reviewer identity resolution | malformed/non-text digest regressions |
 | Minimize durable evidence | controlled reason vocabulary; no name/email/phone/salary/rating/free-form text/prompt/model output | canonical-evidence privacy assertions and redacted `repr()` |

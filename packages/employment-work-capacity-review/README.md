@@ -12,7 +12,8 @@ It is deliberately separate from Assignment allocation. Assignment says where an
 - SHA-256 evidence for reviewed employment terms, the enterprise capacity policy/definition, and reviewer identity resolution;
 - distinct requester and reviewer correlations;
 - one controlled, non-sensitive reason code;
-- evidence version, human review time, and a later-or-equal system-recorded UTC time that cannot be future-dated at issuance.
+- evidence version and human review time;
+- an Orgmetra-generated system-recorded UTC issuance time. Callers cannot supply or backdate `recorded_at`.
 
 ## What it does not do
 
@@ -22,6 +23,6 @@ Before applying a reviewed change, the authoritative Orgmetra host must re-resol
 
 ## Evidence integrity
 
-Trust-bearing text and numeric values require exact built-in runtime types before parsing or comparison. Operational HRIS identifiers reject Nil/Max UUID sentinels without forcing a leaf UUID version; packet-owned actor correlations use opaque UUIDv4 references. Capacity ratios are finite, bounded, exact four-decimal non-negative representations with signed negative zero rejected. `reviewed_at` and `recorded_at` are exact built-in UTC instants; system-recorded evidence cannot precede human review or be authored in the future. Canonical evidence is deterministic and routine `repr()` is fully redacted. A process-local weak issuance registry detects post-issuance field mutation before canonical export; it is defense in depth, not a durable signature or authorization system.
+Trust-bearing text and numeric values require exact built-in runtime types before parsing or comparison. Operational HRIS identifiers reject Nil/Max UUID sentinels without forcing a leaf UUID version; packet-owned actor correlations use opaque UUIDv4 references. Capacity ratios are finite, bounded, exact four-decimal non-negative representations with signed negative zero rejected. `reviewed_at` is caller-supplied human-review time, while `recorded_at` is created inside the Orgmetra constructor from the built-in UTC clock and must not precede that review. Canonical evidence is deterministic and routine `repr()` is fully redacted. A process-local weak issuance registry detects post-issuance field mutation before canonical export; it is defense in depth, not a durable signature or authorization system.
 
 The package's dedicated GitHub workflow builds the exact wheel, binds installation to the wheel SHA-256, executes the installed artifact, requires exact 100% owned statement/branch coverage, and requires a clean checkout.
