@@ -110,6 +110,28 @@ INSERT INTO employment_base_compensation_version (
 SQL
 
 expect_failure \
+    "anchor closure with an open compensation version" \
+    "cannot close base-compensation anchor while a recorded version remains open" \
+    "BEGIN; UPDATE employment_base_compensation_record SET recorded_to = pg_catalog.transaction_timestamp() WHERE employment_base_compensation_record_id = '30000000-0000-7000-8000-000000000301'; SET CONSTRAINTS ALL IMMEDIATE; COMMIT;"
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+UPDATE employment_base_compensation_version
+SET recorded_to = pg_catalog.transaction_timestamp()
+WHERE employment_base_compensation_version_id = '30000000-0000-7000-8000-000000000401';
+UPDATE employment_base_compensation_record
+SET recorded_to = pg_catalog.transaction_timestamp()
+WHERE employment_base_compensation_record_id = '30000000-0000-7000-8000-000000000301';
+SET CONSTRAINTS ALL IMMEDIATE;
+COMMIT;
+SQL
+
+expect_failure \
+    "version insert against a closed compensation anchor" \
+    "base-compensation version requires an open compensation anchor" \
+    "INSERT INTO employment_base_compensation_version (tenant_record_id, employment_base_compensation_version_id, employment_base_compensation_record_id, base_compensation_amount, currency_code, pay_rate_period_code, effective_from) VALUES ('30000000-0000-7000-8000-000000000001', '30000000-0000-7000-8000-000000000403', '30000000-0000-7000-8000-000000000301', 101000.0000, 'USD', 'year', DATE '2027-01-01');"
+
+expect_failure \
     "compensation version TRUNCATE" \
     "employment base-compensation history cannot be truncated" \
     "TRUNCATE TABLE employment_base_compensation_version;"
