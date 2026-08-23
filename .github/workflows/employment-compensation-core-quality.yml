@@ -16,6 +16,7 @@ on:
       - "docs/ERD.md"
       - "docs/TRACEABILITY.md"
       - "CHANGELOG.md"
+      - "manifest.json"
       - ".github/workflows/employment-compensation-core-quality.yml"
   workflow_dispatch:
 
