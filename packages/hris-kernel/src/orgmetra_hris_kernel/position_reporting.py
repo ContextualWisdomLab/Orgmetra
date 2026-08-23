@@ -46,7 +46,7 @@ def _freeze_known_at(value: datetime) -> datetime:
         )
     try:
         offset = value.utcoffset()
-    except Exception as exc:  # pragma: no cover - exercised through the normalized failure contract
+    except Exception as exc:
         raise PositionReportingHierarchyError(
             "known_at timezone could not be resolved safely.",
             next_action="Convert the knowledge cutoff to a fixed UTC timestamp before rebuilding the chart.",
