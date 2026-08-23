@@ -126,14 +126,24 @@ def test_rejects_invalid_authoritative_scope_identifiers(field: str, value: obje
         ("job_analysis_snapshot_digest", "A" * 64),
         ("job_evaluation_method_digest", "abc"),
         ("grade_band_definition_digest", "g" * 64),
-        ("job_analysis_snapshot_digest", 7),
     ],
 )
 def test_rejects_noncanonical_sha256_evidence(field: str, value: object) -> None:
-    """All evidence digests must be exact lower-case SHA-256 hexadecimal text."""
+    """Malformed text evidence digests must fail the lower-case SHA-256 shape check."""
     data = values()
     data[field] = value
     with pytest.raises(ValueError, match="SHA-256"):
+        JobGradeDesignReviewPacket(**data)
+
+
+def test_rejects_non_text_sha256_evidence_before_digest_shape_validation() -> None:
+    """Non-text digest evidence must fail the exact runtime-type boundary first."""
+    data = values()
+    data["job_analysis_snapshot_digest"] = 7
+    with pytest.raises(
+        ValueError,
+        match="job_analysis_snapshot_digest must be an exact string",
+    ):
         JobGradeDesignReviewPacket(**data)
 
 
