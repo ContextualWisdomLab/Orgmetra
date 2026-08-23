@@ -15,6 +15,7 @@ from orgmetra_organization_hierarchy_change_review import (
 TENANT_UUID7 = "0195c23d-9f00-7000-8000-000000000001"
 CHANGE_UUID4 = "11111111-1111-4111-8111-111111111111"
 SECOND_CHANGE_UUID4 = "44444444-4444-4444-8444-444444444444"
+THIRD_CHANGE_UUID4 = "55555555-5555-4555-8555-555555555555"
 UNIT_UUID7 = "0195c23d-9f00-7000-8000-000000000002"
 CURRENT_PARENT_UUID7 = "0195c23d-9f00-7000-8000-000000000003"
 PROPOSED_PARENT_UUID7 = "0195c23d-9f00-7000-8000-000000000004"
@@ -128,7 +129,10 @@ def test_rejects_ambiguous_hierarchy_or_actor_relationships(overrides: dict[str,
 
 def test_allows_attach_and_detach_root_transitions() -> None:
     """Represent root attachment or detachment without inventing a sentinel parent."""
-    attached = build(current_parent_organization_unit_reference=None)
+    attached = build(
+        organization_hierarchy_change_reference=f"organization_hierarchy_change:{THIRD_CHANGE_UUID4}",
+        current_parent_organization_unit_reference=None,
+    )
     detached = build(
         organization_hierarchy_change_reference=f"organization_hierarchy_change:{SECOND_CHANGE_UUID4}",
         proposed_parent_organization_unit_reference=None,
