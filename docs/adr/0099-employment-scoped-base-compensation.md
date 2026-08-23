@@ -21,6 +21,8 @@ Each version stores:
 
 A GiST exclusion constraint prevents two versions for the same compensation anchor from being simultaneously valid in both effective and system-recorded time. Existing bitemporal history guards permit only closure of an open recorded interval rather than in-place rewriting. Tenant-qualified foreign keys bind compensation to the correct Employment, and forced row-level security applies independently to both new relations.
 
+System-recorded `recorded_from` is not caller-authored. Both the compensation anchor and version default it to PostgreSQL `transaction_timestamp()` and a BEFORE INSERT trigger rejects a supplied value that differs from the current transaction timestamp. PostgreSQL defines that function as the transaction start time and keeps it stable within one transaction, giving all compensation facts committed by one transaction the same system-knowledge coordinate. Business-effective dates remain independently caller-supplied governed facts.
+
 The legacy person-scoped `compensation_record` remains readable for historical compatibility but rejects new inserts. Existing rows are not automatically converted because protected main does not contain enough information to infer the Employment or pay-rate period without fabricating provenance. A later governed migration may map a legacy row only when authoritative source evidence supplies those missing facts.
 
 ## Currency boundary
@@ -29,10 +31,10 @@ ISO 4217:2015 remains current and specifies the structure of three-letter alphab
 
 ## Consequences
 
-Concurrent employments can carry independent base-compensation truth without conflating one Person's employment terms. Historical corrections remain reconstructable across business time and system-recorded time. The model is deliberately limited to base compensation: bonus, equity, allowance, payroll calculation, taxation, and total-rewards valuation are not implied by these relations.
+Concurrent employments can carry independent base-compensation truth without conflating one Person's employment terms. Historical corrections remain reconstructable across business time and system-recorded time, while a client cannot backdate the system-knowledge start of a newly inserted compensation fact. The model is deliberately limited to base compensation: bonus, equity, allowance, payroll calculation, taxation, and total-rewards valuation are not implied by these relations.
 
 PR #48 remains the separate human review/evidence boundary for proposed compensation changes; this ADR does not duplicate that packet or grant mutation authority.
 
 ## Verification
 
-`tests/test_employment_compensation_core_postgres.sh` proves concurrent-employment separation, tenant-qualified references, legacy-write rejection, controlled amount/currency/rate-period shape, bitemporal non-overlap, correction-not-rewrite, and forced-RLS visibility. `.github/workflows/employment-compensation-core-quality.yml` runs that contract against the exact pull-request head.
+`tests/test_employment_compensation_core_postgres.sh` proves concurrent-employment separation, tenant-qualified references, legacy-write rejection, database-authored system time, controlled amount/currency/rate-period shape, bitemporal non-overlap, correction-not-rewrite, and forced-RLS visibility. `.github/workflows/employment-compensation-core-quality.yml` runs that contract against the exact pull-request head.
