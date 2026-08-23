@@ -35,7 +35,9 @@ HRIS-owned tenant and Organization Unit identifiers accept canonical non-sentine
 
 Caller-defined subclasses of trust-bearing strings, integers, dates, or datetimes are rejected before equality, ordering, membership, parsing, or canonical emission can depend on caller polymorphism. Canonical evidence is deterministic and the routine `repr` is redacted.
 
-The in-process creation seal is defense in depth against post-construction mutation; it is not durable database uniqueness, distributed authorization, or a substitute for the authoritative audit/outbox transaction.
+A tenant-qualified `organization_hierarchy_change_reference` is also bound to one evidence digest while any idempotent packet carrying that reference remains alive in the process. An exact duplicate is allowed; a different reason, parent, timestamp, digest, actor, or other trust-bearing value under the same still-live reference fails closed. This prevents `dataclasses.replace()` or a second constructor call from silently minting conflicting live review evidence under one packet correlation.
+
+The in-process creation seal and live-reference binding are defense in depth only. They are not durable database uniqueness, distributed authorization, restart-stable identity, or a substitute for the authoritative audit/outbox transaction. Durable persistence must enforce tenant-qualified uniqueness and immutable evidence independently.
 
 ## Quality contract
 
