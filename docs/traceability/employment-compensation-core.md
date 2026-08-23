@@ -5,7 +5,7 @@
 | State | Contract |
 |---|---|
 | Protected main | `compensation_record` is a legacy Person-scoped bitemporal relation with amount and currency but no Employment binding or pay-rate period. |
-| Active PR #99 | `employment_base_compensation_record` binds one base-compensation anchor to one Employment; `employment_base_compensation_version` carries non-overlapping bitemporal amount/currency/rate-period truth; new legacy inserts fail closed; both system-recorded interval endpoints are database-authored. |
+| Active PR #99 | `employment_base_compensation_record` binds one base-compensation anchor to one Employment; `employment_base_compensation_version` carries non-overlapping bitemporal amount/currency/rate-period truth; new legacy inserts fail closed; both system-recorded interval endpoints are database-authored and new rows cannot arrive pre-closed. |
 | Planned | Governed migration of historical legacy rows when an authoritative source supplies both Employment identity and pay-rate-period evidence; authoritative current-currency catalog validation; governed mutation/API materialization. |
 | Out of scope | Payroll calculation, taxes, bonus/equity/allowances, total-rewards valuation, foreign-service table access, autonomous compensation decisions. |
 
@@ -16,12 +16,13 @@
 | Keep Person and Employment separate | New compensation anchor references `employment_record`, not `person_record`. |
 | Support concurrent employments | PostgreSQL regression creates two Employment records for one Person and proves two independent compensation anchors/versions. |
 | Preserve business and system time | Version rows carry independent `effective_*` and `recorded_*` intervals with a two-dimensional GiST exclusion. |
-| Keep system time authoritative | Both new compensation relations default `recorded_from` to PostgreSQL transaction time and reject a caller-supplied value that differs from the current transaction timestamp. BEFORE UPDATE close guards likewise reject caller-selected `recorded_to`; regressions prove arbitrary backdating and future/manual closure fail closed while database transaction-time closure succeeds. |
+| Keep system time authoritative | Both new compensation relations default `recorded_from` to PostgreSQL transaction time, reject a caller-supplied start that differs from the current transaction timestamp, and reject non-NULL `recorded_to` on INSERT. BEFORE UPDATE close guards likewise reject caller-selected `recorded_to`; regressions prove arbitrary backdating, pre-closed insertion, and future/manual closure fail closed while database transaction-time closure succeeds. |
 | Prevent history rewriting | Existing `protect_bitemporal_history()` is attached to both new relations; only closing an open `recorded_to` is accepted, and the compensation-specific close guard fixes the closure coordinate to database transaction time. |
-| Tenant/context isolation | Composite tenant-qualified FK plus forced RLS policies on both relations; NOBYPASSRLS regression proves missing/cross-tenant contexts cannot observe Alpha rows. |
+| Tenant/context isolation | Composite tenant-qualified FK plus forced RLS policies on both relations; NOBYPASSRLS regressions independently prove anchor and version relations expose zero rows without context, only Alpha rows under Alpha context, and zero Alpha rows under Beta context. |
 | Avoid ambiguous compensation facts | Base amount has explicit currency transport code and pay-rate period. New Person-scoped legacy inserts are rejected. |
 | Avoid fabricated migration provenance | No automatic legacy backfill occurs because old rows lack Employment and pay-rate-period evidence. |
 | Keep review and mutation authority separate | PR #48's compensation-change review packet remains a separate active lane; this slice adds only authoritative storage semantics. |
+| Keep production database boundaries beginner-readable | Migration 0018 publishes `COMMENT ON FUNCTION` descriptions for the insert-time system clock guard, history-closure clock guard, and legacy-write rejection function. |
 
 ## Test-first evidence
 
@@ -35,6 +36,10 @@
 - Manifest provenance repair after those changes: `5d076e6e88d8e3b593390dd0866943dbaa9dfbf5`.
 - System-time closure regression: `bdd7b1274ba70ec29629ffbfbabb36bee1078348`. Its workflow was superseded by the immediate repair and is not claimed as terminal RED evidence; the pre-repair source used the generic history guard, which accepted any `recorded_to > recorded_from`.
 - System-time closure root repair: `fa6f8ab9693e40948b9c62a269da41d2ab2e5769`. Employment Compensation Core Quality run `32639870101`, job `97195200896`, checked out that exact head and proved a caller-selected future `recorded_to` fails while `pg_catalog.transaction_timestamp()` closure succeeds; the full focused contract and clean-checkout step were GREEN.
+- Canonical-doc regression `b34d03bf25699b0d1a12f91c5f78b9816b75b8b3` strengthened the focused gate so migration-backed compensation truth must appear in `docs/DATA_MODEL.md`, `docs/ERD.md`, `docs/TRACEABILITY.md`, and `CHANGELOG.md`. Its hosted workflow was later cancelled as superseded, so it is not terminal RED evidence, but its exact job reached the new assertion and failed specifically because the canonical docs omitted both compensation tables.
+- Canonical-doc repair commits `085c69ce8e36296716c26b1da1f40589036bc36d`, `825ce793fa8d9403341d1508effb2c3cdb3e919f`, `dbb101514c168406b2ca21d6635a17b3a0fa58bd`, and `12bd2ccdfbbe358c8fc0293b5b552a3c65892f0a` align the data model, ERD, product traceability and changelog.
+- Pre-closed system-evidence/RLS regression `7d5b8bc1a44f1f7690d0600062afc3570871d8ee` requires both anchor and version INSERT paths to reject caller-supplied `recorded_to` and independently exercises forced RLS on the version relation. The immediate root repair follows on the same canonical branch; any superseded or cancelled regression workflow remains non-passing evidence.
+- Pre-closed system-evidence root repair `e05fded09e04f6f37df95c65c7f5dbb34556a1db` makes the shared INSERT system-time guard reject non-NULL `recorded_to` for both relations and adds beginner-readable public database-function comments without weakening the existing update-time guard.
 
 Current-head hosted evidence must be refreshed after every later code, documentation, manifest, or gate change; predecessor runs are not merge evidence.
 
