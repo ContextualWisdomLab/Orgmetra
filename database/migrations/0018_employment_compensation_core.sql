@@ -72,6 +72,10 @@ RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    IF NEW.recorded_to IS NOT NULL THEN
+        RAISE EXCEPTION 'base-compensation recorded_to must be NULL on insert'
+            USING ERRCODE = '22023';
+    END IF;
     IF NEW.recorded_from IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
         RAISE EXCEPTION 'base-compensation recorded_from must equal the current transaction timestamp'
             USING ERRCODE = '22023';
@@ -79,6 +83,9 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+COMMENT ON FUNCTION enforce_employment_base_compensation_recorded_from() IS
+    'Guards new base-compensation anchors and versions: rejects caller-preclosed evidence and requires recorded_from to equal the current PostgreSQL transaction timestamp.';
 
 CREATE TRIGGER employment_base_compensation_record_system_time_guard
 BEFORE INSERT ON employment_base_compensation_record
@@ -103,6 +110,9 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+COMMENT ON FUNCTION enforce_employment_base_compensation_recorded_to() IS
+    'Guards base-compensation history closure: a changed recorded_to is accepted only when it equals the current PostgreSQL transaction timestamp.';
 
 CREATE TRIGGER employment_base_compensation_record_system_time_close_guard
 BEFORE UPDATE ON employment_base_compensation_record
@@ -133,6 +143,9 @@ BEGIN
         USING ERRCODE = '55000';
 END;
 $$;
+
+COMMENT ON FUNCTION reject_legacy_compensation_insert() IS
+    'Rejects every new Person-scoped legacy compensation_record insert so new base-compensation truth must use the Employment-scoped relations.';
 
 CREATE TRIGGER compensation_record_legacy_insert_guard
 BEFORE INSERT ON compensation_record
