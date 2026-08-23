@@ -98,6 +98,7 @@ REQUIRED = [
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
     "tests/test_employment_compensation_core_postgres.sh",
+    "tests/test_employment_compensation_review_regressions_postgres.sh",
     "tests/validate_repository.py",
 ]
 
