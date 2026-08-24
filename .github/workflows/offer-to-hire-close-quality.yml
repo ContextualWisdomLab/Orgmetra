@@ -1,0 +1,65 @@
+name: Offer To Hire Close Quality
+
+on:
+  pull_request:
+    paths:
+      - "services/people-api/src/orgmetra_people_api/offer_close.py"
+      - "services/people-api/src/orgmetra_people_api/hire.py"
+      - "services/people-api/src/orgmetra_people_api/auth.py"
+      - "services/people-api/tests/test_offer_to_hire_close.py"
+      - "packages/candidate-offer-response/**"
+      - "packages/keyverse-adapter/**"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/offer-to-hire-close-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offer-to-hire-close-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Offer acceptance to confirmed-hire contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up exact Python runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Compile governed boundary
+        run: |
+          python -m compileall -q \
+            services/people-api/src \
+            packages/keyverse-adapter/src \
+            packages/candidate-offer-response/src \
+            services/people-api/tests/test_offer_to_hire_close.py
+      - name: Test exact offer-to-hire boundary with 100% owned coverage
+        env:
+          PYTHONPATH: services/people-api/src:packages/keyverse-adapter/src:packages/candidate-offer-response/src:packages/hris-kernel/src
+          COVERAGE_FILE: /tmp/orgmetra-offer-to-hire-close.coverage
+        run: >-
+          python -m pytest
+          -o 'addopts=--cov=orgmetra_people_api.offer_close --cov-branch --cov-report=term-missing --cov-fail-under=100'
+          services/people-api/tests/test_offer_to_hire_close.py
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
