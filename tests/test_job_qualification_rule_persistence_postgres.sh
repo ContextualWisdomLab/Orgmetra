@@ -21,12 +21,8 @@ OTHER_ANALYSIS_ID="00000000-0000-7000-8000-000000000082"
 DRAFT_ANALYSIS_ID="00000000-0000-7000-8000-000000000083"
 RULE_ID="00000000-0000-7000-8000-000000000091"
 RULE_VERSION_ID="00000000-0000-7000-8000-000000000092"
-OTHER_RULE_ID="00000000-0000-7000-8000-000000000093"
-OTHER_RULE_VERSION_ID="00000000-0000-7000-8000-000000000094"
 AUDIT_ID="00000000-0000-4000-8000-000000000095"
 OUTBOX_ID="00000000-0000-4000-8000-000000000096"
-OTHER_AUDIT_ID="00000000-0000-4000-8000-000000000097"
-OTHER_OUTBOX_ID="00000000-0000-4000-8000-000000000098"
 SNAPSHOT_DIGEST="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 OTHER_SNAPSHOT_DIGEST="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 RULE_DIGEST="dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
@@ -227,11 +223,6 @@ if [[ ${truncate_status} -eq 0 || "${truncate_output}" != *"cannot be truncated"
     echo "qualification-rule evidence could be truncated: ${truncate_output}" >&2
     exit 1
 fi
-
-with_tenant "${OTHER_TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
-INSERT INTO job_profile (tenant_record_id, job_profile_id)
-VALUES ('${OTHER_TENANT_ID}', '${JOB_ID}');
-SQL
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
