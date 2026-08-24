@@ -18,7 +18,7 @@ import json
 import re
 from threading import RLock
 from uuid import UUID
-from weakref import WeakKeyDictionary
+from weakref import ref
 
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(
@@ -50,7 +50,7 @@ _NEXT_ACTION = (
     "People boundary; downstream actions must use published owner contracts."
 )
 _ISSUANCE_LOCK = RLock()
-_ISSUANCE_DIGESTS: WeakKeyDictionary[object, str] = WeakKeyDictionary()
+_ISSUANCE_DIGESTS: dict[int, tuple[object, str]] = {}
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -115,22 +115,32 @@ def _canonical_json(payload: dict[str, object]) -> str:
 
 
 def _seal_issuance(packet: object, canonical: str) -> None:
-    """Bind one live packet instance to its creation-time canonical evidence digest."""
+    """Bind one live packet identity to its creation-time canonical evidence digest."""
     digest = sha256(canonical.encode("utf-8")).hexdigest()
+    packet_id = id(packet)
+
+    def release_issuance(_packet_reference: object) -> None:
+        """Release the process-local seal as soon as its packet is collected."""
+        with _ISSUANCE_LOCK:
+            _ISSUANCE_DIGESTS.pop(packet_id, None)
+
+    packet_reference = ref(packet, release_issuance)
     with _ISSUANCE_LOCK:
-        _ISSUANCE_DIGESTS[packet] = digest
+        _ISSUANCE_DIGESTS[packet_id] = (packet_reference, digest)
 
 
 def _assert_issuance_integrity(packet: object, canonical: str) -> None:
     """Fail closed when a live or copied packet no longer matches issued evidence."""
     digest = sha256(canonical.encode("utf-8")).hexdigest()
     with _ISSUANCE_LOCK:
-        sealed_digest = _ISSUANCE_DIGESTS.get(packet)
-    if sealed_digest is None or sealed_digest != digest:
+        sealed = _ISSUANCE_DIGESTS.get(id(packet))
+    if sealed is None:
+        raise ValueError("employment leave review evidence integrity check failed")
+    if sealed[1] != digest:
         raise ValueError("employment leave review evidence integrity check failed")
 
 
-@dataclass(frozen=True, slots=True, repr=False, eq=False, weakref_slot=True)
+@dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class EmploymentLeaveReviewPacket:
     """Immutable leave-review evidence that cannot authorize mutation or execution."""
 
