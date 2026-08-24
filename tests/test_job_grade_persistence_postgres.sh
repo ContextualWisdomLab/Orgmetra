@@ -81,6 +81,7 @@ import json
 payload = {
     "band_code": "B2",
     "decision_authority": "not_authorized_to_assign_grade_or_compensation",
+    "evidence_version": 1,
     "grade_band_definition_digest": "${GRADE_DEFINITION_DIGEST}",
     "grade_code": "G5",
     "human_review_required": True,
@@ -227,7 +228,7 @@ INSERT INTO job_grade_assignment_version (
     '${TENANT_ID}', '00000000-0000-7000-8000-000000000098', '${ASSIGNMENT_ID}',
     '${GRADE_DEFINITION_ID}', '${OTHER_ANALYSIS_ID}', '${OTHER_SNAPSHOT_DIGEST}',
     'factor_evaluation_method', '${METHOD_DIGEST}', :'review_evidence', :'review_digest',
-    '${REQUESTER}', '${REVIEWER}', '${REASON_CODE}', 2,
+    '${REQUESTER}', '${REVIEWER}', '${REASON_CODE}', 1,
     TIMESTAMPTZ '${REVIEWED_AT}', TIMESTAMPTZ '${PACKET_RECORDED_AT}',
     DATE '2027-01-01', '${AUDIT_ID}'
 );" ; } 2>&1)"
