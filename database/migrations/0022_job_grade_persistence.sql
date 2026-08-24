@@ -100,7 +100,7 @@ CREATE TABLE job_grade_assignment_version (
     CONSTRAINT job_grade_assignment_method_code_check
         CHECK (
             octet_length(job_evaluation_method_code) BETWEEN 3 AND 64
-            AND job_evaluation_method_code ~ '^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$'
+            AND job_evaluation_method_code ~ '^[a-z][a-z0-9]*(_[a-z0-9]+)+$'
         ),
     CONSTRAINT job_grade_assignment_method_digest_check
         CHECK (job_evaluation_method_digest_sha256 ~ '^[0-9a-f]{64}$'),
@@ -133,7 +133,7 @@ CREATE TABLE job_grade_assignment_version (
             'periodic_job_review'
         )),
     CONSTRAINT job_grade_assignment_evidence_version_check
-        CHECK (evidence_version BETWEEN 1 AND 2147483647),
+        CHECK (evidence_version = 1),
     CONSTRAINT job_grade_assignment_review_chronology_check
         CHECK (reviewed_at <= review_packet_recorded_at),
     CONSTRAINT job_grade_assignment_effective_period_check
@@ -373,11 +373,12 @@ BEGIN
     INTO review_key_count
     FROM pg_catalog.jsonb_object_keys(review_payload);
 
-    IF review_key_count <> 19
+    IF review_key_count <> 20
        OR NOT (
            review_payload ?& ARRAY[
                'band_code',
                'decision_authority',
+               'evidence_version',
                'grade_band_definition_digest',
                'grade_code',
                'human_review_required',
@@ -427,6 +428,7 @@ BEGIN
        OR review_payload ->> 'band_code' IS DISTINCT FROM definition_band_code
        OR review_payload ->> 'grade_band_definition_digest'
           IS DISTINCT FROM definition_digest
+       OR review_payload -> 'evidence_version' IS DISTINCT FROM to_jsonb(NEW.evidence_version)
        OR review_requester IS DISTINCT FROM NEW.requester_actor_reference
        OR review_reviewer IS DISTINCT FROM NEW.reviewer_actor_reference
        OR review_payload ->> 'purpose_code' IS DISTINCT FROM NEW.purpose_code
@@ -493,7 +495,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION enforce_job_grade_assignment_scope() IS
-    'Before persisting a Job-grade version, re-resolves its open Job anchor, immutable grade definition, same-Job validated Job Analysis snapshot, exact canonical review packet, reviewer/purpose/reason evidence, and immutable audit/outbox correlation. Persistence does not grant compensation or employment-decision authority.';
+    'Before persisting a Job-grade version, re-resolves its open Job anchor, immutable grade definition, same-Job validated Job Analysis snapshot, exact versioned canonical review packet, reviewer/purpose/reason evidence, and immutable audit/outbox correlation. Persistence does not grant compensation or employment-decision authority.';
 
 CREATE TRIGGER job_grade_assignment_version_scope_guard
 BEFORE INSERT ON job_grade_assignment_version
@@ -592,4 +594,4 @@ COMMENT ON TABLE job_grade_assignment_record IS
     'Durable tenant-scoped bitemporal Job-grade assignment anchor. One stable anchor is owned by one authoritative Job and system-recorded history is correction-not-rewrite.';
 
 COMMENT ON TABLE job_grade_assignment_version IS
-    'Human-reviewed bitemporal Job-grade assignment version bound to one immutable grade definition, same-Job validated Job Analysis snapshot, exact canonical JobGradeDesignReviewPacket bytes, and immutable audit/outbox evidence. It remains explicitly unauthorized for compensation or employment decisions.';
+    'Human-reviewed bitemporal Job-grade assignment version bound to one immutable grade definition, same-Job validated Job Analysis snapshot, exact versioned canonical JobGradeDesignReviewPacket bytes, and immutable audit/outbox evidence. It remains explicitly unauthorized for compensation or employment decisions.';
