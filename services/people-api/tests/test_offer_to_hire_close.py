@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import date, datetime, timezone
 import unittest
 from uuid import UUID
@@ -19,7 +18,9 @@ from orgmetra_people_api.offer_close import (
 )
 
 TENANT = UUID("0198a412-7000-7000-8000-000000000001")
+OTHER_TENANT = UUID("0198a412-7000-7000-8000-000000000099")
 CANDIDATE = UUID("0198a412-7000-7000-8000-000000000010")
+OTHER_CANDIDATE = UUID("0198a412-7000-7000-8000-000000000098")
 DECISION = UUID("0198a412-7000-7000-8000-000000000011")
 PERSON = UUID("0198a412-7000-7000-8000-000000000020")
 PERSON_NAME = UUID("0198a412-7000-7000-8000-000000000021")
@@ -42,10 +43,10 @@ RESPONDED_AT = datetime(2026, 8, 24, 7, 0, tzinfo=timezone.utc)
 RECORDED_AT = datetime(2026, 8, 24, 7, 1, tzinfo=timezone.utc)
 
 
-def response(*, response_code: str = "offer_accepted"):
+def response(*, response_code: str = "offer_accepted", tenant_record_id: str | None = None):
     """Build one value-minimized candidate offer response."""
     return build_candidate_offer_response(
-        tenant_record_id=str(TENANT),
+        tenant_record_id=tenant_record_id or str(TENANT),
         offer_response_reference=RESPONSE_REFERENCE,
         candidate_profile_reference=CANDIDATE_PROFILE_REFERENCE,
         offer_approval_reference=OFFER_APPROVAL_REFERENCE,
@@ -103,6 +104,7 @@ class RecordingHirePort:
     """Capture authoritative hire calls without persisting HR data."""
 
     def __init__(self) -> None:
+        """Start with no persistence calls."""
         self.calls: list[HireAcceptanceCommand] = []
 
     def accept_hire(self, *, command: HireAcceptanceCommand, authorization: object) -> HireAcceptanceResult:
@@ -120,6 +122,7 @@ class RecordingAuthority:
     """Resolve candidate-response evidence to exact authoritative hire scope."""
 
     def __init__(self) -> None:
+        """Start with no authority calls and no forged output overrides."""
         self.calls: list[dict[str, object]] = []
         self.mutate_response = None
         self.override: dict[str, object] = {}
@@ -142,6 +145,23 @@ class RecordingAuthority:
         }
         values.update(self.override)
         return CandidateOfferHireVerification(**values)  # type: ignore[arg-type]
+
+
+def valid_verification(**overrides: object) -> CandidateOfferHireVerification:
+    """Build one exact authoritative verification for constructor-integrity tests."""
+    values: dict[str, object] = {
+        "tenant_record_id": TENANT,
+        "candidate_profile_id": CANDIDATE,
+        "selection_decision_id": DECISION,
+        "offer_response_digest": DIGEST_C,
+        "offer_approval_digest": DIGEST_A,
+        "offer_terms_digest": DIGEST_B,
+        "candidate_actor_reference": "candidate:subject-17",
+        "authority_evidence_reference": AUTHORITY_EVIDENCE_REFERENCE,
+        "authority_evidence_digest": DIGEST_D,
+    }
+    values.update(overrides)
+    return CandidateOfferHireVerification(**values)  # type: ignore[arg-type]
 
 
 class OfferToHireCloseTests(unittest.TestCase):
@@ -193,31 +213,40 @@ class OfferToHireCloseTests(unittest.TestCase):
         self.assertEqual(scope["offer_response_digest"], packet.sha256_digest())
         self.assertEqual(scope["offer_approval_digest"], DIGEST_A)
         self.assertEqual(scope["offer_terms_digest"], DIGEST_B)
+        self.assertEqual(repr(valid_verification()), "CandidateOfferHireVerification(<redacted>)")
 
     def test_authority_scope_mismatch_blocks_hire(self) -> None:
         """A response-to-selection mapping cannot be widened after authority verification."""
-        authority = RecordingAuthority()
-        authority.override["selection_decision_id"] = UUID("0198a412-7000-7000-8000-000000000099")
-        port = RecordingHirePort()
-
-        with self.assertRaisesRegex(OfferToHireIntegrityError, "selection decision"):
-            close_accepted_offer_to_hire(
-                response=response(),
-                principal=PRINCIPAL,
-                command=command(),
-                purpose_code="candidate_hire",
-                policy=POLICY,
-                authority=authority,
-                mutation_port=port,
-            )
-
-        self.assertEqual(port.calls, [])
-
-    def test_authority_must_bind_exact_response_and_offer_digests(self) -> None:
-        """Authoritative mapping must echo the exact immutable response and offer provenance."""
-        for field_name in ("offer_response_digest", "offer_approval_digest", "offer_terms_digest"):
+        for field_name, value, message in (
+            ("tenant_record_id", OTHER_TENANT, "tenant"),
+            ("candidate_profile_id", OTHER_CANDIDATE, "candidate profile"),
+            ("selection_decision_id", UUID("0198a412-7000-7000-8000-000000000097"), "selection decision"),
+        ):
             authority = RecordingAuthority()
-            authority.override[field_name] = "e" * 64
+            authority.override[field_name] = value
+            port = RecordingHirePort()
+            with self.subTest(field_name=field_name), self.assertRaisesRegex(OfferToHireIntegrityError, message):
+                close_accepted_offer_to_hire(
+                    response=response(),
+                    principal=PRINCIPAL,
+                    command=command(),
+                    purpose_code="candidate_hire",
+                    policy=POLICY,
+                    authority=authority,
+                    mutation_port=port,
+                )
+            self.assertEqual(port.calls, [])
+
+    def test_authority_must_bind_exact_response_and_offer_evidence(self) -> None:
+        """Authoritative mapping must echo exact immutable response, offer, and candidate provenance."""
+        for field_name, value in (
+            ("offer_response_digest", "e" * 64),
+            ("offer_approval_digest", "e" * 64),
+            ("offer_terms_digest", "e" * 64),
+            ("candidate_actor_reference", "candidate:other-subject"),
+        ):
+            authority = RecordingAuthority()
+            authority.override[field_name] = value
             port = RecordingHirePort()
             with self.subTest(field_name=field_name), self.assertRaises(OfferToHireIntegrityError):
                 close_accepted_offer_to_hire(
@@ -251,6 +280,77 @@ class OfferToHireCloseTests(unittest.TestCase):
 
         self.assertEqual(port.calls, [])
 
+    def test_preexisting_response_tamper_fails_before_authority(self) -> None:
+        """A response rewritten before orchestration must fail before authority work."""
+        packet = response()
+        object.__setattr__(packet, "offer_terms_digest", "f" * 64)
+        authority = RecordingAuthority()
+
+        with self.assertRaisesRegex(OfferToHireIntegrityError, "not intact"):
+            close_accepted_offer_to_hire(
+                response=packet,
+                principal=PRINCIPAL,
+                command=command(),
+                purpose_code="candidate_hire",
+                policy=POLICY,
+                authority=authority,
+                mutation_port=RecordingHirePort(),
+            )
+
+        self.assertEqual(authority.calls, [])
+
+    def test_command_and_response_tenant_must_match_before_authority(self) -> None:
+        """A foreign-tenant command cannot reuse candidate response evidence."""
+        authority = RecordingAuthority()
+
+        with self.assertRaisesRegex(OfferToHireIntegrityError, "tenant"):
+            close_accepted_offer_to_hire(
+                response=response(),
+                principal=PRINCIPAL,
+                command=command(tenant_record_id=OTHER_TENANT),
+                purpose_code="candidate_hire",
+                policy=POLICY,
+                authority=authority,
+                mutation_port=RecordingHirePort(),
+            )
+
+        self.assertEqual(authority.calls, [])
+
+    def test_untrusted_runtime_types_fail_before_authoritative_work(self) -> None:
+        """Exact command/response types and one authority protocol are mandatory."""
+        authority = RecordingAuthority()
+        with self.assertRaisesRegex(TypeError, "response must be the exact"):
+            close_accepted_offer_to_hire(
+                response=object(),  # type: ignore[arg-type]
+                principal=PRINCIPAL,
+                command=command(),
+                purpose_code="candidate_hire",
+                policy=POLICY,
+                authority=authority,
+                mutation_port=RecordingHirePort(),
+            )
+        with self.assertRaisesRegex(TypeError, "command must be the exact"):
+            close_accepted_offer_to_hire(
+                response=response(),
+                principal=PRINCIPAL,
+                command=object(),  # type: ignore[arg-type]
+                purpose_code="candidate_hire",
+                policy=POLICY,
+                authority=authority,
+                mutation_port=RecordingHirePort(),
+            )
+        with self.assertRaisesRegex(TypeError, "authority must implement"):
+            close_accepted_offer_to_hire(
+                response=response(),
+                principal=PRINCIPAL,
+                command=command(),
+                purpose_code="candidate_hire",
+                policy=POLICY,
+                authority=object(),  # type: ignore[arg-type]
+                mutation_port=RecordingHirePort(),
+            )
+        self.assertEqual(authority.calls, [])
+
     def test_verification_runtime_subclass_cannot_cross_trust_boundary(self) -> None:
         """Caller-defined verification subtypes cannot become authoritative evidence."""
         class ForgedVerification(CandidateOfferHireVerification):
@@ -282,6 +382,51 @@ class OfferToHireCloseTests(unittest.TestCase):
                 purpose_code="candidate_hire",
                 policy=POLICY,
                 authority=ForgedAuthority(),
+                mutation_port=RecordingHirePort(),
+            )
+
+    def test_verification_constructor_rejects_malformed_authority_evidence(self) -> None:
+        """Every trust-bearing authority field must fail closed before orchestration."""
+        invalid_values = (
+            {"tenant_record_id": UUID(int=0)},
+            {"candidate_profile_id": "not-a-uuid"},
+            {"selection_decision_id": UUID(int=(1 << 128) - 1)},
+            {"offer_response_digest": "A" * 64},
+            {"offer_approval_digest": 17},
+            {"offer_terms_digest": "short"},
+            {"candidate_actor_reference": "actor:wrong-owner"},
+            {"candidate_actor_reference": "candidate:" + "x" * 300},
+            {"authority_evidence_reference": 17},
+            {"authority_evidence_reference": "offer_hire_verification:not-a-uuid"},
+            {"authority_evidence_reference": "offer_hire_verification:6ba7b810-9dad-11d1-80b4-00c04fd430c8"},
+            {"authority_evidence_digest": "z" * 64},
+        )
+        for overrides in invalid_values:
+            with self.subTest(overrides=overrides), self.assertRaises(ValueError):
+                valid_verification(**overrides)
+
+    def test_post_construction_verification_rewrite_is_revalidated(self) -> None:
+        """Frozen verification evidence rewritten with object primitives must still fail closed."""
+        authority = RecordingAuthority()
+        original = authority.verify_offer_acceptance(offer_response_digest=DIGEST_C)
+        object.__setattr__(original, "authority_evidence_digest", "z" * 64)
+
+        class RewrittenAuthority:
+            """Return the rewritten verification object."""
+
+            def verify_offer_acceptance(self, **scope: object) -> CandidateOfferHireVerification:
+                """Ignore the current request and return the corrupted authority evidence."""
+                del scope
+                return original
+
+        with self.assertRaises(ValueError):
+            close_accepted_offer_to_hire(
+                response=response(),
+                principal=PRINCIPAL,
+                command=command(),
+                purpose_code="candidate_hire",
+                policy=POLICY,
+                authority=RewrittenAuthority(),
                 mutation_port=RecordingHirePort(),
             )
 
