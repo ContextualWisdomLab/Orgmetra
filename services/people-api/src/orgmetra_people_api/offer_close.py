@@ -1,11 +1,11 @@
 """Connect candidate acceptance evidence to authoritative confirmed-hire materialization.
 
 Candidate response evidence is a necessary candidate-originated fact, never hire
-authority. This boundary snapshots an exact accepted response, asks an injected
-authoritative host to resolve that response to one candidate profile and one immutable
-selection decision, verifies the returned scope, then delegates to the existing
-purpose-bound ``accept_confirmed_hire`` path. No candidate PII or compensation value is
-copied into this orchestration boundary.
+authority. This boundary first verifies that the authenticated caller is purpose-bound to
+materialize the exact selection decision, then snapshots an accepted response, asks an
+injected authoritative host to resolve the response to one candidate profile and selection
+decision, verifies the returned scope, and delegates to the existing confirmed-hire path.
+No candidate PII or compensation value is copied into this orchestration boundary.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from orgmetra_candidate_offer_response import CandidateOfferResponsePacket
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 
 from orgmetra_people_api.auth import AuthenticatedPrincipal
+from orgmetra_people_api.authorization import authorize_resource_fields
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
     HireAcceptancePort,
@@ -31,6 +32,7 @@ from orgmetra_people_api.hire import (
 _MAX_UUID_INT = (1 << 128) - 1
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
+_HIRE_MUTATION_FIELDS = frozenset({"candidate_worker_conversion"})
 
 
 class OfferToHireIntegrityError(RuntimeError):
@@ -177,19 +179,32 @@ def close_accepted_offer_to_hire(
     authority: CandidateOfferHireAuthority,
     mutation_port: HireAcceptancePort,
 ) -> HireAcceptanceResult:
-    """Require exact candidate acceptance and authority mapping before confirmed-hire mutation.
+    """Require authorization, candidate acceptance, and exact mapping before hire mutation.
 
-    The candidate response cannot authorize employment creation by itself. The injected
-    authority must re-resolve the external candidate subject, candidate profile, exact offer
-    approval/terms provenance, response authority, and its mapping to the immutable selection
-    decision supplied by ``command``. Only then does this function invoke the existing
-    purpose-bound confirmed-hire service, which independently authorizes that selection
-    decision before any People/Employment/conversion persistence occurs.
+    The candidate response cannot authorize employment creation by itself. Before candidate
+    identity or offer provenance is resolved, the authenticated principal must already be
+    purpose-bound to materialize the exact immutable selection decision in ``command``. The
+    injected authority then re-resolves candidate and offer scope and returns matching evidence.
+    Only after those checks does this function invoke the existing confirmed-hire service,
+    which independently reauthorizes the same selection decision immediately before the
+    mutation port may persist Person/Employment/conversion truth.
     """
     if type(command) is not HireAcceptanceCommand:
         raise TypeError("command must be the exact HireAcceptanceCommand runtime type")
     if not isinstance(authority, CandidateOfferHireAuthority):
         raise TypeError("authority must implement CandidateOfferHireAuthority")
+
+    authorize_resource_fields(
+        principal=principal,
+        tenant_record_id=command.tenant_record_id,
+        resource_tenant_record_id=command.tenant_record_id,
+        resource_reference=f"selection_decision:{command.selection_decision_id.hex}",
+        purpose_code=purpose_code,
+        operation_code="materialize_worker",
+        resource_kind="selection_decision",
+        requested_fields=_HIRE_MUTATION_FIELDS,
+        policy=policy,
+    )
 
     response_digest, payload = _snapshot_response(response)
     if payload.get("response_code") != "offer_accepted":
