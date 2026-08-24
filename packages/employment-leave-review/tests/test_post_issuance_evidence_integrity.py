@@ -1,5 +1,6 @@
 """Regression coverage for post-issuance employment-leave evidence integrity."""
 
+from copy import copy
 from dataclasses import replace
 from datetime import date, datetime, timezone
 
@@ -66,18 +67,20 @@ def test_valid_value_mutation_cannot_rewrite_emitted_evidence() -> None:
     assert "44444444-4444-4444-8444-444444444444" in original
 
 
-def test_conflicting_live_reissuance_cannot_reuse_leave_review_reference() -> None:
-    """One live tenant-qualified leave-review reference must bind one evidence truth."""
+def test_shallow_copy_does_not_inherit_process_local_issuance_evidence() -> None:
+    """An unsupported copied object must fail closed instead of inheriting issuance trust."""
     packet = _packet()
+    copied = copy(packet)
 
-    with pytest.raises(ValueError, match="conflicting live evidence"):
-        replace(packet, reason_code="operational_continuity_review")
+    assert copied is not packet
+    with pytest.raises(ValueError, match="integrity"):
+        copied.canonical_json()
 
 
-def test_exact_live_duplicate_remains_idempotent() -> None:
-    """An exact duplicate may share the same live evidence binding."""
-    first = _packet()
-    second = build_employment_leave_review_packet(**_packet_args())
+def test_replace_remains_an_explicit_new_packet_issuance() -> None:
+    """The public dataclass replacement behavior remains a new validated packet issuance."""
+    packet = _packet()
+    replacement = replace(packet, reason_code="operational_continuity_review")
 
-    assert first.canonical_json() == second.canonical_json()
-    assert first.sha256_digest() == second.sha256_digest()
+    assert replacement.leave_review_reference == packet.leave_review_reference
+    assert replacement.sha256_digest() != packet.sha256_digest()
