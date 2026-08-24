@@ -14,7 +14,9 @@ from datetime import date, datetime, timezone
 from hashlib import sha256
 import json
 import re
+from threading import RLock
 from uuid import UUID
+from weakref import ref
 
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(
@@ -47,6 +49,8 @@ _NEXT_ACTION = (
     "the authoritative Orgmetra People boundary, and execute payroll only through its "
     "published owner contract."
 )
+_ISSUANCE_LOCK = RLock()
+_ISSUANCE_DIGESTS: dict[int, tuple[object, str]] = {}
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -105,7 +109,38 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+def _canonical_json(payload: dict[str, object]) -> str:
+    """Serialize one already-snapshotted evidence payload deterministically."""
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def _seal_issuance(packet: object, canonical: str) -> None:
+    """Bind one live packet identity to its creation-time canonical evidence digest."""
+    digest = sha256(canonical.encode("utf-8")).hexdigest()
+    packet_id = id(packet)
+
+    def release_issuance(_packet_reference: object) -> None:
+        """Release the process-local seal when its packet is collected."""
+        with _ISSUANCE_LOCK:
+            _ISSUANCE_DIGESTS.pop(packet_id, None)
+
+    packet_reference = ref(packet, release_issuance)
+    with _ISSUANCE_LOCK:
+        _ISSUANCE_DIGESTS[packet_id] = (packet_reference, digest)
+
+
+def _assert_issuance_integrity(packet: object, canonical: str) -> None:
+    """Fail closed when a live or copied packet differs from issued evidence."""
+    digest = sha256(canonical.encode("utf-8")).hexdigest()
+    with _ISSUANCE_LOCK:
+        sealed = _ISSUANCE_DIGESTS.get(id(packet))
+    if sealed is None:
+        raise ValueError("compensation review evidence integrity check failed")
+    if sealed[1] != digest:
+        raise ValueError("compensation review evidence integrity check failed")
+
+
+@dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class CompensationChangeReviewPacket:
     """Immutable compensation-review evidence that cannot authorize mutation or payroll."""
 
@@ -248,10 +283,11 @@ class CompensationChangeReviewPacket:
             raise ValueError("external_execution_state must remain not_authorized_to_execute")
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed compensation-change instruction")
+        _seal_issuance(self, _canonical_json(self._canonical_payload()))
 
-    def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit correlation."""
-        payload = {
+    def _canonical_payload(self) -> dict[str, object]:
+        """Snapshot every trust-bearing field once for integrity verification and export."""
+        return {
             "active_assignment_snapshot_digest": self.active_assignment_snapshot_digest,
             "active_assignment_snapshot_reference": self.active_assignment_snapshot_reference,
             "budget_authorization_digest": self.budget_authorization_digest,
@@ -290,7 +326,12 @@ class CompensationChangeReviewPacket:
             "scope_verification_state": self.scope_verification_state,
             "tenant_record_id": self.tenant_record_id,
         }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    def canonical_json(self) -> str:
+        """Return creation-bound deterministic canonical JSON for immutable audit correlation."""
+        canonical = _canonical_json(self._canonical_payload())
+        _assert_issuance_integrity(self, canonical)
+        return canonical
 
     def sha256_digest(self) -> str:
         """Return SHA-256 over the exact canonical UTF-8 compensation-review packet."""
