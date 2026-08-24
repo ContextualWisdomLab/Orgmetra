@@ -3,8 +3,11 @@
 from datetime import date, datetime, timedelta, timezone, tzinfo
 from uuid import UUID
 
+import pytest
+
 from orgmetra_hris_kernel import (
     DateInterval,
+    EmploymentAbsenceError,
     EmploymentAbsenceSnapshot,
     EmploymentAbsenceVersion,
     EmploymentVersion,
@@ -37,6 +40,23 @@ class OneShotTimezone(tzinfo):
         return "ONE_SHOT"
 
 
+class OffsetlessTimezone(tzinfo):
+    """Pretend to be timezone-bearing while supplying no concrete UTC offset."""
+
+    def utcoffset(self, dt: datetime | None) -> None:
+        return None
+
+    def dst(self, dt: datetime | None) -> None:
+        return None
+
+    def tzname(self, dt: datetime | None) -> str:
+        return "OFFSETLESS"
+
+
+class ForgedDatetime(datetime):
+    """Represent a caller-defined datetime subtype outside the trusted primitive."""
+
+
 def _employment() -> EmploymentVersion:
     return EmploymentVersion(
         tenant_record_id=TENANT,
@@ -62,18 +82,22 @@ def _absence() -> EmploymentAbsenceVersion:
     )
 
 
-def test_builder_detaches_untrusted_timezone_before_bitemporal_resolution() -> None:
-    """Caller timezone code runs once, then trusted UTC drives every comparison/export."""
-    provider = OneShotTimezone()
-    result = build_employment_absence_snapshot(
+def _build(known_at: datetime):
+    return build_employment_absence_snapshot(
         [_absence()],
         [_employment()],
         tenant_record_id=TENANT,
         person_record_id=PERSON,
         employment_record_id=EMPLOYMENT,
         effective_on=date(2026, 8, 25),
-        known_at=datetime(2026, 8, 25, tzinfo=provider),
+        known_at=known_at,
     )
+
+
+def test_builder_detaches_untrusted_timezone_before_bitemporal_resolution() -> None:
+    """Caller timezone code runs once, then trusted UTC drives every comparison/export."""
+    provider = OneShotTimezone()
+    result = _build(datetime(2026, 8, 25, tzinfo=provider))
 
     assert provider.calls == 1
     assert result.known_at.tzinfo is timezone.utc
@@ -95,3 +119,16 @@ def test_direct_snapshot_detaches_untrusted_timezone_before_export() -> None:
     assert provider.calls == 1
     assert result.known_at.tzinfo is timezone.utc
     assert result.canonical_json().count("2026-08-25T00:00:00Z") == 1
+
+
+def test_builder_rejects_datetime_runtime_subclass() -> None:
+    """Caller-defined datetime behavior cannot enter the trusted system-time coordinate."""
+    forged = ForgedDatetime(2026, 8, 25, tzinfo=timezone.utc)
+    with pytest.raises(EmploymentAbsenceError, match="built-in datetime"):
+        _build(forged)
+
+
+def test_builder_rejects_timezone_without_concrete_offset() -> None:
+    """A tzinfo marker without an offset is still semantically timezone-naive."""
+    with pytest.raises(EmploymentAbsenceError, match="concrete UTC offset"):
+        _build(datetime(2026, 8, 25, tzinfo=OffsetlessTimezone()))
