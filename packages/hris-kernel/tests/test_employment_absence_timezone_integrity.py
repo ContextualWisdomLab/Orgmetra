@@ -53,6 +53,19 @@ class OffsetlessTimezone(tzinfo):
         return "OFFSETLESS"
 
 
+class ExplodingTimezone(tzinfo):
+    """Raise from offset resolution so the boundary must normalize provider failure."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        raise RuntimeError("provider-specific timezone failure")
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        return timedelta(0)
+
+    def tzname(self, dt: datetime | None) -> str:
+        return "EXPLODING"
+
+
 class ForgedDatetime(datetime):
     """Represent a caller-defined datetime subtype outside the trusted primitive."""
 
@@ -132,3 +145,9 @@ def test_builder_rejects_timezone_without_concrete_offset() -> None:
     """A tzinfo marker without an offset is still semantically timezone-naive."""
     with pytest.raises(EmploymentAbsenceError, match="concrete UTC offset"):
         _build(datetime(2026, 8, 25, tzinfo=OffsetlessTimezone()))
+
+
+def test_builder_normalizes_timezone_provider_exception() -> None:
+    """Caller timezone failures cannot escape as provider-specific exceptions."""
+    with pytest.raises(EmploymentAbsenceError, match="could not be resolved"):
+        _build(datetime(2026, 8, 25, tzinfo=ExplodingTimezone()))
