@@ -31,7 +31,6 @@ OUTBOX_ID="00000000-0000-4000-8000-000000000052"
 REVIEWER="actor:00000000-0000-4000-8000-000000000061"
 APPLIED_BY="actor:00000000-0000-4000-8000-000000000062"
 REVIEW_DIGEST="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-APPLICATION_DIGEST="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
 with_tenant() {
     local tenant="$1"
@@ -76,7 +75,7 @@ payload = {
     "datacontenttype": "application/json",
     "id": "${AUDIT_ID}",
     "orgmetraactor": "${APPLIED_BY}",
-    "orgmetraevidence": "${APPLICATION_DIGEST}",
+    "orgmetraevidence": "${REVIEW_DIGEST}",
     "orgmetrapurpose": "position_reporting_change_apply",
     "orgmetrareason": "approved_reporting_line_change",
     "orgmetratenant": "${TENANT_ID}",
@@ -117,7 +116,7 @@ INSERT INTO position_reporting_relationship_version (
     effective_from, audit_event_record_id
 ) VALUES (
     '${TENANT_ID}', '${RELATIONSHIP_VERSION_ID}', '${RELATIONSHIP_ID}',
-    '${MANAGER_POSITION_ID}', '${REVIEW_DIGEST}', '${APPLICATION_DIGEST}',
+    '${MANAGER_POSITION_ID}', '${REVIEW_DIGEST}', :'canonical_digest',
     '${REVIEWER}', '${APPLIED_BY}', TIMESTAMPTZ '2026-08-24 01:55:00+00',
     DATE '2026-08-24', '${AUDIT_ID}'
 );
@@ -158,7 +157,7 @@ expect_failure \
     "INSERT INTO position_reporting_relationship_version (${version_columns}) VALUES (
         '${TENANT_ID}', '00000000-0000-7000-8000-000000000072',
         '${SELF_RELATIONSHIP_ID}', '${OTHER_POSITION_ID}',
-        '${REVIEW_DIGEST}', '${APPLICATION_DIGEST}', '${REVIEWER}', '${APPLIED_BY}',
+        '${REVIEW_DIGEST}', '${canonical_digest}', '${REVIEWER}', '${APPLIED_BY}',
         TIMESTAMPTZ '2026-08-24 01:55:00+00', DATE '2026-08-24', '${AUDIT_ID}'
      );"
 
@@ -168,7 +167,7 @@ expect_failure \
     "INSERT INTO position_reporting_relationship_version (${version_columns}) VALUES (
         '${TENANT_ID}', '00000000-0000-7000-8000-000000000073',
         '${REVERSE_RELATIONSHIP_ID}', '${SUBORDINATE_POSITION_ID}',
-        '${REVIEW_DIGEST}', '${APPLICATION_DIGEST}', '${REVIEWER}', '${APPLIED_BY}',
+        '${REVIEW_DIGEST}', '${canonical_digest}', '${REVIEWER}', '${APPLIED_BY}',
         TIMESTAMPTZ '2026-08-24 01:55:00+00', DATE '2026-08-24', '${AUDIT_ID}'
      );"
 
