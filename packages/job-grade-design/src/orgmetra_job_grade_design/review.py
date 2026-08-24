@@ -26,6 +26,7 @@ _MAX_UUID_INT = (1 << 128) - 1
 _PURPOSE_CODE = "job_grade_design_review"
 _REVIEW_STATE = "reviewed_for_authoritative_resolution"
 _DECISION_AUTHORITY = "not_authorized_to_assign_grade_or_compensation"
+_EVIDENCE_VERSION = 1
 _ALLOWED_REASON_CODES = frozenset(
     {
         "job_architecture_alignment",
@@ -124,6 +125,13 @@ def _validate_reason_code(value: object) -> str:
     return text
 
 
+def _validate_evidence_version(value: object) -> int:
+    """Require the exact supported canonical evidence-schema version."""
+    if type(value) is not int or value != _EVIDENCE_VERSION:
+        raise ValueError(f"evidence_version must be exact integer {_EVIDENCE_VERSION}")
+    return value
+
+
 def _validate_utc_timestamp(value: object, field_name: str) -> datetime:
     """Require an exact built-in datetime whose timezone is the UTC singleton."""
     if type(value) is not datetime or value.tzinfo is not timezone.utc:
@@ -159,6 +167,7 @@ class JobGradeDesignReviewPacket:
     reason_code: str
     reviewed_at: datetime
     recorded_at: datetime
+    evidence_version: int = _EVIDENCE_VERSION
     purpose_code: str = _PURPOSE_CODE
     review_state: str = _REVIEW_STATE
     decision_authority: str = _DECISION_AUTHORITY
@@ -210,6 +219,7 @@ class JobGradeDesignReviewPacket:
         recorded_at = _validate_utc_timestamp(self.recorded_at, "recorded_at")
         if recorded_at < reviewed_at:
             raise ValueError("recorded_at cannot precede reviewed_at")
+        _validate_evidence_version(self.evidence_version)
         if type(self.purpose_code) is not str or self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain job_grade_design_review")
         if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
@@ -240,6 +250,7 @@ class JobGradeDesignReviewPacket:
         return {
             "band_code": self.band_code,
             "decision_authority": self.decision_authority,
+            "evidence_version": self.evidence_version,
             "grade_band_definition_digest": self.grade_band_definition_digest,
             "grade_code": self.grade_code,
             "human_review_required": self.human_review_required,
@@ -298,6 +309,7 @@ def build_job_grade_design_review_packet(
     reason_code: str,
     reviewed_at: datetime,
     recorded_at: datetime,
+    evidence_version: int = _EVIDENCE_VERSION,
 ) -> JobGradeDesignReviewPacket:
     """Build one non-authoritative human-reviewed Job grade/band design proposal."""
     return JobGradeDesignReviewPacket(
@@ -315,4 +327,5 @@ def build_job_grade_design_review_packet(
         reason_code=reason_code,
         reviewed_at=reviewed_at,
         recorded_at=recorded_at,
+        evidence_version=evidence_version,
     )
