@@ -1,10 +1,10 @@
 """Connect candidate acceptance evidence to authoritative confirmed-hire materialization.
 
 Candidate response evidence is a necessary candidate-originated fact, never hire
-authority.  This boundary snapshots an exact accepted response, asks an injected
+authority. This boundary snapshots an exact accepted response, asks an injected
 authoritative host to resolve that response to one candidate profile and one immutable
 selection decision, verifies the returned scope, then delegates to the existing
-purpose-bound ``accept_confirmed_hire`` path.  No candidate PII or compensation value is
+purpose-bound ``accept_confirmed_hire`` path. No candidate PII or compensation value is
 copied into this orchestration boundary.
 """
 
@@ -50,7 +50,7 @@ def _validate_digest(value: object, field_name: str) -> None:
 
 
 def _validate_candidate_actor(value: object) -> None:
-    """Require the bounded external candidate subject already reviewed by the response contract."""
+    """Require the bounded external candidate subject reviewed by the response contract."""
     if (
         type(value) is not str
         or len(value) > 288
@@ -138,7 +138,7 @@ class CandidateOfferHireAuthority(Protocol):
         """Return exact-scope evidence only after authoritative identity/offer resolution succeeds."""
 
 
-def _snapshot_response(response: CandidateOfferResponsePacket) -> tuple[str, str, dict[str, object]]:
+def _snapshot_response(response: CandidateOfferResponsePacket) -> tuple[str, dict[str, object]]:
     """Freeze one verified candidate-response representation before authoritative host work."""
     if type(response) is not CandidateOfferResponsePacket:
         raise TypeError("response must be the exact CandidateOfferResponsePacket runtime type")
@@ -147,7 +147,7 @@ def _snapshot_response(response: CandidateOfferResponsePacket) -> tuple[str, str
     except (KeyError, ValueError) as error:
         raise OfferToHireIntegrityError("candidate offer response evidence is not intact") from error
     payload = json.loads(canonical_json)
-    return canonical_json, sha256(canonical_json.encode("utf-8")).hexdigest(), payload
+    return sha256(canonical_json.encode("utf-8")).hexdigest(), payload
 
 
 def _snapshot_verification(value: CandidateOfferHireVerification) -> CandidateOfferHireVerification:
@@ -179,10 +179,10 @@ def close_accepted_offer_to_hire(
 ) -> HireAcceptanceResult:
     """Require exact candidate acceptance and authority mapping before confirmed-hire mutation.
 
-    The candidate response cannot authorize employment creation by itself.  The injected
+    The candidate response cannot authorize employment creation by itself. The injected
     authority must re-resolve the external candidate subject, candidate profile, exact offer
     approval/terms provenance, response authority, and its mapping to the immutable selection
-    decision supplied by ``command``.  Only then does this function invoke the existing
+    decision supplied by ``command``. Only then does this function invoke the existing
     purpose-bound confirmed-hire service, which independently authorizes that selection
     decision before any People/Employment/conversion persistence occurs.
     """
@@ -191,7 +191,7 @@ def close_accepted_offer_to_hire(
     if not isinstance(authority, CandidateOfferHireAuthority):
         raise TypeError("authority must implement CandidateOfferHireAuthority")
 
-    response_json, response_digest, payload = _snapshot_response(response)
+    response_digest, payload = _snapshot_response(response)
     if payload.get("response_code") != "offer_accepted":
         raise OfferToHireIntegrityError("candidate offer response must be accepted before hire orchestration")
     if payload.get("tenant_record_id") != str(command.tenant_record_id):
@@ -236,13 +236,11 @@ def close_accepted_offer_to_hire(
         raise OfferToHireIntegrityError("authority evidence does not match the accepted offer response")
 
     try:
-        post_authority_json = response.canonical_json()
+        response.canonical_json()
     except (KeyError, ValueError) as error:
         raise OfferToHireIntegrityError(
             "candidate offer response changed during authoritative verification"
         ) from error
-    if post_authority_json != response_json:
-        raise OfferToHireIntegrityError("candidate offer response changed during authoritative verification")
 
     return accept_confirmed_hire(
         principal=principal,
