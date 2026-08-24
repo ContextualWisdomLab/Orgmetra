@@ -163,6 +163,10 @@ class TeppAnalysisRequestPacket:
         _validate_governed_code(self.model_contract_version, "model_contract_version")
         _validate_governed_code(self.output_profile, "output_profile")
         _validate_aware_datetime(self.generated_at, "generated_at")
+        if self.generated_at < self.knowledge_cutoff:
+            raise ValueError("generated_at must not precede knowledge_cutoff")
+        if self.tepp_workspace_id == self.tepp_snapshot_id:
+            raise ValueError("tepp_workspace_id and tepp_snapshot_id must be distinct opaque identifiers")
         _validate_evidence_version(self.evidence_version)
         if self.purpose_code != _PURPOSE_CODE:
             raise ValueError(f"purpose_code must remain {_PURPOSE_CODE}")
@@ -207,11 +211,19 @@ class TeppAnalysisRequestPacket:
         return hashlib.sha256(self.canonical_tepp_json().encode("utf-8")).hexdigest()
 
     def governance_scope_digest(self) -> str:
-        """Return SHA-256 over local governance fields that must remain stable on retry."""
+        """Return SHA-256 over local governance fields that must remain stable on retry.
+
+        Every tenant-, study-, actor-, workspace-, snapshot-, and idempotency-scoped
+        correlation participates, so swapping any single reference between packets
+        from different scopes changes the digest and fails the retry comparison.
+        """
         payload = {
             "evidence_version": self.evidence_version,
+            "idempotency_key": self.idempotency_key,
             "requested_by_actor_reference": self.requested_by_actor_reference,
             "snapshot_digest": self.snapshot_digest,
+            "tepp_snapshot_id": self.tepp_snapshot_id,
+            "tepp_workspace_id": self.tepp_workspace_id,
             "tenant_record_id": self.tenant_record_id,
             "validation_study_reference": self.validation_study_reference,
         }

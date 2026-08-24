@@ -46,3 +46,23 @@ def test_rejects_datetime_subclasses_that_can_forge_temporal_evidence(field_name
 
     with pytest.raises(ValueError, match="timezone-aware datetime"):
         build_tepp_analysis_request_packet(**kwargs)
+
+
+def test_generated_at_must_not_precede_knowledge_cutoff() -> None:
+    """Reject packets whose generation instant precedes their own knowledge cutoff."""
+    kwargs = valid_kwargs()
+    kwargs["knowledge_cutoff"] = datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc)
+    kwargs["generated_at"] = datetime(2026, 8, 21, 4, 59, 59, 999999, tzinfo=timezone.utc)
+
+    with pytest.raises(ValueError, match="generated_at must not precede knowledge_cutoff"):
+        build_tepp_analysis_request_packet(**kwargs)
+
+
+def test_equal_workspace_and_snapshot_identifiers_are_rejected() -> None:
+    """Reference manipulation cannot reuse one opaque identifier for two entity types."""
+    kwargs = valid_kwargs()
+    kwargs["tepp_workspace_id"] = "opaque-duplicated-1f2e3d"
+    kwargs["tepp_snapshot_id"] = "opaque-duplicated-1f2e3d"
+
+    with pytest.raises(ValueError, match="must be distinct opaque identifiers"):
+        build_tepp_analysis_request_packet(**kwargs)

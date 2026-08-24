@@ -44,3 +44,22 @@ def test_governance_evidence_carries_the_key_required_for_durable_retry_control(
     assert evidence["idempotency_key"] == packet.idempotency_key
     assert evidence["tepp_request_digest"] == packet.request_digest()
     assert evidence["governance_scope_digest"] == packet.governance_scope_digest()
+
+
+@pytest.mark.parametrize(
+    ("field_name", "replacement"),
+    (
+        ("idempotency_key", "orgmetra-tepp-20260820-9999"),
+        ("tepp_snapshot_id", "snapshot-opaque-tampered"),
+        ("tepp_workspace_id", "workspace-opaque-tampered"),
+    ),
+)
+def test_scope_digest_binds_every_retry_stable_correlation(
+    field_name: str,
+    replacement: object,
+) -> None:
+    """Detect reference manipulation of any correlation inside the retry-stable scope."""
+    packet = build_valid()
+    rebound = replace(packet, **{field_name: replacement})
+
+    assert packet.governance_scope_digest() != rebound.governance_scope_digest()
