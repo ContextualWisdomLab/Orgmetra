@@ -10,6 +10,9 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation_s
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evidence_digest.sql >/dev/null
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0003_audit_outbox_persistence.sql >/dev/null
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+# Exercise the integrated transition-hardened v1 validator. Migration 0024
+# replaces the predecessor validator from 0023 before any application call.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0024_position_lifecycle_transition_hardening.sql >/dev/null
 
 TENANT="0198a412-8000-7000-8000-000000000101"
 ORG="0198a412-8000-7000-8000-000000000102"
