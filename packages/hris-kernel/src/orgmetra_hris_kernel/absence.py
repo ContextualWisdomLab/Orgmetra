@@ -22,6 +22,26 @@ _KNOWN_ABSENCE_STATUSES = frozenset({"confirmed", "cancelled"})
 _ABSENCE_ELIGIBLE_EMPLOYMENT_STATUSES = frozenset({"active", "leave"})
 
 
+def _require_uuid(value: UUID, field_name: str) -> UUID:
+    """Reject caller-defined UUID behavior before scope comparison or rendering."""
+    if type(value) is not UUID:
+        raise EmploymentAbsenceError(
+            f"{field_name} must be a built-in UUID.",
+            next_action="Reload canonical HRIS identity evidence, then rebuild the absence snapshot.",
+        )
+    return value
+
+
+def _require_effective_on(value: date) -> date:
+    """Reject caller-defined business-date behavior before interval comparison/export."""
+    if type(value) is not date:
+        raise EmploymentAbsenceError(
+            "effective_on must be a built-in date.",
+            next_action="Convert the effective date to a standard date, then rebuild the absence snapshot.",
+        )
+    return value
+
+
 def _freeze_known_at(value: datetime) -> datetime:
     """Detach one caller timestamp from polymorphic timezone code into trusted UTC."""
     if type(value) is not datetime:
@@ -34,13 +54,56 @@ def _freeze_known_at(value: datetime) -> datetime:
             "Employment absence knowledge cutoff must be timezone-aware.",
             next_action="Convert the knowledge cutoff to UTC, then rebuild the absence snapshot.",
         )
-    offset = value.utcoffset()
-    if offset is None:
+    try:
+        offset = value.utcoffset()
+        if offset is None:
+            raise EmploymentAbsenceError(
+                "Employment absence knowledge cutoff must provide a concrete UTC offset.",
+                next_action="Convert the knowledge cutoff to UTC, then rebuild the absence snapshot.",
+            )
+        return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except EmploymentAbsenceError:
+        raise
+    except Exception as exc:
         raise EmploymentAbsenceError(
-            "Employment absence knowledge cutoff must provide a concrete UTC offset.",
-            next_action="Convert the knowledge cutoff to UTC, then rebuild the absence snapshot.",
+            "Employment absence knowledge cutoff timezone could not be resolved.",
+            next_action="Convert the knowledge cutoff to a stable UTC datetime, then retry.",
+        ) from exc
+
+
+def _validate_absence_fact_identities(version: EmploymentAbsenceVersion) -> None:
+    """Reject executable UUID subclasses before tenant/Employment scope comparisons."""
+    if not all(
+        type(value) is UUID
+        for value in (
+            version.tenant_record_id,
+            version.employment_absence_record_id,
+            version.employment_absence_version_id,
+            version.employment_record_id,
+            version.person_record_id,
         )
-    return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    ):
+        raise EmploymentAbsenceError(
+            "Employment absence fact identities must be built-in UUIDs.",
+            next_action="Reload canonical Employment absence facts, then rebuild the snapshot.",
+        )
+
+
+def _validate_employment_fact_identities(version: EmploymentVersion) -> None:
+    """Reject executable UUID subclasses before Employment scope comparisons."""
+    if not all(
+        type(value) is UUID
+        for value in (
+            version.tenant_record_id,
+            version.employment_record_id,
+            version.employment_record_version_id,
+            version.person_record_id,
+        )
+    ):
+        raise EmploymentAbsenceError(
+            "Employment fact identities must be built-in UUIDs.",
+            next_action="Reload canonical Employment facts, then rebuild the absence snapshot.",
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,7 +118,17 @@ class EmploymentAbsenceSnapshot:
     employment_absence_record_id: UUID | None
 
     def __post_init__(self) -> None:
-        """Freeze direct temporal evidence and reject ambiguous absence identity."""
+        """Freeze direct evidence primitives before comparison or canonical export."""
+        _require_uuid(self.tenant_record_id, "tenant_record_id")
+        _require_uuid(self.employment_record_id, "employment_record_id")
+        _require_effective_on(self.effective_on)
+        if type(self.is_absent) is not bool:
+            raise EmploymentAbsenceError(
+                "is_absent must be a built-in bool.",
+                next_action="Rebuild the snapshot from authoritative Employment absence truth.",
+            )
+        if self.employment_absence_record_id is not None:
+            _require_uuid(self.employment_absence_record_id, "employment_absence_record_id")
         object.__setattr__(self, "known_at", _freeze_known_at(self.known_at))
         if (self.employment_absence_record_id is not None) != self.is_absent:
             raise EmploymentAbsenceError(
@@ -101,6 +174,8 @@ def _scoped_absence_versions(
     person_record_id: UUID,
 ) -> list[EmploymentAbsenceVersion]:
     """Return tenant/Employment absence facts after validating safe core metadata."""
+    for version in absence_versions:
+        _validate_absence_fact_identities(version)
     scoped = [
         version
         for version in absence_versions
@@ -136,6 +211,8 @@ def _visible_employment(
     known_at: datetime,
 ) -> EmploymentVersion | None:
     """Resolve the exact Employment anchor while rejecting Person rebinding."""
+    for version in employment_versions:
+        _validate_employment_fact_identities(version)
     named = [
         version
         for version in employment_versions
@@ -186,10 +263,11 @@ def build_employment_absence_snapshot(
     fails closed.  ``cancelled`` absence versions remain historical evidence but
     do not make the Employment absent.
 
-    The caller's timezone provider is evaluated once, then detached into a
-    built-in UTC datetime before any bitemporal comparison or canonical export.
-    This prevents stateful caller timezone code from changing checked-versus-
-    emitted system-time evidence.
+    Scope identities and the business date are exact built-in primitives before
+    any tenant/identity comparison.  The caller's timezone provider is evaluated
+    once, then detached into a built-in UTC datetime before any bitemporal
+    comparison or canonical export.  This prevents caller-defined equality,
+    rendering, or timezone behavior from changing checked-versus-emitted truth.
 
     Returns:
         PII-minimized absence evidence containing no Person identifier or reason.
@@ -200,6 +278,10 @@ def build_employment_absence_snapshot(
         SingleValuedFactError: One durable Employment/absence identity resolves
             to contradictory visible versions.
     """
+    tenant_record_id = _require_uuid(tenant_record_id, "tenant_record_id")
+    person_record_id = _require_uuid(person_record_id, "person_record_id")
+    employment_record_id = _require_uuid(employment_record_id, "employment_record_id")
+    effective_on = _require_effective_on(effective_on)
     frozen_known_at = _freeze_known_at(known_at)
 
     scoped = _scoped_absence_versions(
