@@ -40,6 +40,10 @@ class EmploymentExclusivityError(KernelError):
     """Two exclusive employments overlap for one person, or concurrency is unknown."""
 
 
+class EmploymentAbsenceError(KernelError):
+    """Employment absence truth is contradictory, out of scope, or unsupported."""
+
+
 class OrganizationHierarchyError(KernelError):
     """Visible parent links form a cycle inside one tenant's organization hierarchy."""
 
