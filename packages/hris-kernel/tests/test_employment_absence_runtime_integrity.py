@@ -31,6 +31,18 @@ class ForgedStatus(str):
         return other == "confirmed"
 
 
+class ForgedUuid(UUID):
+    """Present a foreign UUID while forging equality and canonical display."""
+
+    __hash__ = UUID.__hash__
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+    def __str__(self) -> str:
+        return "forged-tenant"
+
+
 def _employment(status: str = "active") -> EmploymentVersion:
     return EmploymentVersion(
         tenant_record_id=TENANT,
@@ -80,6 +92,21 @@ def test_employment_status_runtime_subclass_cannot_forge_active_state() -> None:
         _build("confirmed", ForgedStatus("terminated"))
 
 
+def test_builder_rejects_uuid_subclass_before_tenant_scope_comparison() -> None:
+    """A hostile UUID cannot forge cross-tenant equality before scope resolution."""
+    forged_tenant = ForgedUuid("20000000-0000-7000-8000-000000002001")
+    with pytest.raises(EmploymentAbsenceError, match="tenant_record_id must be a built-in UUID"):
+        build_employment_absence_snapshot(
+            [_absence("confirmed")],
+            [_employment()],
+            tenant_record_id=forged_tenant,
+            person_record_id=PERSON,
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+        )
+
+
 def test_direct_snapshot_rejects_naive_recorded_time() -> None:
     """Direct construction cannot bypass the builder's timezone requirement."""
     with pytest.raises(EmploymentAbsenceError, match="timezone-aware"):
@@ -103,4 +130,17 @@ def test_direct_snapshot_rejects_inconsistent_absence_identity() -> None:
             known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
             is_absent=True,
             employment_absence_record_id=None,
+        )
+
+
+def test_direct_snapshot_rejects_integer_absence_state() -> None:
+    """Integer truthiness cannot become canonical boolean absence evidence."""
+    with pytest.raises(EmploymentAbsenceError, match="is_absent must be a built-in bool"):
+        EmploymentAbsenceSnapshot(
+            tenant_record_id=TENANT,
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+            is_absent=1,  # type: ignore[arg-type]
+            employment_absence_record_id=ABSENCE,
         )
