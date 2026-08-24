@@ -27,7 +27,7 @@ BEGIN
 
     SELECT '{' || pg_catalog.string_agg(
         pg_catalog.to_json(key_name)::text || ':' || key_value::text,
-        ',' ORDER BY key_name
+        ',' ORDER BY key_name COLLATE "C"
     ) || '}'
     INTO canonical_text
     FROM pg_catalog.jsonb_each(payload) AS entry(key_name, key_value);
@@ -37,7 +37,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION position_lifecycle_review_canonical_json(text) IS
-    'Returns the compact key-sorted JSON object representation required by Position lifecycle review evidence; malformed or non-object input returns NULL.';
+    'Returns the compact C-collation key-sorted JSON object representation required by Position lifecycle review evidence; malformed or non-object input returns NULL.';
 
 CREATE FUNCTION position_lifecycle_position_snapshot_digest(
     p_tenant_record_id uuid,
