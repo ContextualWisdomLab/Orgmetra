@@ -163,14 +163,14 @@ INSERT INTO job_grade_assignment_version (
     analysis_record_id, job_analysis_snapshot_digest_sha256,
     job_evaluation_method_code, job_evaluation_method_digest_sha256,
     review_evidence_json, review_evidence_digest_sha256,
-    reviewer_actor_reference, reason_code, evidence_version,
+    requester_actor_reference, reviewer_actor_reference, reason_code, evidence_version,
     reviewed_at, review_packet_recorded_at, effective_from,
     audit_event_record_id
 ) VALUES (
     '${TENANT_ID}', '${ASSIGNMENT_VERSION_ID}', '${ASSIGNMENT_ID}',
     '${GRADE_DEFINITION_ID}', '${ANALYSIS_ID}', '${SNAPSHOT_DIGEST}',
     'factor_evaluation_method', '${METHOD_DIGEST}', :'review_evidence', :'review_digest',
-    '${REVIEWER}', '${REASON_CODE}', 1,
+    '${REQUESTER}', '${REVIEWER}', '${REASON_CODE}', 1,
     TIMESTAMPTZ '${REVIEWED_AT}', TIMESTAMPTZ '${PACKET_RECORDED_AT}',
     DATE '2026-09-01', '${AUDIT_ID}'
 );
@@ -187,8 +187,7 @@ if [[ "${state}" != "authoritative_job_grade_assignment|not_authorized_for_compe
 fi
 
 set +e
-mismatch_output="$({ REVIEW_EVIDENCE="${review_evidence}" REVIEW_DIGEST="${review_digest}" \
-    with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+mismatch_output="$({ with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v review_evidence="${review_evidence}" -v review_digest="${review_digest}" -c "
 INSERT INTO job_grade_assignment_version (
     tenant_record_id, job_grade_assignment_version_id,
@@ -196,13 +195,13 @@ INSERT INTO job_grade_assignment_version (
     analysis_record_id, job_analysis_snapshot_digest_sha256,
     job_evaluation_method_code, job_evaluation_method_digest_sha256,
     review_evidence_json, review_evidence_digest_sha256,
-    reviewer_actor_reference, reason_code, evidence_version,
+    requester_actor_reference, reviewer_actor_reference, reason_code, evidence_version,
     reviewed_at, review_packet_recorded_at, effective_from, audit_event_record_id
 ) VALUES (
     '${TENANT_ID}', '00000000-0000-7000-8000-000000000097', '${ASSIGNMENT_ID}',
     '${OTHER_GRADE_DEFINITION_ID}', '${ANALYSIS_ID}', '${SNAPSHOT_DIGEST}',
     'factor_evaluation_method', '${METHOD_DIGEST}', :'review_evidence', :'review_digest',
-    '${REVIEWER}', '${REASON_CODE}', 2,
+    '${REQUESTER}', '${REVIEWER}', '${REASON_CODE}', 2,
     TIMESTAMPTZ '${REVIEWED_AT}', TIMESTAMPTZ '${PACKET_RECORDED_AT}',
     DATE '2027-01-01', '${AUDIT_ID}'
 );" ; } 2>&1)"
@@ -222,13 +221,13 @@ INSERT INTO job_grade_assignment_version (
     analysis_record_id, job_analysis_snapshot_digest_sha256,
     job_evaluation_method_code, job_evaluation_method_digest_sha256,
     review_evidence_json, review_evidence_digest_sha256,
-    reviewer_actor_reference, reason_code, evidence_version,
+    requester_actor_reference, reviewer_actor_reference, reason_code, evidence_version,
     reviewed_at, review_packet_recorded_at, effective_from, audit_event_record_id
 ) VALUES (
     '${TENANT_ID}', '00000000-0000-7000-8000-000000000098', '${ASSIGNMENT_ID}',
     '${GRADE_DEFINITION_ID}', '${OTHER_ANALYSIS_ID}', '${OTHER_SNAPSHOT_DIGEST}',
     'factor_evaluation_method', '${METHOD_DIGEST}', :'review_evidence', :'review_digest',
-    '${REVIEWER}', '${REASON_CODE}', 2,
+    '${REQUESTER}', '${REVIEWER}', '${REASON_CODE}', 2,
     TIMESTAMPTZ '${REVIEWED_AT}', TIMESTAMPTZ '${PACKET_RECORDED_AT}',
     DATE '2027-01-01', '${AUDIT_ID}'
 );" ; } 2>&1)"
