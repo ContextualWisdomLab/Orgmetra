@@ -8,6 +8,7 @@ on:
     paths:
       - "database/migrations/0023_position_lifecycle_application.sql"
       - "tests/test_position_lifecycle_application_postgres.sh"
+      - "tests/test_position_lifecycle_transition_validation_postgres.sh"
       - "docs/adr/0112-position-lifecycle-application.md"
       - "docs/traceability/position-lifecycle-application.md"
       - "docs/doctoring/position-lifecycle-application-references.md"
@@ -61,6 +62,7 @@ jobs:
 
           required = [
               "tests/test_position_lifecycle_application_postgres.sh",
+              "tests/test_position_lifecycle_transition_validation_postgres.sh",
               ".github/workflows/position-lifecycle-application-quality.yml",
           ]
           optional = [
@@ -82,6 +84,8 @@ jobs:
           PY
       - name: Run Position lifecycle application regressions
         run: bash tests/test_position_lifecycle_application_postgres.sh
+      - name: Reject forged lifecycle transition evidence
+        run: bash tests/test_position_lifecycle_transition_validation_postgres.sh
       - name: Require clean checkout
         run: |
           git diff --exit-code
