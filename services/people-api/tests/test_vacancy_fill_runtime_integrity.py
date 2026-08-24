@@ -9,7 +9,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
-from orgmetra_people_api.mutations import AssignmentMutationCommand, AssignmentMutationResult
+from orgmetra_people_api.mutations import AssignmentMutationCommand
 from orgmetra_people_api.vacancy_fill import VacancyFillVerification, fill_position_vacancy
 
 TENANT = UUID("0198a412-8000-7000-8000-000000000001")
