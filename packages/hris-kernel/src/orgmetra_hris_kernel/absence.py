@@ -22,6 +22,27 @@ _KNOWN_ABSENCE_STATUSES = frozenset({"confirmed", "cancelled"})
 _ABSENCE_ELIGIBLE_EMPLOYMENT_STATUSES = frozenset({"active", "leave"})
 
 
+def _freeze_known_at(value: datetime) -> datetime:
+    """Detach one caller timestamp from polymorphic timezone code into trusted UTC."""
+    if type(value) is not datetime:
+        raise EmploymentAbsenceError(
+            "Employment absence knowledge cutoff must be a built-in datetime.",
+            next_action="Convert the knowledge cutoff to a standard timezone-aware datetime, then retry.",
+        )
+    if value.tzinfo is None:
+        raise EmploymentAbsenceError(
+            "Employment absence knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the absence snapshot.",
+        )
+    offset = value.utcoffset()
+    if offset is None:
+        raise EmploymentAbsenceError(
+            "Employment absence knowledge cutoff must provide a concrete UTC offset.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the absence snapshot.",
+        )
+    return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+
+
 @dataclass(frozen=True, slots=True)
 class EmploymentAbsenceSnapshot:
     """PII-minimized operational absence truth at one bitemporal coordinate."""
@@ -34,12 +55,8 @@ class EmploymentAbsenceSnapshot:
     employment_absence_record_id: UUID | None
 
     def __post_init__(self) -> None:
-        """Reject ambiguous direct evidence before canonical serialization."""
-        if self.known_at.tzinfo is None or self.known_at.utcoffset() is None:
-            raise EmploymentAbsenceError(
-                "Employment absence snapshot knowledge cutoff must be timezone-aware.",
-                next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
-            )
+        """Freeze direct temporal evidence and reject ambiguous absence identity."""
+        object.__setattr__(self, "known_at", _freeze_known_at(self.known_at))
         if (self.employment_absence_record_id is not None) != self.is_absent:
             raise EmploymentAbsenceError(
                 "Employment absence snapshot must bind absence identity exactly when absent.",
@@ -57,9 +74,7 @@ class EmploymentAbsenceSnapshot:
             ),
             "employment_record_id": str(self.employment_record_id),
             "is_absent": self.is_absent,
-            "known_at": self.known_at.astimezone(timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z"),
+            "known_at": self.known_at.isoformat().replace("+00:00", "Z"),
             "schema_version": "orgmetra.employment_absence_snapshot.v1",
             "tenant_record_id": str(self.tenant_record_id),
         }
@@ -171,20 +186,21 @@ def build_employment_absence_snapshot(
     fails closed.  ``cancelled`` absence versions remain historical evidence but
     do not make the Employment absent.
 
+    The caller's timezone provider is evaluated once, then detached into a
+    built-in UTC datetime before any bitemporal comparison or canonical export.
+    This prevents stateful caller timezone code from changing checked-versus-
+    emitted system-time evidence.
+
     Returns:
         PII-minimized absence evidence containing no Person identifier or reason.
 
     Raises:
-        EmploymentAbsenceError: Scope, status, Employment coverage, or absence
-            cardinality is invalid.
+        EmploymentAbsenceError: Scope, status, Employment coverage, temporal
+            evidence, or absence cardinality is invalid.
         SingleValuedFactError: One durable Employment/absence identity resolves
             to contradictory visible versions.
     """
-    if known_at.tzinfo is None or known_at.utcoffset() is None:
-        raise EmploymentAbsenceError(
-            "Employment absence knowledge cutoff must be timezone-aware.",
-            next_action="Convert the knowledge cutoff to UTC, then rebuild the absence snapshot.",
-        )
+    frozen_known_at = _freeze_known_at(known_at)
 
     scoped = _scoped_absence_versions(
         absence_versions,
@@ -198,7 +214,7 @@ def build_employment_absence_snapshot(
         employment_record_id=employment_record_id,
         person_record_id=person_record_id,
         effective_on=effective_on,
-        known_at=known_at,
+        known_at=frozen_known_at,
     )
     if employment is None or employment.employment_status_code not in _ABSENCE_ELIGIBLE_EMPLOYMENT_STATUSES:
         raise EmploymentAbsenceError(
@@ -217,7 +233,7 @@ def build_employment_absence_snapshot(
             identity_of="employment_absence_record_id",
             identity_value=employment_absence_record_id,
             effective_on=effective_on,
-            known_at=known_at,
+            known_at=frozen_known_at,
         )
         if version is not None:
             visible.append(version)
@@ -233,7 +249,7 @@ def build_employment_absence_snapshot(
         tenant_record_id=tenant_record_id,
         employment_record_id=employment_record_id,
         effective_on=effective_on,
-        known_at=known_at,
+        known_at=frozen_known_at,
         is_absent=active_absence is not None,
         employment_absence_record_id=(
             active_absence.employment_absence_record_id if active_absence is not None else None
