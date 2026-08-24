@@ -277,20 +277,21 @@ class CandidateOfferResponsePacket:
         """Hash live canonical bytes without recursively invoking the integrity check."""
         return sha256(self._raw_canonical_json().encode("utf-8")).hexdigest()
 
-    def _assert_integrity(self) -> None:
-        """Reject any post-construction rewrite before evidence leaves this boundary."""
+    def _assert_integrity(self) -> str:
+        """Validate and return the exact canonical snapshot that passed the issuance check."""
         self._validate_live()
+        canonical_json = self._raw_canonical_json()
         authoritative_seal = _creation_evidence_seal(self)
         if (
-            self._raw_sha256_digest() != authoritative_seal
+            sha256(canonical_json.encode("utf-8")).hexdigest() != authoritative_seal
             or self._creation_evidence_digest != authoritative_seal
         ):
             raise ValueError("candidate offer response evidence changed after construction")
+        return canonical_json
 
     def canonical_json(self) -> str:
-        """Return deterministic canonical JSON after rechecking creation-time integrity."""
-        self._assert_integrity()
-        return self._raw_canonical_json()
+        """Return the exact deterministic snapshot that passed creation-time integrity."""
+        return self._assert_integrity()
 
     def sha256_digest(self) -> str:
         """Return SHA-256 over exact canonical UTF-8 offer-response evidence."""
