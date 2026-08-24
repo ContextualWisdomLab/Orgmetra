@@ -29,11 +29,12 @@ ASSIGNMENT_DIGEST="$(printf 'assignment-snapshot' | sha256sum | awk '{print $1}'
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -v tenant="$TENANT" -v org="$ORG" -v job="$JOB" -v position="$POSITION" -v current_version="$CURRENT_VERSION" <<'SQL' >/dev/null
-INSERT INTO tenant_record (tenant_record_id, tenant_name) VALUES (:'tenant', 'Lifecycle Test');
-INSERT INTO organization_unit (
-    tenant_record_id, organization_unit_id, organization_unit_name, effective_from
-) VALUES (:'tenant', :'org', 'Lifecycle Org', DATE '2026-01-01');
-INSERT INTO job_profile (tenant_record_id, job_profile_id) VALUES (:'tenant', :'job');
+INSERT INTO tenant_record (tenant_record_id, tenant_reference)
+VALUES (:'tenant', 'tenant:lifecycle_test');
+INSERT INTO organization_unit (tenant_record_id, organization_unit_id)
+VALUES (:'tenant', :'org');
+INSERT INTO job_profile (tenant_record_id, job_profile_id)
+VALUES (:'tenant', :'job');
 INSERT INTO position_record (
     tenant_record_id, position_record_id, organization_unit_id, job_profile_id
 ) VALUES (:'tenant', :'position', :'org', :'job');
