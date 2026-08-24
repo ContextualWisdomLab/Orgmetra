@@ -1,0 +1,90 @@
+name: Job Grade Persistence Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - feat/job-grade-design-review
+    paths:
+      - "database/migrations/0022_job_grade_persistence.sql"
+      - "tests/test_job_grade_persistence_postgres.sh"
+      - "docs/adr/0109-job-grade-persistence.md"
+      - "docs/traceability/job-grade-persistence.md"
+      - "docs/doctoring/job-grade-persistence-references.md"
+      - ".github/workflows/job-grade-persistence-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: job-grade-persistence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres_contract:
+    name: Governed Job grade persistence contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: orgmetra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d orgmetra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Print deterministic Job grade persistence provenance
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          paths = [
+              "tests/test_job_grade_persistence_postgres.sh",
+              ".github/workflows/job-grade-persistence-quality.yml",
+          ]
+          optional = [
+              "database/migrations/0022_job_grade_persistence.sql",
+              "docs/adr/0109-job-grade-persistence.md",
+              "docs/traceability/job-grade-persistence.md",
+              "docs/doctoring/job-grade-persistence-references.md",
+          ]
+          rows = []
+          for path_text in paths + [path for path in optional if Path(path).is_file()]:
+              data = Path(path_text).read_bytes()
+              rows.append(
+                  {
+                      "path": path_text,
+                      "sha256": hashlib.sha256(data).hexdigest(),
+                      "bytes": len(data),
+                      "lines": len(data.decode("utf-8").splitlines()),
+                  }
+              )
+          print(json.dumps(rows, separators=(",", ":")))
+          PY
+      - name: Run Job grade persistence regressions
+        run: bash tests/test_job_grade_persistence_postgres.sh
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
