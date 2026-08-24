@@ -22,6 +22,9 @@ JOB_ID="00000000-0000-7000-8000-000000000021"
 SUBORDINATE_POSITION_ID="00000000-0000-7000-8000-000000000031"
 MANAGER_POSITION_ID="00000000-0000-7000-8000-000000000032"
 OTHER_POSITION_ID="00000000-0000-7000-8000-000000000033"
+SUBORDINATE_POSITION_VERSION_ID="00000000-0000-7000-8000-000000000034"
+MANAGER_POSITION_VERSION_ID="00000000-0000-7000-8000-000000000035"
+OTHER_POSITION_VERSION_ID="00000000-0000-7000-8000-000000000036"
 RELATIONSHIP_ID="00000000-0000-7000-8000-000000000041"
 RELATIONSHIP_VERSION_ID="00000000-0000-7000-8000-000000000042"
 REVERSE_RELATIONSHIP_ID="00000000-0000-7000-8000-000000000043"
@@ -108,12 +111,38 @@ INSERT INTO position_reporting_relationship_record (
     ('${TENANT_ID}', '${RELATIONSHIP_ID}', '${SUBORDINATE_POSITION_ID}', 'solid_line'),
     ('${TENANT_ID}', '${REVERSE_RELATIONSHIP_ID}', '${MANAGER_POSITION_ID}', 'solid_line'),
     ('${TENANT_ID}', '${SELF_RELATIONSHIP_ID}', '${OTHER_POSITION_ID}', 'solid_line');
+SQL
+
+version_columns="tenant_record_id, position_reporting_relationship_version_id,
+position_reporting_relationship_record_id, manager_position_record_id,
+review_evidence_digest_sha256, application_evidence_digest_sha256,
+reviewer_actor_reference, applied_by_actor_reference, reviewed_at,
+effective_from, audit_event_record_id"
+
+expect_failure \
+    "position-reporting relationship accepted endpoints without staffable PositionVersion coverage" \
+    "staffable PositionVersion coverage" \
+    "INSERT INTO position_reporting_relationship_version (${version_columns}) VALUES (
+        '${TENANT_ID}', '${RELATIONSHIP_VERSION_ID}', '${RELATIONSHIP_ID}',
+        '${MANAGER_POSITION_ID}', '${REVIEW_DIGEST}', '${canonical_digest}',
+        '${REVIEWER}', '${APPLIED_BY}', TIMESTAMPTZ '2026-08-24 01:55:00+00',
+        DATE '2026-08-24', '${AUDIT_ID}'
+     );"
+
+with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO position_record_version (
+    tenant_record_id, position_record_version_id, position_record_id,
+    position_status_code, effective_from
+) VALUES
+    ('${TENANT_ID}', '${SUBORDINATE_POSITION_VERSION_ID}', '${SUBORDINATE_POSITION_ID}', 'active', DATE '2026-01-01'),
+    ('${TENANT_ID}', '${MANAGER_POSITION_VERSION_ID}', '${MANAGER_POSITION_ID}', 'open', DATE '2026-01-01'),
+    ('${TENANT_ID}', '${OTHER_POSITION_VERSION_ID}', '${OTHER_POSITION_ID}', 'active', DATE '2026-01-01');
+SQL
+
+with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v canonical_digest="${canonical_digest}" <<SQL
 INSERT INTO position_reporting_relationship_version (
-    tenant_record_id, position_reporting_relationship_version_id,
-    position_reporting_relationship_record_id, manager_position_record_id,
-    review_evidence_digest_sha256, application_evidence_digest_sha256,
-    reviewer_actor_reference, applied_by_actor_reference, reviewed_at,
-    effective_from, audit_event_record_id
+    ${version_columns}
 ) VALUES (
     '${TENANT_ID}', '${RELATIONSHIP_VERSION_ID}', '${RELATIONSHIP_ID}',
     '${MANAGER_POSITION_ID}', '${REVIEW_DIGEST}', :'canonical_digest',
@@ -144,12 +173,6 @@ expect_failure \
         '${TENANT_ID}', '00000000-0000-7000-8000-000000000071',
         '${SUBORDINATE_POSITION_ID}', 'solid_line', TIMESTAMPTZ '2000-01-01 00:00:00+00'
      );"
-
-version_columns="tenant_record_id, position_reporting_relationship_version_id,
-position_reporting_relationship_record_id, manager_position_record_id,
-review_evidence_digest_sha256, application_evidence_digest_sha256,
-reviewer_actor_reference, applied_by_actor_reference, reviewed_at,
-effective_from, audit_event_record_id"
 
 expect_failure \
     "position-reporting relationship accepted self-reporting" \
