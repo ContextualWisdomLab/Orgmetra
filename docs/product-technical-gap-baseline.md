@@ -1,111 +1,131 @@
 # Product and technical gap baseline
 
-Inventory date: 2026-08-24 (Asia/Seoul), superseding the 2026-08-23 snapshot. Protected `develop` head observed: `9e3e4847510e1e612b48474ba42b177b8ed824df`.
+Inventory date: 2026-08-25 (Asia/Seoul). Default `develop` head observed: `9e3e4847510e1e612b48474ba42b177b8ed824df`.
 
-This document is a point-in-time buyer/product planning snapshot. It is **not** merge authorization, branch-protection truth, or a substitute for fresh GitHub state. Every execution loop must refetch all open PRs/issues, exact heads and bases, stacks, reviews/threads, applicable exact-head workflows, and effective repository rules before acting.
+This document is a point-in-time buyer/product planning snapshot. It is **not** merge authorization, branch-protection truth, or a substitute for fresh GitHub state. Every execution loop must refetch open PRs/issues, exact heads and bases, dependency ancestry, reviews/threads, exact-head workflows, effective repository rules, releases, and changed refs before acting.
 
-Orgmetra owns authoritative HRIS employment truth inside its published boundaries. Keyverse remains the read-only identity owner through its published OIDC/SCIM contracts. For the currently published People mutation API, the tenant header is `X-Tenant-Reference`; the ASGI implementation normalizes HTTP header names to lower case before parsing it and binds it to the authoritative tenant UUID. Orgmetra does not invent or issue a foreign identity-provider subject.
+Orgmetra owns authoritative HRIS employment truth inside its published boundaries. Keyverse and other dedicated-writer CWL repositories remain read-only dependencies consumed only through published package/API/event contracts and existing owner-control paths. No static product-gap document may authorize a write into another dedicated-writer repository.
 
-Finance/accounting journal ownership and commercial billing/collection ownership are **not accepted Orgmetra architecture in this snapshot**. Treat those integrations as planned/out-of-scope until an owner contract is published and accepted into Orgmetra's canonical architecture/traceability. Psychometrics Commons and other dedicated-writer CWL repositories remain read-only dependencies consumed only through their published contracts.
+## Repository-control truth
 
-Next operator action: do not self-approve. Process the live open-PR graph oldest/dependency-root first. Merge only an unchanged exact head after every applicable current-head gate is terminal GREEN, required conversations are resolved, qualifying independent non-author approval is present, and `develop` has actually enforceable protection. Short-lived model/status checks are not substitutes for those gates unless the live repository policy explicitly makes them qualifying evidence.
+GitHub currently reports `develop` as `protected: true`, but the effective branch-protection payload observed for the same branch has `protection.enabled=false`, required-status enforcement `off`, and no required contexts/checks. Issue #89 owns that repository-settings defect.
 
-## 2026-08-24 execution-loop findings
+Consequences:
 
-1. **Strix failures were infrastructure, not source defects.** Every `strix` check failure on open PRs traced to NVIDIA NIM `429 Too Many Requests` during the scanner's LLM connection phase (three primary-model attempts plus fallback exhausted, no report artifact, fail-closed). Local exact-head verification of #97, #98, #99, #102, #103, #104, and #95 reproduced all owned package suites green at 100% statement/branch coverage; the scan lane, not the code, was failing. Remediation: same-head re-scan dispatch plus a draft/ready toggle per affected PR to re-fire the required-workflow context without moving any head SHA.
-2. **Org review-dispatch budget was zero.** The organization variable `ORG_SWEEP_REVIEW_DISPATCH_LIMIT` was set to `0`, so the hourly/quarter-hourly org queue sweep could never dispatch an OpenCode review for any repository, leaving every PR approved-blocked on "review dispatch limit reached". Fixed by restoring the limit to `2` (and `ORG_SWEEP_BRANCH_UPDATE_LIMIT` to `1`) and adding `ContextualWisdomLab/Orgmetra` to the central repository's targeted-dispatch allowlist. This is recorded so future zero-review stalls are diagnosed against this variable first.
-3. **Queue congestion is real but not a defect.** Org-wide hosted-runner saturation (hundreds of queued runs across sibling repositories) delays evidence materialization for hours. Waiting is not blocked work: local verification, documentation refresh, and independent lanes continue while hosted evidence catches up.
+- a GREEN PR is not merge-authorized merely because GitHub computes it as mergeable;
+- qualifying independent non-author approval is still required where the repository governance contract requires it;
+- no workflow shim, author approval, predecessor check, model-only status, or manual force merge substitutes for enforceable branch protection;
+- immediately before any future merge, refetch the unchanged exact head, independently resolved live base, reviews, unresolved threads, effective rules/protection, and every applicable exact-head check.
 
+## Merged buyer-visible anchors on `develop`
 
-## Merged buyer-visible anchors on protected develop
-
-This table is a selected set of shipped anchors relevant to the current buyer-gap analysis, not a replacement for Git history.
+This is a selected shipped inventory, not a replacement for Git history.
 
 | Merged PR | Capability |
 |---|---|
-| #26 | `validity_study_case_record` integrity (migration 0010) |
-| #28 | Performance-criterion Job-scope guard (migration 0011) |
+| #26 | `validity_study_case_record` integrity |
+| #28 | Performance-criterion Job-scope guard |
 | #31 | Governed People mutation API |
-| #38 | Governed Job Analysis snapshot persist/read |
+| #38 | Governed Job Analysis snapshot persistence/read |
 | #41 | Governed candidate evidence intake |
 | #43 | Governed offer approval packet |
 
-Do not revive those merged heads. Extend protected truth through a new owner-scoped change only when a fresh buyer gap still exists.
+Do not revive these merged heads. Extend default-branch truth only through a current owner-scoped change when a fresh buyer gap remains.
 
-## Open-PR snapshot
+## Live open-PR control snapshot
 
-The entries below are useful anchors only. They are intentionally not an authoritative or exhaustive queue; live execution order comes from a fresh GitHub graph and remains oldest/dependency-root first.
+The repository currently has 68 open PRs. The examples below are anchors only; execution order comes from a fresh oldest/dependency-root-first graph.
 
-### Draft / dependency-constrained examples
+### Oldest root gate
 
-| PR | Head SHA | Branch | Current snapshot reason |
-|---|---|---|---|
-| [#99](https://github.com/ContextualWisdomLab/Orgmetra/pull/99) | `09dc3135606669cdd60778db531cd3f6af34e171` | `feat/employment-compensation-core` | Draft in fresh GitHub state; do not infer readiness from its body |
-| [#82](https://github.com/ContextualWisdomLab/Orgmetra/pull/82) | `0c3a776f2e2c6f93c25e11c5c3ce3fa66a10b5c9` | `feat/outbox-retry-policy` | Stacked on #51; dependency-first |
-| [#77](https://github.com/ContextualWisdomLab/Orgmetra/pull/77) | `9b02cb911377a5beb9f541e9acf2eb51ff065ee9` | `feat/hr-data-disposition-request` | Stacked on #76; dependency-first |
-| [#67](https://github.com/ContextualWisdomLab/Orgmetra/pull/67) | `cf59b3001fa58e5a978099c2a5692a03f4849fdd` | `feat/candidate-withdrawal-governance` | Stacked on #66; dependency-first |
-| [#58](https://github.com/ContextualWisdomLab/Orgmetra/pull/58) | `c79a6ed49627e6a47947f171aeeed2bf02a8c152` | `build/validation-analysis-reproducibility` | Stacked on #57; dependency-first |
+PR #40 (`8d8896b14db10a5a4981f0b9e209ea00ee3be64c`) is open, non-draft and mergeable. Structured Interview Plan, Foundation, SAST, Security, and Recovery are terminal GREEN on that exact head. Fresh reviews are COMMENTED only and the remaining unresolved threads are informational. It still has no qualifying independent non-author `APPROVE`, and issue #89's protection defect remains open, so it is intentionally unmerged.
 
-Keep a PR Draft whenever any applicable exact-current-head required workflow is absent, queued, pending, cancelled, skipped-required, neutral, failed, or stale; when a valid defect remains unresolved; or when its stack dependency has not integrated. Do not transfer predecessor checks or reviews.
+### Dependency-constrained Draft descendants
 
-### Ready-for-review examples on develop
+These descendants remain Draft. Lane-local GREEN evidence is not integrated protected-base evidence and parent checks/reviews do not transfer.
 
-These are snapshot examples only; re-fetch each head, base, review state, threads, workflows, and effective repository rules before acting.
-
-| PR | Head SHA | Capability |
+| PR | Exact child head | Dependency |
 |---|---|---|
-| [#40](https://github.com/ContextualWisdomLab/Orgmetra/pull/40) | `8d8896b14db10a5a4981f0b9e209ea00ee3be64c` | Governed structured interview plan |
-| [#42](https://github.com/ContextualWisdomLab/Orgmetra/pull/42) | `9b871a3245671f0d14ea56e103ac0d9b91482d43` | Selection outcome monitoring plan |
-| [#44](https://github.com/ContextualWisdomLab/Orgmetra/pull/44) | `482d2970cf872cb6f0b4e15fb8805f8bbfd990ff` | Performance review packet |
-| [#45](https://github.com/ContextualWisdomLab/Orgmetra/pull/45) | `e0af2501d540de48f7c0e0e3d09ac3e2e5417d2b` | Assignment change review packet |
-| [#46](https://github.com/ContextualWisdomLab/Orgmetra/pull/46) | `595c190e30e499abea1284c7307ea0783ada1efd` | Employment separation review packet |
-| [#80](https://github.com/ContextualWisdomLab/Orgmetra/pull/80) | `2300c0a0605d89e58aa70ac04b0dee9a7d516882` | Candidate offer response evidence |
-| [#81](https://github.com/ContextualWisdomLab/Orgmetra/pull/81) | `78a9cb1e047db5c79ca855b992d44749b9214992` | Contextual Orchestrator draft evidence |
-| [#94](https://github.com/ContextualWisdomLab/Orgmetra/pull/94) | `3f67182bb3065f2fc8fd974bfdd75a390d8a8fdc` | Bitemporal Position reporting hierarchy |
-| [#95](https://github.com/ContextualWisdomLab/Orgmetra/pull/95) | `adf055d79d188ba18d06ecf80dc1117858c987f4` | Position reporting-change review |
-| [#96](https://github.com/ContextualWisdomLab/Orgmetra/pull/96) | `b9f8e3d291c4bdcd2f0aa5f9d0378dea09e5e7cd` | Organization hierarchy-change review |
-| [#97](https://github.com/ContextualWisdomLab/Orgmetra/pull/97) | `9715b06d0a459aed7f29293e02de8c2a452e2b87` | Bitemporal Position vacancy evidence |
-| [#98](https://github.com/ContextualWisdomLab/Orgmetra/pull/98) | `9aeeb204acce429f85b028029c9531a5b05f37e1` | Governed HR document evidence |
+| #58 | `c79a6ed49627e6a47947f171aeeed2bf02a8c152` | #57 |
+| #67 | `cf59b3001fa58e5a978099c2a5692a03f4849fdd` | #66 |
+| #77 | `9b02cb911377a5beb9f541e9acf2eb51ff065ee9` | #76 |
+| #82 | `0c3a776f2e2c6f93c25e11c5c3ce3fa66a10b5c9` | #51 |
+| #105 | `168f19402b3b17762cfe60f8a0e93c649a082989` | #104 |
+| #106 | `c35ad114edbce7a4ebafcea793748493f1346351` | #94 |
+| #107 | `5e521fd829de313a037f45ac28227c2ae5362d37` | #98 |
+| #108 | `5027c772e5588b33e953258de008f0253389e95c` | #80 |
+| #109 | `1eb17d1dbfa2ec822a9c6cce52d8a92b19ed9353` | #101 |
+| #112 | `4f2a003769bf8f773559ac8122702f1451f0e8c0` | #111 |
 
-Many other open roots exist. Never use this table to skip an older root or an independently actionable lane.
+Do not restack these descendants merely to manufacture fresh evidence while their parents remain unintegrated. After a parent integrates, retarget/reconcile the child against the then-current `develop`, refetch the resulting exact head/base/conflict state, and rerun all applicable Foundation/SAST/Security/Recovery/product gates without transferring predecessor evidence.
 
-## Buyer-facing gaps after the open queue
+### Selected current root capabilities
 
-Do not open withholding, payroll-pay, statutory accounting, or year-end settlement tables/UI inside Orgmetra without an accepted owner boundary.
+The following are current open-root anchors with terminal exact-head GREEN evidence and are useful for product-gap reasoning. They remain unmerged pending live governance gates.
 
-1. Job-grade design against a persisted Job Analysis snapshot, with a normalized grade/band model and accessible Storybooked interaction.
-2. Job-analysis LLM draft assistance through Contextual Orchestrator/NVIDIA NIM, with semantic-unit provenance and mandatory human confirmation before snapshot persistence.
-3. Offer-to-hire close: connect governed candidate offer response to the authoritative confirmed-hire mutation path without turning response evidence into hire authority.
-4. Vacancy-to-assignment: let an authorized operator fill/freeze a staffable Position through authoritative Assignment truth, preserving bitemporal and audit/outbox evidence.
-5. Purpose-bound document retrieve/export for governed HR document evidence with field minimization, retention/export controls, and immutable audit rather than indiscriminate masking.
-6. For new buyer-visible screens, maintain Storybook, design tokens, accessibility evidence, wireframes, and a governed Figma/Product Design handoff when material.
-7. External finance/accounting or billing integration remains planned until a published owner API/event contract is accepted; Orgmetra must not create statutory-account truth or direct cross-service application-table SQL.
+| PR | Exact head | Capability |
+|---|---|---|
+| #53 | `43ae3c73c0abef8f23d1c14f4e41d25b8c9b14df` | Evidence-centered HR workspace / Storybook slice |
+| #75 | `282ff0966add47a80a2edd76f84c4c65a868fedb` | Governed HR data-export review |
+| #80 | `5070f34cd13814f09d74162347f837cb34d76a57` | Candidate offer-response evidence |
+| #81 | `78a9cb1e047db5c79ca855b992d44749b9214992` | Contextual Orchestrator draft-evidence boundary |
+| #98 | `9aeeb204acce429f85b028029c9531a5b05f37e1` | Governed HR document evidence |
+| #99 | `fff082f56e34e47cb83a19316d132c5638d3b633` | Employment-scoped bitemporal base compensation |
+| #101 | `13c4cf8ee7e91ffa0ac1a33fdc9461e4c31d5fb2` | Governed Job-grade design review |
+| #102 | `d87cb05f723f106c653f2ea07680872fd9c62ada` | Purpose-bound audit-evidence review |
+| #104 | `d92ac4cb798b3bd32b632c0ab677c03f944070e4` | Governed Job qualification-rule review |
+| #110 | `bc84eaa145166a3f77a57f0c94c6d7459cfc65f3` | Vacancy-to-Assignment fill orchestration |
+| #111 | `cfff42f5cf884ff67169ddeff645c6933e19337a` | Governed Position lifecycle-change review |
 
-## Open PRs observed 2026-08-24 (anchors, not authority)
+This table intentionally does not assert that every root is merge-authorized. Fresh review and effective-rule state remain authoritative.
 
-Fifty open PRs were observed. New roots since the previous snapshot include #52 (TEPP analysis adapter), #54 (workforce composition change), #55 (People read hardening), #56 (Organization hierarchy snapshot), #57 (validity analysis handoff), #59-#65 (recorded-time/runtime-integrity repairs), #66 (normalized candidate application), #68 (Naruon calendar integrity), #69-#73 (bitemporal/correction/chronology hardening), #74 (People operability probes), #75/#76/#77 (HR data export/retention/disposition governance), #78 (SBOM/provenance release evidence), #79 (Kubernetes reference deployment), #90 (People HTTP telemetry), #91-#96 (privacy/performance/reporting/hierarchy evidence lanes), #100 (this document), #102-#104 (audit/work-capacity/qualification-rule reviews), #110 (vacancy fill orchestration, draft), #111 (Position lifecycle review), #112 (lifecycle application, stacked draft). Stacks remain dependency-first: #105→#104, #106→#94, #107→#98, #108→#80, #109→#101, #112→#111, #77→#76, #67→#66, #58→#57.
+## Buyer-visible progress since the previous snapshot
+
+Several items that were previously listed as unresolved product gaps now have active owner lanes and must no longer be described as absent:
+
+1. **Job grade/band governance:** #101 provides reviewed Job-grade design evidence; #109 is the dependency-first bitemporal persistence descendant.
+2. **Offer-to-hire close:** #80 owns candidate offer-response evidence; #108 is the dependency-first bridge to the authoritative confirmed-hire boundary.
+3. **Vacancy-to-Assignment fill:** #110 owns the current orchestration slice and delegates final persistence to the authoritative People mutation boundary.
+4. **Position lifecycle:** #111 owns human-reviewed lifecycle-change evidence; #112 is the dependency-first authoritative application descendant.
+5. **HR document evidence:** #98 owns the value-minimized evidence packet; #107 is the dependency-first immutable persistence descendant.
+
+These are active-PR capabilities, **not protected-main truth** until integrated.
+
+## Highest-value buyer gaps after the current queue
+
+Do not open withholding, payroll-pay, statutory accounting, year-end settlement, or foreign-service application tables inside Orgmetra without an accepted owner contract.
+
+1. **Purpose-bound HR document retrieval/export execution.** #75 reviews export intent and #98/#107 govern document evidence/persistence, but a customer still needs an authorized document read/egress execution boundary that re-resolves tenant/Person/Employment scope, purpose, permitted fields/artifact, retention/legal-hold state, delivery destination, human approval, and immutable audit before bytes leave the owner boundary.
+2. **Authoritative Employment leave/absence truth.** #47 provides a governed leave review packet, but protected `develop` still lacks a normalized bitemporal leave/absence application/persistence boundary that preserves Employment scope, business time, system-recorded time, human review, correction-not-rewrite history, tenant isolation, and audit/outbox evidence without turning policy review into payroll or scheduling authority.
+3. **Job-Analysis-specific model-assisted draft workflow.** #81 provides the generic Contextual Orchestrator draft-evidence contract; a later Job Analysis slice should bind semantic-unit Task/FJA/KSAO draft provenance to an exact Job Analysis snapshot workflow and require explicit human confirmation before authoritative persistence. Model output remains untrusted draft evidence.
+4. **Accessible buyer interaction for the newer HRIS cores.** Job-grade, document, Position lifecycle/reporting, and qualification-rule capabilities need cohesive Figma/Product Design handoff, Storybook coverage, keyboard/focus/ARIA evidence, and customer-facing next-action copy when UI work is material. #53 is a useful existing workspace anchor rather than permission to invent protected-main API behavior.
+5. **Integrated release readiness.** Source SBOM/provenance, probes, telemetry and Kubernetes reference lanes exist, but no release/version/tag should be created until one exact integrated protected head satisfies applicable build/package/SBOM/provenance/reproducibility/compatibility/review/migration/rollback/recovery/accessibility/operational gates together and source/artifact hashes are reverified.
+
+External finance/accounting and billing/collection integration remains planned/out-of-scope until an owner publishes a contract accepted into Orgmetra architecture/traceability. Orgmetra must not create statutory-account truth or direct cross-service application-table SQL as a shortcut.
 
 ## Technical non-negotiables
 
-- Exact 100% owned production statement/branch coverage where tooling exposes it, plus beginner-readable public docs/docstrings and realistic round-trip/security/privacy/concurrency/recovery cases.
-- Database objects use descriptive two-or-more-word `snake_case`, 3NF by default, tenant/context isolation, opaque public IDs, and distinct business/effective versus system-recorded time.
-- Job, Position, and Assignment remain separate authoritative concepts.
-- Necessary PII stays usable only through purpose-bound authorization, least privilege, field minimization, encryption, retention/export controls, and immutable audit evidence.
-- High-impact employment decisions require explicit accountable human confirmation with actor/purpose/reason/evidence versioning; LLM output remains untrusted draft evidence only.
-- Design write paths toward CSAP and SOC 2 evidence readiness without claiming certification.
+- Exact 100% owned production statement/branch coverage where tooling exposes it, plus beginner-readable public docs/docstrings and realistic security/privacy/concurrency/migration/recovery/accessibility cases.
+- Descriptive two-or-more-word `snake_case` database objects and 3NF by default.
+- Job, Position, Assignment, Employment, Organization, and Person remain distinct authoritative concepts.
+- Business/effective time and system-recorded time remain separate; correction is correction-not-rewrite.
+- Tenant/context isolation, opaque public correlation, least privilege, field minimization, encryption/retention/export controls, and immutable audit/outbox remain mandatory.
+- Necessary PII remains usable only through purpose-bound authorization; indiscriminate masking is not a substitute for access control.
+- High-impact employment decisions require accountable human confirmation with actor/purpose/reason/evidence versioning. LLM output remains untrusted draft evidence only.
 - Preserve modular MSA extraction boundaries; do not introduce direct cross-service application-table SQL.
-- Failed checks are repair triggers at the first causal owner boundary. Review wait on one lane never blocks independent Orgmetra work.
+- Design toward CSAP and SOC 2 evidence readiness without claiming certification.
+- Queued, pending, cancelled, skipped-required, neutral, absent, stale, predecessor, status-only, or model-only evidence is non-passing.
 
 ## Execution loop
 
-Each run: refetch protected `develop`, all open PRs/issues and exact heads/bases, dependency ancestry, reviews/threads, exact-head workflows and effective rules; process oldest/dependency-root first; repair verified Orgmetra defects test-first when practicable; rerun exact-head evidence; resolve only addressed threads; and merge only with qualifying independent non-author approval plus actually enforceable protection. Refresh this document only as a snapshot after material state changes; never treat its recorded SHAs as current truth.
+Each run: refetch `develop`, all open PRs/issues and exact heads/bases, dependency ancestry, reviews/threads, exact-head workflows, releases and effective rules; process oldest/dependency-root first; repair verified Orgmetra defects at the owning boundary test-first when practicable; rerun exact-head evidence; resolve only addressed threads; and merge only with qualifying independent non-author approval plus actually enforceable protection. Refresh this document only after material state changes and never use its recorded SHAs as current control-plane truth.
 
 ## Doctoring (APA 7th)
 
-Equal Employment Opportunity Commission. (1978). *Uniform guidelines on employee selection procedures* (29 C.F.R. Part 1607).
+American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*.
 
-Society for Industrial and Organizational Psychology. (2018). *Principles for the validation and use of personnel selection procedures* (5th ed.).
+Equal Employment Opportunity Commission. (1978). *Uniform guidelines on employee selection procedures* (29 C.F.R. Part 1607).
 
 International Organization for Standardization. (2025). *ISO 30414:2025 Human resource management — Requirements and recommendations for human capital reporting and disclosure*. ISO.
 
-American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*.
+Society for Industrial and Organizational Psychology. (2018). *Principles for the validation and use of personnel selection procedures* (5th ed.).
