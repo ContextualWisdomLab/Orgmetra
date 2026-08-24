@@ -3,6 +3,8 @@ set -euo pipefail
 
 : "${DATABASE_URL:?DATABASE_URL is required}"
 
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0024_position_lifecycle_transition_hardening.sql >/dev/null
+
 TENANT="0198a412-8000-7000-8000-000000000101"
 POSITION="0198a412-8000-7000-8000-000000000104"
 REVIEW_REF="a0e89c71-41c1-4c63-935c-8569d83f7901"
