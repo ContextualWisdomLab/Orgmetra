@@ -1,10 +1,10 @@
 """Connect candidate acceptance evidence to authoritative confirmed-hire materialization.
 
 Candidate response evidence is a necessary candidate-originated fact, never hire
-authority. This boundary first verifies that the authenticated caller is purpose-bound to
-materialize the exact selection decision, then snapshots an accepted response, asks an
-injected authoritative host to resolve the response to one candidate profile and selection
-decision, verifies the returned scope, and delegates to the existing confirmed-hire path.
+authority. This boundary validates the supplied response envelope, verifies that the
+authenticated caller is purpose-bound to materialize the exact selection decision before
+protected candidate/offer resolution, asks an injected authoritative host to resolve the
+response, verifies the returned scope, and delegates to the existing confirmed-hire path.
 No candidate PII or compensation value is copied into this orchestration boundary.
 """
 
@@ -179,20 +179,26 @@ def close_accepted_offer_to_hire(
     authority: CandidateOfferHireAuthority,
     mutation_port: HireAcceptancePort,
 ) -> HireAcceptanceResult:
-    """Require authorization, candidate acceptance, and exact mapping before hire mutation.
+    """Require response integrity, authorization, and exact mapping before hire mutation.
 
-    The candidate response cannot authorize employment creation by itself. Before candidate
-    identity or offer provenance is resolved, the authenticated principal must already be
-    purpose-bound to materialize the exact immutable selection decision in ``command``. The
-    injected authority then re-resolves candidate and offer scope and returns matching evidence.
-    Only after those checks does this function invoke the existing confirmed-hire service,
-    which independently reauthorizes the same selection decision immediately before the
-    mutation port may persist Person/Employment/conversion truth.
+    The candidate response cannot authorize employment creation by itself. The supplied packet
+    is first validated as immutable candidate-originated evidence and checked against the hire
+    command tenant. Before candidate identity or offer provenance is resolved, the authenticated
+    principal must be purpose-bound to materialize the exact immutable selection decision. The
+    injected authority then re-resolves candidate and offer scope. Only after those checks does
+    this function invoke the existing confirmed-hire service, which independently reauthorizes
+    the same selection decision immediately before persistence.
     """
     if type(command) is not HireAcceptanceCommand:
         raise TypeError("command must be the exact HireAcceptanceCommand runtime type")
     if not isinstance(authority, CandidateOfferHireAuthority):
         raise TypeError("authority must implement CandidateOfferHireAuthority")
+
+    response_digest, payload = _snapshot_response(response)
+    if payload.get("response_code") != "offer_accepted":
+        raise OfferToHireIntegrityError("candidate offer response must be accepted before hire orchestration")
+    if payload.get("tenant_record_id") != str(command.tenant_record_id):
+        raise OfferToHireIntegrityError("candidate response tenant does not match the hire command")
 
     authorize_resource_fields(
         principal=principal,
@@ -205,12 +211,6 @@ def close_accepted_offer_to_hire(
         requested_fields=_HIRE_MUTATION_FIELDS,
         policy=policy,
     )
-
-    response_digest, payload = _snapshot_response(response)
-    if payload.get("response_code") != "offer_accepted":
-        raise OfferToHireIntegrityError("candidate offer response must be accepted before hire orchestration")
-    if payload.get("tenant_record_id") != str(command.tenant_record_id):
-        raise OfferToHireIntegrityError("candidate response tenant does not match the hire command")
 
     verification = authority.verify_offer_acceptance(
         tenant_record_id=str(payload["tenant_record_id"]),
