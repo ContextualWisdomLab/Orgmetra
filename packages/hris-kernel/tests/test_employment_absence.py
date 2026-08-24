@@ -76,9 +76,10 @@ def snapshot(
     known_at: datetime = utc(25),
 ):
     """Build the target worker's absence snapshot."""
+    employments = [employment()] if employment_versions is None else employment_versions
     return build_employment_absence_snapshot(
         absence_versions,
-        employment_versions or [employment()],
+        employments,
         tenant_record_id=TENANT,
         person_record_id=PERSON,
         employment_record_id=EMPLOYMENT,
@@ -109,12 +110,21 @@ def test_snapshot_reports_confirmed_absence_without_reason_values() -> None:
 
 
 def test_snapshot_reports_present_when_no_confirmed_absence_is_visible() -> None:
-    """A cancelled or out-of-period absence must not make the Employment absent."""
-    cancelled = absence(status="cancelled")
-    result = snapshot([cancelled])
+    """A cancelled absence must not make the Employment absent."""
+    result = snapshot([absence(status="cancelled")])
 
     assert result.is_absent is False
     assert result.employment_absence_record_id is None
+    assert result.canonical_document()["employment_absence_record_id"] is None
+
+
+def test_future_confirmed_absence_is_not_visible_early() -> None:
+    """Future business-time absence evidence stays outside today's snapshot."""
+    future = absence(
+        effective_start=date(2026, 9, 1),
+        effective_end=date(2026, 9, 10),
+    )
+    assert snapshot([future]).is_absent is False
 
 
 def test_recorded_correction_can_cancel_previously_confirmed_absence() -> None:
@@ -165,6 +175,17 @@ def test_absence_requires_one_eligible_visible_employment() -> None:
     """Confirmed absence cannot outlive or attach to a terminal Employment."""
     with pytest.raises(EmploymentAbsenceError, match="active or leave Employment"):
         snapshot([absence()], [employment(status="terminated")])
+
+
+def test_absence_requires_a_visible_employment_anchor() -> None:
+    """Missing Employment truth is not silently converted into present-at-work truth."""
+    with pytest.raises(EmploymentAbsenceError, match="active or leave Employment"):
+        snapshot([], [])
+
+
+def test_leave_employment_status_is_eligible_for_absence_truth() -> None:
+    """Existing Employment status `leave` remains compatible with absence reconstruction."""
+    assert snapshot([absence()], [employment(status="leave")]).is_absent is True
 
 
 def test_contradictory_visible_employment_versions_fail_closed() -> None:
