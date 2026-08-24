@@ -188,8 +188,8 @@ if [[ "${state}" != "authoritative_job_grade_assignment|not_authorized_for_compe
 fi
 
 set +e
-mismatch_output="$({ with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
-    -v review_evidence="${review_evidence}" -v review_digest="${review_digest}" -c "
+mismatch_output="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v review_evidence="${review_evidence}" -v review_digest="${review_digest}" <<SQL 2>&1
 INSERT INTO job_grade_assignment_version (
     tenant_record_id, job_grade_assignment_version_id,
     job_grade_assignment_record_id, job_grade_definition_record_id,
@@ -205,7 +205,9 @@ INSERT INTO job_grade_assignment_version (
     '${REQUESTER}', '${REVIEWER}', '${REASON_CODE}', 1,
     TIMESTAMPTZ '${REVIEWED_AT}', TIMESTAMPTZ '${PACKET_RECORDED_AT}',
     DATE '2027-01-01', '${AUDIT_ID}'
-);" ; } 2>&1)"
+);
+SQL
+)"
 mismatch_status=$?
 set -e
 if [[ ${mismatch_status} -eq 0 || "${mismatch_output}" != *"canonical Job grade review evidence"* ]]; then
@@ -214,8 +216,8 @@ if [[ ${mismatch_status} -eq 0 || "${mismatch_output}" != *"canonical Job grade 
 fi
 
 set +e
-wrong_job_output="$({ with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
-    -v review_evidence="${review_evidence}" -v review_digest="${review_digest}" -c "
+wrong_job_output="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v review_evidence="${review_evidence}" -v review_digest="${review_digest}" <<SQL 2>&1
 INSERT INTO job_grade_assignment_version (
     tenant_record_id, job_grade_assignment_version_id,
     job_grade_assignment_record_id, job_grade_definition_record_id,
@@ -231,7 +233,9 @@ INSERT INTO job_grade_assignment_version (
     '${REQUESTER}', '${REVIEWER}', '${REASON_CODE}', 1,
     TIMESTAMPTZ '${REVIEWED_AT}', TIMESTAMPTZ '${PACKET_RECORDED_AT}',
     DATE '2027-01-01', '${AUDIT_ID}'
-);" ; } 2>&1)"
+);
+SQL
+)"
 wrong_job_status=$?
 set -e
 if [[ ${wrong_job_status} -eq 0 || "${wrong_job_output}" != *"same Job"* ]]; then
