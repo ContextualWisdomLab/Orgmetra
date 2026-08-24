@@ -144,7 +144,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION protect_position_reporting_history() IS
-    'Rejects deletion and in-place rewriting of position-reporting history; UPDATE may only close one open system-recorded interval at PostgreSQL transaction time.';
+    'Rejects deletion and in-place rewriting of position-reporting history; UPDATE may only close an open system-recorded interval at PostgreSQL transaction time.';
 
 CREATE TRIGGER position_reporting_record_history_guard
 BEFORE UPDATE OR DELETE ON position_reporting_relationship_record
@@ -165,6 +165,7 @@ DECLARE
     relationship_type text;
     anchor_recorded_to timestamptz;
     audit_event jsonb;
+    audit_event_digest text;
     outbox_found boolean;
     cycle_found boolean;
 BEGIN
@@ -222,8 +223,8 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
-    SELECT canonical_event_json::jsonb
-    INTO audit_event
+    SELECT canonical_event_json::jsonb, event_envelope_digest
+    INTO audit_event, audit_event_digest
     FROM audit_event_record
     WHERE tenant_record_id = NEW.tenant_record_id
       AND audit_event_record_id = NEW.audit_event_record_id
@@ -247,12 +248,18 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
-    IF audit_event ->> 'orgmetrapurpose' <> 'position_reporting_change_apply'
-       OR audit_event ->> 'orgmetraactor' <> NEW.applied_by_actor_reference
-       OR audit_event ->> 'orgmetraevidence' <> NEW.application_evidence_digest_sha256
+    IF audit_event ->> 'orgmetrapurpose'
+          IS DISTINCT FROM 'position_reporting_change_apply'
+       OR audit_event ->> 'orgmetraactor'
+          IS DISTINCT FROM NEW.applied_by_actor_reference
+       OR audit_event ->> 'orgmetraevidence'
+          IS DISTINCT FROM NEW.review_evidence_digest_sha256
+       OR audit_event_digest IS DISTINCT FROM NEW.application_evidence_digest_sha256
        OR audit_event ->> 'subject'
-          <> 'position_reporting_relationship:' || NEW.position_reporting_relationship_record_id::text
-       OR audit_event #>> '{data,result_code}' <> 'position_reporting_applied'
+          IS DISTINCT FROM
+             'position_reporting_relationship:' || NEW.position_reporting_relationship_record_id::text
+       OR audit_event #>> '{data,result_code}'
+          IS DISTINCT FROM 'position_reporting_applied'
        OR (audit_event #>> '{data,high_impact}')::boolean IS DISTINCT FROM false
        OR (audit_event ->> 'time')::timestamptz < NEW.reviewed_at
        OR (audit_event ->> 'time')::timestamptz > NEW.recorded_from THEN
@@ -265,7 +272,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION enforce_position_reporting_scope() IS
-    'Before persistence, resolves the same-tenant relationship anchor, rejects self-reporting and cycles over overlapping effective time, and requires human-review-separated immutable audit/outbox application evidence.';
+    'Before persistence, resolves the same-tenant relationship anchor, rejects self-reporting and cycles over overlapping effective time, and requires immutable audit/outbox application evidence that binds the reviewed evidence digest, applying actor, exact application event digest, subject, result, and chronology.';
 
 CREATE TRIGGER position_reporting_version_scope_guard
 BEFORE INSERT ON position_reporting_relationship_version
@@ -349,4 +356,4 @@ COMMENT ON TABLE position_reporting_relationship_record IS
     'Durable tenant-scoped Position-to-Position solid-line relationship anchor. The subordinate seat and relationship type are stable anchor identity; Person and Assignment are intentionally absent.';
 
 COMMENT ON TABLE position_reporting_relationship_version IS
-    'Authoritative bitemporal manager-Position versions applied only after separate human review and immutable audit/outbox evidence. The relation stores no worker PII, compensation, ratings, or employment-decision output.';
+    'Authoritative bitemporal manager-Position versions applied only after separate human review and immutable audit/outbox evidence. The application audit event must bind the review digest and its exact envelope digest. The relation stores no worker PII, compensation, ratings, or employment-decision output.';
