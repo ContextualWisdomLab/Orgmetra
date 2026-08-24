@@ -10,6 +10,8 @@ Orgmetra architecture assigns `document_records` ownership of HR document metada
 
 `people_core`, `audit_provenance`, and `integration_hub` are separate bounded contexts. Therefore the document-record relation must not query or foreign-key their application tables merely because the initial modular deployment can share one PostgreSQL cluster. Cross-context identities remain opaque published-contract references.
 
+A digest column by itself is insufficient evidence binding: a caller could otherwise persist typed metadata from one document together with a syntactically valid SHA-256 from a different `DocumentRecordEvidence` packet. Durable persistence therefore has to retain the exact value-minimized canonical evidence bytes and verify that their digest and semantic fields describe the same row.
+
 ## Decision
 
 Add one immutable `document_record` relation owned by the document-records boundary. It stores:
@@ -18,9 +20,12 @@ Add one immutable `document_record` relation owned by the document-records bound
 - opaque Person and Employment references rather than cross-service table identifiers;
 - reviewed document category, uploader/persisting actor correlations, and immutable artifact reference;
 - SHA-256 artifact, source-provenance, retention-policy, evidence, and application-evidence digests;
+- the exact bounded canonical JSON emitted by the reviewed `DocumentRecordEvidence` schema;
 - opaque audit/outbox handoff references from owner contracts;
-- business `received_at` and PostgreSQL-owned `recorded_at`;
+- business `received_at` and PostgreSQL-owned persistence `recorded_at`;
 - fixed `restricted_hr`, `artifact_reference_only`, and `not_authorized_for_employment_decision` states.
+
+An insert is accepted only when the SHA-256 of the exact stored canonical JSON equals `evidence_digest_sha256`, the JSON has exactly the reviewed v1 key set, every trust-bearing evidence field equals the typed persistence column or fixed state, the schema version is `orgmetra.document_record_evidence.v1`, the evidence receipt timestamp equals the row receipt timestamp, and the evidence issuance timestamp falls between receipt and durable persistence. The canonical JSON is value-minimized metadata evidence, not document content.
 
 The relation stores no document bytes/title, free-form HR text, compensation, rating, credentials, or employment-decision output. UPDATE, DELETE, and TRUNCATE are rejected. Lifecycle disposition belongs to a separate governed relation rather than rewriting the immutable metadata snapshot.
 
