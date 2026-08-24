@@ -1,0 +1,165 @@
+"""Adversarial runtime regressions for governed vacancy fill orchestration."""
+
+from __future__ import annotations
+
+from datetime import date
+from decimal import Decimal
+import unittest
+from uuid import UUID
+
+from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
+from orgmetra_people_api.auth import AuthenticatedPrincipal
+from orgmetra_people_api.mutations import AssignmentMutationCommand, AssignmentMutationResult
+from orgmetra_people_api.vacancy_fill import VacancyFillVerification, fill_position_vacancy
+
+TENANT = UUID("0198a412-8000-7000-8000-000000000001")
+PERSON = UUID("0198a412-8000-7000-8000-000000000020")
+EMPLOYMENT = UUID("0198a412-8000-7000-8000-000000000030")
+POSITION = UUID("0198a412-8000-7000-8000-000000000040")
+ASSIGNMENT = UUID("0198a412-8000-7000-8000-000000000070")
+AUDIT_EVENT = UUID("0198a412-8000-7000-8000-000000000080")
+OUTBOX = UUID("0198a412-8000-7000-8000-000000000081")
+EFFECTIVE_ON = date(2026, 8, 24)
+CONFIRMATION = "human_confirmation:vacancy-review-17"
+EVIDENCE_VERSION = "vacancy_fill_review:v1"
+
+PRINCIPAL = AuthenticatedPrincipal(
+    tenant_record_id=TENANT,
+    actor_reference="keyverse_subject:workforce-operator-17",
+    granted_scope_codes=frozenset({"orgmetra.people.write"}),
+)
+POLICY = PurposeBoundAccessPolicy(
+    tenant_record_id=TENANT,
+    policy_version_code="people-mutation-v1",
+    resource_kind="assignment_record",
+    purpose_code="workforce_admin",
+    operation_code="create_record",
+    required_scope_code="orgmetra.people.write",
+    permitted_fields=frozenset({"assignment_record"}),
+)
+
+
+def command() -> AssignmentMutationCommand:
+    """Build one valid vacancy-fill Assignment command."""
+    return AssignmentMutationCommand(
+        tenant_record_id=TENANT,
+        employment_record_id=EMPLOYMENT,
+        person_record_id=PERSON,
+        position_record_id=POSITION,
+        assignment_record_id=ASSIGNMENT,
+        audit_event_record_id=AUDIT_EVENT,
+        outbox_delivery_record_id=OUTBOX,
+        allocation_ratio=Decimal("1.0000"),
+        effective_from=EFFECTIVE_ON,
+        confirmation_reference=CONFIRMATION,
+        evidence_version_code=EVIDENCE_VERSION,
+        idempotency_key="vacancy-fill-key-001",
+    )
+
+
+def valid_verification() -> VacancyFillVerification:
+    """Build one fresh human-confirmed vacancy verification."""
+    return VacancyFillVerification(
+        tenant_record_id=TENANT,
+        employment_record_id=EMPLOYMENT,
+        person_record_id=PERSON,
+        position_record_id=POSITION,
+        effective_on=EFFECTIVE_ON,
+        position_status_code="open",
+        available_allocation_ratio=Decimal("1.0000"),
+        confirmation_reference=CONFIRMATION,
+        evidence_version_code=EVIDENCE_VERSION,
+    )
+
+
+class RecordingAuthority:
+    """Record whether protected staffing resolution was reached."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def verify_vacancy_fill(self, *, command: AssignmentMutationCommand) -> VacancyFillVerification:
+        del command
+        self.calls += 1
+        return valid_verification()
+
+
+class VacancyFillRuntimeIntegrityTests(unittest.TestCase):
+    """Close runtime-forgery and unavailable-persistence paths before protected resolution."""
+
+    def test_invalid_mutation_port_fails_before_protected_vacancy_resolution(self) -> None:
+        authority = RecordingAuthority()
+        with self.assertRaisesRegex(TypeError, "PeopleMutationPort"):
+            fill_position_vacancy(
+                principal=PRINCIPAL,
+                command=command(),
+                purpose_code="workforce_admin",
+                policy=POLICY,
+                vacancy_authority=authority,
+                mutation_port=object(),  # type: ignore[arg-type]
+            )
+        self.assertEqual(authority.calls, 0)
+
+    def test_forged_purpose_and_command_primitives_fail_before_resolver(self) -> None:
+        class ForgedText(str):
+            pass
+
+        authority = RecordingAuthority()
+        with self.assertRaisesRegex(TypeError, "purpose_code"):
+            fill_position_vacancy(
+                principal=PRINCIPAL,
+                command=command(),
+                purpose_code=ForgedText("workforce_admin"),
+                policy=POLICY,
+                vacancy_authority=authority,
+                mutation_port=object(),  # type: ignore[arg-type]
+            )
+        for field_name, value in (
+            ("tenant_record_id", "not-a-uuid"),
+            ("effective_from", type("ForgedDate", (date,), {})(2026, 8, 24)),
+            ("allocation_ratio", type("ForgedDecimal", (Decimal,), {})("1.0000")),
+        ):
+            with self.subTest(field_name=field_name):
+                forged = command()
+                object.__setattr__(forged, field_name, value)
+                with self.assertRaises((TypeError, ValueError)):
+                    fill_position_vacancy(
+                        principal=PRINCIPAL,
+                        command=forged,
+                        purpose_code="workforce_admin",
+                        policy=POLICY,
+                        vacancy_authority=authority,
+                        mutation_port=object(),  # type: ignore[arg-type]
+                    )
+        self.assertEqual(authority.calls, 0)
+
+    def test_verification_rejects_nonfinite_and_forged_text_evidence(self) -> None:
+        class ForgedText(str):
+            pass
+
+        for overrides in (
+            {"tenant_record_id": "not-a-uuid"},
+            {"available_allocation_ratio": Decimal("NaN")},
+            {"confirmation_reference": ForgedText(CONFIRMATION)},
+            {"evidence_version_code": ForgedText(EVIDENCE_VERSION)},
+            {"review_state": ForgedText("human_confirmed")},
+        ):
+            values = {
+                "tenant_record_id": TENANT,
+                "employment_record_id": EMPLOYMENT,
+                "person_record_id": PERSON,
+                "position_record_id": POSITION,
+                "effective_on": EFFECTIVE_ON,
+                "position_status_code": "open",
+                "available_allocation_ratio": Decimal("1.0000"),
+                "confirmation_reference": CONFIRMATION,
+                "evidence_version_code": EVIDENCE_VERSION,
+                "review_state": "human_confirmed",
+            }
+            values.update(overrides)
+            with self.subTest(overrides=overrides), self.assertRaises(ValueError):
+                VacancyFillVerification(**values)  # type: ignore[arg-type]
+
+
+if __name__ == "__main__":
+    unittest.main()
