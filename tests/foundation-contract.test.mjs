@@ -266,6 +266,15 @@ test('local links validate files and ignore anchors, web, and mail links', () =>
   }
 });
 
+test('ADR index keeps provenance outside canonical status cells', () => {
+  const indexText = readFileSync(new URL('../docs/adr/README.md', import.meta.url), 'utf8');
+  assert.doesNotMatch(
+    indexText,
+    /\|\s*(?:Proposed|Accepted|Superseded|Rejected)\s+on\s+[^|]+\|/,
+    'ADR status cells must remain canonical; branch provenance belongs in a separate column'
+  );
+});
+
 test('ADR index reports missing files and status mismatch', () => {
   const root = temporaryDirectory();
   try {
