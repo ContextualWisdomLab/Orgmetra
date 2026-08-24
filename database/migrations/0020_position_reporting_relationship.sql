@@ -169,6 +169,19 @@ DECLARE
     outbox_found boolean;
     cycle_found boolean;
 BEGIN
+    -- Graph validity is a tenant-wide invariant. Concurrent opposite edge
+    -- inserts can otherwise both validate before either commits. A transaction
+    -- advisory lock serializes graph mutations for one tenant while still
+    -- allowing different tenants to progress independently. This trigger is
+    -- VOLATILE, so the queries after lock acquisition use current committed
+    -- state under PostgreSQL READ COMMITTED semantics.
+    PERFORM pg_catalog.pg_advisory_xact_lock(
+        pg_catalog.hashtextextended(
+            'orgmetra_position_reporting:' || NEW.tenant_record_id::text,
+            0
+        )
+    );
+
     SELECT subordinate_position_record_id, relationship_type_code, recorded_to
     INTO subordinate_position_id, relationship_type, anchor_recorded_to
     FROM position_reporting_relationship_record
@@ -272,7 +285,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION enforce_position_reporting_scope() IS
-    'Before persistence, resolves the same-tenant relationship anchor, rejects self-reporting and cycles over overlapping effective time, and requires immutable audit/outbox application evidence that binds the reviewed evidence digest, applying actor, exact application event digest, subject, result, and chronology.';
+    'Before persistence, serializes one tenant reporting graph, resolves the same-tenant relationship anchor, rejects self-reporting and cycles over overlapping effective time, and requires immutable audit/outbox application evidence that binds the reviewed evidence digest, applying actor, exact application event digest, subject, result, and chronology.';
 
 CREATE TRIGGER position_reporting_version_scope_guard
 BEFORE INSERT ON position_reporting_relationship_version
