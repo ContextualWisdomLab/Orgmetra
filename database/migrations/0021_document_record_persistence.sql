@@ -159,7 +159,7 @@ DECLARE
     evidence_recorded_at timestamptz;
 BEGIN
     computed_evidence_digest := encode(
-        pg_catalog.digest(
+        public.digest(
             pg_catalog.convert_to(NEW.canonical_evidence_json, 'UTF8'),
             'sha256'
         ),
