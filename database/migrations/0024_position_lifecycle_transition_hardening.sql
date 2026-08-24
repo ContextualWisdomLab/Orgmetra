@@ -66,7 +66,11 @@ BEGIN
         RETURN false;
     END IF;
 
-    SELECT count(*), array_agg(key ORDER BY key)
+    -- Key-shape validation must not depend on the database's locale collation.
+    -- The v1 contract is ASCII field names in deterministic C order; otherwise
+    -- en_US collation can reorder underscore-bearing keys and reject valid review
+    -- evidence even though the key set is exact.
+    SELECT count(*), array_agg(key ORDER BY key COLLATE "C")
     INTO key_count, review_keys
     FROM pg_catalog.json_object_keys(review_json) AS key_set(key);
     IF key_count <> 20 OR review_keys <> expected_keys THEN
