@@ -16,6 +16,7 @@
 | Effective/business and recorded/system time remain separate | version `effective_from/effective_to`; anchor/version `recorded_from/recorded_to` | backdated-system-time regression; bitemporal exclusion |
 | System-recorded time is database-owned | `enforce_position_reporting_system_time()` requires `recorded_from = transaction_timestamp()` and open `recorded_to` | caller-backdated anchor regression |
 | Same-tenant subordinate and manager | composite FKs to `position_record(tenant_record_id, position_record_id)` plus FORCE RLS | schema FK and non-bypass tenant reader regression |
+| Both endpoints are staffable for the full reporting interval | `position_reporting_has_staffable_coverage(...)` resolves system-visible Position anchors and uses `range_agg(daterange(...))` over same-tenant `active`/`open` PositionVersion rows; the resulting multirange must contain the entire reporting effective range | regression first attempts persistence before any PositionVersion exists and requires `staffable PositionVersion coverage`; valid fixture succeeds only after active/open endpoint versions are inserted |
 | No self-reporting | `enforce_position_reporting_scope()` | self-report PostgreSQL regression |
 | No effective-time management cycle in one session | recursive effective-period intersection in `enforce_position_reporting_scope()` | A→B then B→A PostgreSQL regression |
 | Concurrent opposite graph mutations cannot both commit | transaction-scoped tenant advisory lock is acquired before the VOLATILE trigger's graph queries | `tests/test_position_reporting_concurrency_postgres.sh` holds X→Y open while Y→X races; exactly one edge may commit |
@@ -29,6 +30,6 @@
 
 ## Non-goals and buyer-safe interpretation
 
-Persisted reporting hierarchy describes Position structure. It does not prove which worker occupies a seat, does not create/modify Assignment, does not imply performance/compensation authority, and is not an employment decision. PR #94 remains the descriptive snapshot contract for staffable endpoint interpretation at a requested bitemporal coordinate.
+Persisted reporting hierarchy describes Position structure. It does not prove which worker occupies a seat, does not create/modify Assignment, does not imply performance/compensation authority, and is not an employment decision. PR #94 remains the descriptive snapshot contract for staffable endpoint interpretation at a requested bitemporal coordinate; #106 now rejects persistence that could not satisfy that staffable Position contract across the relationship's own effective interval.
 
 The database relation is authoritative only after the application boundary supplies valid reviewed application evidence. RLS does not replace purpose-bound authorization. Production roles must remain non-superuser and `NOBYPASSRLS`; application mutation authority, API exposure, accessible organization-chart UI, migration/rollback choreography, and release integration remain separate bounded work.
