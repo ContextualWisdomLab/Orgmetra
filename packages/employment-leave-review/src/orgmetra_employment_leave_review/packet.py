@@ -16,7 +16,9 @@ from datetime import date, datetime, timezone
 from hashlib import sha256
 import json
 import re
+from threading import RLock
 from uuid import UUID
+from weakref import WeakKeyDictionary
 
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(
@@ -47,6 +49,8 @@ _NEXT_ACTION = (
     "approval and apply any Employment/Assignment status mutation only through the authoritative "
     "People boundary; downstream actions must use published owner contracts."
 )
+_ISSUANCE_LOCK = RLock()
+_ISSUANCE_DIGESTS: WeakKeyDictionary[object, str] = WeakKeyDictionary()
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -105,7 +109,28 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+def _canonical_json(payload: dict[str, object]) -> str:
+    """Serialize one already-snapshotted payload deterministically."""
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def _seal_issuance(packet: object, canonical: str) -> None:
+    """Bind one live packet instance to its creation-time canonical evidence digest."""
+    digest = sha256(canonical.encode("utf-8")).hexdigest()
+    with _ISSUANCE_LOCK:
+        _ISSUANCE_DIGESTS[packet] = digest
+
+
+def _assert_issuance_integrity(packet: object, canonical: str) -> None:
+    """Fail closed when a live or copied packet no longer matches issued evidence."""
+    digest = sha256(canonical.encode("utf-8")).hexdigest()
+    with _ISSUANCE_LOCK:
+        sealed_digest = _ISSUANCE_DIGESTS.get(packet)
+    if sealed_digest is None or sealed_digest != digest:
+        raise ValueError("employment leave review evidence integrity check failed")
+
+
+@dataclass(frozen=True, slots=True, repr=False, eq=False, weakref_slot=True)
 class EmploymentLeaveReviewPacket:
     """Immutable leave-review evidence that cannot authorize mutation or execution."""
 
@@ -250,10 +275,11 @@ class EmploymentLeaveReviewPacket:
             raise ValueError("external_execution_state must remain not_authorized_to_execute")
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed employment-leave instruction")
+        _seal_issuance(self, _canonical_json(self._canonical_payload()))
 
-    def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit correlation."""
-        payload = {
+    def _canonical_payload(self) -> dict[str, object]:
+        """Snapshot every trust-bearing field once for integrity verification and export."""
+        return {
             "active_assignment_snapshot_digest": self.active_assignment_snapshot_digest,
             "active_assignment_snapshot_reference": self.active_assignment_snapshot_reference,
             "benefits_continuity_plan_digest": self.benefits_continuity_plan_digest,
@@ -295,10 +321,15 @@ class EmploymentLeaveReviewPacket:
             "work_continuity_plan_digest": self.work_continuity_plan_digest,
             "work_continuity_plan_reference": self.work_continuity_plan_reference,
         }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    def canonical_json(self) -> str:
+        """Return creation-bound deterministic canonical JSON for immutable audit correlation."""
+        canonical = _canonical_json(self._canonical_payload())
+        _assert_issuance_integrity(self, canonical)
+        return canonical
 
     def sha256_digest(self) -> str:
-        """Return SHA-256 over the exact canonical UTF-8 leave-review packet."""
+        """Return SHA-256 over the exact verified canonical UTF-8 leave-review packet."""
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
