@@ -7,7 +7,9 @@
 - `CompensationChangeReviewPacket`, a value-minimized pre-mutation evidence contract that binds authoritative worker scope, reviewed compensation-plan/policy evidence, pay-equity review, budget authorization, and payroll handoff provenance without copying compensation or protected-attribute values.
 - Fail-closed human-review, authoritative-resolution, no-HRIS-mutation, and no-payroll-execution states with separate requester/reviewer actor references and bounded evidence versions.
 - Deterministic canonical JSON/SHA-256 evidence, redacted representations, canonical non-sentinel UUIDv4 identities for packet-owned namespaced opaque trust references, and exact 100% owned statement/branch coverage regressions.
+- Creation-bound process-local evidence integrity: low-level valid-value field rewrites and unsupported object copies cannot emit a second valid-looking canonical compensation-review truth.
 
 ### Changed
 
 - `tenant_record_id` now follows the authoritative Orgmetra canonical non-sentinel operational-UUID contract instead of imposing a duplicate UUIDv4-only leaf policy; the protected-core UUIDv7 tenant form is covered explicitly while RFC 9562 Nil/Max sentinels remain rejected.
+- Canonical export now snapshots all trust-bearing fields once and verifies the exact snapshot against the packet's construction-time SHA-256 seal before returning evidence. This process-local seal is defense in depth only and does not replace durable authorization, signatures, audit/outbox persistence, or correlation uniqueness.
