@@ -31,6 +31,8 @@ REVERSE_RELATIONSHIP_ID="00000000-0000-7000-8000-000000000043"
 SELF_RELATIONSHIP_ID="00000000-0000-7000-8000-000000000044"
 AUDIT_ID="00000000-0000-4000-8000-000000000051"
 OUTBOX_ID="00000000-0000-4000-8000-000000000052"
+WRONG_REASON_AUDIT_ID="00000000-0000-4000-8000-000000000053"
+WRONG_REASON_OUTBOX_ID="00000000-0000-4000-8000-000000000054"
 REVIEWER="actor:00000000-0000-4000-8000-000000000061"
 APPLIED_BY="actor:00000000-0000-4000-8000-000000000062"
 REVIEW_DIGEST="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -192,6 +194,49 @@ expect_failure \
         '${REVERSE_RELATIONSHIP_ID}', '${SUBORDINATE_POSITION_ID}',
         '${REVIEW_DIGEST}', '${canonical_digest}', '${REVIEWER}', '${APPLIED_BY}',
         TIMESTAMPTZ '2026-08-24 01:55:00+00', DATE '2026-08-24', '${AUDIT_ID}'
+     );"
+
+wrong_reason_event="$(python3 - <<PY
+import json
+payload = {
+    "data": {"high_impact": False, "result_code": "position_reporting_applied"},
+    "datacontenttype": "application/json",
+    "id": "${WRONG_REASON_AUDIT_ID}",
+    "orgmetraactor": "${APPLIED_BY}",
+    "orgmetraevidence": "${REVIEW_DIGEST}",
+    "orgmetrapurpose": "position_reporting_change_apply",
+    "orgmetrareason": "unrelated_change",
+    "orgmetratenant": "${TENANT_ID}",
+    "source": "urn:orgmetra:people_api",
+    "specversion": "1.0",
+    "subject": "position_reporting_relationship:${SELF_RELATIONSHIP_ID}",
+    "time": "2026-08-24T02:00:00Z",
+    "type": "orgmetra.organization.position_reporting_applied",
+}
+print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+PY
+)"
+wrong_reason_digest="$(CANONICAL_EVENT="${wrong_reason_event}" python3 - <<'PY'
+from hashlib import sha256
+import os
+print(sha256(os.environ["CANONICAL_EVENT"].encode("utf-8")).hexdigest())
+PY
+)"
+with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v canonical_event="${wrong_reason_event}" -v canonical_digest="${wrong_reason_digest}" <<SQL
+SELECT record_audit_outbox_event(
+    '${TENANT_ID}'::uuid, '${WRONG_REASON_AUDIT_ID}'::uuid, '${WRONG_REASON_OUTBOX_ID}'::uuid,
+    :'canonical_event', :'canonical_digest', 'integration_hub'
+);
+SQL
+expect_failure \
+    "position-reporting relationship accepted an audit event with the wrong reviewed reason" \
+    "audit evidence does not exactly match" \
+    "INSERT INTO position_reporting_relationship_version (${version_columns}) VALUES (
+        '${TENANT_ID}', '00000000-0000-7000-8000-000000000074',
+        '${SELF_RELATIONSHIP_ID}', '${MANAGER_POSITION_ID}',
+        '${REVIEW_DIGEST}', '${wrong_reason_digest}', '${REVIEWER}', '${APPLIED_BY}',
+        TIMESTAMPTZ '2026-08-24 01:55:00+00', DATE '2026-08-24', '${WRONG_REASON_AUDIT_ID}'
      );"
 
 expect_failure \
