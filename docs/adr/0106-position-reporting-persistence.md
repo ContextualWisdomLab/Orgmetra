@@ -22,11 +22,15 @@ New recorded intervals use PostgreSQL `transaction_timestamp()` and begin open. 
 
 A version insert fails closed unless it has an open same-tenant anchor, a different reviewer and applying actor, immutable same-tenant audit/outbox evidence for `position_reporting_change_apply`, no self-reporting edge, and no management cycle over an overlapping effective period. The application audit event must carry the exact reviewed-evidence digest in `orgmetraevidence`; the version's application-evidence digest must equal the persisted audit envelope digest. This prevents a syntactically valid reviewer/digest pair from being recorded without immutable evidence binding. Composite foreign keys bind both subordinate and manager Position IDs to the same tenant.
 
+Graph acyclicity is tenant-wide and cannot be protected by independent row constraints alone. Before a version trigger reads the graph, it obtains a transaction-scoped PostgreSQL advisory lock keyed from the tenant UUID. Opposite concurrent mutations for one tenant are therefore serialized, while different tenants can proceed independently. The PL/pgSQL trigger remains the default `VOLATILE`; PostgreSQL documents that a `VOLATILE` function obtains a fresh snapshot for each SQL query it executes. After a waiting transaction acquires the tenant graph lock, its recursive graph query therefore sees the relationship committed by the preceding lock holder and rejects the opposite edge as a cycle. Hash-key collisions can only over-serialize unrelated tenants; they cannot relax the invariant.
+
 ## Why this shape
 
 The anchor/version split keeps stable relationship identity separate from changing manager/effective-time facts and therefore remains 3NF while supporting bitemporal correction. PostgreSQL exclusion/range semantics prevent overlapping business/system versions under one relationship identity; the insert guard performs cross-row cycle validation that a row-local `CHECK` constraint cannot express. RLS is defense in depth rather than authorization by itself: the application role must remain `NOSUPERUSER NOBYPASSRLS`, and high-level mutation authority remains outside this migration.
 
 The audit binding deliberately uses the already immutable `audit_event_record` envelope as the application evidence instead of trusting an unrelated caller-provided digest. The event identifies the applying actor, tenant, relationship subject, purpose, result, time, and reviewed-evidence digest; storing its exact envelope digest makes the relationship version cryptographically correlate to that immutable application fact.
+
+The tenant advisory lock is intentionally narrow: it protects only graph mutation validation and is transaction-scoped. It does not replace transaction boundaries, RLS, authorization, or history guards. Its purpose is to make cycle validation defensible under concurrent writes rather than merely correct in single-session tests.
 
 ## Integration and stack boundary
 
@@ -38,6 +42,6 @@ Canonical `docs/DATA_MODEL.md` / `docs/ERD.md` are intentionally not edited in t
 
 ## Consequences
 
-The database can preserve audited supervisory hierarchy truth independently of current worker occupancy. Reads can combine persisted relationships with PR #94's staffable-Position snapshot semantics. The stricter model rejects ambiguous duplicate anchors, self-reporting, cycles, caller-backdated system time, mutation of history, tenant-crossing references, and unbound review/application evidence rather than silently repairing them.
+The database can preserve audited supervisory hierarchy truth independently of current worker occupancy. Reads can combine persisted relationships with PR #94's staffable-Position snapshot semantics. The stricter model rejects ambiguous duplicate anchors, self-reporting, single-session and concurrent cycles, caller-backdated system time, mutation of history, tenant-crossing references, and unbound review/application evidence rather than silently repairing them.
 
 This ADR does not claim certification, branch-protection enforcement, release readiness, or authorization to make employment decisions.
