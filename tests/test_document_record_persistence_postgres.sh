@@ -29,8 +29,40 @@ OUTBOX_REFERENCE="outbox_event:00000000-0000-4000-8000-000000000072"
 ARTIFACT_DIGEST="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 SOURCE_DIGEST="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 RETENTION_DIGEST="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-EVIDENCE_DIGEST="dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 APPLICATION_DIGEST="eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+RECEIVED_AT="2026-08-24T05:55:00Z"
+EVIDENCE_RECORDED_AT="2026-08-24T05:58:00Z"
+
+canonical_evidence="$(python3 - <<PY
+import json
+payload = {
+    "artifact_digest": "${ARTIFACT_DIGEST}",
+    "artifact_reference": "${ARTIFACT_REFERENCE}",
+    "classification_code": "restricted_hr",
+    "content_storage_state": "artifact_reference_only",
+    "decision_authority_state": "not_authorized_for_employment_decision",
+    "document_category_code": "employment_contract",
+    "document_record_reference": "${DOCUMENT_REFERENCE}",
+    "employment_record_reference": "${EMPLOYMENT_REFERENCE}",
+    "person_record_reference": "${PERSON_REFERENCE}",
+    "received_at": "${RECEIVED_AT}",
+    "recorded_at": "${EVIDENCE_RECORDED_AT}",
+    "retention_policy_digest": "${RETENTION_DIGEST}",
+    "retention_policy_reference": "${RETENTION_REFERENCE}",
+    "schema_version": "orgmetra.document_record_evidence.v1",
+    "source_provenance_digest": "${SOURCE_DIGEST}",
+    "tenant_record_id": "${TENANT_ID}",
+    "uploader_actor_reference": "${UPLOADER}",
+}
+print(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True))
+PY
+)"
+EVIDENCE_DIGEST="$(CANONICAL_EVIDENCE="${canonical_evidence}" python3 - <<'PY'
+from hashlib import sha256
+import os
+print(sha256(os.environ["CANONICAL_EVIDENCE"].encode("utf-8")).hexdigest())
+PY
+)"
 
 with_tenant() {
     local tenant="$1"
@@ -63,17 +95,18 @@ person_record_reference, employment_record_reference, uploader_actor_reference,
 persisted_by_actor_reference, document_category_code, artifact_reference,
 artifact_digest_sha256, source_provenance_digest_sha256,
 retention_policy_reference, retention_policy_digest_sha256,
-received_at, evidence_digest_sha256, audit_event_reference,
-outbox_event_reference, application_evidence_digest_sha256,
+received_at, canonical_evidence_json, evidence_digest_sha256,
+audit_event_reference, outbox_event_reference, application_evidence_digest_sha256,
 application_purpose_code, application_reason_code"
 
-with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
+with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v canonical_evidence="${canonical_evidence}" <<SQL
 INSERT INTO document_record (${columns}) VALUES (
     '${TENANT_ID}', '${DOCUMENT_ID}', '${DOCUMENT_REFERENCE}',
     '${PERSON_REFERENCE}', '${EMPLOYMENT_REFERENCE}', '${UPLOADER}', '${PERSISTED_BY}',
     'employment_contract', '${ARTIFACT_REFERENCE}', '${ARTIFACT_DIGEST}',
     '${SOURCE_DIGEST}', '${RETENTION_REFERENCE}', '${RETENTION_DIGEST}',
-    TIMESTAMPTZ '2026-08-24 05:55:00+00', '${EVIDENCE_DIGEST}',
+    TIMESTAMPTZ '${RECEIVED_AT}', :'canonical_evidence', '${EVIDENCE_DIGEST}',
     '${AUDIT_REFERENCE}', '${OUTBOX_REFERENCE}', '${APPLICATION_DIGEST}',
     'document_record_persist', 'reviewed_document_metadata'
 );
@@ -100,7 +133,7 @@ expect_failure \
         'policy_acknowledgement',
         'document_artifact:00000000-0000-4000-8000-000000000042',
         '${ARTIFACT_DIGEST}', '${SOURCE_DIGEST}', '${RETENTION_REFERENCE}',
-        '${RETENTION_DIGEST}', TIMESTAMPTZ '2026-08-24 05:55:00+00',
+        '${RETENTION_DIGEST}', TIMESTAMPTZ '${RECEIVED_AT}', '{}',
         '${EVIDENCE_DIGEST}',
         'audit_event:00000000-0000-4000-8000-000000000081',
         'outbox_event:00000000-0000-4000-8000-000000000082',
@@ -118,7 +151,7 @@ expect_failure \
         'qualification_document',
         'document_artifact:00000000-0000-4000-8000-000000000043',
         '${ARTIFACT_DIGEST}', '${SOURCE_DIGEST}', '${RETENTION_REFERENCE}',
-        '${RETENTION_DIGEST}', pg_catalog.transaction_timestamp() + interval '1 hour',
+        '${RETENTION_DIGEST}', pg_catalog.transaction_timestamp() + interval '1 hour', '{}',
         '${EVIDENCE_DIGEST}',
         'audit_event:00000000-0000-4000-8000-000000000083',
         'outbox_event:00000000-0000-4000-8000-000000000084',
@@ -135,7 +168,7 @@ expect_failure \
         'qualification_document',
         'document_artifact:00000000-0000-4000-8000-000000000044',
         '${ARTIFACT_DIGEST}', '${SOURCE_DIGEST}', '${RETENTION_REFERENCE}',
-        '${RETENTION_DIGEST}', TIMESTAMPTZ '2026-08-24 05:55:00+00',
+        '${RETENTION_DIGEST}', TIMESTAMPTZ '${RECEIVED_AT}', '{}',
         '${EVIDENCE_DIGEST}',
         'audit_event:00000000-0000-4000-8000-000000000085',
         'outbox_event:00000000-0000-4000-8000-000000000086',
@@ -152,12 +185,60 @@ expect_failure \
         'qualification_document',
         'document_artifact:00000000-0000-4000-8000-000000000045',
         '${ARTIFACT_DIGEST}', '${SOURCE_DIGEST}', '${RETENTION_REFERENCE}',
-        '${RETENTION_DIGEST}', TIMESTAMPTZ '2026-08-24 05:55:00+00',
+        '${RETENTION_DIGEST}', TIMESTAMPTZ '${RECEIVED_AT}', '{}',
         '${EVIDENCE_DIGEST}',
         'audit_event:00000000-0000-4000-8000-000000000087',
         'outbox_event:00000000-0000-4000-8000-000000000088',
         '${APPLICATION_DIGEST}', 'document_record_persist', 'reviewed_document_metadata'
      );"
+
+mismatch_reference="document_record:00000000-0000-4000-8000-000000000036"
+mismatch_artifact="document_artifact:00000000-0000-4000-8000-000000000046"
+mismatch_evidence="$(python3 - <<PY
+import json
+payload = {
+    "artifact_digest": "${ARTIFACT_DIGEST}",
+    "artifact_reference": "${mismatch_artifact}",
+    "classification_code": "restricted_hr",
+    "content_storage_state": "artifact_reference_only",
+    "decision_authority_state": "not_authorized_for_employment_decision",
+    "document_category_code": "employment_contract",
+    "document_record_reference": "${mismatch_reference}",
+    "employment_record_reference": "${EMPLOYMENT_REFERENCE}",
+    "person_record_reference": "${PERSON_REFERENCE}",
+    "received_at": "${RECEIVED_AT}",
+    "recorded_at": "${EVIDENCE_RECORDED_AT}",
+    "retention_policy_digest": "${RETENTION_DIGEST}",
+    "retention_policy_reference": "${RETENTION_REFERENCE}",
+    "schema_version": "orgmetra.document_record_evidence.v1",
+    "source_provenance_digest": "${SOURCE_DIGEST}",
+    "tenant_record_id": "${TENANT_ID}",
+    "uploader_actor_reference": "${UPLOADER}",
+}
+print(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True))
+PY
+)"
+set +e
+mismatch_output="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v mismatch_evidence="${mismatch_evidence}" 2>&1 <<SQL
+INSERT INTO document_record (${columns}) VALUES (
+    '${TENANT_ID}', '00000000-0000-7000-8000-000000000036', '${mismatch_reference}',
+    '${PERSON_REFERENCE}', '${EMPLOYMENT_REFERENCE}', '${UPLOADER}', '${PERSISTED_BY}',
+    'employment_contract', '${mismatch_artifact}', '${ARTIFACT_DIGEST}', '${SOURCE_DIGEST}',
+    '${RETENTION_REFERENCE}', '${RETENTION_DIGEST}', TIMESTAMPTZ '${RECEIVED_AT}',
+    :'mismatch_evidence', '${EVIDENCE_DIGEST}',
+    'audit_event:00000000-0000-4000-8000-000000000089',
+    'outbox_event:00000000-0000-4000-8000-000000000090',
+    '${APPLICATION_DIGEST}', 'document_record_persist', 'reviewed_document_metadata'
+);
+SQL
+)"
+mismatch_status=$?
+set -e
+if [[ ${mismatch_status} -eq 0 || "${mismatch_output}" != *"canonical evidence digest"* ]]; then
+    echo "document record accepted a digest from a different evidence packet: ${mismatch_output}" >&2
+    exit 1
+fi
 
 expect_failure \
     "document metadata was rewriteable" \
