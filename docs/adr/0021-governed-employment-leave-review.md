@@ -11,6 +11,8 @@ Protected Orgmetra core already owns tenant identity semantics and accepts canon
 
 Portable review evidence is an especially poor place for medical/family details, free-form leave reasons, compensation/benefit values, credentials, or model-generated narrative. Those values must remain in their purpose-bound authoritative stores rather than being copied into a broad governance artifact. At the same time, an opaque worker reference combined with exact leave dates is still worker-related personal data; minimizing direct identifiers does not make the artifact anonymous or PII-free. Because the packet itself carries personal data, immutable review evidence must also identify the exact handling and retention policies expected to govern that packet rather than relying on unversioned prose.
 
+A frozen Python dataclass is not, by itself, immutable audit evidence: `object.__setattr__` can rewrite otherwise valid fields, and unsupported object copies can bypass assumptions about construction. A live packet therefore needs a fail-closed creation-time integrity check before it emits canonical evidence. That process-local check is defense in depth only; durable authorization and immutable audit/outbox persistence remain authoritative host responsibilities.
+
 Current primary-source context is recorded in `docs/doctoring/employment-leave-review-references.md`: ISO 30201:2026 for HR management-system requirements and U.S. Department of Labor FMLA employer guidance as a jurisdiction-specific example of a governed leave process from request through restoration. The sources inform the control boundary; this ADR does not encode FMLA eligibility or claim universal legal sufficiency.
 
 ## Decision
@@ -21,7 +23,9 @@ The packet binds an authoritative Orgmetra `tenant_record_id` satisfying protect
 
 The packet carries only non-sensitive workflow `reason_code` categories. It carries no substantive leave reason, medical/family values, direct person identifiers such as name/email, compensation or benefit values, credentials, or free-form model output. Opaque Person/Employment/leave-case references and the requested leave business dates remain minimum-necessary personal data. The immutable packet therefore requires `contains_person_pii = true` rather than claiming PII-free evidence. The handling/retention references and digests identify the exact policy artifacts reviewed; they do not prove that policy was enforced. Consumers must still apply purpose-bound authorization, least privilege, retention/export controls, and audit.
 
-The packet is fail-closed at direct construction and through its builder. It permanently states:
+The packet is fail-closed at direct construction and through its builder. Each live packet is bound to a process-local creation-time digest of the exact canonical evidence. `canonical_json()` snapshots the current trust-bearing fields once, verifies that snapshot against the issued digest, and returns that same verified snapshot. Low-level valid-value field rewriting and unsupported shallow copying therefore fail closed before evidence is emitted. `dataclasses.replace(...)` remains an explicit newly validated packet issuance with its own binding; the in-memory registry is not a durable uniqueness constraint, signature, authorization token, or substitute for persistent audit evidence.
+
+The packet permanently states:
 
 - `contains_person_pii = true`;
 - `human_confirmation_required = true`;
@@ -42,6 +46,7 @@ Any subsequent Employment or Assignment mutation must use the authoritative Orgm
 ### Positive
 
 - Review evidence cannot masquerade as approval, an applied HRIS mutation, or downstream completion.
+- A live issued packet cannot silently emit a second valid-looking canonical truth after low-level field rewriting; unsupported copies fail closed.
 - Buyers can correlate the exact leave case/policy and worker scope without copying medical/family or compensation/benefit values, while the artifact honestly identifies its remaining worker/date correlation as personal data.
 - Authoritative UUIDv7 tenant identities remain interoperable, while UUIDv1 timestamp/node correlation is excluded from packet-owned namespaced trust references.
 - Privacy governance is versioned: changing either the handling-policy or retention-policy artifact changes canonical evidence and its SHA-256 digest.
@@ -50,6 +55,8 @@ Any subsequent Employment or Assignment mutation must use the authoritative Orgm
 
 ### Trade-offs
 
+- The process-local issuance registry protects only a live Python object; durable systems still need immutable audit/outbox evidence and authoritative persistence.
+- `dataclasses.replace(...)` is treated as a new validated issuance rather than forbidden globally, so durable correlation uniqueness must be enforced by the authoritative persistence boundary.
 - The packet is not anonymous: exact worker correlation and leave dates require purpose-bound personal-data controls even though direct identifiers and sensitive case values are excluded.
 - Binding policy identities and digests proves what policy evidence was reviewed, not that authorization, retention, export controls, or deletion were actually enforced.
 - The packet alone cannot prove eligibility, lawful use, policy applicability, worker relationships, benefit correctness, or downstream execution.
@@ -58,4 +65,4 @@ Any subsequent Employment or Assignment mutation must use the authoritative Orgm
 
 ## Verification
 
-The package contract requires exact 100% owned statement and branch coverage, direct-construction and `dataclasses.replace(...)` fail-closed regressions, canonical precision-preserving timestamp/digest evidence, authoritative tenant interoperability with protected core's canonical non-sentinel operational-UUID contract including UUIDv7 plus Nil/Max rejection, strict UUIDv4 namespaced opaque references including UUIDv1 rejection, exact handling/retention policy references and digests, non-sensitive reason categories, business-date ordering, bounded evidence version, explicit actor separation, honest personal-data classification plus sensitive-value exclusion, immutable review/mutation/execution states, and a governed next action requiring authoritative resolution before approval.
+The package contract requires exact 100% owned statement and branch coverage, direct-construction and `dataclasses.replace(...)` fail-closed regressions, process-local creation-digest regressions for low-level mutation and unsupported object copies, canonical precision-preserving timestamp/digest evidence, authoritative tenant interoperability with protected core's canonical non-sentinel operational-UUID contract including UUIDv7 plus Nil/Max rejection, strict UUIDv4 namespaced opaque references including UUIDv1 rejection, exact handling/retention policy references and digests, non-sensitive reason categories, business-date ordering, bounded evidence version, explicit actor separation, honest personal-data classification plus sensitive-value exclusion, immutable review/mutation/execution states, and a governed next action requiring authoritative resolution before approval.
