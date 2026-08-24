@@ -20,6 +20,8 @@ A valid packet is not an approval. It remains:
 
 Immediately before approval, the host must re-resolve every reference in the packet tenant, prove requester/reviewer resolve to distinct authoritative actor identities, prove the Person-to-Employment and active Assignment/Job/Position scope, and verify the exact current/proposed compensation evidence, compensation policy, pay-equity review, budget authorization, effective date, and payroll-handoff provenance. UUID syntax is not authorization or relationship evidence: the tenant UUID is governed by authoritative Orgmetra core, while UUIDv4 on packet-owned references is only an opacity/privacy constraint. Any authorized HRIS change then goes through Orgmetra's authoritative People boundary. Payroll execution remains behind the payroll owner's published contract.
 
+Each live packet instance is also bound to the SHA-256 of its exact canonical evidence at construction. `canonical_json()` snapshots every trust-bearing field once, verifies that exact snapshot against the construction-time seal, and returns the same verified snapshot. A low-level valid-value rewrite therefore fails closed rather than emitting a second audit truth, and an unsupported shallow-copied instance has no issuance binding. This is process-local defense in depth only: it is not a signature, durable uniqueness constraint, authorization token, or substitute for immutable audit/outbox persistence.
+
 ## Example
 
 ```python
