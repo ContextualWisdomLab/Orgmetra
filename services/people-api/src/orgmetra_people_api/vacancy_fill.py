@@ -177,6 +177,8 @@ def fill_position_vacancy(
         raise TypeError("purpose_code must be an exact string")
     if not isinstance(vacancy_authority, VacancyFillAuthority):
         raise TypeError("vacancy_authority must implement VacancyFillAuthority")
+    if not isinstance(mutation_port, PeopleMutationPort):
+        raise TypeError("mutation_port must implement PeopleMutationPort")
 
     authorize_resource_fields(
         principal=principal,
