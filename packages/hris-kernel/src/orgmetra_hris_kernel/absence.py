@@ -33,6 +33,19 @@ class EmploymentAbsenceSnapshot:
     is_absent: bool
     employment_absence_record_id: UUID | None
 
+    def __post_init__(self) -> None:
+        """Reject ambiguous direct evidence before canonical serialization."""
+        if self.known_at.tzinfo is None or self.known_at.utcoffset() is None:
+            raise EmploymentAbsenceError(
+                "Employment absence snapshot knowledge cutoff must be timezone-aware.",
+                next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+            )
+        if (self.employment_absence_record_id is not None) != self.is_absent:
+            raise EmploymentAbsenceError(
+                "Employment absence snapshot must bind absence identity exactly when absent.",
+                next_action="Rebuild the snapshot from authoritative Employment absence truth.",
+            )
+
     def canonical_document(self) -> dict[str, str | bool | None]:
         """Return deterministic value-minimized evidence for audit correlation."""
         return {
@@ -85,6 +98,11 @@ def _scoped_absence_versions(
                 "Employment absence person does not match the named Employment person.",
                 next_action="Select the absence record that belongs to this Employment, then retry.",
             )
+        if type(version.absence_status_code) is not str:
+            raise EmploymentAbsenceError(
+                "absence_status_code must be a built-in string.",
+                next_action="Use the canonical confirmed or cancelled status, then retry.",
+            )
         if version.absence_status_code not in _KNOWN_ABSENCE_STATUSES:
             raise EmploymentAbsenceError(
                 "absence_status_code must be confirmed or cancelled.",
@@ -114,6 +132,12 @@ def _visible_employment(
             "The named Employment belongs to another Person in this tenant.",
             next_action="Select the Employment that belongs to this worker, then retry.",
         )
+    for version in named:
+        if type(version.employment_status_code) is not str:
+            raise EmploymentAbsenceError(
+                "Employment status must be a built-in string before absence reconstruction.",
+                next_action="Reload canonical Employment truth, then rebuild the absence snapshot.",
+            )
     return resolve_single_valued_fact(
         named,
         tenant_record_id=tenant_record_id,
