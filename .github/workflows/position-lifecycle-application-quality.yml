@@ -1,0 +1,88 @@
+name: Position Lifecycle Application Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - feat/position-lifecycle-review
+    paths:
+      - "database/migrations/0023_position_lifecycle_application.sql"
+      - "tests/test_position_lifecycle_application_postgres.sh"
+      - "docs/adr/0112-position-lifecycle-application.md"
+      - "docs/traceability/position-lifecycle-application.md"
+      - "docs/doctoring/position-lifecycle-application-references.md"
+      - ".github/workflows/position-lifecycle-application-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: position-lifecycle-application-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres_contract:
+    name: Governed Position lifecycle application contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: orgmetra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d orgmetra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Print deterministic lifecycle application provenance
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          required = [
+              "tests/test_position_lifecycle_application_postgres.sh",
+              ".github/workflows/position-lifecycle-application-quality.yml",
+          ]
+          optional = [
+              "database/migrations/0023_position_lifecycle_application.sql",
+              "docs/adr/0112-position-lifecycle-application.md",
+              "docs/traceability/position-lifecycle-application.md",
+              "docs/doctoring/position-lifecycle-application-references.md",
+          ]
+          rows = []
+          for path_text in required + [path for path in optional if Path(path).is_file()]:
+              data = Path(path_text).read_bytes()
+              rows.append({
+                  "path": path_text,
+                  "sha256": hashlib.sha256(data).hexdigest(),
+                  "bytes": len(data),
+                  "lines": len(data.decode("utf-8").splitlines()),
+              })
+          print(json.dumps(rows, separators=(",", ":")))
+          PY
+      - name: Run Position lifecycle application regressions
+        run: bash tests/test_position_lifecycle_application_postgres.sh
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
