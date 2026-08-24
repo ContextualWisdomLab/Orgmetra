@@ -1,6 +1,6 @@
 # Product and technical gap baseline
 
-Inventory date: 2026-08-23 (Asia/Seoul). Protected `develop` head observed: `9e3e4847510e1e612b48474ba42b177b8ed824df`.
+Inventory date: 2026-08-24 (Asia/Seoul), superseding the 2026-08-23 snapshot. Protected `develop` head observed: `9e3e4847510e1e612b48474ba42b177b8ed824df`.
 
 This document is a point-in-time buyer/product planning snapshot. It is **not** merge authorization, branch-protection truth, or a substitute for fresh GitHub state. Every execution loop must refetch all open PRs/issues, exact heads and bases, stacks, reviews/threads, applicable exact-head workflows, and effective repository rules before acting.
 
@@ -9,6 +9,13 @@ Orgmetra owns authoritative HRIS employment truth inside its published boundarie
 Finance/accounting journal ownership and commercial billing/collection ownership are **not accepted Orgmetra architecture in this snapshot**. Treat those integrations as planned/out-of-scope until an owner contract is published and accepted into Orgmetra's canonical architecture/traceability. Psychometrics Commons and other dedicated-writer CWL repositories remain read-only dependencies consumed only through their published contracts.
 
 Next operator action: do not self-approve. Process the live open-PR graph oldest/dependency-root first. Merge only an unchanged exact head after every applicable current-head gate is terminal GREEN, required conversations are resolved, qualifying independent non-author approval is present, and `develop` has actually enforceable protection. Short-lived model/status checks are not substitutes for those gates unless the live repository policy explicitly makes them qualifying evidence.
+
+## 2026-08-24 execution-loop findings
+
+1. **Strix failures were infrastructure, not source defects.** Every `strix` check failure on open PRs traced to NVIDIA NIM `429 Too Many Requests` during the scanner's LLM connection phase (three primary-model attempts plus fallback exhausted, no report artifact, fail-closed). Local exact-head verification of #97, #98, #99, #102, #103, #104, and #95 reproduced all owned package suites green at 100% statement/branch coverage; the scan lane, not the code, was failing. Remediation: same-head re-scan dispatch plus a draft/ready toggle per affected PR to re-fire the required-workflow context without moving any head SHA.
+2. **Org review-dispatch budget was zero.** The organization variable `ORG_SWEEP_REVIEW_DISPATCH_LIMIT` was set to `0`, so the hourly/quarter-hourly org queue sweep could never dispatch an OpenCode review for any repository, leaving every PR approved-blocked on "review dispatch limit reached". Fixed by restoring the limit to `2` (and `ORG_SWEEP_BRANCH_UPDATE_LIMIT` to `1`) and adding `ContextualWisdomLab/Orgmetra` to the central repository's targeted-dispatch allowlist. This is recorded so future zero-review stalls are diagnosed against this variable first.
+3. **Queue congestion is real but not a defect.** Org-wide hosted-runner saturation (hundreds of queued runs across sibling repositories) delays evidence materialization for hours. Waiting is not blocked work: local verification, documentation refresh, and independent lanes continue while hosted evidence catches up.
+
 
 ## Merged buyer-visible anchors on protected develop
 
@@ -73,6 +80,10 @@ Do not open withholding, payroll-pay, statutory accounting, or year-end settleme
 5. Purpose-bound document retrieve/export for governed HR document evidence with field minimization, retention/export controls, and immutable audit rather than indiscriminate masking.
 6. For new buyer-visible screens, maintain Storybook, design tokens, accessibility evidence, wireframes, and a governed Figma/Product Design handoff when material.
 7. External finance/accounting or billing integration remains planned until a published owner API/event contract is accepted; Orgmetra must not create statutory-account truth or direct cross-service application-table SQL.
+
+## Open PRs observed 2026-08-24 (anchors, not authority)
+
+Fifty open PRs were observed. New roots since the previous snapshot include #52 (TEPP analysis adapter), #54 (workforce composition change), #55 (People read hardening), #56 (Organization hierarchy snapshot), #57 (validity analysis handoff), #59-#65 (recorded-time/runtime-integrity repairs), #66 (normalized candidate application), #68 (Naruon calendar integrity), #69-#73 (bitemporal/correction/chronology hardening), #74 (People operability probes), #75/#76/#77 (HR data export/retention/disposition governance), #78 (SBOM/provenance release evidence), #79 (Kubernetes reference deployment), #90 (People HTTP telemetry), #91-#96 (privacy/performance/reporting/hierarchy evidence lanes), #100 (this document), #102-#104 (audit/work-capacity/qualification-rule reviews), #110 (vacancy fill orchestration, draft), #111 (Position lifecycle review), #112 (lifecycle application, stacked draft). Stacks remain dependency-first: #105→#104, #106→#94, #107→#98, #108→#80, #109→#101, #112→#111, #77→#76, #67→#66, #58→#57.
 
 ## Technical non-negotiables
 
