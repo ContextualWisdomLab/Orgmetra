@@ -156,6 +156,41 @@ BEFORE UPDATE OR DELETE ON position_reporting_relationship_version
 FOR EACH ROW
 EXECUTE FUNCTION protect_position_reporting_history();
 
+CREATE FUNCTION position_reporting_has_staffable_coverage(
+    checked_tenant_record_id uuid,
+    checked_position_record_id uuid,
+    checked_effective_from date,
+    checked_effective_to date,
+    checked_known_at timestamptz
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+    SELECT COALESCE(
+        pg_catalog.range_agg(
+            daterange(version.effective_from, version.effective_to, '[)')
+        ) @> daterange(checked_effective_from, checked_effective_to, '[)'),
+        false
+    )
+    FROM position_record AS record
+    JOIN position_record_version AS version
+      ON version.tenant_record_id = record.tenant_record_id
+     AND version.position_record_id = record.position_record_id
+    WHERE record.tenant_record_id = checked_tenant_record_id
+      AND record.position_record_id = checked_position_record_id
+      AND record.recorded_from <= checked_known_at
+      AND (record.recorded_to IS NULL OR checked_known_at < record.recorded_to)
+      AND version.recorded_from <= checked_known_at
+      AND (version.recorded_to IS NULL OR checked_known_at < version.recorded_to)
+      AND version.position_status_code IN ('active', 'open')
+      AND daterange(version.effective_from, version.effective_to, '[)') &&
+          daterange(checked_effective_from, checked_effective_to, '[)');
+$$;
+
+COMMENT ON FUNCTION position_reporting_has_staffable_coverage(uuid, uuid, date, date, timestamptz) IS
+    'Returns true only when one tenant Position is system-visible and its active/open PositionVersion union covers the entire proposed reporting effective interval at the proposed recorded-time coordinate.';
+
 CREATE FUNCTION enforce_position_reporting_scope()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -199,6 +234,23 @@ BEGIN
     END IF;
     IF subordinate_position_id = NEW.manager_position_record_id THEN
         RAISE EXCEPTION 'a Position cannot report to itself'
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF NOT position_reporting_has_staffable_coverage(
+        NEW.tenant_record_id,
+        subordinate_position_id,
+        NEW.effective_from,
+        NEW.effective_to,
+        NEW.recorded_from
+    ) OR NOT position_reporting_has_staffable_coverage(
+        NEW.tenant_record_id,
+        NEW.manager_position_record_id,
+        NEW.effective_from,
+        NEW.effective_to,
+        NEW.recorded_from
+    ) THEN
+        RAISE EXCEPTION 'position-reporting endpoints require staffable PositionVersion coverage for the entire effective interval'
             USING ERRCODE = '23514';
     END IF;
 
@@ -285,7 +337,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION enforce_position_reporting_scope() IS
-    'Before persistence, serializes one tenant reporting graph, resolves the same-tenant relationship anchor, rejects self-reporting and cycles over overlapping effective time, and requires immutable audit/outbox application evidence that binds the reviewed evidence digest, applying actor, exact application event digest, subject, result, and chronology.';
+    'Before persistence, serializes one tenant reporting graph, resolves the same-tenant relationship anchor, requires staffable subordinate/manager PositionVersion coverage for the full effective interval, rejects self-reporting and cycles over overlapping effective time, and requires immutable audit/outbox application evidence that binds the reviewed evidence digest, applying actor, exact application event digest, subject, result, and chronology.';
 
 CREATE TRIGGER position_reporting_version_scope_guard
 BEFORE INSERT ON position_reporting_relationship_version
@@ -369,4 +421,4 @@ COMMENT ON TABLE position_reporting_relationship_record IS
     'Durable tenant-scoped Position-to-Position solid-line relationship anchor. The subordinate seat and relationship type are stable anchor identity; Person and Assignment are intentionally absent.';
 
 COMMENT ON TABLE position_reporting_relationship_version IS
-    'Authoritative bitemporal manager-Position versions applied only after separate human review and immutable audit/outbox evidence. The application audit event must bind the review digest and its exact envelope digest. The relation stores no worker PII, compensation, ratings, or employment-decision output.';
+    'Authoritative bitemporal manager-Position versions applied only after separate human review and immutable audit/outbox evidence. Both Position endpoints must remain staffable for the full effective interval at the recorded-time coordinate. The application audit event must bind the review digest and its exact envelope digest. The relation stores no worker PII, compensation, ratings, or employment-decision output.';
