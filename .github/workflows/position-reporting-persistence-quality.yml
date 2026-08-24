@@ -9,6 +9,7 @@ on:
       - "database/migrations/0020_position_reporting_relationship.sql"
       - "tests/test_position_reporting_persistence_postgres.sh"
       - "tests/test_position_reporting_review_binding_postgres.sh"
+      - "tests/test_position_reporting_concurrency_postgres.sh"
       - "docs/adr/0106-position-reporting-persistence.md"
       - "docs/traceability/position-reporting-persistence.md"
       - "docs/doctoring/position-reporting-persistence-references.md"
@@ -63,6 +64,7 @@ jobs:
           required = [
               "tests/test_position_reporting_persistence_postgres.sh",
               "tests/test_position_reporting_review_binding_postgres.sh",
+              "tests/test_position_reporting_concurrency_postgres.sh",
               ".github/workflows/position-reporting-persistence-quality.yml",
           ]
           optional = [
@@ -86,6 +88,8 @@ jobs:
         run: bash tests/test_position_reporting_persistence_postgres.sh
       - name: Verify immutable human-review binding
         run: bash tests/test_position_reporting_review_binding_postgres.sh
+      - name: Verify concurrent cycle prevention
+        run: bash tests/test_position_reporting_concurrency_postgres.sh
       - name: Require clean checkout
         run: |
           git diff --exit-code
