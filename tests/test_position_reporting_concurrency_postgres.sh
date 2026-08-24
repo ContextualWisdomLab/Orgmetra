@@ -19,6 +19,8 @@ REVIEWER_X="actor:00000000-0000-4000-8000-000000000091"
 REVIEWER_Y="actor:00000000-0000-4000-8000-000000000092"
 APPLIER_X="actor:00000000-0000-4000-8000-000000000093"
 APPLIER_Y="actor:00000000-0000-4000-8000-000000000094"
+POSITION_X_VERSION="00000000-0000-7000-8000-000000000095"
+POSITION_Y_VERSION="00000000-0000-7000-8000-000000000096"
 REVIEW_DIGEST_X="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 REVIEW_DIGEST_Y="dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 
@@ -34,6 +36,12 @@ INSERT INTO position_record (
 ) VALUES
     ('${TENANT_ID}', '${POSITION_X}', '${ORG_ID}', '${JOB_ID}'),
     ('${TENANT_ID}', '${POSITION_Y}', '${ORG_ID}', '${JOB_ID}');
+INSERT INTO position_record_version (
+    tenant_record_id, position_record_version_id, position_record_id,
+    position_status_code, effective_from
+) VALUES
+    ('${TENANT_ID}', '${POSITION_X_VERSION}', '${POSITION_X}', 'active', DATE '2026-01-01'),
+    ('${TENANT_ID}', '${POSITION_Y_VERSION}', '${POSITION_Y}', 'active', DATE '2026-01-01');
 INSERT INTO position_reporting_relationship_record (
     tenant_record_id, position_reporting_relationship_record_id,
     subordinate_position_record_id, relationship_type_code
