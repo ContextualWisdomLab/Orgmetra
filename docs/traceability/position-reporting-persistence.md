@@ -5,7 +5,7 @@
 - **Protected-main truth:** `develop@9e3e4847510e1e612b48474ba42b177b8ed824df` has no persisted Position-to-Position reporting relation.
 - **Parent active PR:** #94 adds bitemporal in-memory reporting reconstruction at `3f67182bb3065f2fc8fd974bfdd75a390d8a8fdc`.
 - **This active PR:** #106 persists reviewed solid-line Position relationships and remains a Draft stacked descendant until #94 integrates and this branch is retargeted/revalidated.
-- **Separate active owner:** #95 owns the in-memory pre-mutation review packet. #106 consumes only evidence digests/audit correlation and does not rewrite #95.
+- **Separate active owner:** #95 owns the in-memory pre-mutation review packet. #106 consumes only the reviewed-evidence digest plus immutable application audit correlation and does not rewrite #95.
 
 ## Requirement → implementation → executable evidence
 
@@ -19,7 +19,8 @@
 | No self-reporting | `enforce_position_reporting_scope()` | self-report PostgreSQL regression |
 | No effective-time management cycle | recursive effective-period intersection in `enforce_position_reporting_scope()` | A→B then B→A PostgreSQL regression |
 | Human review is distinct from applying actor | exact actor-format checks plus `reviewer_actor_reference <> applied_by_actor_reference` | database constraints and valid separated actors fixture |
-| Applied truth requires immutable audit/outbox evidence | scope guard verifies purpose, actor, application digest, subject, result code, review/application chronology, and integration-hub outbox | valid `record_audit_outbox_event(...)` fixture; mismatched evidence fails closed |
+| Reviewed evidence is immutable application evidence, not an unattested column | application audit `orgmetraevidence` must equal `review_evidence_digest_sha256`; stored application digest must equal `audit_event_record.event_envelope_digest` | `tests/test_position_reporting_review_binding_postgres.sh` |
+| Applied truth requires immutable audit/outbox evidence | scope guard verifies purpose, applying actor, reviewed-evidence digest, exact audit-envelope digest, subject, result code, review/application chronology, and integration-hub outbox | valid `record_audit_outbox_event(...)` fixture; mismatched evidence fails closed |
 | Historical truth cannot be rewritten/deleted | `protect_position_reporting_history()` | manager rewrite regression |
 | Table-wide destruction cannot bypass row guards | explicit BEFORE TRUNCATE guards and revoked PUBLIC TRUNCATE | TRUNCATE regression |
 | Tenant isolation is enforced for ordinary app/read roles | `ENABLE` + `FORCE ROW LEVEL SECURITY`; tenant policy on both relations | `NOSUPERUSER NOBYPASSRLS` reader sees alpha=1, beta=0, missing-context=0 |
