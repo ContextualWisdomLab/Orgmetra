@@ -25,6 +25,7 @@ OTHER_POSITION_ID="00000000-0000-7000-8000-000000000033"
 RELATIONSHIP_ID="00000000-0000-7000-8000-000000000041"
 RELATIONSHIP_VERSION_ID="00000000-0000-7000-8000-000000000042"
 REVERSE_RELATIONSHIP_ID="00000000-0000-7000-8000-000000000043"
+SELF_RELATIONSHIP_ID="00000000-0000-7000-8000-000000000044"
 AUDIT_ID="00000000-0000-4000-8000-000000000051"
 OUTBOX_ID="00000000-0000-4000-8000-000000000052"
 REVIEWER="actor:00000000-0000-4000-8000-000000000061"
@@ -38,10 +39,24 @@ with_tenant() {
     PGOPTIONS="-c orgmetra.tenant_record_id=${tenant}" command psql "$@"
 }
 
+expect_failure() {
+    local label="$1"
+    local needle="$2"
+    local sql="$3"
+    local output status
+    set +e
+    output="$({ with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "${sql}"; } 2>&1)"
+    status=$?
+    set -e
+    if [[ ${status} -eq 0 || "${output}" != *"${needle}"* ]]; then
+        echo "${label}: ${output}" >&2
+        exit 1
+    fi
+}
+
 with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
 VALUES ('${TENANT_ID}', 'tenant_alpha'), ('${OTHER_TENANT_ID}', 'tenant_beta');
-
 INSERT INTO organization_unit (tenant_record_id, organization_unit_id)
 VALUES ('${TENANT_ID}', '${ORG_ID}');
 INSERT INTO job_profile (tenant_record_id, job_profile_id)
@@ -87,14 +102,13 @@ SELECT record_audit_outbox_event(
     '${TENANT_ID}'::uuid, '${AUDIT_ID}'::uuid, '${OUTBOX_ID}'::uuid,
     :'canonical_event', :'canonical_digest', 'integration_hub'
 );
-
 INSERT INTO position_reporting_relationship_record (
     tenant_record_id, position_reporting_relationship_record_id,
     subordinate_position_record_id, relationship_type_code
-) VALUES (
-    '${TENANT_ID}', '${RELATIONSHIP_ID}', '${SUBORDINATE_POSITION_ID}', 'solid_line'
-);
-
+) VALUES
+    ('${TENANT_ID}', '${RELATIONSHIP_ID}', '${SUBORDINATE_POSITION_ID}', 'solid_line'),
+    ('${TENANT_ID}', '${REVERSE_RELATIONSHIP_ID}', '${MANAGER_POSITION_ID}', 'solid_line'),
+    ('${TENANT_ID}', '${SELF_RELATIONSHIP_ID}', '${OTHER_POSITION_ID}', 'solid_line');
 INSERT INTO position_reporting_relationship_version (
     tenant_record_id, position_reporting_relationship_version_id,
     position_reporting_relationship_record_id, manager_position_record_id,
@@ -121,91 +135,54 @@ if [[ "${persisted}" != "solid_line|${MANAGER_POSITION_ID}|applied_after_human_r
     exit 1
 fi
 
-set +e
-backdated_output="$({ with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
-INSERT INTO position_reporting_relationship_record (
-    tenant_record_id, position_reporting_relationship_record_id,
-    subordinate_position_record_id, relationship_type_code, recorded_from
-) VALUES (
-    '${TENANT_ID}', '00000000-0000-7000-8000-000000000071',
-    '${OTHER_POSITION_ID}', 'solid_line', TIMESTAMPTZ '2000-01-01 00:00:00+00'
-);" ; } 2>&1)"
-backdated_status=$?
-set -e
-if [[ ${backdated_status} -eq 0 || "${backdated_output}" != *"transaction timestamp"* ]]; then
-    echo "position-reporting anchor accepted caller-backdated system time: ${backdated_output}" >&2
-    exit 1
-fi
+expect_failure \
+    "position-reporting anchor accepted caller-backdated system time" \
+    "transaction timestamp" \
+    "INSERT INTO position_reporting_relationship_record (
+        tenant_record_id, position_reporting_relationship_record_id,
+        subordinate_position_record_id, relationship_type_code, recorded_from
+     ) VALUES (
+        '${TENANT_ID}', '00000000-0000-7000-8000-000000000071',
+        '${SUBORDINATE_POSITION_ID}', 'solid_line', TIMESTAMPTZ '2000-01-01 00:00:00+00'
+     );"
 
-set +e
-self_output="$({ with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
-INSERT INTO position_reporting_relationship_record (
-    tenant_record_id, position_reporting_relationship_record_id,
-    subordinate_position_record_id, relationship_type_code
-) VALUES (
-    '${TENANT_ID}', '${REVERSE_RELATIONSHIP_ID}', '${MANAGER_POSITION_ID}', 'solid_line'
-);
-INSERT INTO position_reporting_relationship_version (
-    tenant_record_id, position_reporting_relationship_version_id,
-    position_reporting_relationship_record_id, manager_position_record_id,
-    review_evidence_digest_sha256, application_evidence_digest_sha256,
-    reviewer_actor_reference, applied_by_actor_reference, reviewed_at,
-    effective_from, audit_event_record_id
-) VALUES (
-    '${TENANT_ID}', '00000000-0000-7000-8000-000000000072',
-    '${REVERSE_RELATIONSHIP_ID}', '${MANAGER_POSITION_ID}',
-    '${REVIEW_DIGEST}', '${APPLICATION_DIGEST}', '${REVIEWER}', '${APPLIED_BY}',
-    TIMESTAMPTZ '2026-08-24 01:55:00+00', DATE '2026-08-24', '${AUDIT_ID}'
-);" ; } 2>&1)"
-self_status=$?
-set -e
-if [[ ${self_status} -eq 0 || "${self_output}" != *"cannot report to itself"* ]]; then
-    echo "position-reporting relationship accepted self-reporting: ${self_output}" >&2
-    exit 1
-fi
+version_columns="tenant_record_id, position_reporting_relationship_version_id,
+position_reporting_relationship_record_id, manager_position_record_id,
+review_evidence_digest_sha256, application_evidence_digest_sha256,
+reviewer_actor_reference, applied_by_actor_reference, reviewed_at,
+effective_from, audit_event_record_id"
 
-set +e
-cycle_output="$({ with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
-INSERT INTO position_reporting_relationship_version (
-    tenant_record_id, position_reporting_relationship_version_id,
-    position_reporting_relationship_record_id, manager_position_record_id,
-    review_evidence_digest_sha256, application_evidence_digest_sha256,
-    reviewer_actor_reference, applied_by_actor_reference, reviewed_at,
-    effective_from, audit_event_record_id
-) VALUES (
-    '${TENANT_ID}', '00000000-0000-7000-8000-000000000073',
-    '${REVERSE_RELATIONSHIP_ID}', '${SUBORDINATE_POSITION_ID}',
-    '${REVIEW_DIGEST}', '${APPLICATION_DIGEST}', '${REVIEWER}', '${APPLIED_BY}',
-    TIMESTAMPTZ '2026-08-24 01:55:00+00', DATE '2026-08-24', '${AUDIT_ID}'
-);" ; } 2>&1)"
-cycle_status=$?
-set -e
-if [[ ${cycle_status} -eq 0 || "${cycle_output}" != *"cycle"* ]]; then
-    echo "position-reporting relationship accepted a management cycle: ${cycle_output}" >&2
-    exit 1
-fi
+expect_failure \
+    "position-reporting relationship accepted self-reporting" \
+    "cannot report to itself" \
+    "INSERT INTO position_reporting_relationship_version (${version_columns}) VALUES (
+        '${TENANT_ID}', '00000000-0000-7000-8000-000000000072',
+        '${SELF_RELATIONSHIP_ID}', '${OTHER_POSITION_ID}',
+        '${REVIEW_DIGEST}', '${APPLICATION_DIGEST}', '${REVIEWER}', '${APPLIED_BY}',
+        TIMESTAMPTZ '2026-08-24 01:55:00+00', DATE '2026-08-24', '${AUDIT_ID}'
+     );"
 
-set +e
-rewrite_output="$({ with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
-UPDATE position_reporting_relationship_version
-SET manager_position_record_id = '${OTHER_POSITION_ID}'::uuid
-WHERE position_reporting_relationship_version_id = '${RELATIONSHIP_VERSION_ID}'::uuid;" ; } 2>&1)"
-rewrite_status=$?
-set -e
-if [[ ${rewrite_status} -eq 0 || "${rewrite_output}" != *"history"* ]]; then
-    echo "position-reporting history was rewriteable: ${rewrite_output}" >&2
-    exit 1
-fi
+expect_failure \
+    "position-reporting relationship accepted a management cycle" \
+    "cycle" \
+    "INSERT INTO position_reporting_relationship_version (${version_columns}) VALUES (
+        '${TENANT_ID}', '00000000-0000-7000-8000-000000000073',
+        '${REVERSE_RELATIONSHIP_ID}', '${SUBORDINATE_POSITION_ID}',
+        '${REVIEW_DIGEST}', '${APPLICATION_DIGEST}', '${REVIEWER}', '${APPLIED_BY}',
+        TIMESTAMPTZ '2026-08-24 01:55:00+00', DATE '2026-08-24', '${AUDIT_ID}'
+     );"
 
-set +e
-truncate_output="$({ with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
-    "TRUNCATE position_reporting_relationship_version;" ; } 2>&1)"
-truncate_status=$?
-set -e
-if [[ ${truncate_status} -eq 0 || "${truncate_output}" != *"cannot be truncated"* ]]; then
-    echo "position-reporting history could be truncated: ${truncate_output}" >&2
-    exit 1
-fi
+expect_failure \
+    "position-reporting history was rewriteable" \
+    "history" \
+    "UPDATE position_reporting_relationship_version
+     SET manager_position_record_id = '${OTHER_POSITION_ID}'::uuid
+     WHERE position_reporting_relationship_version_id = '${RELATIONSHIP_VERSION_ID}'::uuid;"
+
+expect_failure \
+    "position-reporting history could be truncated" \
+    "cannot be truncated" \
+    "TRUNCATE position_reporting_relationship_version;"
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
