@@ -315,6 +315,8 @@ BEGIN
 
     IF audit_event ->> 'orgmetrapurpose'
           IS DISTINCT FROM 'position_reporting_change_apply'
+       OR audit_event ->> 'orgmetrareason'
+          IS DISTINCT FROM 'approved_reporting_line_change'
        OR audit_event ->> 'orgmetraactor'
           IS DISTINCT FROM NEW.applied_by_actor_reference
        OR audit_event ->> 'orgmetraevidence'
@@ -337,7 +339,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION enforce_position_reporting_scope() IS
-    'Before persistence, serializes one tenant reporting graph, resolves the same-tenant relationship anchor, requires staffable subordinate/manager PositionVersion coverage for the full effective interval, rejects self-reporting and cycles over overlapping effective time, and requires immutable audit/outbox application evidence that binds the reviewed evidence digest, applying actor, exact application event digest, subject, result, and chronology.';
+    'Before persistence, serializes one tenant reporting graph, resolves the same-tenant relationship anchor, requires staffable subordinate/manager PositionVersion coverage for the full effective interval, rejects self-reporting and cycles over overlapping effective time, and requires immutable audit/outbox application evidence that binds the governed reason, reviewed evidence digest, applying actor, exact application event digest, subject, result, and chronology.';
 
 CREATE TRIGGER position_reporting_version_scope_guard
 BEFORE INSERT ON position_reporting_relationship_version
@@ -421,4 +423,4 @@ COMMENT ON TABLE position_reporting_relationship_record IS
     'Durable tenant-scoped Position-to-Position solid-line relationship anchor. The subordinate seat and relationship type are stable anchor identity; Person and Assignment are intentionally absent.';
 
 COMMENT ON TABLE position_reporting_relationship_version IS
-    'Authoritative bitemporal manager-Position versions applied only after separate human review and immutable audit/outbox evidence. Both Position endpoints must remain staffable for the full effective interval at the recorded-time coordinate. The application audit event must bind the review digest and its exact envelope digest. The relation stores no worker PII, compensation, ratings, or employment-decision output.';
+    'Authoritative bitemporal manager-Position versions applied only after separate human review and immutable audit/outbox evidence. Both Position endpoints must remain staffable for the full effective interval at the recorded-time coordinate. The application audit event must bind the governed reason, review digest, and its exact envelope digest. The relation stores no worker PII, compensation, ratings, or employment-decision output.';
