@@ -9,8 +9,12 @@ on:
       - "services/people-api/src/orgmetra_people_api/hire.py"
       - "services/people-api/src/orgmetra_people_api/auth.py"
       - "services/people-api/tests/test_offer_to_hire_close.py"
+      - "services/people-api/README.md"
+      - "services/people-api/CHANGELOG.md"
       - "packages/candidate-offer-response/**"
       - "packages/keyverse-adapter/**"
+      - "docs/traceability/offer-to-hire-close.md"
+      - "docs/doctoring/offer-to-hire-close-references.md"
       - ".github/requirements/foundation-test.txt"
       - ".github/workflows/offer-to-hire-close-quality.yml"
   workflow_dispatch:
@@ -74,6 +78,12 @@ jobs:
           pyproject = open("services/people-api/pyproject.toml", encoding="utf-8").read()
           assert '"orgmetra-candidate-offer-response==0.1.0"' in pyproject
           PY
+      - name: Require buyer-readable governance documentation
+        run: |
+          grep -F 'CandidateOfferHireAuthority' services/people-api/README.md
+          grep -F 'not an autonomous or model-derived employment decision' docs/traceability/offer-to-hire-close.md
+          grep -F 'U.S. Equal Employment Opportunity Commission' docs/doctoring/offer-to-hire-close-references.md
+          grep -F 'close_accepted_offer_to_hire' services/people-api/CHANGELOG.md
       - name: Require clean checkout
         run: |
           git diff --exit-code
