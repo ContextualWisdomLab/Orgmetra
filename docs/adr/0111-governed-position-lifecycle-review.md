@@ -4,7 +4,7 @@ Status: Proposed
 
 ## Context
 
-Protected `develop` stores Job, Position, and Assignment separately and already recognizes Position lifecycle vocabulary, but the shipped People mutation path only creates Position records. Vacancy evidence and vacancy-to-assignment orchestration do not own a review contract for freezing, closing, abolishing, or reactivating an existing seat.
+Current `develop` product truth stores Job, Position, and Assignment separately and already recognizes Position lifecycle vocabulary, but the shipped People mutation path only creates Position records. Repository-governance issue #89 records that enforceable `develop` branch protection is currently absent; restoring that protection remains a prerequisite for merge authorization and is not implied by this ADR. Vacancy evidence and vacancy-to-assignment orchestration do not own a review contract for freezing, closing, abolishing, or reactivating an existing seat.
 
 A lifecycle change can affect staffing availability and later workforce evidence. Reusing a generic Position-creation command or a reporting-line review would blur evidence ownership and could let cached/UI state substitute for current bitemporal truth.
 
