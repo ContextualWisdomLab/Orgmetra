@@ -1,0 +1,106 @@
+"""Adversarial runtime-integrity regressions for Employment absence truth."""
+
+from datetime import date, datetime, timezone
+from uuid import UUID
+
+import pytest
+
+from orgmetra_hris_kernel import (
+    DateInterval,
+    EmploymentAbsenceError,
+    EmploymentAbsenceSnapshot,
+    EmploymentAbsenceVersion,
+    EmploymentVersion,
+    RecordedInterval,
+    build_employment_absence_snapshot,
+)
+
+TENANT = UUID("10000000-0000-7000-8000-000000002001")
+PERSON = UUID("10000000-0000-7000-8000-000000002002")
+EMPLOYMENT = UUID("10000000-0000-7000-8000-000000002003")
+ABSENCE = UUID("10000000-0000-7000-8000-000000002004")
+
+
+class ForgedStatus(str):
+    """Expose different stored text while pretending to equal an allowed status."""
+
+    def __hash__(self) -> int:
+        return hash("confirmed")
+
+    def __eq__(self, other: object) -> bool:
+        return other == "confirmed"
+
+
+def _employment(status: str = "active") -> EmploymentVersion:
+    return EmploymentVersion(
+        tenant_record_id=TENANT,
+        employment_record_id=EMPLOYMENT,
+        employment_record_version_id=UUID("10000000-0000-7000-8000-000000002101"),
+        person_record_id=PERSON,
+        employment_status_code=status,
+        effective=DateInterval(date(2026, 1, 1)),
+        recorded=RecordedInterval(datetime(2026, 1, 1, tzinfo=timezone.utc)),
+    )
+
+
+def _absence(status: str) -> EmploymentAbsenceVersion:
+    return EmploymentAbsenceVersion(
+        tenant_record_id=TENANT,
+        employment_absence_record_id=ABSENCE,
+        employment_absence_version_id=UUID("10000000-0000-7000-8000-000000002102"),
+        employment_record_id=EMPLOYMENT,
+        person_record_id=PERSON,
+        absence_status_code=status,
+        effective=DateInterval(date(2026, 8, 1), date(2026, 9, 1)),
+        recorded=RecordedInterval(datetime(2026, 8, 1, tzinfo=timezone.utc)),
+    )
+
+
+def _build(absence_status: str, employment_status: str = "active"):
+    return build_employment_absence_snapshot(
+        [_absence(absence_status)],
+        [_employment(employment_status)],
+        tenant_record_id=TENANT,
+        person_record_id=PERSON,
+        employment_record_id=EMPLOYMENT,
+        effective_on=date(2026, 8, 25),
+        known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+    )
+
+
+def test_absence_status_runtime_subclass_cannot_forge_confirmed_state() -> None:
+    """Membership/equality overrides must not create confirmed absence truth."""
+    with pytest.raises(EmploymentAbsenceError, match="built-in string"):
+        _build(ForgedStatus("secret_medical_state"))
+
+
+def test_employment_status_runtime_subclass_cannot_forge_active_state() -> None:
+    """An untrusted Employment status subclass cannot provide eligibility coverage."""
+    with pytest.raises(EmploymentAbsenceError, match="Employment status"):
+        _build("confirmed", ForgedStatus("terminated"))
+
+
+def test_direct_snapshot_rejects_naive_recorded_time() -> None:
+    """Direct construction cannot bypass the builder's timezone requirement."""
+    with pytest.raises(EmploymentAbsenceError, match="timezone-aware"):
+        EmploymentAbsenceSnapshot(
+            tenant_record_id=TENANT,
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=datetime(2026, 8, 25),
+            is_absent=False,
+            employment_absence_record_id=None,
+        )
+
+
+def test_direct_snapshot_rejects_inconsistent_absence_identity() -> None:
+    """Canonical evidence cannot claim absence without a durable absence identity."""
+    with pytest.raises(EmploymentAbsenceError, match="absence identity"):
+        EmploymentAbsenceSnapshot(
+            tenant_record_id=TENANT,
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+            is_absent=True,
+            employment_absence_record_id=None,
+        )
