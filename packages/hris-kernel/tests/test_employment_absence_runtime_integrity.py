@@ -116,13 +116,31 @@ def test_builder_rejects_uuid_subclass_before_tenant_scope_comparison() -> None:
 
 
 def test_builder_rejects_fact_uuid_subclass_before_tenant_scope_comparison() -> None:
-    """A hostile fact UUID cannot forge membership in the requested tenant."""
+    """A hostile absence fact UUID cannot forge membership in the requested tenant."""
     forged_tenant = ForgedUuid("20000000-0000-7000-8000-000000002001")
     forged_absence = replace(_absence("confirmed"), tenant_record_id=forged_tenant)
     with pytest.raises(EmploymentAbsenceError, match="absence fact identities must be built-in UUIDs"):
         build_employment_absence_snapshot(
             [forged_absence],
             [_employment()],
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+        )
+
+
+def test_builder_rejects_employment_fact_uuid_subclass_before_scope_comparison() -> None:
+    """A hostile Employment fact UUID cannot forge the requested Employment scope."""
+    forged_employment = replace(
+        _employment(),
+        employment_record_id=ForgedUuid("20000000-0000-7000-8000-000000002003"),
+    )
+    with pytest.raises(EmploymentAbsenceError, match="Employment fact identities must be built-in UUIDs"):
+        build_employment_absence_snapshot(
+            [_absence("confirmed")],
+            [forged_employment],
             tenant_record_id=TENANT,
             person_record_id=PERSON,
             employment_record_id=EMPLOYMENT,
