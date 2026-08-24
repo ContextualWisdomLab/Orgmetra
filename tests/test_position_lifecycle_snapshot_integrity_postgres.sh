@@ -3,6 +3,10 @@ set -euo pipefail
 
 : "${DATABASE_URL:?DATABASE_URL is required}"
 
+migration="database/migrations/0025_position_lifecycle_snapshot_hardening.sql"
+test -f "$migration"
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
+
 TENANT="0198a412-8000-7000-8000-000000000101"
 POSITION="0198a412-8000-7000-8000-000000000104"
 CURRENT_VERSION="0198a412-8000-7000-8000-000000000106"
@@ -16,7 +20,7 @@ REVIEWER="actor:6aacb560-ec5d-41d7-94a5-27cf95438b1b"
 APPLIER="actor:faefac04-52e8-43d2-aa54-d9046238733f"
 
 # The authoritative database snapshot digests must be available to the review
-# producer and to the application guard.  Their absence is itself fail-closed.
+# producer and to the application guard. Their absence is itself fail-closed.
 POSITION_DIGEST="$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -v tenant="$TENANT" -v position="$POSITION" <<'SQL'
 SELECT public.position_lifecycle_position_snapshot_digest(
     :'tenant', :'position', DATE '2026-09-15'
@@ -62,10 +66,21 @@ PY
 REVIEW_DIGEST="$(printf '%s' "$REVIEW_JSON" | sha256sum | awk '{print $1}')"
 
 canonicalized="$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 -v review_json="$REVIEW_JSON" <<'SQL'
-SELECT public.position_lifecycle_review_canonical_json(:'review_json'::jsonb);
+SELECT public.position_lifecycle_review_canonical_json(:'review_json');
 SQL
 )"
 test "$canonicalized" = "$REVIEW_JSON"
+
+valid_accepted="$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 \
+  -v review_json="$REVIEW_JSON" -v review_digest="$REVIEW_DIGEST" \
+  -v tenant="$TENANT" -v position="$POSITION" <<'SQL'
+SELECT public.validate_position_lifecycle_review_evidence(
+    :'review_json', :'review_digest', :'tenant', :'position',
+    'frozen', 'open', DATE '2026-09-15'
+);
+SQL
+)"
+test "$valid_accepted" = "t"
 
 # A semantically equivalent but noncanonical representation must not become
 # durable review evidence merely because a caller recomputed its SHA-256.
@@ -99,6 +114,30 @@ then
   echo "forged lifecycle snapshot evidence was applied" >&2
   exit 1
 fi
+
+# The exact fresh snapshot evidence must still be usable through the authoritative
+# application boundary after the forged attempt rolls back atomically.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -v tenant="$TENANT" -v position="$POSITION" -v current_version="$CURRENT_VERSION" \
+  -v successor="$SUCCESSOR" -v application="$APPLICATION" \
+  -v review_json="$REVIEW_JSON" -v review_digest="$REVIEW_DIGEST" \
+  -v applier="$APPLIER" -v audit="$AUDIT" -v outbox="$OUTBOX" <<'SQL' >/dev/null
+SELECT public.apply_position_lifecycle_change(
+    :'tenant', :'position', :'current_version', :'successor', :'application',
+    :'review_json', :'review_digest', :'applier', :'audit', :'outbox'
+);
+SQL
+
+applied_status="$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 \
+  -v tenant="$TENANT" -v successor="$SUCCESSOR" <<'SQL'
+SELECT position_status_code
+FROM position_record_version
+WHERE tenant_record_id = :'tenant'
+  AND position_record_version_id = :'successor'
+  AND recorded_to IS NULL;
+SQL
+)"
+test "$applied_status" = "open"
 
 # The high-impact mutation function must never be executable through PostgreSQL's
 # default PUBLIC function privilege; deployment must grant it deliberately.
