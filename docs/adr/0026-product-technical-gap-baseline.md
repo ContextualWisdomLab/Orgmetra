@@ -1,6 +1,6 @@
 # ADR 0026: Product and technical gap baseline
 
-- Status: Accepted on active development branch
+- Status: Accepted
 - Date: 2026-08-20
 - Owners: Orgmetra Product / Platform
 
