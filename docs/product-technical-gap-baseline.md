@@ -120,6 +120,13 @@ External finance/accounting and billing/collection integration remains planned/o
 
 Each run: refetch `develop`, all open PRs/issues and exact heads/bases, dependency ancestry, reviews/threads, exact-head workflows, releases and effective rules; process oldest/dependency-root first; repair verified Orgmetra defects at the owning boundary test-first when practicable; rerun exact-head evidence; resolve only addressed threads; and merge only with qualifying independent non-author approval plus actually enforceable protection. Refresh this document only after material state changes and never use its recorded SHAs as current control-plane truth.
 
+## 2026-08-24/25 automation findings (operator diagnostics)
+
+1. **Strix failures were infrastructure, not source defects.** Repeated `strix` failures traced to NVIDIA NIM `429 Too Many Requests` during scanner LLM connection (three primary attempts plus fallback exhausted, no report artifact, fail-closed). Local exact-head verification reproduced all owned package suites green at 100% statement/branch coverage; the scan lane, not the code, was failing. Remediation: staggered same-head re-scan dispatch (`repository_dispatch strix-scan`) instead of concurrent bursts.
+2. **Org review-dispatch budget was zero.** `ORG_SWEEP_REVIEW_DISPATCH_LIMIT` was `0`, so the org queue sweep could never dispatch an OpenCode review anywhere. Restored to `2` with `ORG_SWEEP_BRANCH_UPDATE_LIMIT=1`; `ContextualWisdomLab/Orgmetra` added to the central targeted-dispatch allowlist. Diagnose future zero-review stalls against this variable first.
+3. **Strix gate semantics after a completed scan.** A real reported vulnerability fails the required check by design. PR #52's first completed scan surfaced one legitimate MEDIUM IDOR-shaped finding (cross-field reference validation missing in `TeppAnalysisRequestPacket`); repaired at head `e068df7` with temporal ordering, distinct workspace/snapshot identifiers, and a scope digest binding every retry-stable correlation. Scanner finding -> test-first root repair -> fresh full-head evidence is the intended loop.
+4. **Shared-credential saturation is the remaining systemic constraint.** The OpenCode GitHub App installation token hits GitHub API rate limits mid-sweep before reaching later repositories, and NVIDIA NIM 429s arrive org-wide because one key is shared. Both are transient retryable infra states, never source defects; a scan can complete with zero vulnerabilities yet fail closed on one transient backend signal in its console output.
+
 ## Doctoring (APA 7th)
 
 American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*.
