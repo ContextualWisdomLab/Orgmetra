@@ -8,7 +8,8 @@ on:
       - "services/people-api/src/orgmetra_people_api/offer_close.py"
       - "services/people-api/src/orgmetra_people_api/hire.py"
       - "services/people-api/src/orgmetra_people_api/auth.py"
-      - "services/people-api/tests/test_offer_to_hire_close.py"
+      - "services/people-api/src/orgmetra_people_api/authorization.py"
+      - "services/people-api/tests/test_offer_to_hire_*.py"
       - "services/people-api/README.md"
       - "services/people-api/CHANGELOG.md"
       - "packages/candidate-offer-response/**"
@@ -57,7 +58,8 @@ jobs:
             packages/keyverse-adapter/src \
             packages/candidate-offer-response/src \
             packages/hris-kernel/src \
-            services/people-api/tests/test_offer_to_hire_close.py
+            services/people-api/tests/test_offer_to_hire_close.py \
+            services/people-api/tests/test_offer_to_hire_authorization_order.py
       - name: Test exact offer-to-hire boundary with 100% owned coverage
         env:
           PYTHONPATH: services/people-api/src:packages/keyverse-adapter/src:packages/candidate-offer-response/src:packages/hris-kernel/src
@@ -66,6 +68,7 @@ jobs:
           python -m pytest
           -o 'addopts=--cov=orgmetra_people_api.offer_close --cov-branch --cov-report=term-missing --cov-fail-under=100'
           services/people-api/tests/test_offer_to_hire_close.py
+          services/people-api/tests/test_offer_to_hire_authorization_order.py
       - name: Require public export and declared candidate-response dependency
         env:
           PYTHONPATH: services/people-api/src:packages/keyverse-adapter/src:packages/candidate-offer-response/src:packages/hris-kernel/src
