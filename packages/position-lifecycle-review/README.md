@@ -4,7 +4,7 @@ This package records **human-reviewed evidence for a proposed lifecycle change t
 
 ## Why it exists
 
-Protected Orgmetra already treats `Job`, `Position`, and `Assignment` as separate HRIS facts and recognizes Position statuses `open`, `active`, `frozen`, `closed`, and `abolished`. A commercial HRIS also needs review evidence before a seat is frozen, closed, abolished, or reactivated, because those changes can alter staffing availability and downstream workforce reporting.
+Current Orgmetra `develop` product truth already treats `Job`, `Position`, and `Assignment` as separate HRIS facts and recognizes Position statuses `open`, `active`, `frozen`, `closed`, and `abolished`. This statement describes shipped product behavior only: enforceable branch protection is currently absent and repository-governance issue #89 must be resolved before merge authorization. A commercial HRIS also needs review evidence before a seat is frozen, closed, abolished, or reactivated, because those changes can alter staffing availability and downstream workforce reporting.
 
 `PositionLifecycleChangeReviewPacket` binds:
 
