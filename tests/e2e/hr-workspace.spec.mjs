@@ -29,6 +29,9 @@ test('human-review workspace states remain keyboard-accessible and localized', a
   await page.goto(workspacePath);
 
   await expect(page.getByRole('heading', { name: 'HR Home' })).toBeVisible();
+  const localeToggle = page.locator('#locale-toggle');
+  await expect(localeToggle).toHaveText('한국어');
+  await expect(localeToggle).toHaveAccessibleName('Change language to 한국어');
   await page.locator('[data-view-link="employee-profile"]').first().click();
   await expect(page.getByRole('heading', { name: 'Employee Profile' })).toBeVisible();
 
@@ -42,10 +45,11 @@ test('human-review workspace states remain keyboard-accessible and localized', a
   await expect(page.locator('#details-panel')).toBeVisible();
   await expect(page.locator('#permission-panel')).toBeHidden();
 
-  await page.locator('#locale-toggle').click();
+  await localeToggle.click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'ko');
   await expect(page.getByRole('heading', { name: '직원 프로필' })).toBeVisible();
-  await expect(page.locator('#locale-toggle')).toHaveAccessibleName('언어 변경');
+  await expect(localeToggle).toHaveText('English');
+  await expect(localeToggle).toHaveAccessibleName('언어를 English로 변경');
 
   await page.locator('[data-action="correct-history"]').click();
   const confirmationDialog = page.locator('#confirmation-dialog');
