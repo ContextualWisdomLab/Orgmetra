@@ -16,3 +16,4 @@
 | [0012](0012-governed-migration-handoff.md) | Governed migration handoff | Accepted on active implementation branch |
 | [0013](0013-governed-requisition-review-packet.md) | Governed requisition review packet | Accepted on active implementation branch |
 | [0014](0014-job-analysis-snapshot-persistence.md) | Persist governed job-analysis snapshots | Accepted on active implementation branch |
+| [0113](0113-authoritative-employment-absence-truth.md) | Reason-free bitemporal Employment absence truth | Accepted on active implementation branch |
