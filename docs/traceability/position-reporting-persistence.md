@@ -17,7 +17,8 @@
 | System-recorded time is database-owned | `enforce_position_reporting_system_time()` requires `recorded_from = transaction_timestamp()` and open `recorded_to` | caller-backdated anchor regression |
 | Same-tenant subordinate and manager | composite FKs to `position_record(tenant_record_id, position_record_id)` plus FORCE RLS | schema FK and non-bypass tenant reader regression |
 | No self-reporting | `enforce_position_reporting_scope()` | self-report PostgreSQL regression |
-| No effective-time management cycle | recursive effective-period intersection in `enforce_position_reporting_scope()` | A→B then B→A PostgreSQL regression |
+| No effective-time management cycle in one session | recursive effective-period intersection in `enforce_position_reporting_scope()` | A→B then B→A PostgreSQL regression |
+| Concurrent opposite graph mutations cannot both commit | transaction-scoped tenant advisory lock is acquired before the VOLATILE trigger's graph queries | `tests/test_position_reporting_concurrency_postgres.sh` holds X→Y open while Y→X races; exactly one edge may commit |
 | Human review is distinct from applying actor | exact actor-format checks plus `reviewer_actor_reference <> applied_by_actor_reference` | database constraints and valid separated actors fixture |
 | Reviewed evidence is immutable application evidence, not an unattested column | application audit `orgmetraevidence` must equal `review_evidence_digest_sha256`; stored application digest must equal `audit_event_record.event_envelope_digest` | `tests/test_position_reporting_review_binding_postgres.sh` |
 | Applied truth requires immutable audit/outbox evidence | scope guard verifies purpose, applying actor, reviewed-evidence digest, exact audit-envelope digest, subject, result code, review/application chronology, and integration-hub outbox | valid `record_audit_outbox_event(...)` fixture; mismatched evidence fails closed |
