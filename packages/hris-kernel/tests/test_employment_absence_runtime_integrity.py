@@ -1,5 +1,6 @@
 """Adversarial runtime-integrity regressions for Employment absence truth."""
 
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from uuid import UUID
 
@@ -41,6 +42,13 @@ class ForgedUuid(UUID):
 
     def __str__(self) -> str:
         return "forged-tenant"
+
+
+class ForgedDate(date):
+    """Return different canonical text from a caller-defined date subtype."""
+
+    def isoformat(self) -> str:
+        return "2099-12-31"
 
 
 def _employment(status: str = "active") -> EmploymentVersion:
@@ -93,7 +101,7 @@ def test_employment_status_runtime_subclass_cannot_forge_active_state() -> None:
 
 
 def test_builder_rejects_uuid_subclass_before_tenant_scope_comparison() -> None:
-    """A hostile UUID cannot forge cross-tenant equality before scope resolution."""
+    """A hostile query UUID cannot forge cross-tenant equality before scope resolution."""
     forged_tenant = ForgedUuid("20000000-0000-7000-8000-000000002001")
     with pytest.raises(EmploymentAbsenceError, match="tenant_record_id must be a built-in UUID"):
         build_employment_absence_snapshot(
@@ -104,6 +112,49 @@ def test_builder_rejects_uuid_subclass_before_tenant_scope_comparison() -> None:
             employment_record_id=EMPLOYMENT,
             effective_on=date(2026, 8, 25),
             known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+        )
+
+
+def test_builder_rejects_fact_uuid_subclass_before_tenant_scope_comparison() -> None:
+    """A hostile fact UUID cannot forge membership in the requested tenant."""
+    forged_tenant = ForgedUuid("20000000-0000-7000-8000-000000002001")
+    forged_absence = replace(_absence("confirmed"), tenant_record_id=forged_tenant)
+    with pytest.raises(EmploymentAbsenceError, match="absence fact identities must be built-in UUIDs"):
+        build_employment_absence_snapshot(
+            [forged_absence],
+            [_employment()],
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+        )
+
+
+def test_direct_snapshot_rejects_uuid_subclass_before_canonicalization() -> None:
+    """Direct evidence cannot retain executable UUID display/equality behavior."""
+    forged_tenant = ForgedUuid("20000000-0000-7000-8000-000000002001")
+    with pytest.raises(EmploymentAbsenceError, match="tenant_record_id must be a built-in UUID"):
+        EmploymentAbsenceSnapshot(
+            tenant_record_id=forged_tenant,
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+            is_absent=False,
+            employment_absence_record_id=None,
+        )
+
+
+def test_direct_snapshot_rejects_date_subclass_before_canonicalization() -> None:
+    """Direct evidence cannot retain caller-defined date rendering behavior."""
+    with pytest.raises(EmploymentAbsenceError, match="effective_on must be a built-in date"):
+        EmploymentAbsenceSnapshot(
+            tenant_record_id=TENANT,
+            employment_record_id=EMPLOYMENT,
+            effective_on=ForgedDate(2026, 8, 25),
+            known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+            is_absent=False,
+            employment_absence_record_id=None,
         )
 
 
