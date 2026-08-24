@@ -16,15 +16,19 @@
 | Support correction-not-rewrite | HRIS kernel | recorded-time confirmed→cancelled regression |
 | Reject contradictory visible versions | shared bitemporal resolver | duplicate Employment/absence version regressions |
 | Reject overlapping operational absence identities | HRIS kernel | multiple-confirmed-absence regression |
+| Reject runtime status-subclass forgery | HRIS kernel | `test_employment_absence_runtime_integrity.py` |
+| Detach caller timezone behavior before bitemporal comparison/export | HRIS kernel | `test_employment_absence_timezone_integrity.py` |
 | Do not expose sensitive leave reason or Person identifier in canonical snapshot evidence | HRIS kernel | canonical evidence minimization regression |
 | Produce deterministic audit-correlation bytes | HRIS kernel | `canonical_document()`, `canonical_json()`, `content_digest()` regression |
 | Preserve high-impact human authority outside descriptive absence truth | downstream authorized host | no mutation/decision method exists in this slice |
 
 ## Data contract
 
-`EmploymentAbsenceVersion` is a bitemporal version of one durable `employment_absence_record_id`. It binds one tenant, Employment, and Person to an effective interval and recorded interval. `absence_status_code` is deliberately limited to `confirmed` or `cancelled`; it does not encode why the worker is absent.
+`EmploymentAbsenceVersion` is a bitemporal version of one durable `employment_absence_record_id`. It binds one tenant, Employment, and Person to an effective interval and recorded interval. `absence_status_code` is deliberately limited to exact built-in-string `confirmed` or `cancelled`; it does not encode why the worker is absent.
 
 At a requested coordinate, `build_employment_absence_snapshot(...)` requires exactly one visible same-tenant Employment version in status `active` or `leave`. Every visible durable absence identity must resolve to at most one version, and at most one `confirmed` operational absence may be visible for the Employment. A cancelled version is retained as historical truth but does not mark the Employment absent.
+
+The caller-supplied knowledge cutoff must be an exact built-in `datetime` with a concrete UTC offset. Orgmetra evaluates that timezone provider once, converts the coordinate to a built-in UTC datetime, and uses only the frozen UTC value for subsequent bitemporal comparison and canonical evidence. This prevents stateful caller timezone code from changing checked-versus-emitted system-time evidence.
 
 Canonical snapshot evidence contains only opaque tenant/Employment/absence identifiers, the effective and knowledge coordinates, a boolean absence state, and schema version. Person identity and leave reason are intentionally excluded.
 
