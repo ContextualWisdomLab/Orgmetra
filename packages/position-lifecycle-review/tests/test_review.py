@@ -2,9 +2,8 @@
 
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
 import gc
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -26,7 +25,7 @@ def build_packet(**overrides: object) -> PositionLifecycleChangeReviewPacket:
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
         "position_record_id": POSITION,
-        "position_lifecycle_change_reference": CHANGE,
+        "position_lifecycle_change_reference": uuid4(),
         "current_status_code": "active",
         "proposed_status_code": "frozen",
         "effective_on": date(2026, 9, 1),
@@ -62,7 +61,7 @@ def test_approved_packet_is_deterministic_and_value_minimized() -> None:
     assert "employee" not in encoded.lower()
     assert "person" not in encoded.lower()
     assert "compensation" not in encoded.lower()
-    assert POSITION.hex in encoded
+    assert str(POSITION) in encoded
     assert "PositionLifecycleChangeReviewPacket(redacted)" == repr(packet)
 
 
@@ -184,7 +183,7 @@ def test_post_construction_payload_tampering_fails_closed() -> None:
 
 def test_live_change_reference_cannot_bind_conflicting_evidence() -> None:
     """One live tenant-qualified review reference cannot denote two reviewed truths."""
-    packet = build_packet()
+    packet = build_packet(position_lifecycle_change_reference=CHANGE)
     with pytest.raises(ValueError):
         replace(packet, proposed_status_code="closed", reason_code="position_closure")
     duplicate = replace(packet)
@@ -193,7 +192,7 @@ def test_live_change_reference_cannot_bind_conflicting_evidence() -> None:
 
 def test_reference_binding_releases_only_after_all_duplicates_die() -> None:
     """Live duplicate accounting keeps a correlation bound until the last packet is gone."""
-    packet = build_packet()
+    packet = build_packet(position_lifecycle_change_reference=CHANGE)
     duplicate = replace(packet)
     key_values = {
         "tenant_record_id": packet.tenant_record_id,
@@ -209,9 +208,8 @@ def test_reference_binding_releases_only_after_all_duplicates_die() -> None:
     assert replacement.proposed_status_code == "closed"
 
 
-def test_non_decimal_noise_is_not_part_of_the_packet_contract() -> None:
-    """The package deliberately carries no staffing allocation or compensation value."""
+def test_staffing_and_compensation_values_are_not_packet_fields() -> None:
+    """The review evidence deliberately carries no allocation or compensation value."""
     packet = build_packet()
     assert not hasattr(packet, "allocation_ratio")
     assert not hasattr(packet, "compensation_amount")
-    assert Decimal("1.0") == Decimal("1.0")
