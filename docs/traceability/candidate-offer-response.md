@@ -23,6 +23,7 @@
 | Evidence preserves candidate response time and system-recorded time | Active PR | detached UTC `responded_at` / `recorded_at`; chronology regression |
 | Caller-defined scalar/time subclasses cannot forge canonical evidence | Active PR | exact runtime type checks and hostile-subclass regressions |
 | Post-construction rewriting invalidates evidence | Active PR | creation-time canonical digest seal plus mutation regressions |
+| Canonical export emits the same snapshot that passed integrity validation | Active PR | `_assert_integrity()` returns the checked canonical bytes; `test_checked_snapshot_integrity.py` reproduces an interleaving valid-value rewrite and requires the previously checked snapshot to be emitted |
 | Exact 100% owned statement/branch coverage | Active PR | `.github/workflows/candidate-offer-response-quality.yml` |
 | Keyverse credentials or source state are never persisted here | Dependency contract | existing `packages/keyverse-adapter`; candidate-response packet stores opaque identity-resolution evidence only |
 | Actual identity proofing/authentication assurance selection | Out of scope | authoritative identity owner / relying-party risk assessment |
@@ -34,6 +35,8 @@
 This slice does not introduce a new cross-service persistence path or a new architecture decision. It implements the existing Orgmetra principles in ADR 0001 (authoritative HRIS record), ADR 0006 (governed immutable audit/outbox evidence), ADR 0008 (purpose-bound PII authorization), and ADR 0017 (governed offer approval). It therefore adds no competing numbered ADR and does not edit the active canonical ADR index.
 
 Keyverse remains read-only. The candidate actor is validated as a bounded namespaced opaque reference compatible with Orgmetra's protected-main Keyverse adapter; the response packet does not infer, rewrite, or constrain Keyverse's underlying OIDC `sub` to UUIDv4. `identity_resolution_reference` remains an Orgmetra-owned correlation reference with its explicit UUIDv4 contract and digest.
+
+The candidate-response canonicalizer validates one payload snapshot against the process-local issuance seal and returns that same snapshot. It does not validate one read and then serialize the mutable object again. This preserves checked-versus-emitted audit integrity even if a same-process caller uses low-level mutation between those two phases; any later export from the changed packet still fails closed against the original issuance seal.
 
 ## Buyer outcome
 
