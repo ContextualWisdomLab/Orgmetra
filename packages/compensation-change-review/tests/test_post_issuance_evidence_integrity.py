@@ -2,6 +2,7 @@
 
 from copy import copy
 from datetime import date, datetime, timezone
+from gc import collect
 
 import pytest
 
@@ -70,3 +71,14 @@ def test_shallow_copy_does_not_inherit_process_local_issuance_evidence() -> None
     assert copied is not packet
     with pytest.raises(ValueError, match="integrity"):
         copied.canonical_json()
+
+
+def test_collected_packet_releases_process_local_issuance_binding() -> None:
+    """Weak cleanup must not leave stale process-local issuance state behind."""
+    packet = _packet()
+    assert packet.canonical_json()
+    del packet
+    collect()
+
+    replacement = _packet()
+    assert replacement.canonical_json()
