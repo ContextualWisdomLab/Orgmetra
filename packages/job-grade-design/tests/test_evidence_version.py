@@ -39,7 +39,7 @@ def test_canonical_job_grade_review_binds_explicit_evidence_version() -> None:
 
 @pytest.mark.parametrize("value", [0, -1, 2_147_483_648, True, 1.0, "1"])
 def test_rejects_invalid_or_non_exact_evidence_versions(value: object) -> None:
-    """Evidence version must be an exact positive bounded integer, never bool/coercible data."""
+    """Evidence version must be exactly built-in integer 1, never bool/coercible data."""
     data = packet_values()
     data["evidence_version"] = value
 
