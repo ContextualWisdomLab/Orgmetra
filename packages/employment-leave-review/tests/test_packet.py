@@ -2,6 +2,7 @@ from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone, tzinfo
 from hashlib import sha256
 import json
+from uuid import NAMESPACE_URL, uuid3, uuid5
 
 import pytest
 
@@ -28,6 +29,12 @@ U = {
 }
 D = "a" * 64
 UUID1_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+NON_V4_IDS = {
+    "uuid1_time_based": UUID1_ID,
+    "uuid3_md5_deterministic": str(uuid3(NAMESPACE_URL, "https://orgmetra.invalid/leave")),
+    "uuid5_sha1_deterministic": str(uuid5(NAMESPACE_URL, "https://orgmetra.invalid/leave")),
+    "uuid7_time_ordered": "017f22e2-79b0-7cc3-98c4-dc0c0c07398f",
+}
 
 
 def args() -> dict[str, object]:
@@ -117,6 +124,7 @@ def test_reference_guards_reject_wrong_namespace_and_non_uuid(field: str, prefix
         replace(p, **{field: 3})
 
 
+@pytest.mark.parametrize("non_v4_id", sorted(NON_V4_IDS))
 @pytest.mark.parametrize(
     ("field", "prefix"),
     [
@@ -135,11 +143,13 @@ def test_reference_guards_reject_wrong_namespace_and_non_uuid(field: str, prefix
         ("reviewer_reference", "actor"),
     ],
 )
-def test_reference_guards_reject_uuid1_through_builder_and_replace(
+def test_reference_guards_reject_every_non_uuid4_through_builder_and_replace(
     field: str,
     prefix: str,
+    non_v4_id: str,
 ) -> None:
-    value = f"{prefix}:{UUID1_ID}"
+    """Only opaque UUIDv4 suffixes satisfy the packet reference contract."""
+    value = f"{prefix}:{non_v4_id}"
     builder_args = args()
     builder_args[field] = value
     with pytest.raises(ValueError, match=field):
@@ -211,6 +221,18 @@ def test_business_dates_and_order_fail_closed() -> None:
         replace(p, requested_leave_end_on="2026-09-30")
     with pytest.raises(ValueError, match="must not precede"):
         replace(p, requested_leave_end_on=date(2026, 8, 31))
+
+
+def test_single_day_leave_is_intentional_evidence() -> None:
+    """Equal start/end dates record one governed single-day leave, not an error."""
+    single_day = replace(
+        packet(),
+        requested_leave_start_on=date(2026, 9, 1),
+        requested_leave_end_on=date(2026, 9, 1),
+    )
+    assert single_day.requested_leave_start_on == date(2026, 9, 1)
+    assert single_day.requested_leave_end_on == date(2026, 9, 1)
+    assert single_day.sha256_digest()
 
 
 def test_timestamp_requires_aware_usable_offset_and_preserves_subseconds() -> None:
