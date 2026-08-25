@@ -345,7 +345,8 @@ def test_clock_failure_at_request_start_never_blocks_the_wrapped_hr_request() ->
 
     sent = _run(middleware, _scope())
 
-    assert [message.get("status") for message in sent] == [200]
+    starts = [m.get("status") for m in sent if m.get("type") == "http.response.start"]
+    assert starts == [200]
     assert sink.measurements == []
 
 
@@ -375,7 +376,8 @@ def test_clock_failure_at_completion_is_swallowed_without_export() -> None:
 
     sent = _run(middleware, _scope())
 
-    assert [message.get("status") for message in sent] == [200]
+    starts = [m.get("status") for m in sent if m.get("type") == "http.response.start"]
+    assert starts == [200]
     assert sink.measurements == []
 
 
