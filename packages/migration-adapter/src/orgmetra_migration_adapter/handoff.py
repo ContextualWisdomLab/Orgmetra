@@ -268,7 +268,7 @@ def _require_operational_uuid(value: str) -> None:
     _require_exact_text(value, "tenant record identifier is malformed")
     try:
         parsed = UUID(value)
-    except (AttributeError, TypeError, ValueError) as exc:
+    except ValueError as exc:
         raise ContractViolation("tenant record identifier is malformed") from exc
     if str(parsed) != value:
         raise ContractViolation("tenant record identifier must use canonical UUID text")
