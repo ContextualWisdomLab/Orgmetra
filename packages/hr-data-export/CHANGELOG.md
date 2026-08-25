@@ -10,7 +10,7 @@ All notable package-local changes are documented here. Protected-repository rele
 - Bounded `HrDataExportArtifact` with exact immutable bytes, reviewed field tuple, exact media type, SHA-256 and hard 10 MiB budget.
 - `HrDataExportAuditReceipt` requiring value-minimized immutable audit evidence to bind the exact reviewed/export-authorized artifact **before** outbound egress.
 - `HrDataExportEgressReceipt` for host-owned `authenticated_one_time_download` evidence with mandatory one-time-use enforcement.
-- `execute_reviewed_hr_export(...)` orchestration with authorization-freshness checks before protected reads, after materialization, after audit and after egress.
+- `execute_reviewed_hr_export(...)` orchestration with authorization-freshness checks before protected reads, after materialization and after audit, plus exact delivery-time authorization-window validation on the returned egress receipt.
 - Externally sealed `HrDataExportExecutionReceipt` containing only correlations, evidence digests, artifact size, audit/egress references and chronology—never raw HR values.
 - Adversarial execution tests for scope drift, policy/legal-hold blocks, authorization TOCTOU, artifact mismatch/size, audit binding, egress binding, one-time semantics and post-issuance tampering.
 
@@ -18,7 +18,8 @@ All notable package-local changes are documented here. Protected-repository rele
 
 - Retrieval/review evidence is never treated as export authority; execution requires a fresh export-specific authority decision and accountable human approval.
 - Raw HR values cannot reach the egress port before exact artifact validation and committed pre-delivery audit evidence.
-- Authorization expiry during materialization or audit latency blocks later audit/egress as appropriate; expiry during egress prevents Orgmetra from issuing a successful durable receipt.
+- Authorization expiry during materialization or audit latency blocks later audit/egress as appropriate. The one-time host receipt must prove that actual delivery occurred before expiry; later receipt-processing latency does not turn an already completed authorized delivery into a retryable failure.
+- Delivery at or after the half-open authorization expiry instant fails receipt validation even when the egress call began earlier.
 - Parent `HrDataExportReviewPacket` creation evidence is inherited with the process-local external seal repair; valid-looking low-level scope rewrites fail closed.
 
 ## 0.1.0 — Unreleased parent review
