@@ -235,3 +235,52 @@ def test_replacement_is_a_distinct_system_recorded_issuance() -> None:
     assert replacement.draft_evidence_reference != envelope.draft_evidence_reference
     assert replacement.recorded_at >= envelope.recorded_at
     assert replacement.evidence_digest() != envelope.evidence_digest()
+
+
+def test_canonical_json_emits_the_exact_snapshot_that_passed_integrity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Never reread live fields after the creation seal has validated one canonical snapshot."""
+    envelope = build()
+    original_payload = DraftEvidenceEnvelope._payload
+    calls = 0
+    forged_digest = "d" * 64
+
+    def payload_with_interleaving(self: DraftEvidenceEnvelope) -> dict[str, object]:
+        """Return forged evidence only if export performs an unsafe second live-field read."""
+        nonlocal calls
+        calls += 1
+        payload = original_payload(self)
+        if calls == 2:
+            payload["response_evidence_digest"] = forged_digest
+        return payload
+
+    monkeypatch.setattr(DraftEvidenceEnvelope, "_payload", payload_with_interleaving)
+    canonical = envelope.canonical_json()
+    assert calls == 1
+    assert f'"response_evidence_digest":"{DIGEST_B}"' in canonical
+    assert forged_digest not in canonical
+
+
+def test_canonical_document_returns_the_verified_snapshot_without_rereading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Return the verified document snapshot instead of reading mutable fields again after validation."""
+    envelope = build()
+    original_payload = DraftEvidenceEnvelope._payload
+    calls = 0
+    forged_digest = "d" * 64
+
+    def payload_with_interleaving(self: DraftEvidenceEnvelope) -> dict[str, object]:
+        """Return forged evidence only if document export performs a second live-field read."""
+        nonlocal calls
+        calls += 1
+        payload = original_payload(self)
+        if calls == 2:
+            payload["response_evidence_digest"] = forged_digest
+        return payload
+
+    monkeypatch.setattr(DraftEvidenceEnvelope, "_payload", payload_with_interleaving)
+    document = envelope.canonical_document()
+    assert calls == 1
+    assert document["response_evidence_digest"] == DIGEST_B
