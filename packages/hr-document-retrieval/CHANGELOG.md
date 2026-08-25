@@ -6,5 +6,6 @@
 - Recheck authorization freshness after the protected artifact read and immediately before audit/byte release, and use that post-verification instant as the retrieval receipt's system-recorded time.
 - Keep returned document bytes usable for authorized HR work while excluding content and high-value HR data from durable retrieval receipts.
 - Fail closed on tenant/document/scope drift, authorization that expires before release, denied authorization, retention/classification drift, hostile runtime primitives, oversized or digest-mismatched artifacts, and audit persistence failure.
-- Add adversarial tests and a dedicated exact-head quality workflow requiring 100% owned production statement/branch coverage, an isolated package-install smoke test, and a clean checkout.
+- Add adversarial tests and a dedicated exact-head quality workflow requiring 100% owned production statement/branch coverage, a hash-bound isolated package-install smoke test, and a clean checkout.
 - Make the isolated-install smoke test reproducible on CPython 3.14.7 by installing the reviewed, SHA-256-locked setuptools 84.0.0 wheel before invoking the package's declared `setuptools.build_meta` backend with build isolation disabled.
+- Build the tested package wheel from the exact checkout, compute that wheel's SHA-256, and require the same local wheel hash during isolated installation rather than allowing an unhashed source-install command.
