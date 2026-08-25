@@ -137,6 +137,38 @@ class VacancyFillRuntimeIntegrityTests(unittest.TestCase):
                     )
         self.assertEqual(authority.calls, 0)
 
+    def test_nonfinite_command_allocation_fails_before_protected_resolver(self) -> None:
+        """Reject exact Decimal NaN before protected staffing truth can be inspected."""
+
+        class NeverMutationPort:
+            """Satisfy the mutation-port protocol without permitting a write."""
+
+            def create_employment(self, *, command: object, authorization: object) -> object:
+                del command, authorization
+                raise AssertionError("nonfinite vacancy fill must not create Employment")
+
+            def create_position(self, *, command: object, authorization: object) -> object:
+                del command, authorization
+                raise AssertionError("nonfinite vacancy fill must not create Position")
+
+            def create_assignment(self, *, command: object, authorization: object) -> object:
+                del command, authorization
+                raise AssertionError("nonfinite vacancy fill must not create Assignment")
+
+        authority = RecordingAuthority()
+        forged = command()
+        object.__setattr__(forged, "allocation_ratio", Decimal("NaN"))
+        with self.assertRaisesRegex(ValueError, "finite"):
+            fill_position_vacancy(
+                principal=PRINCIPAL,
+                command=forged,
+                purpose_code="workforce_admin",
+                policy=POLICY,
+                vacancy_authority=authority,
+                mutation_port=NeverMutationPort(),  # type: ignore[arg-type]
+            )
+        self.assertEqual(authority.calls, 0)
+
     def test_verification_rejects_nonfinite_and_forged_text_evidence(self) -> None:
         class ForgedText(str):
             pass
