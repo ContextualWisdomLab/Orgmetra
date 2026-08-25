@@ -19,6 +19,6 @@ Status: `implemented_on_active_pr` only. This document does not describe protect
 | Produce deterministic immutable correlation evidence | canonical precision-preserving UTC JSON and SHA-256 over exact UTF-8 bytes | canonicalization/digest regression | implemented_on_active_pr |
 | Keep foreign dedicated-writer systems read-only | no provider credentials, no foreign mutation, no cross-service application-table SQL; downstream work only through published owner contracts | package architecture and ADR 0020 | implemented_on_active_pr |
 
-## Protected-main boundary
+## Protected-`develop` boundary
 
 Protected `develop` remains authoritative for currently integrated HRIS behavior. This active PR adds only a pre-mutation evidence contract. It does not integrate or claim the unmerged People mutation, Job Analysis, payroll/final-pay, benefits, or identity execution capabilities of other lanes/repositories.
