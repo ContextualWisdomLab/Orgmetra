@@ -59,8 +59,10 @@ jobs:
       - name: Prove documented normalized application model
         run: |
           grep -Fq '| `candidate_application_record` |' docs/DATA_MODEL.md
+          grep -Fq '| `candidate_application_record_version` |' docs/DATA_MODEL.md
           grep -Fq '| `candidate_application_stage_record` |' docs/DATA_MODEL.md
           grep -Fq 'candidate_application_record' docs/ERD.md
+          grep -Fq 'candidate_application_record_version' docs/ERD.md
           grep -Fq 'candidate_application_stage_record' docs/ERD.md
       - name: Prove test syntax
         run: bash -n tests/test_candidate_application_postgres.sh tests/test_candidate_application_decision_boundary_postgres.sh tests/test_candidate_application_rls_postgres.sh
