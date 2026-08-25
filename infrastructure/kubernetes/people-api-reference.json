@@ -161,7 +161,19 @@
                     "memory": "512Mi",
                     "ephemeral-storage": "256Mi"
                   }
-                }
+                },
+                "volumeMounts": [
+                  {
+                    "name": "tmp-scratch",
+                    "mountPath": "/tmp"
+                  }
+                ]
+              }
+            ],
+            "volumes": [
+              {
+                "name": "tmp-scratch",
+                "emptyDir": {}
               }
             ]
           }
@@ -252,6 +264,21 @@
                   "matchLabels": {
                     "orgmetra.cwl/people-api-client": "true"
                   }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "protocol": "TCP",
+                "port": 8080
+              }
+            ]
+          },
+          {
+            "from": [
+              {
+                "ipBlock": {
+                  "cidr": "192.0.2.0/24"
                 }
               }
             ],

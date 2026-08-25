@@ -33,6 +33,41 @@ function peopleContainer(document) {
   return deployment.spec.template.spec.containers[0];
 }
 
+// RFC 5737 TEST-NET-1 placeholder: operators MUST replace it with the exact
+// node CIDR their kubelet probes originate from before server-side apply.
+const PROBE_CIDR_PLACEHOLDER = "192.0.2.0/24";
+
+test("kubelet probe ingress is explicitly permitted", () => {
+  const document = referenceDocument();
+  const policy = resource(document, "NetworkPolicy", "orgmetra-people-api-access");
+  const probeRules = (policy.spec.ingress ?? []).filter((rule) =>
+    (rule.from ?? []).some((source) => "ipBlock" in source),
+  );
+  assert.equal(probeRules.length, 1);
+  assert.deepEqual(probeRules[0].from, [{ ipBlock: { cidr: PROBE_CIDR_PLACEHOLDER } }]);
+  assert.deepEqual(probeRules[0].ports, [{ protocol: "TCP", port: 8080 }]);
+});
+
+test("read-only root filesystem has a dedicated writable tmp scratch volume", () => {
+  const document = referenceDocument();
+  const deployment = resource(document, "Deployment", "orgmetra-people-api");
+  const podSpec = deployment.spec.template.spec;
+  const scratchVolumes = podSpec.volumes.filter(
+    (volume) => volume.name === "tmp-scratch",
+  );
+  assert.equal(scratchVolumes.length, 1);
+  assert.deepEqual(scratchVolumes[0].emptyDir, {});
+  for (const volume of podSpec.volumes) {
+    assert.equal("hostPath" in volume, false, "hostPath volumes are forbidden");
+  }
+  const container = peopleContainer(document);
+  const mounts = container.volumeMounts.filter(
+    (mount) => mount.mountPath === "/tmp",
+  );
+  assert.equal(mounts.length, 1);
+  assert.deepEqual(mounts[0], { name: "tmp-scratch", mountPath: "/tmp" });
+});
+
 test("reference contains the bounded deployment resource set", () => {
   const document = referenceDocument();
   assert.equal(document.apiVersion, "v1");
@@ -180,6 +215,10 @@ test("network policy is default-deny with explicit People API flows", () => {
           },
         },
       ],
+      ports: [{ protocol: "TCP", port: 8080 }],
+    },
+    {
+      from: [{ ipBlock: { cidr: PROBE_CIDR_PLACEHOLDER } }],
       ports: [{ protocol: "TCP", port: 8080 }],
     },
   ]);

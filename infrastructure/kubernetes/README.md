@@ -16,7 +16,7 @@ The probe paths also assume the selected image contains the governed People API 
 
 ## Pod hardening
 
-The `orgmetra-system` namespace declares `pod-security.kubernetes.io/enforce=restricted` and matching audit/warn labels. The People API pod is non-root, uses `RuntimeDefault` seccomp, disables service-account token automount, privilege escalation, privileged mode and host namespaces, drops every Linux capability, and uses a read-only root filesystem.
+The `orgmetra-system` namespace declares `pod-security.kubernetes.io/enforce=restricted` and matching audit/warn labels. The People API pod is non-root, uses `RuntimeDefault` seccomp, disables service-account token automount, privilege escalation, privileged mode and host namespaces, drops every Linux capability, and uses a read-only root filesystem. Because the root filesystem is read-only, the pod declares a dedicated `tmp-scratch` `emptyDir` mounted at `/tmp`; do not remove it and do not replace it with a `hostPath`.
 
 Cluster operators must verify that admission controls actually enforce the intended Restricted profile. If the environment injects sidecars or init containers, those injected containers must independently satisfy the same effective policy.
 
@@ -33,8 +33,9 @@ The timing values are bounded reference defaults, not universal tuning values. V
 The namespace starts from default-deny ingress and egress. The People API policy then permits only:
 
 1. TCP/8080 ingress from same-namespace pods explicitly labelled `orgmetra.cwl/people-api-client=true`;
-2. TCP/5432 egress to same-namespace pods labelled `app.kubernetes.io/name=orgmetra-postgres`;
-3. DNS to kube-system pods labelled `k8s-app=kube-dns` over UDP/TCP 53.
+2. TCP/8080 ingress from the kubelet probe source range, modelled by the RFC 5737 TEST-NET-1 placeholder `192.0.2.0/24`. **Replace that `ipBlock.cidr` with the exact node CIDR your cluster's kubelet probes originate from** (or the documented per-node ranges); without it, a default-deny CNI drops HTTP health probes and every pod fails liveness;
+3. TCP/5432 egress to same-namespace pods labelled `app.kubernetes.io/name=orgmetra-postgres`;
+4. DNS to kube-system pods labelled `k8s-app=kube-dns` over UDP/TCP 53.
 
 A **NetworkPolicy-capable CNI** is required. If the selected cluster networking implementation does not enforce Kubernetes NetworkPolicy, do not claim that this reference provides network isolation.
 
