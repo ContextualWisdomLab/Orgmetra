@@ -53,8 +53,9 @@ jobs:
         run: python -m pytest -c packages/hr-document-retrieval/pyproject.toml packages/hr-document-retrieval/tests
       - name: Prove isolated package install
         run: |
-          rm -rf /tmp/orgmetra-hr-document-retrieval-installed
-          python -m pip install --no-deps --no-build-isolation --target /tmp/orgmetra-hr-document-retrieval-installed packages/hr-document-retrieval
+          rm -rf /tmp/orgmetra-hr-document-retrieval-build /tmp/orgmetra-hr-document-retrieval-installed
+          cp -R packages/hr-document-retrieval /tmp/orgmetra-hr-document-retrieval-build
+          python -m pip install --no-deps --no-build-isolation --target /tmp/orgmetra-hr-document-retrieval-installed /tmp/orgmetra-hr-document-retrieval-build
           PYTHONPATH=/tmp/orgmetra-hr-document-retrieval-installed python - <<'PY'
           import orgmetra_hr_document_retrieval as package
           assert "retrieve_hr_document" in package.__all__
