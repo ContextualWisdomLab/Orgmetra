@@ -224,22 +224,25 @@ class DraftEvidenceEnvelope:
         """Serialize the live payload deterministically without consulting the creation snapshot."""
         return json.dumps(self._payload(), sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
-    def _assert_integrity(self) -> None:
-        """Reject accidental post-construction rewrites before evidence leaves the boundary."""
+    def _assert_integrity(self) -> tuple[dict[str, object], str]:
+        """Validate and return the exact snapshot whose bytes match the creation-time seal."""
         self._validate_fields()
+        payload = self._payload()
+        payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
         seal = self._creation_seal
-        if type(seal) is not str or not hmac.compare_digest(seal, _seal(self._canonical_payload_json())):
+        if type(seal) is not str or not hmac.compare_digest(seal, _seal(payload_json)):
             raise ValueError("draft evidence changed after construction")
+        return payload, payload_json
 
     def canonical_document(self) -> dict[str, object]:
-        """Return a fresh canonical document only while the issuance snapshot remains intact."""
-        self._assert_integrity()
-        return self._payload()
+        """Return a detached copy of the exact canonical snapshot that passed integrity validation."""
+        payload, _ = self._assert_integrity()
+        return dict(payload)
 
     def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit/outbox correlation."""
-        self._assert_integrity()
-        return self._canonical_payload_json()
+        """Return the exact deterministic canonical bytes that passed integrity validation."""
+        _, payload_json = self._assert_integrity()
+        return payload_json
 
     def evidence_digest(self) -> str:
         """Return the SHA-256 digest of the exact canonical evidence bytes."""
