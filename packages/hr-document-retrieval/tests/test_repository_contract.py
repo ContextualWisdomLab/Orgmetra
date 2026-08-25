@@ -24,6 +24,16 @@ def test_docs_keep_active_pr_truth_distinct_from_protected_main() -> None:
     assert "checks, reviews, source code, and PR state do not transfer" in traceability
 
 
+def test_python_support_is_bounded_to_the_exact_hosted_minor() -> None:
+    """Public package metadata must not claim future or older untested Python minors."""
+    root = Path(__file__).resolve().parents[3]
+    pyproject = (root / "packages/hr-document-retrieval/pyproject.toml").read_text()
+    workflow = (root / ".github/workflows/hr-document-retrieval-quality.yml").read_text()
+    assert 'requires-python = ">=3.14,<3.15"' in pyproject
+    assert 'requires = ["setuptools==84.0.0"]' in pyproject
+    assert 'python-version: "3.14.7"' in workflow
+
+
 def test_isolated_install_uses_hash_locked_reviewed_build_backend() -> None:
     """No-build-isolation smoke tests must install an exact reviewed build backend first."""
     root = Path(__file__).resolve().parents[3]
