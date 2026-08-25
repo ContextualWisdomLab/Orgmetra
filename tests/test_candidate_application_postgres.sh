@@ -213,6 +213,74 @@ if [[ "${duplicate_requisition_output}" != *"candidate_application_candidate_req
     exit 1
 fi
 
+# A governed correction closes the anchor's open recorded interval and appends
+# the corrected row. The partial unique index admits exactly one OPEN anchor,
+# so closed history must not block the corrected insert while a second OPEN
+# duplicate for the same pair still fails.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+UPDATE candidate_application_record
+SET recorded_to = TIMESTAMPTZ '2026-08-21 12:00:00+00'
+WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'
+  AND candidate_application_record_id = '10000000-0000-7000-8000-000000000051';
+
+INSERT INTO candidate_application_record (
+    tenant_record_id, candidate_application_record_id, candidate_profile_id,
+    job_profile_id, position_record_id, requisition_reference, submitted_at,
+    recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '10000000-0000-7000-8000-000000000053',
+    '10000000-0000-7000-8000-000000000011',
+    '10000000-0000-7000-8000-000000000021',
+    '10000000-0000-7000-8000-000000000041',
+    'requisition:11111111-1111-4111-8111-111111111111',
+    TIMESTAMPTZ '2026-08-21 09:10:00+00',
+    TIMESTAMPTZ '2026-08-21 12:00:00+00'
+);
+SQL
+
+corrected_open_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT count(*)
+FROM candidate_application_record
+WHERE tenant_record_id = '${TENANT_ALPHA}'::uuid
+  AND candidate_profile_id = '10000000-0000-7000-8000-000000000011'::uuid
+  AND requisition_reference = 'requisition:11111111-1111-4111-8111-111111111111'
+  AND recorded_to IS NULL;
+")"
+if [[ "${corrected_open_count}" != "1" ]]; then
+    echo "correction did not leave exactly one open corrected anchor" >&2
+    exit 1
+fi
+
+set +e
+open_duplicate_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO candidate_application_record (
+    tenant_record_id, candidate_application_record_id, candidate_profile_id,
+    job_profile_id, position_record_id, requisition_reference, submitted_at,
+    recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '10000000-0000-7000-8000-000000000054',
+    '10000000-0000-7000-8000-000000000011',
+    '10000000-0000-7000-8000-000000000021',
+    '10000000-0000-7000-8000-000000000041',
+    'requisition:11111111-1111-4111-8111-111111111111',
+    TIMESTAMPTZ '2026-08-21 09:10:00+00',
+    TIMESTAMPTZ '2026-08-21 12:30:00+00'
+);
+SQL
+} 2>&1)"
+open_duplicate_status=$?
+set -e
+if [[ ${open_duplicate_status} -eq 0 ]]; then
+    echo "a second open anchor duplicated a corrected candidate/requisition identity" >&2
+    exit 1
+fi
+if [[ "${open_duplicate_output}" != *"candidate_application_candidate_requisition_unique"* ]]; then
+    echo "post-correction duplicate failed unexpectedly: ${open_duplicate_output}" >&2
+    exit 1
+fi
+
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO candidate_application_stage_record (
     tenant_record_id, candidate_application_stage_record_id,

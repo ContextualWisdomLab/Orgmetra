@@ -64,10 +64,18 @@ CREATE TABLE candidate_application_record (
     CONSTRAINT candidate_application_submission_recorded_order_check
         CHECK (submitted_at <= recorded_from),
     CONSTRAINT candidate_application_tenant_identity_unique
-        UNIQUE (tenant_record_id, candidate_application_record_id),
-    CONSTRAINT candidate_application_candidate_requisition_unique
-        UNIQUE (tenant_record_id, candidate_profile_id, requisition_reference)
+        UNIQUE (tenant_record_id, candidate_application_record_id)
 );
+
+-- At most one OPEN application anchor per tenant/candidate/requisition pair.
+-- The predicate excludes closed bitemporal history so the governed correction
+-- pattern (close recorded_to, then append the corrected row) stays possible;
+-- a full-row constraint would make every anchor permanently uncorrectable.
+CREATE UNIQUE INDEX candidate_application_candidate_requisition_unique
+    ON public.candidate_application_record (
+        tenant_record_id, candidate_profile_id, requisition_reference
+    )
+    WHERE recorded_to IS NULL;
 
 CREATE TABLE candidate_application_stage_record (
     tenant_record_id uuid NOT NULL REFERENCES public.tenant_record(tenant_record_id),
