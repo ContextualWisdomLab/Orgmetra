@@ -53,7 +53,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "608adea92d058833e3cba477b11b2d2ffcf9d1a8ef2d6f83ec538f3c2ce0a968",
+      "sha256": "608ade458c3db8492fc3b5c212f44cb94b9f3ec4b6acfa4c01c9b8065adae9c2",
       "bytes": 18559,
       "lines": 83
     },
@@ -83,7 +83,7 @@
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "67cf453e49c5b869afaa1f8845313c2fd0096540a3604c6b0d7b8e4d60a2739",
+      "sha256": "67cf52bb9104227d32572357c49cebf636494d6fc66fb440f2e415414876b74e",
       "bytes": 29937,
       "lines": 446
     },
@@ -311,8 +311,8 @@
     },
     {
       "path": "docs/adr/0007-governed-job-analysis-evidence.md",
-      "sha256": "cef54d7af2b97c495f52ad2cdfce1cb6c05362f1da367b11287c821da252d830",
-      "bytes": 5626,
+      "sha256": "be665cb6132fd8acd60c00623b1f69fce97d2b301e0c87df3a0925643459c0e3",
+      "bytes": 5605,
       "lines": 57
     },
     {
@@ -353,14 +353,14 @@
     },
     {
       "path": "docs/adr/0014-job-analysis-snapshot-persistence.md",
-      "sha256": "1881f042821abd24e39c99d6dd136bbcef2fe09278041c7cefce0f1aa7325c6b",
-      "bytes": 5354,
+      "sha256": "a3d7e8c2234d48183433b0d06795534a8ef8b2d7b6298bed5574e088ebdae656",
+      "bytes": 5333,
       "lines": 49
     },
     {
       "path": "docs/adr/0026-product-technical-gap-baseline.md",
-      "sha256": "8e5e4fdd3bdd0a3a2e29517de8346148bb4780cfb7c568844bc034a9593aab6d",
-      "bytes": 3162,
+      "sha256": "6d3f463e1601b0a6d5c9f404a8f866aa5ec7ea30b512b2c5251dfb5c3f42b3b4",
+      "bytes": 3133,
       "lines": 32
     },
     {
@@ -449,9 +449,9 @@
     },
     {
       "path": "tests/e2e/hr-workspace.spec.mjs",
-      "sha256": "5e8abce5949105cd4ebe3f8481b74e7511ddd06aca8d9a6cb8d4506d0b251c82",
-      "bytes": 11294,
-      "lines": 246
+      "sha256": "234b43b7a6f030e0a889079f25f42c298a81f1b6c3003ec533fb7174c1e74754",
+      "bytes": 11516,
+      "lines": 250
     },
     {
       "path": "tests/foundation-contract.test.mjs",
