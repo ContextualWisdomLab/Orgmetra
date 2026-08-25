@@ -11,6 +11,7 @@ TENANT_ALPHA="10000000-0000-7000-8000-000000000001"
 TENANT_BETA="20000000-0000-7000-8000-000000000001"
 APPLICATION_ONE="10000000-0000-7000-8000-000000000051"
 APPLICATION_TWO="10000000-0000-7000-8000-000000000052"
+APPLICATION_THREE="10000000-0000-7000-8000-000000000053"
 
 assert_sql_rejected() {
     local expected="$1"
@@ -88,15 +89,29 @@ fi
 assert_sql_rejected \
     "candidate_application_candidate_tenant_fk" \
     "cross-tenant candidate anchor" \
-    "INSERT INTO candidate_application_record (tenant_record_id,candidate_application_record_id,candidate_profile_id,requisition_reference,submitted_at,recorded_from) VALUES ('${TENANT_ALPHA}'::uuid,'10000000-0000-7000-8000-000000000053'::uuid,'20000000-0000-7000-8000-000000000011'::uuid,'requisition:33333333-3333-4333-8333-333333333333',TIMESTAMPTZ '2026-08-21 09:12:00+00',TIMESTAMPTZ '2026-08-21 09:12:01+00');"
+    "INSERT INTO candidate_application_record (tenant_record_id,candidate_application_record_id,candidate_profile_id,requisition_reference,submitted_at,recorded_from) VALUES ('${TENANT_ALPHA}'::uuid,'${APPLICATION_THREE}'::uuid,'20000000-0000-7000-8000-000000000011'::uuid,'requisition:33333333-3333-4333-8333-333333333333',TIMESTAMPTZ '2026-08-21 09:12:00+00',TIMESTAMPTZ '2026-08-21 09:12:01+00');"
 
-# Keep the mismatch regression outside the current application's effective
-# interval so the Position/Job FK is the first causal boundary rather than the
-# independent bitemporal-overlap guard.
+# Create a fresh durable application anchor with no scope version so the
+# Position/Job mismatch regression reaches the intended composite FK instead of
+# being intercepted by the independent bitemporal-overlap guard.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO candidate_application_record (
+    tenant_record_id, candidate_application_record_id, candidate_profile_id,
+    requisition_reference, submitted_at, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '10000000-0000-7000-8000-000000000053',
+    '10000000-0000-7000-8000-000000000011',
+    'requisition:33333333-3333-4333-8333-333333333333',
+    TIMESTAMPTZ '2026-08-21 09:12:00+00',
+    TIMESTAMPTZ '2026-08-21 09:12:01+00'
+);
+SQL
+
 assert_sql_rejected \
     "candidate_application_version_position_job_tenant_fk" \
     "Position/Job mismatch" \
-    "INSERT INTO candidate_application_record_version (tenant_record_id,candidate_application_record_version_id,candidate_application_record_id,job_profile_id,position_record_id,effective_from,effective_to,recorded_from) VALUES ('${TENANT_ALPHA}'::uuid,'10000000-0000-7000-8000-000000000073'::uuid,'${APPLICATION_ONE}'::uuid,'10000000-0000-7000-8000-000000000021'::uuid,'10000000-0000-7000-8000-000000000042'::uuid,TIMESTAMPTZ '2026-08-21 08:00:00+00',TIMESTAMPTZ '2026-08-21 09:00:00+00',TIMESTAMPTZ '2026-08-21 11:00:00+00');"
+    "INSERT INTO candidate_application_record_version (tenant_record_id,candidate_application_record_version_id,candidate_application_record_id,job_profile_id,position_record_id,effective_from,recorded_from) VALUES ('${TENANT_ALPHA}'::uuid,'10000000-0000-7000-8000-000000000073'::uuid,'${APPLICATION_THREE}'::uuid,'10000000-0000-7000-8000-000000000021'::uuid,'10000000-0000-7000-8000-000000000042'::uuid,TIMESTAMPTZ '2026-08-21 09:12:00+00',TIMESTAMPTZ '2026-08-21 11:00:00+00');"
 
 assert_sql_rejected \
     "candidate_application_candidate_requisition_unique" \
