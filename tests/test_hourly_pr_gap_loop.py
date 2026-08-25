@@ -1,20 +1,16 @@
-"""Regression tests for the scheduled Orgmetra PR/gap loop."""
+"""Regression tests for the scheduled Orgmetra gap-baseline audit."""
 
 from __future__ import annotations
 
 import importlib.util
 import json
-import re
 from pathlib import Path
 from types import ModuleType
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "hourly-pr-gap-loop.yml"
 SCRIPT = ROOT / "scripts" / "ops" / "gap_baseline_freshness.py"
-CENTRAL_SCHEDULER = (
-    "ContextualWisdomLab/.github/.github/workflows/"
-    "pr-review-merge-scheduler.yml"
-)
+CENTRAL_SCHEDULER = "pr-review-merge-scheduler.yml"
 
 
 def _load_script() -> ModuleType:
@@ -25,23 +21,17 @@ def _load_script() -> ModuleType:
     return module
 
 
-def test_reusable_scheduler_is_job_level_immutably_pinned_and_least_privileged() -> None:
-    """Call the pinned scheduler as a job without forwarding reviewer credentials."""
+def test_hourly_audit_does_not_create_a_second_pr_writer() -> None:
+    """The Orgmetra heartbeat must stay read-only beside the central writer."""
     text = WORKFLOW.read_text(encoding="utf-8")
-    scheduler_block = text.split("  scheduler-sweep:\n", 1)[1].split(
-        "\n  gap-baseline-freshness:", 1
-    )[0]
 
-    assert "\n    steps:" not in scheduler_block
-    assert "@main" not in scheduler_block
-    assert re.search(
-        rf"^    uses: {re.escape(CENTRAL_SCHEDULER)}@[0-9a-f]{{40}}$",
-        scheduler_block,
-        re.MULTILINE,
-    )
-    # The central owner already supports OIDC app-token exchange. The caller
-    # must not forward repository/org secrets such as independent-review tokens.
-    assert "secrets: inherit" not in scheduler_block
+    assert CENTRAL_SCHEDULER not in text
+    assert "contents: write" not in text
+    assert "pull-requests: write" not in text
+    assert "actions: write" not in text
+    assert "id-token: write" not in text
+    assert "secrets: inherit" not in text
+    assert "permissions:\n  contents: read\n  pull-requests: read\n  issues: read" in text
 
 
 def test_live_queue_counts_request_all_pages(monkeypatch) -> None:
