@@ -3,9 +3,12 @@
 from pathlib import Path
 
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
+
 def _workflow(path: str) -> str:
     """Read one reviewed repository-local workflow as UTF-8 text."""
-    return Path(path).read_text(encoding="utf-8")
+    return (REPOSITORY_ROOT / path).read_text(encoding="utf-8")
 
 
 def test_job_analysis_api_quality_runs_on_current_default_branch_pull_requests() -> None:

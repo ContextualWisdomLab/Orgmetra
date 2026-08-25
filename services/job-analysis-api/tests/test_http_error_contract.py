@@ -112,7 +112,7 @@ class JobAnalysisHttpErrorContractTests(unittest.IsolatedAsyncioTestCase):
 
     def test_openapi_allows_the_deprecated_error_alias_without_weakening_required_fields(self) -> None:
         """Preserve current clients while requiring the governed four-field envelope."""
-        schema = Path("schemas/openapi.yaml").read_text(encoding="utf-8")
+        schema = (Path(__file__).resolve().parents[3] / "schemas" / "openapi.yaml").read_text(encoding="utf-8")
         error_schema = schema.split("    ErrorResponse:\n", 1)[1].split(
             "  responses:\n", 1
         )[0]

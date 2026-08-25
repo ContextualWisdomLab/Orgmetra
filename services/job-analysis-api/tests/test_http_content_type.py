@@ -108,7 +108,7 @@ class JobAnalysisHttpContentTypeTests(unittest.IsolatedAsyncioTestCase):
 
     def test_openapi_publishes_the_unsupported_media_type_response(self) -> None:
         """Keep generated clients aligned with the runtime 415 contract."""
-        schema = Path("schemas/openapi.yaml").read_text(encoding="utf-8")
+        schema = (Path(__file__).resolve().parents[3] / "schemas" / "openapi.yaml").read_text(encoding="utf-8")
         collection = schema.split(
             "  /tenants/{tenant_record_id}/job-analysis-snapshots:", 1
         )[1].split(

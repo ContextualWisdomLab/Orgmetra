@@ -5,7 +5,7 @@ from pathlib import Path
 
 def test_snapshot_arrays_publish_runtime_cardinality_and_item_types() -> None:
     """Keep client schemas aligned with bounded runtime parsing and evidence shapes."""
-    schema = Path("schemas/openapi.yaml").read_text(encoding="utf-8")
+    schema = (Path(__file__).resolve().parents[3] / "schemas" / "openapi.yaml").read_text(encoding="utf-8")
     command = schema.split("    PersistJobAnalysisSnapshotCommand:", 1)[1].split(
         "    JobAnalysisSnapshotDocument:", 1
     )[0]
@@ -31,7 +31,7 @@ def test_snapshot_arrays_publish_runtime_cardinality_and_item_types() -> None:
 
 def test_snapshot_get_publishes_dedicated_not_found_response() -> None:
     """Do not document a missing snapshot as generic invalid-command validation."""
-    schema = Path("schemas/openapi.yaml").read_text(encoding="utf-8")
+    schema = (Path(__file__).resolve().parents[3] / "schemas" / "openapi.yaml").read_text(encoding="utf-8")
     item_path = "  /tenants/{tenant_record_id}/job-analysis-snapshots/{analysis_record_id}:"
     item_block = schema.split(item_path, 1)[1].split("components:", 1)[0]
 
