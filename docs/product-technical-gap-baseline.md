@@ -111,7 +111,7 @@ For live-state documentation defects such as repository ruleset truth, do **not*
 - PR #54 demonstrates why source ownership matters: its Orgmetra-native gates are GREEN while the current blocking review cites a central coverage-evidence failure. Repair must stay at the existing central owner boundary.
 - Review capacity remains the dominant integration constraint: the effective ruleset requires two qualifying approvals, while current Orgmetra open PRs have no qualifying `APPROVE` in the fresh review search.
 
-## Doctoring (APA 7th)
+## References (APA 7th)
 
 American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*.
 
