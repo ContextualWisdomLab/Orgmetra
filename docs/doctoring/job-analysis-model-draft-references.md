@@ -1,6 +1,6 @@
 # Job Analysis model-draft references
 
-Reviewed for this active PR on 2026-08-26. These references support orchestration design, Job Analysis evidence discipline, and human-accountable use; they do not establish autonomous employment-decision authority.
+Reviewed for this active PR on 2026-08-26. These references support orchestration design, Job Analysis evidence discipline, human-accountable use, and reproducible package evidence; they do not establish autonomous employment-decision authority or certification.
 
 ## Primary orchestration research
 
@@ -19,6 +19,12 @@ American Educational Research Association, American Psychological Association, &
 Society for Industrial and Organizational Psychology. (2018). *Principles for the validation and use of personnel selection procedures* (5th ed.). Society for Industrial and Organizational Psychology.
 
 These standards support explicit construct/evidence provenance, controlled interpretation, and separation between evidence generation and consequential decision authority. In this package, model output is an untrusted proposal that requires distinct human review and remains non-authoritative until a separate Job Analysis persistence boundary revalidates it.
+
+## Packaging evidence
+
+Python Packaging Authority. (2026, August 8). *setuptools 84.0.0*. Python Package Index. https://pypi.org/project/setuptools/84.0.0/
+
+PyPI reports `setuptools-84.0.0-py3-none-any.whl` with SHA-256 `51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670`. The exact-head quality lane installs that reviewed backend by hash, builds the package wheel from the exact Git checkout with build isolation disabled, computes the resulting local wheel SHA-256, and requires that same hash for the isolated install used as package evidence. Public Python support is bounded to `>=3.14,<3.15` because this lane executes exact CPython 3.14.7 rather than claiming untested future minor versions.
 
 ## Engineering interpretation
 
