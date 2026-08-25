@@ -82,8 +82,24 @@ def test_live_queue_counts_request_all_pages(monkeypatch) -> None:
 
     assert state["open_pull_requests"] == 2
     assert state["open_issues"] == 1
-    queue_calls = [call for call in calls if "/pulls?" in " ".join(call) or "/issues?" in " ".join(call)]
+    queue_calls = [
+        call
+        for call in calls
+        if "/pulls?" in " ".join(call) or "/issues?" in " ".join(call)
+    ]
     assert len(queue_calls) == 2
     for call in queue_calls:
         assert "--paginate" in call
         assert "--slurp" in call
+
+
+def test_missing_baseline_is_nonfatal_until_dependency_integrates(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    """A pre-#100 scheduled run must report absence without staying permanently red."""
+    module = _load_script()
+    missing = tmp_path / "product-technical-gap-baseline.md"
+    monkeypatch.setattr(module.sys, "argv", ["gap-baseline-freshness", "--baseline", str(missing)])
+
+    assert module.main() == 0
+    assert "baseline not present" in capsys.readouterr().out.lower()
