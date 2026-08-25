@@ -56,6 +56,102 @@ expect_failure() {
     fi
 }
 
+review_digest() {
+    REVIEW_JSON="$1" python3 - <<'PY'
+from hashlib import sha256
+import os
+print(sha256(os.environ["REVIEW_JSON"].encode("utf-8")).hexdigest())
+PY
+}
+
+build_review() {
+    local unit_id="$1"
+    local current_parent="$2"
+    local proposed_parent="$3"
+    local change_reference="$4"
+    local unit_digest="$5"
+    local hierarchy_digest="$6"
+    TENANT_ID="${TENANT_ID}" UNIT_ID="${unit_id}" CURRENT_PARENT="${current_parent}" \
+    PROPOSED_PARENT="${proposed_parent}" CHANGE_REFERENCE="${change_reference}" \
+    REQUESTER="${REQUESTER}" REVIEWER="${REVIEWER}" EFFECTIVE_ON="${EFFECTIVE_ON}" \
+    UNIT_DIGEST="${unit_digest}" HIERARCHY_DIGEST="${hierarchy_digest}" \
+    PYTHONPATH=packages/organization-hierarchy-change-review/src python3 - <<'PY'
+from datetime import date, datetime, timezone
+import os
+from orgmetra_organization_hierarchy_change_review import build_organization_hierarchy_change_review_packet
+
+def organization_reference(raw: str):
+    return None if raw == "ROOT" else f"organization_unit:{raw}"
+
+packet = build_organization_hierarchy_change_review_packet(
+    tenant_record_id=os.environ["TENANT_ID"],
+    organization_hierarchy_change_reference=os.environ["CHANGE_REFERENCE"],
+    organization_unit_reference=f"organization_unit:{os.environ['UNIT_ID']}",
+    current_parent_organization_unit_reference=organization_reference(os.environ["CURRENT_PARENT"]),
+    proposed_parent_organization_unit_reference=organization_reference(os.environ["PROPOSED_PARENT"]),
+    effective_on=date.fromisoformat(os.environ["EFFECTIVE_ON"]),
+    organization_unit_snapshot_digest=os.environ["UNIT_DIGEST"],
+    hierarchy_snapshot_digest=os.environ["HIERARCHY_DIGEST"],
+    requester_reference=os.environ["REQUESTER"],
+    reviewer_reference=os.environ["REVIEWER"],
+    purpose_code="organization_hierarchy_change_review",
+    reason_code="organizational_realignment",
+    recorded_at=datetime.now(timezone.utc),
+)
+print(packet.canonical_json())
+PY
+}
+
+run_application() {
+    local unit_id="$1"
+    local predecessor_id="$2"
+    local successor_id="$3"
+    local application_id="$4"
+    local canonical_review_json="$5"
+    local digest="$6"
+    local audit_id="$7"
+    local outbox_id="$8"
+    with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+        -v review_json="${canonical_review_json}" -v review_digest="${digest}" <<SQL
+SELECT apply_organization_hierarchy_change(
+    '${TENANT_ID}'::uuid,
+    '${unit_id}'::uuid,
+    '${predecessor_id}'::uuid,
+    '${successor_id}'::uuid,
+    '${application_id}'::uuid,
+    :'review_json',
+    :'review_digest',
+    '${APPLIER}',
+    '${audit_id}'::uuid,
+    '${outbox_id}'::uuid
+);
+SQL
+}
+
+expect_application_failure() {
+    local label="$1"
+    local needle="$2"
+    local unit_id="$3"
+    local predecessor_id="$4"
+    local successor_id="$5"
+    local application_id="$6"
+    local canonical_review_json="$7"
+    local digest="$8"
+    local audit_id="$9"
+    local outbox_id="${10}"
+    local output status
+    set +e
+    output="$(run_application \
+        "${unit_id}" "${predecessor_id}" "${successor_id}" "${application_id}" \
+        "${canonical_review_json}" "${digest}" "${audit_id}" "${outbox_id}" 2>&1)"
+    status=$?
+    set -e
+    if [[ ${status} -eq 0 || "${output}" != *"${needle}"* ]]; then
+        echo "${label}: ${output}" >&2
+        exit 1
+    fi
+}
+
 with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
 VALUES ('${TENANT_ID}', 'tenant_alpha'), ('${OTHER_TENANT_ID}', 'tenant_beta');
@@ -77,71 +173,18 @@ INSERT INTO organization_unit_version (
     ('${TENANT_ID}', '${DESCENDANT_VERSION_ID}', '${DESCENDANT_ID}', 'Descendant', 'team', '${UNIT_ID}', DATE '2020-01-01');
 SQL
 
-unit_digest="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "
-SELECT organization_unit_review_snapshot_digest(
-  '${TENANT_ID}'::uuid, '${UNIT_ID}'::uuid, DATE '${EFFECTIVE_ON}', pg_catalog.transaction_timestamp()
-);")"
-hierarchy_digest="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "
-SELECT organization_hierarchy_review_snapshot_digest(
-  '${TENANT_ID}'::uuid, DATE '${EFFECTIVE_ON}', pg_catalog.transaction_timestamp()
-);")"
-
+unit_digest="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "SELECT organization_unit_review_snapshot_digest('${TENANT_ID}'::uuid, '${UNIT_ID}'::uuid, DATE '${EFFECTIVE_ON}', pg_catalog.transaction_timestamp());")"
+hierarchy_digest="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "SELECT organization_hierarchy_review_snapshot_digest('${TENANT_ID}'::uuid, DATE '${EFFECTIVE_ON}', pg_catalog.transaction_timestamp());")"
 if [[ ! "${unit_digest}" =~ ^[0-9a-f]{64}$ || ! "${hierarchy_digest}" =~ ^[0-9a-f]{64}$ ]]; then
     echo "authoritative organization snapshot digests were not produced" >&2
     exit 1
 fi
 
-review_json="$(
-    PYTHONPATH=packages/organization-hierarchy-change-review/src \
-    TENANT_ID="${TENANT_ID}" UNIT_ID="${UNIT_ID}" OLD_PARENT_ID="${OLD_PARENT_ID}" \
-    NEW_PARENT_ID="${NEW_PARENT_ID}" CHANGE_REFERENCE="${CHANGE_REFERENCE}" \
-    REQUESTER="${REQUESTER}" REVIEWER="${REVIEWER}" EFFECTIVE_ON="${EFFECTIVE_ON}" \
-    UNIT_DIGEST="${unit_digest}" HIERARCHY_DIGEST="${hierarchy_digest}" \
-    python3 - <<'PY'
-from datetime import date, datetime, timezone
-import os
-from orgmetra_organization_hierarchy_change_review import build_organization_hierarchy_change_review_packet
-
-packet = build_organization_hierarchy_change_review_packet(
-    tenant_record_id=os.environ["TENANT_ID"],
-    organization_hierarchy_change_reference=os.environ["CHANGE_REFERENCE"],
-    organization_unit_reference=f"organization_unit:{os.environ['UNIT_ID']}",
-    current_parent_organization_unit_reference=f"organization_unit:{os.environ['OLD_PARENT_ID']}",
-    proposed_parent_organization_unit_reference=f"organization_unit:{os.environ['NEW_PARENT_ID']}",
-    effective_on=date.fromisoformat(os.environ["EFFECTIVE_ON"]),
-    organization_unit_snapshot_digest=os.environ["UNIT_DIGEST"],
-    hierarchy_snapshot_digest=os.environ["HIERARCHY_DIGEST"],
-    requester_reference=os.environ["REQUESTER"],
-    reviewer_reference=os.environ["REVIEWER"],
-    purpose_code="organization_hierarchy_change_review",
-    reason_code="organizational_realignment",
-    recorded_at=datetime.now(timezone.utc),
-)
-print(packet.canonical_json())
-PY
-)"
-review_digest="$(REVIEW_JSON="${review_json}" python3 - <<'PY'
-from hashlib import sha256
-import os
-print(sha256(os.environ["REVIEW_JSON"].encode("utf-8")).hexdigest())
-PY
-)"
-
-with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
-    -v review_json="${review_json}" -v review_digest="${review_digest}" <<SQL
-SELECT apply_organization_hierarchy_change(
-    '${TENANT_ID}'::uuid,
-    '${UNIT_ID}'::uuid,
-    '${UNIT_VERSION_ID}'::uuid,
-    '${SUCCESSOR_VERSION_ID}'::uuid,
-    '${APPLICATION_ID}'::uuid,
-    :'review_json',
-    :'review_digest',
-    '${APPLIER}',
-    '${AUDIT_ID}'::uuid,
-    '${OUTBOX_ID}'::uuid
-);
-SQL
+review_json="$(build_review "${UNIT_ID}" "${OLD_PARENT_ID}" "${NEW_PARENT_ID}" "${CHANGE_REFERENCE}" "${unit_digest}" "${hierarchy_digest}")"
+review_sha256="$(review_digest "${review_json}")"
+run_application \
+    "${UNIT_ID}" "${UNIT_VERSION_ID}" "${SUCCESSOR_VERSION_ID}" "${APPLICATION_ID}" \
+    "${review_json}" "${review_sha256}" "${AUDIT_ID}" "${OUTBOX_ID}"
 
 current_parent="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "
 SELECT COALESCE(parent_organization_unit_id::text, 'ROOT')
@@ -182,9 +225,7 @@ expect_failure \
     "organization hierarchy application evidence was rewriteable" \
     "append-only" \
     with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
-    "UPDATE organization_hierarchy_change_application_record
-     SET reason_code = 'administrative_correction'
-     WHERE organization_hierarchy_change_application_record_id = '${APPLICATION_ID}'::uuid;"
+    "UPDATE organization_hierarchy_change_application_record SET reason_code = 'administrative_correction' WHERE organization_hierarchy_change_application_record_id = '${APPLICATION_ID}'::uuid;"
 
 expect_failure \
     "organization hierarchy application evidence could be truncated" \
@@ -192,115 +233,33 @@ expect_failure \
     with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
     "TRUNCATE organization_hierarchy_change_application_record;"
 
-# Fresh evidence claiming the old parent after the successful move must fail closed.
-stale_unit_digest="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "
-SELECT organization_unit_review_snapshot_digest(
-  '${TENANT_ID}'::uuid, '${UNIT_ID}'::uuid, DATE '${EFFECTIVE_ON}', pg_catalog.transaction_timestamp()
-);")"
-stale_hierarchy_digest="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "
-SELECT organization_hierarchy_review_snapshot_digest(
-  '${TENANT_ID}'::uuid, DATE '${EFFECTIVE_ON}', pg_catalog.transaction_timestamp()
-);")"
-stale_json="$(
-    PYTHONPATH=packages/organization-hierarchy-change-review/src \
-    TENANT_ID="${TENANT_ID}" UNIT_ID="${UNIT_ID}" OLD_PARENT_ID="${OLD_PARENT_ID}" \
-    NEW_PARENT_ID="${DESCENDANT_ID}" \
-    CHANGE_REFERENCE="organization_hierarchy_change:00000000-0000-4000-8000-000000000071" \
-    REQUESTER="${REQUESTER}" REVIEWER="${REVIEWER}" EFFECTIVE_ON="${EFFECTIVE_ON}" \
-    UNIT_DIGEST="${stale_unit_digest}" HIERARCHY_DIGEST="${stale_hierarchy_digest}" \
-    python3 - <<'PY'
-from datetime import date, datetime, timezone
-import os
-from orgmetra_organization_hierarchy_change_review import build_organization_hierarchy_change_review_packet
-packet = build_organization_hierarchy_change_review_packet(
-    tenant_record_id=os.environ["TENANT_ID"],
-    organization_hierarchy_change_reference=os.environ["CHANGE_REFERENCE"],
-    organization_unit_reference=f"organization_unit:{os.environ['UNIT_ID']}",
-    current_parent_organization_unit_reference=f"organization_unit:{os.environ['OLD_PARENT_ID']}",
-    proposed_parent_organization_unit_reference=f"organization_unit:{os.environ['NEW_PARENT_ID']}",
-    effective_on=date.fromisoformat(os.environ["EFFECTIVE_ON"]),
-    organization_unit_snapshot_digest=os.environ["UNIT_DIGEST"],
-    hierarchy_snapshot_digest=os.environ["HIERARCHY_DIGEST"],
-    requester_reference=os.environ["REQUESTER"],
-    reviewer_reference=os.environ["REVIEWER"],
-    purpose_code="organization_hierarchy_change_review",
-    reason_code="organizational_realignment",
-    recorded_at=datetime.now(timezone.utc),
-)
-print(packet.canonical_json())
-PY
-)"
-stale_digest="$(REVIEW_JSON="${stale_json}" python3 - <<'PY'
-from hashlib import sha256
-import os
-print(sha256(os.environ["REVIEW_JSON"].encode()).hexdigest())
-PY
-)"
-expect_failure \
+# Fresh evidence that lies about the current parent must be rejected before mutation.
+stale_unit_digest="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "SELECT organization_unit_review_snapshot_digest('${TENANT_ID}'::uuid, '${UNIT_ID}'::uuid, DATE '${EFFECTIVE_ON}', pg_catalog.transaction_timestamp());")"
+stale_hierarchy_digest="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "SELECT organization_hierarchy_review_snapshot_digest('${TENANT_ID}'::uuid, DATE '${EFFECTIVE_ON}', pg_catalog.transaction_timestamp());")"
+stale_json="$(build_review "${UNIT_ID}" "${OLD_PARENT_ID}" "${DESCENDANT_ID}" "organization_hierarchy_change:00000000-0000-4000-8000-000000000071" "${stale_unit_digest}" "${stale_hierarchy_digest}")"
+stale_sha256="$(review_digest "${stale_json}")"
+expect_application_failure \
     "organization hierarchy application accepted stale current-parent evidence" \
     "stale" \
-    with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
-    -v review_json="${stale_json}" -v review_digest="${stale_digest}" -c \
-    "SELECT apply_organization_hierarchy_change(
-        '${TENANT_ID}'::uuid, '${UNIT_ID}'::uuid, '${SUCCESSOR_VERSION_ID}'::uuid,
-        '00000000-0000-7000-8000-000000000075'::uuid,
-        '00000000-0000-7000-8000-000000000076'::uuid,
-        :'review_json', :'review_digest', '${APPLIER}',
-        '00000000-0000-4000-8000-000000000077'::uuid,
-        '00000000-0000-4000-8000-000000000078'::uuid
-     );"
+    "${UNIT_ID}" "${SUCCESSOR_VERSION_ID}" \
+    "00000000-0000-7000-8000-000000000075" \
+    "00000000-0000-7000-8000-000000000076" \
+    "${stale_json}" "${stale_sha256}" \
+    "00000000-0000-4000-8000-000000000077" \
+    "00000000-0000-4000-8000-000000000078"
 
 # A proposed parent that is currently a descendant would form a cycle.
-cycle_unit_digest="${stale_unit_digest}"
-cycle_hierarchy_digest="${stale_hierarchy_digest}"
-cycle_json="$(
-    PYTHONPATH=packages/organization-hierarchy-change-review/src \
-    TENANT_ID="${TENANT_ID}" UNIT_ID="${UNIT_ID}" \
-    OLD_PARENT_ID="${NEW_PARENT_ID}" NEW_PARENT_ID="${DESCENDANT_ID}" \
-    CHANGE_REFERENCE="organization_hierarchy_change:00000000-0000-4000-8000-000000000081" \
-    REQUESTER="${REQUESTER}" REVIEWER="${REVIEWER}" EFFECTIVE_ON="${EFFECTIVE_ON}" \
-    UNIT_DIGEST="${cycle_unit_digest}" HIERARCHY_DIGEST="${cycle_hierarchy_digest}" \
-    python3 - <<'PY'
-from datetime import date, datetime, timezone
-import os
-from orgmetra_organization_hierarchy_change_review import build_organization_hierarchy_change_review_packet
-packet = build_organization_hierarchy_change_review_packet(
-    tenant_record_id=os.environ["TENANT_ID"],
-    organization_hierarchy_change_reference=os.environ["CHANGE_REFERENCE"],
-    organization_unit_reference=f"organization_unit:{os.environ['UNIT_ID']}",
-    current_parent_organization_unit_reference=f"organization_unit:{os.environ['OLD_PARENT_ID']}",
-    proposed_parent_organization_unit_reference=f"organization_unit:{os.environ['NEW_PARENT_ID']}",
-    effective_on=date.fromisoformat(os.environ["EFFECTIVE_ON"]),
-    organization_unit_snapshot_digest=os.environ["UNIT_DIGEST"],
-    hierarchy_snapshot_digest=os.environ["HIERARCHY_DIGEST"],
-    requester_reference=os.environ["REQUESTER"],
-    reviewer_reference=os.environ["REVIEWER"],
-    purpose_code="organization_hierarchy_change_review",
-    reason_code="organizational_realignment",
-    recorded_at=datetime.now(timezone.utc),
-)
-print(packet.canonical_json())
-PY
-)"
-cycle_digest="$(REVIEW_JSON="${cycle_json}" python3 - <<'PY'
-from hashlib import sha256
-import os
-print(sha256(os.environ["REVIEW_JSON"].encode()).hexdigest())
-PY
-)"
-expect_failure \
+cycle_json="$(build_review "${UNIT_ID}" "${NEW_PARENT_ID}" "${DESCENDANT_ID}" "organization_hierarchy_change:00000000-0000-4000-8000-000000000081" "${stale_unit_digest}" "${stale_hierarchy_digest}")"
+cycle_sha256="$(review_digest "${cycle_json}")"
+expect_application_failure \
     "organization hierarchy application accepted a parent cycle" \
     "cycle" \
-    with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
-    -v review_json="${cycle_json}" -v review_digest="${cycle_digest}" -c \
-    "SELECT apply_organization_hierarchy_change(
-        '${TENANT_ID}'::uuid, '${UNIT_ID}'::uuid, '${SUCCESSOR_VERSION_ID}'::uuid,
-        '00000000-0000-7000-8000-000000000085'::uuid,
-        '00000000-0000-7000-8000-000000000086'::uuid,
-        :'review_json', :'review_digest', '${APPLIER}',
-        '00000000-0000-4000-8000-000000000087'::uuid,
-        '00000000-0000-4000-8000-000000000088'::uuid
-     );"
+    "${UNIT_ID}" "${SUCCESSOR_VERSION_ID}" \
+    "00000000-0000-7000-8000-000000000085" \
+    "00000000-0000-7000-8000-000000000086" \
+    "${cycle_json}" "${cycle_sha256}" \
+    "00000000-0000-4000-8000-000000000087" \
+    "00000000-0000-4000-8000-000000000088"
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 DO $$
@@ -318,15 +277,9 @@ GRANT USAGE ON SCHEMA public TO orgmetra_hierarchy_reader, orgmetra_untrusted_ex
 GRANT SELECT ON organization_hierarchy_change_application_record TO orgmetra_hierarchy_reader;
 SQL
 
-alpha_count="$(PGPASSWORD=orgmetra_hierarchy_reader PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" \
-    psql -h localhost -U orgmetra_hierarchy_reader -d orgmetra -Atqc \
-    'SELECT count(*) FROM organization_hierarchy_change_application_record;')"
-beta_count="$(PGPASSWORD=orgmetra_hierarchy_reader PGOPTIONS="-c orgmetra.tenant_record_id=${OTHER_TENANT_ID}" \
-    psql -h localhost -U orgmetra_hierarchy_reader -d orgmetra -Atqc \
-    'SELECT count(*) FROM organization_hierarchy_change_application_record;')"
-missing_count="$(PGPASSWORD=orgmetra_hierarchy_reader \
-    psql -h localhost -U orgmetra_hierarchy_reader -d orgmetra -Atqc \
-    'SELECT count(*) FROM organization_hierarchy_change_application_record;')"
+alpha_count="$(PGPASSWORD=orgmetra_hierarchy_reader PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" psql -h localhost -U orgmetra_hierarchy_reader -d orgmetra -Atqc 'SELECT count(*) FROM organization_hierarchy_change_application_record;')"
+beta_count="$(PGPASSWORD=orgmetra_hierarchy_reader PGOPTIONS="-c orgmetra.tenant_record_id=${OTHER_TENANT_ID}" psql -h localhost -U orgmetra_hierarchy_reader -d orgmetra -Atqc 'SELECT count(*) FROM organization_hierarchy_change_application_record;')"
+missing_count="$(PGPASSWORD=orgmetra_hierarchy_reader psql -h localhost -U orgmetra_hierarchy_reader -d orgmetra -Atqc 'SELECT count(*) FROM organization_hierarchy_change_application_record;')"
 if [[ "${alpha_count}" != "1" || "${beta_count}" != "0" || "${missing_count}" != "0" ]]; then
     echo "organization hierarchy application RLS isolation failed: alpha=${alpha_count} beta=${beta_count} missing=${missing_count}" >&2
     exit 1
@@ -337,13 +290,6 @@ expect_failure \
     "permission denied for function apply_organization_hierarchy_change" \
     env PGPASSWORD=orgmetra_untrusted_executor PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" \
     psql -h localhost -U orgmetra_untrusted_executor -d orgmetra -v ON_ERROR_STOP=1 -c \
-    "SELECT apply_organization_hierarchy_change(
-        '${TENANT_ID}'::uuid, '${UNIT_ID}'::uuid, '${SUCCESSOR_VERSION_ID}'::uuid,
-        '00000000-0000-7000-8000-000000000091'::uuid,
-        '00000000-0000-7000-8000-000000000092'::uuid,
-        '{}'::text, repeat('a',64), '${APPLIER}',
-        '00000000-0000-4000-8000-000000000093'::uuid,
-        '00000000-0000-4000-8000-000000000094'::uuid
-     );"
+    "SELECT apply_organization_hierarchy_change('${TENANT_ID}'::uuid, '${UNIT_ID}'::uuid, '${SUCCESSOR_VERSION_ID}'::uuid, '00000000-0000-7000-8000-000000000091'::uuid, '00000000-0000-7000-8000-000000000092'::uuid, '{}'::text, repeat('a',64), '${APPLIER}', '00000000-0000-4000-8000-000000000093'::uuid, '00000000-0000-4000-8000-000000000094'::uuid);"
 
 echo "organization hierarchy change application contract passed"
