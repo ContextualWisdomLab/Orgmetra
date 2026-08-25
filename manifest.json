@@ -80,7 +80,7 @@
     {"path":"tests/test_candidate_application_postgres.sh","sha256":"69e18d46a76a35afa0d97e855bff79100a51f4f2ab603707db2be8e552b5c686","bytes":14311,"lines":236},
     {"path":"tests/test_candidate_application_rls_postgres.sh","sha256":"0f0ae93d28bb88430e377c05654250d2567ea0ff6c9b5c41365779fe91e2a563","bytes":4637,"lines":118},
     {"path":"tests/test_candidate_worker_conversion_postgres.sh","sha256":"681cb74d6cfa859ed92c6c2439881ea20c430ef8df94ec662e2807761a377f90","bytes":14673,"lines":344},
-    {"path":"tests/test_criterion_observation_scope_postgres.sh","sha256":"0ee9539ee57b840c27d08009f7868cdc8662669df78a01dbc8be39216b8f1a3d","bytes":17811,"lines":469},
+    {"path":"tests/test_criterion_observation_scope_postgres.sh","sha256":"0ee9539ee57f840c27d08009f7868cdc8662669df78a01dbc8be39216b8f1a3d","bytes":17811,"lines":469},
     {"path":"tests/test_evidence_sealing_postgres.sh","sha256":"57d16b632a0c60ffdcb4842ceb1cfe25d19c54cefeeefb622ff4fa6e83441ad7","bytes":11349,"lines":370},
     {"path":"tests/test_job_analysis_snapshot_postgres.sh","sha256":"ca9c323a1dd68cfc520277efbbb7495e37fb3ca027890928c8624e5b4f57403f","bytes":13542,"lines":296},
     {"path":"tests/test_operational_uuid_postgres.sh","sha256":"7378f98f0d4b3000e8ea641d8701f1540dbad71410b3637d81d799969e0f6ff7","bytes":3346,"lines":101},
