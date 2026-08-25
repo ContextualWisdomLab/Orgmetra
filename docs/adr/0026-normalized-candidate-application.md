@@ -1,6 +1,7 @@
 # ADR 0026: Normalize candidate applications away from candidate identity
 
-- **Status:** Proposed on active PR; not protected-main truth until merged
+- Status: Proposed
+- Provenance: active PR; not protected-main truth until merged
 - **Date:** 2026-08-21
 - **Decision owner:** Orgmetra
 

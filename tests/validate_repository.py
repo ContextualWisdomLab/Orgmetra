@@ -71,6 +71,8 @@ REQUIRED = [
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
+    "database/migrations/0014_candidate_application_core.sql",
+    "database/migrations/0015_candidate_withdrawal_governance.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -92,6 +94,11 @@ REQUIRED = [
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
+    "tests/test_candidate_application_postgres.sh",
+    "tests/test_candidate_application_rls_postgres.sh",
+    "tests/test_candidate_application_decision_boundary_postgres.sh",
+    "tests/test_candidate_withdrawal_postgres.sh",
+    "tests/test_candidate_withdrawal_security_postgres.sh",
     "tests/validate_repository.py",
 ]
 

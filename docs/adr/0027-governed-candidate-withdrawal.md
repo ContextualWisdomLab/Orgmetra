@@ -1,6 +1,7 @@
 # ADR 0027: Govern candidate-initiated application withdrawal as immutable evidence
 
-- **Status:** Proposed on active stacked PR; not protected-main truth until merged
+- Status: Proposed
+- Provenance: active stacked PR; not protected-main truth until merged
 - **Date:** 2026-08-21
 - **Decision owner:** Orgmetra
 - **Dependency:** ADR 0026 / PR #66 normalized candidate application
