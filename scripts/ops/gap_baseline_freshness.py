@@ -5,7 +5,7 @@ This script is the operational regression required by the baseline document's
 own execution-loop contract: every loop must refetch live GitHub state and
 reject stale buyer copy before acting. It never hard-codes volatile payloads;
 every comparison is computed at runtime from the recorded inventory date, the
-live default branch, and the live open pull-request/issue queues.
+live default branch, and the complete live open pull-request/issue queues.
 
 Exit codes:
     0  audit completed; findings are reported in the step summary text
@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -28,47 +29,74 @@ from pathlib import Path
 INVENTORY_DATE_PATTERN = re.compile(
     r"^Inventory date:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE
 )
+REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
-def _run_gh_json(arguments: list[str]) -> list[dict[str, object]]:
-    """Return parsed JSON from one ``gh api`` invocation as a list payload."""
+def _run_gh_json(
+    arguments: list[str], *, paginate: bool = False
+) -> list[dict[str, object]]:
+    """Return a list payload from ``gh api``, flattening all pages when asked."""
+    command = ["gh", *arguments]
+    if paginate:
+        command.extend(["--paginate", "--slurp"])
     completed = subprocess.run(
-        ["gh", *arguments],
+        command,
         check=False,
         capture_output=True,
         text=True,
     )
     if completed.returncode != 0:
         raise RuntimeError(f"gh {' '.join(arguments)} failed: {completed.stderr.strip()}")
-    return json.loads(completed.stdout)
+
+    payload = json.loads(completed.stdout)
+    if paginate:
+        if not isinstance(payload, list):
+            raise RuntimeError("unexpected paginated GitHub payload shape")
+        flattened: list[dict[str, object]] = []
+        for page in payload:
+            if not isinstance(page, list) or not all(isinstance(item, dict) for item in page):
+                raise RuntimeError("unexpected paginated GitHub page shape")
+            flattened.extend(page)
+        return flattened
+
+    if not isinstance(payload, list) or not all(isinstance(item, dict) for item in payload):
+        raise RuntimeError("unexpected GitHub list payload shape")
+    return payload
+
+
+def _live_repository() -> str:
+    """Return the repository this workflow actually executes in."""
+    repository = os.environ.get("GITHUB_REPOSITORY", "ContextualWisdomLab/Orgmetra")
+    if REPOSITORY_PATTERN.fullmatch(repository) is None:
+        raise RuntimeError("invalid GITHUB_REPOSITORY shape")
+    return repository
 
 
 def _live_state() -> dict[str, object]:
-    """Fetch the live open PR/issue queue and newest develop integration."""
+    """Fetch complete live open PR/issue queues and newest develop integration."""
+    repository = _live_repository()
     open_pull_requests = _run_gh_json(
-        [
-            "api",
-            "repos/{owner}/{repo}/pulls?state=open&per_page=100".replace(
-                "{owner}/{repo}", "ContextualWisdomLab/Orgmetra"
-            ),
-        ]
+        ["api", f"repos/{repository}/pulls?state=open&per_page=100"],
+        paginate=True,
     )
-    if not isinstance(open_pull_requests, list):
-        raise RuntimeError("unexpected pull request payload shape")
     open_issues = _run_gh_json(
-        ["api", "repos/ContextualWisdomLab/Orgmetra/issues?state=open&per_page=100"]
+        ["api", f"repos/{repository}/issues?state=open&per_page=100"],
+        paginate=True,
     )
-    if not isinstance(open_issues, list):
-        raise RuntimeError("unexpected issue payload shape")
     # Issues and PRs share the issues endpoint; keep only genuine issues.
     genuine_issues = [item for item in open_issues if "pull_request" not in item]
     commits = _run_gh_json(
-        ["api", "repos/ContextualWisdomLab/Orgmetra/commits?sha=develop&per_page=1"]
+        ["api", f"repos/{repository}/commits?sha=develop&per_page=1"]
     )
     newest_commit_date = None
-    if isinstance(commits, list) and commits:
-        commit_date = commits[0]["commit"]["committer"]["date"]
-        newest_commit_date = str(commit_date)
+    if commits:
+        commit = commits[0].get("commit")
+        if not isinstance(commit, dict):
+            raise RuntimeError("unexpected commit payload shape")
+        committer = commit.get("committer")
+        if not isinstance(committer, dict) or not isinstance(committer.get("date"), str):
+            raise RuntimeError("unexpected commit committer payload shape")
+        newest_commit_date = committer["date"]
     return {
         "open_pull_requests": len(open_pull_requests),
         "open_issues": len(genuine_issues),
