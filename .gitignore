@@ -35,3 +35,10 @@ secrets/
 artifacts/
 reports/
 *.log
+
+# Code intelligence index (generated)
+.codegraph/
+
+# Generated test/build artifacts
+storybook-static/
+test-results/

@@ -10,7 +10,11 @@ from uuid import UUID
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.mutations import AssignmentMutationCommand
-from orgmetra_people_api.vacancy_fill import VacancyFillVerification, fill_position_vacancy
+from orgmetra_people_api.vacancy_fill import (
+    VacancyFillIntegrityError,
+    VacancyFillVerification,
+    fill_position_vacancy,
+)
 
 TENANT = UUID("0198a412-8000-7000-8000-000000000001")
 PERSON = UUID("0198a412-8000-7000-8000-000000000020")
@@ -159,6 +163,65 @@ class VacancyFillRuntimeIntegrityTests(unittest.TestCase):
             values.update(overrides)
             with self.subTest(overrides=overrides), self.assertRaises(ValueError):
                 VacancyFillVerification(**values)  # type: ignore[arg-type]
+
+    def test_post_construction_forged_allocation_fails_closed_before_mutation(self) -> None:
+        """A mutated verification value object must fail closed, never compare as passable."""
+
+        class ForgedDecimal(Decimal):
+            pass
+
+        class StaticAuthority:
+            """Return one pre-built verification regardless of the requested command."""
+
+            def __init__(self, verification: VacancyFillVerification) -> None:
+                self.verification = verification
+                self.calls = 0
+
+            def verify_vacancy_fill(self, *, command: AssignmentMutationCommand) -> VacancyFillVerification:
+                del command
+                self.calls += 1
+                return self.verification
+
+        class NeverAssignmentPort:
+            """Record whether any authoritative persistence write was reached."""
+
+            def __init__(self) -> None:
+                self.assignment_calls: list[object] = []
+
+            def create_employment(self, *, command: object, authorization: object) -> object:
+                del command, authorization
+                raise AssertionError("vacancy fill must not create Employment")
+
+            def create_position(self, *, command: object, authorization: object) -> object:
+                del command, authorization
+                raise AssertionError("vacancy fill must not create Position")
+
+            def create_assignment(self, *, command: object, authorization: object) -> object:
+                self.assignment_calls.append((command, authorization))
+                raise AssertionError("forged vacancy evidence reached the Assignment write")
+
+        # A NaN allocation would otherwise compare ``False`` against every threshold
+        # and silently pass the capacity check, so both forged shapes fail closed.
+        for forged_ratio in (Decimal("NaN"), ForgedDecimal("1.0000"), Decimal("Infinity")):
+            with self.subTest(ratio=str(forged_ratio)):
+                verification = valid_verification()
+                object.__setattr__(verification, "available_allocation_ratio", forged_ratio)
+                authority = StaticAuthority(verification)
+                port = NeverAssignmentPort()
+                with self.assertRaisesRegex(
+                    VacancyFillIntegrityError,
+                    "finite exact Decimal",
+                ):
+                    fill_position_vacancy(
+                        principal=PRINCIPAL,
+                        command=command(),
+                        purpose_code="workforce_admin",
+                        policy=POLICY,
+                        vacancy_authority=authority,  # type: ignore[arg-type]
+                        mutation_port=port,  # type: ignore[arg-type]
+                    )
+                self.assertEqual(authority.calls, 1)
+                self.assertEqual(port.assignment_calls, [])
 
 
 if __name__ == "__main__":

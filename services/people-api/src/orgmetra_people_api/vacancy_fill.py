@@ -15,7 +15,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-import re
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -23,15 +22,15 @@ from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.authorization import authorize_resource_fields
 from orgmetra_people_api.mutations import (
+    _MAX_UUID_INT,
+    _REFERENCE_PATTERN,
+    _VERSION_PATTERN,
     AssignmentMutationCommand,
     AssignmentMutationResult,
     PeopleMutationPort,
     create_assignment_record,
 )
 
-_MAX_UUID_INT = (1 << 128) - 1
-_REFERENCE_PATTERN = re.compile(r"\A[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*\Z", flags=re.ASCII)
-_VERSION_PATTERN = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:-]*\Z", flags=re.ASCII)
 _STAFFABLE_POSITION_STATUSES = frozenset({"active", "open"})
 _ASSIGNMENT_FIELDS = frozenset({"assignment_record"})
 
@@ -138,7 +137,19 @@ def _validate_command_runtime(command: AssignmentMutationCommand) -> None:
 def _require_matching_verification(
     *, command: AssignmentMutationCommand, verification: VacancyFillVerification
 ) -> None:
-    """Require fresh resolver evidence to match the exact proposed Assignment and its review."""
+    """Require fresh resolver evidence to match the exact proposed Assignment and its review.
+
+    Allocation truth is re-validated here even though ``VacancyFillVerification``
+    validates at construction, because this module's own trust boundary treats any
+    post-construction mutation of a value object as hostile input.  A NaN or
+    forged-Decimal allocation would otherwise compare as ``False`` and silently
+    pass the capacity check below, so it fails closed before any comparison runs.
+    """
+    ratio = verification.available_allocation_ratio
+    if type(ratio) is not Decimal or not ratio.is_finite():
+        raise VacancyFillIntegrityError(
+            "authoritative vacancy evidence allocation must be one finite exact Decimal"
+        )
     if (
         verification.tenant_record_id != command.tenant_record_id
         or verification.employment_record_id != command.employment_record_id
@@ -147,7 +158,7 @@ def _require_matching_verification(
         or verification.effective_on != command.effective_from
         or verification.confirmation_reference != command.confirmation_reference
         or verification.evidence_version_code != command.evidence_version_code
-        or verification.available_allocation_ratio < command.allocation_ratio
+        or ratio < command.allocation_ratio
     ):
         raise VacancyFillIntegrityError("authoritative vacancy evidence no longer matches the proposed Assignment")
 
