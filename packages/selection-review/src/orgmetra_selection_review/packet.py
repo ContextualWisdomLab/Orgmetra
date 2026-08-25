@@ -52,13 +52,13 @@ def _validate_code(value: str, field_name: str) -> None:
 
 def _validate_digest(value: str, field_name: str) -> None:
     """Require a lowercase SHA-256 digest for immutable evidence binding."""
-    if not isinstance(value, str) or not _DIGEST_PATTERN.fullmatch(value):
+    if type(value) is not str or not _DIGEST_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
 def _validate_evidence_version_code(value: str) -> None:
     """Require canonical positive evidence_version_N text without value-bearing suffixes."""
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ValueError("evidence_version_code must be a canonical positive evidence version")
     match = _EVIDENCE_VERSION_PATTERN.fullmatch(value)
     if match is None or int(match.group(1)) > 2_147_483_647:

@@ -148,6 +148,22 @@ def test_rejects_reference_subclass_before_parser_methods_can_forge_namespace():
 
 
 @pytest.mark.parametrize(
+    ("field", "forged"),
+    [
+        ("evidence_set_digest", ForgedGovernanceText("f" * 64, "0" * 64)),
+        (
+            "evidence_version_code",
+            ForgedGovernanceText("evidence_version_999999", "evidence_version_1"),
+        ),
+    ],
+)
+def test_rejects_forged_digest_and_version_subclasses(field, forged):
+    """Exact-type validation keeps evidence binding text free of comparison forgery."""
+    with pytest.raises(ValueError):
+        _packet(**{field: forged})
+
+
+@pytest.mark.parametrize(
     ("field", "raw_value", "accepted_value"),
     [
         ("review_state", "approved", "requires_human_decision"),
