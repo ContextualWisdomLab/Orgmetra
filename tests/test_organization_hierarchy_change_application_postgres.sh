@@ -231,7 +231,7 @@ expect_failure \
     "organization hierarchy application evidence could be truncated" \
     "cannot be truncated" \
     with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
-    "TRUNCATE organization_hierarchy_change_application_record;"
+    "TRUNCATE organization_hierarchy_change_application_record CASCADE;"
 
 # Fresh evidence that lies about the current parent must be rejected before mutation.
 stale_unit_digest="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "SELECT organization_unit_review_snapshot_digest('${TENANT_ID}'::uuid, '${UNIT_ID}'::uuid, DATE '${EFFECTIVE_ON}', pg_catalog.transaction_timestamp());")"
