@@ -7,6 +7,7 @@ on:
       - feat/organization-hierarchy-change-review
     paths:
       - "database/migrations/0027_organization_hierarchy_change_application.sql"
+      - "database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql"
       - "tests/test_organization_hierarchy_change_application_postgres.sh"
       - "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh"
       - "docs/adr/0119-organization-hierarchy-change-application.md"
@@ -61,12 +62,13 @@ jobs:
           from pathlib import Path
 
           required = [
+              "database/migrations/0027_organization_hierarchy_change_application.sql",
+              "database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql",
               "tests/test_organization_hierarchy_change_application_postgres.sh",
               "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh",
               ".github/workflows/organization-hierarchy-change-application-quality.yml",
           ]
           optional = [
-              "database/migrations/0027_organization_hierarchy_change_application.sql",
               "docs/adr/0119-organization-hierarchy-change-application.md",
               "docs/traceability/organization-hierarchy-change-application.md",
               "docs/doctoring/organization-hierarchy-change-application-references.md",
@@ -84,6 +86,8 @@ jobs:
           PY
       - name: Run organization-hierarchy application regressions
         run: bash tests/test_organization_hierarchy_change_application_postgres.sh
+      - name: Apply stale-transaction concurrency hardening
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql
       - name: Run stale-transaction concurrency regression
         run: bash tests/test_organization_hierarchy_change_application_concurrency_postgres.sh
       - name: Require clean checkout
