@@ -24,6 +24,8 @@ OpenID Foundation. (2014). *OpenID Connect Core 1.0 incorporating errata set 2*.
 
 ## Primary-source verification
 
+- CSRC records SP 800-63-4 with document date **July 2025** (`Date Published: July 2025`, document-history final entry `07/31/25`); NIST's public announcement of the final suite followed on August 1, 2025. The two dates refer to different events and are both retained here.
+- Official CSRC author order for SP 800-63-4: David Temoshok, Diana Proud-Madruga, Yee-Yin Choong, Ryan Galluzzo, Sarbari Gupta, Connie LaSalle, Naomi Lefkovitz, Andrew Regenscheid. The APA entry preserves this exact order.
 - NIST published final SP 800-63 Revision 4 in July 2025; it supersedes SP 800-63-3.
 - NIST Privacy Framework 1.0 was published January 16, 2020 and remains the final 1.0 publication while newer Privacy Framework work is developed separately.
 - RFC 9562 was published May 2024 as an IETF Standards Track RFC and obsoletes RFC 4122.
