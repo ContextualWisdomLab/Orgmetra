@@ -303,3 +303,16 @@ def test_next_action_requires_authoritative_context_resolution() -> None:
     assert "re-resolve" in packet.next_action
     assert "opportunity-to-perform" in packet.next_action
     assert "Do not adjust an individual performance rating" in packet.next_action
+
+
+def test_unregistered_instance_exports_as_governance_error() -> None:
+    """Fail closed with the governance error when export runs off-lifecycle."""
+    packet = build()
+    restored = object.__new__(type(packet))
+    dataclass_fields = [
+        name for name in PerformanceContextEvidencePacket.__slots__ if not name.startswith("__")
+    ]
+    for field_name in dataclass_fields:
+        object.__setattr__(restored, field_name, getattr(packet, field_name))
+    with pytest.raises(ValueError, match="governed constructor"):
+        restored.canonical_json()

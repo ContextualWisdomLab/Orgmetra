@@ -2,7 +2,7 @@
 
 ## Truth boundary
 
-- **Protected-main truth:** `develop@9e3e4847510e1e612b48474ba42b177b8ed824df` has performance cycles and criterion observations but no governed performance-context evidence packet.
+- **Protected-`develop` truth:** `develop@9e3e4847510e1e612b48474ba42b177b8ed824df` has performance cycles and criterion observations but no governed performance-context evidence packet.
 - **Active PR truth:** PR #93 adds `PerformanceContextEvidencePacket` and its exact-head quality gate.
 - **Accepted architecture:** Orgmetra remains the authoritative HRIS owner; context evidence is value-minimized provenance, not a cross-service database join and not a numerical estimation kernel.
 - **Planned after integration:** authoritative persistence/audit binding for durable distributed uniqueness; governed statistical use in validity/workforce analysis with scientifically relevant multilevel, cross-classified, multiple-membership, and temporal structure.
