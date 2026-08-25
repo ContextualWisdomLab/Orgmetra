@@ -8,4 +8,5 @@
 - Require a distinct accountable human reviewer and keep both confirmed and rejected drafts non-authoritative for Job Analysis persistence or employment decisions.
 - Fail closed on hostile runtime subtypes, malformed references/digests/timestamps, scope mismatch, chronology errors, callback-result type forgery, and request/model mutation across authority, orchestration, and human-review calls.
 - Seal issued receipt evidence outside caller-writable receipt fields and detect post-issuance canonical-evidence mutation.
+- Require the runtime outcome's draft bytes to match the reviewed receipt digest on construction and every read, preventing a caller from pairing or later mutating unrelated text next to valid receipt evidence.
 - Add exact-head CI with beginner-readable docstring validation and exact 100% owned production statement/branch coverage.
