@@ -264,7 +264,11 @@ class PerformanceGoalPlanPacket:
         payload_json = _canonical_payload_json(_payload(self))
         current_digest = sha256(payload_json.encode("utf-8")).hexdigest()
         with _REGISTRY_LOCK:
-            creation_digest = _CREATION_DIGESTS[self]
+            creation_digest = _CREATION_DIGESTS.get(self)
+        if creation_digest is None:
+            raise ValueError(
+                "performance goal-plan evidence was not issued through the governed constructor"
+            )
         if current_digest != creation_digest:
             raise ValueError("performance goal-plan evidence changed after issuance")
         return payload_json

@@ -214,3 +214,15 @@ def test_accepts_operational_non_v4_core_references() -> None:
         performance_cycle_reference=f"performance_cycle:{core}",
     )
     assert json.loads(item.canonical_json())["employment_record_reference"].endswith(core)
+
+
+def test_unregistered_instance_exports_as_governance_error() -> None:
+    """Fail closed with the governance error when export runs off-lifecycle."""
+    built = packet()
+    restored = object.__new__(type(built))
+    for field_name in PerformanceGoalPlanPacket.__slots__:
+        if field_name.startswith("__"):
+            continue
+        object.__setattr__(restored, field_name, getattr(built, field_name))
+    with pytest.raises(ValueError, match="governed constructor"):
+        restored.canonical_json()
