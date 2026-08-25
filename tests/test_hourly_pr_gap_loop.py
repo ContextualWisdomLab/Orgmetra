@@ -25,8 +25,8 @@ def _load_script() -> ModuleType:
     return module
 
 
-def test_reusable_scheduler_is_job_level_and_immutably_pinned() -> None:
-    """The scheduled mutation driver must call one pinned reusable workflow job."""
+def test_reusable_scheduler_is_job_level_immutably_pinned_and_least_privileged() -> None:
+    """Call the pinned scheduler as a job without forwarding reviewer credentials."""
     text = WORKFLOW.read_text(encoding="utf-8")
     scheduler_block = text.split("  scheduler-sweep:\n", 1)[1].split(
         "\n  gap-baseline-freshness:", 1
@@ -39,7 +39,9 @@ def test_reusable_scheduler_is_job_level_and_immutably_pinned() -> None:
         scheduler_block,
         re.MULTILINE,
     )
-    assert "    secrets: inherit" in scheduler_block
+    # The central owner already supports OIDC app-token exchange. The caller
+    # must not forward repository/org secrets such as independent-review tokens.
+    assert "secrets: inherit" not in scheduler_block
 
 
 def test_live_queue_counts_request_all_pages(monkeypatch) -> None:
@@ -99,7 +101,11 @@ def test_missing_baseline_is_nonfatal_until_dependency_integrates(
     """A pre-#100 scheduled run must report absence without staying permanently red."""
     module = _load_script()
     missing = tmp_path / "product-technical-gap-baseline.md"
-    monkeypatch.setattr(module.sys, "argv", ["gap-baseline-freshness", "--baseline", str(missing)])
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        ["gap-baseline-freshness", "--baseline", str(missing)],
+    )
 
     assert module.main() == 0
     assert "baseline not present" in capsys.readouterr().out.lower()
