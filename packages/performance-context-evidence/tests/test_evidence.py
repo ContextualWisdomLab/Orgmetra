@@ -2,7 +2,9 @@
 
 from datetime import date, datetime, timedelta, timezone
 import gc
+from hashlib import sha256
 import json
+from uuid import UUID
 
 import pytest
 
@@ -27,6 +29,16 @@ ORGANIZATIONS = (
 REQUESTER = "actor:a1111111-1111-4111-8111-111111111111"
 REVIEWER = "actor:b1111111-1111-4111-8111-111111111111"
 DIGESTS = ("a" * 64, "b" * 64, "c" * 64, "d" * 64)
+
+
+@pytest.fixture(autouse=True)
+def unique_packet_reference(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
+    """Give each test one deterministic packet reference while preserving within-test conflicts."""
+    packet_bytes = bytearray(sha256(request.node.nodeid.encode("utf-8")).digest()[:16])
+    packet_bytes[6] = (packet_bytes[6] & 0x0F) | 0x40
+    packet_bytes[8] = (packet_bytes[8] & 0x3F) | 0x80
+    packet_uuid = UUID(bytes=bytes(packet_bytes))
+    monkeypatch.setitem(globals(), "PACKET", f"performance_context_evidence:{packet_uuid}")
 
 
 def values(**overrides: object) -> dict[str, object]:
