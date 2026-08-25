@@ -455,7 +455,7 @@
     },
     {
       "path": "tests/test_candidate_application_rls_postgres.sh",
-      "sha256": "56c9286ba0ad0cd0760bbb2f3d4a791c186561ef23d35864897ebd9d0da02fa0",
+      "sha256": "d9d091eda946385e9864e49e6a82dd966c9033de33bca04f19b5b2607d2dcc8b",
       "bytes": 4433,
       "lines": 115
     },
