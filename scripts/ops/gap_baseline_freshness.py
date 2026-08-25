@@ -9,7 +9,7 @@ live default branch, and the complete live open pull-request/issue queues.
 
 Exit codes:
     0  audit completed, or the baseline has not integrated yet; findings are reported
-    2  contract violation (an existing baseline is unreadable/invalid)
+    2  contract violation or live-state evidence could not be established
 
 The output is plain Markdown so callers can append it directly to
 ``$GITHUB_STEP_SUMMARY``.
@@ -25,11 +25,13 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 INVENTORY_DATE_PATTERN = re.compile(
     r"^Inventory date:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE
 )
 REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+BASELINE_TIMEZONE = ZoneInfo("Asia/Seoul")
 
 
 def _run_gh_json(
@@ -129,26 +131,24 @@ def main() -> int:
         print("gap-baseline freshness: FAIL missing 'Inventory date:' header")
         return 2
 
-    inventory_date = datetime.strptime(match.group(1), "%Y-%m-%d").replace(
-        tzinfo=timezone.utc
-    )
-    now = datetime.now(tz=timezone.utc)
-    age_days = (now - inventory_date).total_seconds() / 86400
+    inventory_date = datetime.strptime(match.group(1), "%Y-%m-%d").date()
+    now_date = datetime.now(tz=BASELINE_TIMEZONE).date()
+    age_days = (now_date - inventory_date).days
 
     lines = [
         "## Gap baseline freshness",
         "",
         f"- Baseline file: `{baseline_path.as_posix()}`",
-        f"- Inventory date: {inventory_date.date().isoformat()} "
-        f"(age {age_days:.1f} days)",
+        f"- Inventory date: {inventory_date.isoformat()} "
+        f"(age {float(age_days):.1f} days)",
     ]
 
     try:
         state = _live_state()
     except (RuntimeError, ValueError, KeyError) as error:
-        lines.append(f"- Live-state fetch failed (transient?): {error}")
+        lines.append(f"- FAIL live-state fetch: {error}")
         print("\n".join(lines))
-        return 0
+        return 2
 
     lines.extend(
         [
@@ -165,7 +165,9 @@ def main() -> int:
         integration_time = datetime.fromisoformat(
             newest_integration.replace("Z", "+00:00")
         )
-        integrations_after_snapshot = integration_time > inventory_date
+        integrations_after_snapshot = (
+            integration_time.astimezone(BASELINE_TIMEZONE).date() > inventory_date
+        )
 
     if integrations_after_snapshot:
         lines.append(
