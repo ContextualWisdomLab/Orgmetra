@@ -11,10 +11,12 @@ _DOCUMENTS = (
 )
 
 
-def test_lifecycle_review_docs_do_not_claim_unenforced_branch_protection() -> None:
-    """Buyer-facing docs must distinguish default-branch truth from protection state."""
+def test_lifecycle_review_docs_describe_effective_repository_controls() -> None:
+    """Buyer-facing docs must not mistake classic protection for effective rules."""
     for document_path in _DOCUMENTS:
         document = document_path.read_text(encoding="utf-8")
         assert "issue #89" in document
+        assert "effective organization ruleset" in document
+        assert "branch protection is currently absent" not in document
         assert "Protected `develop`" not in document
         assert "Protected Orgmetra" not in document
