@@ -394,3 +394,27 @@ def test_telemetry_surface_is_importable_from_package_root() -> None:
     assert ExportedMeasurement is PeopleHttpRequestMeasurement
     assert ExportedClassifier is classify_people_http_route
     assert ExportedNormalizer is normalize_http_method
+
+
+def test_clock_failure_at_request_start_logs_degradation_exactly_once(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """One degraded request must emit exactly one value-free warning record."""
+    import logging
+
+    sink = _RecordingSink()
+    middleware = PeopleHttpTelemetryMiddleware(
+        app=_success_app(),
+        sink=sink,
+        clock=_ExplodingClock(),
+    )
+
+    with caplog.at_level(logging.WARNING, logger="orgmetra_people_api.telemetry"):
+        _run(middleware, _scope())
+
+    degradation_records = [
+        record for record in caplog.records
+        if getattr(record, "telemetry_event", None)
+        == "http_server_request_measurement_rejected"
+    ]
+    assert len(degradation_records) == 1

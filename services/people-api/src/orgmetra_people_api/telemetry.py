@@ -183,7 +183,6 @@ class PeopleHttpTelemetryMiddleware:
             started_at = self.clock()
         except Exception:  # noqa: BLE001 - telemetry must never become HR request authority.
             started_at = None
-            self._warn_measurement_not_exported()
         status_code: int | None = None
 
         async def measured_send(message: dict[str, object]) -> None:
