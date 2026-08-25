@@ -21,7 +21,8 @@ Separate active Orgmetra PRs own document metadata evidence/persistence and expo
 | Audit before disclosure | Immutable receipt append must succeed before `DocumentRetrievalResult` is returned. |
 | No high-impact decision authority | Result and receipt are fixed to `not_authorized_for_employment_decision`. |
 | Runtime-integrity hardening | Exact built-in primitives, detached timezone-aware system values, output revalidation, host capability validation, and mutation regressions fail closed. |
-| Test evidence | Dedicated quality lane requires exact 100% owned production statement/branch coverage, a reviewed SHA-256-locked build backend, a wheel built from the exact checkout whose computed SHA-256 is required again at isolated install, and a clean checkout. |
+| Python compatibility truth | Public metadata is bounded to `>=3.14,<3.15`, and the exact quality lane uses CPython 3.14.7; older or future minors are not claimed without separate exact evidence. |
+| Test/package evidence | Dedicated quality lane requires exact 100% owned production statement/branch coverage, a reviewed SHA-256-locked build backend, a wheel built from the exact checkout whose computed SHA-256 is required again at isolated install, and a clean checkout. |
 
 ## Next integration action
 
