@@ -109,7 +109,8 @@ def _release_binding(object_id: int, key: tuple[UUID, UUID], digest: str) -> Non
     with _LOCK:
         _ISSUANCE_DIGESTS.pop(object_id, None)
         bound_digest, count = _REFERENCE_BINDINGS[key]
-        assert bound_digest == digest
+        if bound_digest != digest:
+            raise AssertionError("reference binding digest drifted from its issuance")
         if count == 1:
             del _REFERENCE_BINDINGS[key]
         else:

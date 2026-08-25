@@ -213,3 +213,21 @@ def test_staffing_and_compensation_values_are_not_packet_fields() -> None:
     packet = build_packet()
     assert not hasattr(packet, "allocation_ratio")
     assert not hasattr(packet, "compensation_amount")
+
+
+def test_release_binding_raises_on_digest_drift() -> None:
+    """Fail loudly if a binding's digest drifted from its issuance before release."""
+    packet = build_packet()
+    reference = (
+        TENANT,
+        packet.position_lifecycle_change_reference,
+    )
+    import orgmetra_position_lifecycle_review.review as review_module
+
+    key = (TENANT, uuid4())
+    review_module._REFERENCE_BINDINGS[key] = ("0" * 64, 1)
+    try:
+        with pytest.raises(AssertionError, match="digest drifted"):
+            review_module._release_binding(id(packet), key, POSITION_DIGEST)
+    finally:
+        review_module._REFERENCE_BINDINGS.pop(key, None)
