@@ -16,6 +16,8 @@
 | `position_record_version` | Bitemporal position status and effective period. |
 | `assignment_record` | A person's allocation to a position through one employment. |
 | `candidate_profile` | Applicant/candidate record before hire. |
+| `candidate_application_record` | Durable tenant-scoped application identity binding one candidate to one Job, an optional Job-consistent Position, an opaque requisition reference, submission time, and system-recorded correction history. |
+| `candidate_application_stage_record` | Bitemporal non-terminal recruiting stage history for one candidate application; terminal employer outcomes and candidate withdrawal remain governed by separate evidence boundaries. |
 | `candidate_worker_link` | Legacy append-only candidate-to-worker linkage retained for historical reads; new writes use `candidate_worker_conversion_record`. |
 | `candidate_worker_conversion_record` | Governed bitemporal candidate-to-worker conversion bound to the hire decision, person, employment, immutable audit event, and outbox evidence. |
 | `people_mutation_idempotency_record` | Append-only tenant/route/idempotency-key binding to the canonical command digest and first committed created-record identity for governed People writes. |
@@ -53,6 +55,8 @@ Intervals are half-open and non-empty: an end value, when present, must be stric
 Durable anchors such as `organization_unit`, `job_profile`, `employment_record`, and `position_record` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version`, `job_profile_version`, `employment_record_version`, and `position_record_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
 
 Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
+
+Candidate application identity is distinct from candidate identity. `candidate_application_record` keeps one durable application anchor for one candidate/Job/requisition context and allows system-recorded correction by closing an open recorded interval and appending replacement knowledge. `candidate_application_stage_record` carries effective and system-recorded intervals for non-terminal pipeline state. The stage vocabulary does not duplicate high-impact selection decisions or infer candidate withdrawal without separate governed actor/evidence provenance.
 
 ## High-impact decision evidence
 
