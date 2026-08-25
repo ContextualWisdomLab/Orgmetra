@@ -207,3 +207,21 @@ def test_direct_snapshot_rejects_invalid_staffed_fte(bad_fte: object) -> None:
     """FTE remains a non-negative Decimal rather than a caller-coercible number."""
     with pytest.raises(SingleValuedFactError, match="non-negative Decimal"):
         PositionVacancySnapshot(TENANT, DAY, KNOWN, 0, 0, 0, 0, bad_fte)  # type: ignore[arg-type]
+
+
+def test_snapshot_rejects_out_of_band_stored_allocation_ratio() -> None:
+    """Fail closed when a stored ratio escapes the governed 0 < ratio <= 1 band."""
+    positions = [position(P1)]
+    assignments = [
+        assignment(P1, "0.8000"),
+        assignment(P1, "-0.5000", serial=2),
+    ]
+
+    with pytest.raises(SingleValuedFactError, match="governed 0 < ratio <= 1 band"):
+        build_position_vacancy_snapshot(
+            position_versions=positions,
+            assignments=assignments,
+            tenant_record_id=TENANT,
+            effective_on=DAY,
+            known_at=KNOWN,
+        )
