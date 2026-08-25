@@ -76,7 +76,7 @@ def _validate_reference(value: str, prefix: str, field_name: str) -> None:
 
 def _validate_requirements_version_code(value: str) -> None:
     """Require a bounded numeric requirements-version identifier without semantic text."""
-    if not isinstance(value, str) or not _REQUIREMENTS_VERSION_PATTERN.fullmatch(value):
+    if type(value) is not str or not _REQUIREMENTS_VERSION_PATTERN.fullmatch(value):
         raise ValueError(
             "requirements_version_code must match requirements_version_<positive-integer>"
         )
@@ -92,7 +92,10 @@ def _freeze_timestamp(value: datetime) -> datetime:
         raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
     if type(offset) is not timedelta:
         raise ValueError("generated_at must be an exact timezone-aware datetime")
-    return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    try:
+        return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
 
 
 def _canonical_timestamp(value: datetime) -> str:
@@ -135,7 +138,7 @@ class RequisitionReviewPacket:
             "job_requirements_reference",
         )
         if (
-            not isinstance(self.job_requirements_digest, str)
+            type(self.job_requirements_digest) is not str
             or not _DIGEST_PATTERN.fullmatch(self.job_requirements_digest)
         ):
             raise ValueError("job_requirements_digest must be lowercase SHA-256 hex")

@@ -147,3 +147,15 @@ def test_valid_packet_still_serializes_reviewed_governance_values() -> None:
     assert payload["reason_code"] == "approved_growth_plan"
     assert payload["review_state"] == "requires_human_approval"
     assert payload["next_action"] == EXPECTED_NEXT_ACTION
+
+
+def test_rejects_digest_text_subclass_before_pattern_match() -> None:
+    """Ensure digest text cannot carry caller-defined runtime behavior into evidence."""
+    with pytest.raises(ValueError):
+        _packet(job_requirements_digest=OpaqueTextSubclass("0" * 64))
+
+
+def test_rejects_requirements_version_code_text_subclass() -> None:
+    """Ensure requirements version text cannot carry caller-defined runtime behavior."""
+    with pytest.raises(ValueError):
+        _packet(requirements_version_code=OpaqueTextSubclass("requirements_version_1"))

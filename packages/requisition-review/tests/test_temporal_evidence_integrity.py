@@ -53,6 +53,20 @@ class _ExplodingOffset(tzinfo):
         return timedelta(0)
 
 
+class _OversizedOffset(tzinfo):
+    """Return one extreme offset so UTC detachment overflows the datetime range."""
+
+    def utcoffset(self, value):  # type: ignore[no-untyped-def]
+        """Force the subtraction outside representable instants."""
+        del value
+        return timedelta(hours=23, minutes=59)
+
+    def dst(self, value):  # type: ignore[no-untyped-def]
+        """Keep daylight saving fixed."""
+        del value
+        return timedelta(0)
+
+
 def _build(generated_at: datetime):
     """Build one otherwise-valid requisition-review packet."""
     return build_requisition_review_packet(
@@ -105,3 +119,10 @@ def test_requisition_review_rejects_postconstruction_timezone_reinjection() -> N
     object.__setattr__(packet, "generated_at", datetime(2026, 8, 21, 5, 10, tzinfo=_MutableOffset()))
     with pytest.raises(ValueError, match="generated_at"):
         packet.canonical_json()
+
+
+def test_requisition_review_normalizes_offset_overflow_to_value_error() -> None:
+    """Fail closed with the contract error when UTC detachment overflows."""
+    extreme = datetime(1, 1, 1, 0, 0, tzinfo=_OversizedOffset())
+    with pytest.raises(ValueError, match="generated_at"):
+        _build(extreme)
