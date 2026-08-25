@@ -21,6 +21,10 @@ erDiagram
     employment_record ||--o{ assignment_record : covers
     person_record ||--o{ assignment_record : receives
     position_record ||--o{ assignment_record : assigned_through
+    candidate_profile ||--o{ candidate_application_record : submits
+    job_profile ||--o{ candidate_application_record : targets
+    position_record ||--o{ candidate_application_record : optionally_targets
+    candidate_application_record ||--o{ candidate_application_stage_record : has_stage_history
     candidate_profile ||--o| candidate_worker_link : may_become
     person_record ||--o{ candidate_worker_link : links_worker
     job_profile ||--o{ criterion_blueprint : requires
@@ -50,6 +54,8 @@ erDiagram
 `organization_unit`, `job_profile`, `employment_record`, and `position_record` are durable anchors. Mutable names, classifications, parent relationships, titles, families, version codes, and employment or position status live in bitemporal version rows. Positions retain stable organization/job references while retroactive corrections append or supersede version facts rather than rewriting identity. An organization version may reference another durable organization as its parent; self-parenting is rejected at the database boundary. An assignment names the employment that covers it, so a person cannot be assigned through another worker's employment. Exclusive employment versions for one person cannot overlap. An assignment day must land on an `active` or `open` position version, and visible allocations for one seat cannot exceed 1.0000.
 
 Every owned HRIS fact carries `tenant_record_id`. Relationships that cross table boundaries use tenant-qualified foreign keys, and row-level security independently filters every tenant-scoped relation. The tenant column is therefore both a referential-integrity boundary and a runtime isolation boundary, not a caller-supplied business attribute.
+
+A candidate profile can have many application identities because the same candidate may pursue multiple openings. `candidate_application_record` binds one candidate to one Job, optional Job-consistent Position and opaque requisition reference; at most one open system-recorded anchor exists for the same tenant/candidate/requisition context, while closed correction history may coexist. Each application has bitemporal `candidate_application_stage_record` history for non-terminal recruiting stages. High-impact selection outcomes and candidate withdrawal are not inferred from those raw stage rows.
 
 A candidate profile can be linked to at most one worker identity within its tenant. A person identity can have multiple candidate-worker links across reapplications or historical candidate profiles, so the person-side cardinality is one-to-many.
 
