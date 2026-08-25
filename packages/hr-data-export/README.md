@@ -20,8 +20,10 @@ The stacked execution boundary `execute_reviewed_hr_export(...)` accepts the exa
 6. re-check authorization freshness after materialization;
 7. commit a value-minimized immutable audit/outbox receipt that binds the review, export authorization, human approval and exact artifact SHA-256/byte length;
 8. re-check authorization freshness after audit and **before** outbound egress;
-9. hand the already-audited bytes only to a host-owned `authenticated_one_time_download` port;
-10. re-check freshness and validate the one-time egress receipt before Orgmetra issues a successful value-minimized execution receipt.
+9. hand the already-audited bytes only to a host-owned `authenticated_one_time_download` port, which must enforce the same authorization window at the actual delivery instant;
+10. validate that the returned delivery receipt proves `delivered_at` occurred inside the half-open authorization window and no later than Orgmetra's post-egress observation before issuing a successful value-minimized execution receipt.
+
+A delivery that completed inside the authorization window remains a completed audited delivery even if Orgmetra observes its receipt after the window has subsequently expired. This prevents a successful one-time delivery from being reported as a retryable failure merely because receipt processing crossed the expiry boundary. Conversely, a receipt whose actual `delivered_at` is at or after authorization expiry fails closed.
 
 The final Orgmetra receipt stores correlation, digests, artifact size, audit/egress references and chronology only. It never contains employee names, email values, employee numbers, compensation, ratings, candidate data or raw exported content. Its creation-time canonical evidence is sealed outside receipt-writable state so post-issuance rewrites fail closed.
 
@@ -31,7 +33,7 @@ The package does not implement Keyverse identity, direct foreign-service SQL, em
 
 ## Customer/operator next action
 
-For a reviewed request, verify that the exact requested field list, reason, destination and accountable reviewer are still appropriate. The execution host must then obtain a fresh export-specific authority decision and human approval, materialize only that exact scope, durably audit before delivery, and stop immediately if scope, policy, legal hold, retention or authorization freshness changes.
+For a reviewed request, verify that the exact requested field list, reason, destination and accountable reviewer are still appropriate. The execution host must then obtain a fresh export-specific authority decision and human approval, materialize only that exact scope, durably audit before delivery, and stop immediately if scope, policy, legal hold, retention or authorization freshness changes before delivery. A one-time delivery host must record the actual delivery instant so Orgmetra can prove it fell inside the authorized window without turning later receipt-processing latency into a duplicate-export retry.
 
 ## Verification
 
