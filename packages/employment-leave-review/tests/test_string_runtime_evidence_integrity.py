@@ -122,3 +122,11 @@ def test_rejects_forged_direct_construction_constant_text(field_name: str) -> No
     packet = build_employment_leave_review_packet(**valid_kwargs())
     with pytest.raises(ValueError, match=field_name):
         replace(packet, **{field_name: ForgedGovernanceText("attacker_controlled_text")})
+
+
+def test_rejects_digest_string_subclass_before_pattern_match() -> None:
+    """Digest text cannot carry caller-defined runtime behavior into evidence."""
+    kwargs = valid_kwargs()
+    kwargs["handling_policy_digest"] = ForgedGovernanceText("b" * 64)
+    with pytest.raises(ValueError, match="handling_policy_digest"):
+        build_employment_leave_review_packet(**kwargs)
