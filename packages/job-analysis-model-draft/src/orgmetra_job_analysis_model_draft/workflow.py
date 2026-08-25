@@ -238,9 +238,22 @@ class JobAnalysisModelDraftReceipt:
 
 @dataclass(frozen=True, slots=True)
 class JobAnalysisModelDraftOutcome:
-    """Runtime draft text paired with non-authoritative durable evidence."""
-    draft_text: str = field(repr=False)
+    """Runtime draft text paired with matching non-authoritative durable evidence."""
+    _draft_text: str = field(repr=False)
     receipt: JobAnalysisModelDraftReceipt
+    def __post_init__(self) -> None:
+        """Require the runtime draft bytes to match the issued receipt digest."""
+        text = _text(self._draft_text, "draft_text", 20000)
+        if type(self.receipt) is not JobAnalysisModelDraftReceipt:
+            raise TypeError("receipt must be exact JobAnalysisModelDraftReceipt")
+        document = self.receipt.canonical_document()
+        if _sha(text) != document.get("draft_digest_sha256"):
+            raise JobAnalysisModelDraftError("runtime draft does not match issued receipt")
+    @property
+    def draft_text(self) -> str:
+        """Return runtime draft text only while it still matches the issued receipt."""
+        self.__post_init__()
+        return self._draft_text
 
 def generate_job_analysis_model_draft(request: JobAnalysisDraftRequest, scope_resolver: Callable[[JobAnalysisDraftRequest], JobAnalysisDraftScopeVerification], orchestrator: Callable[[JobAnalysisDraftRequest], DraftModelResult], human_reviewer: Callable[[JobAnalysisDraftRequest, DraftModelResult], HumanDraftReview]) -> JobAnalysisModelDraftOutcome:
     """Authorize, draft, human-review, and issue evidence without persisting Job Analysis truth."""
