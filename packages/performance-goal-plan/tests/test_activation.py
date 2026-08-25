@@ -183,7 +183,7 @@ def test_activation_rejects_non_verification_authority_result() -> None:
             """Return a forged result object."""
             return object()
 
-    with pytest.raises(TypeError, match="verification"):
+    with pytest.raises(TypeError, match="PerformanceGoalPlanActivationVerification"):
         activate_performance_goal_plan(
             item,
             approving_actor_reference=item.reviewer_reference,
