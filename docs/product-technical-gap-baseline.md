@@ -2,20 +2,37 @@
 
 Inventory date: 2026-08-25 (Asia/Seoul). Default `develop` head observed: `9e3e4847510e1e612b48474ba42b177b8ed824df`.
 
-This document is a point-in-time buyer/product planning snapshot. It is **not** merge authorization, branch-protection truth, or a substitute for fresh GitHub state. Every execution loop must refetch open PRs/issues, exact heads and bases, dependency ancestry, reviews/threads, exact-head workflows, effective repository rules, releases, and changed refs before acting.
+This document is a point-in-time buyer/product planning snapshot. It is **not** merge authorization, approval evidence, or a substitute for fresh GitHub state. Every execution loop must refetch open PRs/issues, exact heads and independently resolved bases, stack ancestry, formal reviews and unresolved threads, exact-head workflow/job checkout SHAs, effective rulesets, releases, and changed refs before acting.
 
 Orgmetra owns authoritative HRIS employment truth inside its published boundaries. Keyverse and other dedicated-writer CWL repositories remain read-only dependencies consumed only through published package/API/event contracts and existing owner-control paths. No static product-gap document may authorize a write into another dedicated-writer repository.
 
-## Repository-control truth
+## Effective repository-control truth
 
-GitHub currently reports `develop` as `protected: true`, but the effective branch-protection payload observed for the same branch has `protection.enabled=false`, required-status enforcement `off`, and no required contexts/checks. Issue #89 owns that repository-settings defect.
+The effective control plane for default branch `develop` is organization ruleset **18156473 — `CWL Central required workflows`**, not the empty classic branch-protection payload by itself. Fresh repository reads on 2026-08-25 show this ruleset is `enforcement: active` and targets `~DEFAULT_BRANCH`, which includes Orgmetra `develop`.
+
+The active ruleset requires:
+
+- pull-request integration;
+- **2 approving reviews**;
+- dismissal of stale approvals after a push;
+- approval after the last push;
+- required review-thread resolution;
+- extra approval for unattributed changes;
+- the central required-workflow set from `ContextualWisdomLab/.github@main` (`close-empty-pr.yml`, `opencode-review.yml`, `pr-review-merge-scheduler.yml`, `security-scan.yml`, `strix.yml`, `sast-semgrep.yml`, and `noema-review.yml`);
+- branch-deletion protection; and
+- non-fast-forward protection.
+
+Issue #89 remains open for two narrower commercial-control gaps. First, the effective ruleset still grants `OrganizationAdmin` an `always` bypass and the connected user reports `current_user_can_bypass=always`; routine administrator bypass is not an acceptable steady-state acquisition-grade control. Second, the ruleset does not itself enumerate every Orgmetra-local Foundation, Recovery, coverage/package/provenance, and product-quality gate, so merge readiness must continue to require fresh exact-head terminal GREEN for every applicable local gate unless fail-closed transitive enforcement is proven.
+
+The classic branch payload may still report `protection.enabled=false`, required-status enforcement `off`, and no classic contexts/checks. That is **not evidence that `develop` has no effective protection** while ruleset 18156473 is active. Buyer-facing documents and PR metadata must not repeat that obsolete inference.
 
 Consequences:
 
-- a GREEN PR is not merge-authorized merely because GitHub computes it as mergeable;
-- qualifying independent non-author approval is still required where the repository governance contract requires it;
-- no workflow shim, author approval, predecessor check, model-only status, or manual force merge substitutes for enforceable branch protection;
-- immediately before any future merge, refetch the unchanged exact head, independently resolved live base, reviews, unresolved threads, effective rules/protection, and every applicable exact-head check.
+- a GREEN or GitHub-mergeable PR is not merge-authorized;
+- two qualifying approvals and the last-push/review-thread rules remain mandatory;
+- routine administrator bypass must not be used as a normal merge path;
+- no workflow shim, author approval, predecessor check, status-only/model-only result, or force merge substitutes for the effective ruleset plus applicable exact-head local gates;
+- immediately before any future merge, refetch the unchanged exact head, live base, formal reviews, unresolved threads, effective ruleset, and every applicable exact-head check/job.
 
 ## Merged buyer-visible anchors on `develop`
 
@@ -32,74 +49,39 @@ This is a selected shipped inventory, not a replacement for Git history.
 
 Do not revive these merged heads. Extend default-branch truth only through a current owner-scoped change when a fresh buyer gap remains.
 
-## Live open-PR control snapshot
+## Fresh control anchors
 
-The repository currently has 70 open PRs (verified 2026-08-25). The examples below are anchors only; execution order comes from a fresh oldest/dependency-root-first graph.
+The following anchors were freshly rechecked during the 2026-08-25 maintenance loop. They are intentionally sparse: an exhaustive static PR table becomes stale faster than it helps buyers or maintainers.
 
-### Oldest root gate
+- **Oldest dependency-root PR #40** remains exact head `8d8896b14db10a5a4981f0b9e209ea00ee3be64c`, open, non-draft, mergeable, and exact-head GREEN for Structured Interview Plan, Foundation, SAST, Security, and Recovery. Submitted reviews are COMMENTED only; there is no qualifying `APPROVE`.
+- **PR #54** remains exact head `cc6784ec33b1145c342bbbb99ebece1d37aeec80` with Orgmetra-owned product/Foundation/security/recovery evidence GREEN, but it is the sole open `CHANGES_REQUESTED` lane. The cited blocker is owned by the existing central `.github` coverage/review path (`.github#1250` / PR #1052), not an Orgmetra-native source failure. Keep that dependency boundary read-only from this loop.
+- **PR #110** is exact head `305757e7daa3e8fd4d79ef385b42828e6f99d04c` and its People/Foundation/Recovery/SAST/Security/Job-Analysis gates are terminal GREEN. GitHub currently reports it Draft; prior event history shows a separate same-repository lifecycle writer repeatedly alternating Draft/Ready state, so this loop must not race that writer merely to change PR state.
+- **PR #113** is exact head `3da7ad076f977a3ccd9e130a58786c9d26763a16` with Workforce/People/Job-Analysis/Foundation/Recovery/SAST/Security GREEN, but live GitHub state is Draft despite stale body text claiming Ready. Treat the live lifecycle state as authoritative and do not race the other writer.
+- **PR #114** is the dependency-first child of #113 at exact head `656544bc4d86122ee42b50246500bf31785d6d53`; focused `Employment Absence Persistence Quality` is terminal GREEN. This is stack-local evidence only and cannot transfer parent checks/reviews or authorize integration before #113.
 
-PR #40 (`8d8896b14db10a5a4981f0b9e209ea00ee3be64c`) is open, non-draft and mergeable. Structured Interview Plan, Foundation, SAST, Security, and Recovery are terminal GREEN on that exact head. Fresh reviews are COMMENTED only and the remaining unresolved threads are informational. It still has no qualifying independent non-author `APPROVE`, and issue #89's protection defect remains open, so it is intentionally unmerged.
+The repository currently has a large open PR graph. Execution order must come from a fresh oldest/dependency-root-first graph, not from recorded queue counts in this snapshot.
 
-### Dependency-constrained Draft descendants
+## Active-PR capabilities that are no longer buyer gaps
 
-These descendants remain Draft. Lane-local GREEN evidence is not integrated protected-base evidence and parent checks/reviews do not transfer.
+Several capabilities previously described as absent now have active owner lanes. They remain **active-PR truth, not default-branch truth**, until integrated.
 
-| PR | Exact child head | Dependency |
-|---|---|---|
-| #58 | `c79a6ed49627e6a47947f171aeeed2bf02a8c152` | #57 |
-| #67 | `cf59b3001fa58e5a978099c2a5692a03f4849fdd` | #66 |
-| #77 | `9b02cb911377a5beb9f541e9acf2eb51ff065ee9` | #76 |
-| #82 | `0c3a776f2e2c6f93c25e11c5c3ce3fa66a10b5c9` | #51 |
-| #105 | `168f19402b3b17762cfe60f8a0e93c649a082989` | #104 |
-| #106 | `c35ad114edbce7a4ebafcea793748493f1346351` | #94 |
-| #107 | `5e521fd829de313a037f45ac28227c2ae5362d37` | #98 |
-| #108 | `5027c772e5588b33e953258de008f0253389e95c` | #80 |
-| #109 | `1eb17d1dbfa2ec822a9c6cce52d8a92b19ed9353` | #101 |
-| #112 | `4f2a003769bf8f773559ac8122702f1451f0e8c0` | #111 |
+- Job grade/band governance has a reviewed design-evidence root and a dependency-first bitemporal persistence child.
+- Candidate offer response and offer-to-hire closure have active evidence/bridge lanes.
+- Vacancy-to-Assignment fill orchestration is implemented on #110 and delegates final persistence to the authoritative People mutation boundary.
+- Position lifecycle review/application and Position reporting review/persistence have active dependency-ordered lanes.
+- HR document evidence and immutable document metadata persistence have active dependency-ordered lanes.
+- Reason-free authoritative Employment absence truth is implemented on #113, with durable bitemporal persistence on child #114.
 
-Do not restack these descendants merely to manufacture fresh evidence while their parents remain unintegrated. After a parent integrates, retarget/reconcile the child against the then-current `develop`, refetch the resulting exact head/base/conflict state, and rerun all applicable Foundation/SAST/Security/Recovery/product gates without transferring predecessor evidence.
-
-### Selected current root capabilities
-
-The following are current open-root anchors with terminal exact-head GREEN evidence and are useful for product-gap reasoning. They remain unmerged pending live governance gates.
-
-| PR | Exact head | Capability |
-|---|---|---|
-| #53 | `43ae3c73c0abef8f23d1c14f4e41d25b8c9b14df` | Evidence-centered HR workspace / Storybook slice |
-| #75 | `282ff0966add47a80a2edd76f84c4c65a868fedb` | Governed HR data-export review |
-| #80 | `5070f34cd13814f09d74162347f837cb34d76a57` | Candidate offer-response evidence |
-| #81 | `78a9cb1e047db5c79ca855b992d44749b9214992` | Contextual Orchestrator draft-evidence boundary |
-| #98 | `9aeeb204acce429f85b028029c9531a5b05f37e1` | Governed HR document evidence |
-| #99 | `fff082f56e34e47cb83a19316d132c5638d3b633` | Employment-scoped bitemporal base compensation |
-| #101 | `13c4cf8ee7e91ffa0ac1a33fdc9461e4c31d5fb2` | Governed Job-grade design review |
-| #102 | `d87cb05f723f106c653f2ea07680872fd9c62ada` | Purpose-bound audit-evidence review |
-| #104 | `d92ac4cb798b3bd32b632c0ab677c03f944070e4` | Governed Job qualification-rule review |
-| #110 | `bc84eaa145166a3f77a57f0c94c6d7459cfc65f3` | Vacancy-to-Assignment fill orchestration |
-| #111 | `cfff42f5cf884ff67169ddeff645c6933e19337a` | Governed Position lifecycle-change review |
-
-This table intentionally does not assert that every root is merge-authorized. Fresh review and effective-rule state remain authoritative.
-
-## Buyer-visible progress since the previous snapshot
-
-Several items that were previously listed as unresolved product gaps now have active owner lanes and must no longer be described as absent:
-
-1. **Job grade/band governance:** #101 provides reviewed Job-grade design evidence; #109 is the dependency-first bitemporal persistence descendant.
-2. **Offer-to-hire close:** #80 owns candidate offer-response evidence; #108 is the dependency-first bridge to the authoritative confirmed-hire boundary.
-3. **Vacancy-to-Assignment fill:** #110 owns the current orchestration slice and delegates final persistence to the authoritative People mutation boundary.
-4. **Position lifecycle:** #111 owns human-reviewed lifecycle-change evidence; #112 is the dependency-first authoritative application descendant.
-5. **HR document evidence:** #98 owns the value-minimized evidence packet; #107 is the dependency-first immutable persistence descendant.
-
-These are active-PR capabilities, **not protected-main truth** until integrated.
+Do not describe these capabilities as shipped until their owner PRs integrate into fresh `develop`.
 
 ## Highest-value buyer gaps after the current queue
 
 Do not open withholding, payroll-pay, statutory accounting, year-end settlement, or foreign-service application tables inside Orgmetra without an accepted owner contract.
 
-1. **Purpose-bound HR document retrieval/export execution.** #75 reviews export intent and #98/#107 govern document evidence/persistence, but a customer still needs an authorized document read/egress execution boundary that re-resolves tenant/Person/Employment scope, purpose, permitted fields/artifact, retention/legal-hold state, delivery destination, human approval, and immutable audit before bytes leave the owner boundary.
-2. **Authoritative Employment leave/absence truth.** #47 provides a governed leave review packet, but protected `develop` still lacks a normalized bitemporal leave/absence application/persistence boundary that preserves Employment scope, business time, system-recorded time, human review, correction-not-rewrite history, tenant isolation, and audit/outbox evidence without turning policy review into payroll or scheduling authority.
-3. **Job-Analysis-specific model-assisted draft workflow.** #81 provides the generic Contextual Orchestrator draft-evidence contract; a later Job Analysis slice should bind semantic-unit Task/FJA/KSAO draft provenance to an exact Job Analysis snapshot workflow and require explicit human confirmation before authoritative persistence. Model output remains untrusted draft evidence.
-4. **Accessible buyer interaction for the newer HRIS cores.** Job-grade, document, Position lifecycle/reporting, and qualification-rule capabilities need cohesive Figma/Product Design handoff, Storybook coverage, keyboard/focus/ARIA evidence, and customer-facing next-action copy when UI work is material. #53 is a useful existing workspace anchor rather than permission to invent protected-main API behavior.
-5. **Integrated release readiness.** Source SBOM/provenance, probes, telemetry and Kubernetes reference lanes exist, but no release/version/tag should be created until one exact integrated protected head satisfies applicable build/package/SBOM/provenance/reproducibility/compatibility/review/migration/rollback/recovery/accessibility/operational gates together and source/artifact hashes are reverified.
+1. **Purpose-bound HR document retrieval/export execution.** Export-review and document-evidence/persistence lanes exist, but a customer still needs an authorized document read/egress execution boundary that re-resolves tenant/Person/Employment scope, purpose, permitted artifact/fields, retention/legal-hold state, destination, accountable human approval, and immutable audit before bytes leave the owner boundary.
+2. **Job-Analysis-specific model-assisted draft workflow.** A generic Contextual Orchestrator draft-evidence boundary exists, but Job Analysis still needs a bounded workflow binding semantic-unit Task/FJA/KSAO draft provenance to an exact Job Analysis snapshot and explicit human confirmation before authoritative persistence. Model output remains untrusted draft evidence.
+3. **Accessible buyer interaction for newer HRIS cores.** Job-grade, document, Position lifecycle/reporting, qualification-rule, absence, and workforce-capacity capabilities need cohesive Figma/Product Design handoff, Storybook coverage, keyboard/focus/ARIA evidence, and customer-facing next-action copy when UI work is material. The existing HR workspace lane is an anchor, not permission to invent unavailable default-branch APIs.
+4. **Integrated release readiness.** Source SBOM/provenance, health/readiness, telemetry, and Kubernetes reference lanes exist, but no release/version/tag should be created until one exact integrated `develop` head satisfies all applicable build/package/SBOM/provenance/reproducibility/compatibility/review/migration/rollback/recovery/accessibility/operational gates together and source/artifact hashes are reverified.
 
 External finance/accounting and billing/collection integration remains planned/out-of-scope until an owner publishes a contract accepted into Orgmetra architecture/traceability. Orgmetra must not create statutory-account truth or direct cross-service application-table SQL as a shortcut.
 
@@ -118,17 +100,16 @@ External finance/accounting and billing/collection integration remains planned/o
 
 ## Execution loop
 
-Each run: refetch `develop`, all open PRs/issues and exact heads/bases, dependency ancestry, reviews/threads, exact-head workflows, releases and effective rules; process oldest/dependency-root first; repair verified Orgmetra defects at the owning boundary test-first when practicable; rerun exact-head evidence; resolve only addressed threads; and merge only with qualifying independent non-author approval plus actually enforceable protection. Refresh this document only after material state changes and never use its recorded SHAs as current control-plane truth.
+Each run: refetch `develop`, all open PRs/issues and exact heads/bases, dependency ancestry, formal reviews/threads, exact-head workflows/jobs, releases, changed refs and effective rules; process oldest/dependency-root first; repair verified Orgmetra defects at the owning boundary test-first when an executable regression is appropriate; rerun exact-head evidence; resolve only addressed threads; and merge only when the unchanged head satisfies the effective ruleset plus every applicable local gate. Refresh this document only after material buyer/product state changes and never use its recorded SHAs as current control-plane truth.
 
-## 2026-08-24/25 automation findings (operator diagnostics)
+For live-state documentation defects such as repository ruleset truth, do **not** hard-code a volatile external GitHub payload into an executable repository test merely to create artificial RED evidence. The regression is operational: each execution loop must refetch the effective ruleset and reject stale buyer copy before acting. Executable regressions remain required for code-owned behavior and stable repository contracts.
 
-1. **Strix failures were infrastructure, not source defects.** Repeated `strix` failures traced to NVIDIA NIM `429 Too Many Requests` during scanner LLM connection (three primary attempts plus fallback exhausted, no report artifact, fail-closed). Local exact-head verification reproduced all owned package suites green at 100% statement/branch coverage; the scan lane, not the code, was failing. Remediation: staggered same-head re-scan dispatch (`repository_dispatch strix-scan`) instead of concurrent bursts.
-2. **Org review-dispatch budget was zero.** `ORG_SWEEP_REVIEW_DISPATCH_LIMIT` was `0`, so the org queue sweep could never dispatch an OpenCode review anywhere. Restored to `2` with `ORG_SWEEP_BRANCH_UPDATE_LIMIT=1`; `ContextualWisdomLab/Orgmetra` added to the central targeted-dispatch allowlist. Diagnose future zero-review stalls against this variable first.
-3. **Strix gate semantics after a completed scan.** A real reported vulnerability fails the required check by design. PR #52's first completed scan surfaced one legitimate MEDIUM IDOR-shaped finding (cross-field reference validation missing in `TeppAnalysisRequestPacket`); repaired at head `e068df7` with temporal ordering, distinct workspace/snapshot identifiers, and a scope digest binding every retry-stable correlation. Scanner finding -> test-first root repair -> fresh full-head evidence is the intended loop.
-4. **Shared-credential saturation is the remaining systemic constraint.** The OpenCode GitHub App installation token hits GitHub API rate limits mid-sweep before reaching later repositories, and NVIDIA NIM 429s arrive org-wide because one key is shared. Both are transient retryable infra states, never source defects; a scan can complete with zero vulnerabilities yet fail closed on one transient backend signal in its console output.
-5. **2026-08-25 second Strix failure mode: OpenCode app-token exchange outage (distinct from NIM 429).** Twelve PR heads (#80, #85, #95, #97, #98, #99, #102, #103, #104, #110, #111, #113) showed terminal `strix=FAILURE` where the job log shows `curl: (22) ... error: 500` against `https://api.opencode.ai` followed by "OpenCode app token exchange unavailable: app token request did not complete." six times, then the fail-closed provider-unavailable error; the scanner never produced findings, so no source defect is implied. Remediation applied: provider health re-verified (`/health` → 200) and each failed run re-executed on its identical head via the authenticated REST endpoint `POST /repos/{owner}/{repo}/actions/runs/{id}/rerun` (`--failed` rerun), preserving exact-head semantics without transferring predecessor evidence.
-6. **Hourly review-repair heartbeat survived a transient GitHub read failure.** Run 32805870622 failed once inside `fetch_open_prs` when `gh api graphql` returned non-JSON text ("invalid character ' ' in literal false"), an upstream/API hiccup the scheduler script does not yet retry; the next heartbeat succeeded. Candidate hardening at the owning central boundary: bounded retry/backoff around `run_github_read` for non-deterministic CLI failures.
-7. **Review pipeline state at this snapshot:** the only qualifying review submission found was `opencode-agent CHANGES_REQUESTED` on PR #54 (coverage-evidence blocker on head `cc6784ec…`, workflow run 32790319079); Devin/CodeRabbit/github-code-quality comments do not satisfy approval gates. All other open PRs await current-head dispatch through the restored org sweep budget (finding 2). Nothing here authorizes a merge while issue #89's effective-protection defect remains open.
+## 2026-08-24/25 operator diagnostics
+
+- Repeated Strix failures have included NVIDIA NIM 429 saturation and a separate OpenCode app-token exchange 500 outage. Provider-unavailable runs are non-passing but do not imply a source defect without a scanner finding. Same-head reruns preserve exact-head semantics after transient recovery.
+- Org review dispatch was previously disabled by `ORG_SWEEP_REVIEW_DISPATCH_LIMIT=0`; the central owner restored bounded dispatch. This remains foreign owner-control evidence, not permission for Orgmetra to mutate central `.github`.
+- PR #54 demonstrates why source ownership matters: its Orgmetra-native gates are GREEN while the current blocking review cites a central coverage-evidence failure. Repair must stay at the existing central owner boundary.
+- Review capacity remains the dominant integration constraint: the effective ruleset requires two qualifying approvals, while current Orgmetra open PRs have no qualifying `APPROVE` in the fresh review search.
 
 ## Doctoring (APA 7th)
 
