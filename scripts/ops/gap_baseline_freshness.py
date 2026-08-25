@@ -133,6 +133,13 @@ def main() -> int:
 
     inventory_date = datetime.strptime(match.group(1), "%Y-%m-%d").date()
     now_date = datetime.now(tz=BASELINE_TIMEZONE).date()
+    if inventory_date > now_date:
+        print(
+            "gap-baseline freshness: FAIL future inventory date "
+            f"{inventory_date.isoformat()} exceeds current Asia/Seoul date "
+            f"{now_date.isoformat()}"
+        )
+        return 2
     age_days = (now_date - inventory_date).days
 
     lines = [
