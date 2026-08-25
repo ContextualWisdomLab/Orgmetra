@@ -35,14 +35,7 @@ def test_isolated_install_uses_hash_locked_reviewed_build_backend() -> None:
         "python -m pip install --require-hashes --no-deps --only-binary=:all: "
         "-r packages/hr-document-retrieval/build-requirements.txt"
     )
-    source_install = (
-        "python -m pip install --no-deps --no-build-isolation --target "
-        "/tmp/orgmetra-hr-document-retrieval-installed "
-        "/tmp/orgmetra-hr-document-retrieval-build"
-    )
     assert install_backend in workflow
-    assert source_install in workflow
-    assert workflow.index(install_backend) < workflow.index(source_install)
     package_lines = [
         line for line in requirements.splitlines() if line and not line.startswith("#")
     ]
@@ -50,3 +43,26 @@ def test_isolated_install_uses_hash_locked_reviewed_build_backend() -> None:
         "setuptools==84.0.0 "
         "--hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670"
     ]
+
+
+def test_isolated_install_hash_binds_the_locally_built_wheel() -> None:
+    """Installed package bytes must be bound to the wheel built from the exact checkout."""
+    root = Path(__file__).resolve().parents[3]
+    workflow = (root / ".github/workflows/hr-document-retrieval-quality.yml").read_text()
+    build_wheel = (
+        "python -m pip wheel --no-deps --no-build-isolation --wheel-dir "
+        "/tmp/orgmetra-hr-document-retrieval-wheels "
+        "/tmp/orgmetra-hr-document-retrieval-build"
+    )
+    hash_wheel = 'wheel_sha="$(sha256sum "$wheel" | cut -d\' \' -f1)"'
+    install_wheel = (
+        "python -m pip install --require-hashes --no-deps --target "
+        "/tmp/orgmetra-hr-document-retrieval-installed "
+        "-r /tmp/orgmetra-hr-document-retrieval-wheel.txt"
+    )
+    assert build_wheel in workflow
+    assert hash_wheel in workflow
+    assert install_wheel in workflow
+    assert workflow.index(build_wheel) < workflow.index(hash_wheel)
+    assert workflow.index(hash_wheel) < workflow.index(install_wheel)
+    assert "pip install --no-deps --no-build-isolation --target" not in workflow
