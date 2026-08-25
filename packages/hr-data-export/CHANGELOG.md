@@ -17,3 +17,4 @@ All notable package-local changes are documented here. Protected-repository rele
 
 - The packet is permanently `not_authorized_to_export` and `requires_authoritative_resolution`; it cannot itself be used as an export capability.
 - Trust-bearing primitive subclasses and packet subclasses fail closed before governance comparisons or canonical serialization.
+- Creation-time canonical evidence is sealed in a process-local weak registry outside packet-writable state so a low-level valid-looking post-issuance scope rewrite cannot become a second reviewed audit truth. Durable cross-process uniqueness and replay protection remain authoritative persistence responsibilities.
