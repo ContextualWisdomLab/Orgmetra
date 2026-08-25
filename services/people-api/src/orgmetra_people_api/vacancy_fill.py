@@ -116,7 +116,7 @@ class VacancyFillAuthority(Protocol):
 
 
 def _validate_command_runtime(command: AssignmentMutationCommand) -> None:
-    """Reject caller-defined runtime primitives before authorization or protected resolution."""
+    """Reject caller-defined or non-finite primitives before protected resolution."""
     for field_name in (
         "tenant_record_id",
         "employment_record_id",
@@ -129,6 +129,8 @@ def _validate_command_runtime(command: AssignmentMutationCommand) -> None:
         _validate_operational_uuid(field_name, getattr(command, field_name))
     if type(command.effective_from) is not date or type(command.allocation_ratio) is not Decimal:
         raise TypeError("AssignmentMutationCommand trust-bearing fields must use exact runtime primitives")
+    if not command.allocation_ratio.is_finite():
+        raise ValueError("allocation_ratio must be a finite Decimal before vacancy resolution")
     for value in (command.confirmation_reference, command.evidence_version_code, command.idempotency_key):
         if type(value) is not str:
             raise TypeError("AssignmentMutationCommand trust-bearing fields must use exact runtime primitives")
