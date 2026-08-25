@@ -145,7 +145,7 @@ def _expected_manifest_document() -> dict[str, Any]:
     return {
         "package": "orgmetra-foundation-pack",
         "version": "0.1.0",
-        "generated_for_branch": "feat/audit-outbox-envelope",
+        "generated_for_branch": "feat/kubernetes-reference-deployment",
         "files": files,
     }
 
@@ -159,10 +159,10 @@ def _manifest_entries() -> dict[str, dict[str, Any]]:
 
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         _fail("manifest.json must contain a files array")
-    if manifest.get("generated_for_branch") != "feat/audit-outbox-envelope":
+    if manifest.get("generated_for_branch") != "feat/kubernetes-reference-deployment":
         _fail(
             "manifest generated_for_branch must identify the active generation branch "
-            "feat/audit-outbox-envelope"
+            "feat/kubernetes-reference-deployment"
         )
 
     entries: dict[str, dict[str, Any]] = {}

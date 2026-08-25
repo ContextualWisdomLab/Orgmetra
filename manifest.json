@@ -1,7 +1,7 @@
 {
   "package": "orgmetra-foundation-pack",
   "version": "0.1.0",
-  "generated_for_branch": "feat/audit-outbox-envelope",
+  "generated_for_branch": "feat/kubernetes-reference-deployment",
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
@@ -509,8 +509,8 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "12d23b715e7bf6520a89502b953bffe4ebca66b9973e8a07aedf5a81bbf08aa1",
-      "bytes": 27622,
+      "sha256": "9baf354b4728cd0087480e7d04c189b89c41f4b37e3e3a2ea2bda9080803287f",
+      "bytes": 27652,
       "lines": 644
     }
   ]
