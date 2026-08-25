@@ -73,7 +73,7 @@ def _model() -> DraftModelResult:
 
 
 def test_rejected_draft_preserves_controlled_human_reason_in_durable_evidence() -> None:
-    """A rejected draft must retain why the accountable human rejected it."""
+    """A rejected draft must retain its reason and direct the next actor to revise, not persist."""
     request = _request()
 
     def review(actual: JobAnalysisDraftRequest, _: DraftModelResult) -> HumanDraftReview:
@@ -90,3 +90,4 @@ def test_rejected_draft_preserves_controlled_human_reason_in_durable_evidence() 
     document = outcome.receipt.canonical_document()
     assert document["review_state"] == "human_rejected_draft"
     assert document["review_reason_code"] == "insufficient_evidence"
+    assert document["next_action"] == "revise draft evidence before authoritative submission"
