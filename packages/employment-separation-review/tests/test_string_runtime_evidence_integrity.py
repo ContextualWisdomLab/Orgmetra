@@ -117,3 +117,24 @@ def test_rejects_forged_direct_construction_constant_text(field_name: str) -> No
     packet = build_employment_separation_review_packet(**valid_kwargs())
     with pytest.raises(ValueError, match=field_name):
         replace(packet, **{field_name: ForgedGovernanceText("attacker_controlled_text")})
+
+
+class OpaqueDigestText(str):
+    """Retain hostile raw text while pretending to equal any reviewed digest."""
+
+    def __eq__(self, other):  # type: ignore[no-untyped-def]
+        return True
+
+    def __ne__(self, other):  # type: ignore[no-untyped-def]
+        return False
+
+    def __hash__(self) -> int:
+        return hash("a" * 64)
+
+
+def test_rejects_digest_string_subclass_before_pattern_match() -> None:
+    """Digest text cannot carry caller-defined runtime behavior into evidence."""
+    kwargs = valid_kwargs()
+    kwargs["separation_policy_digest"] = OpaqueDigestText("0" * 64)
+    with pytest.raises(ValueError, match="separation_policy_digest"):
+        build_employment_separation_review_packet(**kwargs)

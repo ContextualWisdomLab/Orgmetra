@@ -88,9 +88,9 @@ def _validate_reference(value: str, prefix: str, field_name: str) -> None:
         raise ValueError(error_message)
 
 
-def _validate_digest(value: str, field_name: str) -> None:
-    """Require lowercase SHA-256 hexadecimal evidence."""
-    if not isinstance(value, str) or not _DIGEST_PATTERN.fullmatch(value):
+def _validate_digest(value: str, field_name: str = "digest") -> None:
+    """Require exact built-in lowercase SHA-256 hexadecimal evidence."""
+    if type(value) is not str or not _DIGEST_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
