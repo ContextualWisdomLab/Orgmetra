@@ -1,0 +1,75 @@
+name: Hourly PR and Gap Loop
+
+# Durable execution-loop driver for Orgmetra.
+#
+# Contract (docs/product-technical-gap-baseline.md "Execution loop"):
+# each hour this workflow (1) re-runs the TRUSTED central review/merge
+# scheduler so approval-ready heads keep integrating even when no PR event
+# fires, and (2) audits docs/product-technical-gap-baseline.md against live
+# repository truth so the next development iteration starts from fresh state.
+#
+# All mutations stay inside the sanctioned central machinery; this workflow
+# never bypasses ruleset 18156473 gates and never self-approves.
+
+on:
+  schedule:
+    # Hourly, offset from quarter-hour org sweeps to avoid provider contention.
+    - cron: "37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  checks: read
+  statuses: read
+
+concurrency:
+  group: hourly-pr-gap-loop
+  cancel-in-progress: false
+
+jobs:
+  scheduler-sweep:
+    name: Trusted review and merge sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Review dispatch stays bounded (2 per hour) because the central org
+      # queue sweep additionally dispatches reviews every 15 minutes; the
+      # bounded budget prevents model-provider saturation while guaranteeing
+      # progress for lanes whose last event predates their readiness.
+      - name: Invoke central PR review and merge scheduler
+        uses: ContextualWisdomLab/.github/.github/workflows/pr-review-merge-scheduler.yml@main
+        with:
+          dry_run: "false"
+          max_prs: "100"
+          trigger_reviews: true
+          review_dispatch_limit: "2"
+          branch_update_limit: "2"
+          enable_auto_merge: true
+          merge_mode: direct_or_auto
+          update_branches: true
+          stale_opencode_minutes: "90"
+          project_flow: git-flow
+          base_branch: develop
+        secrets: inherit
+
+  gap-baseline-freshness:
+    name: Gap baseline freshness audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout default branch truth
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Audit gap baseline against live repository state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/ops/gap_baseline_freshness.py \
+            --baseline docs/product-technical-gap-baseline.md >> "$GITHUB_STEP_SUMMARY"
