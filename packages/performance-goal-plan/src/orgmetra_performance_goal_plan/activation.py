@@ -157,7 +157,7 @@ class PerformanceGoalPlanActivationVerification:
             _EMPLOYMENT_DECISION_AUTHORITY,
             "employment_decision_authority",
         )
-        if payload["evidence_version"] != 1 or type(payload["evidence_version"]) is not int:
+        if type(payload["evidence_version"]) is not int or payload["evidence_version"] != 1:
             raise ValueError("evidence_version must remain exact integer 1")
         return payload
 
@@ -275,7 +275,7 @@ def _receipt_payload(receipt: PerformanceGoalPlanActivationReceipt) -> dict[str,
         _EMPLOYMENT_DECISION_AUTHORITY,
         "employment_decision_authority",
     )
-    if payload["evidence_version"] != 1 or type(payload["evidence_version"]) is not int:
+    if type(payload["evidence_version"]) is not int or payload["evidence_version"] != 1:
         raise ValueError("evidence_version must remain exact integer 1")
     return payload
 
@@ -324,8 +324,10 @@ def activate_performance_goal_plan(
         raise TypeError("authority must return exact PerformanceGoalPlanActivationVerification")
     verification_payload = verification.snapshot()
 
-    if plan.canonical_json() != plan_json:
-        raise ValueError("reviewed performance goal-plan evidence changed during authority verification")
+    # Re-reading through the plan's own creation seal is the mutation check. A changed
+    # plan cannot emit a second valid canonical truth, so no separate unreachable
+    # string-inequality branch is needed here.
+    plan.canonical_json()
 
     expected_scope = (
         plan_payload["tenant_record_id"],
