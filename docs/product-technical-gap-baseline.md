@@ -34,7 +34,7 @@ Do not revive these merged heads. Extend default-branch truth only through a cur
 
 ## Live open-PR control snapshot
 
-The repository currently has 68 open PRs. The examples below are anchors only; execution order comes from a fresh oldest/dependency-root-first graph.
+The repository currently has 70 open PRs (verified 2026-08-25). The examples below are anchors only; execution order comes from a fresh oldest/dependency-root-first graph.
 
 ### Oldest root gate
 
@@ -126,6 +126,9 @@ Each run: refetch `develop`, all open PRs/issues and exact heads/bases, dependen
 2. **Org review-dispatch budget was zero.** `ORG_SWEEP_REVIEW_DISPATCH_LIMIT` was `0`, so the org queue sweep could never dispatch an OpenCode review anywhere. Restored to `2` with `ORG_SWEEP_BRANCH_UPDATE_LIMIT=1`; `ContextualWisdomLab/Orgmetra` added to the central targeted-dispatch allowlist. Diagnose future zero-review stalls against this variable first.
 3. **Strix gate semantics after a completed scan.** A real reported vulnerability fails the required check by design. PR #52's first completed scan surfaced one legitimate MEDIUM IDOR-shaped finding (cross-field reference validation missing in `TeppAnalysisRequestPacket`); repaired at head `e068df7` with temporal ordering, distinct workspace/snapshot identifiers, and a scope digest binding every retry-stable correlation. Scanner finding -> test-first root repair -> fresh full-head evidence is the intended loop.
 4. **Shared-credential saturation is the remaining systemic constraint.** The OpenCode GitHub App installation token hits GitHub API rate limits mid-sweep before reaching later repositories, and NVIDIA NIM 429s arrive org-wide because one key is shared. Both are transient retryable infra states, never source defects; a scan can complete with zero vulnerabilities yet fail closed on one transient backend signal in its console output.
+5. **2026-08-25 second Strix failure mode: OpenCode app-token exchange outage (distinct from NIM 429).** Twelve PR heads (#80, #85, #95, #97, #98, #99, #102, #103, #104, #110, #111, #113) showed terminal `strix=FAILURE` where the job log shows `curl: (22) ... error: 500` against `https://api.opencode.ai` followed by "OpenCode app token exchange unavailable: app token request did not complete." six times, then the fail-closed provider-unavailable error; the scanner never produced findings, so no source defect is implied. Remediation applied: provider health re-verified (`/health` → 200) and each failed run re-executed on its identical head via the authenticated REST endpoint `POST /repos/{owner}/{repo}/actions/runs/{id}/rerun` (`--failed` rerun), preserving exact-head semantics without transferring predecessor evidence.
+6. **Hourly review-repair heartbeat survived a transient GitHub read failure.** Run 32805870622 failed once inside `fetch_open_prs` when `gh api graphql` returned non-JSON text ("invalid character ' ' in literal false"), an upstream/API hiccup the scheduler script does not yet retry; the next heartbeat succeeded. Candidate hardening at the owning central boundary: bounded retry/backoff around `run_github_read` for non-deterministic CLI failures.
+7. **Review pipeline state at this snapshot:** the only qualifying review submission found was `opencode-agent CHANGES_REQUESTED` on PR #54 (coverage-evidence blocker on head `cc6784ec…`, workflow run 32790319079); Devin/CodeRabbit/github-code-quality comments do not satisfy approval gates. All other open PRs await current-head dispatch through the restored org sweep budget (finding 2). Nothing here authorizes a merge while issue #89's effective-protection defect remains open.
 
 ## Doctoring (APA 7th)
 
