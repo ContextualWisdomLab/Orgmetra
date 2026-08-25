@@ -155,7 +155,11 @@ def _canonical_json(payload: dict[str, object]) -> str:
 
 @dataclass(frozen=True, slots=True, weakref_slot=True, eq=False, repr=False)
 class JobQualificationRuleReviewPacket:
-    """Human-reviewed Job qualification-rule proposal without candidate-decision authority."""
+    """Human-reviewed Job qualification-rule proposal without candidate-decision authority.
+
+    The packet is deliberately non-subclassable: trust-boundary validation must
+    never be bypassable by an in-process subclass overriding the validation hook.
+    """
 
     tenant_record_id: str
     job_record_reference: str
@@ -184,6 +188,13 @@ class JobQualificationRuleReviewPacket:
         WeakKeyDictionary["JobQualificationRuleReviewPacket", str]
     ] = WeakKeyDictionary()
     _issuance_lock: ClassVar[RLock] = RLock()
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Reject every subclass so validation can never be overridden away."""
+        raise TypeError(
+            "JobQualificationRuleReviewPacket must not be subclassed; "
+            "trust-boundary validation is non-overridable"
+        )
 
     def __post_init__(self) -> None:
         """Generate system time, validate all trust-bearing fields, and seal evidence."""

@@ -353,3 +353,26 @@ def test_replace_remains_non_authoritative_and_reissues_system_time() -> None:
     assert second.decision_authority == "not_authorized_for_candidate_or_employment_decision"
     assert second.recorded_at >= first.recorded_at
     assert second.sha256_digest() != first.sha256_digest()
+
+
+def test_subclass_cannot_override_the_trust_boundary() -> None:
+    """Subclass forgery must fail closed at class definition, before any instance."""
+
+    with pytest.raises(TypeError, match="must not be subclassed"):
+
+        class ForgedPacket(JobQualificationRuleReviewPacket):
+            """A hostile subclass attempting to skip trust-boundary validation."""
+
+            def _validated_payload(self) -> dict[str, object]:
+                return {}
+
+
+def test_valid_packets_still_canonicalize_and_hash_deterministically() -> None:
+    """Base-class construction keeps stable canonical evidence per issued instance."""
+    first = build_job_qualification_rule_review_packet(**values())
+    second = build_job_qualification_rule_review_packet(**values())
+
+    assert first.canonical_json() == first.canonical_json()
+    assert first.sha256_digest() == first.sha256_digest()
+    assert second.sha256_digest() != first.sha256_digest()
+    assert len(first.canonical_json()) > 0
