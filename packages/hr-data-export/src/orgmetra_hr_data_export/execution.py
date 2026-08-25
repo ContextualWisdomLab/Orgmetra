@@ -501,7 +501,7 @@ def _validate_egress_receipt(
     published_at: datetime,
     observed_at: datetime,
 ) -> None:
-    """Require one-time egress evidence to bind the exact audited artifact and chronology."""
+    """Require one-time egress evidence to bind the exact audited artifact and authorization window."""
     if (
         receipt.tenant_record_id != verification.tenant_record_id
         or receipt.export_execution_reference != verification.export_execution_reference
@@ -511,6 +511,8 @@ def _validate_egress_receipt(
         or receipt.destination_kind != verification.destination_kind
         or receipt.one_time_use_enforced is not True
         or receipt.delivered_at < published_at
+        or receipt.delivered_at < verification.verified_at
+        or receipt.delivered_at >= verification.authorization_expires_at
         or receipt.delivered_at > observed_at
     ):
         raise HrDataExportExecutionError("egress receipt does not bind exact audited export evidence")
@@ -529,8 +531,10 @@ def execute_reviewed_hr_export(
 
     Reviewed scope is snapshotted before authority work and checked again after that call.
     Authorization freshness is checked before protected materialization, after materialization,
-    after durable audit, and after host egress. Immutable audit evidence must validate before
-    the egress port can receive bytes. Returned durable evidence contains no raw HR values.
+    and immediately before host egress. The returned host receipt must prove that actual
+    delivery occurred inside the same authorization window and no later than post-egress
+    observation. Immutable audit evidence must validate before the egress port can receive
+    bytes. Returned durable evidence contains no raw HR values.
     """
     if type(review) is not HrDataExportReviewPacket:
         raise TypeError("review must be the exact governed HrDataExportReviewPacket type")
@@ -595,7 +599,6 @@ def execute_reviewed_hr_export(
         published_at=published_at,
     )
     observed_at = _clock_now(now_provider)
-    _require_current_authorization(verification, observed_at)
     if type(egress_result) is not HrDataExportEgressReceipt:
         raise HrDataExportExecutionError("egress port returned invalid one-time-delivery receipt")
     egress_receipt = egress_result
