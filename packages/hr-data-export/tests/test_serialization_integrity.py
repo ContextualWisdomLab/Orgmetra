@@ -40,3 +40,14 @@ def test_canonicalization_rejects_reinjected_non_utc_timestamp() -> None:
     )
     with pytest.raises(ValueError, match="canonical built-in UTC"):
         result.canonical_json()
+
+
+def test_canonicalization_rejects_valid_post_issuance_field_scope_rewrite() -> None:
+    """A valid-looking field-scope rewrite cannot become a second reviewed audit truth."""
+    result = _packet()
+    original_digest = result.sha256_digest()
+    object.__setattr__(result, "requested_fields", ("display_name",))
+
+    with pytest.raises(ValueError, match="altered after issuance"):
+        result.canonical_json()
+    assert original_digest != "0" * 64
