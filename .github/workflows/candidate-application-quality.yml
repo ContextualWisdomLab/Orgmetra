@@ -10,6 +10,9 @@ on:
       - "tests/test_candidate_application_decision_boundary_postgres.sh"
       - "tests/test_candidate_application_rls_postgres.sh"
       - ".github/workflows/candidate-application-quality.yml"
+      - "manifest.json"
+      - "docs/DATA_MODEL.md"
+      - "docs/ERD.md"
       - "docs/adr/0026-normalized-candidate-application.md"
       - "docs/traceability/candidate-application-core.md"
       - "docs/doctoring/candidate-application-references.md"
@@ -53,6 +56,12 @@ jobs:
         env:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Prove documented normalized application model
+        run: |
+          grep -Fq '| `candidate_application_record` |' docs/DATA_MODEL.md
+          grep -Fq '| `candidate_application_stage_record` |' docs/DATA_MODEL.md
+          grep -Fq 'candidate_application_record' docs/ERD.md
+          grep -Fq 'candidate_application_stage_record' docs/ERD.md
       - name: Prove test syntax
         run: bash -n tests/test_candidate_application_postgres.sh tests/test_candidate_application_decision_boundary_postgres.sh tests/test_candidate_application_rls_postgres.sh
       - name: Prove normalized application persistence
