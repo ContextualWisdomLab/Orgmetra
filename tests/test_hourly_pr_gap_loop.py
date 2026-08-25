@@ -99,3 +99,77 @@ def test_missing_baseline_is_nonfatal_until_dependency_integrates(
 
     assert module.main() == 0
     assert "baseline not present" in capsys.readouterr().out.lower()
+
+
+def test_same_inventory_day_integration_is_not_newer(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    """A same-Korea-calendar-day commit must not make a date-only snapshot stale."""
+    module = _load_script()
+    baseline = tmp_path / "product-technical-gap-baseline.md"
+    baseline.write_text("Inventory date: 2026-08-25 (Asia/Seoul).\n", encoding="utf-8")
+    monkeypatch.setattr(
+        module,
+        "_live_state",
+        lambda: {
+            "open_pull_requests": 4,
+            "open_issues": 1,
+            "newest_develop_commit_date": "2026-08-25T12:00:00Z",
+        },
+    )
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        ["gap-baseline-freshness", "--baseline", str(baseline)],
+    )
+
+    assert module.main() == 0
+    assert "result: current" in capsys.readouterr().out.lower()
+
+
+def test_next_korea_calendar_day_integration_requires_refresh(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    """UTC timestamps crossing midnight in Korea must stale the prior local date."""
+    module = _load_script()
+    baseline = tmp_path / "product-technical-gap-baseline.md"
+    baseline.write_text("Inventory date: 2026-08-25 (Asia/Seoul).\n", encoding="utf-8")
+    monkeypatch.setattr(
+        module,
+        "_live_state",
+        lambda: {
+            "open_pull_requests": 4,
+            "open_issues": 1,
+            "newest_develop_commit_date": "2026-08-25T16:00:00Z",
+        },
+    )
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        ["gap-baseline-freshness", "--baseline", str(baseline)],
+    )
+
+    assert module.main() == 0
+    assert "refresh candidate" in capsys.readouterr().out.lower()
+
+
+def test_live_state_failure_is_nonpassing(monkeypatch, tmp_path, capsys) -> None:
+    """An unavailable live control plane must fail closed instead of silently passing."""
+    module = _load_script()
+    baseline = tmp_path / "product-technical-gap-baseline.md"
+    baseline.write_text("Inventory date: 2026-08-25 (Asia/Seoul).\n", encoding="utf-8")
+
+    def fail_live_state() -> dict[str, object]:
+        raise RuntimeError("GitHub API unavailable")
+
+    monkeypatch.setattr(module, "_live_state", fail_live_state)
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        ["gap-baseline-freshness", "--baseline", str(baseline)],
+    )
+
+    assert module.main() == 2
+    output = capsys.readouterr().out.lower()
+    assert "fail live-state fetch" in output
+    assert "github api unavailable" in output
