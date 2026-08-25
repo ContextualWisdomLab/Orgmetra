@@ -4,12 +4,14 @@ on:
   pull_request:
     branches:
       - develop
+      - feat/governed-hr-data-export-control
     paths:
       - "packages/hr-data-export/**"
       - ".github/requirements/foundation-test.txt"
       - ".github/workflows/hr-data-export-quality.yml"
       - "docs/doctoring/hr-data-export-control-references.md"
       - "docs/traceability/hr-data-export-control.md"
+      - "docs/traceability/hr-data-export-execution.md"
   workflow_dispatch:
 
 permissions:
@@ -45,7 +47,7 @@ jobs:
           python -m pip check
       - name: Compile export-control package
         run: python -m compileall -q packages/hr-data-export/src packages/hr-data-export/tests
-      - name: Test HR data export review with exact statement and branch coverage
+      - name: Test HR data export review and execution with exact statement and branch coverage
         env:
           PYTHONPATH: packages/hr-data-export/src
           COVERAGE_FILE: /tmp/orgmetra-hr-data-export.coverage
