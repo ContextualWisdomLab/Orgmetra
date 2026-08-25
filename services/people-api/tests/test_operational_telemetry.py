@@ -324,3 +324,71 @@ def test_measurement_rejects_unbounded_or_noncanonical_dimensions(
 
     with pytest.raises((TypeError, ValueError), match=message):
         PeopleHttpRequestMeasurement(**values)  # type: ignore[arg-type]
+
+
+class _ExplodingClock:
+    """Simulate a telemetry clock source that fails on every sample."""
+
+    def __call__(self) -> float:
+        """Raise to model an unavailable monotonic clock source."""
+        raise RuntimeError("clock source unavailable")
+
+
+def test_clock_failure_at_request_start_never_blocks_the_wrapped_hr_request() -> None:
+    """A failing start-time clock must not propagate into the served HR request."""
+    sink = _RecordingSink()
+    middleware = PeopleHttpTelemetryMiddleware(
+        app=_success_app(),
+        sink=sink,
+        clock=_ExplodingClock(),
+    )
+
+    sent = _run(middleware, _scope())
+
+    assert [message.get("status") for message in sent] == [200]
+    assert sink.measurements == []
+
+
+def test_clock_failure_at_completion_is_swallowed_without_export() -> None:
+    """A failing completion-time clock degrades telemetry instead of the request."""
+    sink = _RecordingSink()
+
+    class _HalfBrokenClock:
+        """Serve one start sample, then fail for every later sample."""
+
+        def __init__(self) -> None:
+            """Arm exactly one successful start-time sample."""
+            self._calls = 0
+
+        def __call__(self) -> float:
+            """Return the deterministic start sample once, then raise."""
+            self._calls += 1
+            if self._calls == 1:
+                return 10.0
+            raise RuntimeError("clock source unavailable")
+
+    middleware = PeopleHttpTelemetryMiddleware(
+        app=_success_app(),
+        sink=sink,
+        clock=_HalfBrokenClock(),
+    )
+
+    sent = _run(middleware, _scope())
+
+    assert [message.get("status") for message in sent] == [200]
+    assert sink.measurements == []
+
+
+def test_telemetry_surface_is_importable_from_package_root() -> None:
+    """Deployment adapters must compose telemetry through the public package surface."""
+    from orgmetra_people_api import (  # noqa: PLC0415 - import-surface regression
+        PeopleHttpRequestMeasurement as ExportedMeasurement,
+        PeopleHttpTelemetryMiddleware as ExportedMiddleware,
+        classify_people_http_route as ExportedClassifier,
+        normalize_http_method as ExportedNormalizer,
+    )
+
+    assert ExportedMiddleware is PeopleHttpTelemetryMiddleware
+    assert ExportedMeasurement is PeopleHttpRequestMeasurement
+    assert ExportedClassifier is classify_people_http_route
+    assert ExportedNormalizer is normalize_http_method

@@ -43,6 +43,12 @@ from orgmetra_people_api.people import (
 from orgmetra_people_api.postgres import PostgresPeopleReadPort
 from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
+from orgmetra_people_api.telemetry import (
+    PeopleHttpRequestMeasurement,
+    PeopleHttpTelemetryMiddleware,
+    classify_people_http_route,
+    normalize_http_method,
+)
 
 __all__ = [
     "AuthenticatedPrincipal",
@@ -59,6 +65,8 @@ __all__ = [
     "PeopleMutationIntegrityError",
     "PeopleMutationNotFound",
     "PeopleMutationPort",
+    "PeopleHttpRequestMeasurement",
+    "PeopleHttpTelemetryMiddleware",
     "PeopleReadPort",
     "PeopleRecordIntegrityError",
     "PeopleRecordNotFound",
@@ -75,9 +83,11 @@ __all__ = [
     "WorkerPeopleRecord",
     "accept_confirmed_hire",
     "authorize_resource_fields",
+    "classify_people_http_route",
     "create_assignment_record",
     "create_employment_record",
     "create_position_record",
     "extract_bearer_token",
+    "normalize_http_method",
     "read_worker_people_record",
 ]

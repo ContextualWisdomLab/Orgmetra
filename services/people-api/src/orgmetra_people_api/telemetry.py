@@ -178,7 +178,12 @@ class PeopleHttpTelemetryMiddleware:
             await self.app(scope, receive, send)
             return
 
-        started_at = self.clock()
+        started_at: float | None
+        try:
+            started_at = self.clock()
+        except Exception:  # noqa: BLE001 - telemetry must never become HR request authority.
+            started_at = None
+            self._warn_measurement_not_exported()
         status_code: int | None = None
 
         async def measured_send(message: dict[str, object]) -> None:
@@ -219,11 +224,14 @@ class PeopleHttpTelemetryMiddleware:
         self,
         *,
         scope: Mapping[str, object],
-        started_at: float,
+        started_at: float | None,
         status_code: int | None,
         error_type: str | None,
     ) -> None:
         """Best-effort emit one bounded measurement without leaking request values."""
+        if started_at is None:
+            self._warn_measurement_not_exported()
+            return
         try:
             duration_seconds = float(self.clock() - started_at)
             measurement = PeopleHttpRequestMeasurement(
@@ -234,11 +242,14 @@ class PeopleHttpTelemetryMiddleware:
                 error_type=error_type,
             )
             self.sink.record_http_server_request(measurement)
-        except Exception as error:  # noqa: BLE001 - telemetry must never become HR request authority.
-            _LOGGER.warning(
-                "People HTTP telemetry measurement was not exported",
-                extra={
-                    "telemetry_event": "http_server_request_measurement_rejected",
-                    "error_class": type(error).__name__,
-                },
-            )
+        except Exception:  # noqa: BLE001 - telemetry must never become HR request authority.
+            self._warn_measurement_not_exported()
+
+    def _warn_measurement_not_exported(self) -> None:
+        """Log one bounded, value-free telemetry degradation record."""
+        _LOGGER.warning(
+            "People HTTP telemetry measurement was not exported",
+            extra={
+                "telemetry_event": "http_server_request_measurement_rejected",
+            },
+        )
