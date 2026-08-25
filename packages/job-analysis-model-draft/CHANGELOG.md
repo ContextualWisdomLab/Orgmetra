@@ -7,6 +7,7 @@
 - Bind untrusted draft output to an exact reviewed orchestration revision, route, digest, and orchestration provenance.
 - Require a distinct accountable human reviewer and keep both confirmed and rejected drafts non-authoritative for Job Analysis persistence or employment decisions.
 - Preserve the controlled human-review reason code in durable receipt evidence so a rejection or confirmation remains auditable without storing free-form review text.
+- Give rejected drafts a revision-only next action instead of telling downstream users or agents to submit human-rejected evidence to authoritative persistence.
 - Fail closed on hostile runtime subtypes, malformed references/digests/timestamps, scope mismatch, chronology errors, callback-result type forgery, and request/model mutation across authority, orchestration, and human-review calls.
 - Seal issued receipt evidence outside caller-writable receipt fields and detect post-issuance canonical-evidence mutation.
 - Require the runtime outcome's draft bytes to match the reviewed receipt digest on construction and every read, preventing a caller from pairing or later mutating unrelated text next to valid receipt evidence.
