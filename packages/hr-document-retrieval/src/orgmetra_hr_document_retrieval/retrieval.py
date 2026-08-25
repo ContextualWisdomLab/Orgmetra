@@ -432,7 +432,8 @@ def retrieve_hr_document(
 
     The execution order is security-significant: host capability validation → request
     snapshot → authoritative metadata resolution → exact-scope human authorization →
-    bounded artifact read and digest verification → immutable audit append → byte release.
+    bounded artifact read and digest verification → authorization freshness recheck →
+    immutable audit append → byte release.
     """
     _require_method(metadata_resolver, "resolve_document_scope", "metadata_resolver")
     _require_method(authority, "authorize_document_retrieval", "authority")
@@ -440,7 +441,6 @@ def retrieve_hr_document(
     _require_method(audit_writer, "append_document_retrieval_receipt", "audit_writer")
 
     request = _query_snapshot(query)
-    current_time = _now_utc()
 
     scope = _scope_snapshot(metadata_resolver.resolve_document_scope(request))
     if (
@@ -470,9 +470,11 @@ def retrieve_hr_document(
         raise _fail("authorization evidence does not match the exact retrieval scope")
     if authorization.permitted is not True:
         raise _fail("document retrieval is not authorized")
-    if authorization.reviewed_at > current_time:
+
+    authorization_checked_at = _now_utc()
+    if authorization.reviewed_at > authorization_checked_at:
         raise _fail("authorization review time cannot be later than the retrieval instant")
-    if authorization.expires_at <= current_time:
+    if authorization.expires_at <= authorization_checked_at:
         raise _fail("document retrieval authorization is expired or chronologically invalid")
 
     artifact = _artifact_snapshot(
@@ -483,12 +485,16 @@ def retrieve_hr_document(
     if actual_digest != artifact.digest_sha256 or actual_digest != scope.artifact_digest_sha256:
         raise _fail("document artifact digest does not match reviewed metadata")
 
+    release_time = _now_utc()
+    if authorization.expires_at <= release_time:
+        raise _fail("document retrieval authorization expired before byte release")
+
     receipt_json = _canonical_receipt(
         query=request,
         scope=scope,
         authorization=authorization,
         artifact=artifact,
-        recorded_at=current_time,
+        recorded_at=release_time,
     )
     audit_writer.append_document_retrieval_receipt(receipt_json)
     receipt_digest = sha256(receipt_json.encode("utf-8")).hexdigest()
