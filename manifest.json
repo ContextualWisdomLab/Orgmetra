@@ -53,9 +53,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "cd03d52e56a7281e98a09f4ebc6114b5e974aab42ead83b4155e596a3b800180",
-      "bytes": 18246,
-      "lines": 82
+      "sha256": "608adea92d058833e3cba477b11b2d2ffcf9d1a8ef2d6f83ec538f3c2ce0a968",
+      "bytes": 18559,
+      "lines": 83
     },
     {
       "path": "CLAUDE.md",
@@ -83,8 +83,8 @@
     },
     {
       "path": "apps/hr-workspace/app.js",
-      "sha256": "40525ba82b4f47ab9de918465c9775dd40b243085c09e70da4d41f4a2e456ae0",
-      "bytes": 29910,
+      "sha256": "67cf453e49c5b869afaa1f8845313c2fd0096540a3604c6b0d7b8e4d60a2739",
+      "bytes": 29937,
       "lines": 446
     },
     {
@@ -131,7 +131,7 @@
     },
     {
       "path": "database/migrations/0005_outbox_delivery_finalization.sql",
-      "sha256": "b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5b7a3a25fa60016b6a4961",
+      "sha256": "b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5ef9e8a92abba5c3cf182",
       "bytes": 6125,
       "lines": 170
     },
