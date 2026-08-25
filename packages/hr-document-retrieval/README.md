@@ -9,8 +9,9 @@ A document identifier, cached UI row, review packet, or storage reference is nev
 3. resolve fresh authoritative document metadata;
 4. obtain human-accountable authorization bound to the exact tenant, document, Person, Employment, artifact reference and digest, retention state, classification, purpose, reason, requester, delivery context, and byte limit;
 5. perform a bounded artifact read and verify SHA-256 against both storage output and authoritative metadata;
-6. append a value-minimized immutable retrieval receipt; and
-7. only after that audit append succeeds, return the bytes.
+6. recheck authorization freshness against the just-verified artifact;
+7. append a value-minimized immutable retrieval receipt; and
+8. only after that audit append succeeds, return the bytes.
 
 The result is always `not_authorized_for_employment_decision`. This package does not evaluate the document, infer suitability, classify a worker, or authorize hiring, termination, pay, performance, or any other high-impact employment action.
 
