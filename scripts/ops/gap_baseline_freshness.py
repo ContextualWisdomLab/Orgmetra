@@ -8,8 +8,8 @@ every comparison is computed at runtime from the recorded inventory date, the
 live default branch, and the complete live open pull-request/issue queues.
 
 Exit codes:
-    0  audit completed; findings are reported in the step summary text
-    2  contract violation (unreadable/invalid baseline structure)
+    0  audit completed, or the baseline has not integrated yet; findings are reported
+    2  contract violation (an existing baseline is unreadable/invalid)
 
 The output is plain Markdown so callers can append it directly to
 ``$GITHUB_STEP_SUMMARY``.
@@ -113,6 +113,13 @@ def main() -> int:
     baseline_path = Path(arguments.baseline)
     try:
         baseline_text = baseline_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        print(
+            "gap-baseline freshness: baseline not present on this integrated "
+            "branch yet; audit remains non-mutating and will activate when the "
+            "baseline owner integrates"
+        )
+        return 0
     except OSError as error:
         print(f"gap-baseline freshness: FAIL unreadable baseline: {error}")
         return 2
