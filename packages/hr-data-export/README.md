@@ -6,6 +6,8 @@ This package defines a **pre-export review packet** for HR data egress. It is in
 
 `HrDataExportReviewPacket` binds one tenant, one opaque HR resource, one purpose-bound authorization evidence reference and SHA-256 digest, one reviewed field subset, one requester, one distinct reviewer, one export format, one delivery class, one evidence version, and one recorded instant. Trust-bearing strings and integers use exact built-in runtime types so caller-defined equality, hashing, ordering, or parser behavior cannot make validation disagree with canonical audit evidence. Recorded time is detached from caller-controlled `tzinfo` behavior and stored as built-in UTC.
 
+The packet also seals its creation-time canonical evidence in a process-local weak registry outside packet-writable state. That defense prevents low-level `object.__setattr__` rewriting of one valid reviewed field scope into a second valid-looking audit truth. The registry is **defense in depth only**: durable uniqueness, replay/idempotency, cross-process authorization, and immutable audit/outbox persistence remain responsibilities of the authoritative host transaction.
+
 The requested field tuple is explicit, sorted, unique, non-empty, and capped at 64 names. There is no wildcard. Supported review reasons are `employee_access_request`, `regulatory_disclosure`, and `contractual_hr_export`; formats are `json` and `csv`; the only delivery class in this slice is `authenticated_one_time_download`.
 
 ## What this slice does not do
