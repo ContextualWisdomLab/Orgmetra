@@ -75,6 +75,11 @@ class PositionVacancySnapshot:
                 "Position vacancy staffed FTE must be a non-negative Decimal.",
                 next_action="Rebuild the snapshot from canonical Assignment allocation ratios.",
             )
+        if not self.staffed_fte.is_finite() or self.staffed_fte.as_tuple().exponent != -4:
+            raise SingleValuedFactError(
+                "Position vacancy staffed FTE must use exactly four decimal places.",
+                next_action="Rebuild the snapshot so staffed FTE carries the canonical 0.0000 scale.",
+            )
 
     def canonical_json(self) -> str:
         """Return deterministic aggregate evidence suitable for audit correlation."""

@@ -225,3 +225,10 @@ def test_snapshot_rejects_out_of_band_stored_allocation_ratio() -> None:
             effective_on=DAY,
             known_at=KNOWN,
         )
+
+
+@pytest.mark.parametrize("bad_fte", [Decimal("0"), Decimal("1.2")])
+def test_direct_snapshot_rejects_noncanonical_four_place_fte(bad_fte: Decimal) -> None:
+    """staffed_fte must carry exactly four decimal places for stable digests."""
+    with pytest.raises(SingleValuedFactError, match="four decimal places"):
+        PositionVacancySnapshot(TENANT, DAY, KNOWN, 0, 0, 0, 0, bad_fte)
