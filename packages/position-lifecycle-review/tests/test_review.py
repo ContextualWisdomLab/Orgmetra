@@ -218,10 +218,6 @@ def test_staffing_and_compensation_values_are_not_packet_fields() -> None:
 def test_release_binding_raises_on_digest_drift() -> None:
     """Fail loudly if a binding's digest drifted from its issuance before release."""
     packet = build_packet()
-    reference = (
-        TENANT,
-        packet.position_lifecycle_change_reference,
-    )
     import orgmetra_position_lifecycle_review.review as review_module
 
     key = (TENANT, uuid4())
