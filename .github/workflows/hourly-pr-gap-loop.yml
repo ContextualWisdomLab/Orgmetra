@@ -11,6 +11,9 @@ name: Hourly PR and Gap Loop
 # The central scheduler is called only through an immutable reviewed commit.
 # Its mutation permissions are scoped to that reusable-workflow job; the local
 # freshness audit remains read-only and never self-approves or bypasses rules.
+# Repository/organization secrets are deliberately not inherited: the central
+# owner already supports OIDC app-token exchange, so independent-review or PAT
+# credentials do not cross this caller boundary.
 
 on:
   schedule:
@@ -46,7 +49,6 @@ jobs:
       stale_opencode_minutes: "90"
       project_flow: git-flow
       base_branch: develop
-    secrets: inherit
 
   gap-baseline-freshness:
     name: Gap baseline freshness audit
