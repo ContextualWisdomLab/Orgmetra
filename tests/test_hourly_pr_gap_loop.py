@@ -101,6 +101,36 @@ def test_missing_baseline_is_nonfatal_until_dependency_integrates(
     assert "baseline not present" in capsys.readouterr().out.lower()
 
 
+def test_future_inventory_date_is_nonpassing_without_live_read(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    """A future-dated buyer snapshot cannot be accepted as current repository truth."""
+    module = _load_script()
+    baseline = tmp_path / "product-technical-gap-baseline.md"
+    baseline.write_text("Inventory date: 2999-12-31 (Asia/Seoul).\n", encoding="utf-8")
+    live_calls = 0
+
+    def live_state() -> dict[str, object]:
+        nonlocal live_calls
+        live_calls += 1
+        return {
+            "open_pull_requests": 4,
+            "open_issues": 1,
+            "newest_develop_commit_date": "2026-08-25T12:00:00Z",
+        }
+
+    monkeypatch.setattr(module, "_live_state", live_state)
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        ["gap-baseline-freshness", "--baseline", str(baseline)],
+    )
+
+    assert module.main() == 2
+    assert live_calls == 0
+    assert "future inventory date" in capsys.readouterr().out.lower()
+
+
 def test_same_inventory_day_integration_is_not_newer(
     monkeypatch, tmp_path, capsys
 ) -> None:
