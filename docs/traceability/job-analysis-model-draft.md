@@ -13,6 +13,7 @@ This traceability file describes **active PR truth only** until the owning branc
 | Human reviewer must be distinct and use a controlled confirmation/rejection reason | `HumanDraftReview`; workflow actor-separation check | `test_human_reviewer_must_be_distinct_and_reason_compatible`; `test_rejected_draft_is_auditable_but_never_persistence_authority` |
 | Human confirmation cannot become Job Analysis persistence authority | `JobAnalysisModelDraftReceipt` canonical evidence | happy-path/rejected-draft regressions assert `not_authorized_for_job_analysis_persistence` |
 | Checked request/model evidence cannot be rewritten during injected callbacks | workflow request/model snapshots | authority/model/human mutation regressions |
+| Runtime draft bytes cannot be detached from the reviewed receipt digest after issuance | `JobAnalysisModelDraftOutcome` construction/read check | `test_runtime_outcome_cannot_detach_draft_text_from_receipt` |
 | Caller-defined runtime subtypes, malformed IDs/digests/timestamps, and invalid callback result types fail closed | validators + exact-type callback boundaries | malformed-governance, timestamp, semantic collection, scope-verification, and callback-result regressions |
 | Issued durable evidence must detect post-issuance rewriting | process-local receipt seal + workflow-only issuance token | `test_receipt_rejects_direct_replacement_and_post_issuance_mutation` |
 | Owned production code remains exactly 100% statement/branch covered | package pytest/coverage policy | `Job Analysis Model Draft Quality` exact-head workflow |
