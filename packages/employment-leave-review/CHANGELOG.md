@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added a governed, value-minimized employment-leave review packet with authoritative tenant/worker-scope resolution, exact leave-case/policy provenance, work/benefits continuity and return-to-work evidence, human-only approval, and fail-closed mutation/external-execution states.
+- Added a governed, value-minimized employment-leave review packet that validates references and fixed governance states while requiring the host authority to re-resolve tenant/worker scope before approval; exact leave-case/policy provenance, work/benefits continuity and return-to-work evidence, human-only approval, and fail-closed mutation/external-execution states.
 - Required canonical non-sentinel UUIDv4 identity for every packet-owned namespaced trust reference, rejecting UUIDv1 timestamp/node correlation metadata and every other UUID version.
 - Changed `tenant_record_id` to follow protected Orgmetra's authoritative canonical non-sentinel operational-UUID contract, accepting the core UUIDv7 tenant form while retaining RFC 9562 Nil/Max rejection.
 - Excluded direct identifiers, medical/family values, compensation/benefit values, and free-form leave-reason narrative from the portable governance envelope; only non-sensitive workflow reason categories are permitted.
