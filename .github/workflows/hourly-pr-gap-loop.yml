@@ -8,8 +8,9 @@ name: Hourly PR and Gap Loop
 # fires, and (2) audits docs/product-technical-gap-baseline.md against live
 # repository truth so the next development iteration starts from fresh state.
 #
-# All mutations stay inside the sanctioned central machinery; this workflow
-# never bypasses ruleset 18156473 gates and never self-approves.
+# The central scheduler is called only through an immutable reviewed commit.
+# Its mutation permissions are scoped to that reusable-workflow job; the local
+# freshness audit remains read-only and never self-approves or bypasses rules.
 
 on:
   schedule:
@@ -17,12 +18,7 @@ on:
     - cron: "37 * * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: read
-  issues: read
-  checks: read
-  statuses: read
+permissions: {}
 
 concurrency:
   group: hourly-pr-gap-loop
@@ -31,33 +27,35 @@ concurrency:
 jobs:
   scheduler-sweep:
     name: Trusted review and merge sweep
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      # Review dispatch stays bounded (2 per hour) because the central org
-      # queue sweep additionally dispatches reviews every 15 minutes; the
-      # bounded budget prevents model-provider saturation while guaranteeing
-      # progress for lanes whose last event predates their readiness.
-      - name: Invoke central PR review and merge scheduler
-        uses: ContextualWisdomLab/.github/.github/workflows/pr-review-merge-scheduler.yml@main
-        with:
-          dry_run: "false"
-          max_prs: "100"
-          trigger_reviews: true
-          review_dispatch_limit: "2"
-          branch_update_limit: "2"
-          enable_auto_merge: true
-          merge_mode: direct_or_auto
-          update_branches: true
-          stale_opencode_minutes: "90"
-          project_flow: git-flow
-          base_branch: develop
-        secrets: inherit
+    uses: ContextualWisdomLab/.github/.github/workflows/pr-review-merge-scheduler.yml@8fd471a31399a914d9cb22a840f4a4c68e010ea6
+    permissions:
+      actions: write
+      checks: read
+      contents: write
+      id-token: write
+      pull-requests: write
+    with:
+      dry_run: false
+      max_prs: "100"
+      trigger_reviews: true
+      review_dispatch_limit: "2"
+      branch_update_limit: "2"
+      enable_auto_merge: true
+      merge_mode: direct_or_auto
+      update_branches: true
+      stale_opencode_minutes: "90"
+      project_flow: git-flow
+      base_branch: develop
+    secrets: inherit
 
   gap-baseline-freshness:
     name: Gap baseline freshness audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
     steps:
       - name: Checkout default branch truth
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
