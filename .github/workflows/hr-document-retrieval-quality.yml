@@ -44,6 +44,10 @@ jobs:
         run: |
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
+      - name: Install reviewed package build backend
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r packages/hr-document-retrieval/build-requirements.txt
+          python -m pip check
       - name: Compile package and tests
         run: python -m compileall -q packages/hr-document-retrieval/src packages/hr-document-retrieval/tests
       - name: Test exact statement and branch coverage

@@ -7,3 +7,4 @@
 - Keep returned document bytes usable for authorized HR work while excluding content and high-value HR data from durable retrieval receipts.
 - Fail closed on tenant/document/scope drift, authorization that expires before release, denied authorization, retention/classification drift, hostile runtime primitives, oversized or digest-mismatched artifacts, and audit persistence failure.
 - Add adversarial tests and a dedicated exact-head quality workflow requiring 100% owned production statement/branch coverage, an isolated package-install smoke test, and a clean checkout.
+- Make the isolated-install smoke test reproducible on CPython 3.14.7 by installing the reviewed, SHA-256-locked setuptools 84.0.0 wheel before invoking the package's declared `setuptools.build_meta` backend with build isolation disabled.
