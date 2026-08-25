@@ -16,6 +16,8 @@ This traceability file describes **active PR truth only** until the owning branc
 | Runtime draft bytes cannot be detached from the reviewed receipt digest after issuance | `JobAnalysisModelDraftOutcome` construction/read check | `test_runtime_outcome_cannot_detach_draft_text_from_receipt` |
 | Caller-defined runtime subtypes, malformed IDs/digests/timestamps, and invalid callback result types fail closed | validators + exact-type callback boundaries | malformed-governance, timestamp, semantic collection, scope-verification, and callback-result regressions |
 | Issued durable evidence must detect post-issuance rewriting | process-local receipt seal + workflow-only issuance token | `test_receipt_rejects_direct_replacement_and_post_issuance_mutation` |
+| Public Python support must not silently widen beyond the hosted minor | package metadata + exact CI runtime | `test_python_support_is_bounded_to_the_exact_hosted_minor` requires `>=3.14,<3.15` and exact CPython 3.14.7 |
+| Installed package evidence must be reproducible and hash-bound | package-specific reviewed build-backend lock + exact-checkout local wheel | `test_isolated_install_hash_binds_backend_and_exact_local_wheel` requires SHA-256-locked setuptools, local wheel construction, computed wheel digest, and `pip --require-hashes` installation |
 | Owned production code remains exactly 100% statement/branch covered | package pytest/coverage policy | `Job Analysis Model Draft Quality` exact-head workflow |
 
 ## Boundary to authoritative persistence
