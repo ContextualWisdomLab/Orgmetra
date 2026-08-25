@@ -116,7 +116,10 @@ def _freeze_timestamp(value: datetime, field_name: str) -> datetime:
         raise ValueError(f"{field_name} must have a valid timezone offset") from None
     if offset is None:
         raise ValueError(f"{field_name} must have a valid timezone offset")
-    utc_naive = value.replace(tzinfo=None) - offset
+    try:
+        utc_naive = value.replace(tzinfo=None) - offset
+    except OverflowError:
+        raise ValueError(f"{field_name} must have a valid timezone offset") from None
     return utc_naive.replace(tzinfo=timezone.utc)
 
 

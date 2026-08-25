@@ -322,3 +322,11 @@ def test_direct_construction_cannot_rewrite_next_action() -> None:
 def test_operational_tenant_accepts_uuid7() -> None:
     packet = _build()
     assert UUID(packet.tenant_record_id).version == 7
+
+
+@pytest.mark.parametrize("field_name", ["responded_at", "recorded_at"])
+def test_offset_overflow_normalizes_to_governed_value_error(field_name: str) -> None:
+    """Normalize range overflow during UTC detachment to the governed error."""
+    extreme = datetime(1, 1, 1, 0, 0, tzinfo=_MutableTimezone(timedelta(hours=23, minutes=59)))
+    with pytest.raises(ValueError, match=f"{field_name} must have a valid timezone offset"):
+        _build(**{field_name: extreme})
