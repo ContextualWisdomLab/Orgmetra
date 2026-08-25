@@ -90,10 +90,13 @@ assert_sql_rejected \
     "cross-tenant candidate anchor" \
     "INSERT INTO candidate_application_record (tenant_record_id,candidate_application_record_id,candidate_profile_id,requisition_reference,submitted_at,recorded_from) VALUES ('${TENANT_ALPHA}'::uuid,'10000000-0000-7000-8000-000000000053'::uuid,'20000000-0000-7000-8000-000000000011'::uuid,'requisition:33333333-3333-4333-8333-333333333333',TIMESTAMPTZ '2026-08-21 09:12:00+00',TIMESTAMPTZ '2026-08-21 09:12:01+00');"
 
+# Keep the mismatch regression outside the current application's effective
+# interval so the Position/Job FK is the first causal boundary rather than the
+# independent bitemporal-overlap guard.
 assert_sql_rejected \
     "candidate_application_version_position_job_tenant_fk" \
     "Position/Job mismatch" \
-    "INSERT INTO candidate_application_record_version (tenant_record_id,candidate_application_record_version_id,candidate_application_record_id,job_profile_id,position_record_id,effective_from,recorded_from) VALUES ('${TENANT_ALPHA}'::uuid,'10000000-0000-7000-8000-000000000073'::uuid,'${APPLICATION_ONE}'::uuid,'10000000-0000-7000-8000-000000000021'::uuid,'10000000-0000-7000-8000-000000000042'::uuid,TIMESTAMPTZ '2026-08-21 09:10:00+00',TIMESTAMPTZ '2026-08-21 11:00:00+00');"
+    "INSERT INTO candidate_application_record_version (tenant_record_id,candidate_application_record_version_id,candidate_application_record_id,job_profile_id,position_record_id,effective_from,effective_to,recorded_from) VALUES ('${TENANT_ALPHA}'::uuid,'10000000-0000-7000-8000-000000000073'::uuid,'${APPLICATION_ONE}'::uuid,'10000000-0000-7000-8000-000000000021'::uuid,'10000000-0000-7000-8000-000000000042'::uuid,TIMESTAMPTZ '2026-08-21 08:00:00+00',TIMESTAMPTZ '2026-08-21 09:00:00+00',TIMESTAMPTZ '2026-08-21 11:00:00+00');"
 
 assert_sql_rejected \
     "candidate_application_candidate_requisition_unique" \
