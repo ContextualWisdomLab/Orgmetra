@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/candidate-application-quality.yml",
-      "sha256": "e28aac50f94a512db5cf0e416da002f44062ed42bc507610c5924c5de9d7c7b5",
-      "bytes": 2628,
-      "lines": 67
+      "sha256": "71c7815c4b6755d5f3b37c299ca6f407b6e6c62b08b10a2b107438dd653118e8",
+      "bytes": 3064,
+      "lines": 76
     },
     {
       "path": ".github/workflows/foundation-ci.yml",
