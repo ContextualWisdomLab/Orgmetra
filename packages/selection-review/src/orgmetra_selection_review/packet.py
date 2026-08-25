@@ -98,8 +98,14 @@ def _freeze_timestamp(value: datetime) -> datetime:
 
 
 def _canonical_timestamp(value: datetime) -> str:
-    """Render only a previously detached built-in UTC instant as RFC 3339 text."""
-    if type(value) is not datetime or type(value.tzinfo) is not timezone:
+    """Render only a previously detached built-in UTC instant as RFC 3339 text.
+
+    The identity check against the single ``timezone.utc`` instance also rejects
+    a built-in fixed non-UTC offset such as ``timezone(timedelta(hours=9))``,
+    which would otherwise serialize as ``+09:00`` and change the SHA-256
+    evidence digest after a low-level ``object.__setattr__`` reinjection.
+    """
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
         raise ValueError("generated_at must be an exact timezone-aware datetime")
     return value.isoformat().replace("+00:00", "Z")
 

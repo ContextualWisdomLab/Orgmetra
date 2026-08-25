@@ -206,6 +206,18 @@ def test_canonicalization_rejects_postconstruction_timezone_reinjection():
         packet.canonical_json()
 
 
+def test_canonicalization_rejects_builtin_non_utc_timezone_reinjection():
+    """Reject a built-in fixed non-UTC offset, which is not an executable tzinfo subclass."""
+    packet = _packet()
+    object.__setattr__(
+        packet,
+        "generated_at",
+        datetime(2026, 8, 18, 11, 30, tzinfo=timezone(timedelta(hours=9))),
+    )
+    with pytest.raises(ValueError, match="generated_at"):
+        packet.canonical_json()
+
+
 def test_valid_packet_still_serializes_reviewed_governance_values():
     """Preserve the normal governed packet after strict runtime-type validation."""
     payload = json.loads(_model_packet().canonical_json())
