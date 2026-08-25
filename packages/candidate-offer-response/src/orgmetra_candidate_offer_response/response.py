@@ -51,7 +51,10 @@ def _register_creation_evidence_seal(packet: object, digest: str) -> None:
 def _creation_evidence_seal(packet: object) -> str:
     """Return the authoritative process-local seal for a live governed packet."""
     with _CREATION_EVIDENCE_SEALS_LOCK:
-        return _CREATION_EVIDENCE_SEALS[id(packet)]
+        seal = _CREATION_EVIDENCE_SEALS.get(id(packet))
+    if seal is None:
+        raise ValueError("candidate offer response evidence has no issuance seal")
+    return seal
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
