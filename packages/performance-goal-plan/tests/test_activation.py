@@ -1,7 +1,8 @@
 """Executable contract for authoritative performance-goal plan activation."""
 
+from copy import copy
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from uuid import uuid4
 
@@ -93,7 +94,7 @@ def test_activation_emits_value_minimized_authority_bound_receipt() -> None:
     receipt = activate_performance_goal_plan(
         item,
         approving_actor_reference=item.reviewer_reference,
-        approved_at=datetime(2026, 8, 23, 1, 1, tzinfo=timezone.utc),
+        approved_at=datetime(2026, 8, 23, 10, 1, tzinfo=timezone(timedelta(hours=9))),
         authority=authority,
     )
     document = json.loads(receipt.canonical_json())
@@ -134,6 +135,24 @@ def test_activation_requires_the_reviewed_human_actor() -> None:
             item,
             approving_actor_reference=ref("actor"),
             approved_at=datetime(2026, 8, 23, 1, 1, tzinfo=timezone.utc),
+            authority=authority,
+        )
+    assert authority.calls == 0
+
+
+@pytest.mark.parametrize(
+    "approved_at",
+    [object(), datetime(2026, 8, 23, 1, 1)],
+)
+def test_activation_rejects_untrusted_approval_timestamp_runtime(approved_at: object) -> None:
+    """Approval time must be an exact built-in fixed-offset datetime before authority work."""
+    item = packet()
+    authority = Authority(item)
+    with pytest.raises(ValueError, match="approved_at"):
+        activate_performance_goal_plan(
+            item,
+            approving_actor_reference=item.reviewer_reference,
+            approved_at=approved_at,  # type: ignore[arg-type]
             authority=authority,
         )
     assert authority.calls == 0
@@ -212,15 +231,19 @@ def test_activation_rejects_plan_mutation_across_authority_call() -> None:
         )
 
 
-def test_verification_rejects_invalid_chronology_and_governance() -> None:
-    """Authority verification is itself a strict value-minimized governed artifact."""
+def valid_verification() -> PerformanceGoalPlanActivationVerification:
+    """Return one standalone valid authority verification for direct validation tests."""
     item = packet()
-    authority = Authority(item)
-    valid = authority.verify_activation(
+    return Authority(item).verify_activation(
         plan=item,
         approving_actor_reference=item.reviewer_reference,
         approved_at=datetime(2026, 8, 23, 1, 1, tzinfo=timezone.utc),
     )
+
+
+def test_verification_rejects_invalid_chronology_and_governance() -> None:
+    """Authority verification is itself a strict value-minimized governed artifact."""
+    valid = valid_verification()
     assert repr(valid) == "PerformanceGoalPlanActivationVerification(<redacted>)"
     with pytest.raises(ValueError, match="verified_at"):
         replace(valid, verified_at=datetime(2026, 8, 23, 1, 0, tzinfo=timezone.utc))
@@ -228,33 +251,87 @@ def test_verification_rejects_invalid_chronology_and_governance() -> None:
         replace(valid, authority_evidence_digest="not-a-digest")
     with pytest.raises(ValueError):
         replace(valid, activation_state="auto_activated")
+    with pytest.raises(ValueError):
+        replace(valid, activation_state=object())  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="cadence"):
+        replace(valid, feedback_cadence_code="weekly_check_in")
+
+
+@pytest.mark.parametrize("evidence_version", [True, 2])
+def test_verification_requires_exact_evidence_version_one(evidence_version: object) -> None:
+    """Authority evidence version is exact integer one rather than coercible numeric input."""
+    with pytest.raises(ValueError, match="evidence_version"):
+        replace(valid_verification(), evidence_version=evidence_version)
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [object(), datetime(2026, 8, 23, 1, 1)],
+)
+def test_verification_rejects_untrusted_timestamp_runtime(timestamp: object) -> None:
+    """Verification timestamps reject both non-datetime and offsetless datetime input."""
+    with pytest.raises(ValueError):
+        replace(valid_verification(), approved_at=timestamp)  # type: ignore[arg-type]
+
+
+def issued_receipt() -> PerformanceGoalPlanActivationReceipt:
+    """Issue one valid receipt through the governed activation factory."""
+    item = packet()
+    return activate_performance_goal_plan(
+        item,
+        approving_actor_reference=item.reviewer_reference,
+        approved_at=datetime(2026, 8, 23, 1, 1, tzinfo=timezone.utc),
+        authority=Authority(item),
+    )
+
+
+def receipt_values() -> dict[str, object]:
+    """Return valid direct-construction values that still lack factory issuance authority."""
+    item = packet()
+    return {
+        "activation_reference": ref("performance_goal_activation"),
+        "tenant_record_id": item.tenant_record_id,
+        "performance_goal_plan_reference": item.performance_goal_plan_reference,
+        "plan_digest": item.sha256_digest(),
+        "approving_actor_reference": item.reviewer_reference,
+        "approved_at": datetime(2026, 8, 23, 1, 1, tzinfo=timezone.utc),
+        "activated_at": datetime(2026, 8, 23, 1, 2, tzinfo=timezone.utc),
+        "authority_evidence_reference": ref("performance_goal_authority"),
+        "authority_evidence_digest": DIGEST_C,
+    }
 
 
 def test_receipt_cannot_be_constructed_or_rewritten_outside_activation() -> None:
     """Issued activation evidence cannot be minted or replaced without authority verification."""
-    item = packet()
-    authority = Authority(item)
-    receipt = activate_performance_goal_plan(
-        item,
-        approving_actor_reference=item.reviewer_reference,
-        approved_at=datetime(2026, 8, 23, 1, 1, tzinfo=timezone.utc),
-        authority=authority,
-    )
+    receipt = issued_receipt()
     with pytest.raises(TypeError):
         replace(receipt, plan_digest="d" * 64)
     object.__setattr__(receipt, "plan_digest", "d" * 64)
     with pytest.raises(ValueError, match="altered"):
         receipt.canonical_json()
-
     with pytest.raises(TypeError):
-        PerformanceGoalPlanActivationReceipt(
-            activation_reference=ref("performance_goal_activation"),
-            tenant_record_id=item.tenant_record_id,
-            performance_goal_plan_reference=item.performance_goal_plan_reference,
-            plan_digest=item.sha256_digest(),
-            approving_actor_reference=item.reviewer_reference,
-            approved_at=datetime(2026, 8, 23, 1, 1, tzinfo=timezone.utc),
-            activated_at=datetime(2026, 8, 23, 1, 2, tzinfo=timezone.utc),
-            authority_evidence_reference=ref("performance_goal_authority"),
-            authority_evidence_digest=DIGEST_C,
-        )
+        PerformanceGoalPlanActivationReceipt(**receipt_values())  # type: ignore[arg-type]
+
+
+def test_copied_receipt_has_no_issuance_seal() -> None:
+    """Object copying cannot clone process-local issuance authority."""
+    duplicate = copy(issued_receipt())
+    with pytest.raises(ValueError, match="altered"):
+        duplicate.canonical_json()
+
+
+def test_receipt_rejects_impossible_activation_chronology_before_token_check() -> None:
+    """Malformed direct construction fails on chronology before issuance authority is considered."""
+    values = receipt_values()
+    values["activated_at"] = datetime(2026, 8, 23, 1, 0, tzinfo=timezone.utc)
+    with pytest.raises(ValueError, match="activated_at"):
+        PerformanceGoalPlanActivationReceipt(**values)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("evidence_version", [True, 2])
+def test_receipt_requires_exact_evidence_version_one(evidence_version: object) -> None:
+    """Receipt evidence version rejects boolean and unsupported integer values."""
+    values = receipt_values()
+    values["evidence_version"] = evidence_version
+    with pytest.raises(ValueError, match="evidence_version"):
+        PerformanceGoalPlanActivationReceipt(**values)  # type: ignore[arg-type]
