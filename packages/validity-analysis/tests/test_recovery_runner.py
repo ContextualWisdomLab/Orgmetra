@@ -273,3 +273,37 @@ def test_main_fails_closed_for_contract_only_designs(
 def test_runner_test_fixture_has_aware_timestamp() -> None:
     """Keep this module's timestamp import contract explicit for future evidence tests."""
     assert datetime.now(timezone.utc).tzinfo is not None
+
+
+def test_run_worker_forwards_home_and_tool_cache_roots(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """uv and cargo keep working when the parent shell provides their cache roots."""
+    captured: dict[str, object] = {}
+    monkeypatch.setenv("HOME", "/home/operator")
+    monkeypatch.setenv("UV_CACHE_DIR", "/cache/uv")
+    monkeypatch.setenv("CARGO_HOME", "/cache/cargo")
+    monkeypatch.setattr(runner.shutil, "which", lambda name: "/usr/local/bin/uv")
+
+    def fake_run(*args: object, **kwargs: object) -> SimpleNamespace:
+        """Capture one subprocess call and return one valid worker object."""
+        captured.update(kwargs)
+        return SimpleNamespace(returncode=0, stdout=json.dumps(output()), stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    runner.run_worker(
+        repository=REPOSITORY,
+        design_code="nested_multilevel",
+        rust_device="cpu",
+        persons=48,
+        items_per_dim=3,
+        clusters=4,
+        seed=42,
+        worker_count=4,
+    )
+
+    environment = captured["env"]
+    assert isinstance(environment, dict)
+    assert environment["HOME"] == "/home/operator"
+    assert environment["UV_CACHE_DIR"] == "/cache/uv"
+    assert environment["CARGO_HOME"] == "/cache/cargo"

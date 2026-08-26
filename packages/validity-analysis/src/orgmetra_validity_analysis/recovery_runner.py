@@ -173,6 +173,9 @@ def run_worker(
             environment = {
                 "PATH": os.environ.get("PATH", ""),
                 "TMPDIR": os.environ.get("TMPDIR", ""),
+                "HOME": os.environ.get("HOME", ""),
+                "UV_CACHE_DIR": os.environ.get("UV_CACHE_DIR", ""),
+                "CARGO_HOME": os.environ.get("CARGO_HOME", ""),
                 "ORGMETRA_DESIGN_CODE": design_code,
                 "ORGMETRA_PERSONS": str(persons),
                 "ORGMETRA_ITEMS_PER_DIM": str(items_per_dim),
