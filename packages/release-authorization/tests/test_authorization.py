@@ -212,7 +212,7 @@ def test_authorization_requires_separate_release_actor(release_actor: str) -> No
         ({"qualifying_independent_approval_count": 1}, "two qualifying"),
         ({"last_push_approved": False}, "last push"),
         ({"review_threads_resolved": False}, "review threads"),
-        ({"all_required_gates_green": False}, "required gates"),
+        ({"all_required_gates_green": False}, "required gate"),
         ({"routine_admin_bypass_disabled": False}, "administrator bypass"),
     ],
 )
