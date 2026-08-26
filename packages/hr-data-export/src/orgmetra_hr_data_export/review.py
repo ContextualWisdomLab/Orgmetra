@@ -131,10 +131,11 @@ def _freeze_timestamp(value: object) -> datetime:
     return (naive_value - offset).replace(tzinfo=timezone.utc)
 
 
-def _validate_frozen_timestamp(value: object) -> None:
-    """Require the stored audit instant to be the detached built-in UTC representation."""
+def _validate_frozen_timestamp(value: object) -> datetime:
+    """Return the stored audit instant after requiring detached built-in UTC form."""
     if type(value) is not datetime or value.tzinfo is not timezone.utc:
         raise ValueError("generated_at must remain the canonical built-in UTC datetime")
+    return value
 
 
 def _validate_evidence_version(value: object) -> None:

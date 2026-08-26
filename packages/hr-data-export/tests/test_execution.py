@@ -792,3 +792,46 @@ def test_governed_execution_evidence_types_are_final(governed_type: type[object]
     """Caller-defined subtypes cannot override trust-bearing behavior at execution boundaries."""
     with pytest.raises(TypeError):
         type("ForgedEvidence", (governed_type,), {})
+
+
+def test_review_digest_drift_across_authority_fails_before_materialization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review evidence that stops matching its verified snapshot fails closed."""
+    review, verification, artifact, _, materializer, audit, egress, clock, events = success_ports()
+    original_canonical_json = type(review).canonical_json
+    state = {"verified": False}
+
+    class DriftAfterAuthority(FakeAuthority):
+        """Flip the drift flag only after authoritative verification returns."""
+
+        def verify_export(
+            self,
+            *,
+            review: HrDataExportReviewPacket,
+            review_digest: str,
+            requested_at: datetime,
+        ) -> object:
+            """Record the governed call, then arm post-verification evidence drift."""
+            self.events.append("authority")
+            assert review_digest == review.sha256_digest()
+            assert requested_at.tzinfo is UTC
+            state["verified"] = True
+            return self.result
+
+    def drifting_canonical_json(self: Any) -> str:
+        """Return the verified rendering once, then a divergent rendering afterwards."""
+        text = original_canonical_json(self)
+        return text + " " if state["verified"] else text
+
+    monkeypatch.setattr(type(review), "canonical_json", drifting_canonical_json)
+    with pytest.raises(HrDataExportExecutionError, match="changed across authoritative verification"):
+        execute_fixture(
+            review,
+            DriftAfterAuthority(verification, events),
+            materializer,
+            audit,
+            egress,
+            clock,
+        )
+    assert events == ["authority"]
