@@ -81,6 +81,7 @@ class RecordingAuthority:
             "person_record_reference": packet.person_record_reference,
             "employment_record_reference": packet.employment_record_reference,
             "approving_actor_reference": approving_actor_reference,
+            "approved_at": approved_at,
             "authority_evidence_reference": AUTHORITY_REFERENCE,
             "authority_evidence_digest": "4" * 64,
         }
@@ -107,6 +108,7 @@ class MutatingAuthority:
             person_record_reference=packet.person_record_reference,
             employment_record_reference=packet.employment_record_reference,
             approving_actor_reference=approving_actor_reference,
+            approved_at=approved_at,
             authority_evidence_reference=AUTHORITY_REFERENCE,
             authority_evidence_digest="4" * 64,
         )
@@ -210,6 +212,12 @@ def test_rejects_authority_evidence_for_different_review_scope() -> None:
             "employment_record_reference": "employment_record:56565656-5656-4656-8656-565656565656"
         }
     )
+    with pytest.raises(ValueError, match="different reviewed separation"):
+        approve_valid(authority=authority)
+
+
+def test_rejects_authority_evidence_for_different_approval_instant() -> None:
+    authority = RecordingAuthority(overrides={"approved_at": APPROVED_AT + timedelta(seconds=1)})
     with pytest.raises(ValueError, match="different reviewed separation"):
         approve_valid(authority=authority)
 
