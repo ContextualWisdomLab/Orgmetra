@@ -10,6 +10,13 @@ function hardwareAccelerationAdr() {
   return readFileSync(ADR_URL, 'utf8');
 }
 
+function decisionSection(adr) {
+  const start = adr.indexOf('## Decision');
+  const end = adr.indexOf('## Consequences', start);
+  assert.ok(start >= 0 && end > start, 'ADR must contain a bounded Decision section');
+  return adr.slice(start, end);
+}
+
 function assertManifestEntry(path) {
   const artifactBytes = readFileSync(new URL(`../${path}`, import.meta.url));
   const manifest = JSON.parse(readFileSync(MANIFEST_URL, 'utf8'));
@@ -22,22 +29,32 @@ function assertManifestEntry(path) {
 }
 
 test('MLX sidecar contract defines container-to-host routing for supported engines', () => {
-  const adr = hardwareAccelerationAdr();
+  const decision = decisionSection(hardwareAccelerationAdr());
 
-  assert.match(adr, /host\.docker\.internal/);
-  assert.match(adr, /host\.containers\.internal/);
-  assert.match(adr, /host-gateway/);
-  assert.match(adr, /Colima/i);
-  assert.doesNotMatch(adr, /Containers talk to it over localhost HTTP\/gRPC/);
+  assert.match(decision, /host\.docker\.internal/);
+  assert.match(decision, /host\.containers\.internal/);
+  assert.match(decision, /host-gateway/);
+  assert.match(decision, /Colima/i);
+  assert.doesNotMatch(decision, /Containers talk to it over localhost HTTP\/gRPC/);
 });
 
 test('MLX sidecar contract fails closed instead of silently changing compute paths', () => {
-  const adr = hardwareAccelerationAdr();
+  const decision = decisionSection(hardwareAccelerationAdr());
 
-  assert.match(adr, /bind address/i);
-  assert.match(adr, /fail(?:s|ure)?[- ]closed/i);
-  assert.match(adr, /no silent CPU fallback/i);
-  assert.match(adr, /health\/version handshake/i);
+  assert.match(decision, /bind address/i);
+  assert.match(decision, /fail(?:s|ure)?[- ]closed/i);
+  assert.match(decision, /no silent CPU fallback/i);
+  assert.match(decision, /health\/version handshake/i);
+  assert.match(decision, /accelerator_unavailable/);
+});
+
+test('MLX sidecar contract authenticates and authorizes callers on an allowlisted ingress path', () => {
+  const decision = decisionSection(hardwareAccelerationAdr());
+
+  assert.match(decision, /client identity/i);
+  assert.match(decision, /allowlist/i);
+  assert.match(decision, /authoriz(?:e|ed|ation)/i);
+  assert.match(decision, /accelerator_unavailable/);
 });
 
 test('hardware acceleration ADR is sealed in the canonical provenance manifest', () => {
