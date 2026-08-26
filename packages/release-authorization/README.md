@@ -15,6 +15,8 @@ It does **not** create a Git tag, GitHub Release, signature, deployment, artifac
 - every applicable local/central release gate is terminal GREEN; and
 - routine administrator bypass is disabled.
 
+The authorization clock must occur no more than **60 seconds** after that control snapshot. A syntactically valid but stale control result therefore cannot authorize a release.
+
 This is intentionally stricter than the live organization ruleset observed on 2026-08-26. The live ruleset currently requires only one approval, does not require last-push approval, and permits OrganizationAdmin `always` bypass; therefore a truthful production authority must currently fail closed rather than manufacture a successful verification.
 
 ## Evidence and separation of duties
