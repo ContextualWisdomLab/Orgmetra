@@ -92,6 +92,7 @@ class EmploymentSeparationApprovalVerification:
     person_record_reference: str
     employment_record_reference: str
     approving_actor_reference: str
+    approved_at: datetime
     authority_evidence_reference: str
     authority_evidence_digest: str
 
@@ -294,6 +295,7 @@ def approve_employment_separation(
         packet.person_record_reference,
         packet.employment_record_reference,
         approving_actor_reference,
+        frozen_approved_at,
     )
 
     verification = authority.verify_approval(
@@ -313,6 +315,7 @@ def approve_employment_separation(
         verification.person_record_reference,
         verification.employment_record_reference,
         verification.approving_actor_reference,
+        verification.approved_at,
         verification.authority_evidence_reference,
         verification.authority_evidence_digest,
     )
@@ -323,6 +326,7 @@ def approve_employment_separation(
         verified_person_reference,
         verified_employment_reference,
         verified_approving_actor,
+        verified_approved_at,
         verified_authority_reference,
         verified_authority_digest,
     ) = verification_snapshot
@@ -341,6 +345,7 @@ def approve_employment_separation(
         "employment_record_reference",
     )
     _validate_reference(verified_approving_actor, "actor", "approving_actor_reference")
+    _canonical_approved_at(verified_approved_at)
     _validate_reference(
         verified_authority_reference,
         "separation_approval_verification",
@@ -348,7 +353,7 @@ def approve_employment_separation(
     )
     _validate_digest(verified_authority_digest, "authority_evidence_digest")
 
-    verified_scope = verification_snapshot[:6]
+    verified_scope = verification_snapshot[:7]
     if verified_scope != expected_scope:
         raise ValueError("approval authority returned evidence for a different reviewed separation")
 
@@ -361,7 +366,7 @@ def approve_employment_separation(
         approving_actor_reference=expected_scope[5],
         authority_evidence_reference=verified_authority_reference,
         authority_evidence_digest=verified_authority_digest,
-        approved_at=frozen_approved_at,
+        approved_at=expected_scope[6],
         _issuance_token=_RECEIPT_ISSUANCE_TOKEN,
     )
     object.__setattr__(receipt, "_issuance_token", None)
