@@ -6,7 +6,8 @@ set -euo pipefail
 for migration in \
   database/migrations/0001_foundation_schema.sql \
   database/migrations/0002_sealed_evidence_digest.sql \
-  database/migrations/0031_employment_work_capacity_persistence.sql; do
+  database/migrations/0031_employment_work_capacity_persistence.sql \
+  database/migrations/0032_employment_work_capacity_forward_chain.sql; do
   if [[ ! -f "${migration}" ]]; then
     echo "required Employment work-capacity persistence migration is missing: ${migration}" >&2
     exit 1
@@ -71,7 +72,7 @@ common = {
     "employment_terms_evidence_digest": "${TERMS_DIGEST}",
     "evidence_version": 1,
     "human_review_required": True,
-    "next_action": "Re-resolve authoritative Employment and capacity truth, verify human authority and evidence, then persist with immutable audit and outbox evidence.",
+    "next_action": "Within tenant_record_id, re-resolve the authoritative Employment and current work-capacity truth at effective_on, verify reviewer identity/authority and the exact reviewed employment-terms and capacity-policy evidence, recalculate Assignment allocation and compensation/payroll impacts, then persist any approved bitemporal capacity change with immutable audit/outbox evidence. This packet does not itself mutate Employment, Assignment, compensation, payroll, leave, or scheduling.",
     "purpose_code": "employment_work_capacity_review",
     "requester_actor_reference": "${REQUESTER}",
     "review_state": "reviewed_for_authoritative_resolution",
@@ -272,7 +273,7 @@ expect_failure \
 
 expect_failure \
   "cross-tenant application accepted parent review evidence" \
-  "review tenant does not match requested tenant" \
+  "tenant context does not match requested tenant" \
   "SELECT apply_employment_work_capacity_change(
      '${OTHER_TENANT_ID}'::uuid,
      '20000000-0000-7000-8000-000000000031'::uuid,
