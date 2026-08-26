@@ -13,7 +13,8 @@ trap 'psql "${ROOT_URL}/postgres" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS
 for migration in \
   database/migrations/0001_foundation_schema.sql \
   database/migrations/0002_sealed_evidence_digest.sql \
-  database/migrations/0031_employment_work_capacity_persistence.sql; do
+  database/migrations/0031_employment_work_capacity_persistence.sql \
+  database/migrations/0032_employment_work_capacity_forward_chain.sql; do
   psql "${RETRO_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
