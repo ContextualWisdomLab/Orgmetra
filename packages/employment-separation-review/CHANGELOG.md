@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added an accountable `approve_employment_separation(...)` boundary that requires exact authoritative reviewer/scope verification and emits a value-minimized receipt that remains `not_authorized_to_apply` and `not_authorized_to_execute`.
+- Bound approval to the exact pre-authority packet bytes/SHA-256 and approval instant, reject packet mutation or wrong-scope authority evidence, and protect live receipt canonical evidence with a process-local HMAC-backed issuance seal outside receipt-writable slots.
 - Added a governed, value-free employment-separation review packet with exact evidence binding, controlled non-sensitive reason metadata, authoritative-scope resolution, human-only approval, and fail-closed mutation/external-execution states.
 - Required canonical non-sentinel UUIDv4 identity for every packet-owned namespaced trust reference, rejecting UUIDv1 timestamp/node correlation metadata and every other UUID version.
 - Strengthened authoritative-scope review so every packet reference must be re-resolved inside the exact tenant context and the Person-to-Employment plus active Assignment/Job/Position worker binding must be proven before approval.
