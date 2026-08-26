@@ -196,7 +196,7 @@ INSERT INTO performance_goal_plan_version (
  approving_actor_reference, approved_at, activated_at, effective_from, effective_to, audit_event_record_id, recorded_from
 ) SELECT tenant_record_id, '10000000-0000-7000-8000-000000000055', performance_goal_plan_record_id,
  goal_set_digest_sha256, measurement_definition_digest_sha256, goal_count, feedback_cadence_code,
- plan_evidence_json, plan_evidence_digest_sha256, 'performance_goal_activation:00000000-0000-4000-8000-000000000056',
+ plan_evidence_json, plan_evidence_digest_sha256, activation_reference,
  activation_evidence_json, activation_evidence_digest_sha256, authority_evidence_reference,
  authority_evidence_digest_sha256, approving_actor_reference, approved_at, activated_at,
  effective_from, effective_to, audit_event_record_id, TIMESTAMPTZ '2000-01-01 00:00:00+00'
@@ -211,7 +211,7 @@ INSERT INTO performance_goal_plan_version (
  approving_actor_reference, approved_at, activated_at, effective_from, effective_to, audit_event_record_id
 ) SELECT tenant_record_id, '10000000-0000-7000-8000-000000000057', performance_goal_plan_record_id,
  goal_set_digest_sha256, measurement_definition_digest_sha256, goal_count, feedback_cadence_code,
- plan_evidence_json, plan_evidence_digest_sha256, 'performance_goal_activation:00000000-0000-4000-8000-000000000058',
+ plan_evidence_json, plan_evidence_digest_sha256, activation_reference,
  activation_evidence_json, activation_evidence_digest_sha256, authority_evidence_reference,
  authority_evidence_digest_sha256, approving_actor_reference, approved_at, activated_at,
  DATE '2027-01-01', DATE '2027-01-15', audit_event_record_id
@@ -226,7 +226,7 @@ INSERT INTO performance_goal_plan_version (
  approving_actor_reference, approved_at, activated_at, effective_from, effective_to, audit_event_record_id
 ) SELECT tenant_record_id, '10000000-0000-7000-8000-000000000059', performance_goal_plan_record_id,
  goal_set_digest_sha256, measurement_definition_digest_sha256, goal_count, feedback_cadence_code,
- plan_evidence_json, plan_evidence_digest_sha256, 'performance_goal_activation:00000000-0000-4000-8000-000000000060',
+ plan_evidence_json, plan_evidence_digest_sha256, activation_reference,
  activation_evidence_json, activation_evidence_digest_sha256, authority_evidence_reference,
  authority_evidence_digest_sha256, approving_actor_reference, approved_at, activated_at,
  DATE '2028-02-01', DATE '2028-03-01', audit_event_record_id
