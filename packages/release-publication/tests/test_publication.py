@@ -109,11 +109,14 @@ def _authorization_receipt():
     )
 
 
-def _platform_receipt(**overrides: object) -> ReleasePlatformReceipt:
+def _platform_receipt(
+    *, authorization_evidence_digest_sha256: str | None = None, **overrides: object
+) -> ReleasePlatformReceipt:
     """Build one valid host-owned publication receipt with optional overrides."""
-    auth = _authorization_receipt()
+    if authorization_evidence_digest_sha256 is None:
+        authorization_evidence_digest_sha256 = _authorization_receipt().sha256_digest()
     values: dict[str, object] = {
-        "authorization_evidence_digest_sha256": auth.sha256_digest(),
+        "authorization_evidence_digest_sha256": authorization_evidence_digest_sha256,
         "candidate_revision_sha": _CANDIDATE,
         "tag_name": "v1.2.3",
         "publication_reference": _PUBLICATION_REFERENCE,
@@ -173,9 +176,12 @@ class _Publisher:
 
 def test_publication_consumes_exact_authorization_once() -> None:
     """Publish one exact candidate and return immutable publication evidence."""
-    publisher = _Publisher(_platform_receipt())
+    authorization = _authorization_receipt()
+    publisher = _Publisher(
+        _platform_receipt(authorization_evidence_digest_sha256=authorization.sha256_digest())
+    )
     receipt = publish_authorized_release(
-        authorization_receipt=_authorization_receipt(),
+        authorization_receipt=authorization,
         publication_reference=_PUBLICATION_REFERENCE,
         publisher=publisher,
         clock=lambda: _PUBLISH_STARTED_AT,
@@ -236,10 +242,13 @@ def test_publication_rejects_invalid_correlation_reference(reference: str) -> No
 
 def test_lost_publish_response_reconciles_without_republication() -> None:
     """Recover ambiguous success by lookup only and never publish twice."""
-    reconciled = _platform_receipt()
+    authorization = _authorization_receipt()
+    reconciled = _platform_receipt(
+        authorization_evidence_digest_sha256=authorization.sha256_digest()
+    )
     publisher = _Publisher(object(), reconcile_result=reconciled, raise_publish=True)
     receipt = publish_authorized_release(
-        authorization_receipt=_authorization_receipt(),
+        authorization_receipt=authorization,
         publication_reference=_PUBLICATION_REFERENCE,
         publisher=publisher,
         clock=lambda: _PUBLISH_STARTED_AT,
@@ -251,9 +260,15 @@ def test_lost_publish_response_reconciles_without_republication() -> None:
 
 def test_malformed_immediate_receipt_reconciles_without_republication() -> None:
     """Treat malformed immediate host evidence as ambiguous and reconcile by correlation."""
-    publisher = _Publisher(object(), reconcile_result=_platform_receipt())
+    authorization = _authorization_receipt()
+    publisher = _Publisher(
+        object(),
+        reconcile_result=_platform_receipt(
+            authorization_evidence_digest_sha256=authorization.sha256_digest()
+        ),
+    )
     receipt = publish_authorized_release(
-        authorization_receipt=_authorization_receipt(),
+        authorization_receipt=authorization,
         publication_reference=_PUBLICATION_REFERENCE,
         publisher=publisher,
         clock=lambda: _PUBLISH_STARTED_AT,
@@ -279,11 +294,37 @@ def test_missing_reconciliation_is_indeterminate_and_non_retryable() -> None:
 
 def test_reconciliation_scope_mismatch_is_indeterminate() -> None:
     """Reject reconciliation evidence that does not bind the authorized exact candidate."""
-    bad = _platform_receipt(candidate_revision_sha="b" * 40)
+    authorization = _authorization_receipt()
+    bad = _platform_receipt(
+        authorization_evidence_digest_sha256=authorization.sha256_digest(),
+        candidate_revision_sha="b" * 40,
+    )
     publisher = _Publisher(object(), reconcile_result=bad, raise_publish=True)
     with pytest.raises(ReleasePublicationIndeterminateError, match="do not republish"):
         publish_authorized_release(
-            authorization_receipt=_authorization_receipt(),
+            authorization_receipt=authorization,
+            publication_reference=_PUBLICATION_REFERENCE,
+            publisher=publisher,
+            clock=lambda: _PUBLISH_STARTED_AT,
+        )
+    assert publisher.publish_calls == 1
+    assert publisher.reconcile_calls == 1
+
+
+def test_platform_receipt_bound_to_other_authorization_is_indeterminate() -> None:
+    """Reject host evidence bound to a different exact parent authorization receipt."""
+    authorization = _authorization_receipt()
+    other_authorization = _authorization_receipt()
+    assert authorization.sha256_digest() != other_authorization.sha256_digest()
+    publisher = _Publisher(
+        _platform_receipt(
+            authorization_evidence_digest_sha256=other_authorization.sha256_digest()
+        ),
+        reconcile_result=None,
+    )
+    with pytest.raises(ReleasePublicationIndeterminateError, match="do not republish"):
+        publish_authorized_release(
+            authorization_receipt=authorization,
             publication_reference=_PUBLICATION_REFERENCE,
             publisher=publisher,
             clock=lambda: _PUBLISH_STARTED_AT,
@@ -294,10 +335,15 @@ def test_reconciliation_scope_mismatch_is_indeterminate() -> None:
 
 def test_publication_receipt_rejects_post_issuance_rewrite() -> None:
     """Prevent one published release receipt from emitting a second canonical truth."""
+    authorization = _authorization_receipt()
     receipt = publish_authorized_release(
-        authorization_receipt=_authorization_receipt(),
+        authorization_receipt=authorization,
         publication_reference=_PUBLICATION_REFERENCE,
-        publisher=_Publisher(_platform_receipt()),
+        publisher=_Publisher(
+            _platform_receipt(
+                authorization_evidence_digest_sha256=authorization.sha256_digest()
+            )
+        ),
         clock=lambda: _PUBLISH_STARTED_AT,
     )
     object.__setattr__(receipt, "publication_state", "not_published")
