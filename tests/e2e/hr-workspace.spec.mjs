@@ -266,6 +266,7 @@ test('the bypass control follows the active workspace locale', async ({ page }) 
 
   const skipLink = page.getByRole('link', { name: 'Skip to main content' });
   await page.locator('#locale-toggle').click();
-  await expect(skipLink).toHaveText('본문으로 건너뛰기');
+  await expect(skipLink.locator('[lang="ko"]')).toBeVisible();
+  await expect(skipLink.locator('[lang="en"]')).toBeHidden();
   await expect(skipLink).toHaveAccessibleName('본문으로 건너뛰기');
 });
