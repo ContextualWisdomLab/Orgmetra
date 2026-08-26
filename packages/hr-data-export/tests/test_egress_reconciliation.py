@@ -5,10 +5,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 
+import pytest
+
 from orgmetra_hr_data_export import HrDataExportReviewPacket
 from orgmetra_hr_data_export.execution import (
     HrDataExportArtifact,
     HrDataExportAuditReceipt,
+    HrDataExportDeliveryIndeterminateError,
     HrDataExportEgressReceipt,
     HrDataExportExecutionReceipt,
     HrDataExportExecutionVerification,
@@ -35,6 +38,7 @@ FIELDS = ("email_address", "employee_number")
 
 
 def _review() -> HrDataExportReviewPacket:
+    """Build one valid reviewed export scope without retaining HR values."""
     return HrDataExportReviewPacket(
         tenant_record_id=TENANT_ID,
         export_review_reference=EXPORT_REVIEW_REFERENCE,
@@ -55,6 +59,7 @@ def _review() -> HrDataExportReviewPacket:
 
 
 def _verification(review: HrDataExportReviewPacket) -> HrDataExportExecutionVerification:
+    """Build current export-specific authority evidence for the reviewed scope."""
     return HrDataExportExecutionVerification(
         tenant_record_id=review.tenant_record_id,
         export_execution_reference=EXECUTION_REFERENCE,
@@ -78,7 +83,10 @@ def _verification(review: HrDataExportReviewPacket) -> HrDataExportExecutionVeri
 
 
 class _Clock:
+    """Return deterministic request, authorization, audit, publish and observation instants."""
+
     def __init__(self) -> None:
+        """Seed the exact five clock readings used by one successful execution attempt."""
         self.values = iter(
             [
                 BASE_TIME + timedelta(seconds=1),
@@ -90,52 +98,99 @@ class _Clock:
         )
 
     def __call__(self) -> datetime:
+        """Return the next deterministic UTC instant."""
         return next(self.values)
 
 
+class _ClockFailsAfterPublish(_Clock):
+    """Model clock loss after the outbound side effect may already have occurred."""
+
+    def __init__(self) -> None:
+        """Track reads so only the post-publication observation fails."""
+        super().__init__()
+        self.calls = 0
+
+    def __call__(self) -> datetime:
+        """Raise on the fifth read, which is the first read after publication."""
+        self.calls += 1
+        if self.calls == 5:
+            raise RuntimeError("clock unavailable after publication")
+        return super().__call__()
+
+
 class _Authority:
+    """Return one exact current export verification."""
+
     def __init__(self, verification: HrDataExportExecutionVerification) -> None:
+        """Store the governed verification returned by the fake authority."""
         self.verification = verification
 
     def verify_export(self, **_: object) -> object:
+        """Return the configured current authority evidence."""
         return self.verification
 
 
 class _Materializer:
+    """Return one bounded transient export artifact."""
+
     def __init__(self, artifact: HrDataExportArtifact) -> None:
+        """Store the protected artifact returned by the fake materializer."""
         self.artifact = artifact
 
     def materialize_export(self, **_: object) -> object:
+        """Return the configured artifact without creating durable HR-value evidence."""
         return self.artifact
 
 
 class _Audit:
+    """Return one immutable pre-delivery audit receipt."""
+
     def __init__(self, receipt: HrDataExportAuditReceipt) -> None:
+        """Store the value-minimized audit receipt returned by the fake audit port."""
         self.receipt = receipt
 
     def append_pre_delivery_audit(self, **_: object) -> object:
+        """Return the configured audit-before-egress evidence."""
         return self.receipt
 
 
 class _AmbiguousEgress:
     """Model delivery that succeeds externally but returns an unusable first receipt."""
 
-    def __init__(self, reconciled_receipt: HrDataExportEgressReceipt) -> None:
+    def __init__(self, reconciled_receipt: object) -> None:
+        """Store authoritative reconciliation output and initialize side-effect counters."""
         self.reconciled_receipt = reconciled_receipt
         self.publish_calls = 0
         self.reconcile_calls = 0
 
     def publish_one_time_download(self, **_: object) -> object:
+        """Record exactly one external publish while returning unusable immediate evidence."""
         self.publish_calls += 1
         return object()
 
     def reconcile_one_time_download(self, **_: object) -> object:
+        """Look up existing delivery evidence without causing another publication."""
         self.reconcile_calls += 1
         return self.reconciled_receipt
 
 
-def test_invalid_post_side_effect_receipt_reconciles_without_republishing() -> None:
-    """Ambiguous delivery must reconcile by execution correlation and never publish twice."""
+class _PublishRaisesAfterSideEffect(_AmbiguousEgress):
+    """Model a transport exception after the host may already have completed delivery."""
+
+    def publish_one_time_download(self, **_: object) -> object:
+        """Record the single possible side effect, then lose the immediate response."""
+        self.publish_calls += 1
+        raise TimeoutError("delivery response lost after side effect")
+
+
+def _execution_inputs() -> tuple[
+    HrDataExportReviewPacket,
+    HrDataExportExecutionVerification,
+    HrDataExportArtifact,
+    HrDataExportAuditReceipt,
+    HrDataExportEgressReceipt,
+]:
+    """Build one internally consistent reviewed, authorized, audited export fixture."""
     review = _review()
     verification = _verification(review)
     artifact = HrDataExportArtifact(
@@ -165,18 +220,65 @@ def test_invalid_post_side_effect_receipt_reconciles_without_republishing() -> N
         one_time_use_enforced=True,
         delivered_at=BASE_TIME + timedelta(seconds=4),
     )
-    egress = _AmbiguousEgress(reconciled)
+    return review, verification, artifact, audit_receipt, reconciled
 
-    receipt = execute_reviewed_hr_export(
+
+def _execute(egress: object, clock: object) -> HrDataExportExecutionReceipt:
+    """Execute one fixture through the public governed export boundary."""
+    review, verification, artifact, audit_receipt, _ = _execution_inputs()
+    return execute_reviewed_hr_export(
         review=review,
         authority=_Authority(verification),
         materializer=_Materializer(artifact),
         audit_port=_Audit(audit_receipt),
-        egress_port=egress,
-        now_provider=_Clock(),
+        egress_port=egress,  # type: ignore[arg-type]
+        now_provider=clock,  # type: ignore[arg-type]
     )
+
+
+def test_invalid_post_side_effect_receipt_reconciles_without_republishing() -> None:
+    """Malformed immediate evidence is reconciled by correlation without a second publish."""
+    *_, reconciled = _execution_inputs()
+    egress = _AmbiguousEgress(reconciled)
+
+    receipt = _execute(egress, _Clock())
 
     assert isinstance(receipt, HrDataExportExecutionReceipt)
     assert receipt.egress_reference == EGRESS_REFERENCE
     assert egress.publish_calls == 1
     assert egress.reconcile_calls == 1
+
+
+def test_publish_exception_reconciles_existing_delivery_without_republishing() -> None:
+    """A lost publish response reconciles the existing execution instead of retrying egress."""
+    *_, reconciled = _execution_inputs()
+    egress = _PublishRaisesAfterSideEffect(reconciled)
+
+    receipt = _execute(egress, _Clock())
+
+    assert receipt.egress_reference == EGRESS_REFERENCE
+    assert egress.publish_calls == 1
+    assert egress.reconcile_calls == 1
+
+
+def test_unreconciled_delivery_is_explicitly_nonretryable() -> None:
+    """Absent authoritative reconciliation fails as indeterminate and never republishes."""
+    egress = _AmbiguousEgress(object())
+
+    with pytest.raises(HrDataExportDeliveryIndeterminateError, match="do not republish automatically"):
+        _execute(egress, _Clock())
+
+    assert egress.publish_calls == 1
+    assert egress.reconcile_calls == 1
+
+
+def test_clock_loss_after_publish_is_indeterminate_not_retryable() -> None:
+    """Clock failure after the side effect cannot be misreported as a safe retry opportunity."""
+    *_, reconciled = _execution_inputs()
+    egress = _AmbiguousEgress(reconciled)
+
+    with pytest.raises(HrDataExportDeliveryIndeterminateError, match="do not republish automatically"):
+        _execute(egress, _ClockFailsAfterPublish())
+
+    assert egress.publish_calls == 1
+    assert egress.reconcile_calls == 0
