@@ -10,9 +10,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
+import hmac
 import json
 import re
+import secrets
+from threading import RLock
 from uuid import UUID
+from weakref import finalize
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -33,6 +37,34 @@ _NEXT_ACTION = (
     "analyst and accountable human reviewer for any employment-process change or legal "
     "conclusion."
 )
+_PROCESS_PLAN_SEAL_KEY = secrets.token_bytes(32)
+_PLAN_SEALS: dict[int, str] = {}
+_PLAN_SEALS_LOCK = RLock()
+
+
+def _discard_plan_seal(plan_id: int) -> None:
+    """Discard process-local issuance evidence after its monitoring plan is collected."""
+    with _PLAN_SEALS_LOCK:
+        _PLAN_SEALS.pop(plan_id, None)
+
+
+def _register_plan_seal(plan: object, seal: str) -> None:
+    """Bind one live monitoring-plan identity to evidence outside writable slots."""
+    plan_id = id(plan)
+    with _PLAN_SEALS_LOCK:
+        _PLAN_SEALS[plan_id] = seal
+    finalize(plan, _discard_plan_seal, plan_id)
+
+
+def _authoritative_plan_seal(plan: object) -> str | None:
+    """Return process-local issuance evidence without trusting plan-owned state."""
+    with _PLAN_SEALS_LOCK:
+        return _PLAN_SEALS.get(id(plan))
+
+
+def _seal_plan(payload_json: str) -> str:
+    """Bind one process-local issuance to its exact canonical monitoring-plan bytes."""
+    return hmac.new(_PROCESS_PLAN_SEAL_KEY, payload_json.encode("utf-8"), "sha256").hexdigest()
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -104,7 +136,7 @@ def _canonical_timestamp(value: datetime) -> str:
     return value.isoformat().replace("+00:00", "Z")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class SelectionOutcomeMonitoringPlan:
     """Immutable aggregate-monitoring plan awaiting accountable human review."""
 
@@ -215,48 +247,60 @@ class SelectionOutcomeMonitoringPlan:
             raise ValueError("review_state must remain requires_human_review")
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed monitoring instruction")
+        _register_plan_seal(self, _seal_plan(_canonical_plan_json_unchecked(self)))
 
     def __repr__(self) -> str:
         """Return a fully redacted representation safe for routine logs and assertions."""
         return "SelectionOutcomeMonitoringPlan(<redacted>)"
 
     def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit correlation."""
-        payload = {
-            "actor_reference": self.actor_reference,
-            "analysis_scope": self.analysis_scope,
-            "contains_individual_records": self.contains_individual_records,
-            "decision_authority": self.decision_authority,
-            "evidence_version": self.evidence_version,
-            "generated_at": _canonical_timestamp(self.generated_at),
-            "human_confirmation_required": self.human_confirmation_required,
-            "job_profile_reference": self.job_profile_reference,
-            "monitoring_end": self.monitoring_end.isoformat(),
-            "monitoring_plan_reference": self.monitoring_plan_reference,
-            "monitoring_start": self.monitoring_start.isoformat(),
-            "next_action": self.next_action,
-            "outcome_snapshot_digest": self.outcome_snapshot_digest,
-            "outcome_snapshot_reference": self.outcome_snapshot_reference,
-            "population_snapshot_digest": self.population_snapshot_digest,
-            "population_snapshot_reference": self.population_snapshot_reference,
-            "protected_attribute_policy_digest": self.protected_attribute_policy_digest,
-            "protected_attribute_policy_reference": self.protected_attribute_policy_reference,
-            "purpose_code": self.purpose_code,
-            "reason_code": self.reason_code,
-            "review_state": self.review_state,
-            "reviewer_reference": self.reviewer_reference,
-            "selection_process_reference": self.selection_process_reference,
-            "small_sample_policy_digest": self.small_sample_policy_digest,
-            "small_sample_policy_reference": self.small_sample_policy_reference,
-            "statistical_plan_digest": self.statistical_plan_digest,
-            "statistical_plan_reference": self.statistical_plan_reference,
-            "tenant_record_id": self.tenant_record_id,
-        }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        """Return issuance-verified deterministic JSON for immutable audit correlation."""
+        payload_json = _canonical_plan_json_unchecked(self)
+        authoritative_seal = _authoritative_plan_seal(self)
+        if authoritative_seal is None:
+            raise ValueError("selection monitoring plan issuance evidence is unavailable")
+        if not hmac.compare_digest(authoritative_seal, _seal_plan(payload_json)):
+            raise ValueError("selection monitoring plan evidence changed after issuance")
+        return payload_json
 
     def sha256_digest(self) -> str:
-        """Return SHA-256 over the exact canonical UTF-8 monitoring plan."""
+        """Return SHA-256 over the exact issuance-verified UTF-8 monitoring plan."""
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
+
+
+def _canonical_plan_json_unchecked(plan: SelectionOutcomeMonitoringPlan) -> str:
+    """Render canonical bytes without consulting process-local issuance state."""
+    payload = {
+        "actor_reference": plan.actor_reference,
+        "analysis_scope": plan.analysis_scope,
+        "contains_individual_records": plan.contains_individual_records,
+        "decision_authority": plan.decision_authority,
+        "evidence_version": plan.evidence_version,
+        "generated_at": _canonical_timestamp(plan.generated_at),
+        "human_confirmation_required": plan.human_confirmation_required,
+        "job_profile_reference": plan.job_profile_reference,
+        "monitoring_end": plan.monitoring_end.isoformat(),
+        "monitoring_plan_reference": plan.monitoring_plan_reference,
+        "monitoring_start": plan.monitoring_start.isoformat(),
+        "next_action": plan.next_action,
+        "outcome_snapshot_digest": plan.outcome_snapshot_digest,
+        "outcome_snapshot_reference": plan.outcome_snapshot_reference,
+        "population_snapshot_digest": plan.population_snapshot_digest,
+        "population_snapshot_reference": plan.population_snapshot_reference,
+        "protected_attribute_policy_digest": plan.protected_attribute_policy_digest,
+        "protected_attribute_policy_reference": plan.protected_attribute_policy_reference,
+        "purpose_code": plan.purpose_code,
+        "reason_code": plan.reason_code,
+        "review_state": plan.review_state,
+        "reviewer_reference": plan.reviewer_reference,
+        "selection_process_reference": plan.selection_process_reference,
+        "small_sample_policy_digest": plan.small_sample_policy_digest,
+        "small_sample_policy_reference": plan.small_sample_policy_reference,
+        "statistical_plan_digest": plan.statistical_plan_digest,
+        "statistical_plan_reference": plan.statistical_plan_reference,
+        "tenant_record_id": plan.tenant_record_id,
+    }
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
 def build_selection_outcome_monitoring_plan(
