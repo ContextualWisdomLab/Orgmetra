@@ -264,8 +264,10 @@ test('keyboard users can bypass repeated workspace navigation', async ({ page })
 test('the bypass control follows the active workspace locale', async ({ page }) => {
   await page.goto(workspacePath);
 
-  const skipLink = page.getByRole('link', { name: 'Skip to main content' });
+  const skipLink = page.locator('a.skip-link[href="#main-content"]');
+  await expect(skipLink).toHaveAccessibleName('Skip to main content');
   await page.locator('#locale-toggle').click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ko');
   await expect(skipLink.locator('[lang="ko"]')).toBeVisible();
   await expect(skipLink.locator('[lang="en"]')).toBeHidden();
   await expect(skipLink).toHaveAccessibleName('본문으로 건너뛰기');
