@@ -10,6 +10,17 @@ function hardwareAccelerationAdr() {
   return readFileSync(ADR_URL, 'utf8');
 }
 
+function assertManifestEntry(path) {
+  const artifactBytes = readFileSync(new URL(`../${path}`, import.meta.url));
+  const manifest = JSON.parse(readFileSync(MANIFEST_URL, 'utf8'));
+  const entry = manifest.files.find((candidate) => candidate.path === path);
+
+  assert.ok(entry, `${path} must be present in manifest.json`);
+  assert.equal(entry.sha256, createHash('sha256').update(artifactBytes).digest('hex'));
+  assert.equal(entry.bytes, artifactBytes.byteLength);
+  assert.equal(entry.lines, artifactBytes.toString('utf8').split(/\r?\n/).filter((_, index, lines) => index < lines.length - 1 || lines[index] !== '').length);
+}
+
 test('MLX sidecar contract defines container-to-host routing for supported engines', () => {
   const adr = hardwareAccelerationAdr();
 
@@ -30,13 +41,10 @@ test('MLX sidecar contract fails closed instead of silently changing compute pat
 });
 
 test('hardware acceleration ADR is sealed in the canonical provenance manifest', () => {
-  const path = 'docs/adr/0090-hardware-acceleration-container-boundary.md';
-  const adrBytes = readFileSync(ADR_URL);
-  const manifest = JSON.parse(readFileSync(MANIFEST_URL, 'utf8'));
-  const entry = manifest.files.find((candidate) => candidate.path === path);
+  assertManifestEntry('docs/adr/0090-hardware-acceleration-container-boundary.md');
+});
 
-  assert.ok(entry, `${path} must be present in manifest.json`);
-  assert.equal(entry.sha256, createHash('sha256').update(adrBytes).digest('hex'));
-  assert.equal(entry.bytes, adrBytes.byteLength);
-  assert.equal(entry.lines, adrBytes.toString('utf8').split(/\r?\n/).filter((_, index, lines) => index < lines.length - 1 || lines[index] !== '').length);
+test('hardware acceleration inventory sources are sealed in the canonical provenance manifest', () => {
+  assertManifestEntry('scripts/foundation-contract-core.mjs');
+  assertManifestEntry('tests/validate_repository.py');
 });
