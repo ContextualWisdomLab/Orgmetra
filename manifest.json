@@ -449,9 +449,9 @@
     },
     {
       "path": "tests/e2e/hr-workspace.spec.mjs",
-      "sha256": "a7e5d2feea2ddaf1aeb1511b20f3576797b2fe8da2395fbc48d90ae25ccda7ad",
-      "bytes": 12323,
-      "lines": 271
+      "sha256": "5ebb7184d52c8ad4e245802c7ba46714409fa9cec4a9cdaf299d1901eb39849a",
+      "bytes": 12382,
+      "lines": 272
     },
     {
       "path": "tests/foundation-contract.test.mjs",
