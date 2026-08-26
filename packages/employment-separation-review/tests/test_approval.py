@@ -163,6 +163,18 @@ def test_rejects_non_packet_runtime_type_before_authority() -> None:
     assert authority.calls == 0
 
 
+def test_rejects_malformed_approval_time_before_authority() -> None:
+    authority = RecordingAuthority()
+    with pytest.raises(ValueError, match="approved_at"):
+        approve_employment_separation(
+            packet=build_packet(),
+            authority=authority,
+            approving_actor_reference=REVIEWER,
+            approved_at=APPROVED_AT.replace(tzinfo=None),
+        )
+    assert authority.calls == 0
+
+
 def test_rejects_approval_before_review_generation_before_authority() -> None:
     authority = RecordingAuthority()
     with pytest.raises(ValueError, match="must not precede"):
@@ -321,7 +333,7 @@ def test_missing_process_local_issuance_evidence_fails_closed() -> None:
 def test_receipt_rejects_noncanonical_stored_timestamp() -> None:
     receipt = approve_valid()
     object.__setattr__(receipt, "approved_at", APPROVED_AT.replace(tzinfo=None))
-    with pytest.raises(ValueError, match="generated_at|timezone-aware"):
+    with pytest.raises(ValueError, match="approved_at"):
         receipt.canonical_json()
 
 
