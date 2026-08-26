@@ -7,6 +7,7 @@ on:
       - feat/employment-work-capacity-review
     paths:
       - "database/migrations/0031_employment_work_capacity_persistence.sql"
+      - "database/migrations/0032_employment_work_capacity_forward_chain.sql"
       - "tests/test_employment_work_capacity_persistence_postgres.sh"
       - "tests/test_employment_work_capacity_retroactive_postgres.sh"
       - "docs/adr/0131-employment-work-capacity-persistence.md"
@@ -67,6 +68,7 @@ jobs:
           ]
           optional = [
               "database/migrations/0031_employment_work_capacity_persistence.sql",
+              "database/migrations/0032_employment_work_capacity_forward_chain.sql",
               "docs/adr/0131-employment-work-capacity-persistence.md",
               "docs/traceability/employment-work-capacity-persistence.md",
               "docs/doctoring/employment-work-capacity-persistence-references.md",
