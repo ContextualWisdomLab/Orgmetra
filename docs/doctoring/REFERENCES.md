@@ -68,8 +68,6 @@ World Wide Web Consortium. (2013). *PROV-O: The PROV ontology*. https://www.w3.o
 
 World Wide Web Consortium. (2023, October 5). *Web Content Accessibility Guidelines (WCAG) 2.2*. https://www.w3.org/TR/WCAG22/
 
-World Wide Web Consortium. (n.d.). *G1: Adding a link at the top of each page that goes directly to the main content area*. Retrieved August 27, 2026, from https://www.w3.org/WAI/WCAG22/Techniques/general/G1
-
 ## Product and technical gap baseline sources
 
 American Institute of Certified Public Accountants. (2023). *2017 trust services criteria (with revised points of focus—2022).* https://www.aicpa-cima.com/resources/download/2017-trust-services-criteria-with-revised-points-of-focus-2022
