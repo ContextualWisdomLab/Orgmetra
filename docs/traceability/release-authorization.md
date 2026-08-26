@@ -13,19 +13,19 @@
 |---|---|---|
 | Readiness review remains non-authorizing | PR #118 package contract | Exact `ReleaseReadinessReviewPacket` runtime type plus verified parent canonical evidence |
 | Reviewed candidate equals freshly integrated default head | PR #126 authorization boundary | `ReleaseControlVerification` snapshot + mismatch regressions |
-| Fresh control evidence | PR #126 authorization boundary | Authorization instant must be at or after verification and no more than 60 seconds later; stale-control regression fails closed |
+| Fresh control evidence | PR #126 authorization boundary | Authorization instant and durable audit `recorded_at` must both be at or after verification and no more than 60 seconds later; stale-control and audit-latency regressions fail closed |
 | Independent review is acquisition-grade | PR #126 policy | At least two qualifying independent non-author approvals and last-push approval required even when the live ruleset is weaker |
 | Review conversations resolved | PR #126 policy | `review_threads_resolved is True` regression |
 | All applicable release gates terminal GREEN | PR #126 policy | `all_required_gates_green is True` regression; queued/pending/skipped/cancelled/absent evidence cannot authorize |
 | Routine administrator bypass disabled | PR #126 policy | `routine_admin_bypass_disabled is True` regression; current live `always` bypass therefore fails closed |
 | Separation of duties | PR #126 authorization boundary | Release actor must differ from readiness requester and reviewer |
 | Immutable pre-authority audit | Orgmetra audit/outbox host port | Exact authorization JSON/SHA-256 bound to `ReleaseAuditReceipt` before authority receipt issuance |
-| Audit chronology | PR #126 authorization boundary | Audit `recorded_at >= authorized_at` regression |
+| Audit chronology and freshness | PR #126 authorization boundary | Audit `recorded_at >= authorized_at` and audit completion stays within the 60-second control-freshness window |
 | Post-issuance receipt integrity | PR #126 receipt | Factory-only construction, process-local issuance seal, mutation regression, redacted `repr` |
 | Exact owned coverage/package evidence | PR #126 focused workflow | CPython 3.14.7, exact 100% statement/branch coverage, SHA-256-bound isolated parent+child wheel install, clean checkout |
 | Publication remains separate | ADR 0126 and package README | Receipt fixed to `publication_state = not_published`; no GitHub release/tag side effect in this PR |
 
-The 60-second window is a conservative Orgmetra operational bound, not a claim of GitHub state immutability. A downstream publisher must still re-check the exact authorization/control binding immediately before a release side effect.
+The 60-second window is a conservative Orgmetra operational bound, not a claim of GitHub state immutability. Durable audit completion must occur inside that window, and a downstream publisher must still re-check the exact authorization/control binding immediately before a release side effect.
 
 ## Dependency and integration order
 
