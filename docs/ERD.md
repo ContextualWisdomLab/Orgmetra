@@ -22,7 +22,7 @@ erDiagram
     person_record ||--o{ assignment_record : receives
     position_record ||--o{ assignment_record : assigned_through
     candidate_profile ||--o{ candidate_application_record : submits
-    candidate_application_record ||--|{ candidate_application_record_version : scopes_through
+    candidate_application_record ||--o{ candidate_application_record_version : scopes_through
     job_profile ||--o{ candidate_application_record_version : targeted_by
     position_record ||--o{ candidate_application_record_version : optionally_targeted_by
     candidate_application_record ||--o{ candidate_application_stage_record : has_stage_history
