@@ -1,8 +1,8 @@
 """Authoritative human-approval boundary for reviewed Employment separations.
 
-The pre-mutation review packet is deliberately non-authorizing.  This module adds
+The pre-mutation review packet is deliberately non-authorizing. This module adds
 one accountable approval step that is still not permission to mutate Employment,
-Assignment, identity, payroll, benefits, or any foreign-owner system.  The host
+Assignment, identity, payroll, benefits, or any foreign-owner system. The host
 authority must re-resolve the exact reviewed scope and approval instant before a
 value-minimized receipt can be issued.
 """
@@ -64,6 +64,22 @@ def _authoritative_creation_seal(receipt: object) -> str | None:
 def _seal(payload_json: str) -> str:
     """Bind one process-local issuance to its exact canonical payload bytes."""
     return hmac.new(_PROCESS_SEAL_KEY, payload_json.encode("utf-8"), "sha256").hexdigest()
+
+
+def _freeze_approved_at(value: object) -> datetime:
+    """Freeze one caller approval instant while keeping diagnostics field-specific."""
+    try:
+        return _freeze_timestamp(value)  # type: ignore[arg-type]
+    except ValueError as error:
+        raise ValueError("approved_at must be a valid non-future timezone-aware datetime") from error
+
+
+def _canonical_approved_at(value: object) -> str:
+    """Render one governed approval instant with field-specific diagnostics."""
+    try:
+        return _canonical_timestamp(value)  # type: ignore[arg-type]
+    except ValueError as error:
+        raise ValueError("approved_at must be an exact built-in UTC datetime") from error
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -162,7 +178,7 @@ class EmploymentSeparationApprovalReceipt:
             "authority_evidence_reference",
         )
         _validate_digest(self.authority_evidence_digest, "authority_evidence_digest")
-        _canonical_timestamp(self.approved_at)
+        _canonical_approved_at(self.approved_at)
         if type(self.purpose_code) is not str or self.purpose_code != _PURPOSE_CODE:
             raise ValueError("purpose_code must remain employment_separation_approval")
         if (
@@ -194,7 +210,7 @@ class EmploymentSeparationApprovalReceipt:
         return {
             "approval_reason_code": self.approval_reason_code,
             "approval_state": self.approval_state,
-            "approved_at": _canonical_timestamp(self.approved_at),
+            "approved_at": _canonical_approved_at(self.approved_at),
             "approving_actor_reference": self.approving_actor_reference,
             "authority_evidence_digest": self.authority_evidence_digest,
             "authority_evidence_reference": self.authority_evidence_reference,
@@ -262,7 +278,7 @@ def approve_employment_separation(
     """Approve one exact review without granting Employment or downstream mutation authority."""
     if type(packet) is not EmploymentSeparationReviewPacket:
         raise TypeError("packet must be an EmploymentSeparationReviewPacket")
-    frozen_approved_at = _freeze_timestamp(approved_at)
+    frozen_approved_at = _freeze_approved_at(approved_at)
     if frozen_approved_at < packet.generated_at:
         raise ValueError("approved_at must not precede separation review generated_at")
     _validate_reference(approving_actor_reference, "actor", "approving_actor_reference")
@@ -290,43 +306,49 @@ def approve_employment_separation(
     if type(verification) is not EmploymentSeparationApprovalVerification:
         raise TypeError("authority must return EmploymentSeparationApprovalVerification")
 
-    _validate_operational_uuid(verification.tenant_record_id, "tenant_record_id")
-    _validate_reference(
-        verification.separation_review_reference,
-        "employment_separation_review",
-        "separation_review_reference",
-    )
-    _validate_digest(verification.review_digest, "review_digest")
-    _validate_reference(
-        verification.person_record_reference,
-        "person_record",
-        "person_record_reference",
-    )
-    _validate_reference(
-        verification.employment_record_reference,
-        "employment_record",
-        "employment_record_reference",
-    )
-    _validate_reference(
-        verification.approving_actor_reference,
-        "actor",
-        "approving_actor_reference",
-    )
-    _validate_reference(
-        verification.authority_evidence_reference,
-        "separation_approval_verification",
-        "authority_evidence_reference",
-    )
-    _validate_digest(verification.authority_evidence_digest, "authority_evidence_digest")
-
-    verified_scope = (
+    verification_snapshot = (
         verification.tenant_record_id,
         verification.separation_review_reference,
         verification.review_digest,
         verification.person_record_reference,
         verification.employment_record_reference,
         verification.approving_actor_reference,
+        verification.authority_evidence_reference,
+        verification.authority_evidence_digest,
     )
+    (
+        verified_tenant,
+        verified_review_reference,
+        verified_review_digest,
+        verified_person_reference,
+        verified_employment_reference,
+        verified_approving_actor,
+        verified_authority_reference,
+        verified_authority_digest,
+    ) = verification_snapshot
+
+    _validate_operational_uuid(verified_tenant, "tenant_record_id")
+    _validate_reference(
+        verified_review_reference,
+        "employment_separation_review",
+        "separation_review_reference",
+    )
+    _validate_digest(verified_review_digest, "review_digest")
+    _validate_reference(verified_person_reference, "person_record", "person_record_reference")
+    _validate_reference(
+        verified_employment_reference,
+        "employment_record",
+        "employment_record_reference",
+    )
+    _validate_reference(verified_approving_actor, "actor", "approving_actor_reference")
+    _validate_reference(
+        verified_authority_reference,
+        "separation_approval_verification",
+        "authority_evidence_reference",
+    )
+    _validate_digest(verified_authority_digest, "authority_evidence_digest")
+
+    verified_scope = verification_snapshot[:6]
     if verified_scope != expected_scope:
         raise ValueError("approval authority returned evidence for a different reviewed separation")
 
@@ -337,8 +359,8 @@ def approve_employment_separation(
         person_record_reference=expected_scope[3],
         employment_record_reference=expected_scope[4],
         approving_actor_reference=expected_scope[5],
-        authority_evidence_reference=verification.authority_evidence_reference,
-        authority_evidence_digest=verification.authority_evidence_digest,
+        authority_evidence_reference=verified_authority_reference,
+        authority_evidence_digest=verified_authority_digest,
         approved_at=frozen_approved_at,
         _issuance_token=_RECEIPT_ISSUANCE_TOKEN,
     )
