@@ -14,9 +14,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
+import hmac
 import json
 import re
+import secrets
+from threading import RLock
 from uuid import UUID
+from weakref import finalize
 
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(
@@ -33,6 +37,34 @@ _NEXT_ACTION = (
     "provenance; then record accountable human rating and feedback through the "
     "authoritative performance workflow."
 )
+_PROCESS_PACKET_SEAL_KEY = secrets.token_bytes(32)
+_PACKET_SEALS: dict[int, str] = {}
+_PACKET_SEALS_LOCK = RLock()
+
+
+def _discard_packet_seal(packet_id: int) -> None:
+    """Discard process-local issuance evidence after its review packet is collected."""
+    with _PACKET_SEALS_LOCK:
+        _PACKET_SEALS.pop(packet_id, None)
+
+
+def _register_packet_seal(packet: object, seal: str) -> None:
+    """Bind one live review-packet identity to evidence outside writable slots."""
+    packet_id = id(packet)
+    with _PACKET_SEALS_LOCK:
+        _PACKET_SEALS[packet_id] = seal
+    finalize(packet, _discard_packet_seal, packet_id)
+
+
+def _authoritative_packet_seal(packet: object) -> str | None:
+    """Return process-local issuance evidence without trusting packet-owned state."""
+    with _PACKET_SEALS_LOCK:
+        return _PACKET_SEALS.get(id(packet))
+
+
+def _seal_packet(payload_json: str) -> str:
+    """Bind one process-local issuance to exact canonical performance-review bytes."""
+    return hmac.new(_PROCESS_PACKET_SEAL_KEY, payload_json.encode("utf-8"), "sha256").hexdigest()
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -116,7 +148,7 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class PerformanceReviewPacket:
     """Immutable value-minimized review packet awaiting authoritative resolution."""
 
@@ -227,46 +259,58 @@ class PerformanceReviewPacket:
             )
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed performance-review instruction")
+        _register_packet_seal(self, _seal_packet(_canonical_packet_json_unchecked(self)))
 
     def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit correlation."""
-        payload = {
-            "contains_direct_person_identifiers": self.contains_direct_person_identifiers,
-            "contains_free_form_model_output": self.contains_free_form_model_output,
-            "contains_personal_data": self.contains_personal_data,
-            "contains_rating_value": self.contains_rating_value,
-            "criterion_observation_snapshot_digest": self.criterion_observation_snapshot_digest,
-            "criterion_observation_snapshot_reference": self.criterion_observation_snapshot_reference,
-            "criterion_set_digest": self.criterion_set_digest,
-            "criterion_set_reference": self.criterion_set_reference,
-            "decision_authority": self.decision_authority,
-            "development_plan_digest": self.development_plan_digest,
-            "development_plan_reference": self.development_plan_reference,
-            "employment_record_reference": self.employment_record_reference,
-            "evidence_version": self.evidence_version,
-            "generated_at": _canonical_timestamp(self.generated_at),
-            "goal_plan_digest": self.goal_plan_digest,
-            "goal_plan_reference": self.goal_plan_reference,
-            "human_confirmation_required": self.human_confirmation_required,
-            "job_profile_reference": self.job_profile_reference,
-            "next_action": self.next_action,
-            "performance_cycle_reference": self.performance_cycle_reference,
-            "performance_review_reference": self.performance_review_reference,
-            "person_record_reference": self.person_record_reference,
-            "purpose_code": self.purpose_code,
-            "reason_code": self.reason_code,
-            "review_period_end": self.review_period_end.isoformat(),
-            "review_period_start": self.review_period_start.isoformat(),
-            "review_state": self.review_state,
-            "reviewer_reference": self.reviewer_reference,
-            "scope_verification_state": self.scope_verification_state,
-            "tenant_record_id": self.tenant_record_id,
-        }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        """Return issuance-verified deterministic JSON for immutable audit correlation."""
+        payload_json = _canonical_packet_json_unchecked(self)
+        authoritative_seal = _authoritative_packet_seal(self)
+        if authoritative_seal is None:
+            raise ValueError("performance review issuance evidence is unavailable")
+        if not hmac.compare_digest(authoritative_seal, _seal_packet(payload_json)):
+            raise ValueError("performance review evidence changed after issuance")
+        return payload_json
 
     def sha256_digest(self) -> str:
-        """Return SHA-256 over the exact canonical UTF-8 performance-review packet."""
+        """Return SHA-256 over the exact issuance-verified UTF-8 review packet."""
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
+
+
+def _canonical_packet_json_unchecked(packet: PerformanceReviewPacket) -> str:
+    """Render canonical bytes without consulting process-local issuance state."""
+    payload = {
+        "contains_direct_person_identifiers": packet.contains_direct_person_identifiers,
+        "contains_free_form_model_output": packet.contains_free_form_model_output,
+        "contains_personal_data": packet.contains_personal_data,
+        "contains_rating_value": packet.contains_rating_value,
+        "criterion_observation_snapshot_digest": packet.criterion_observation_snapshot_digest,
+        "criterion_observation_snapshot_reference": packet.criterion_observation_snapshot_reference,
+        "criterion_set_digest": packet.criterion_set_digest,
+        "criterion_set_reference": packet.criterion_set_reference,
+        "decision_authority": packet.decision_authority,
+        "development_plan_digest": packet.development_plan_digest,
+        "development_plan_reference": packet.development_plan_reference,
+        "employment_record_reference": packet.employment_record_reference,
+        "evidence_version": packet.evidence_version,
+        "generated_at": _canonical_timestamp(packet.generated_at),
+        "goal_plan_digest": packet.goal_plan_digest,
+        "goal_plan_reference": packet.goal_plan_reference,
+        "human_confirmation_required": packet.human_confirmation_required,
+        "job_profile_reference": packet.job_profile_reference,
+        "next_action": packet.next_action,
+        "performance_cycle_reference": packet.performance_cycle_reference,
+        "performance_review_reference": packet.performance_review_reference,
+        "person_record_reference": packet.person_record_reference,
+        "purpose_code": packet.purpose_code,
+        "reason_code": packet.reason_code,
+        "review_period_end": packet.review_period_end.isoformat(),
+        "review_period_start": packet.review_period_start.isoformat(),
+        "review_state": packet.review_state,
+        "reviewer_reference": packet.reviewer_reference,
+        "scope_verification_state": packet.scope_verification_state,
+        "tenant_record_id": packet.tenant_record_id,
+    }
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
 def build_performance_review_packet(
