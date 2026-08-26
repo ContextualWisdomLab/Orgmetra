@@ -9,6 +9,9 @@ body { margin: 0; background: var(--orgmetra-surface-page); color: var(--orgmetr
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--orgmetra-focus-ring); outline-offset: 2px; }
+.skip-link { position: fixed; top: var(--orgmetra-space-sm); left: var(--orgmetra-space-sm); z-index: 1000; transform: translateY(calc(-100% - var(--orgmetra-space-lg))); border: 2px solid var(--orgmetra-action-review); border-radius: var(--orgmetra-radius-md); padding: 10px 14px; background: var(--orgmetra-surface-card); color: var(--orgmetra-text-primary); font-weight: 700; text-decoration: none; }
+.skip-link:focus, .skip-link:focus-visible { transform: translateY(0); }
+html[lang="en"] .skip-link [lang="ko"], html[lang="ko"] .skip-link [lang="en"] { display: none; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 232px minmax(0, 1fr); }
 .sidebar { display: flex; flex-direction: column; gap: var(--orgmetra-space-md); padding: 32px 20px; background: var(--workspace-sidebar); color: white; }
 .brand { color: white; font-size: 24px; font-weight: 700; text-decoration: none; letter-spacing: -0.02em; }
