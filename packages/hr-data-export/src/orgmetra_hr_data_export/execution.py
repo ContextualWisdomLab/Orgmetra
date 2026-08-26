@@ -41,6 +41,10 @@ class HrDataExportExecutionError(ValueError):
     """Raised when governed HR export execution evidence fails closed."""
 
 
+class HrDataExportDeliveryIndeterminateError(HrDataExportExecutionError):
+    """Raised after egress when delivery cannot be reconciled safely without republishing."""
+
+
 def _freeze_execution_time(value: object, field_name: str) -> datetime:
     """Normalize one host time into the package's exact built-in UTC representation."""
     try:
@@ -294,7 +298,7 @@ class HrDataExportAuditPort(Protocol):
 
 
 class HrDataExportEgressPort(Protocol):
-    """Host contract for one-time authenticated delivery of already-audited bytes."""
+    """Host contract for one-time authenticated delivery with authoritative reconciliation."""
 
     def publish_one_time_download(
         self,
@@ -304,7 +308,18 @@ class HrDataExportEgressPort(Protocol):
         audit_receipt: HrDataExportAuditReceipt,
         published_at: datetime,
     ) -> object:
-        """Publish the exact audited bytes and return one-time egress evidence."""
+        """Publish the exact audited bytes once and return one-time egress evidence."""
+
+    def reconcile_one_time_download(
+        self,
+        *,
+        verification: HrDataExportExecutionVerification,
+        artifact: HrDataExportArtifact,
+        audit_receipt: HrDataExportAuditReceipt,
+        published_at: datetime,
+        observed_at: datetime,
+    ) -> object:
+        """Read authoritative delivery evidence by existing execution correlation without republishing."""
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True, repr=False, init=False, eq=False)
@@ -381,7 +396,7 @@ class HrDataExportExecutionReceipt:
             _RECEIPT_SEALS[self] = sha256(canonical.encode("utf-8")).hexdigest()
 
     def __repr__(self) -> str:
-        """Redact durable authorization, audit and egress correlations from routine logs."""
+        """Redact durable authorization, audit and egress correlations from routine logging."""
         return "HrDataExportExecutionReceipt(<redacted>)"
 
     def _payload(self) -> dict[str, object]:
@@ -518,6 +533,41 @@ def _validate_egress_receipt(
         raise HrDataExportExecutionError("egress receipt does not bind exact audited export evidence")
 
 
+def _reconcile_egress_receipt(
+    egress_port: HrDataExportEgressPort,
+    *,
+    verification: HrDataExportExecutionVerification,
+    artifact: HrDataExportArtifact,
+    audit_receipt: HrDataExportAuditReceipt,
+    published_at: datetime,
+    observed_at: datetime,
+) -> HrDataExportEgressReceipt:
+    """Reconcile an ambiguous delivery exactly once without calling publish again."""
+    try:
+        result = egress_port.reconcile_one_time_download(
+            verification=verification,
+            artifact=artifact,
+            audit_receipt=audit_receipt,
+            published_at=published_at,
+            observed_at=observed_at,
+        )
+        if type(result) is not HrDataExportEgressReceipt:
+            raise HrDataExportExecutionError("egress reconciliation returned invalid delivery evidence")
+        _validate_egress_receipt(
+            result,
+            verification,
+            artifact,
+            audit_receipt,
+            published_at,
+            observed_at,
+        )
+    except Exception as exc:
+        raise HrDataExportDeliveryIndeterminateError(
+            "egress port delivery outcome is indeterminate; do not republish automatically; reconcile the existing export execution"
+        ) from exc
+    return result
+
+
 def execute_reviewed_hr_export(
     *,
     review: HrDataExportReviewPacket,
@@ -533,8 +583,10 @@ def execute_reviewed_hr_export(
     Authorization freshness is checked before protected materialization, after materialization,
     and immediately before host egress. The returned host receipt must prove that actual
     delivery occurred inside the same authorization window and no later than post-egress
-    observation. Immutable audit evidence must validate before the egress port can receive
-    bytes. Returned durable evidence contains no raw HR values.
+    observation. If publication succeeds ambiguously, the same execution correlation is
+    reconciled without a second publication; unreconciled outcomes are explicitly non-retryable.
+    Immutable audit evidence must validate before the egress port can receive bytes. Returned
+    durable evidence contains no raw HR values.
     """
     if type(review) is not HrDataExportReviewPacket:
         raise TypeError("review must be the exact governed HrDataExportReviewPacket type")
@@ -593,24 +645,55 @@ def execute_reviewed_hr_export(
     published_at = _clock_now(now_provider)
     _require_current_authorization(verification, published_at)
 
-    egress_result = egress_port.publish_one_time_download(
-        verification=verification,
-        artifact=artifact,
-        audit_receipt=audit_receipt,
-        published_at=published_at,
-    )
-    observed_at = _clock_now(now_provider)
-    if type(egress_result) is not HrDataExportEgressReceipt:
-        raise HrDataExportExecutionError("egress port returned invalid one-time-delivery receipt")
-    egress_receipt = egress_result
-    _validate_egress_receipt(
-        egress_receipt,
-        verification,
-        artifact,
-        audit_receipt,
-        published_at,
-        observed_at,
-    )
+    publication_error: Exception | None = None
+    try:
+        egress_result = egress_port.publish_one_time_download(
+            verification=verification,
+            artifact=artifact,
+            audit_receipt=audit_receipt,
+            published_at=published_at,
+        )
+    except Exception as exc:
+        publication_error = exc
+        egress_result = None
+    try:
+        observed_at = _clock_now(now_provider)
+    except HrDataExportExecutionError as exc:
+        raise HrDataExportDeliveryIndeterminateError(
+            "egress port delivery outcome is indeterminate after publication; do not republish automatically"
+        ) from exc
+
+    if publication_error is None and type(egress_result) is HrDataExportEgressReceipt:
+        try:
+            _validate_egress_receipt(
+                egress_result,
+                verification,
+                artifact,
+                audit_receipt,
+                published_at,
+                observed_at,
+            )
+        except HrDataExportExecutionError:
+            egress_receipt = _reconcile_egress_receipt(
+                egress_port,
+                verification=verification,
+                artifact=artifact,
+                audit_receipt=audit_receipt,
+                published_at=published_at,
+                observed_at=observed_at,
+            )
+        else:
+            egress_receipt = egress_result
+    else:
+        egress_receipt = _reconcile_egress_receipt(
+            egress_port,
+            verification=verification,
+            artifact=artifact,
+            audit_receipt=audit_receipt,
+            published_at=published_at,
+            observed_at=observed_at,
+        )
+
     if egress_receipt.delivered_at >= verification.authorization_expires_at:
         raise HrDataExportExecutionError("export authorization expired or is not yet valid")
     return HrDataExportExecutionReceipt(
