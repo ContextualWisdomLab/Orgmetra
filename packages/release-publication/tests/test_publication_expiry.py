@@ -119,7 +119,7 @@ class _LatePublisher:
         return self._late_receipt()
 
     def reconcile_release(self, **kwargs: object) -> object:
-        """Return the same stale external truth through lookup only."""
+        """Expose read-only lookup evidence if an operator later reconciles this correlation."""
         self.reconcile_calls += 1
         assert kwargs["authorization_evidence_digest_sha256"] == self.authorization_digest
         return self._late_receipt()
@@ -137,4 +137,4 @@ def test_publication_after_authorization_expiry_is_indeterminate_and_never_repub
             clock=lambda: _AUDITED + timedelta(seconds=1),
         )
     assert publisher.publish_calls == 1
-    assert publisher.reconcile_calls == 1
+    assert publisher.reconcile_calls == 0
