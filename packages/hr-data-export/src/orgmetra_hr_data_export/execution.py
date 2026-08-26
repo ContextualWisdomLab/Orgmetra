@@ -517,6 +517,8 @@ def _validate_egress_receipt(
     observed_at: datetime,
 ) -> None:
     """Require one-time egress evidence to bind the exact audited artifact and authorization window."""
+    if receipt.delivered_at >= verification.authorization_expires_at:
+        raise HrDataExportExecutionError("export authorization expired or is not yet valid")
     if (
         receipt.tenant_record_id != verification.tenant_record_id
         or receipt.export_execution_reference != verification.export_execution_reference
@@ -527,7 +529,6 @@ def _validate_egress_receipt(
         or receipt.one_time_use_enforced is not True
         or receipt.delivered_at < published_at
         or receipt.delivered_at < verification.verified_at
-        or receipt.delivered_at > verification.authorization_expires_at
         or receipt.delivered_at > observed_at
     ):
         raise HrDataExportExecutionError("egress receipt does not bind exact audited export evidence")
@@ -694,8 +695,6 @@ def execute_reviewed_hr_export(
             observed_at=observed_at,
         )
 
-    if egress_receipt.delivered_at >= verification.authorization_expires_at:
-        raise HrDataExportExecutionError("export authorization expired or is not yet valid")
     return HrDataExportExecutionReceipt(
         tenant_record_id=verification.tenant_record_id,
         export_execution_reference=verification.export_execution_reference,
