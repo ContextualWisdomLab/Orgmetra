@@ -49,6 +49,19 @@ export const ActionButtons = {
   `)
 };
 
+export const KeyboardBypass = {
+  name: 'Keyboard bypass — focused',
+  render: () => `
+    <div class="storybook-preview" data-figma-node-id="1:10" lang="en">
+      <a class="skip-link" href="#storybook-main" autofocus><span lang="en">Skip to main content</span><span lang="ko">본문으로 건너뛰기</span></a>
+      <div class="app-shell" style="min-height: 280px">
+        <aside class="sidebar" aria-label="Repeated workspace navigation"><a class="brand" href="#">Orgmetra</a><nav class="nav-list"><button class="nav-item is-active" type="button">HR Home</button><button class="nav-item" type="button">Employee Profile</button></nav></aside>
+        <main class="main-content" id="storybook-main" tabindex="-1"><p class="eyebrow">WCAG 2.4.1 interaction state</p><h2>Keyboard bypass target</h2><p class="panel-copy">The first keyboard action exposes a visible bypass control that moves focus beyond repeated navigation.</p></main>
+      </div>
+    </div>
+  `
+};
+
 export const FieldStates = {
   name: 'Read-only and validation error',
   render: () => frame(`
