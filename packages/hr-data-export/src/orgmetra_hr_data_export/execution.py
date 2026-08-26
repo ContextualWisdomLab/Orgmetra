@@ -570,7 +570,8 @@ def execute_reviewed_hr_export(
         export_format_code=export_format_code,
         destination_kind=destination_kind,
     )
-    _require_current_authorization(verification, requested_at)
+    materialization_authorized_at = _clock_now(now_provider)
+    _require_current_authorization(verification, materialization_authorized_at)
 
     artifact_result = materializer.materialize_export(verification=verification)
     if type(artifact_result) is not HrDataExportArtifact:
