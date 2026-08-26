@@ -4,7 +4,7 @@
 
 - **Protected/default-branch truth:** `develop@9e3e4847510e1e612b48474ba42b177b8ed824df` does not yet ship authoritative Employment work-capacity persistence.
 - **Parent active-PR truth:** #103 owns non-authorizing human-reviewed work-capacity evidence at exact head `645d2f3b2db10e2bdfbe60422837a5986d8f39f8`.
-- **This active-PR truth:** #128 owns the durable application/persistence boundary plus forward-chain hardening. It is a dependency-first Draft and is not shipped product truth.
+- **This active-PR truth:** #128 owns the durable application/persistence boundary, forward-chain hardening, and exact canonical parent-evidence byte binding. It is a dependency-first Draft and is not shipped product truth.
 - **Out of scope:** payroll calculation, compensation mutation, statutory leave classification, scheduling, disability/medical case data, Assignment mutation, candidate decisions, retroactive replay/correction, or foreign-service table access.
 
 ## Requirement-to-evidence map
@@ -17,7 +17,7 @@
 | Do not invent pre-bootstrap history | resolver returns no row before first `effective_on` | `before_first == none` regression |
 | Match later reviews to current authoritative truth | latest visible effective point is compared with reviewed current ratio | mismatched-current adversarial application must fail |
 | Prevent retroactive downstream-chain corruption | migration 0032 locks the same tenant/Employment chain and requires `effective_on` after the latest visible point | dedicated fresh-database regression attempts Sep-15 insertion after Sep-1/Oct-1 truth and requires fail-closed with October truth unchanged |
-| Bind exact parent review evidence | raw review JSON SHA-256, exact key set and normalized field comparison | forged review digest and mismatched scope regressions |
+| Bind exact parent review evidence | raw review JSON SHA-256, exact key set, normalized field comparison, and migration 0033 compact C-key-sorted canonical-byte guard | forged review digest, mismatched scope, and semantically equivalent but reordered/whitespace-altered review JSON with a recomputed digest must fail |
 | Human review and actor separation | parent review state plus requester/reviewer/applier separation | reviewer-as-applier adversarial regression |
 | Purpose/reason/evidence versioning | fixed application purpose, controlled reason and evidence version 1 | persisted-state and review-shape checks |
 | Immutable audit/outbox correlation without cross-service SQL | opaque review-audit/application-audit/application-outbox references and envelope digests | format constraints; no foreign application-table query in migration |
@@ -32,6 +32,8 @@
 A buyer may resolve contracted Employment capacity at a business date and a system-knowledge cutoff after purpose-bound host authorization. The result is Employment truth, not a performance rating, fitness-for-work judgment, pay amount, leave classification, or scheduling instruction. Customer-facing surfaces should explain the next action: review downstream Assignment allocation and compensation/payroll impacts through their own authoritative boundaries before those domains are changed.
 
 Normal reviewed changes move the authoritative effective-point chain forward. If HR must correct an earlier business-effective point after later points already exist, this boundary refuses the mutation instead of silently invalidating downstream review premises. A future replay/correction operation must re-prove every affected later point and emit new immutable evidence.
+
+Durable review evidence is byte-identical to the parent packet's deterministic `json.dumps(..., sort_keys=True, separators=(",", ":"), ensure_ascii=True)` representation. Semantically equivalent JSON with different key order or whitespace is not a second valid representation, even when a caller recomputes SHA-256. This prevents one reviewed fact from acquiring multiple durable byte identities and preserves exact audit correlation.
 
 ## Merge/release conditions
 
