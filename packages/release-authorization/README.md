@@ -15,18 +15,18 @@ It does **not** create a Git tag, GitHub Release, signature, deployment, artifac
 - every applicable local/central release gate is terminal GREEN; and
 - routine administrator bypass is disabled.
 
-The authorization clock must occur no more than **60 seconds** after that control snapshot. A syntactically valid but stale control result therefore cannot authorize a release.
+The authorization clock must occur no more than **60 seconds** after that control snapshot, and immutable audit evidence must also be durably recorded before the same 60-second freshness window expires. A syntactically valid control result therefore cannot become stale during audit work and still produce release authority.
 
 This is intentionally stricter than the live organization ruleset observed on 2026-08-26. The live ruleset currently requires only one approval, does not require last-push approval, and permits OrganizationAdmin `always` bypass; therefore a truthful production authority must currently fail closed rather than manufacture a successful verification.
 
 ## Evidence and separation of duties
 
-The parent readiness packet remains `not_authorized_to_release`. The release actor must be distinct from both the readiness requester and reviewer. Before returning authority, Orgmetra binds the exact readiness digest, exact fresh-control digest, canonical `vMAJOR.MINOR.PATCH` tag, release actor, controlled purpose/reason, and evidence version to immutable audit evidence. A mismatched or temporally impossible audit receipt fails closed.
+The parent readiness packet remains `not_authorized_to_release`. The release actor must be distinct from both the readiness requester and reviewer. Before returning authority, Orgmetra binds the exact readiness digest, exact fresh-control digest, canonical `vMAJOR.MINOR.PATCH` tag, release actor, controlled purpose/reason, and evidence version to immutable audit evidence. A mismatched, temporally impossible, or control-stale audit receipt fails closed.
 
 The high-impact authorization receipt is factory-issued, has a redacted routine representation, and detects post-issuance mutation before canonical evidence can be emitted. Process-local issuance protection is defense in depth; durable audit/outbox storage remains the authoritative cross-process evidence boundary.
 
 ## Host responsibilities
 
-The production host must implement `ReleaseControlAuthority` by freshly reading the actual integrated default-branch head, effective ruleset, qualifying reviews, unresolved conversations, and exact-revision local/central gates. It must implement `ReleaseAuditPort` on Orgmetra's immutable audit/outbox boundary. No direct cross-service application-table SQL is permitted.
+The production host must implement `ReleaseControlAuthority` by freshly reading the actual integrated default-branch head, effective ruleset, qualifying reviews, unresolved conversations, and exact-revision local/central gates. It must implement `ReleaseAuditPort` on Orgmetra's immutable audit/outbox boundary and return the durable audit timestamp used to prove that the authorization did not outlive the control-freshness window. No direct cross-service application-table SQL is permitted.
 
 A future publication adapter must re-check the exact authorization/revision/tag immediately before the release side effect and handle ambiguous publication without blindly creating a second release. GitHub's Create Release API can create a tag from `target_commitish` when the tag does not already exist, so the publication adapter must always send the exact authorized revision rather than relying on the mutable default-branch name.
