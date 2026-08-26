@@ -27,12 +27,15 @@ Normal application is also **forward-only**. Once a later effective point is aut
 
 - requires the session tenant to equal the requested tenant;
 - binds exact parent review JSON bytes to their SHA-256 and revalidates the parent review key set, tenant/Employment scope, fixed non-authorizing governance state, human-review requirement, reason code, actor separation, evidence version, capacity scale and review chronology;
+- requires the review JSON bytes themselves to equal the parent's deterministic compact, C-key-sorted representation; semantically equivalent reordered or whitespace-altered JSON is rejected even if a caller recomputes SHA-256;
 - requires a third actor to apply the reviewed change, distinct from requester and reviewer;
 - requires opaque review-audit, application-audit and application-outbox correlations and SHA-256 envelope evidence without querying another service's application tables;
 - serializes one tenant-qualified Employment's capacity mutations with a transaction-scoped advisory lock;
 - requires an `active` or `leave` Employment version at `effective_on` as visible at the database transaction time;
 - derives normalized persistence fields from the reviewed JSON rather than trusting duplicate caller-supplied values; and
 - revokes `PUBLIC` execution. Production deployment must grant the function only to the purpose-authorized Orgmetra host role after that host resolves reviewer/applier authority and immutable audit/outbox contracts.
+
+The canonical-byte rule is an evidence-identity boundary, not cosmetic JSON formatting. Parent #103 signs one deterministic UTF-8 representation using sorted keys and compact separators. Allowing alternate whitespace/key order plus a caller-recomputed digest would create multiple durable byte identities for one reviewed fact and break exact audit correlation. Migration 0033 therefore rejects any alternate representation before durable work-capacity truth is accepted.
 
 The persisted relation does **not** store medical/disability detail, legal leave reasons, payroll values, compensation amounts, ratings, candidate data, free-form personal notes, prompts, or model output. A capacity ratio is necessary authorized Employment-terms data; it is not an employment suitability decision and does not authorize compensation, scheduling, leave, payroll or Assignment mutation.
 
@@ -51,6 +54,7 @@ The application boundary takes `pg_advisory_xact_lock` over the tenant-qualified
 - Capacity becomes an authoritative Employment fact instead of an inference from Assignment allocation.
 - Business-effective and system-recorded history remain distinct.
 - Parent review evidence remains non-authorizing; application is a separate controlled act.
+- One reviewed packet has one durable canonical byte identity; alternate JSON formatting cannot be re-hashed into a second accepted evidence representation.
 - Audit/outbox stay contract correlations rather than direct cross-service SQL.
 - The initial bootstrap explicitly limits truth to its own effective date forward.
 - Normal changes cannot be inserted retroactively underneath already-authoritative downstream points; replay is a separate governed operation.
