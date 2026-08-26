@@ -2,6 +2,13 @@
 set -euo pipefail
 
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
+ROOT_URL="${DATABASE_URL%/*}"
+CANONICAL_DB="orgmetra_capacity_canonical"
+CANONICAL_URL="${ROOT_URL}/${CANONICAL_DB}"
+
+psql "${ROOT_URL}/postgres" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS ${CANONICAL_DB};"
+psql "${ROOT_URL}/postgres" -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${CANONICAL_DB};"
+trap 'psql "${ROOT_URL}/postgres" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS '${CANONICAL_DB}' WITH (FORCE);" >/dev/null 2>&1 || true' EXIT
 
 migrations=(
   database/migrations/0001_foundation_schema.sql
@@ -13,15 +20,15 @@ if [[ -f database/migrations/0033_employment_work_capacity_canonical_evidence.sq
   migrations+=(database/migrations/0033_employment_work_capacity_canonical_evidence.sql)
 fi
 for migration in "${migrations[@]}"; do
-  psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
+  psql "${CANONICAL_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
-TENANT_ID="10000000-0000-7000-8000-000000000001"
-PERSON_ID="10000000-0000-7000-8000-000000000011"
-EMPLOYMENT_ID="10000000-0000-7000-8000-000000000021"
-EMPLOYMENT_VERSION_ID="10000000-0000-7000-8000-000000000022"
-CAPACITY_RECORD_ID="10000000-0000-7000-8000-000000000031"
-CAPACITY_VERSION_ID="10000000-0000-7000-8000-000000000032"
+TENANT_ID="40000000-0000-7000-8000-000000000001"
+PERSON_ID="40000000-0000-7000-8000-000000000011"
+EMPLOYMENT_ID="40000000-0000-7000-8000-000000000021"
+EMPLOYMENT_VERSION_ID="40000000-0000-7000-8000-000000000022"
+CAPACITY_RECORD_ID="40000000-0000-7000-8000-000000000031"
+CAPACITY_VERSION_ID="40000000-0000-7000-8000-000000000032"
 REQUESTER="actor:00000000-0000-4000-8000-000000000041"
 REVIEWER="actor:00000000-0000-4000-8000-000000000042"
 APPLIER="actor:00000000-0000-4000-8000-000000000043"
@@ -38,9 +45,9 @@ with_tenant() {
   PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" command psql "$@"
 }
 
-with_tenant "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
+with_tenant "${CANONICAL_URL}" -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
-VALUES ('${TENANT_ID}', 'tenant_alpha');
+VALUES ('${TENANT_ID}', 'tenant_canonical');
 INSERT INTO person_record (tenant_record_id, person_record_id)
 VALUES ('${TENANT_ID}', '${PERSON_ID}');
 INSERT INTO employment_record (tenant_record_id, employment_record_id, person_record_id)
@@ -87,7 +94,7 @@ PY
 )"
 
 set +e
-output="$(with_tenant "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
+output="$(with_tenant "${CANONICAL_URL}" -v ON_ERROR_STOP=1 -c "
 SELECT apply_employment_work_capacity_change(
   '${TENANT_ID}'::uuid,
   '${CAPACITY_RECORD_ID}'::uuid,
@@ -114,7 +121,7 @@ if [[ "${output}" != *"review evidence must use exact canonical JSON bytes"* ]];
   exit 1
 fi
 
-anchor_count="$(with_tenant "${DATABASE_URL}" -Atqc "
+anchor_count="$(with_tenant "${CANONICAL_URL}" -Atqc "
 SELECT count(*) FROM employment_work_capacity_record
 WHERE employment_record_id='${EMPLOYMENT_ID}'::uuid;")"
 if [[ "${anchor_count}" != "0" ]]; then
