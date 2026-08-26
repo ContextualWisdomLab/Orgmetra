@@ -14,9 +14,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
+import hmac
 import json
 import re
+import secrets
+from threading import RLock
 from uuid import UUID
+from weakref import finalize
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -49,6 +53,34 @@ _NEXT_ACTION = (
     "employment change only through the authoritative People mutation boundary, and execute "
     "downstream actions only through their published owner boundaries."
 )
+_PROCESS_REVIEW_SEAL_KEY = secrets.token_bytes(32)
+_REVIEW_SEALS: dict[int, str] = {}
+_REVIEW_SEALS_LOCK = RLock()
+
+
+def _discard_review_seal(packet_id: int) -> None:
+    """Discard process-local review issuance evidence after its packet is collected."""
+    with _REVIEW_SEALS_LOCK:
+        _REVIEW_SEALS.pop(packet_id, None)
+
+
+def _register_review_seal(packet: object, seal: str) -> None:
+    """Bind one live packet identity to evidence outside packet-writable slots."""
+    packet_id = id(packet)
+    with _REVIEW_SEALS_LOCK:
+        _REVIEW_SEALS[packet_id] = seal
+    finalize(packet, _discard_review_seal, packet_id)
+
+
+def _authoritative_review_seal(packet: object) -> str | None:
+    """Return process-local issuance evidence without trusting packet-owned state."""
+    with _REVIEW_SEALS_LOCK:
+        return _REVIEW_SEALS.get(id(packet))
+
+
+def _seal_review(payload_json: str) -> str:
+    """Bind one process-local review issuance to its exact canonical payload bytes."""
+    return hmac.new(_PROCESS_REVIEW_SEAL_KEY, payload_json.encode("utf-8"), "sha256").hexdigest()
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -132,7 +164,7 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class EmploymentSeparationReviewPacket:
     """Immutable separation evidence that cannot authorize mutation or owner execution."""
 
@@ -290,21 +322,28 @@ class EmploymentSeparationReviewPacket:
             raise ValueError("decision_authority must remain human_review_only")
         if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_review")
-        if type(self.scope_verification_state) is not str or self.scope_verification_state != _SCOPE_VERIFICATION_STATE:
+        if (
+            type(self.scope_verification_state) is not str
+            or self.scope_verification_state != _SCOPE_VERIFICATION_STATE
+        ):
             raise ValueError(
                 "scope_verification_state must remain requires_authoritative_resolution"
             )
         if type(self.mutation_state) is not str or self.mutation_state != _MUTATION_STATE:
             raise ValueError("mutation_state must remain not_authorized_to_apply")
-        if type(self.external_execution_state) is not str or self.external_execution_state != _EXTERNAL_EXECUTION_STATE:
+        if (
+            type(self.external_execution_state) is not str
+            or self.external_execution_state != _EXTERNAL_EXECUTION_STATE
+        ):
             raise ValueError(
                 "external_execution_state must remain not_authorized_to_execute"
             )
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed employment-separation instruction")
+        _register_review_seal(self, _seal_review(self._canonical_json_unchecked()))
 
-    def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit correlation."""
+    def _canonical_json_unchecked(self) -> str:
+        """Render canonical review bytes without consulting process-local issuance state."""
         payload = {
             "access_deprovisioning_plan_digest": self.access_deprovisioning_plan_digest,
             "access_deprovisioning_plan_reference": self.access_deprovisioning_plan_reference,
@@ -348,6 +387,17 @@ class EmploymentSeparationReviewPacket:
             "tenant_record_id": self.tenant_record_id,
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    def canonical_json(self) -> str:
+        """Return creation-bound canonical JSON for immutable audit correlation."""
+        canonical = self._canonical_json_unchecked()
+        authoritative_seal = _authoritative_review_seal(self)
+        if (
+            type(authoritative_seal) is not str
+            or not hmac.compare_digest(_seal_review(canonical), authoritative_seal)
+        ):
+            raise ValueError("employment separation review changed after review issuance")
+        return canonical
 
     def sha256_digest(self) -> str:
         """Return SHA-256 over the exact canonical UTF-8 separation-review packet."""
