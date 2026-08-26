@@ -414,6 +414,8 @@ def authorize_release_candidate(
         raise ReleaseAuthorizationError("audit receipt digest does not bind the exact authorization evidence")
     if audit_recorded_at < authorized_at:
         raise ReleaseAuthorizationError("audit recorded_at cannot precede release authorization")
+    if audit_recorded_at - verified_at > _MAX_CONTROL_AGE:
+        raise ReleaseAuthorizationError("fresh control verification became stale before immutable audit completed")
 
     return ReleaseAuthorizationReceipt(
         candidate_revision_sha=candidate_revision,
