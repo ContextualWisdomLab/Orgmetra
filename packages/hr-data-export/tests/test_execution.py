@@ -96,15 +96,19 @@ def make_verification(
 
 
 class SequenceClock:
-    """Return exact instants in order so authorization TOCTOU checks are observable."""
+    """Return exact instants in order while modeling the new post-authority freshness read."""
 
     def __init__(self, *values: datetime) -> None:
         self.values = list(values)
+        self._repeat_first = True
 
     def __call__(self) -> datetime:
-        """Return the next configured time or make unexpected extra clock reads fail."""
+        """Reuse the first instant for request/freshness, then consume later phase instants."""
         if not self.values:
             raise AssertionError("clock called more often than expected")
+        if self._repeat_first:
+            self._repeat_first = False
+            return self.values[0]
         return self.values.pop(0)
 
 
