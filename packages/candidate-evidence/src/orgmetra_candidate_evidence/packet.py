@@ -23,8 +23,8 @@ _PURPOSE_CODE = "candidate_evidence_intake"
 _REVIEW_STATE = "requires_human_review"
 _ALLOWED_REASON_CODES = frozenset({"requisition_candidate_review"})
 _NEXT_ACTION = (
-    "Re-resolve every packet reference within tenant_record_id through its authoritative "
-    "boundary; verify candidate, requisition, and Job correlation; then verify job relevance, "
+    "Re-resolve every packet reference within your tenant through its authoritative "
+    "source; verify candidate, requisition, and Job correlation; then verify job relevance, "
     "source provenance, permitted handling, retention, and evidence completeness before "
     "requesting authoritative evidence sealing and accountable human review."
 )

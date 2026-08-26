@@ -152,7 +152,7 @@ def _visible_assignments(
             raise SingleValuedFactError(
                 "One assignment identity resolved to more than one visible assignment fact.",
                 next_action=(
-                    "Close the superseded recorded assignment interval, then rebuild the workforce snapshot."
+                    "Close the outdated assignment version that should have been replaced, then rebuild the workforce snapshot."
                 ),
             )
         seen.add(fact.assignment_record_id)

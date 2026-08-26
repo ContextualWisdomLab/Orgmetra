@@ -40,6 +40,6 @@ def close_recorded_interval(fact: FactT, *, recorded_to: datetime) -> FactT:
     if recorded_to <= recorded.start:
         raise CorrectionError(
             "Recorded end must be strictly later than recorded start.",
-            next_action="Choose a close time after the original recorded_from, then save.",
+            next_action="Choose a close time after the version's original recorded start, then save.",
         )
     return replace(fact, recorded=RecordedInterval(start=recorded.start, end=recorded_to))

@@ -86,7 +86,7 @@ def resolve_single_valued_fact(
     if len(visible) > 1:
         raise SingleValuedFactError(
             "One tenant-scoped identity resolved to more than one version.",
-            next_action="Close the prior recorded interval, then insert exactly one replacement.",
+            next_action="Close the previous version's record period, then insert exactly one replacement.",
         )
     if not visible:
         return None

@@ -301,7 +301,7 @@ class HireAcceptanceAsgiApp:
                 status=404,
                 payload={
                     "error": "hire_decision_not_found",
-                    "message": "Verify the confirmed hire decision, tenant, and sealed evidence, then retry.",
+                    "message": "Verify the confirmed hire decision, tenant, and finalized evidence set, then retry.",
                 },
             )
             return
@@ -311,7 +311,7 @@ class HireAcceptanceAsgiApp:
                 status=409,
                 payload={
                     "error": "hire_integrity_conflict",
-                    "message": "The hire cannot be materialized safely; ask an Orgmetra operator to inspect the decision lineage.",
+                    "message": "The confirmed hire cannot be recorded safely; ask an Orgmetra operator to inspect the hire decision history.",
                 },
             )
             return

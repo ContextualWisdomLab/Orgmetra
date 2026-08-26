@@ -131,7 +131,7 @@ def validate_assignment_employment_coverage(
                 raise EmploymentCoverageError(
                     "Assignment intersects contradictory employment versions in this tenant.",
                     next_action=(
-                        "Close the superseded recorded employment version, then save the assignment again."
+                        "Close the outdated employment version that should have been replaced, then save the assignment again."
                     ),
                 )
     visible = [

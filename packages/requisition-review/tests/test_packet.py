@@ -177,7 +177,7 @@ def test_hiring_manager_and_approver_require_authoritative_separation():
         packet(approver_actor_reference=HIRING_MANAGER)
 
     normalized_next_action = packet().next_action.lower()
-    assert "hiring_manager_actor_reference and approver_actor_reference" in normalized_next_action
+    assert "hiring manager's and approver's actor references" in normalized_next_action
     assert "resolved actor identities are distinct" in normalized_next_action
 
 

@@ -62,7 +62,7 @@ def validate_organization_hierarchy(
                 raise OrganizationHierarchyError(
                     "Visible organization parent links form a cycle in this tenant.",
                     next_action=(
-                        "Close or correct the superseded parent link, then validate the organization chart again."
+                        "Close or correct the outdated parent link, then validate the organization chart again."
                     ),
                 )
             seen.add(current)

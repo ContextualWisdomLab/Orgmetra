@@ -22,7 +22,7 @@ flowchart LR
 4. Recruiters evaluate candidates against the published job profile.
 5. Interviews focus on evidence gaps and critical KSAO requirements.
 6. Selection decisions are recorded with evidence sufficiency and uncertainty.
-7. Hired candidates become workers through append-only candidate-worker links.
+7. Hired candidates become workers through permanent, auditable candidate-to-worker records.
 8. Work opportunities, assignments, and criterion observations accumulate over time.
 9. Validation studies analyze predictive validity, bias, criterion quality, and drift.
 10. HR revises job architecture, assessment policy, or performance criteria based on evidence.

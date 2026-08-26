@@ -22,8 +22,8 @@ _REVIEW_PURPOSE = "requisition_review"
 _REVIEW_STATE = "requires_human_approval"
 _ALLOWED_REASON_CODES = frozenset({"approved_growth_plan"})
 _NEXT_ACTION = (
-    "Within tenant_record_id, re-resolve hiring_manager_actor_reference and "
-    "approver_actor_reference through the authoritative actor boundary and verify their "
+    "Within your tenant, re-resolve the hiring manager's and approver's actor references "
+    "through the authoritative identity source and verify their "
     "resolved actor identities are distinct; then confirm the opening is tied to the "
     "approved Job requirements and authorized headcount before recording accountable human "
     "requisition approval."

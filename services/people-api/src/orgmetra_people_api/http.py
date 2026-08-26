@@ -175,7 +175,7 @@ class PeopleAsgiApp:
                 status=409,
                 payload={
                     "error": "worker_integrity_conflict",
-                    "message": "The worker record cannot be returned safely; ask an Orgmetra operator to inspect the authoritative lineage.",
+                    "message": "The worker record cannot be returned safely; ask an Orgmetra operator to inspect the worker record history.",
                 },
             )
             return
