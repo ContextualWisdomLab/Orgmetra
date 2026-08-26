@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - develop
+      - feat/governed-employment-separation-review
     paths:
       - "packages/employment-separation-review/**"
       - ".github/requirements/foundation-test.txt"
