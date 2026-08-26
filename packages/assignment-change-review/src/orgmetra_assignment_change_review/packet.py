@@ -13,9 +13,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
+import hmac
 import json
 import re
+import secrets
+from threading import RLock
 from uuid import UUID
+from weakref import finalize
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -46,6 +50,34 @@ _NEXT_ACTION = (
     "plan provenance. Record accountable human approval and apply the change only through "
     "the authoritative People mutation boundary."
 )
+_PROCESS_PACKET_SEAL_KEY = secrets.token_bytes(32)
+_PACKET_SEALS: dict[int, str] = {}
+_PACKET_SEALS_LOCK = RLock()
+
+
+def _discard_packet_seal(packet_id: int) -> None:
+    """Discard process-local issuance evidence after its review packet is collected."""
+    with _PACKET_SEALS_LOCK:
+        _PACKET_SEALS.pop(packet_id, None)
+
+
+def _register_packet_seal(packet: object, seal: str) -> None:
+    """Bind one live review-packet identity to evidence outside writable slots."""
+    packet_id = id(packet)
+    with _PACKET_SEALS_LOCK:
+        _PACKET_SEALS[packet_id] = seal
+    finalize(packet, _discard_packet_seal, packet_id)
+
+
+def _authoritative_packet_seal(packet: object) -> str | None:
+    """Return process-local issuance evidence without trusting packet-owned state."""
+    with _PACKET_SEALS_LOCK:
+        return _PACKET_SEALS.get(id(packet))
+
+
+def _seal_packet(payload_json: str) -> str:
+    """Bind one process-local issuance to exact canonical assignment-change bytes."""
+    return hmac.new(_PROCESS_PACKET_SEAL_KEY, payload_json.encode("utf-8"), "sha256").hexdigest()
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -129,7 +161,7 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class AssignmentChangeReviewPacket:
     """Immutable assignment-change evidence that cannot itself authorize a mutation."""
 
@@ -277,51 +309,63 @@ class AssignmentChangeReviewPacket:
             raise ValueError("mutation_state must remain not_authorized_to_apply")
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed assignment-change instruction")
+        _register_packet_seal(self, _seal_packet(_canonical_packet_json_unchecked(self)))
 
     def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit correlation."""
-        payload = {
-            "allocation_plan_digest": self.allocation_plan_digest,
-            "allocation_plan_reference": self.allocation_plan_reference,
-            "allocation_policy_digest": self.allocation_policy_digest,
-            "allocation_policy_reference": self.allocation_policy_reference,
-            "assignment_change_review_reference": self.assignment_change_review_reference,
-            "communication_plan_digest": self.communication_plan_digest,
-            "communication_plan_reference": self.communication_plan_reference,
-            "contains_compensation_values": self.contains_compensation_values,
-            "contains_free_form_model_output": self.contains_free_form_model_output,
-            "contains_person_pii": self.contains_person_pii,
-            "current_assignment_reference": self.current_assignment_reference,
-            "current_job_profile_reference": self.current_job_profile_reference,
-            "current_position_record_reference": self.current_position_record_reference,
-            "current_scope_snapshot_digest": self.current_scope_snapshot_digest,
-            "current_scope_snapshot_reference": self.current_scope_snapshot_reference,
-            "decision_authority": self.decision_authority,
-            "employment_record_reference": self.employment_record_reference,
-            "evidence_version": self.evidence_version,
-            "generated_at": _canonical_timestamp(self.generated_at),
-            "human_confirmation_required": self.human_confirmation_required,
-            "mutation_state": self.mutation_state,
-            "next_action": self.next_action,
-            "person_record_reference": self.person_record_reference,
-            "proposed_job_profile_reference": self.proposed_job_profile_reference,
-            "proposed_position_record_reference": self.proposed_position_record_reference,
-            "purpose_code": self.purpose_code,
-            "reason_code": self.reason_code,
-            "requested_effective_on": self.requested_effective_on.isoformat(),
-            "requester_reference": self.requester_reference,
-            "review_state": self.review_state,
-            "reviewer_reference": self.reviewer_reference,
-            "scope_verification_state": self.scope_verification_state,
-            "tenant_record_id": self.tenant_record_id,
-            "worker_impact_assessment_digest": self.worker_impact_assessment_digest,
-            "worker_impact_assessment_reference": self.worker_impact_assessment_reference,
-        }
-        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        """Return issuance-verified deterministic JSON for immutable audit correlation."""
+        payload_json = _canonical_packet_json_unchecked(self)
+        authoritative_seal = _authoritative_packet_seal(self)
+        if authoritative_seal is None:
+            raise ValueError("assignment change review issuance evidence is unavailable")
+        if not hmac.compare_digest(authoritative_seal, _seal_packet(payload_json)):
+            raise ValueError("assignment change review evidence changed after issuance")
+        return payload_json
 
     def sha256_digest(self) -> str:
-        """Return SHA-256 over the exact canonical UTF-8 assignment-change packet."""
+        """Return SHA-256 over the exact issuance-verified UTF-8 assignment-change packet."""
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
+
+
+def _canonical_packet_json_unchecked(packet: AssignmentChangeReviewPacket) -> str:
+    """Render canonical bytes without consulting process-local issuance state."""
+    payload = {
+        "allocation_plan_digest": packet.allocation_plan_digest,
+        "allocation_plan_reference": packet.allocation_plan_reference,
+        "allocation_policy_digest": packet.allocation_policy_digest,
+        "allocation_policy_reference": packet.allocation_policy_reference,
+        "assignment_change_review_reference": packet.assignment_change_review_reference,
+        "communication_plan_digest": packet.communication_plan_digest,
+        "communication_plan_reference": packet.communication_plan_reference,
+        "contains_compensation_values": packet.contains_compensation_values,
+        "contains_free_form_model_output": packet.contains_free_form_model_output,
+        "contains_person_pii": packet.contains_person_pii,
+        "current_assignment_reference": packet.current_assignment_reference,
+        "current_job_profile_reference": packet.current_job_profile_reference,
+        "current_position_record_reference": packet.current_position_record_reference,
+        "current_scope_snapshot_digest": packet.current_scope_snapshot_digest,
+        "current_scope_snapshot_reference": packet.current_scope_snapshot_reference,
+        "decision_authority": packet.decision_authority,
+        "employment_record_reference": packet.employment_record_reference,
+        "evidence_version": packet.evidence_version,
+        "generated_at": _canonical_timestamp(packet.generated_at),
+        "human_confirmation_required": packet.human_confirmation_required,
+        "mutation_state": packet.mutation_state,
+        "next_action": packet.next_action,
+        "person_record_reference": packet.person_record_reference,
+        "proposed_job_profile_reference": packet.proposed_job_profile_reference,
+        "proposed_position_record_reference": packet.proposed_position_record_reference,
+        "purpose_code": packet.purpose_code,
+        "reason_code": packet.reason_code,
+        "requested_effective_on": packet.requested_effective_on.isoformat(),
+        "requester_reference": packet.requester_reference,
+        "review_state": packet.review_state,
+        "reviewer_reference": packet.reviewer_reference,
+        "scope_verification_state": packet.scope_verification_state,
+        "tenant_record_id": packet.tenant_record_id,
+        "worker_impact_assessment_digest": packet.worker_impact_assessment_digest,
+        "worker_impact_assessment_reference": packet.worker_impact_assessment_reference,
+    }
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
 def build_assignment_change_review_packet(
