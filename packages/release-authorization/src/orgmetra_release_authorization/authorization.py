@@ -8,7 +8,7 @@ from hashlib import sha256
 import json
 import re
 from threading import RLock
-from typing import Callable, Protocol
+from typing import Callable, ClassVar, Protocol
 from weakref import WeakKeyDictionary
 
 from orgmetra_release_readiness_review import ReleaseReadinessReviewPacket
@@ -213,8 +213,8 @@ class ReleaseAuthorizationReceipt:
     release_authority: str
     publication_state: str
 
-    _issuance_digests: dict["ReleaseAuthorizationReceipt", str] = {}
-    _issuance_lock = RLock()
+    _issuance_digests: ClassVar[WeakKeyDictionary["ReleaseAuthorizationReceipt", str]] = WeakKeyDictionary()
+    _issuance_lock: ClassVar[RLock] = RLock()
 
     def __init__(
         self,
