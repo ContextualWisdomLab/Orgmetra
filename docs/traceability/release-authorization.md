@@ -11,8 +11,9 @@
 
 | Requirement | Owner | Evidence |
 |---|---|---|
-| Readiness review remains non-authorizing | PR #118 package contract | Exact `ReleaseReadinessReviewPacket` runtime type plus canonical `not_authorized_to_release` state |
+| Readiness review remains non-authorizing | PR #118 package contract | Exact `ReleaseReadinessReviewPacket` runtime type plus verified parent canonical evidence |
 | Reviewed candidate equals freshly integrated default head | PR #126 authorization boundary | `ReleaseControlVerification` snapshot + mismatch regressions |
+| Fresh control evidence | PR #126 authorization boundary | Authorization instant must be at or after verification and no more than 60 seconds later; stale-control regression fails closed |
 | Independent review is acquisition-grade | PR #126 policy | At least two qualifying independent non-author approvals and last-push approval required even when the live ruleset is weaker |
 | Review conversations resolved | PR #126 policy | `review_threads_resolved is True` regression |
 | All applicable release gates terminal GREEN | PR #126 policy | `all_required_gates_green is True` regression; queued/pending/skipped/cancelled/absent evidence cannot authorize |
@@ -23,6 +24,8 @@
 | Post-issuance receipt integrity | PR #126 receipt | Factory-only construction, process-local issuance seal, mutation regression, redacted `repr` |
 | Exact owned coverage/package evidence | PR #126 focused workflow | CPython 3.14.7, exact 100% statement/branch coverage, SHA-256-bound isolated parent+child wheel install, clean checkout |
 | Publication remains separate | ADR 0126 and package README | Receipt fixed to `publication_state = not_published`; no GitHub release/tag side effect in this PR |
+
+The 60-second window is a conservative Orgmetra operational bound, not a claim of GitHub state immutability. A downstream publisher must still re-check the exact authorization/control binding immediately before a release side effect.
 
 ## Dependency and integration order
 
