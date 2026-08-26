@@ -16,8 +16,11 @@ Status: `implemented_on_active_pr` only. This document does not describe protect
 | Prevent sensitive separation narrative from becoming portable governance data | no free-form case narrative; reason is one reviewed operational category | sensitive/unreviewed reason rejection and privacy-flag regressions | implemented_on_active_pr |
 | Preserve accountable human authority | different opaque requester/reviewer references, authoritative resolved-actor separation before approval, mandatory human confirmation, human-only decision authority, review required | actor-separation, tenant-scope-resolution, and immutable-governance regressions | implemented_on_active_pr |
 | Prevent review evidence from masquerading as live HRIS truth or completed owner execution | `requires_authoritative_resolution`, `not_authorized_to_apply`, `not_authorized_to_execute` | direct construction and `dataclasses.replace(...)` regressions | implemented_on_active_pr |
-| Produce deterministic immutable correlation evidence | canonical precision-preserving UTC JSON and SHA-256 over exact UTF-8 bytes | canonicalization/digest regression | implemented_on_active_pr |
+| Prevent a previously issued review from being rewritten into a different valid separation fact | process-local creation seal is stored outside packet-writable slots; canonical export recomputes the exact payload seal and fails closed on post-construction mutation or missing issuance evidence | `test_post_construction_review_rewrite_cannot_change_canonical_evidence`; `test_missing_process_local_review_issuance_evidence_fails_closed` | implemented_on_active_pr |
+| Produce deterministic immutable correlation evidence | canonical precision-preserving UTC JSON and SHA-256 over exact UTF-8 bytes, creation-bound for each live issued packet | canonicalization/digest and issuance-integrity regressions | implemented_on_active_pr |
 | Keep foreign dedicated-writer systems read-only | no provider credentials, no foreign mutation, no cross-service application-table SQL; downstream work only through published owner contracts | package architecture and ADR 0020 | implemented_on_active_pr |
+
+The process-local creation seal is defense-in-depth, not durable cryptographic attestation or cross-process uniqueness. Authoritative persistence must bind the already-issued canonical bytes/digest to immutable audit/outbox evidence and reject conflicting durable reuse of the same review correlation.
 
 ## Protected-`develop` boundary
 
