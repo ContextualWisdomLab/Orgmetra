@@ -89,21 +89,21 @@
     },
     {
       "path": "apps/hr-workspace/index.html",
-      "sha256": "2c6ca469a5b055b990aa8b391627e90222943bd169a8fc2bac585f8e1eb9f9f5",
-      "bytes": 19622,
-      "lines": 158
+      "sha256": "2baf25f0f6ca90bc231ca66ef9c81c734d08e428814b7f7793f1fcf99d82ed15",
+      "bytes": 19764,
+      "lines": 159
     },
     {
       "path": "apps/hr-workspace/styles.css",
-      "sha256": "8932d491b2aed9eac0ec312aa9520052a8833d14b6d91bc2f609c7b7a65ea30f",
-      "bytes": 10156,
-      "lines": 119
+      "sha256": "3751c1abbd8863040cdf61adf65a4fee9d00f78a9848e4a6b01a71b06b961926",
+      "bytes": 10731,
+      "lines": 122
     },
     {
       "path": "apps/hr-workspace/workspace.stories.js",
-      "sha256": "7f30c56ca15a41541fdd44376aeb3b7cba9f39d76d00c05edd1f9934c884f35b",
-      "bytes": 6670,
-      "lines": 121
+      "sha256": "b4e2820c3aa5e08bde95592c3d47012eecc8d3f968fe511231f2e258124d7ee5",
+      "bytes": 7641,
+      "lines": 134
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
@@ -227,9 +227,9 @@
     },
     {
       "path": "docs/STORYBOOK.md",
-      "sha256": "2157edf98a525323f3368d4459ec7f0f6c5b030b814e33753bc9cb7b0660f64c",
-      "bytes": 3067,
-      "lines": 80
+      "sha256": "5784f5937e2e66769dbcf73af001be7d12dfd11eca7356f08ab6d85a52568ce2",
+      "bytes": 3528,
+      "lines": 85
     },
     {
       "path": "docs/TEST_STRATEGY.md",
@@ -269,9 +269,9 @@
     },
     {
       "path": "docs/WIREFRAMES.md",
-      "sha256": "b03aa6419aeaf5d42a5698c4d43a434c1633b7ac6fd0b0bd0cda979077adc56e",
-      "bytes": 2005,
-      "lines": 77
+      "sha256": "50b9d2737ed88636fc416e1ae6c22b9258a7b5fff80e233f06c5e4cdd3f58099",
+      "bytes": 2994,
+      "lines": 87
     },
     {
       "path": "docs/adr/0001-orgmetra-authoritative-hris-record.md",
@@ -449,9 +449,9 @@
     },
     {
       "path": "tests/e2e/hr-workspace.spec.mjs",
-      "sha256": "234b43b7a6f030e0a889079f25f42c298a81f1b6c3003ec533fb7174c1e74754",
-      "bytes": 11516,
-      "lines": 250
+      "sha256": "a7e5d2feea2ddaf1aeb1511b20f3576797b2fe8da2395fbc48d90ae25ccda7ad",
+      "bytes": 12323,
+      "lines": 271
     },
     {
       "path": "tests/foundation-contract.test.mjs",
