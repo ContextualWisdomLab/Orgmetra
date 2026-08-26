@@ -8,8 +8,10 @@ on:
     paths:
       - "database/migrations/0031_employment_work_capacity_persistence.sql"
       - "database/migrations/0032_employment_work_capacity_forward_chain.sql"
+      - "database/migrations/0033_employment_work_capacity_canonical_evidence.sql"
       - "tests/test_employment_work_capacity_persistence_postgres.sh"
       - "tests/test_employment_work_capacity_retroactive_postgres.sh"
+      - "tests/test_employment_work_capacity_canonical_evidence_postgres.sh"
       - "docs/adr/0131-employment-work-capacity-persistence.md"
       - "docs/traceability/employment-work-capacity-persistence.md"
       - "docs/doctoring/employment-work-capacity-persistence-references.md"
@@ -64,11 +66,13 @@ jobs:
           required = [
               "tests/test_employment_work_capacity_persistence_postgres.sh",
               "tests/test_employment_work_capacity_retroactive_postgres.sh",
+              "tests/test_employment_work_capacity_canonical_evidence_postgres.sh",
               ".github/workflows/employment-work-capacity-persistence-quality.yml",
           ]
           optional = [
               "database/migrations/0031_employment_work_capacity_persistence.sql",
               "database/migrations/0032_employment_work_capacity_forward_chain.sql",
+              "database/migrations/0033_employment_work_capacity_canonical_evidence.sql",
               "docs/adr/0131-employment-work-capacity-persistence.md",
               "docs/traceability/employment-work-capacity-persistence.md",
               "docs/doctoring/employment-work-capacity-persistence-references.md",
@@ -88,6 +92,8 @@ jobs:
         run: bash tests/test_employment_work_capacity_persistence_postgres.sh
       - name: Run retroactive-chain protection regression
         run: bash tests/test_employment_work_capacity_retroactive_postgres.sh
+      - name: Run canonical review-evidence regression
+        run: bash tests/test_employment_work_capacity_canonical_evidence_postgres.sh
       - name: Require clean checkout
         run: |
           git diff --exit-code
