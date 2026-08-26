@@ -9,7 +9,8 @@
 | `employment_record` | Durable employment identity for a person. |
 | `employment_record_version` | Bitemporal employment status, exclusive-or-concurrent code, and effective period. |
 | `organization_unit` | Durable organizational identity referenced by positions and hierarchy facts. |
-| `organization_unit_version` | Bitemporal organizational name, type, and parent relationship for an organization unit. |
+| `organization_unit_version` | Bitemporal organizational name, type, and parent relationship for an organization unit; reviewed hierarchy changes bind the exact predecessor and successor versions. |
+| `organization_hierarchy_change_application_record` | Governed application of one reviewed organization-hierarchy change, binding the canonical review evidence to exact predecessor/successor `organization_unit_version` rows and the resulting parent relationship under accountable actor references. |
 | `job_profile` | Durable job identity referenced by positions, criteria, and decisions. |
 | `job_profile_version` | Bitemporal title, family, and version definition for a job profile. |
 | `position_record` | Durable seat identity that keeps stable organization and job references. |

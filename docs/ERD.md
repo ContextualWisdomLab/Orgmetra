@@ -14,6 +14,8 @@ erDiagram
     employment_record ||--o{ employment_record_version : has_versions
     organization_unit ||--o{ organization_unit_version : has_versions
     organization_unit_version }o--o| organization_unit : may_parent
+    organization_unit_version ||--o{ organization_hierarchy_change_application_record : predecessor_version
+    organization_unit_version ||--o{ organization_hierarchy_change_application_record : successor_version
     organization_unit ||--o{ position_record : contains
     job_profile ||--o{ job_profile_version : has_versions
     job_profile ||--o{ position_record : defines
