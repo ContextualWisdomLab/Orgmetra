@@ -230,7 +230,7 @@ class TeppAnalysisRequestPacket:
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
-    def is_idempotent_retry_of(self, other: "TeppAnalysisRequestPacket") -> bool:
+    def is_idempotent_retry_of(self, other: object) -> bool:
         """Return whether another packet replays the same key, TEPP body, and local scope."""
         return (
             type(other) is TeppAnalysisRequestPacket
@@ -239,7 +239,7 @@ class TeppAnalysisRequestPacket:
             and self.governance_scope_digest() == other.governance_scope_digest()
         )
 
-    def idempotency_conflicts_with(self, other: "TeppAnalysisRequestPacket") -> bool:
+    def idempotency_conflicts_with(self, other: object) -> bool:
         """Return whether one key has been rebound to different TEPP or governance semantics."""
         return (
             type(other) is TeppAnalysisRequestPacket
