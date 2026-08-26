@@ -42,17 +42,21 @@ function pythonRequiredFiles() {
 }
 
 function writeMigrationBackedTables(root) {
-  write(
-    root,
-    'database/migrations/0013_job_analysis_snapshot.sql',
-    [
-      'CREATE TABLE job_analysis_snapshot (tenant_record_id uuid NOT NULL);',
-      'CREATE TABLE job_analysis_task_item (tenant_record_id uuid NOT NULL);',
-      'CREATE TABLE job_analysis_ksao_item (tenant_record_id uuid NOT NULL);',
-      'CREATE TABLE job_analysis_task_ksao_link (tenant_record_id uuid NOT NULL);',
-      'CREATE TABLE job_analysis_write_command (tenant_record_id uuid NOT NULL);'
-    ].join('\n') + '\n'
-  );
+  MIGRATION_BACKED_DATABASE_OBJECT_NAMES.forEach((tableName, position) => {
+    const migrationNumber =
+      tableName === 'people_mutation_idempotency_record'
+        ? '0012'
+        : String(20 + position).padStart(4, '0');
+    const fileStem =
+      tableName === 'people_mutation_idempotency_record'
+        ? 'people_mutation_idempotency'
+        : tableName;
+    write(
+      root,
+      `database/migrations/${migrationNumber}_${fileStem}.sql`,
+      `CREATE TABLE ${tableName} (tenant_record_id uuid NOT NULL);\n`
+    );
+  });
 }
 
 function makeMinimalValidFoundation(root) {
@@ -157,6 +161,7 @@ test('migration-backed database object validation detects table rename', () => {
 test('migration-backed validation ignores fake CREATE TABLE text in comments and literals', () => {
   const root = temporaryDirectory();
   try {
+    writeMigrationBackedTables(root);
     write(
       root,
       'database/migrations/0012_people_mutation_idempotency.sql',
@@ -172,7 +177,6 @@ test('migration-backed validation ignores fake CREATE TABLE text in comments and
         'SELECT $payload$CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid);$payload$;'
       ].join('\n')
     );
-    writeMigrationBackedTables(root);
     assert.deepEqual(validateMigrationBackedDatabaseObjectNames(root), [
       'Migration-backed database object is missing from migrations: people_mutation_idempotency_record'
     ]);
@@ -382,5 +386,41 @@ test('CLI returns a structured failure report', () => {
     assert.match(errors.value(), /"status": "failed"/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('every migration-created table is inventoried in both object-name sets', () => {
+  const createdTableNames = new Set();
+  const foundationTableNamePattern =
+    /CREATE\s+TABLE\s+([a-z_][a-z0-9_]*)\s*\(/g;
+  const foundationSqlPath = 'database/migrations/0001_foundation_schema.sql';
+  const foundationSql = readFileSync(
+    new URL(`../${foundationSqlPath}`, import.meta.url),
+    'utf8',
+  );
+  const foundationTableNames = new Set(
+    [...foundationSql.matchAll(foundationTableNamePattern)].map(
+      (match) => match[1],
+    ),
+  );
+  for (const requiredPath of REQUIRED_FILES) {
+    if (!requiredPath.startsWith('database/migrations/')) continue;
+    const sql = readFileSync(new URL(`../${requiredPath}`, import.meta.url), 'utf8');
+    for (const match of sql.matchAll(/CREATE\s+TABLE\s+([a-z_][a-z0-9_]*)\s*\(/g)) {
+      createdTableNames.add(match[1]);
+    }
+  }
+  assert.ok(createdTableNames.size > 0, 'migration table discovery found no tables');
+  for (const tableName of createdTableNames) {
+    assert.ok(
+      DATABASE_OBJECT_NAMES.includes(tableName),
+      `DATABASE_OBJECT_NAMES omits migrated table ${tableName}`,
+    );
+    if (!foundationTableNames.has(tableName)) {
+      assert.ok(
+        MIGRATION_BACKED_DATABASE_OBJECT_NAMES.includes(tableName),
+        `MIGRATION_BACKED_DATABASE_OBJECT_NAMES omits post-foundation table ${tableName}`,
+      );
+    }
   }
 });
