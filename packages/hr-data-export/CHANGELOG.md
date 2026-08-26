@@ -11,8 +11,10 @@ All notable package-local changes are documented here. Protected-repository rele
 - `HrDataExportAuditReceipt` requiring value-minimized immutable audit evidence to bind the exact reviewed/export-authorized artifact **before** outbound egress.
 - `HrDataExportEgressReceipt` for host-owned `authenticated_one_time_download` evidence with mandatory one-time-use enforcement.
 - `execute_reviewed_hr_export(...)` orchestration with authorization-freshness checks before protected reads, after materialization and after audit, plus exact delivery-time authorization-window validation on the returned egress receipt.
+- Mandatory `HrDataExportEgressPort.reconcile_one_time_download(...)` contract for authoritative lookup of an existing ambiguous one-time delivery without republishing bytes.
+- `HrDataExportDeliveryIndeterminateError` so unreconciled post-publication outcomes are explicitly non-retryable rather than indistinguishable from pre-side-effect failures.
 - Externally sealed `HrDataExportExecutionReceipt` containing only correlations, evidence digests, artifact size, audit/egress references and chronology—never raw HR values.
-- Adversarial execution tests for scope drift, policy/legal-hold blocks, authorization TOCTOU, artifact mismatch/size, audit binding, egress binding, one-time semantics and post-issuance tampering.
+- Adversarial execution tests for scope drift, policy/legal-hold blocks, authorization TOCTOU, artifact mismatch/size, audit binding, egress binding, one-time semantics, ambiguous delivery reconciliation and post-issuance tampering.
 
 ### Security
 
@@ -20,6 +22,8 @@ All notable package-local changes are documented here. Protected-repository rele
 - Raw HR values cannot reach the egress port before exact artifact validation and committed pre-delivery audit evidence.
 - Authorization expiry during materialization or audit latency blocks later audit/egress as appropriate. The one-time host receipt must prove that actual delivery occurred before expiry; later receipt-processing latency does not turn an already completed authorized delivery into a retryable failure.
 - Delivery at or after the half-open authorization expiry instant fails receipt validation even when the egress call began earlier.
+- An exception or unusable receipt after the publication call never triggers a second publication. Orgmetra performs reconciliation-only lookup under the same execution/audit/artifact correlation; missing or invalid reconciliation raises `HrDataExportDeliveryIndeterminateError` with a do-not-republish contract.
+- A post-publication clock failure is likewise treated as an indeterminate side-effect outcome rather than a safe retry opportunity.
 - Parent `HrDataExportReviewPacket` creation evidence is inherited with the process-local external seal repair; valid-looking low-level scope rewrites fail closed.
 
 ## 0.1.0 — Unreleased parent review
