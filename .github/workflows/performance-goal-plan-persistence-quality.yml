@@ -7,6 +7,7 @@ on:
       - feat/performance-goal-plan-activation
     paths:
       - "database/migrations/0029_performance_goal_plan_persistence.sql"
+      - "database/migrations/0030_performance_goal_plan_evidence_binding.sql"
       - "tests/test_performance_goal_plan_persistence_postgres.sh"
       - "docs/adr/0125-performance-goal-plan-persistence.md"
       - "docs/traceability/performance-goal-plan-persistence.md"
@@ -65,6 +66,7 @@ jobs:
           ]
           optional = [
               "database/migrations/0029_performance_goal_plan_persistence.sql",
+              "database/migrations/0030_performance_goal_plan_evidence_binding.sql",
               "docs/adr/0125-performance-goal-plan-persistence.md",
               "docs/traceability/performance-goal-plan-persistence.md",
               "docs/doctoring/performance-goal-plan-persistence-references.md",
