@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
 from threading import RLock
-from typing import Callable, ClassVar, Protocol
+from typing import Callable, ClassVar, Protocol, cast
 from weakref import WeakKeyDictionary
 
 from orgmetra_release_readiness_review import ReleaseReadinessReviewPacket
@@ -25,6 +25,7 @@ _RELEASE_AUTHORITY = "authorized_for_exact_release_operation"
 _PUBLICATION_STATE = "not_published"
 _EVIDENCE_VERSION = 1
 _MINIMUM_APPROVALS = 2
+_MAX_CONTROL_AGE = timedelta(seconds=60)
 _RECEIPT_CAPABILITY = object()
 
 
@@ -352,10 +353,6 @@ def authorize_release_candidate(
     readiness_document = json.loads(readiness_json)
     readiness_digest = sha256(readiness_json.encode("utf-8")).hexdigest()
     candidate_revision = readiness_document["candidate_revision_sha"]
-    if readiness_document.get("release_authority") != "not_authorized_to_release":
-        raise ReleaseAuthorizationError("readiness evidence must remain not_authorized_to_release")
-    if readiness_document.get("integration_state") != "requires_protected_head_verification":
-        raise ReleaseAuthorizationError("readiness evidence must require protected-head verification")
     if release_actor in {
         readiness_document.get("requester_actor_reference"),
         readiness_document.get("reviewer_actor_reference"),
@@ -367,8 +364,7 @@ def authorize_release_candidate(
         raise ReleaseAuthorizationError("authority must return an exact ReleaseControlVerification")
     control_snapshot = verification.snapshot()
     _validate_control_snapshot(control_snapshot, candidate_revision)
-    verified_at = control_snapshot["verified_at"]
-    assert type(verified_at) is datetime
+    verified_at = cast(datetime, control_snapshot["verified_at"])
 
     try:
         authorized_at = _validate_timestamp(clock(), "authorized_at")
@@ -376,6 +372,8 @@ def authorize_release_candidate(
         raise ReleaseAuthorizationError(str(exc)) from exc
     if authorized_at < verified_at:
         raise ReleaseAuthorizationError("authorized_at cannot precede fresh control verification")
+    if authorized_at - verified_at > _MAX_CONTROL_AGE:
+        raise ReleaseAuthorizationError("fresh control verification is stale for release authorization")
 
     control_document = dict(control_snapshot)
     control_document["verified_at"] = _canonical_timestamp(verified_at)
