@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - develop
+      - feat/governed-hr-data-export-control
     paths:
       - "packages/hr-data-export/**"
       - ".github/requirements/foundation-test.txt"
