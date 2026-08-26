@@ -53,9 +53,9 @@ DECLARE
         'tenant_record_id'
     ];
     expected_activation_keys constant text[] := ARRAY[
+        'activated_at',
         'activation_reference',
         'activation_state',
-        'activated_at',
         'approved_at',
         'approving_actor_reference',
         'authority_evidence_digest',
