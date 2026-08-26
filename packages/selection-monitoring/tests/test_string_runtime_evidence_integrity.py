@@ -55,6 +55,10 @@ class ForgedGovernanceCode(str):
         return hash("quarterly_selection_governance")
 
 
+class DigestSubclass(str):
+    """Semantically valid-looking digest carried by an untrusted runtime subclass."""
+
+
 def valid_kwargs() -> dict[str, object]:
     """Return one otherwise valid monitoring-plan input."""
     return {
@@ -115,4 +119,13 @@ def test_rejects_reason_code_string_subclass_that_can_forge_closed_code_membersh
     kwargs["reason_code"] = ForgedGovernanceCode("attacker_controlled_reason")
 
     with pytest.raises(ValueError, match="reason_code"):
+        build_selection_outcome_monitoring_plan(**kwargs)
+
+
+def test_rejects_digest_string_subclass_before_canonical_evidence_binding() -> None:
+    """Digest evidence must use the same exact built-in string boundary as other trust text."""
+    kwargs = valid_kwargs()
+    kwargs["population_snapshot_digest"] = DigestSubclass("a" * 64)
+
+    with pytest.raises(ValueError, match="population_snapshot_digest"):
         build_selection_outcome_monitoring_plan(**kwargs)
