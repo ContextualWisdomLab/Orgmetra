@@ -28,6 +28,11 @@ function assertManifestEntry(path) {
   assert.equal(entry.lines, artifactBytes.toString('utf8').split(/\r?\n/).filter((_, index, lines) => index < lines.length - 1 || lines[index] !== '').length);
 }
 
+function assertPosixTextFile(path) {
+  const text = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+  assert.ok(text.endsWith('\n'), `${path} must end with a newline`);
+}
+
 test('MLX sidecar contract defines container-to-host routing for supported engines', () => {
   const decision = decisionSection(hardwareAccelerationAdr());
 
@@ -64,4 +69,9 @@ test('hardware acceleration ADR is sealed in the canonical provenance manifest',
 test('hardware acceleration inventory sources are sealed in the canonical provenance manifest', () => {
   assertManifestEntry('scripts/foundation-contract-core.mjs');
   assertManifestEntry('tests/validate_repository.py');
+});
+
+test('hardware acceleration inventory sources remain POSIX text files', () => {
+  assertPosixTextFile('scripts/foundation-contract-core.mjs');
+  assertPosixTextFile('tests/validate_repository.py');
 });
