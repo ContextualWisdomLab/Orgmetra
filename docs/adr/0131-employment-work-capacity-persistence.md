@@ -17,7 +17,9 @@ Add two 3NF relations owned by the HRIS core:
 
 A capacity point means “from `effective_on`, use this capacity ratio until a later effective point supersedes it for business-time resolution.” `resolve_employment_work_capacity(tenant, employment, effective_on, known_at)` selects the latest effective point not after the requested business date among versions visible at the requested system-knowledge time. This avoids rewriting the previous business row every time a future capacity change is approved while preserving both business-effective and system-recorded history.
 
-The first persisted capacity point is a bounded bootstrap. It may rely only on the exact reviewed employment-terms/capacity-policy evidence bound by parent #103 and becomes authoritative **from its own `effective_on` forward**; it does not invent pre-bootstrap capacity history. Every later change must match the already-authoritative capacity resolved at its proposed effective date before a new point can be appended.
+The first persisted capacity point is a bounded bootstrap. It may rely only on the exact reviewed employment-terms/capacity-policy evidence bound by parent #103 and becomes authoritative **from its own `effective_on` forward**; it does not invent pre-bootstrap capacity history. Every later normal change must match the already-authoritative capacity resolved at its proposed effective date before a new point can be appended.
+
+Normal application is also **forward-only**. Once a later effective point is authoritative, a newly recorded earlier/same effective point could invalidate the reviewed `current_capacity_ratio` premise of that later point. Migration 0032 therefore rejects normal inserts whose `effective_on` is not after the latest currently system-visible point. Retroactive correction is not silently forbidden as a business need; it requires a separate correction/replay boundary that closes affected system-time versions, revalidates every downstream effective point in order, and emits new immutable evidence. That broader replay operation is outside this bounded slice.
 
 ## Authority and evidence boundary
 
@@ -36,13 +38,13 @@ The persisted relation does **not** store medical/disability detail, legal leave
 
 ## Temporal and integrity semantics
 
-PostgreSQL `transaction_timestamp()` supplies one stable system-recorded time for each application transaction. A GiST exclusion constraint prevents two system-visible claims for the same capacity identity and the same `effective_on`. Historical rows are immutable except for closing an open system-recorded interval at the current transaction timestamp; corrections append replacement evidence rather than rewriting prior truth.
+PostgreSQL `transaction_timestamp()` supplies one stable system-recorded time for each application transaction. A GiST exclusion constraint prevents two system-visible claims for the same capacity identity and the same `effective_on`. Historical rows are immutable except for closing an open system-recorded interval at the current transaction timestamp; corrections are correction-not-rewrite and must emit replacement evidence through an explicit correction/replay contract rather than editing prior truth.
 
-The first capacity point carries `bootstrap_from_reviewed_terms`; subsequent points carry `matched_authoritative_capacity`. Tenant RLS is enabled and forced on both relations, while a tenant-scoped read role must be `NOSUPERUSER NOBYPASSRLS` in production verification.
+The first capacity point carries `bootstrap_from_reviewed_terms`; subsequent forward points carry `matched_authoritative_capacity`. Tenant RLS is enabled and forced on both relations, while a tenant-scoped read role must be `NOSUPERUSER NOBYPASSRLS` in production verification.
 
 ## Concurrency
 
-The application boundary takes `pg_advisory_xact_lock` over the tenant-qualified Employment before anchor creation/current-capacity comparison. PostgreSQL transaction-level advisory locks are held until transaction end; hash collisions may over-serialize but cannot weaken the invariant. This prevents two concurrent reviewed changes from both validating against the same stale current-capacity truth and then independently appending contradictory next states.
+The application boundary takes `pg_advisory_xact_lock` over the tenant-qualified Employment before anchor creation/current-capacity comparison. Migration 0032's forward-chain trigger takes the same transaction-scoped lock before checking the latest effective point. PostgreSQL transaction-level advisory locks are held until transaction end; hash collisions may over-serialize but cannot weaken the invariant. This prevents two concurrent reviewed changes from both validating against the same stale current-capacity truth and then independently appending contradictory next states.
 
 ## Consequences
 
@@ -51,6 +53,7 @@ The application boundary takes `pg_advisory_xact_lock` over the tenant-qualified
 - Parent review evidence remains non-authorizing; application is a separate controlled act.
 - Audit/outbox stay contract correlations rather than direct cross-service SQL.
 - The initial bootstrap explicitly limits truth to its own effective date forward.
+- Normal changes cannot be inserted retroactively underneath already-authoritative downstream points; replay is a separate governed operation.
 - This PR remains dependency-first under #103. Parent checks/reviews never transfer; after parent integration this branch must retarget to fresh `develop` and rerun every applicable local and central gate.
 
 ## References
