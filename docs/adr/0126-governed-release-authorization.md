@@ -23,6 +23,8 @@ The boundary accepts only an exact `ReleaseReadinessReviewPacket`, snapshots its
 5. every applicable local/central exact-revision gate is terminal GREEN; and
 6. routine administrator bypass is disabled.
 
+The authorization instant must occur no more than 60 seconds after that control snapshot. This bounded window is an Orgmetra fail-closed operational policy, not a claim that GitHub guarantees repository state remains unchanged for 60 seconds; a later publication boundary must re-check its own exact authorization/control binding immediately before side effects.
+
 After fresh control verification, the boundary creates value-minimized canonical authorization evidence containing the candidate revision, readiness digest, control-verification digest, canonical `vMAJOR.MINOR.PATCH` tag, pseudonymous release actor, controlled purpose/reason, evidence version, and authorization time. The host must append that evidence through `ReleaseAuditPort`. The returned audit receipt must bind the exact authorization digest and have a non-preceding system-recorded time.
 
 Only then may Orgmetra issue `ReleaseAuthorizationReceipt`, whose authority is `authorized_for_exact_release_operation` and whose publication state is always `not_published`.
@@ -32,6 +34,7 @@ Only then may Orgmetra issue `ReleaseAuthorizationReceipt`, whose authority is `
 - The readiness reviewer/requester cannot also be the release actor.
 - Caller-defined string/bool/int/datetime subtypes are not trusted at evidence boundaries.
 - Control verification is snapshotted once and policy is evaluated against that snapshot, preventing checked-versus-hashed evidence drift.
+- A control snapshot older than 60 seconds cannot authorize a release.
 - The authorization receipt cannot be directly constructed through its public constructor and detects post-issuance mutation before canonical evidence emission.
 - Process-local issuance sealing is defense in depth only; immutable audit/outbox is the durable cross-process evidence owner.
 - This PR does not create a tag, release, signature, deployment, artifact upload, repository-setting change, or administrator bypass.
