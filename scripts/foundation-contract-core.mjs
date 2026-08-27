@@ -22,6 +22,7 @@ export const REQUIRED_FILES = Object.freeze([
   'package.json',
   '.github/workflows/foundation-ci.yml',
   '.github/workflows/job-analysis-api-quality.yml',
+  '.github/workflows/outbox-retry-policy-quality.yml',
   'docs/PRD.md',
   'docs/TRD.md',
   'docs/USER_STORIES.md',
@@ -68,6 +69,7 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
   'database/migrations/0013_job_analysis_snapshot.sql',
+  'database/migrations/0016_outbox_retry_policy.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -84,6 +86,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_outbox_claim_postgres.sh',
   'tests/test_outbox_dead_letter_postgres.sh',
   'tests/test_audit_outbox_hardening_postgres.sh',
+  'tests/test_outbox_retry_policy_postgres.sh',
   'tests/test_candidate_worker_conversion_postgres.sh',
   'tests/test_validity_study_case_postgres.sh',
   'tests/test_criterion_observation_scope_postgres.sh',
@@ -129,11 +132,13 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
   'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
   'outbox_event', 'outbox_delivery_record', 'outbox_delivery_escalation_record',
-  'people_mutation_idempotency_record', 'inbox_event', 'integration_delivery'
+  'outbox_retry_policy_record', 'people_mutation_idempotency_record',
+  'inbox_event', 'integration_delivery'
 ]);
 
 /** Migration-backed logical objects whose persisted table identity must not drift. */
 export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
+  'outbox_retry_policy_record',
   'people_mutation_idempotency_record',
   'job_analysis_snapshot',
   'job_analysis_task_item',

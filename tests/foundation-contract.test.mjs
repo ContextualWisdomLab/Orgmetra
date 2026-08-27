@@ -53,6 +53,11 @@ function writeMigrationBackedTables(root) {
       'CREATE TABLE job_analysis_write_command (tenant_record_id uuid NOT NULL);'
     ].join('\n') + '\n'
   );
+  write(
+    root,
+    'database/migrations/0016_outbox_retry_policy.sql',
+    'CREATE TABLE outbox_retry_policy_record (tenant_record_id uuid NOT NULL);\n'
+  );
 }
 
 function makeMinimalValidFoundation(root) {
