@@ -1,0 +1,58 @@
+.employment-absence-state {
+  display: grid;
+  gap: var(--orgmetra-space-md);
+  max-width: 40rem;
+  padding: var(--orgmetra-space-lg);
+  border: 1px solid var(--orgmetra-border-subtle);
+  border-radius: var(--orgmetra-radius-md);
+  background: var(--orgmetra-surface-card);
+  color: var(--orgmetra-text-primary);
+}
+
+.employment-absence-status,
+.employment-absence-next-action {
+  display: grid;
+  gap: var(--orgmetra-space-xs);
+  margin: 0;
+}
+
+.employment-absence-status span,
+.employment-absence-next-action span {
+  color: var(--orgmetra-text-muted);
+}
+
+.employment-absence-state[data-interaction-state="read-only"] {
+  border-color: var(--orgmetra-border-subtle);
+}
+
+.employment-absence-state[data-interaction-state="permission-denied"],
+.employment-absence-state[data-interaction-state="validation-error"],
+.employment-absence-state[data-interaction-state="error"] {
+  border-color: var(--orgmetra-danger);
+}
+
+.employment-absence-state[aria-busy="true"] {
+  cursor: progress;
+}
+
+.employment-absence-submit {
+  justify-self: start;
+  min-height: 44px;
+  padding: var(--orgmetra-space-sm) var(--orgmetra-space-md);
+  border: 0;
+  border-radius: var(--orgmetra-radius-sm);
+  background: var(--orgmetra-action-review);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.employment-absence-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.employment-absence-submit:focus-visible {
+  outline: 3px solid var(--orgmetra-focus-ring);
+  outline-offset: 3px;
+}
