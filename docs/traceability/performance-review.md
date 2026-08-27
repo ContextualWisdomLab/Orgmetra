@@ -11,6 +11,7 @@ Status: **active PR / proposed capability**, not protected-main truth.
 | Bind predetermined criteria and goals | `criterion_set_reference`/digest, `goal_plan_reference`/digest | Implemented on active PR |
 | Bind exact outcome evidence without copying values | `criterion_observation_snapshot_reference`/digest | Implemented on active PR |
 | Preserve optional development provenance | paired `development_plan_reference`/digest | Implemented on active PR |
+| Reject caller-defined digest string subclasses at every evidence boundary | `_validate_digest` requires exact built-in `str`; `test_rejects_digest_string_subclass_at_all_digest_boundaries` covers criteria, goal-plan, criterion-observation, and development-plan digests | Implemented on active PR |
 | Keep person PII, rating values, free-form feedback/model output outside packet | immutable false flags plus absence of value-bearing fields | Implemented on active PR |
 | Require accountable human review | fixed `human_confirmation_required=True`, `decision_authority=human_review_only`, `review_state=requires_human_review` | Implemented on active PR |
 | Version high-impact review evidence | bounded positive `evidence_version` is validated, serialized in canonical JSON, and changes SHA-256 correlation evidence | Implemented on active PR |
