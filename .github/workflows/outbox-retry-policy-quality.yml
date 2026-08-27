@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - develop
+      - docs/protected-truth-refresh
   workflow_dispatch:
 
 permissions:
@@ -44,6 +45,8 @@ jobs:
         env:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Verify workflow covers root and stacked bases
+        run: node --test tests/outbox-retry-policy-workflow.test.mjs
       - name: Run governed retry policy contract
         run: bash tests/test_outbox_retry_policy_postgres.sh
       - name: Prove test is read-only
