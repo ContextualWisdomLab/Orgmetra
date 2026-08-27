@@ -1,0 +1,58 @@
+.position-reporting-review-state {
+  display: grid;
+  gap: var(--orgmetra-space-md);
+  max-width: 40rem;
+  padding: var(--orgmetra-space-lg);
+  border: 1px solid var(--orgmetra-border-subtle);
+  border-radius: var(--orgmetra-radius-md);
+  background: var(--orgmetra-surface-card);
+  color: var(--orgmetra-text-primary);
+}
+
+.position-reporting-review-status,
+.position-reporting-review-next-action {
+  display: grid;
+  gap: var(--orgmetra-space-xs);
+  margin: 0;
+}
+
+.position-reporting-review-status span,
+.position-reporting-review-next-action span {
+  color: var(--orgmetra-text-muted);
+}
+
+.position-reporting-review-state[data-interaction-state="high-risk-confirmation"] {
+  border-color: var(--orgmetra-action-review);
+}
+
+.position-reporting-review-state[data-interaction-state="permission-denied"],
+.position-reporting-review-state[data-interaction-state="validation-error"],
+.position-reporting-review-state[data-interaction-state="error"] {
+  border-color: var(--orgmetra-danger);
+}
+
+.position-reporting-review-state[aria-busy="true"] {
+  cursor: progress;
+}
+
+.position-reporting-review-submit {
+  justify-self: start;
+  min-height: 44px;
+  padding: var(--orgmetra-space-sm) var(--orgmetra-space-md);
+  border: 0;
+  border-radius: var(--orgmetra-radius-sm);
+  background: var(--orgmetra-action-review);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.position-reporting-review-submit:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.position-reporting-review-submit:focus-visible {
+  outline: 3px solid var(--orgmetra-focus-ring);
+  outline-offset: 3px;
+}
