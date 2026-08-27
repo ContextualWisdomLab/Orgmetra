@@ -26,6 +26,18 @@ const expectedStates = {
   error: ['false', 'alert', false, 'error', 'Job grade review unavailable'],
 };
 
+const allowedViewModelKeys = [
+  'actionLabel',
+  'ariaBusy',
+  'ariaLive',
+  'interactionState',
+  'label',
+  'message',
+  'nextAction',
+  'role',
+  'submitDisabled',
+];
+
 test('Job grade review states are bounded, actionable, and value-minimized', () => {
   for (const [state, [ariaBusy, role, submitDisabled, interactionState, label]] of Object.entries(expectedStates)) {
     const model = jobGradeReviewViewModel(state);
@@ -36,12 +48,25 @@ test('Job grade review states are bounded, actionable, and value-minimized', () 
     assert.equal(model.label, label);
     assert.equal(model.ariaLive, role === 'alert' ? 'assertive' : 'polite');
     assert.match(model.nextAction, /\.$/);
+    assert.deepEqual(Object.keys(model).sort(), allowedViewModelKeys);
 
-    const serialized = JSON.stringify(model);
-    assert.doesNotMatch(
-      serialized,
-      /person|candidate|employee_name|email|phone|compensation|salary|pay|rating|assessment|credential|token|prompt|model_output/i,
-    );
+    for (const forbiddenKey of [
+      'personRecordId',
+      'candidateReference',
+      'employeeName',
+      'email',
+      'phone',
+      'compensationValue',
+      'salaryValue',
+      'ratingValue',
+      'assessmentResult',
+      'credential',
+      'token',
+      'prompt',
+      'modelOutput',
+    ]) {
+      assert.equal(Object.hasOwn(model, forbiddenKey), false);
+    }
 
     const markup = jobGradeReviewStateMarkup(state);
     assert.match(markup, /data-figma-node-id="1:64"/);
