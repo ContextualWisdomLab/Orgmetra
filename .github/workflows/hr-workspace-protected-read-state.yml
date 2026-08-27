@@ -42,8 +42,13 @@ jobs:
         with:
           node-version: "24"
           check-latest: false
-      - name: Run protected-read accessibility contract
-        run: node --test tests/hr-workspace-protected-read-state.test.mjs
+      - name: Run protected-read accessibility contract with exact coverage
+        run: >-
+          node --test --experimental-test-coverage
+          --test-coverage-lines=100
+          --test-coverage-branches=100
+          --test-coverage-functions=100
+          tests/hr-workspace-protected-read-state.test.mjs
       - name: Require clean checkout
         run: |
           git diff --exit-code
