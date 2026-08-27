@@ -8,8 +8,6 @@ World Wide Web Consortium. (2023). *Web Content Accessibility Guidelines (WCAG) 
 
 World Wide Web Consortium. (2023). *Accessible Rich Internet Applications (WAI-ARIA) 1.2*. https://www.w3.org/TR/wai-aria-1.2/
 
-World Wide Web Consortium, Web Accessibility Initiative. (n.d.). *ARIA live regions*. MDN/WAI-ARIA semantics are implemented here only through standards-defined `status`, `alert`, `aria-live`, and `aria-busy` behavior; Orgmetra does not claim third-party accessibility certification.
-
 ## Applied interpretation
 
 - Progress messages that do not require immediate intervention use a polite `status` live region.
