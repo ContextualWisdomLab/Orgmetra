@@ -31,6 +31,21 @@ test('review state requires explicit high-risk confirmation before one-time deli
   assert.match(markup, /class="hr-export-publish"[^>]* disabled/);
 });
 
+test('confirmed state enables exactly one backend handoff while keeping confirmation locked', () => {
+  const ready = exportDeliveryViewModel('ready');
+  assert.equal(ready.interactionState, 'default');
+  assert.equal(ready.ariaBusy, 'false');
+  assert.equal(ready.confirmDisabled, true);
+  assert.equal(ready.publishDisabled, false);
+  assert.match(ready.message, /backend must still revalidate authorization/i);
+  assert.equal(ready.nextAction, 'Start one audited one-time delivery attempt.');
+
+  const markup = exportDeliveryStateMarkup('ready');
+  assert.match(markup, /class="hr-export-confirm"[^>]* disabled/);
+  assert.match(markup, /class="hr-export-publish"[^>]*>Start one-time delivery/);
+  assert.doesNotMatch(markup, /class="hr-export-publish"[^>]* disabled/);
+});
+
 test('publishing is perceivable and prevents duplicate confirmation or delivery', () => {
   const publishing = exportDeliveryViewModel('publishing');
   assert.equal(publishing.ariaBusy, 'true');
@@ -77,7 +92,7 @@ test('unsupported or boxed state values fail closed before rendering', () => {
 });
 
 test('Storybook and styling cover the Figma-required high-risk and terminal states', () => {
-  for (const storyName of ['ReviewRequired', 'Publishing', 'DeliveredReadOnly', 'DeliveryIndeterminate', 'PermissionDenied']) {
+  for (const storyName of ['ReviewRequired', 'ConfirmedReady', 'Publishing', 'DeliveredReadOnly', 'DeliveryIndeterminate', 'PermissionDenied']) {
     assert.match(story, new RegExp(`export const ${storyName}`));
   }
   assert.match(story, /exportDeliveryStateMarkup/);
