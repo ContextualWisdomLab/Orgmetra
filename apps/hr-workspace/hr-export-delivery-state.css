@@ -1,0 +1,69 @@
+.hr-export-delivery-state {
+  display: grid;
+  gap: var(--orgmetra-space-md);
+  max-width: 40rem;
+  padding: var(--orgmetra-space-lg);
+  border: 1px solid var(--orgmetra-border-subtle);
+  border-radius: var(--orgmetra-radius-md);
+  background: var(--orgmetra-surface-card);
+  color: var(--orgmetra-text-primary);
+}
+
+.hr-export-status,
+.hr-export-next-action {
+  display: grid;
+  gap: var(--orgmetra-space-xs);
+  margin: 0;
+}
+
+.hr-export-status span,
+.hr-export-next-action span {
+  color: var(--orgmetra-text-muted);
+}
+
+.hr-export-delivery-state[data-interaction-state="high-risk-confirmation"] {
+  border-color: var(--orgmetra-action-review);
+}
+
+.hr-export-delivery-state[data-interaction-state="permission-denied"],
+.hr-export-delivery-state[data-interaction-state="error"] {
+  border-color: var(--orgmetra-danger);
+}
+
+.hr-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--orgmetra-space-sm);
+}
+
+.hr-export-confirm,
+.hr-export-publish {
+  min-height: 44px;
+  padding: var(--orgmetra-space-sm) var(--orgmetra-space-md);
+  border: 0;
+  border-radius: var(--orgmetra-radius-sm);
+  font: inherit;
+  cursor: pointer;
+}
+
+.hr-export-confirm {
+  background: var(--orgmetra-surface-muted);
+  color: var(--orgmetra-text-primary);
+}
+
+.hr-export-publish {
+  background: var(--orgmetra-action-review);
+  color: #fff;
+}
+
+.hr-export-confirm:disabled,
+.hr-export-publish:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.hr-export-confirm:focus-visible,
+.hr-export-publish:focus-visible {
+  outline: 3px solid var(--orgmetra-focus-ring);
+  outline-offset: 3px;
+}
