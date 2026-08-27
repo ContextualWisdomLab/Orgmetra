@@ -175,3 +175,49 @@ def test_direct_output_rejects_noncanonical_span_entries(
             reporting_position_count=sum(int(value) for _, value in spans),
             span_by_manager=spans,
         )
+
+
+@pytest.mark.parametrize(
+    ("manager_count", "reporting_count"),
+    [(-1, 0), (True, 0), (0, -1), (0, False)],
+)
+def test_direct_output_rejects_noncanonical_aggregate_counts(
+    manager_count: object,
+    reporting_count: object,
+) -> None:
+    """Aggregate count fields remain exact non-negative integers under direct construction."""
+    with pytest.raises(PositionSpanOfControlError, match="exact non-negative integers"):
+        PositionSpanOfControlSnapshot(
+            tenant_record_id=TENANT,
+            effective_on=DAY,
+            known_at=KNOWN,
+            manager_position_count=manager_count,  # type: ignore[arg-type]
+            reporting_position_count=reporting_count,  # type: ignore[arg-type]
+            span_by_manager=(),
+        )
+
+
+def test_direct_output_rejects_mutable_span_collection() -> None:
+    """A mutable top-level span collection cannot become canonical audit evidence."""
+    with pytest.raises(PositionSpanOfControlError, match="exact immutable tuple"):
+        PositionSpanOfControlSnapshot(
+            tenant_record_id=TENANT,
+            effective_on=DAY,
+            known_at=KNOWN,
+            manager_position_count=0,
+            reporting_position_count=0,
+            span_by_manager=[],  # type: ignore[arg-type]
+        )
+
+
+def test_direct_output_rejects_mutable_span_entry() -> None:
+    """A mutable manager/count entry cannot become canonical audit evidence."""
+    with pytest.raises(PositionSpanOfControlError, match="entries must be exact two-item tuples"):
+        PositionSpanOfControlSnapshot(
+            tenant_record_id=TENANT,
+            effective_on=DAY,
+            known_at=KNOWN,
+            manager_position_count=1,
+            reporting_position_count=1,
+            span_by_manager=([MANAGER, 1],),  # type: ignore[arg-type]
+        )
