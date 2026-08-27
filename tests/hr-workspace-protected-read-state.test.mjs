@@ -24,6 +24,7 @@ test('loading is explicitly busy and prevents a duplicate protected read', () =>
   assert.equal(loading.nextAction, 'Wait for the current protected read to finish.');
 
   const markup = protectedReadStateMarkup('loading');
+  assert.match(markup, /data-figma-node-id="1:64"/);
   assert.match(markup, /aria-busy="true"/);
   assert.match(markup, /<button[^>]* disabled/);
   assert.match(markup, /Wait for the current protected read to finish\./);
@@ -44,9 +45,14 @@ test('terminal states remain actionable without exposing protected values', () =
   assert.equal(loaded.interactionState, 'read-only');
   assert.equal(loaded.nextAction, 'Review the authorized read-only values or start a new protected read.');
 
-  for (const state of [denied, failed, loaded]) {
+  const idle = protectedReadViewModel('idle');
+  assert.equal(idle.ariaBusy, 'false');
+  assert.equal(idle.submitDisabled, false);
+
+  for (const state of [idle, denied, failed, loaded]) {
     const serialized = JSON.stringify(state);
     assert.doesNotMatch(serialized, /password|token|credential|display_name|compensation|rating/i);
+    assert.match(protectedReadStateMarkup(state === idle ? 'idle' : state === denied ? 'denied' : state === failed ? 'error' : 'loaded'), /Next action/);
   }
 });
 
@@ -56,7 +62,6 @@ test('unsupported request state fails closed before rendering', () => {
 });
 
 test('Storybook covers Figma-required loading, disabled, error, and read-only states', () => {
-  assert.match(story, /data-figma-node-id="1:64"/);
   for (const storyName of ['Idle', 'Loading', 'LoadedReadOnly', 'PermissionDenied', 'Error']) {
     assert.match(story, new RegExp(`export const ${storyName}`));
   }
