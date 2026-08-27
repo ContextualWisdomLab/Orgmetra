@@ -47,6 +47,10 @@ class ForgedGovernanceText(str):
         return hash("scheduled_cycle_review")
 
 
+class ForgedDigest(str):
+    """Valid-looking digest subclass that must not cross the evidence boundary."""
+
+
 def valid_kwargs() -> dict[str, object]:
     """Return one otherwise valid performance-review packet input."""
     return {
@@ -98,6 +102,23 @@ def test_rejects_purpose_code_string_subclass_that_can_forge_fixed_code_check() 
     kwargs = valid_kwargs()
     kwargs["purpose_code"] = ForgedGovernanceText("attacker_controlled_purpose")
     with pytest.raises(ValueError, match="purpose_code"):
+        build_performance_review_packet(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    (
+        "criterion_set_digest",
+        "goal_plan_digest",
+        "criterion_observation_snapshot_digest",
+        "development_plan_digest",
+    ),
+)
+def test_rejects_digest_string_subclass_at_all_digest_boundaries(field_name: str) -> None:
+    """Every trust-bearing SHA-256 field requires exact built-in text."""
+    kwargs = valid_kwargs()
+    kwargs[field_name] = ForgedDigest(str(kwargs[field_name]))
+    with pytest.raises(ValueError, match=field_name):
         build_performance_review_packet(**kwargs)
 
 
