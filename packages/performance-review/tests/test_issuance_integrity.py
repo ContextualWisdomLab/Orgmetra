@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date
 
 import pytest
 
@@ -32,7 +32,6 @@ def _build_packet():
         reason_code="scheduled_cycle_review",
         review_period_start=date(2026, 1, 1),
         review_period_end=date(2026, 6, 30),
-        generated_at=datetime(2026, 8, 19, 5, 15, 30, 123456, tzinfo=timezone.utc),
     )
 
 
