@@ -1,6 +1,6 @@
 # Product and technical gap baseline
 
-Inventory date: 2026-08-28 (Asia/Seoul). Default `develop` head observed: `9e3e4847510e1e612b48474ba42b177b8ed824df`.
+Inventory date: 2026-08-29 (Asia/Seoul). Default `develop` head observed: `9e3e4847510e1e612b48474ba42b177b8ed824df`.
 
 This is a point-in-time buyer/product planning snapshot. It is **not** merge authorization, approval evidence, or a substitute for fresh GitHub state. Every execution loop must refetch open PRs/issues, exact heads and independently resolved bases, dependency ancestry, formal reviews and unresolved threads, exact-head workflow/job checkout SHAs, effective rulesets, releases, and changed refs before acting.
 
@@ -78,6 +78,7 @@ The following material owner lanes were freshly rechecked during the 2026-08-28 
 - **PR #116** owns purpose-bound HR document retrieval, including authorization freshness through artifact verification, bounded content verification, audit-before-release, and hash-bound installed-artifact evidence. #132 mirrors only the customer interaction sequence.
 - **PR #117** owns Job-Analysis-specific model-assisted Task/FJA/KSAO draft workflow; raw model output remains untrusted draft evidence and distinct accountable human review is mandatory.
 - **PR #124** owns hardware-acceleration ADR security hardening at exact head `34a6520bf69731e69da27138e627ae774071376b`; local exact-head ADR/Foundation/Recovery/Job-Analysis/SAST/Security evidence is GREEN, while its live Ready-for-review state remains authoritative.
+- **PR #133** owns Position span-of-control structural evidence. Exact head `139c715062c044fa3cb13967d94268069310c7b3` now includes the current `feat/position-reporting-hierarchy` base at `2ff1262b976029e447dc736e6472eebbac30a7f5` and reconciles the UTC-range regression cases. The exact workflow-equivalent HRIS-kernel run passed `213` tests with `100%` statement/branch coverage; the dedicated hosted Check is currently **QUEUED**, the PR remains Draft with no qualifying approval, and no review threads are unresolved. It remains active-PR truth only and is not shipped on `develop`.
 
 Dependency-first descendants for qualification-rule persistence, Position reporting persistence, HR document persistence, offer-to-hire closure, Job-grade persistence, Position lifecycle application, Organization hierarchy application, Employment absence persistence, export execution, performance-goal activation/persistence, Employment work-capacity persistence, Employment-separation approval, release authorization/publication, and all HR Workspace interaction children remain active-PR truth only. Their focused GREEN evidence never transfers across parent integration or restack.
 
