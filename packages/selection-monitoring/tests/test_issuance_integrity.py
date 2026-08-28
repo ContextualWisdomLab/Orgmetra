@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 from datetime import date, datetime, timezone
+import pickle
 
 import pytest
 
@@ -61,3 +63,17 @@ def test_missing_process_local_issuance_evidence_fails_closed() -> None:
 
     with pytest.raises(ValueError, match="issuance evidence is unavailable"):
         plan.canonical_json()
+
+
+def test_copied_or_serialized_plan_fails_closed_without_issuance_evidence() -> None:
+    """Reject copies and serialized plans that bypass the original issuance seal."""
+    plan = _build_plan()
+    clones = (
+        copy.copy(plan),
+        copy.deepcopy(plan),
+        pickle.loads(pickle.dumps(plan)),
+    )
+
+    for clone in clones:
+        with pytest.raises(ValueError, match="issuance evidence is unavailable"):
+            clone.canonical_json()
