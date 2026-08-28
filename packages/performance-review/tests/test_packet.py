@@ -1,6 +1,7 @@
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
+import inspect
 import json
 
 import pytest
@@ -245,3 +246,16 @@ def test_direct_construction_revalidates_reference_and_digest() -> None:
 def test_builder_returns_same_public_type_as_direct_contract() -> None:
     packet = build_valid()
     assert isinstance(packet, PerformanceReviewPacket)
+
+
+def test_system_recorded_issuance_time_is_not_caller_supplied() -> None:
+    """System-recorded audit time must not be accepted from the packet caller."""
+    assert "generated_at" not in inspect.signature(build_performance_review_packet).parameters
+    assert "generated_at" not in inspect.signature(PerformanceReviewPacket).parameters
+
+
+def test_unverified_uuidv4_reference_is_classified_as_potential_direct_identifier() -> None:
+    """UUIDv4 syntax alone must not justify a no-direct-identifier assertion."""
+    encoded_person = "person_record:4a616e65-2d44-4f65-8065-2d53534e3132"
+    packet = build_valid(person_record_reference=encoded_person)
+    assert packet.contains_direct_person_identifiers is True
