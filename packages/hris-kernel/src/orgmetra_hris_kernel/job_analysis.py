@@ -10,7 +10,7 @@ snapshots require accountable human review and non-LLM evidence.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
@@ -64,7 +64,7 @@ def _validate_code(value: object, field_name: str) -> str:
 
 def _validate_reference(value: object, field_name: str) -> str:
     """Return a namespaced opaque reference instead of human-readable identity data."""
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ValueError(f"{field_name} must be a string")
     if not _REFERENCE_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be a namespaced opaque reference")
@@ -73,7 +73,7 @@ def _validate_reference(value: object, field_name: str) -> str:
 
 def _validate_version(value: object, field_name: str) -> str:
     """Return a compact immutable version token."""
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ValueError(f"{field_name} must be a string")
     if not _VERSION_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be a compact version token")
@@ -82,7 +82,7 @@ def _validate_version(value: object, field_name: str) -> str:
 
 def _validate_text(value: object, field_name: str, *, minimum: int = 1) -> str:
     """Return normalized nonblank explanatory text without changing its meaning."""
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ValueError(f"{field_name} must be a string")
     normalized = " ".join(value.split())
     if len(normalized) < minimum:
@@ -100,19 +100,28 @@ def _validate_level(value: object, field_name: str) -> int:
 
 
 def _validate_aware_datetime(value: object, field_name: str) -> datetime:
-    """Return an exact offset-aware instant suitable for immutable evidence ordering."""
+    """Detach one exact offset-aware instant as immutable UTC evidence."""
     if type(value) is not datetime:
         raise ValueError(f"{field_name} must be a datetime")
     if value.tzinfo is None:
         raise ValueError(f"{field_name} must be timezone-aware")
-    if value.utcoffset() is None:
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise ValueError(f"{field_name} must resolve to a UTC offset") from exc
+    if offset is None or type(offset) is not timedelta:
         raise ValueError(f"{field_name} must resolve to a UTC offset")
-    return value
+    try:
+        return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise ValueError(f"{field_name} must be a representable timezone-aware datetime") from exc
 
 
 def _utc_text(value: datetime) -> str:
-    """Serialize an already-validated instant as canonical UTC text."""
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    """Serialize a previously detached built-in UTC instant as canonical text."""
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
+        raise ValueError("datetime must be an exact timezone-aware datetime")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,7 +137,7 @@ class EvidenceSource:
 
     def __post_init__(self) -> None:
         """Reject ambiguous, credential-bearing, mutable, or untyped provenance."""
-        if not isinstance(self.source_uri, str):
+        if type(self.source_uri) is not str:
             raise ValueError("source_uri must be a string")
         parsed = urlsplit(self.source_uri)
         if parsed.scheme != "https" or not parsed.hostname:
@@ -141,8 +150,12 @@ class EvidenceSource:
             _validate_text(self.source_title, "source_title", minimum=3),
         )
         _validate_version(self.source_version_code, "source_version_code")
-        _validate_aware_datetime(self.retrieved_at, "retrieved_at")
-        if not isinstance(self.content_digest_sha256, str):
+        object.__setattr__(
+            self,
+            "retrieved_at",
+            _validate_aware_datetime(self.retrieved_at, "retrieved_at"),
+        )
+        if type(self.content_digest_sha256) is not str:
             raise ValueError("content_digest_sha256 must be a string")
         if not _SHA256_PATTERN.fullmatch(self.content_digest_sha256):
             raise ValueError("content_digest_sha256 must be 64 lowercase hexadecimal characters")
@@ -175,7 +188,7 @@ class TaskEvidence:
         )
         _validate_level(self.importance_level, "importance_level")
         _validate_level(self.difficulty_level, "difficulty_level")
-        if not isinstance(self.source, EvidenceSource):
+        if type(self.source) is not EvidenceSource:
             raise ValueError("source must be EvidenceSource")
 
 
@@ -207,7 +220,7 @@ class KSAORequirement:
         )
         _validate_level(self.importance_level, "importance_level")
         _validate_level(self.proficiency_level, "proficiency_level")
-        if not isinstance(self.source, EvidenceSource):
+        if type(self.source) is not EvidenceSource:
             raise ValueError("source must be EvidenceSource")
 
 
@@ -240,7 +253,7 @@ class FunctionalJobAnalysisProfile:
                 raise ValueError(f"{field_name} must be an integer")
             if not 0 <= value <= maximum:
                 raise ValueError(f"{field_name} must be between 0 and {maximum}")
-        if not isinstance(self.source, EvidenceSource):
+        if type(self.source) is not EvidenceSource:
             raise ValueError("source must be EvidenceSource")
 
 
@@ -258,7 +271,7 @@ class TaskKSAOLink:
         _validate_uuid(self.task_record_id, "task_record_id")
         _validate_uuid(self.ksao_record_id, "ksao_record_id")
         _validate_level(self.relationship_strength, "relationship_strength")
-        if not isinstance(self.essential_for_task, bool):
+        if type(self.essential_for_task) is not bool:
             raise ValueError("essential_for_task must be a bool")
 
 
@@ -297,13 +310,14 @@ class JobAnalysisSnapshot:
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a date")
         recorded_at = _validate_aware_datetime(self.recorded_at, "recorded_at")
-        if not isinstance(self.tasks, tuple) or not self.tasks:
+        object.__setattr__(self, "recorded_at", recorded_at)
+        if type(self.tasks) is not tuple or not self.tasks:
             raise ValueError("tasks must be a non-empty tuple")
-        if not isinstance(self.ksao_requirements, tuple) or not self.ksao_requirements:
+        if type(self.ksao_requirements) is not tuple or not self.ksao_requirements:
             raise ValueError("ksao_requirements must be a non-empty tuple")
-        if not isinstance(self.task_ksao_links, tuple) or not self.task_ksao_links:
+        if type(self.task_ksao_links) is not tuple or not self.task_ksao_links:
             raise ValueError("task_ksao_links must be a non-empty tuple")
-        if not isinstance(self.fja_profile, FunctionalJobAnalysisProfile):
+        if type(self.fja_profile) is not FunctionalJobAnalysisProfile:
             raise ValueError("fja_profile must be FunctionalJobAnalysisProfile")
 
         for item in (*self.tasks, *self.ksao_requirements, self.fja_profile):
@@ -331,7 +345,7 @@ class JobAnalysisSnapshot:
         ksao_id_set = set(ksao_ids)
         link_pairs: set[tuple[UUID, UUID]] = set()
         for link in self.task_ksao_links:
-            if not isinstance(link, TaskKSAOLink):
+            if type(link) is not TaskKSAOLink:
                 raise ValueError("task_ksao_links must contain TaskKSAOLink values")
             if link.task_record_id not in task_id_set:
                 raise ValueError("task_ksao_links contains an unknown task_record_id")
@@ -351,6 +365,7 @@ class JobAnalysisSnapshot:
         if self.reviewed_by_reference is not None:
             _validate_reference(self.reviewed_by_reference, "reviewed_by_reference")
             reviewed_at = _validate_aware_datetime(self.reviewed_at, "reviewed_at")
+            object.__setattr__(self, "reviewed_at", reviewed_at)
             if reviewed_at > recorded_at:
                 raise ValueError("reviewed_at must not be later than recorded_at")
             if any(source.retrieved_at > reviewed_at for source in sources):

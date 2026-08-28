@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from uuid import UUID
 
 import pytest
@@ -101,6 +101,56 @@ class _ForgedLevel(int):
         return True
 
 
+class _OpaqueText(str):
+    """Represent valid evidence text through an untrusted runtime subclass."""
+
+
+class _MutableOffset(tzinfo):
+    """Expose timezone state that can change after evidence construction."""
+
+    def __init__(self) -> None:
+        """Start with a UTC offset."""
+        self.offset = timedelta(0)
+
+    def utcoffset(self, value):  # type: ignore[no-untyped-def]
+        """Return the currently configured offset."""
+        del value
+        return self.offset
+
+    def dst(self, value):  # type: ignore[no-untyped-def]
+        """Keep daylight saving fixed."""
+        del value
+        return timedelta(0)
+
+
+class _ExplodingOffset(tzinfo):
+    """Raise arbitrary provider behavior while an evidence instant is resolved."""
+
+    def utcoffset(self, value):  # type: ignore[no-untyped-def]
+        """Force the trust boundary to normalize provider failures."""
+        del value
+        raise RuntimeError("provider details must not escape")
+
+    def dst(self, value):  # type: ignore[no-untyped-def]
+        """Keep daylight saving fixed if queried."""
+        del value
+        return timedelta(0)
+
+
+class _OversizedOffset(tzinfo):
+    """Return an extreme offset that cannot be detached from year one."""
+
+    def utcoffset(self, value):  # type: ignore[no-untyped-def]
+        """Force UTC detachment outside representable datetime values."""
+        del value
+        return timedelta(hours=23, minutes=59)
+
+    def dst(self, value):  # type: ignore[no-untyped-def]
+        """Keep daylight saving fixed."""
+        del value
+        return timedelta(0)
+
+
 def _source(retrieved_at: datetime) -> EvidenceSource:
     """Build one governed source record."""
     return EvidenceSource(
@@ -188,6 +238,35 @@ def test_evidence_source_rejects_datetime_subclass_before_provenance_canonicaliz
 
 
 @pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("source_uri", _OpaqueText("https://www.onetcenter.org/database.html")),
+        ("source_title", _OpaqueText("O*NET Database")),
+        ("source_version_code", _OpaqueText("onet:30.3")),
+        ("content_digest_sha256", _OpaqueText("b" * 64)),
+    ],
+)
+def test_evidence_source_rejects_string_subclasses_before_canonicalization(
+    field_name: str, value: str
+) -> None:
+    """Reject caller-controlled string behavior in source provenance fields."""
+    source = _source(datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc))
+    with pytest.raises(ValueError, match="must be"):
+        replace(source, **{field_name: value})
+
+
+def test_snapshot_rejects_reference_string_subclasses_before_canonicalization() -> None:
+    """Reject caller-controlled runtime behavior in accountable review references."""
+    snapshot = _snapshot(
+        effective_from=date(2026, 8, 1),
+        recorded_at=RECORDED_AT,
+        reviewed_at=RECORDED_AT,
+    )
+    with pytest.raises(ValueError, match="reviewed_by_reference must be a string"):
+        replace(snapshot, reviewed_by_reference=_OpaqueText("keyverse_subject:01JIOPSYCH"))
+
+
+@pytest.mark.parametrize(
     ("effective_from", "recorded_at", "reviewed_at"),
     [
         (_ForgedDate(2026, 8, 1), RECORDED_AT, RECORDED_AT),
@@ -225,6 +304,62 @@ def test_evidence_source_rejects_origin_subclass_that_forges_allow_list_membersh
     source = _source(datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc))
     with pytest.raises(ValueError, match="origin_code must be a string"):
         replace(source, origin_code=_ForgedOriginCode("shadow_origin"))
+
+
+def test_evidence_source_detaches_mutable_timezone_state() -> None:
+    """Keep source provenance chronology stable after timezone state mutates."""
+    zone = _MutableOffset()
+    source = _source(datetime(2026, 8, 21, 5, 0, tzinfo=zone))
+    first = source.retrieved_at
+
+    zone.offset = timedelta(hours=9)
+
+    assert source.retrieved_at == first
+    assert source.retrieved_at.tzinfo is timezone.utc
+
+
+def test_snapshot_detaches_mutable_timezone_state() -> None:
+    """Keep snapshot chronology stable after caller-owned timezone state mutates."""
+    zone = _MutableOffset()
+    snapshot = _snapshot(
+        effective_from=date(2026, 8, 1),
+        recorded_at=datetime(2026, 8, 21, 5, 15, tzinfo=zone),
+        reviewed_at=RECORDED_AT,
+    )
+    first = snapshot.to_snapshot()
+
+    zone.offset = timedelta(hours=9)
+
+    assert snapshot.recorded_at.tzinfo is timezone.utc
+    assert snapshot.to_snapshot() == first
+
+
+def test_evidence_source_normalizes_timezone_provider_exceptions() -> None:
+    """Do not leak arbitrary timezone-provider exceptions from source construction."""
+    with pytest.raises(ValueError, match="retrieved_at must resolve to a UTC offset"):
+        _source(datetime(2026, 8, 21, 5, 0, tzinfo=_ExplodingOffset()))
+
+
+def test_evidence_source_normalizes_offset_overflow_to_value_error() -> None:
+    """Fail closed when UTC detachment exceeds representable datetime values."""
+    with pytest.raises(ValueError, match="retrieved_at must be a representable"):
+        _source(datetime(1, 1, 1, 0, 0, tzinfo=_OversizedOffset()))
+
+
+def test_snapshot_canonicalization_rejects_reintroduced_timezone_behavior() -> None:
+    """Fail closed if low-level mutation reintroduces executable timezone behavior."""
+    snapshot = _snapshot(
+        effective_from=date(2026, 8, 1),
+        recorded_at=RECORDED_AT,
+        reviewed_at=RECORDED_AT,
+    )
+    object.__setattr__(
+        snapshot,
+        "recorded_at",
+        datetime(2026, 8, 21, 5, 15, tzinfo=_MutableOffset()),
+    )
+    with pytest.raises(ValueError, match="exact timezone-aware datetime"):
+        snapshot.to_snapshot()
 
 
 def test_task_rejects_integer_subclass_that_forges_level_bounds() -> None:

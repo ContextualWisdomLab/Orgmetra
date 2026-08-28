@@ -11,7 +11,7 @@ business mutation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
@@ -32,6 +32,29 @@ _REQUIRED_TEXT_FIELDS = (
     "result_code",
 )
 _ALL_REQUIRED_TEXT_FIELDS = ("source_service", "event_type", *_REQUIRED_TEXT_FIELDS)
+
+
+def _freeze_timestamp(value: datetime) -> datetime:
+    """Detach caller-controlled timezone behavior as one immutable UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
+        raise ValueError("occurred_at must be an exact timezone-aware datetime.")
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise ValueError("occurred_at must resolve to a UTC offset.") from exc
+    if offset is None or type(offset) is not timedelta:
+        raise ValueError("occurred_at must resolve to a UTC offset.")
+    try:
+        return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise ValueError("occurred_at must be a representable timezone-aware datetime.") from exc
+
+
+def _canonical_timestamp(value: datetime) -> str:
+    """Render only a previously detached built-in UTC instant as RFC 3339 text."""
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
+        raise ValueError("occurred_at must be an exact timezone-aware datetime.")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,14 +101,11 @@ class AuditOutboxEvent:
         if type(self.high_impact) is not bool:
             raise ValueError("high_impact must be a boolean.")
         for field_name in _ALL_REQUIRED_TEXT_FIELDS:
-            if not isinstance(getattr(self, field_name), str):
+            if type(getattr(self, field_name)) is not str:
                 raise ValueError(f"{field_name} must be a string.")
-        if self.confirmation_reference is not None and not isinstance(self.confirmation_reference, str):
+        if self.confirmation_reference is not None and type(self.confirmation_reference) is not str:
             raise ValueError("confirmation_reference must be a string when supplied.")
-        if self.occurred_at.tzinfo is None:
-            raise ValueError("occurred_at must be timezone-aware.")
-        if self.occurred_at.utcoffset() is None:
-            raise ValueError("occurred_at must resolve to a UTC offset.")
+        object.__setattr__(self, "occurred_at", _freeze_timestamp(self.occurred_at))
         if _SOURCE_SERVICE_PATTERN.fullmatch(self.source_service) is None:
             raise ValueError("source_service must contain two or more lower snake_case words.")
         if _EVENT_TYPE_PATTERN.fullmatch(self.event_type) is None:
@@ -118,14 +138,13 @@ class AuditOutboxEvent:
             PII-minimized result body. Persist this mapping atomically with the
             owning business write before asynchronous delivery.
         """
-        occurred_utc = self.occurred_at.astimezone(timezone.utc)
         envelope: dict[str, object] = {
             "specversion": "1.0",
             "id": str(self.event_id),
             "source": f"urn:orgmetra:{self.source_service}",
             "type": self.event_type,
             "subject": self.resource_reference,
-            "time": occurred_utc.isoformat().replace("+00:00", "Z"),
+            "time": _canonical_timestamp(self.occurred_at),
             "datacontenttype": "application/json",
             "orgmetratenant": str(self.tenant_record_id),
             "orgmetraactor": self.actor_reference,
