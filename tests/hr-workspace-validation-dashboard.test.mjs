@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
   validationDashboardMarkup,
   validationDashboardViewModel,
 } from '../apps/hr-workspace/validation-dashboard-state.js';
+
+const workflow = readFileSync(
+  new URL('../.github/workflows/hr-workspace-validation-dashboard.yml', import.meta.url),
+  'utf8',
+);
 
 const STATES = Object.freeze([
   'idle',
@@ -132,4 +138,8 @@ test('validation dashboard gives a concrete fail-closed next action', () => {
     assert.equal(model.actionDisabled, false);
     assert.match(model.nextAction, pattern);
   }
+});
+
+test('the dedicated contract reruns after retargeting to protected develop', () => {
+  assert.match(workflow, /branches:\n\s+- develop\n\s+- feat\/hr-workspace-protected-read-state/);
 });
