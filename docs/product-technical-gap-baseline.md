@@ -35,10 +35,15 @@ Consequences:
 
 | Merged PR | Capability |
 |---|---|
+| #25 | Governed Job Analysis evidence boundary |
 | #26 | `validity_study_case_record` integrity |
 | #28 | Performance-criterion Job-scope guard |
 | #31 | Governed People mutation API |
+| #32 | Governed Naruon calendar intent adapter |
+| #33 | Bitemporal workforce-composition evidence |
+| #35 | Governed HRIS migration handoff |
 | #38 | Governed Job Analysis snapshot persistence/read |
+| #39 | Governed requisition review packet |
 | #41 | Governed candidate evidence intake |
 | #43 | Governed offer approval packet |
 
