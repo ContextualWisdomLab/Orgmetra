@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 
 import {
   jobArchitectureMarkup,
@@ -57,6 +58,8 @@ const FORBIDDEN_VALUE_KEYS = Object.freeze([
   'prompt',
   'modelOutput',
 ]);
+
+const WORKFLOW = readFileSync(new URL('../.github/workflows/hr-workspace-job-architecture.yml', import.meta.url), 'utf8');
 
 test('Job Architecture exposes only bounded governed workspace states', () => {
   for (const state of STATES) {
@@ -154,4 +157,8 @@ test('Job Architecture fails closed with a concrete next action', () => {
     assert.equal(model.jobProfilePublished, false);
     assert.match(model.nextAction, pattern);
   }
+});
+
+test('Job Architecture contract runs on protected develop and dependency parent pull requests', () => {
+  assert.match(WORKFLOW, /branches:\n\s+- develop\n\s+- feat\/hr-workspace-protected-read-state/);
 });
