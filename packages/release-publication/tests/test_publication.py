@@ -197,6 +197,29 @@ def test_publication_consumes_exact_authorization_once() -> None:
     assert repr(receipt) == "ReleasePublicationReceipt(<redacted>)"
 
 
+def test_consumed_authorization_cannot_be_reused_for_another_publication_attempt() -> None:
+    """Reject a second operation using the same one-shot authorization before host work."""
+    authorization = _authorization_receipt()
+    publisher = _Publisher(
+        _platform_receipt(authorization_evidence_digest_sha256=authorization.sha256_digest())
+    )
+    publish_authorized_release(
+        authorization_receipt=authorization,
+        publication_reference=_PUBLICATION_REFERENCE,
+        publisher=publisher,
+        clock=lambda: _PUBLISH_STARTED_AT,
+    )
+
+    with pytest.raises(ReleasePublicationError, match="already been consumed"):
+        publish_authorized_release(
+            authorization_receipt=authorization,
+            publication_reference=_PUBLICATION_REFERENCE,
+            publisher=publisher,
+            clock=lambda: _PUBLISH_STARTED_AT,
+        )
+    assert publisher.publish_calls == 1
+
+
 def test_publication_rejects_non_authorization_before_host_work() -> None:
     """Reject invented authorization evidence before any publication call."""
     publisher = _Publisher(_platform_receipt())

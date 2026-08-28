@@ -9,7 +9,7 @@ import json
 import re
 from threading import RLock
 from typing import Callable, ClassVar, Protocol, cast
-from weakref import WeakKeyDictionary
+from weakref import WeakKeyDictionary, WeakSet
 
 from orgmetra_release_authorization import ReleaseAuthorizationReceipt
 
@@ -28,6 +28,8 @@ _REASON_CODE = "authorized_commercial_release"
 _EVIDENCE_VERSION = 1
 _MAX_AUTHORIZATION_AGE = timedelta(seconds=60)
 _RECEIPT_CAPABILITY = object()
+_CONSUMED_AUTHORIZATIONS: WeakSet[ReleaseAuthorizationReceipt] = WeakSet()
+_CONSUMPTION_LOCK = RLock()
 
 
 class ReleasePublicationError(ValueError):
@@ -376,6 +378,14 @@ def _reconcile_or_raise(
     return snapshot
 
 
+def _consume_authorization(receipt: ReleaseAuthorizationReceipt) -> None:
+    """Atomically consume one authorization before any publication side effect."""
+    with _CONSUMPTION_LOCK:
+        if receipt in _CONSUMED_AUTHORIZATIONS:
+            raise ReleasePublicationError("release authorization has already been consumed")
+        _CONSUMED_AUTHORIZATIONS.add(receipt)
+
+
 def publish_authorized_release(
     *,
     authorization_receipt: object,
@@ -404,6 +414,7 @@ def publish_authorized_release(
     if publication_started_at - audit_recorded_at > _MAX_AUTHORIZATION_AGE:
         raise ReleasePublicationError("release authorization is stale for publication")
 
+    _consume_authorization(authorization_receipt)
     publish_kwargs = {
         "candidate_revision_sha": candidate_revision,
         "tag_name": tag_name,
