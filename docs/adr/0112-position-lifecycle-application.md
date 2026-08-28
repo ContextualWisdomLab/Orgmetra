@@ -1,0 +1,41 @@
+# ADR 0112: Apply reviewed Position lifecycle changes as bitemporal truth
+
+Status: Proposed
+
+## Context
+
+PR #111 adds a human-reviewed, deliberately non-authorizing `PositionLifecycleChangeReviewPacket`. Protected `develop` already separates stable `position_record` identity from bitemporal `position_record_version`, and Assignment truth separately represents worker occupancy. A commercial HRIS still needs an authoritative boundary that can turn an approved lifecycle proposal into Position truth without treating stale UI state or the review artifact itself as authority.
+
+Closing or abolishing an occupied Position is high-impact because it can make staffing truth internally inconsistent. Rewriting a PositionVersion in place would also destroy what the system previously knew. The review packet carries value-minimized Position and Assignment snapshot digests, so the application boundary must prove those digests still describe authoritative truth rather than merely checking that they look like SHA-256 values.
+
+## Decision
+
+Add an Orgmetra-owned Position lifecycle application boundary. It consumes exact v1 canonical review evidence, revalidates its SHA-256 and governed shape, locks the tenant-qualified Position, resolves the exact PositionVersion covering the requested business-effective date at current system time, rejects stale reviewed status, and checks current Assignment occupancy before `closed` or `abolished` transitions.
+
+The authoritative boundary independently canonicalizes the review JSON as compact key-sorted object bytes and rejects semantically equivalent but differently encoded input. It recomputes a value-minimized Position snapshot digest from the current Position anchor plus the system-visible PositionVersion at the reviewed effective date, and a deterministic Assignment-occupancy digest from the system-visible assignments at that date. Both must exactly match the reviewed digests before mutation. Missing authoritative Position truth fails closed; an empty Assignment set has a deterministic digest. This prevents a caller from substituting arbitrary syntactically valid hashes or replaying a stale review after relevant Position/Assignment truth changes.
+
+Application closes only the predecessor system-recorded interval at PostgreSQL transaction time. When the reviewed effective date splits an existing business-effective interval, it inserts a preserved predecessor segment plus the reviewed successor segment at the new system-recorded time. The stable Position identity is unchanged.
+
+One immutable `position_lifecycle_application_record` binds predecessor/successor identities, exact review bytes/digest, requester/reviewer/applier separation, lifecycle reason, human-review chronology, and the audit/outbox identities. The audit/outbox event is created in the same transaction and must match Position subject, purpose, reason, review digest, applier, high-impact result, and human-confirmation reference. Application evidence and PositionVersion history reject UPDATE/DELETE rewrite; tenant-scoped application evidence uses forced row-level security.
+
+The high-impact `apply_position_lifecycle_change(...)` function does not retain PostgreSQL's default `PUBLIC EXECUTE` privilege. Production execution must therefore be granted deliberately to the intended application role; this database privilege is defense in depth and does not replace purpose-bound application authorization.
+
+## Consequences
+
+- Business-effective time and system-recorded time remain independent and reconstructable.
+- A later-effective PositionVersion that was already recorded remains a separate scheduled fact; applying a review to an earlier interval does not silently overwrite that future lifecycle state. Any change to that later interval requires its own reviewed application.
+- A review packet never authorizes mutation by itself; current Position and Assignment truth is re-resolved and cryptographically compared with the reviewed snapshots at application time.
+- Canonical review bytes are part of the governed contract; recomputing a digest over a differently encoded but semantically equivalent document does not create acceptable evidence.
+- `closed` and `abolished` fail closed while any current Assignment overlaps the requested effective date or later.
+- Existing Assignment, reporting-line, compensation, assessment, and Person facts remain separate; no cross-service table SQL is introduced.
+- The branch is a dependency-first descendant of #111 and remains Draft until the parent integrates and fresh post-restack gates pass.
+- Direct production database privileges remain a deployment concern; forced row-level security and revoked default function execution do not replace application authorization.
+
+## Alternatives rejected
+
+1. **Overwrite `position_record_version.position_status_code`.** Rejected because it destroys system-time history.
+2. **Create a new Position identity for each lifecycle change.** Rejected because Job/Position/Assignment semantics require a stable Position anchor with versioned state.
+3. **Apply the review without refreshing Assignment truth.** Rejected because a reviewed closure can become stale before application and strand active staffing evidence.
+4. **Trust caller-supplied snapshot hashes after syntax validation.** Rejected because a caller could forge or replay otherwise well-shaped evidence without proving it still matches authoritative bitemporal truth.
+5. **Leave `apply_position_lifecycle_change(...)` executable by PostgreSQL `PUBLIC`.** Rejected because a high-impact employment-data mutation boundary should require an explicit deployment grant.
+6. **Move lifecycle state into reporting or vacancy tables.** Rejected because those relations own different facts and would violate the Job/Position/Assignment model.

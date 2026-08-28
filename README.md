@@ -79,3 +79,5 @@ Job evidence
 ## Status
 
 Protected `develop` includes the employment-truth kernel, governed candidate-to-worker conversion, purpose-bound PII authorization, normalized worker-bound validity studies, criterion-observation scope, bitemporal workforce-composition evidence, the governed Naruon intent adapter, and requisition review packets. This active PR adds durable purpose-bound People mutation and confirmed-hire materialization paths for Employment, Position, and Assignment with atomic audit/outbox evidence and tenant-scoped idempotency; treat those write paths as active-PR truth until this exact head passes all fresh protected-base gates and merges.
+
+The stacked Position lifecycle application branch adds a separate high-impact database boundary: only canonical human-reviewed lifecycle evidence whose fresh tenant-scoped Position and Assignment snapshots still match may produce an immutable bitemporal PositionVersion correction and atomic audit/outbox evidence. It remains active-PR truth until its parent review boundary is integrated and fresh protected gates pass.
