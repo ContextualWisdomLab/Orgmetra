@@ -440,6 +440,12 @@ def publish_authorized_release(
                 publication_started_at=publication_started_at,
             )
 
+    published_at = cast(datetime, platform_snapshot["published_at"])
+    if published_at - audit_recorded_at > _MAX_AUTHORIZATION_AGE:
+        raise ReleasePublicationIndeterminateError(
+            "release was published after authorization expiry; do not republish"
+        )
+
     return ReleasePublicationReceipt(
         authorization_evidence_digest_sha256=authorization_digest,
         candidate_revision_sha=candidate_revision,
@@ -448,6 +454,6 @@ def publish_authorized_release(
         platform_release_digest_sha256=cast(str, platform_snapshot["platform_release_digest_sha256"]),
         audit_event_envelope_digest_sha256=cast(str, platform_snapshot["audit_event_envelope_digest_sha256"]),
         publication_started_at=publication_started_at,
-        published_at=cast(datetime, platform_snapshot["published_at"]),
+        published_at=published_at,
         _capability=_RECEIPT_CAPABILITY,
     )

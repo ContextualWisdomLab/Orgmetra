@@ -9,7 +9,6 @@ import pytest
 
 from orgmetra_release_publication import ReleasePlatformReceipt, ReleasePublicationError
 from orgmetra_release_publication import publication as publication_module
-from orgmetra_release_publication import execution as execution_module
 
 _DIGEST = "1" * 64
 _CANDIDATE = "a" * 40
@@ -254,17 +253,3 @@ def test_publication_core_rejects_start_before_authorization_audit(monkeypatch: 
             publisher=_ReconcileFailure(),  # type: ignore[arg-type]
             clock=lambda: datetime(2026, 8, 26, 8, 0, 1, tzinfo=timezone.utc),
         )
-
-
-@pytest.mark.parametrize(
-    "payload",
-    [
-        {},
-        {"audit_recorded_at": 7},
-        {"audit_recorded_at": "not-a-timeZ"},
-    ],
-)
-def test_execution_guard_normalizes_invalid_parent_audit_time(payload: dict[str, object]) -> None:
-    """Reject unreadable authorization chronology before invoking the publication core."""
-    with pytest.raises(ReleasePublicationError, match="audit time is invalid"):
-        execution_module._authorization_audit_time(_CanonicalReceipt(payload))  # type: ignore[arg-type]

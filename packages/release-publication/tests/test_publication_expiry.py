@@ -13,6 +13,7 @@ from orgmetra_release_publication import (
     ReleasePublicationIndeterminateError,
     publish_authorized_release,
 )
+from orgmetra_release_publication import publication as publication_module
 
 _CANDIDATE = "a" * 40
 _DIGEST = "1" * 64
@@ -125,12 +126,16 @@ class _LatePublisher:
         return self._late_receipt()
 
 
-def test_publication_after_authorization_expiry_is_indeterminate_and_never_republished() -> None:
+@pytest.mark.parametrize(
+    "publish",
+    [publish_authorized_release, publication_module.publish_authorized_release],
+)
+def test_publication_after_authorization_expiry_is_indeterminate_and_never_republished(publish) -> None:
     """Do not bless or retry a host release published after authorization expiry."""
     authorization = _authorization()
     publisher = _LatePublisher(authorization.sha256_digest())
     with pytest.raises(ReleasePublicationIndeterminateError, match="do not republish"):
-        publish_authorized_release(
+        publish(
             authorization_receipt=authorization,
             publication_reference=_REFERENCE,
             publisher=publisher,
