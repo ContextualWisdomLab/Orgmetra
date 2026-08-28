@@ -18,6 +18,7 @@
 | Immutable audit/outbox | `audit_event_record_id` + scope trigger | exact subject/purpose/actor/evidence/time/result and `integration_hub` outbox required |
 | Effective and system-recorded time | effective range + recorded range | backdated `recorded_from` rejection, bitemporal exclusion, correction-only closure |
 | Tenant isolation | FORCE RLS on both relations | `NOSUPERUSER NOBYPASSRLS` reader sees only its tenant; missing context sees no rows |
+| Prevent trigger name-resolution shadowing | trusted migration path plus fixed trigger-function `search_path` | full migration-chain contract counts all five pinned trigger functions |
 | Data minimization | relation shape | no candidate/person identifiers, PII, raw rule text, scores, compensation or model output columns |
 | History integrity | history and TRUNCATE guards | in-place rewrite, DELETE and TRUNCATE fail closed; anchor cannot close before versions |
 

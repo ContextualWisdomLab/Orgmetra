@@ -21,7 +21,7 @@ The version always persists with `activation_state = requires_authoritative_acti
 
 Raw qualification-rule text, candidate/person identifiers, PII, assessment outcomes, cut scores, compensation and model output are intentionally absent from these relations. The artifact is represented by digest and controlled metadata only.
 
-System-recorded `recorded_from` must equal PostgreSQL `transaction_timestamp()`; callers cannot backdate recorded truth. Effective time remains independent business time. Recorded history is append/correction-only, TRUNCATE is rejected, and FORCE RLS uses the existing transaction-local tenant context. A durable anchor cannot close while a child version remains recorded open.
+System-recorded `recorded_from` must equal PostgreSQL `transaction_timestamp()`; callers cannot backdate recorded truth. Effective time remains independent business time. Recorded history is append/correction-only, TRUNCATE is rejected, and FORCE RLS uses the existing transaction-local tenant context. Every new trigger function pins `search_path` to `pg_catalog, public, pg_temp`, while migration-time object creation uses the trusted `public, pg_catalog` path. A durable anchor cannot close while a child version remains recorded open.
 
 ## Consequences
 

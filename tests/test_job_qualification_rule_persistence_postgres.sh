@@ -7,10 +7,39 @@ for migration in \
     database/migrations/0001_foundation_schema.sql \
     database/migrations/0002_sealed_evidence_digest.sql \
     database/migrations/0003_audit_outbox_persistence.sql \
+    database/migrations/0004_outbox_delivery_claim.sql \
+    database/migrations/0005_outbox_delivery_finalization.sql \
+    database/migrations/0006_outbox_delivery_dead_letter.sql \
+    database/migrations/0007_outbox_retry_exhaustion.sql \
+    database/migrations/0008_audit_outbox_review_hardening.sql \
+    database/migrations/0009_candidate_worker_conversion_governance.sql \
+    database/migrations/0010_validity_study_case_integrity.sql \
+    database/migrations/0011_criterion_observation_scope.sql \
+    database/migrations/0012_people_mutation_idempotency.sql \
     database/migrations/0013_job_analysis_snapshot.sql \
     database/migrations/0019_job_qualification_rule_persistence.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
+
+guarded_function_count="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_catalog.pg_proc AS procedure_record
+JOIN pg_catalog.pg_namespace AS procedure_schema
+  ON procedure_schema.oid = procedure_record.pronamespace
+WHERE procedure_schema.nspname = 'public'
+  AND procedure_record.proname IN (
+      'enforce_job_qualification_rule_system_time',
+      'protect_job_qualification_rule_history',
+      'enforce_job_qualification_rule_scope',
+      'enforce_job_qualification_rule_anchor_alignment',
+      'reject_job_qualification_rule_truncate'
+  )
+  AND procedure_record.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp'];
+")"
+if [[ "${guarded_function_count}" != "5" ]]; then
+    echo "qualification-rule trigger functions did not pin their trusted search_path: ${guarded_function_count}" >&2
+    exit 1
+fi
 
 TENANT_ID="10000000-0000-7000-8000-000000000001"
 OTHER_TENANT_ID="20000000-0000-7000-8000-000000000002"

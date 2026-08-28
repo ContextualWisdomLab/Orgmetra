@@ -3,6 +3,8 @@
 -- value-minimized: raw rule text, candidate/person PII, cut scores, assessment
 -- outcomes and model output are deliberately outside these relations.
 
+SET search_path = public, pg_catalog;
+
 CREATE TABLE job_qualification_rule_record (
     tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
     job_qualification_rule_record_id uuid PRIMARY KEY,
@@ -113,6 +115,7 @@ CREATE TABLE job_qualification_rule_version (
 CREATE FUNCTION enforce_job_qualification_rule_system_time()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_to IS NOT NULL THEN
@@ -143,6 +146,7 @@ EXECUTE FUNCTION enforce_job_qualification_rule_system_time();
 CREATE FUNCTION protect_job_qualification_rule_history()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -178,6 +182,7 @@ EXECUTE FUNCTION protect_job_qualification_rule_history();
 CREATE FUNCTION enforce_job_qualification_rule_scope()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     anchor_job_profile_id uuid;
@@ -282,6 +287,7 @@ EXECUTE FUNCTION enforce_job_qualification_rule_scope();
 CREATE FUNCTION enforce_job_qualification_rule_anchor_alignment()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_to IS NULL OR NEW.recorded_to IS NOT DISTINCT FROM OLD.recorded_to THEN
@@ -314,6 +320,7 @@ EXECUTE FUNCTION enforce_job_qualification_rule_anchor_alignment();
 CREATE FUNCTION reject_job_qualification_rule_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'Job qualification-rule history cannot be truncated'
