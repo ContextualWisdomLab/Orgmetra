@@ -3,6 +3,7 @@ name: HR Workspace Position Reporting Review State Quality
 on:
   pull_request:
     branches:
+      - develop
       - feat/hr-workspace-protected-read-state
     paths:
       - "apps/hr-workspace/position-reporting-review-state.js"

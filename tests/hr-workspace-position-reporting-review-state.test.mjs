@@ -14,6 +14,10 @@ const css = readFileSync(
   new URL('../apps/hr-workspace/position-reporting-review-state.css', import.meta.url),
   'utf8',
 );
+const workflow = readFileSync(
+  new URL('../.github/workflows/hr-workspace-position-reporting-review-state.yml', import.meta.url),
+  'utf8',
+);
 
 const expectedStates = {
   idle: ['false', 'status', false, 'default', 'Review reporting-line evidence'],
@@ -135,4 +139,8 @@ test('Storybook and CSS cover high-risk reporting-line review accessibility stat
   assert.match(css, /\[aria-busy="true"\]/);
   assert.match(css, /high-risk-confirmation/);
   assert.match(css, /min-height:\s*44px/);
+});
+
+test('the dedicated contract reruns on protected develop after parent integration', () => {
+  assert.match(workflow, /branches:\n\s+- develop\n\s+- feat\/hr-workspace-protected-read-state/);
 });
