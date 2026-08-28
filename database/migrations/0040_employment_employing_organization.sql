@@ -50,6 +50,90 @@ ON employment_employing_organization_record (
     employing_organization_unit_id
 );
 
+-- The exact-one rule spans three relations. Deferred constraint triggers alone
+-- can suffer READ COMMITTED write skew when two transactions validate before
+-- either commit becomes visible. Serialize only mutations that can change this
+-- invariant, scoped to one tenant. Hash collisions merely serialize unrelated
+-- tenants; they cannot weaken integrity.
+CREATE FUNCTION serialize_employment_employing_organization_invariant()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_tenant_record_id uuid;
+    v_organization_unit_id uuid;
+    touches_exact_one boolean := false;
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        v_tenant_record_id := OLD.tenant_record_id;
+    ELSE
+        v_tenant_record_id := NEW.tenant_record_id;
+    END IF;
+
+    IF TG_TABLE_NAME = 'employment_record_version' THEN
+        IF TG_OP = 'INSERT' THEN
+            touches_exact_one := NEW.employment_status_code IN ('active', 'leave');
+        ELSIF TG_OP = 'DELETE' THEN
+            touches_exact_one := OLD.employment_status_code IN ('active', 'leave');
+        ELSE
+            touches_exact_one := OLD.employment_status_code IN ('active', 'leave')
+                OR NEW.employment_status_code IN ('active', 'leave');
+        END IF;
+    ELSIF TG_TABLE_NAME = 'organization_unit_version' THEN
+        IF TG_OP = 'DELETE' THEN
+            v_organization_unit_id := OLD.organization_unit_id;
+            touches_exact_one := OLD.organization_type_code = 'legal_entity';
+        ELSIF TG_OP = 'INSERT' THEN
+            v_organization_unit_id := NEW.organization_unit_id;
+            touches_exact_one := NEW.organization_type_code = 'legal_entity';
+        ELSE
+            v_organization_unit_id := NEW.organization_unit_id;
+            touches_exact_one := OLD.organization_type_code = 'legal_entity'
+                OR NEW.organization_type_code = 'legal_entity';
+        END IF;
+
+        IF NOT touches_exact_one THEN
+            touches_exact_one := EXISTS (
+                SELECT 1
+                FROM employment_employing_organization_record relation
+                WHERE relation.tenant_record_id = v_tenant_record_id
+                  AND relation.employing_organization_unit_id = v_organization_unit_id
+            );
+        END IF;
+    ELSE
+        -- Every employer-relationship mutation changes the exact-one graph.
+        touches_exact_one := true;
+    END IF;
+
+    IF touches_exact_one THEN
+        PERFORM pg_advisory_xact_lock(
+            hashtext('orgmetra.employment_employer_exact_one'),
+            hashtext(v_tenant_record_id::text)
+        );
+    END IF;
+
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER employment_employing_organization_invariant_employment_lock
+BEFORE INSERT OR UPDATE OR DELETE ON employment_record_version
+FOR EACH ROW
+EXECUTE FUNCTION serialize_employment_employing_organization_invariant();
+
+CREATE TRIGGER employment_employing_organization_invariant_relationship_lock
+BEFORE INSERT OR UPDATE OR DELETE ON employment_employing_organization_record
+FOR EACH ROW
+EXECUTE FUNCTION serialize_employment_employing_organization_invariant();
+
+CREATE TRIGGER employment_employing_organization_invariant_organization_lock
+BEFORE INSERT OR UPDATE OR DELETE ON organization_unit_version
+FOR EACH ROW
+EXECUTE FUNCTION serialize_employment_employing_organization_invariant();
+
 CREATE FUNCTION validate_employment_employing_organization_scope()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -349,6 +433,7 @@ ON employment_employing_organization_record
 USING (tenant_record_id = current_tenant_record_id())
 WITH CHECK (tenant_record_id = current_tenant_record_id());
 
+REVOKE ALL ON FUNCTION serialize_employment_employing_organization_invariant() FROM PUBLIC;
 REVOKE ALL ON FUNCTION validate_employment_employing_organization_scope() FROM PUBLIC;
 REVOKE ALL ON FUNCTION reject_employment_employing_organization_truncate() FROM PUBLIC;
 
