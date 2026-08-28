@@ -117,6 +117,16 @@ test('idle and every governed state render only constant value-minimized interac
 test('unsupported or non-string states are rejected before rendering', () => {
   assert.throws(() => positionLifecycleReviewViewModel({}), /exact built-in string/);
   assert.throws(() => positionLifecycleReviewViewModel('approved'), /unsupported Position lifecycle review state/);
+  for (const inheritedState of ['constructor', 'toString', '__proto__']) {
+    assert.throws(
+      () => positionLifecycleReviewViewModel(inheritedState),
+      /unsupported Position lifecycle review state/,
+    );
+    assert.throws(
+      () => positionLifecycleReviewStateMarkup(inheritedState),
+      /unsupported Position lifecycle review state/,
+    );
+  }
   assert.throws(() => positionLifecycleReviewStateMarkup(3), /exact built-in string/);
 });
 
