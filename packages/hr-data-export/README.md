@@ -6,7 +6,7 @@ This package separates **pre-export human review** from the later **audited one-
 
 `HrDataExportReviewPacket` binds one tenant, one opaque HR resource, one purpose-bound authorization evidence reference and SHA-256 digest, one explicit sorted/unique field subset, distinct requester/reviewer actors, one export format, one delivery class, one evidence version and one detached UTC instant. It carries no HR field values and remains `not_authorized_to_export`.
 
-Creation-time canonical review evidence is sealed in a process-local weak registry outside packet-writable state so low-level valid-looking post-issuance rewrites cannot create a second reviewed truth. This is defense in depth only; durable uniqueness and replay/idempotency remain host persistence responsibilities.
+Creation-time canonical review evidence is sealed in a process-local weak registry outside packet-writable state so low-level valid-looking post-issuance rewrites cannot create a second reviewed truth. Packet equality is intentionally identity-based because the seal is instance-bound; compare canonical JSON or its SHA-256 digest for semantic equality. This is defense in depth only; durable uniqueness and replay/idempotency remain host persistence responsibilities.
 
 ## One-time execution
 
@@ -29,7 +29,7 @@ A delivery that completed inside the authorization window remains a completed au
 
 A clock failure after the publication call is also an indeterminate delivery outcome, not a safe retry signal. Operators must reconcile the existing `export_execution_reference` and audit correlation before any later action. The governed function never invokes the publication operation twice in one execution attempt.
 
-The final Orgmetra receipt stores correlation, digests, artifact size, audit/egress references and chronology only. It never contains employee names, email values, employee numbers, compensation, ratings, candidate data or raw exported content. Its creation-time canonical evidence is sealed outside receipt-writable state so post-issuance rewrites fail closed.
+The final Orgmetra receipt stores correlation, digests, artifact size, audit/egress references and chronology only. It never contains employee names, email values, employee numbers, compensation, ratings, candidate data or raw exported content. Its creation-time canonical evidence is sealed outside receipt-writable state so post-issuance rewrites fail closed; receipt equality is likewise identity-based, so compare canonical JSON or its SHA-256 digest for semantic equality.
 
 ## What this package still does not own
 

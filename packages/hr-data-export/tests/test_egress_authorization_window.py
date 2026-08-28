@@ -11,8 +11,8 @@ from orgmetra_hr_data_export import HrDataExportReviewPacket
 from orgmetra_hr_data_export.execution import (
     HrDataExportArtifact,
     HrDataExportAuditReceipt,
+    HrDataExportDeliveryIndeterminateError,
     HrDataExportEgressReceipt,
-    HrDataExportExecutionError,
     HrDataExportExecutionVerification,
     execute_reviewed_hr_export,
 )
@@ -123,6 +123,10 @@ class EgressPort:
         assert published_at <= self.receipt.delivered_at
         return self.receipt
 
+    def reconcile_one_time_download(self, **_: object) -> object:
+        """Return the same authoritative receipt without publishing again."""
+        return self.receipt
+
 
 def make_review() -> HrDataExportReviewPacket:
     """Return one valid reviewed export request."""
@@ -195,7 +199,7 @@ def make_ports(
         artifact_sha256_digest=artifact.sha256_digest,
         artifact_byte_length=artifact.byte_length,
         audit_event_reference=AUDIT_REFERENCE,
-        recorded_at=BASE_TIME + timedelta(seconds=2),
+        recorded_at=BASE_TIME + timedelta(seconds=3),
     )
     egress_receipt = HrDataExportEgressReceipt(
         tenant_record_id=TENANT_ID,
@@ -253,6 +257,7 @@ def test_delivery_before_expiry_remains_successful_when_observed_after_expiry() 
             BASE_TIME + timedelta(seconds=1),
             BASE_TIME + timedelta(seconds=2),
             BASE_TIME + timedelta(seconds=3),
+            BASE_TIME + timedelta(seconds=3),
             BASE_TIME + timedelta(seconds=5),
         ),
     )
@@ -262,13 +267,13 @@ def test_delivery_before_expiry_remains_successful_when_observed_after_expiry() 
 
 
 def test_delivery_at_or_after_expiry_is_rejected_by_receipt_window_binding() -> None:
-    """The receipt itself must prove delivery occurred inside the authorized half-open interval."""
+    """An expired delivery receipt is indeterminate and never becomes an automatic retry."""
     expires_at = BASE_TIME + timedelta(seconds=4)
     review, authority, materializer, audit_port, egress_port = make_ports(
         delivered_at=BASE_TIME + timedelta(seconds=4, milliseconds=500),
         expires_at=expires_at,
     )
-    with pytest.raises(HrDataExportExecutionError, match="egress receipt"):
+    with pytest.raises(HrDataExportDeliveryIndeterminateError, match="do not republish"):
         execute(
             review,
             authority,
@@ -278,6 +283,7 @@ def test_delivery_at_or_after_expiry_is_rejected_by_receipt_window_binding() -> 
             SequenceClock(
                 BASE_TIME + timedelta(seconds=1),
                 BASE_TIME + timedelta(seconds=2),
+                BASE_TIME + timedelta(seconds=3),
                 BASE_TIME + timedelta(seconds=3),
                 BASE_TIME + timedelta(seconds=5),
             ),

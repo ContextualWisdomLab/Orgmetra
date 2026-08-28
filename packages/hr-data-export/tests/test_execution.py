@@ -13,6 +13,7 @@ from orgmetra_hr_data_export import HrDataExportReviewPacket
 from orgmetra_hr_data_export.execution import (
     HrDataExportArtifact,
     HrDataExportAuditReceipt,
+    HrDataExportDeliveryIndeterminateError,
     HrDataExportEgressReceipt,
     HrDataExportExecutionError,
     HrDataExportExecutionReceipt,
@@ -623,7 +624,7 @@ def test_wrong_egress_type_and_expiry_during_egress_fail_closed() -> None:
     artifact = make_artifact()
     audit_receipt = make_audit_receipt(verification, artifact)
     events: list[str] = []
-    with pytest.raises(HrDataExportExecutionError, match="egress port"):
+    with pytest.raises(HrDataExportDeliveryIndeterminateError, match="do not republish"):
         execute_reviewed_hr_export(
             review=review,
             authority=FakeAuthority(verification, events),
@@ -643,7 +644,7 @@ def test_wrong_egress_type_and_expiry_during_egress_fail_closed() -> None:
     expiring_audit = make_audit_receipt(expiring, artifact)
     expiring_egress = make_egress_receipt(expiring, artifact, expiring_audit)
     events = []
-    with pytest.raises(HrDataExportExecutionError, match="expired"):
+    with pytest.raises(HrDataExportDeliveryIndeterminateError, match="do not republish"):
         execute_reviewed_hr_export(
             review=review,
             authority=FakeAuthority(expiring, events),

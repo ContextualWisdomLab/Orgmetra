@@ -170,6 +170,8 @@ class HrDataExportReviewPacket:
     leaves its owning service. A process-local external creation seal prevents
     low-level mutation from turning one reviewed correlation into a second truth;
     durable cross-process uniqueness remains the persistence/audit owner's job.
+    Identity equality is intentional because that seal is keyed by packet instance;
+    compare ``canonical_json()`` or ``sha256_digest()`` for semantic equality.
     """
 
     tenant_record_id: str

@@ -10,7 +10,7 @@ one-time-delivery mechanism.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from hashlib import sha256
 import json
 from threading import Lock
@@ -324,7 +324,12 @@ class HrDataExportEgressPort(Protocol):
 
 @dataclass(frozen=True, slots=True, weakref_slot=True, repr=False, init=False, eq=False)
 class HrDataExportExecutionReceipt:
-    """Value-minimized successful export receipt issued only by governed orchestration."""
+    """Value-minimized successful export receipt issued only by governed orchestration.
+
+    Identity equality is intentional because the process-local seal is keyed by
+    receipt instance; compare ``canonical_json()`` or ``sha256_digest()`` for
+    semantic equality.
+    """
 
     tenant_record_id: str
     export_execution_reference: str
