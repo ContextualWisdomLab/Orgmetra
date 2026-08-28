@@ -216,13 +216,18 @@ def _decision(
     policy: PurposeBoundAccessPolicy,
     allowed: bool,
     reason_code: str,
+    next_action_override: str | None = None,
 ) -> AuthorizationDecision:
     """Build one immutable allow/deny record without copying protected values."""
     authorized_fields = request.requested_fields if allowed else frozenset()
     next_action = (
         "Continue with only the authorized fields."
         if allowed
-        else _DENIAL_NEXT_ACTION[reason_code]
+        else (
+            next_action_override
+            if next_action_override is not None
+            else _DENIAL_NEXT_ACTION[reason_code]
+        )
     )
     return AuthorizationDecision(
         allowed=allowed,
@@ -300,6 +305,10 @@ def evaluate_purpose_bound_access(
             policy=policy,
             allowed=False,
             reason_code="required_scope_missing",
+            next_action_override=(
+                "Obtain the exact Keyverse scope for the governed target before retrying; "
+                "the operation scope alone cannot authorize that target."
+            ),
         )
     if not request.requested_fields.issubset(policy.permitted_fields):
         return _decision(
