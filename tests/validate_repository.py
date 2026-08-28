@@ -272,7 +272,7 @@ def _validate_database_contract() -> None:
         "CREATE FUNCTION protect_bitemporal_history",
         "to_jsonb(NEW) - 'recorded_to' <> to_jsonb(OLD) - 'recorded_to'",
         "CREATE TRIGGER person_record_bitemporal_guard",
-        "CREATE TRIGGER person_name_record_bitemporal_guard",
+        "CREATE TRIGGER person_name_bitemporal_guard",
         "CREATE TRIGGER employment_record_bitemporal_guard",
         "CREATE TRIGGER organization_unit_anchor_bitemporal_guard",
         "CREATE TRIGGER organization_unit_bitemporal_guard",
