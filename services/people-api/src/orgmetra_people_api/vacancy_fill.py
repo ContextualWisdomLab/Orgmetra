@@ -39,6 +39,35 @@ class VacancyFillIntegrityError(RuntimeError):
     """Indicate that fresh authoritative vacancy evidence no longer matches the requested fill."""
 
 
+def _validate_verification_fields(verification: VacancyFillVerification) -> None:
+    """Require every vacancy verification field to retain its trusted runtime invariant."""
+    for field_name in (
+        "tenant_record_id",
+        "employment_record_id",
+        "person_record_id",
+        "position_record_id",
+    ):
+        _validate_operational_uuid(field_name, getattr(verification, field_name))
+    if type(verification.effective_on) is not date:
+        raise ValueError("effective_on must be a business date.")
+    if (
+        type(verification.position_status_code) is not str
+        or verification.position_status_code not in _STAFFABLE_POSITION_STATUSES
+    ):
+        raise ValueError("position_status_code must be active or open.")
+    ratio = verification.available_allocation_ratio
+    if type(ratio) is not Decimal or not ratio.is_finite():
+        raise ValueError("available_allocation_ratio must be a finite exact Decimal.")
+    if ratio <= Decimal("0") or ratio > Decimal("1.0000"):
+        raise ValueError("available_allocation_ratio must be greater than 0 and at most 1.0000.")
+    if ratio.as_tuple().exponent < -4:
+        raise ValueError("available_allocation_ratio must have at most four decimal places.")
+    _validate_reference("confirmation_reference", verification.confirmation_reference)
+    _validate_version(verification.evidence_version_code)
+    if type(verification.review_state) is not str or verification.review_state != "human_confirmed":
+        raise ValueError("review_state must be human_confirmed.")
+
+
 def _validate_operational_uuid(field_name: str, value: object) -> None:
     """Require an exact UUID outside Orgmetra's reserved protocol sentinels."""
     if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
@@ -80,27 +109,7 @@ class VacancyFillVerification:
 
     def __post_init__(self) -> None:
         """Fail closed on malformed or non-human vacancy evidence before mutation."""
-        for field_name in (
-            "tenant_record_id",
-            "employment_record_id",
-            "person_record_id",
-            "position_record_id",
-        ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
-        if type(self.effective_on) is not date:
-            raise ValueError("effective_on must be a business date.")
-        if type(self.position_status_code) is not str or self.position_status_code not in _STAFFABLE_POSITION_STATUSES:
-            raise ValueError("position_status_code must be active or open.")
-        if type(self.available_allocation_ratio) is not Decimal or not self.available_allocation_ratio.is_finite():
-            raise ValueError("available_allocation_ratio must be a finite Decimal.")
-        if self.available_allocation_ratio <= Decimal("0") or self.available_allocation_ratio > Decimal("1.0000"):
-            raise ValueError("available_allocation_ratio must be greater than 0 and at most 1.0000.")
-        if self.available_allocation_ratio.as_tuple().exponent < -4:
-            raise ValueError("available_allocation_ratio must have at most four decimal places.")
-        _validate_reference("confirmation_reference", self.confirmation_reference)
-        _validate_version(self.evidence_version_code)
-        if type(self.review_state) is not str or self.review_state != "human_confirmed":
-            raise ValueError("review_state must be human_confirmed.")
+        _validate_verification_fields(self)
 
     def __repr__(self) -> str:
         """Avoid leaking correlation identifiers through routine logs and assertion output."""
@@ -147,11 +156,13 @@ def _require_matching_verification(
     forged-Decimal allocation would otherwise compare as ``False`` and silently
     pass the capacity check below, so it fails closed before any comparison runs.
     """
-    ratio = verification.available_allocation_ratio
-    if type(ratio) is not Decimal or not ratio.is_finite():
+    try:
+        _validate_verification_fields(verification)
+    except (TypeError, ValueError) as error:
         raise VacancyFillIntegrityError(
-            "authoritative vacancy evidence allocation must be one finite exact Decimal"
-        )
+            f"authoritative vacancy evidence failed runtime validation: {error}"
+        ) from error
+    ratio = verification.available_allocation_ratio
     if (
         verification.tenant_record_id != command.tenant_record_id
         or verification.employment_record_id != command.employment_record_id

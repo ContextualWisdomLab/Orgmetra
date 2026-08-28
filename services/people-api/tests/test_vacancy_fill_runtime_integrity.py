@@ -255,6 +255,49 @@ class VacancyFillRuntimeIntegrityTests(unittest.TestCase):
                 self.assertEqual(authority.calls, 1)
                 self.assertEqual(port.assignment_calls, [])
 
+    def test_post_construction_non_staffable_or_nonhuman_evidence_fails_closed(self) -> None:
+        class NeverMutationPort:
+            """Satisfy the mutation-port protocol without permitting a write."""
+
+            def create_employment(self, *, command: object, authorization: object) -> object:
+                del command, authorization
+                raise AssertionError("invalid vacancy evidence must not create Employment")
+
+            def create_position(self, *, command: object, authorization: object) -> object:
+                del command, authorization
+                raise AssertionError("invalid vacancy evidence must not create Position")
+
+            def create_assignment(self, *, command: object, authorization: object) -> object:
+                del command, authorization
+                raise AssertionError("invalid vacancy evidence must not create Assignment")
+
+        for field_name, value in (
+            ("position_status_code", "closed"),
+            ("review_state", "model_confirmed"),
+        ):
+            with self.subTest(field_name=field_name):
+                verification = valid_verification()
+                object.__setattr__(verification, field_name, value)
+                authority = type(
+                    "StaticAuthority",
+                    (),
+                    {
+                        "verify_vacancy_fill": lambda self, *, command: verification,
+                    },
+                )()
+                with self.assertRaisesRegex(
+                    VacancyFillIntegrityError,
+                    "failed runtime validation",
+                ):
+                    fill_position_vacancy(
+                        principal=PRINCIPAL,
+                        command=command(),
+                        purpose_code="workforce_admin",
+                        policy=POLICY,
+                        vacancy_authority=authority,  # type: ignore[arg-type]
+                        mutation_port=NeverMutationPort(),
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()
