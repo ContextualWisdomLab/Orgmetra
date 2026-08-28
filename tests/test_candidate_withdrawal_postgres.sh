@@ -33,22 +33,9 @@ INSERT INTO candidate_profile (
         TIMESTAMPTZ '2026-08-21 09:00:00+00'
     );
 
-INSERT INTO job_profile (tenant_record_id, job_profile_id, recorded_from)
-VALUES
-    (
-        '10000000-0000-7000-8000-000000000001',
-        '10000000-0000-7000-8000-000000000021',
-        TIMESTAMPTZ '2026-08-21 09:00:00+00'
-    ),
-    (
-        '20000000-0000-7000-8000-000000000001',
-        '20000000-0000-7000-8000-000000000021',
-        TIMESTAMPTZ '2026-08-21 09:00:00+00'
-    );
-
 INSERT INTO candidate_application_record (
     tenant_record_id, candidate_application_record_id, candidate_profile_id,
-    job_profile_id, requisition_reference, submitted_at, recorded_from
+    requisition_reference, submitted_at, recorded_from
 ) VALUES
     (
         '10000000-0000-7000-8000-000000000001',
