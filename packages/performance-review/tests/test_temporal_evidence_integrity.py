@@ -1,4 +1,4 @@
-"""Regression coverage for recorded-time evidence integrity."""
+"""Regression coverage for system-recorded performance-review time integrity."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
+import orgmetra_performance_review.packet as packet_module
 from orgmetra_performance_review import build_performance_review_packet
 
 
@@ -22,10 +23,10 @@ class ForgedDateTime(datetime):
 
 
 class MutableTimezone(tzinfo):
-    """Timezone provider whose offset changes after evidence issuance."""
+    """Clock timezone provider whose offset changes after evidence issuance."""
 
     def __init__(self, offset: timedelta) -> None:
-        """Store one caller-controlled offset."""
+        """Store one mutable offset."""
         self.offset = offset
 
     def utcoffset(self, dt: datetime | None) -> timedelta:
@@ -38,7 +39,7 @@ class MutableTimezone(tzinfo):
 
 
 class NullOffsetTimezone(tzinfo):
-    """Timezone provider with no concrete UTC offset."""
+    """Clock timezone provider with no concrete UTC offset."""
 
     def utcoffset(self, dt: datetime | None) -> None:
         """Return no usable offset."""
@@ -50,10 +51,10 @@ class NullOffsetTimezone(tzinfo):
 
 
 class RaisingTimezone(tzinfo):
-    """Timezone provider that raises while resolving UTC offset."""
+    """Clock timezone provider that raises while resolving UTC offset."""
 
     def utcoffset(self, dt: datetime | None) -> timedelta:
-        """Raise caller-controlled behavior at the trust boundary."""
+        """Raise at the recorded-time trust boundary."""
         raise RuntimeError("provider failure")
 
     def dst(self, dt: datetime | None) -> timedelta:
@@ -83,26 +84,29 @@ def valid_kwargs() -> dict[str, object]:
         "reason_code": "scheduled_cycle_review",
         "review_period_start": date(2026, 1, 1),
         "review_period_end": date(2026, 6, 30),
-        "generated_at": datetime(2026, 8, 19, 5, 15, 30, tzinfo=timezone.utc),
     }
 
 
-def test_rejects_datetime_subclasses_that_can_forge_recorded_time_evidence() -> None:
-    """Canonical audit evidence must not invoke caller-overridable datetime methods."""
-    kwargs = valid_kwargs()
-    kwargs["generated_at"] = ForgedDateTime(2026, 8, 19, 5, 15, 30, tzinfo=timezone.utc)
+def test_rejects_datetime_subclasses_from_trusted_clock_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Canonical audit evidence must not invoke overridable datetime methods."""
+    forged = ForgedDateTime(2026, 8, 19, 5, 15, 30, tzinfo=timezone.utc)
+    monkeypatch.setattr(packet_module, "_system_recorded_at", lambda: forged)
 
     with pytest.raises(ValueError, match="generated_at"):
-        build_performance_review_packet(**kwargs)
+        build_performance_review_packet(**valid_kwargs())
 
 
-def test_detaches_mutable_timezone_from_recorded_time_evidence() -> None:
-    """A mutable timezone provider must not rewrite canonical evidence after issuance."""
+def test_detaches_mutable_clock_timezone_from_recorded_time_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A mutable clock timezone provider must not rewrite issued evidence."""
     provider = MutableTimezone(timedelta(hours=9))
-    kwargs = valid_kwargs()
-    kwargs["generated_at"] = datetime(2026, 8, 19, 14, 15, 30, tzinfo=provider)
+    recorded_at = datetime(2026, 8, 19, 14, 15, 30, tzinfo=provider)
+    monkeypatch.setattr(packet_module, "_system_recorded_at", lambda: recorded_at)
 
-    packet = build_performance_review_packet(**kwargs)
+    packet = build_performance_review_packet(**valid_kwargs())
     before = packet.canonical_json()
     provider.offset = timedelta(hours=-7)
 
@@ -111,44 +115,58 @@ def test_detaches_mutable_timezone_from_recorded_time_evidence() -> None:
     assert packet.generated_at.tzinfo is timezone.utc
 
 
-def test_rejects_future_recorded_time() -> None:
-    """Do not seal performance-review evidence for a system time that has not occurred."""
-    kwargs = valid_kwargs()
-    kwargs["generated_at"] = datetime(2099, 1, 1, tzinfo=timezone.utc)
+def test_rejects_future_system_recorded_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Do not seal evidence when the trusted clock reports a future instant."""
+    monkeypatch.setattr(
+        packet_module,
+        "_system_recorded_at",
+        lambda: datetime(2099, 1, 1, tzinfo=timezone.utc),
+    )
 
     with pytest.raises(ValueError, match="generated_at must not be in the future"):
-        build_performance_review_packet(**kwargs)
+        build_performance_review_packet(**valid_kwargs())
 
 
-def test_rejects_timezone_without_concrete_offset() -> None:
-    """Reject tzinfo objects that cannot resolve a concrete UTC offset."""
-    kwargs = valid_kwargs()
-    kwargs["generated_at"] = datetime(2026, 8, 19, 5, 15, 30, tzinfo=NullOffsetTimezone())
-
-    with pytest.raises(ValueError, match="generated_at"):
-        build_performance_review_packet(**kwargs)
-
-
-def test_normalizes_timezone_provider_failure() -> None:
-    """Do not leak caller timezone exceptions across the review-evidence boundary."""
-    kwargs = valid_kwargs()
-    kwargs["generated_at"] = datetime(2026, 8, 19, 5, 15, 30, tzinfo=RaisingTimezone())
+def test_rejects_clock_timezone_without_concrete_offset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject clock adapters that cannot resolve a concrete UTC offset."""
+    recorded_at = datetime(2026, 8, 19, 5, 15, 30, tzinfo=NullOffsetTimezone())
+    monkeypatch.setattr(packet_module, "_system_recorded_at", lambda: recorded_at)
 
     with pytest.raises(ValueError, match="generated_at"):
-        build_performance_review_packet(**kwargs)
+        build_performance_review_packet(**valid_kwargs())
 
 
-def test_rejects_timezone_normalization_overflow() -> None:
-    """Fail closed when a valid offset cannot be represented as a UTC datetime."""
-    kwargs = valid_kwargs()
-    kwargs["generated_at"] = datetime.min.replace(tzinfo=timezone(timedelta(hours=14)))
+def test_normalizes_clock_timezone_provider_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Do not leak clock timezone exceptions across the evidence boundary."""
+    recorded_at = datetime(2026, 8, 19, 5, 15, 30, tzinfo=RaisingTimezone())
+    monkeypatch.setattr(packet_module, "_system_recorded_at", lambda: recorded_at)
 
     with pytest.raises(ValueError, match="generated_at"):
-        build_performance_review_packet(**kwargs)
+        build_performance_review_packet(**valid_kwargs())
 
 
-def test_rejects_post_construction_timezone_reinjection() -> None:
+def test_rejects_clock_timezone_normalization_overflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fail closed when a clock instant cannot be represented as UTC."""
+    recorded_at = datetime.min.replace(tzinfo=timezone(timedelta(hours=14)))
+    monkeypatch.setattr(packet_module, "_system_recorded_at", lambda: recorded_at)
+
+    with pytest.raises(ValueError, match="generated_at"):
+        build_performance_review_packet(**valid_kwargs())
+
+
+def test_rejects_post_construction_timezone_reinjection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Do not emit evidence after low-level replacement of the frozen UTC instant."""
+    monkeypatch.setattr(
+        packet_module,
+        "_system_recorded_at",
+        lambda: datetime(2026, 8, 19, 5, 15, 30, tzinfo=timezone.utc),
+    )
     packet = build_performance_review_packet(**valid_kwargs())
     object.__setattr__(
         packet,
