@@ -111,6 +111,12 @@ def test_rejects_tenant_text_subclass_before_uuid_parsing() -> None:
         _packet(tenant_record_id=OpaqueTextSubclass(TENANT))
 
 
+def test_rejects_digest_text_subclass_before_canonical_evidence() -> None:
+    """Ensure digest evidence cannot retain caller-defined string behavior."""
+    with pytest.raises(ValueError):
+        _packet(job_requirements_digest=OpaqueTextSubclass("a" * 64))
+
+
 @pytest.mark.parametrize(
     ("field", "forged"),
     [
