@@ -7,6 +7,7 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0040_employment_employing_organization.sql
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
 INSERT INTO tenant_record (tenant_record_id, tenant_reference) VALUES
  ('10000000-0000-7000-8000-000000000001','tenant_alpha'),
  ('20000000-0000-7000-8000-000000000001','tenant_beta');
@@ -43,10 +44,14 @@ INSERT INTO employment_employing_organization_record (
 ) VALUES
  ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000050',
   '10000000-0000-7000-8000-000000000020','10000000-0000-7000-8000-000000000030',
-  DATE '2026-01-01',TIMESTAMPTZ '2026-01-03 00:00:00+00'),
+  DATE '2026-01-01',TIMESTAMPTZ '2026-01-02 00:00:00+00'),
+ ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000051',
+  '10000000-0000-7000-8000-000000000022','10000000-0000-7000-8000-000000000031',
+  DATE '2026-01-01',TIMESTAMPTZ '2026-01-02 00:00:00+00'),
  ('20000000-0000-7000-8000-000000000001','20000000-0000-7000-8000-000000000050',
   '20000000-0000-7000-8000-000000000020','20000000-0000-7000-8000-000000000030',
-  DATE '2026-01-01',TIMESTAMPTZ '2026-01-03 00:00:00+00');
+  DATE '2026-01-01',TIMESTAMPTZ '2026-01-02 00:00:00+00');
+COMMIT;
 SQL
 
 count="$(psql "${DATABASE_URL}" -Atqc "SELECT count(*) FROM employment_employing_organization_record WHERE tenant_record_id='10000000-0000-7000-8000-000000000001'::uuid AND employment_record_id='10000000-0000-7000-8000-000000000020'::uuid AND daterange(effective_from,effective_to,'[)') @> DATE '2026-08-28' AND tstzrange(recorded_from,recorded_to,'[)') @> TIMESTAMPTZ '2026-08-28 00:00:00+00';")"
@@ -62,17 +67,21 @@ expect_failure() {
  [[ $status -ne 0 && "$output" == *"$expected"* ]] || { echo "expected failure '$expected', got: $output" >&2; exit 1; }
 }
 
-expect_failure employment_employing_organization_bitemporal_exclusion psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO employment_employing_organization_record (tenant_record_id,employment_employing_organization_record_id,employment_record_id,employing_organization_unit_id,effective_from,recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000051','10000000-0000-7000-8000-000000000020','10000000-0000-7000-8000-000000000031',DATE '2026-06-01',TIMESTAMPTZ '2026-01-04 00:00:00+00');"
-expect_failure "employing organization must be a legal_entity" psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO employment_employing_organization_record (tenant_record_id,employment_employing_organization_record_id,employment_record_id,employing_organization_unit_id,effective_from,effective_to,recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000052','10000000-0000-7000-8000-000000000020','10000000-0000-7000-8000-000000000032',DATE '2026-01-01',DATE '2026-06-01',TIMESTAMPTZ '2026-01-03 00:00:00+00');"
+expect_failure employment_employing_organization_bitemporal_exclusion psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO employment_employing_organization_record (tenant_record_id,employment_employing_organization_record_id,employment_record_id,employing_organization_unit_id,effective_from,recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000058','10000000-0000-7000-8000-000000000020','10000000-0000-7000-8000-000000000031',DATE '2026-06-01',TIMESTAMPTZ '2026-01-04 00:00:00+00');"
+expect_failure "employing organization must be a legal_entity" psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO employment_employing_organization_record (tenant_record_id,employment_employing_organization_record_id,employment_record_id,employing_organization_unit_id,effective_from,effective_to,recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000059','10000000-0000-7000-8000-000000000020','10000000-0000-7000-8000-000000000032',DATE '2026-01-01',DATE '2026-06-01',TIMESTAMPTZ '2026-01-03 00:00:00+00');"
 expect_failure "employing organization interval must be covered by active or leave Employment truth" psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO employment_employing_organization_record (tenant_record_id,employment_employing_organization_record_id,employment_record_id,employing_organization_unit_id,effective_from,effective_to,recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000055','10000000-0000-7000-8000-000000000020','10000000-0000-7000-8000-000000000030',DATE '2025-01-01',DATE '2025-06-01',TIMESTAMPTZ '2026-01-03 00:00:00+00');"
 # Separate Employment prevents the cardinality exclusion from masking the tenant FK boundary.
 expect_failure employment_employing_organization_unit_tenant_fk psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO employment_employing_organization_record (tenant_record_id,employment_employing_organization_record_id,employment_record_id,employing_organization_unit_id,effective_from,recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000053','10000000-0000-7000-8000-000000000022','20000000-0000-7000-8000-000000000030',DATE '2026-01-01',TIMESTAMPTZ '2026-01-03 00:00:00+00');"
+expect_failure "exactly one legal employer" psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "BEGIN; INSERT INTO employment_record (tenant_record_id,employment_record_id,person_record_id) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000026','10000000-0000-7000-8000-000000000010'); INSERT INTO employment_record_version (tenant_record_id,employment_record_version_id,employment_record_id,employment_status_code,effective_from,recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000027','10000000-0000-7000-8000-000000000026','active',DATE '2026-01-01',TIMESTAMPTZ '2026-01-03 00:00:00+00'); COMMIT;"
+expect_failure "exactly one legal employer" psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "BEGIN; INSERT INTO employment_record (tenant_record_id,employment_record_id,person_record_id) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000028','10000000-0000-7000-8000-000000000010'); INSERT INTO employment_record_version (tenant_record_id,employment_record_version_id,employment_record_id,employment_status_code,effective_from,effective_to,recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000029','10000000-0000-7000-8000-000000000028','active',DATE '2026-01-01',DATE '2026-12-31',TIMESTAMPTZ '2026-01-03 00:00:00+00'); INSERT INTO employment_employing_organization_record (tenant_record_id,employment_employing_organization_record_id,employment_record_id,employing_organization_unit_id,effective_from,effective_to,recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000060','10000000-0000-7000-8000-000000000028','10000000-0000-7000-8000-000000000030',DATE '2026-01-01',DATE '2026-06-01',TIMESTAMPTZ '2026-01-03 00:00:00+00'), ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000061','10000000-0000-7000-8000-000000000028','10000000-0000-7000-8000-000000000030',DATE '2026-07-01',DATE '2026-12-31',TIMESTAMPTZ '2026-01-03 00:00:00+00'); COMMIT;"
 expect_failure "bitemporal correction may only close an open recorded interval" psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "UPDATE employment_employing_organization_record SET employing_organization_unit_id='10000000-0000-7000-8000-000000000031' WHERE employment_employing_organization_record_id='10000000-0000-7000-8000-000000000050';"
 expect_failure "employment employing-organization history cannot be truncated" psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "TRUNCATE employment_employing_organization_record;"
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
 UPDATE employment_employing_organization_record SET recorded_to=TIMESTAMPTZ '2026-09-01 00:00:00+00' WHERE employment_employing_organization_record_id='10000000-0000-7000-8000-000000000050';
 INSERT INTO employment_employing_organization_record (tenant_record_id,employment_employing_organization_record_id,employment_record_id,employing_organization_unit_id,effective_from,recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000054','10000000-0000-7000-8000-000000000020','10000000-0000-7000-8000-000000000031',DATE '2026-01-01',TIMESTAMPTZ '2026-09-01 00:00:00+00');
+COMMIT;
 CREATE ROLE orgmetra_employer_reader NOSUPERUSER NOBYPASSRLS;
 GRANT SELECT ON employment_employing_organization_record TO orgmetra_employer_reader;
 SET ROLE orgmetra_employer_reader;

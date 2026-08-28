@@ -17,7 +17,7 @@ ISO 30414:2025 is the current published second edition of the human-capital repo
 
 Add `employment_employing_organization_record` as a 3NF bitemporal relationship between one tenant-scoped Employment and one tenant-scoped Organization.
 
-At any single effective-date/system-recorded-time coordinate, one Employment may resolve to at most one employing organization. The organization must be classified as `legal_entity` across the relationship's full effective interval at the relationship's recorded-time coordinate. The relationship interval must also be fully covered by `active` or `leave` Employment truth at that same recorded-time coordinate.
+At every effective-date/system-recorded-time coordinate where Employment status is `active` or `leave`, exactly one employing organization must resolve: overlaps are rejected by the bitemporal exclusion and missing relationships or effective gaps are rejected by deferred database constraint triggers. Those triggers revalidate Employment version, relationship, and legal-organization recorded-time changes together at transaction commit. The organization must be classified as `legal_entity` across the relationship's full effective interval at the relationship's recorded-time coordinate. The relationship interval must also be fully covered by `active` or `leave` Employment truth at that same recorded-time coordinate.
 
 The relationship is independent of Position and Assignment. It stores no Person PII, compensation, payroll, tax, benefits, statutory-account, candidate, performance, or model-output fields.
 
@@ -42,7 +42,7 @@ History is correction-not-rewrite: business fields cannot be updated in place; t
 
 `tests/test_employment_employing_organization_postgres.sh` proves:
 
-- one employer per Employment business/system coordinate;
+- exactly one employer per active/leave Employment business/system coordinate, including missing and effective-gap rejection;
 - full-interval `legal_entity` classification;
 - full-interval active/leave Employment coverage;
 - tenant-qualified cross-tenant rejection;

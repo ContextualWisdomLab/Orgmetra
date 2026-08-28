@@ -104,6 +104,218 @@ BEFORE INSERT ON employment_employing_organization_record
 FOR EACH ROW
 EXECUTE FUNCTION validate_employment_employing_organization_scope();
 
+CREATE FUNCTION employment_employing_organization_exact_one_is_valid(
+    target_tenant_record_id uuid,
+    target_employment_record_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+WITH active_employment_versions AS (
+    SELECT effective_from, effective_to, recorded_from, recorded_to
+    FROM employment_record_version
+    WHERE tenant_record_id = target_tenant_record_id
+      AND employment_record_id = target_employment_record_id
+      AND employment_status_code IN ('active', 'leave')
+), relationship_rows AS (
+    SELECT effective_from, effective_to, recorded_from, recorded_to,
+           employing_organization_unit_id
+    FROM employment_employing_organization_record
+    WHERE tenant_record_id = target_tenant_record_id
+      AND employment_record_id = target_employment_record_id
+), recorded_points AS (
+    SELECT recorded_from AS recorded_point FROM active_employment_versions
+    UNION
+    SELECT recorded_to FROM active_employment_versions WHERE recorded_to IS NOT NULL
+    UNION
+    SELECT recorded_from FROM relationship_rows
+    UNION
+    SELECT recorded_to FROM relationship_rows WHERE recorded_to IS NOT NULL
+    UNION
+    SELECT organization_version.recorded_from
+    FROM organization_unit_version organization_version
+    WHERE organization_version.tenant_record_id = target_tenant_record_id
+      AND organization_version.organization_unit_id IN (
+          SELECT employing_organization_unit_id FROM relationship_rows
+      )
+    UNION
+    SELECT organization_version.recorded_to
+    FROM organization_unit_version organization_version
+    WHERE organization_version.tenant_record_id = target_tenant_record_id
+      AND organization_version.organization_unit_id IN (
+          SELECT employing_organization_unit_id FROM relationship_rows
+      )
+      AND organization_version.recorded_to IS NOT NULL
+)
+SELECT NOT EXISTS (
+    SELECT 1
+    FROM active_employment_versions employment_version
+    JOIN recorded_points point
+      ON tstzrange(
+             employment_version.recorded_from,
+             employment_version.recorded_to,
+             '[)'
+         ) @> point.recorded_point
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM (
+            SELECT range_agg(
+                       daterange(
+                           relationship.effective_from,
+                           relationship.effective_to,
+                           '[)'
+                       )
+                   ) AS covered_effective_period
+            FROM relationship_rows relationship
+            WHERE tstzrange(
+                      relationship.recorded_from,
+                      relationship.recorded_to,
+                      '[)'
+                  ) @> point.recorded_point
+              AND EXISTS (
+                  SELECT 1
+                  FROM (
+                      SELECT range_agg(
+                                 daterange(
+                                     organization_version.effective_from,
+                                     organization_version.effective_to,
+                                     '[)'
+                                 )
+                             ) AS legal_entity_effective_period
+                      FROM organization_unit_version organization_version
+                      WHERE organization_version.tenant_record_id = target_tenant_record_id
+                        AND organization_version.organization_unit_id = relationship.employing_organization_unit_id
+                        AND organization_version.organization_type_code = 'legal_entity'
+                        AND tstzrange(
+                                organization_version.recorded_from,
+                                organization_version.recorded_to,
+                                '[)'
+                            ) @> point.recorded_point
+                  ) legal_entity
+                  WHERE legal_entity.legal_entity_effective_period @> daterange(
+                      relationship.effective_from,
+                      relationship.effective_to,
+                      '[)'
+                  )
+              )
+        ) relationship_coverage
+        WHERE relationship_coverage.covered_effective_period @> daterange(
+            employment_version.effective_from,
+            employment_version.effective_to,
+            '[)'
+        )
+    )
+);
+$$;
+
+CREATE FUNCTION enforce_employment_employing_organization_exact_one()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_tenant_record_id uuid;
+    v_employment_record_id uuid;
+    v_organization_unit_id uuid;
+    old_tenant_record_id uuid;
+    old_organization_unit_id uuid;
+    affected_tenant_record_id uuid;
+    affected_employment_record_id uuid;
+BEGIN
+    IF TG_TABLE_NAME IN (
+        'employment_record_version',
+        'employment_employing_organization_record'
+    ) THEN
+        IF TG_OP = 'DELETE' THEN
+            v_tenant_record_id := OLD.tenant_record_id;
+            v_employment_record_id := OLD.employment_record_id;
+        ELSE
+            v_tenant_record_id := NEW.tenant_record_id;
+            v_employment_record_id := NEW.employment_record_id;
+        END IF;
+
+        IF NOT employment_employing_organization_exact_one_is_valid(
+            v_tenant_record_id,
+            v_employment_record_id
+        ) THEN
+            RAISE EXCEPTION 'active or leave Employment must have exactly one legal employer across every effective and recorded-time coordinate'
+                USING ERRCODE = '23514';
+        END IF;
+
+        IF TG_OP = 'UPDATE'
+           AND (
+               OLD.tenant_record_id IS DISTINCT FROM NEW.tenant_record_id
+               OR OLD.employment_record_id IS DISTINCT FROM NEW.employment_record_id
+           )
+           AND NOT employment_employing_organization_exact_one_is_valid(
+               OLD.tenant_record_id,
+               OLD.employment_record_id
+           ) THEN
+            RAISE EXCEPTION 'active or leave Employment must have exactly one legal employer across every effective and recorded-time coordinate'
+                USING ERRCODE = '23514';
+        END IF;
+    ELSE
+        IF TG_OP = 'DELETE' THEN
+            v_tenant_record_id := OLD.tenant_record_id;
+            v_organization_unit_id := OLD.organization_unit_id;
+        ELSE
+            v_tenant_record_id := NEW.tenant_record_id;
+            v_organization_unit_id := NEW.organization_unit_id;
+        END IF;
+
+        IF TG_OP = 'UPDATE' THEN
+            old_tenant_record_id := OLD.tenant_record_id;
+            old_organization_unit_id := OLD.organization_unit_id;
+        END IF;
+
+        FOR affected_tenant_record_id, affected_employment_record_id IN
+            SELECT DISTINCT relation.tenant_record_id, relation.employment_record_id
+            FROM employment_employing_organization_record relation
+            WHERE (
+                relation.tenant_record_id = v_tenant_record_id
+                AND relation.employing_organization_unit_id = v_organization_unit_id
+            )
+            OR (
+                TG_OP = 'UPDATE'
+                AND relation.tenant_record_id = old_tenant_record_id
+                AND relation.employing_organization_unit_id = old_organization_unit_id
+            )
+        LOOP
+            IF NOT employment_employing_organization_exact_one_is_valid(
+                affected_tenant_record_id,
+                affected_employment_record_id
+            ) THEN
+                RAISE EXCEPTION 'active or leave Employment must have exactly one legal employer across every effective and recorded-time coordinate'
+                    USING ERRCODE = '23514';
+            END IF;
+        END LOOP;
+    END IF;
+
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER employment_employing_organization_exact_one_employment_guard
+AFTER INSERT OR UPDATE OR DELETE ON employment_record_version
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION enforce_employment_employing_organization_exact_one();
+
+CREATE CONSTRAINT TRIGGER employment_employing_organization_exact_one_relationship_guard
+AFTER INSERT OR UPDATE OR DELETE ON employment_employing_organization_record
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION enforce_employment_employing_organization_exact_one();
+
+CREATE CONSTRAINT TRIGGER employment_employing_organization_exact_one_organization_guard
+AFTER INSERT OR UPDATE OR DELETE ON organization_unit_version
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION enforce_employment_employing_organization_exact_one();
+
 CREATE TRIGGER employment_employing_organization_bitemporal_guard
 BEFORE UPDATE OR DELETE ON employment_employing_organization_record
 FOR EACH ROW
