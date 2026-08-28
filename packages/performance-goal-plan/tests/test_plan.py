@@ -2,8 +2,10 @@
 
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone, tzinfo
+import gc
 import json
 from uuid import uuid4
+from weakref import ref as weak_ref
 
 import pytest
 
@@ -195,6 +197,22 @@ def test_rejects_conflicting_live_reissuance_of_same_plan_reference() -> None:
         replace(original, goal_count=4)
     duplicate = replace(original)
     assert duplicate.canonical_json() == original.canonical_json()
+    del duplicate
+    gc.collect()
+    with pytest.raises(ValueError):
+        replace(original, goal_count=4)
+
+
+def test_releases_plan_reference_after_the_last_packet_is_gone() -> None:
+    """Allow a new evidence binding only after every prior live packet is gone."""
+    original = packet()
+    original_reference = weak_ref(original)
+    del original
+    gc.collect()
+    assert original_reference() is None
+
+    replacement = packet(goal_count=4)
+    assert json.loads(replacement.canonical_json())["goal_count"] == 4
 
 
 def test_detects_post_construction_evidence_mutation() -> None:

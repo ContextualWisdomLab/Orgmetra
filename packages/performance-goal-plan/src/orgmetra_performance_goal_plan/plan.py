@@ -14,7 +14,7 @@ import json
 import re
 from threading import RLock
 from uuid import UUID
-from weakref import WeakKeyDictionary, WeakValueDictionary
+from weakref import ReferenceType, WeakKeyDictionary, ref
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -38,9 +38,21 @@ _NEXT_ACTION = (
 
 _REGISTRY_LOCK = RLock()
 _CREATION_DIGESTS: WeakKeyDictionary[PerformanceGoalPlanPacket, str] = WeakKeyDictionary()
-_LIVE_REFERENCES: WeakValueDictionary[tuple[str, str], PerformanceGoalPlanPacket] = (
-    WeakValueDictionary()
-)
+_LIVE_REFERENCES: dict[
+    tuple[str, str], dict[ReferenceType[PerformanceGoalPlanPacket], str]
+] = {}
+
+
+def _release_live_reference(
+    plan_key: tuple[str, str],
+    packet_reference: ReferenceType[PerformanceGoalPlanPacket],
+) -> None:
+    """Forget one dead packet without dropping another live packet for the key."""
+    with _REGISTRY_LOCK:
+        live_evidence = _LIVE_REFERENCES[plan_key]
+        live_evidence.pop(packet_reference, None)
+        if not live_evidence:
+            _LIVE_REFERENCES.pop(plan_key, None)
 
 
 def _validate_operational_uuid_text(value: object, field_name: str) -> None:
@@ -253,11 +265,27 @@ class PerformanceGoalPlanPacket:
         creation_digest = sha256(payload_json.encode("utf-8")).hexdigest()
         key = (self.tenant_record_id, self.performance_goal_plan_reference)
         with _REGISTRY_LOCK:
-            existing = _LIVE_REFERENCES.get(key)
-            if existing is not None and _CREATION_DIGESTS.get(existing) != creation_digest:
-                raise ValueError("performance goal-plan reference is bound to different live evidence")
+            live_evidence = _LIVE_REFERENCES.get(key)
+            if live_evidence is not None:
+                if any(
+                    live_digest != creation_digest
+                    for live_digest in live_evidence.values()
+                ):
+                    raise ValueError(
+                        "performance goal-plan reference is bound to different live evidence"
+                    )
+            else:
+                live_evidence = {}
+                _LIVE_REFERENCES[key] = live_evidence
             _CREATION_DIGESTS[self] = creation_digest
-            _LIVE_REFERENCES[key] = self
+            packet_reference = ref(
+                self,
+                lambda dead_reference, plan_key=key: _release_live_reference(
+                    plan_key,
+                    dead_reference,
+                ),
+            )
+            live_evidence[packet_reference] = creation_digest
 
     def canonical_json(self) -> str:
         """Return one verified snapshot of deterministic canonical audit evidence."""
