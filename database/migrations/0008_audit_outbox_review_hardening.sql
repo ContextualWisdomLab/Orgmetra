@@ -88,6 +88,14 @@ DECLARE
         'time',
         'type'
     ];
+    candidate_withdrawal_data_keys constant text[] := ARRAY[
+        'evidence_version',
+        'high_impact',
+        'identity_resolution_digest',
+        'identity_resolution_reference',
+        'result_code',
+        'withdrawal_evidence_digest'
+    ];
 BEGIN
     IF public.is_operational_uuid(p_audit_event_record_id) IS NOT TRUE
        OR public.is_operational_uuid(p_tenant_record_id) IS NOT TRUE THEN
@@ -125,7 +133,12 @@ BEGIN
     SELECT pg_catalog.array_agg(data_key ORDER BY data_key COLLATE "C")
     INTO data_keys
     FROM pg_catalog.jsonb_object_keys(event_data) AS data_key_set(data_key);
-    IF data_keys IS DISTINCT FROM ARRAY['high_impact', 'result_code']::text[] THEN
+    IF event_envelope ->> 'source' = 'urn:orgmetra:talent_acquisition'
+       AND event_envelope ->> 'type' = 'orgmetra.candidate.application_withdrawn' THEN
+        IF data_keys IS DISTINCT FROM candidate_withdrawal_data_keys THEN
+            RETURN false;
+        END IF;
+    ELSIF data_keys IS DISTINCT FROM ARRAY['high_impact', 'result_code']::text[] THEN
         RETURN false;
     END IF;
 
@@ -166,6 +179,40 @@ BEGIN
             !~ '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
        OR (event_data ->> 'result_code') COLLATE "C"
             !~ '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$' THEN
+        RETURN false;
+    END IF;
+
+    IF event_envelope ->> 'source' = 'urn:orgmetra:talent_acquisition'
+       AND event_envelope ->> 'type' = 'orgmetra.candidate.application_withdrawn'
+       AND (
+           pg_catalog.jsonb_typeof(event_data -> 'evidence_version')
+               IS DISTINCT FROM 'number'
+           OR (event_data ->> 'evidence_version') IS NULL
+           OR (
+               CASE
+                   WHEN (event_data ->> 'evidence_version') COLLATE "C"
+                            ~ '^[1-9][0-9]{0,6}$'
+                   THEN (event_data ->> 'evidence_version')::integer
+                            BETWEEN 1 AND 1000000
+                   ELSE false
+               END
+           ) IS NOT TRUE
+           OR pg_catalog.jsonb_typeof(event_data -> 'identity_resolution_reference')
+               IS DISTINCT FROM 'string'
+           OR (event_data ->> 'identity_resolution_reference') IS NULL
+           OR (event_data ->> 'identity_resolution_reference') COLLATE "C"
+               !~ '^identity_resolution:[A-Za-z0-9][A-Za-z0-9._~-]*$'
+           OR pg_catalog.jsonb_typeof(event_data -> 'identity_resolution_digest')
+               IS DISTINCT FROM 'string'
+           OR (event_data ->> 'identity_resolution_digest') IS NULL
+           OR (event_data ->> 'identity_resolution_digest') COLLATE "C"
+               !~ '^[0-9a-f]{64}$'
+           OR pg_catalog.jsonb_typeof(event_data -> 'withdrawal_evidence_digest')
+               IS DISTINCT FROM 'string'
+           OR (event_data ->> 'withdrawal_evidence_digest') IS NULL
+           OR (event_data ->> 'withdrawal_evidence_digest') COLLATE "C"
+               !~ '^[0-9a-f]{64}$'
+       ) THEN
         RETURN false;
     END IF;
 

@@ -113,6 +113,14 @@ BEGIN
        OR audit_event_envelope ->> 'orgmetrapurpose' <> 'candidate_withdrawal'
        OR audit_event_envelope ->> 'orgmetrareason' <> 'candidate_requested'
        OR audit_event_envelope ->> 'orgmetraevidence' <> NEW.withdrawal_evidence_reference
+       OR audit_event_envelope #>> '{data,identity_resolution_reference}'
+          <> NEW.identity_resolution_reference
+       OR audit_event_envelope #>> '{data,identity_resolution_digest}'
+          <> NEW.identity_resolution_digest
+       OR audit_event_envelope #>> '{data,withdrawal_evidence_digest}'
+          <> NEW.withdrawal_evidence_digest
+       OR audit_event_envelope #>> '{data,evidence_version}'
+          <> NEW.evidence_version::text
        OR audit_event_envelope ? 'orgmetraconfirmation'
        OR (audit_event_envelope #>> '{data,high_impact}')::boolean IS NOT FALSE
        OR audit_event_envelope #>> '{data,result_code}' <> 'application_withdrawn'

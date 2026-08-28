@@ -14,7 +14,7 @@ This PR does not assign an Identity Assurance Level, Authenticator Assurance Lev
 
 ### Event interoperability
 
-The CloudEvents project lists v1.0.2 as the latest released core CloudEvents specification. Orgmetra's existing audit/outbox persistence already uses a CloudEvents-compatible version-1.0 envelope with product-specific governance extensions. Candidate withdrawal reuses that accepted envelope and binds the exact withdrawal subject, candidate actor, purpose, reason, evidence reference, time, and result rather than inventing a second event format.
+The CloudEvents project lists v1.0.2 as the latest released core CloudEvents specification. Orgmetra's existing audit/outbox persistence already uses a CloudEvents-compatible version-1.0 envelope with product-specific governance extensions. Candidate withdrawal reuses that accepted envelope and binds the exact withdrawal subject, candidate actor, identity-resolution reference/digest, withdrawal evidence reference/digest, evidence version, purpose, reason, time, and result rather than inventing a second event format.
 
 ### PostgreSQL persistence controls
 

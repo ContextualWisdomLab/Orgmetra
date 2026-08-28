@@ -78,6 +78,10 @@ record_event() {
     local actor="$5"
     local evidence="$6"
     local event_time="$7"
+    local identity_reference="$8"
+    local identity_digest="$9"
+    local withdrawal_digest="${10}"
+    local evidence_version="${11}"
 
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
         --set=event_id="${event_id}" \
@@ -86,7 +90,11 @@ record_event() {
         --set=subject="${subject}" \
         --set=actor="${actor}" \
         --set=evidence="${evidence}" \
-        --set=event_time="${event_time}" <<'SQL'
+        --set=event_time="${event_time}" \
+        --set=identity_reference="${identity_reference}" \
+        --set=identity_digest="${identity_digest}" \
+        --set=withdrawal_digest="${withdrawal_digest}" \
+        --set=evidence_version="${evidence_version}" <<'SQL'
 WITH envelope AS (
     SELECT jsonb_build_object(
         'specversion', '1.0',
@@ -103,7 +111,11 @@ WITH envelope AS (
         'orgmetraevidence', :'evidence',
         'data', jsonb_build_object(
             'high_impact', false,
-            'result_code', 'application_withdrawn'
+            'result_code', 'application_withdrawn',
+            'evidence_version', :'evidence_version'::integer,
+            'identity_resolution_reference', :'identity_reference',
+            'identity_resolution_digest', :'identity_digest',
+            'withdrawal_evidence_digest', :'withdrawal_digest'
         )
     )::text AS canonical_event_json
 ), payload AS (
@@ -132,7 +144,11 @@ record_event \
     'candidate_withdrawal_record:72000000-0000-7000-8000-000000000001' \
     'candidate:73000000-0000-4000-8000-000000000001' \
     'candidate_withdrawal_evidence:74000000-0000-4000-8000-000000000001' \
-    '2026-08-21T09:20:00Z'
+    '2026-08-21T09:20:00Z' \
+    'identity_resolution:75000000-0000-4000-8000-000000000001' \
+    "$(printf 'a%.0s' {1..64})" \
+    "$(printf 'b%.0s' {1..64})" \
+    '1'
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO candidate_withdrawal_record (

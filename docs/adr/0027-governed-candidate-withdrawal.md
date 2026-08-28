@@ -30,7 +30,7 @@ A withdrawal row binds:
 
 Exactly one withdrawal may exist for one application. The row is append-only: UPDATE, DELETE, and TRUNCATE are rejected. The table forces row-level security using Orgmetra's existing tenant-context function.
 
-Before insert, `validate_candidate_withdrawal_evidence()` re-resolves the tenant-local application and immutable audit event. It rejects withdrawal before application submission and requires the audit envelope to bind the exact withdrawal record, candidate actor, purpose `candidate_withdrawal`, reason `candidate_requested`, withdrawal evidence reference, event time, and non-high-impact `application_withdrawn` result. A matching transactional outbox delivery record must already exist.
+Before insert, `validate_candidate_withdrawal_evidence()` re-resolves the tenant-local application and immutable audit event. It rejects withdrawal before application submission and requires the audit envelope to bind the exact withdrawal record, candidate actor, identity-resolution reference/digest, withdrawal evidence reference/digest, evidence version, purpose `candidate_withdrawal`, reason `candidate_requested`, event time, and non-high-impact `application_withdrawn` result. A matching transactional outbox delivery record must already exist.
 
 The generic audit API may represent many actor namespaces. Therefore `candidate_withdrawal_record` independently restricts its initiating actor to the `candidate:` namespace. A valid generic audit envelope with a `staff:` actor cannot become a withdrawal row.
 

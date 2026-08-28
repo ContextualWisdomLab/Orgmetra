@@ -14,6 +14,10 @@ record_event() {
     local actor="$5"
     local evidence="$6"
     local event_time="$7"
+    local identity_reference="$8"
+    local identity_digest="$9"
+    local withdrawal_digest="${10}"
+    local evidence_version="${11}"
 
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
         --set=event_id="${event_id}" \
@@ -22,7 +26,11 @@ record_event() {
         --set=subject="${subject}" \
         --set=actor="${actor}" \
         --set=evidence="${evidence}" \
-        --set=event_time="${event_time}" <<'SQL'
+        --set=event_time="${event_time}" \
+        --set=identity_reference="${identity_reference}" \
+        --set=identity_digest="${identity_digest}" \
+        --set=withdrawal_digest="${withdrawal_digest}" \
+        --set=evidence_version="${evidence_version}" <<'SQL'
 WITH envelope AS (
     SELECT jsonb_build_object(
         'specversion', '1.0',
@@ -39,7 +47,11 @@ WITH envelope AS (
         'orgmetraevidence', :'evidence',
         'data', jsonb_build_object(
             'high_impact', false,
-            'result_code', 'application_withdrawn'
+            'result_code', 'application_withdrawn',
+            'evidence_version', :'evidence_version'::integer,
+            'identity_resolution_reference', :'identity_reference',
+            'identity_resolution_digest', :'identity_digest',
+            'withdrawal_evidence_digest', :'withdrawal_digest'
         )
     )::text AS canonical_event_json
 ), payload AS (
@@ -71,7 +83,11 @@ record_event \
     'candidate_withdrawal_record:72000000-0000-7000-8000-000000000002' \
     'candidate:73000000-0000-4000-8000-000000000001' \
     'candidate_withdrawal_evidence:74000000-0000-4000-8000-000000000002' \
-    '2026-08-21T09:21:00Z'
+    '2026-08-21T09:21:00Z' \
+    'identity_resolution:75000000-0000-4000-8000-000000000002' \
+    "$(printf 'c%.0s' {1..64})" \
+    "$(printf 'd%.0s' {1..64})" \
+    '2'
 
 set +e
 duplicate_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
@@ -114,7 +130,11 @@ record_event \
     'candidate_withdrawal_record:82000000-0000-7000-8000-000000000001' \
     'staff:83000000-0000-4000-8000-000000000001' \
     'candidate_withdrawal_evidence:84000000-0000-4000-8000-000000000001' \
-    '2026-08-21T09:20:00Z'
+    '2026-08-21T09:20:00Z' \
+    'identity_resolution:85000000-0000-4000-8000-000000000001' \
+    "$(printf 'e%.0s' {1..64})" \
+    "$(printf 'f%.0s' {1..64})" \
+    '1'
 
 set +e
 staff_actor_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
@@ -148,7 +168,8 @@ if [[ ${staff_actor_status} -eq 0 || "${staff_actor_output}" != *"candidate_with
 fi
 
 # Candidate-shaped actor text is not enough: the immutable audit envelope must bind
-# the exact evidence reference supplied by the withdrawal row.
+# the exact evidence reference, identity-resolution reference/digest, withdrawal
+# digest, and evidence version supplied by the withdrawal row.
 record_event \
     '80000000-0000-7000-8000-000000000002' \
     '81000000-0000-7000-8000-000000000002' \
@@ -156,7 +177,11 @@ record_event \
     'candidate_withdrawal_record:82000000-0000-7000-8000-000000000002' \
     'candidate:83000000-0000-4000-8000-000000000002' \
     'candidate_withdrawal_evidence:84000000-0000-4000-8000-000000000002' \
-    '2026-08-21T09:22:00Z'
+    '2026-08-21T09:22:00Z' \
+    'identity_resolution:85000000-0000-4000-8000-000000000002' \
+    "$(printf '1%.0s' {1..64})" \
+    "$(printf '2%.0s' {1..64})" \
+    '1'
 
 set +e
 forged_evidence_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
@@ -171,11 +196,11 @@ INSERT INTO candidate_withdrawal_record (
     '82000000-0000-7000-8000-000000000002',
     '20000000-0000-7000-8000-000000000051',
     'candidate:83000000-0000-4000-8000-000000000002',
-    'identity_resolution:85000000-0000-4000-8000-000000000002',
-    repeat('1', 64),
-    'candidate_withdrawal_evidence:84000000-0000-4000-8000-000000000099',
-    repeat('2', 64),
-    1,
+    'identity_resolution:85000000-0000-4000-8000-000000000099',
+    repeat('9', 64),
+    'candidate_withdrawal_evidence:84000000-0000-4000-8000-000000000002',
+    repeat('8', 64),
+    3,
     TIMESTAMPTZ '2026-08-21 09:22:00+00',
     '80000000-0000-7000-8000-000000000002',
     TIMESTAMPTZ '2026-08-21 09:22:01+00'
@@ -198,7 +223,11 @@ record_event \
     'candidate_withdrawal_record:82000000-0000-7000-8000-000000000003' \
     'candidate:83000000-0000-4000-8000-000000000003' \
     'candidate_withdrawal_evidence:84000000-0000-4000-8000-000000000003' \
-    '2026-08-21T09:23:00Z'
+    '2026-08-21T09:23:00Z' \
+    'identity_resolution:85000000-0000-4000-8000-000000000003' \
+    "$(printf '3%.0s' {1..64})" \
+    "$(printf '4%.0s' {1..64})" \
+    '1'
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO candidate_withdrawal_record (
