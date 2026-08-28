@@ -145,7 +145,7 @@ class PostgresAssignmentHistoryReadPort:
 
         if type(rows) is not list:
             raise AssignmentHistoryIntegrityError(
-                "database assignment-history read must return an immutable row list"
+                "database assignment-history read must return the default list row collection"
             )
 
         records: list[AssignmentHistoryRecord] = []
