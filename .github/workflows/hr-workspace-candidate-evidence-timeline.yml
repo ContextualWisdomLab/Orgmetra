@@ -3,6 +3,7 @@ name: HR Workspace Candidate Evidence Timeline Quality
 on:
   pull_request:
     branches:
+      - develop
       - feat/hr-workspace-protected-read-state
     paths:
       - "apps/hr-workspace/candidate-evidence-timeline.js"
