@@ -1,0 +1,64 @@
+.job-architecture-state {
+  display: grid;
+  gap: var(--orgmetra-space-md);
+  max-width: 42rem;
+  padding: var(--orgmetra-space-lg);
+  border: 1px solid var(--orgmetra-border-subtle);
+  border-radius: var(--orgmetra-radius-md);
+  background: var(--orgmetra-surface-card);
+  color: var(--orgmetra-text-primary);
+}
+
+.job-architecture-status,
+.job-architecture-evidence,
+.job-architecture-confirmation,
+.job-architecture-publication,
+.job-architecture-next-action {
+  display: grid;
+  gap: var(--orgmetra-space-xs);
+  margin: 0;
+}
+
+.job-architecture-status span,
+.job-architecture-evidence span,
+.job-architecture-confirmation span,
+.job-architecture-publication span,
+.job-architecture-next-action span {
+  color: var(--orgmetra-text-muted);
+}
+
+.job-architecture-state[data-interaction-state="high-risk-confirmation"] {
+  border-color: var(--orgmetra-action-review);
+}
+
+.job-architecture-state[data-interaction-state="permission-denied"],
+.job-architecture-state[data-interaction-state="validation-error"],
+.job-architecture-state[data-interaction-state="error"] {
+  border-color: var(--orgmetra-danger);
+}
+
+.job-architecture-state[aria-busy="true"] {
+  cursor: progress;
+}
+
+.job-architecture-action {
+  justify-self: start;
+  min-height: 44px;
+  padding: var(--orgmetra-space-sm) var(--orgmetra-space-md);
+  border: 0;
+  border-radius: var(--orgmetra-radius-sm);
+  background: var(--orgmetra-action-review);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.job-architecture-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.job-architecture-action:focus-visible {
+  outline: 3px solid var(--orgmetra-focus-ring);
+  outline-offset: 3px;
+}
