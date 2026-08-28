@@ -101,6 +101,16 @@ test('denial, stale evidence, hierarchy conflict, and failure explain the next s
 
 test('unsupported runtime input fails closed before rendering', () => {
   assert.throws(() => positionReportingReviewViewModel('approved'), /unsupported reporting-line review state/);
+  for (const inheritedState of ['constructor', 'toString', '__proto__']) {
+    assert.throws(
+      () => positionReportingReviewViewModel(inheritedState),
+      /unsupported reporting-line review state/,
+    );
+    assert.throws(
+      () => positionReportingReviewStateMarkup(inheritedState),
+      /unsupported reporting-line review state/,
+    );
+  }
   assert.throws(() => positionReportingReviewViewModel(new String('review')), /exact built-in string/);
   assert.throws(() => positionReportingReviewStateMarkup(Symbol('recorded')), /exact built-in string/);
 });
