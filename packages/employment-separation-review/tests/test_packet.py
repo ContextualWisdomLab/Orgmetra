@@ -122,6 +122,13 @@ def test_canonical_json_and_digest_are_deterministic() -> None:
     assert canonical == build_valid().canonical_json()
 
 
+def test_post_construction_review_rewrite_cannot_change_canonical_evidence() -> None:
+    packet = build_valid()
+    object.__setattr__(packet, "reason_code", "retirement_transition")
+    with pytest.raises(ValueError, match="changed after review issuance"):
+        packet.canonical_json()
+
+
 def test_timestamp_normalizes_to_utc_without_losing_precision() -> None:
     shifted = GENERATED_AT.astimezone(timezone(timedelta(hours=9)))
     assert build_valid(generated_at=shifted).canonical_json() == build_valid().canonical_json()
