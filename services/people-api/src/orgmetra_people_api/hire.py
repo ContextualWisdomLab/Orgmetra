@@ -95,7 +95,7 @@ class HireAcceptanceCommand:
             raise ValueError("display_name must not contain control characters.")
         validate_idempotency_key(self.idempotency_key)
         if (
-            not isinstance(self.employment_status_code, str)
+            type(self.employment_status_code) is not str
             or _STATUS_CODE_PATTERN.fullmatch(self.employment_status_code) is None
         ):
             raise ValueError("employment_status_code must be a lower snake_case code.")

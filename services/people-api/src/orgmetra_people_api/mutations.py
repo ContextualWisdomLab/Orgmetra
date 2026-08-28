@@ -54,13 +54,13 @@ def _validate_operational_uuid(field_name: str, value: object) -> None:
 
 def _validate_confirmation(value: object) -> None:
     """Require one namespaced human-confirmation reference."""
-    if not isinstance(value, str) or _REFERENCE_PATTERN.fullmatch(value) is None:
+    if type(value) is not str or _REFERENCE_PATTERN.fullmatch(value) is None:
         raise ValueError("confirmation_reference must be a namespaced opaque reference.")
 
 
 def _validate_evidence_version(value: object) -> None:
     """Require one whitespace-free evidence version token."""
-    if not isinstance(value, str) or _VERSION_PATTERN.fullmatch(value) is None:
+    if type(value) is not str or _VERSION_PATTERN.fullmatch(value) is None:
         raise ValueError("evidence_version_code must be a whitespace-free version token.")
 
 

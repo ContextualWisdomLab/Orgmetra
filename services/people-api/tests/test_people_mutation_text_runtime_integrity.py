@@ -92,6 +92,14 @@ class _ForgedDisplayName(str):
         return iter("Alice")
 
 
+class _ForgedGovernanceText(str):
+    """Present reviewed governance text with caller-defined rendering semantics."""
+
+    def __str__(self) -> str:
+        """Render a different value if canonical evidence later formats the field."""
+        return "caller_defined_governance_text"
+
+
 def _employment(**overrides: object) -> EmploymentMutationCommand:
     """Build one otherwise-valid high-impact employment mutation command."""
     values: dict[str, object] = {
@@ -160,6 +168,8 @@ def test_rejects_status_string_subclass_that_forges_allow_list_membership() -> N
         _employment(employment_status_code=_ForgedClosedCode("model_decided"))
     with pytest.raises(ValueError, match="position_status_code"):
         _position(position_status_code=_ForgedClosedCode("model_decided"))
+    with pytest.raises(ValueError, match="employment_status_code"):
+        _hire(employment_status_code=_ForgedClosedCode("model_decided"))
 
 
 def test_rejects_concurrency_string_subclass_that_forges_allow_list_membership() -> None:
@@ -178,3 +188,13 @@ def test_rejects_display_name_string_subclass_before_person_pii_persistence() ->
     """Necessary Person-name PII cannot hide control text behind overridden methods."""
     with pytest.raises(ValueError, match="display_name"):
         _hire(display_name=_ForgedDisplayName("\n"))
+
+
+def test_rejects_governance_text_subclasses_before_digest_or_persistence() -> None:
+    """Confirmation and evidence text must retain the exact reviewed runtime value."""
+    with pytest.raises(ValueError, match="confirmation_reference"):
+        _employment(
+            confirmation_reference=_ForgedGovernanceText("human_confirmation:text-runtime-22")
+        )
+    with pytest.raises(ValueError, match="evidence_version_code"):
+        _position(evidence_version_code=_ForgedGovernanceText("position_evidence:v1"))
