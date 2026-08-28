@@ -25,6 +25,14 @@ CREATE TABLE employment_employing_organization_record (
         CHECK (effective_to IS NULL OR effective_to > effective_from),
     CONSTRAINT employment_employing_organization_recorded_period_check
         CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
+    CONSTRAINT employment_employing_organization_tenant_operational_uuid_check
+        CHECK (is_operational_uuid(tenant_record_id)),
+    CONSTRAINT employment_employing_organization_record_operational_uuid_check
+        CHECK (is_operational_uuid(employment_employing_organization_record_id)),
+    CONSTRAINT employment_employing_organization_employment_operational_uuid_check
+        CHECK (is_operational_uuid(employment_record_id)),
+    CONSTRAINT employment_employing_organization_unit_operational_uuid_check
+        CHECK (is_operational_uuid(employing_organization_unit_id)),
     CONSTRAINT employment_employing_organization_tenant_identity_unique
         UNIQUE (tenant_record_id, employment_employing_organization_record_id),
     CONSTRAINT employment_employing_organization_bitemporal_exclusion
