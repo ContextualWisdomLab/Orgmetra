@@ -119,6 +119,7 @@ def test_happy_path_binds_semantic_units_and_human_review_without_authorizing_pe
     assert document["decision_authority"] == "not_authorized_for_job_analysis_persistence"
     assert document["next_action"] == "submit through the authoritative Job Analysis persistence boundary"
     assert document["purpose_code"] == "job_analysis_model_draft"
+    assert document["authority_evidence_digest_sha256"] == digest("authority")
     assert document["semantic_unit_evidence_digest_sha256"] == req.semantic_unit_evidence_digest_sha256()
     assert "Draft Task/FJA/KSAO synthesis" not in encoded
     assert "Handle escalations" not in encoded

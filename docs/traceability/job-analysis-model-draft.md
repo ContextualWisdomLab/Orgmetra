@@ -4,7 +4,7 @@ This traceability file describes **active PR truth only** until the owning branc
 
 | Requirement / risk | Owner boundary | Executable evidence |
 |---|---|---|
-| Model work must not start before exact tenant/Job Analysis snapshot/purpose/requester authorization | `generate_job_analysis_model_draft` + injected `scope_resolver` | `test_authority_rejection_prevents_model_and_human_work`; `test_scope_verification_must_match_exact_request` |
+| Model work must not start before exact tenant/Job Analysis snapshot/purpose/requester authorization, and the exact authority evidence must remain correlated | `generate_job_analysis_model_draft` + injected `scope_resolver` | `test_authority_rejection_prevents_model_and_human_work`; `test_scope_verification_must_match_exact_request`; happy-path receipt assertion |
 | Drafting evidence must cover Task, FJA, and KSAO rather than an incomplete evidence family | `JobAnalysisDraftRequest.semantic_units` | `test_request_requires_task_fja_and_ksao_semantic_units` |
 | Runtime semantic text must be content-digest bound, source-provenance bound, sorted, and unique | `SemanticUnit`; `JobAnalysisDraftRequest` | `test_semantic_units_are_digest_bound_and_canonically_ordered` |
 | Raw Task/FJA/KSAO text must not enter durable evidence | `SemanticUnit.evidence`; request canonical document | `test_happy_path_binds_semantic_units_and_human_review_without_authorizing_persistence` |

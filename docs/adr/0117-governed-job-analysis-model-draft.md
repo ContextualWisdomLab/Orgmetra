@@ -19,7 +19,7 @@ Orgmetra will expose a transport-neutral model-draft workflow with four explicit
 3. **Untrusted orchestration result.** The injected model adapter returns raw draft text plus its digest, a reviewed exact orchestration revision, orchestration-evidence digest, and route reference. Contextual Orchestrator is a read-only dedicated-writer dependency and is consumed only through this injected host contract.
 4. **Accountable human review.** A reviewer distinct from the requester explicitly confirms the draft for later authoritative review or rejects it with a controlled reason. Confirmation does not authorize persistence.
 
-The durable receipt always states `decision_authority=not_authorized_for_job_analysis_persistence`. The authoritative Job Analysis persistence boundary must independently re-resolve current scope, actor authority, evidence, and immutable audit/outbox before any authoritative change.
+The durable receipt retains the exact authorizing evidence digest and always states `decision_authority=not_authorized_for_job_analysis_persistence`. The authoritative Job Analysis persistence boundary must independently re-resolve current scope, actor authority, evidence, and immutable audit/outbox before any authoritative change.
 
 ## Integrity and privacy consequences
 

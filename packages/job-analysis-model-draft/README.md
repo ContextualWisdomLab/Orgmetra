@@ -12,7 +12,7 @@ Execution is deliberately ordered:
 2. Only after authorization succeeds, pass the governed request to an injected model-orchestration adapter. Contextual Orchestrator remains a read-only dedicated-writer dependency; this package does not import its private implementation or query its application tables.
 3. Bind the untrusted model draft to its SHA-256 digest, exact reviewed orchestration revision, orchestration-evidence digest, and opaque model-route reference.
 4. Require a **different human reviewer** to confirm the draft for later authoritative review or reject it with a controlled reason.
-5. Issue value-minimized, tamper-evident durable evidence. Raw Task/FJA/KSAO text and raw model output are excluded from the receipt.
+5. Issue value-minimized, tamper-evident durable evidence, including the exact authority-evidence digest used for the scope decision. Raw Task/FJA/KSAO text and raw model output are excluded from the receipt.
 
 A human-confirmed draft is still marked `not_authorized_for_job_analysis_persistence`. The only next action is submission through the authoritative Job Analysis persistence boundary, which must re-resolve the current Job Analysis truth and make its own authorization/audit decision.
 

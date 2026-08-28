@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from hashlib import sha256
-import json, re
+import json
+import re
 from threading import RLock
 from typing import Callable
 from uuid import UUID
@@ -289,7 +290,7 @@ def generate_job_analysis_model_draft(request: JobAnalysisDraftRequest, scope_re
     if _time(review.reviewed_at, "reviewed_at") < _time(request.requested_at, "requested_at"):
         raise JobAnalysisModelDraftError("reviewed_at cannot predate requested_at")
     confirmed = review.decision_code == "confirm_for_authoritative_review"
-    document = request.document() | {"draft_digest_sha256": result.draft_digest_sha256, "model_evidence_digest_sha256": model_digest, "orchestration_revision": result.orchestration_revision, "route_reference": result.route_reference, "reviewer_actor_reference": review.reviewer_actor_reference, "review_evidence_digest_sha256": review.review_evidence_digest_sha256, "reviewed_at": _time(review.reviewed_at, "reviewed_at").isoformat().replace("+00:00", "Z"), "review_state": "human_confirmed_draft" if confirmed else "human_rejected_draft", "review_reason_code": review.reason_code, "decision_authority": "not_authorized_for_job_analysis_persistence", "next_action": "submit through the authoritative Job Analysis persistence boundary" if confirmed else "revise draft evidence before authoritative submission"}
+    document = request.document() | {"authority_evidence_digest_sha256": verification.authority_evidence_digest_sha256, "draft_digest_sha256": result.draft_digest_sha256, "model_evidence_digest_sha256": model_digest, "orchestration_revision": result.orchestration_revision, "route_reference": result.route_reference, "reviewer_actor_reference": review.reviewer_actor_reference, "review_evidence_digest_sha256": review.review_evidence_digest_sha256, "reviewed_at": _time(review.reviewed_at, "reviewed_at").isoformat().replace("+00:00", "Z"), "review_state": "human_confirmed_draft" if confirmed else "human_rejected_draft", "review_reason_code": review.reason_code, "decision_authority": "not_authorized_for_job_analysis_persistence", "next_action": "submit through the authoritative Job Analysis persistence boundary" if confirmed else "revise draft evidence before authoritative submission"}
     receipt = JobAnalysisModelDraftReceipt(_json(document), _TOKEN)
     with _LOCK:
         _SEALS[receipt] = _sha(receipt._canonical_json)
