@@ -9,6 +9,7 @@ the People API never reaches into their private implementation boundaries.
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 import json
@@ -65,9 +66,10 @@ class PeopleOperabilityAsgiApp:
 
     ``/health`` never invokes dependencies and therefore remains suitable for a
     liveness probe that should not create restart loops during a database outage.
-    ``/ready`` invokes the supplied owned-dependency probe and returns HTTP 503
-    on any dependency failure. Neither route accepts credentials, reads HR data,
-    returns dependency details, or claims that foreign CWL services are healthy.
+    ``/ready`` offloads the supplied synchronous owned-dependency probe from the
+    ASGI event loop and returns HTTP 503 on any dependency failure. Neither route
+    accepts credentials, reads HR data, returns dependency details, or claims
+    that foreign CWL services are healthy.
     """
 
     readiness_probe: ReadinessProbe
@@ -101,7 +103,7 @@ class PeopleOperabilityAsgiApp:
             return
         if path == "/ready":
             try:
-                self.readiness_probe.check_ready()
+                await asyncio.to_thread(self.readiness_probe.check_ready)
             except Exception:  # noqa: BLE001 - readiness must normalize dependency details.
                 await _send_json(
                     send,
