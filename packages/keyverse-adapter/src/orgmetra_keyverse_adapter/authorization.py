@@ -50,20 +50,20 @@ def _validate_uuid(field_name: str, value: object) -> None:
 
 
 def _validate_code(field_name: str, value: object) -> None:
-    """Require an explicit lower snake_case policy or request code."""
-    if not isinstance(value, str) or _CODE_PATTERN.fullmatch(value) is None:
+    """Require an exact built-in lower snake_case policy or request code."""
+    if type(value) is not str or _CODE_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be a lower snake_case code.")
 
 
 def _validate_resource_kind(value: object) -> None:
-    """Require a descriptive two-or-more-word lower snake_case resource kind."""
-    if not isinstance(value, str) or _RESOURCE_KIND_PATTERN.fullmatch(value) is None:
+    """Require an exact built-in descriptive lower snake_case resource kind."""
+    if type(value) is not str or _RESOURCE_KIND_PATTERN.fullmatch(value) is None:
         raise ValueError("resource_kind must contain two or more lower snake_case words.")
 
 
 def _validate_scope(field_name: str, value: object) -> None:
-    """Require one explicit Orgmetra operation scope rather than wildcards."""
-    if not isinstance(value, str) or _SCOPE_PATTERN.fullmatch(value) is None:
+    """Require one exact built-in Orgmetra operation scope rather than wildcards."""
+    if type(value) is not str or _SCOPE_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be an explicit orgmetra.<context>.<operation> scope.")
 
 
@@ -73,36 +73,36 @@ def _validate_reference(
     *,
     expected_namespace: str | None = None,
 ) -> None:
-    """Require an opaque audit reference and optionally bind it to one resource kind."""
-    if not isinstance(value, str) or _REFERENCE_PATTERN.fullmatch(value) is None:
+    """Require an exact built-in opaque reference and optionally bind its namespace."""
+    if type(value) is not str or _REFERENCE_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be a namespaced opaque reference.")
     if expected_namespace is not None and value.partition(":")[0] != expected_namespace:
         raise ValueError(f"{field_name} namespace must match resource_kind.")
 
 
 def _validate_version(value: object) -> None:
-    """Require an immutable, whitespace-free policy version token."""
-    if not isinstance(value, str) or _VERSION_PATTERN.fullmatch(value) is None:
+    """Require an exact built-in immutable, whitespace-free policy version token."""
+    if type(value) is not str or _VERSION_PATTERN.fullmatch(value) is None:
         raise ValueError("policy_version_code must be a whitespace-free version token.")
 
 
 def _validate_field_set(field_name: str, values: object) -> None:
-    """Require an immutable, non-empty set of explicit lower snake_case fields."""
-    if not isinstance(values, frozenset):
+    """Require an exact immutable set of exact built-in lower snake_case fields."""
+    if type(values) is not frozenset:
         raise ValueError(f"{field_name} must be a frozenset.")
     if not values:
         raise ValueError(f"{field_name} must not be empty.")
-    if any(not isinstance(value, str) or _CODE_PATTERN.fullmatch(value) is None for value in values):
+    if any(type(value) is not str or _CODE_PATTERN.fullmatch(value) is None for value in values):
         raise ValueError(f"{field_name} must contain only explicit lower snake_case field names.")
 
 
 def _validate_scope_set(values: object) -> None:
-    """Require immutable, non-empty, explicit token scopes from the authenticated principal."""
-    if not isinstance(values, frozenset):
+    """Require an exact immutable set of exact built-in authenticated token scopes."""
+    if type(values) is not frozenset:
         raise ValueError("granted_scope_codes must be a frozenset.")
     if not values:
         raise ValueError("granted_scope_codes must not be empty.")
-    if any(not isinstance(value, str) or _SCOPE_PATTERN.fullmatch(value) is None for value in values):
+    if any(type(value) is not str or _SCOPE_PATTERN.fullmatch(value) is None for value in values):
         raise ValueError("granted_scope_codes must contain only explicit Orgmetra scopes.")
 
 
