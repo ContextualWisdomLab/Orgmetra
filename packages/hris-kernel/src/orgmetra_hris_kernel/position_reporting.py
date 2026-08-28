@@ -71,10 +71,8 @@ def _freeze_known_at(value: datetime) -> datetime:
         return wall_time - offset
     except (OverflowError, ValueError) as exc:
         raise PositionReportingHierarchyError(
-            "known_at cannot be represented as a UTC datetime.",
-            next_action=(
-                "Use a representable UTC knowledge cutoff, then rebuild the reporting chart."
-            ),
+            "known_at UTC instant is outside the supported datetime range.",
+            next_action="Use a representable authoritative UTC system-knowledge timestamp, then rebuild the chart.",
         ) from exc
 
 
@@ -212,8 +210,16 @@ def build_position_reporting_snapshot(
     ]
 
     manager_by_subordinate: dict[UUID, UUID] = {}
+    seen_relationship_ids: set[UUID] = set()
     verified_positions: set[UUID] = set()
     for relationship in visible:
+        relationship_id = relationship.position_reporting_relationship_id
+        if relationship_id in seen_relationship_ids:
+            raise PositionReportingHierarchyError(
+                "A visible position reporting relationship identity appears more than once.",
+                next_action="Resolve the duplicate reporting relationship identity, then rebuild the chart.",
+            )
+        seen_relationship_ids.add(relationship_id)
         subordinate = relationship.subordinate_position_record_id
         manager = relationship.manager_position_record_id
         if subordinate in manager_by_subordinate:

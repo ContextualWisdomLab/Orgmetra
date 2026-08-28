@@ -52,6 +52,11 @@ from orgmetra_hris_kernel.position_reporting import (
     build_position_reporting_snapshot,
 )
 from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts, resolve_single_valued_fact
+from orgmetra_hris_kernel.span_of_control import (
+    PositionSpanOfControlError,
+    PositionSpanOfControlSnapshot,
+    build_position_span_of_control_snapshot,
+)
 from orgmetra_hris_kernel.workforce import (
     WorkforceCompositionSnapshot,
     build_workforce_composition_snapshot,
@@ -80,6 +85,8 @@ __all__ = [
     "PositionReportingRelationship",
     "PositionReportingSnapshot",
     "PositionSeatError",
+    "PositionSpanOfControlError",
+    "PositionSpanOfControlSnapshot",
     "PositionVersion",
     "RecordedInterval",
     "SingleValuedFactError",
@@ -87,6 +94,7 @@ __all__ = [
     "TaskKSAOLink",
     "WorkforceCompositionSnapshot",
     "build_position_reporting_snapshot",
+    "build_position_span_of_control_snapshot",
     "build_workforce_composition_snapshot",
     "close_recorded_interval",
     "resolve_bitemporal_facts",
