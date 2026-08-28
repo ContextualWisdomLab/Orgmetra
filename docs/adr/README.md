@@ -17,3 +17,4 @@
 | [0013](0013-governed-requisition-review-packet.md) | Governed requisition review packet | Accepted on active implementation branch |
 | [0014](0014-job-analysis-snapshot-persistence.md) | Persist governed job-analysis snapshots | Accepted on active implementation branch |
 | [0018](0018-governed-performance-review.md) | Governed performance-review evidence packet | Proposed — active PR only |
+| [0018](0018-governed-performance-review.md) | Governed performance-review evidence packet | Proposed — active PR only |
