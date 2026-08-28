@@ -47,7 +47,7 @@
 }
 
 .hr-export-confirm {
-  background: var(--orgmetra-surface-muted);
+  background: var(--orgmetra-surface-page);
   color: var(--orgmetra-text-primary);
 }
 

@@ -71,11 +71,10 @@ function requireExactExportDeliveryState(state) {
   if (typeof state !== 'string') {
     throw new TypeError('HR export delivery state must be an exact built-in string');
   }
-  const model = EXPORT_DELIVERY_STATES[state];
-  if (!model) {
+  if (!Object.hasOwn(EXPORT_DELIVERY_STATES, state)) {
     throw new TypeError(`unsupported HR export delivery state: ${state}`);
   }
-  return model;
+  return EXPORT_DELIVERY_STATES[state];
 }
 
 /**

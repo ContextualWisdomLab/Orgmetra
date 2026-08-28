@@ -91,12 +91,29 @@ test('unsupported or boxed state values fail closed before rendering', () => {
   assert.throws(() => exportDeliveryViewModel(new String('review')), /exact built-in string/);
 });
 
+test('prototype-inherited names cannot masquerade as governed export states', () => {
+  for (const inheritedName of ['constructor', 'toString', '__proto__']) {
+    assert.throws(
+      () => exportDeliveryViewModel(inheritedName),
+      /unsupported HR export delivery state/,
+      `${inheritedName} must fail closed at the view-model boundary`,
+    );
+    assert.throws(
+      () => exportDeliveryStateMarkup(inheritedName),
+      /unsupported HR export delivery state/,
+      `${inheritedName} must fail closed before markup is emitted`,
+    );
+  }
+});
+
 test('Storybook and styling cover the Figma-required high-risk and terminal states', () => {
   for (const storyName of ['ReviewRequired', 'ConfirmedReady', 'Publishing', 'DeliveredReadOnly', 'DeliveryIndeterminate', 'PermissionDenied']) {
     assert.match(story, new RegExp(`export const ${storyName}`));
   }
   assert.match(story, /exportDeliveryStateMarkup/);
   assert.match(css, /data-interaction-state="high-risk-confirmation"/);
+  assert.match(css, /var\(--orgmetra-surface-page\)/);
+  assert.doesNotMatch(css, /var\(--orgmetra-surface-muted\)/);
   assert.match(css, /var\(--orgmetra-focus-ring\)/);
   assert.match(css, /:focus-visible/);
 });
