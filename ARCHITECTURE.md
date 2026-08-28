@@ -75,7 +75,7 @@ The initial deployment may share one physical PostgreSQL cluster. Logical isolat
 | Service identifier | Owned schema and representative tables | Database role |
 |---|---|---|
 | `people_core` | `people_core`: person, name, employment, assignment, compensation, and candidate-worker linkage records | `people_core_role` |
-| `organization_core` | `organization_core`: organization units and position records | `organization_core_role` |
+| `organization_core` | `organization_core`: organization units, position records, and Position reporting relations | `organization_core_role` |
 | `job_architecture` | `job_architecture`: job profiles, publication evidence, and persisted `job_analysis_snapshot` / task / KSAO rows | `job_architecture_role` |
 | `talent_acquisition` | `talent_acquisition`: candidate profiles, selection decisions, and decision evidence | `talent_acquisition_role` |
 | `performance_management` | `performance_management`: criterion blueprints and observations | `performance_management_role` |

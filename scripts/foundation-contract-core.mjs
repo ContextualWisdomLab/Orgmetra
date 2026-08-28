@@ -68,6 +68,7 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
   'database/migrations/0013_job_analysis_snapshot.sql',
+  'database/migrations/0020_position_reporting_relationship.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -89,6 +90,9 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/test_job_analysis_snapshot_postgres.sh',
+  'tests/test_position_reporting_persistence_postgres.sh',
+  'tests/test_position_reporting_review_binding_postgres.sh',
+  'tests/test_position_reporting_concurrency_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -112,6 +116,7 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'organization_unit', 'organization_relation', 'business_location',
   'cost_center_record', 'job_family', 'job_profile', 'job_profile_version',
   'position_record', 'position_record_version', 'position_relation',
+  'position_reporting_relationship_record', 'position_reporting_relationship_version',
   'assignment_record',
   'job_analysis_snapshot', 'job_analysis_task_item', 'job_analysis_ksao_item',
   'job_analysis_task_ksao_link', 'job_analysis_write_command',
@@ -139,7 +144,9 @@ export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
   'job_analysis_task_item',
   'job_analysis_ksao_item',
   'job_analysis_task_ksao_link',
-  'job_analysis_write_command'
+  'job_analysis_write_command',
+  'position_reporting_relationship_record',
+  'position_reporting_relationship_version'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;

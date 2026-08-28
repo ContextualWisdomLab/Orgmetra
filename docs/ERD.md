@@ -18,6 +18,10 @@ erDiagram
     job_profile ||--o{ job_profile_version : has_versions
     job_profile ||--o{ position_record : defines
     position_record ||--o{ position_record_version : has_versions
+    position_record ||--o{ position_reporting_relationship_record : subordinate
+    position_reporting_relationship_record ||--o{ position_reporting_relationship_version : has_versions
+    position_record ||--o{ position_reporting_relationship_version : manager
+    audit_event_record ||--o| position_reporting_relationship_version : proves_application
     employment_record ||--o{ assignment_record : covers
     person_record ||--o{ assignment_record : receives
     position_record ||--o{ assignment_record : assigned_through
@@ -48,6 +52,8 @@ erDiagram
 ## Cardinality decisions
 
 `organization_unit`, `job_profile`, `employment_record`, and `position_record` are durable anchors. Mutable names, classifications, parent relationships, titles, families, version codes, and employment or position status live in bitemporal version rows. Positions retain stable organization/job references while retroactive corrections append or supersede version facts rather than rewriting identity. An organization version may reference another durable organization as its parent; self-parenting is rejected at the database boundary. An assignment names the employment that covers it, so a person cannot be assigned through another worker's employment. Exclusive employment versions for one person cannot overlap. An assignment day must land on an `active` or `open` position version, and visible allocations for one seat cannot exceed 1.0000.
+
+Active PR #106 adds a Position-to-Position reporting anchor and reviewed manager-Position version. It is independent of worker occupancy and Assignment state; its effective/system intervals, staffable endpoint coverage, audit binding, cycle guard, and tenant isolation are enforced by the proposed migration until the PR is integrated and retargeted.
 
 Every owned HRIS fact carries `tenant_record_id`. Relationships that cross table boundaries use tenant-qualified foreign keys, and row-level security independently filters every tenant-scoped relation. The tenant column is therefore both a referential-integrity boundary and a runtime isolation boundary, not a caller-supplied business attribute.
 
