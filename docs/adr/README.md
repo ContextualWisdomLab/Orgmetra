@@ -16,3 +16,5 @@
 | [0012](0012-governed-migration-handoff.md) | Governed migration handoff | Accepted on active implementation branch |
 | [0013](0013-governed-requisition-review-packet.md) | Governed requisition review packet | Accepted on active implementation branch |
 | [0014](0014-job-analysis-snapshot-persistence.md) | Persist governed job-analysis snapshots | Accepted on protected `develop` |
+| [0017](0017-governed-offer-approval.md) | Governed offer approval evidence | Accepted on protected `develop` |
+| [0025](0025-governed-candidate-evidence-intake.md) | Govern candidate evidence intake as reference-only evidence | Accepted on protected `develop` |
