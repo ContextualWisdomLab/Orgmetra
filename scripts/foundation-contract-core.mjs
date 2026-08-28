@@ -53,6 +53,7 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0013-governed-requisition-review-packet.md',
   'docs/adr/0014-job-analysis-snapshot-persistence.md',
   'docs/adr/0090-hardware-acceleration-container-boundary.md',
+  'docs/doctoring/2026-08-26-hardware-acceleration-container-routing.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
