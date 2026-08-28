@@ -68,7 +68,7 @@ function requireExactState(value) {
   if (typeof value !== 'string') {
     throw new TypeError('performance-goal review state must be an exact built-in string');
   }
-  const model = STATE_MODELS[value];
+  const model = Object.hasOwn(STATE_MODELS, value) ? STATE_MODELS[value] : undefined;
   if (!model) throw new TypeError(`unsupported performance-goal review state: ${value}`);
   return model;
 }

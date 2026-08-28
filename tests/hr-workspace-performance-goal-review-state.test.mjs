@@ -93,6 +93,16 @@ test('stale and blocked states demand fresh authoritative evidence instead of in
 
 test('unsupported runtime input fails closed before rendering', () => {
   assert.throws(() => performanceGoalReviewViewModel('activated'), /unsupported performance-goal review state/);
+  for (const inheritedState of ['constructor', 'toString', '__proto__']) {
+    assert.throws(
+      () => performanceGoalReviewViewModel(inheritedState),
+      /unsupported performance-goal review state/,
+    );
+    assert.throws(
+      () => performanceGoalReviewStateMarkup(inheritedState),
+      /unsupported performance-goal review state/,
+    );
+  }
   assert.throws(() => performanceGoalReviewViewModel(new String('review')), /exact built-in string/);
   assert.throws(() => performanceGoalReviewStateMarkup(Symbol('recorded')), /exact built-in string/);
 });
