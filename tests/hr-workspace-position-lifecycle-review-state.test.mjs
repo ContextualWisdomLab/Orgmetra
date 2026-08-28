@@ -156,6 +156,7 @@ test('traceability separates review evidence from authoritative Position applica
 });
 
 test('focused workflow runs on the real stacked base and enforces exact coverage', () => {
+  assert.match(workflow, /develop/);
   assert.match(workflow, /feat\/hr-workspace-protected-read-state/);
   assert.match(workflow, /--test-coverage-lines=100/);
   assert.match(workflow, /--test-coverage-branches=100/);
