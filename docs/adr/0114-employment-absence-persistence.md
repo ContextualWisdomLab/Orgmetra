@@ -20,7 +20,7 @@ Add two 3NF relations:
 
 The version relation uses PostgreSQL-owned `transaction_timestamp()` for system time. An open version can only be corrected by closing `recorded_to` at the current transaction timestamp; all other UPDATE/DELETE/TRUNCATE attempts fail closed. A new version then records the corrected fact without rewriting history.
 
-Before insert, the database requires current system-visible `active` or `leave` Employment versions to cover the entire proposed absence effective interval. A tenant-qualified transaction-scoped advisory lock serializes absence mutations for one Employment, after which the insert rejects a second overlapping `confirmed` absence identity. Lock-key collisions only reduce concurrency; they do not relax the invariant.
+Before inserting a `confirmed` version, the database requires current system-visible `active` or `leave` Employment versions to cover the entire proposed absence effective interval. A `cancelled` correction is allowed to close a previously recorded absence even after current Employment coverage ends; otherwise termination could make correction-not-rewrite impossible. A tenant-qualified transaction-scoped advisory lock serializes absence mutations for one Employment, after which the insert rejects a second overlapping `confirmed` absence identity. Lock-key collisions only reduce concurrency; they do not relax the invariant.
 
 Both relations use ENABLE + FORCE ROW LEVEL SECURITY with transaction-local tenant context. The migration stores opaque audit/outbox references and SHA-256 evidence correlations but does not query another service's application tables.
 
@@ -35,6 +35,6 @@ No generic reason, diagnosis, family detail, statutory category, disciplinary no
 - Buyers can reconstruct operational absence truth as-of business and system time after the parent contract is integrated.
 - Correction preserves what the system previously knew instead of rewriting the past.
 - Concurrent overlapping confirmed absences fail closed rather than being silently consolidated.
-- An Employment must have active/leave coverage for the entire persisted absence interval.
+- A `confirmed` version must have active/leave coverage for the entire persisted absence interval; a `cancelled` correction may preserve history after coverage ends.
 - This PR remains stacked and Draft until #113 integrates; parent checks/reviews are not transferable.
 - After parent integration, this lane must retarget to fresh `develop`, reconcile migration numbering, and rerun all applicable CI/security/recovery/product gates on the resulting exact head.

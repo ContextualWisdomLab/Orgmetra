@@ -142,10 +142,41 @@ expect_failure \
      audit_event_reference, outbox_event_reference, application_evidence_digest_sha256
    ) VALUES (
      '${TENANT_ID}', '10000000-0000-7000-8000-000000000043', '${OTHER_ABSENCE_ID}',
-     'cancelled', DATE '2027-02-01', DATE '2027-02-02', '${SOURCE_DIGEST}',
+     'confirmed', DATE '2027-02-01', DATE '2027-02-02', '${SOURCE_DIGEST}',
      'audit_event:00000000-0000-4000-8000-000000000067',
      'outbox_event:00000000-0000-4000-8000-000000000068', '${APPLICATION_DIGEST}'
    );"
+
+with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
+INSERT INTO employment_absence_version (
+  tenant_record_id, employment_absence_version_id, employment_absence_record_id,
+  absence_status_code, effective_from, effective_to, source_evidence_digest_sha256,
+  audit_event_reference, outbox_event_reference, application_evidence_digest_sha256
+) VALUES (
+  '${TENANT_ID}', '10000000-0000-7000-8000-000000000043', '${OTHER_ABSENCE_ID}',
+  'cancelled', DATE '2027-02-01', DATE '2027-02-02', '${SOURCE_DIGEST}',
+  'audit_event:00000000-0000-4000-8000-000000000067',
+  'outbox_event:00000000-0000-4000-8000-000000000068', '${APPLICATION_DIGEST}'
+);"
+
+expect_failure \
+  "same-transaction absence closure created a zero-length recorded interval" \
+  "employment_absence_recorded_period_check" \
+  "BEGIN;
+   INSERT INTO employment_absence_version (
+     tenant_record_id, employment_absence_version_id, employment_absence_record_id,
+     absence_status_code, effective_from, effective_to, source_evidence_digest_sha256,
+     audit_event_reference, outbox_event_reference, application_evidence_digest_sha256
+   ) VALUES (
+     '${TENANT_ID}', '10000000-0000-7000-8000-000000000044', '${ABSENCE_ID}',
+     'cancelled', DATE '2028-01-01', DATE '2028-01-02', '${SOURCE_DIGEST}',
+     'audit_event:00000000-0000-4000-8000-000000000071',
+     'outbox_event:00000000-0000-4000-8000-000000000072', '${APPLICATION_DIGEST}'
+   );
+   UPDATE employment_absence_version
+   SET recorded_to = pg_catalog.transaction_timestamp()
+   WHERE employment_absence_version_id='10000000-0000-7000-8000-000000000044'::uuid;
+   COMMIT;"
 
 expect_failure \
   "absence evidence was rewriteable" \
@@ -198,6 +229,25 @@ FROM pg_class
 WHERE relname IN ('employment_absence_record','employment_absence_version');")"
 if [[ "${rls_state}" != "employment_absence_record:true:true,employment_absence_version:true:true" ]]; then
   echo "employment absence RLS is not enabled and forced: ${rls_state}" >&2
+  exit 1
+fi
+
+pinned_search_path="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_proc AS procedure_record
+JOIN pg_namespace AS namespace_record ON namespace_record.oid = procedure_record.pronamespace
+WHERE namespace_record.nspname = 'public'
+  AND procedure_record.proname IN (
+    'enforce_employment_absence_anchor_system_time',
+    'employment_absence_has_staffable_coverage',
+    'validate_employment_absence_version_insert',
+    'protect_employment_absence_anchor_immutability',
+    'protect_employment_absence_version_history',
+    'reject_employment_absence_truncate'
+  )
+  AND procedure_record.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[];")"
+if [[ "${pinned_search_path}" != "6" ]]; then
+  echo "employment absence functions do not pin a trusted search_path: ${pinned_search_path}" >&2
   exit 1
 fi
 

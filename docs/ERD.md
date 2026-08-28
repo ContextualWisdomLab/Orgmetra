@@ -12,6 +12,9 @@ erDiagram
     person_record ||--o{ person_name_record : has_names
     person_record ||--o{ employment_record : has
     employment_record ||--o{ employment_record_version : has_versions
+    employment_record ||--o{ employment_absence_record : has_absence_identity
+    person_record ||--o{ employment_absence_record : binds_person
+    employment_absence_record ||--o{ employment_absence_version : has_versions
     organization_unit ||--o{ organization_unit_version : has_versions
     organization_unit_version }o--o| organization_unit : may_parent
     organization_unit ||--o{ position_record : contains
@@ -62,6 +65,8 @@ A `validity_study` connects the criterion blueprint to the exact selection decis
 One immutable `audit_event_record` may have multiple `outbox_delivery_record` rows when the same event must reach multiple delivery targets. The unique `(tenant_record_id, audit_event_record_id, delivery_target_code)` key permits at most one delivery lifecycle per target. Delivery retries mutate only the delivery relation; the canonical event bytes and digest are append-only and therefore cannot drift with transport state.
 
 A `people_mutation_idempotency_record` belongs to one tenant and names one created employment, position, or assignment identity for one route and `Idempotency-Key`. The unique `(tenant_record_id, command_route, idempotency_key)` key prevents a retry from creating a second authoritative fact. Tenants do not share keys.
+
+The active stacked migration `0026_employment_absence_persistence.sql` separates one reason-free `employment_absence_record` identity from its bitemporal `employment_absence_version` rows. The anchor binds one same-tenant Employment and Person; confirmed versions require full active/leave Employment coverage, while cancelled correction versions can preserve history after coverage ends. The version relation rejects overlapping effective/recorded rectangles, arbitrary mutation, and bulk truncation, and both relations use forced tenant RLS.
 
 A delivery can have at most one `outbox_delivery_escalation_record`, enforced by the unique `(tenant_record_id, outbox_delivery_record_id)` key. The escalation row exists only for a terminal `dead_lettered` delivery and records the failure classification, terminal attempt count, recorded time, and an opaque operator/customer escalation reference without copying the event payload. The row is append-only; terminal queue history is not reopened or rewritten.
 

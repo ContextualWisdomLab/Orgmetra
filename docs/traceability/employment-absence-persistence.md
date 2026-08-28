@@ -9,7 +9,7 @@ This document distinguishes protected-default-branch truth from the active stack
 | Business-effective and system-recorded time remain separate | HRIS core | effective/recorded columns and bitemporal exclusion constraint |
 | System-recorded creation/version time is database-owned | HRIS core | caller-backdating regression |
 | Corrections close history instead of rewriting it | HRIS core | permitted current-time `recorded_to` closure plus immutable-field regression |
-| Persisted absence interval has active/leave Employment coverage | HRIS core | full-range coverage negative regression |
+| Confirmed persisted absence interval has active/leave Employment coverage | HRIS core | full-range coverage negative regression; cancellation-after-coverage regression |
 | At most one overlapping confirmed absence fact per Employment | HRIS core | serialized second-anchor rejection regression |
 | Tenant visibility is fail-closed | HRIS core | ENABLE + FORCE RLS and `NOBYPASSRLS` reader regression |
 | Sensitive leave reasons are absent from generic core storage | HRIS core | forbidden-column regression |

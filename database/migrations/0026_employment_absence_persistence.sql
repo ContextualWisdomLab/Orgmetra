@@ -24,7 +24,7 @@ CREATE TABLE employment_absence_record (
         UNIQUE (tenant_record_id, employment_absence_record_id)
 );
 
-COMMENT ON TABLE employment_absence_record IS
+COMMENT ON TABLE public.employment_absence_record IS
     'Stable tenant-qualified identity for one reason-free Employment absence fact. Sensitive leave reasons and employment-decision authority are intentionally absent.';
 
 CREATE TABLE employment_absence_version (
@@ -84,17 +84,18 @@ CREATE TABLE employment_absence_version (
         EXCLUDE USING gist (
             tenant_record_id WITH =,
             employment_absence_record_id WITH =,
-            daterange(effective_from, effective_to, '[)') WITH &&,
-            tstzrange(recorded_from, recorded_to, '[)') WITH &&
+            pg_catalog.daterange(effective_from, effective_to, '[)') WITH &&,
+            pg_catalog.tstzrange(recorded_from, recorded_to, '[)') WITH &&
         )
 );
 
-COMMENT ON TABLE employment_absence_version IS
+COMMENT ON TABLE public.employment_absence_version IS
     'Bitemporal, reason-free status history for one Employment absence identity. confirmed/cancelled are operational facts only and never authorize an employment decision.';
 
-CREATE FUNCTION enforce_employment_absence_anchor_system_time()
+CREATE FUNCTION public.enforce_employment_absence_anchor_system_time()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.created_at IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
@@ -105,15 +106,15 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION enforce_employment_absence_anchor_system_time() IS
+COMMENT ON FUNCTION public.enforce_employment_absence_anchor_system_time() IS
     'Prevents caller-backdated system creation time on the durable absence identity.';
 
 CREATE TRIGGER employment_absence_anchor_system_time_guard
-BEFORE INSERT ON employment_absence_record
+BEFORE INSERT ON public.employment_absence_record
 FOR EACH ROW
-EXECUTE FUNCTION enforce_employment_absence_anchor_system_time();
+EXECUTE FUNCTION public.enforce_employment_absence_anchor_system_time();
 
-CREATE FUNCTION employment_absence_has_staffable_coverage(
+CREATE FUNCTION public.employment_absence_has_staffable_coverage(
     requested_tenant_id uuid,
     requested_employment_id uuid,
     requested_effective_from date,
@@ -123,17 +124,18 @@ CREATE FUNCTION employment_absence_has_staffable_coverage(
 RETURNS boolean
 LANGUAGE sql
 STABLE
+SET search_path = pg_catalog, public, pg_temp
 AS $$
     SELECT COALESCE(
-        daterange(requested_effective_from, requested_effective_to, '[)') <@
-        pg_catalog.range_agg(daterange(
+        pg_catalog.daterange(requested_effective_from, requested_effective_to, '[)') <@
+        pg_catalog.range_agg(pg_catalog.daterange(
             employment_version.effective_from,
             employment_version.effective_to,
             '[)'
         )),
         false
     )
-    FROM employment_record_version AS employment_version
+    FROM public.employment_record_version AS employment_version
     WHERE employment_version.tenant_record_id = requested_tenant_id
       AND employment_version.employment_record_id = requested_employment_id
       AND employment_version.employment_status_code IN ('active', 'leave')
@@ -144,12 +146,13 @@ AS $$
       );
 $$;
 
-COMMENT ON FUNCTION employment_absence_has_staffable_coverage(uuid, uuid, date, date, timestamptz) IS
+COMMENT ON FUNCTION public.employment_absence_has_staffable_coverage(uuid, uuid, date, date, timestamptz) IS
     'Requires current system-visible active/leave Employment versions to cover the complete proposed absence business interval.';
 
-CREATE FUNCTION validate_employment_absence_version_insert()
+CREATE FUNCTION public.validate_employment_absence_version_insert()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     absence_employment_id uuid;
@@ -162,7 +165,7 @@ BEGIN
 
     SELECT absence_record.employment_record_id
     INTO absence_employment_id
-    FROM employment_absence_record AS absence_record
+    FROM public.employment_absence_record AS absence_record
     WHERE absence_record.tenant_record_id = NEW.tenant_record_id
       AND absence_record.employment_absence_record_id = NEW.employment_absence_record_id;
 
@@ -180,7 +183,8 @@ BEGIN
         )
     );
 
-    IF NOT employment_absence_has_staffable_coverage(
+    IF NEW.absence_status_code = 'confirmed'
+       AND NOT public.employment_absence_has_staffable_coverage(
         NEW.tenant_record_id,
         absence_employment_id,
         NEW.effective_from,
@@ -193,8 +197,8 @@ BEGIN
 
     IF NEW.absence_status_code = 'confirmed' AND EXISTS (
         SELECT 1
-        FROM employment_absence_record AS other_record
-        JOIN employment_absence_version AS other_version
+        FROM public.employment_absence_record AS other_record
+        JOIN public.employment_absence_version AS other_version
           ON other_version.tenant_record_id = other_record.tenant_record_id
          AND other_version.employment_absence_record_id = other_record.employment_absence_record_id
         WHERE other_record.tenant_record_id = NEW.tenant_record_id
@@ -203,8 +207,8 @@ BEGIN
           AND other_version.absence_status_code = 'confirmed'
           AND other_version.recorded_from <= insertion_time
           AND (other_version.recorded_to IS NULL OR other_version.recorded_to > insertion_time)
-          AND daterange(other_version.effective_from, other_version.effective_to, '[)') &&
-              daterange(NEW.effective_from, NEW.effective_to, '[)')
+          AND pg_catalog.daterange(other_version.effective_from, other_version.effective_to, '[)') &&
+              pg_catalog.daterange(NEW.effective_from, NEW.effective_to, '[)')
     ) THEN
         RAISE EXCEPTION 'a confirmed absence already exists for this Employment and effective interval'
             USING ERRCODE = '23514';
@@ -214,17 +218,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION validate_employment_absence_version_insert() IS
-    'Validates database-owned system time, complete active/leave Employment coverage, and serialized single-confirmed-absence truth before insert.';
+COMMENT ON FUNCTION public.validate_employment_absence_version_insert() IS
+    'Validates database-owned system time, confirmed-absence active/leave Employment coverage, and serialized single-confirmed-absence truth before insert.';
 
 CREATE TRIGGER employment_absence_version_insert_guard
-BEFORE INSERT ON employment_absence_version
+BEFORE INSERT ON public.employment_absence_version
 FOR EACH ROW
-EXECUTE FUNCTION validate_employment_absence_version_insert();
+EXECUTE FUNCTION public.validate_employment_absence_version_insert();
 
-CREATE FUNCTION protect_employment_absence_anchor_immutability()
+CREATE FUNCTION public.protect_employment_absence_anchor_immutability()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'employment-absence identity is immutable'
@@ -232,17 +237,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION protect_employment_absence_anchor_immutability() IS
+COMMENT ON FUNCTION public.protect_employment_absence_anchor_immutability() IS
     'Rejects UPDATE and DELETE on stable absence identities; corrections belong in version history.';
 
 CREATE TRIGGER employment_absence_anchor_immutability_guard
-BEFORE UPDATE OR DELETE ON employment_absence_record
+BEFORE UPDATE OR DELETE ON public.employment_absence_record
 FOR EACH ROW
-EXECUTE FUNCTION protect_employment_absence_anchor_immutability();
+EXECUTE FUNCTION public.protect_employment_absence_anchor_immutability();
 
-CREATE FUNCTION protect_employment_absence_version_history()
+CREATE FUNCTION public.protect_employment_absence_version_history()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -262,17 +268,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION protect_employment_absence_version_history() IS
+COMMENT ON FUNCTION public.protect_employment_absence_version_history() IS
     'Allows only one correction-not-rewrite transition: closing an open recorded interval at the current transaction timestamp.';
 
 CREATE TRIGGER employment_absence_version_history_guard
-BEFORE UPDATE OR DELETE ON employment_absence_version
+BEFORE UPDATE OR DELETE ON public.employment_absence_version
 FOR EACH ROW
-EXECUTE FUNCTION protect_employment_absence_version_history();
+EXECUTE FUNCTION public.protect_employment_absence_version_history();
 
-CREATE FUNCTION reject_employment_absence_truncate()
+CREATE FUNCTION public.reject_employment_absence_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'employment-absence history cannot be truncated'
@@ -280,21 +287,21 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION reject_employment_absence_truncate() IS
+COMMENT ON FUNCTION public.reject_employment_absence_truncate() IS
     'Rejects table-wide TRUNCATE so reason-free absence history cannot bypass row-level immutability.';
 
 CREATE TRIGGER employment_absence_record_truncate_guard
-BEFORE TRUNCATE ON employment_absence_record
+BEFORE TRUNCATE ON public.employment_absence_record
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_employment_absence_truncate();
+EXECUTE FUNCTION public.reject_employment_absence_truncate();
 
 CREATE TRIGGER employment_absence_version_truncate_guard
-BEFORE TRUNCATE ON employment_absence_version
+BEFORE TRUNCATE ON public.employment_absence_version
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_employment_absence_truncate();
+EXECUTE FUNCTION public.reject_employment_absence_truncate();
 
-REVOKE TRUNCATE ON employment_absence_record FROM PUBLIC;
-REVOKE TRUNCATE ON employment_absence_version FROM PUBLIC;
+REVOKE TRUNCATE ON public.employment_absence_record FROM PUBLIC;
+REVOKE TRUNCATE ON public.employment_absence_version FROM PUBLIC;
 
 ALTER TABLE employment_absence_record ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employment_absence_record FORCE ROW LEVEL SECURITY;
@@ -302,7 +309,7 @@ ALTER TABLE employment_absence_version ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employment_absence_version FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY employment_absence_record_tenant_isolation_policy
-ON employment_absence_record
+ON public.employment_absence_record
 USING (
     tenant_record_id = NULLIF(
         pg_catalog.current_setting('orgmetra.tenant_record_id', true),
@@ -317,7 +324,7 @@ WITH CHECK (
 );
 
 CREATE POLICY employment_absence_version_tenant_isolation_policy
-ON employment_absence_version
+ON public.employment_absence_version
 USING (
     tenant_record_id = NULLIF(
         pg_catalog.current_setting('orgmetra.tenant_record_id', true),

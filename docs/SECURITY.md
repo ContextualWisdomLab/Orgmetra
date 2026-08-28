@@ -11,6 +11,7 @@
 - Immutable audit evidence
 - Mutable outbox delivery coordination
 - Immutable outbox terminal-escalation evidence
+- Reason-free Employment absence persistence
 
 ## Security principles
 
@@ -20,6 +21,7 @@
 - Durable UUID identity columns reject the RFC 9562 Nil and Max sentinel values at the PostgreSQL boundary; reserved protocol sentinels cannot become tenant, person, employment, organization, job, position, assignment, candidate, decision, evidence, outcome, transition, audit-event, outbox-delivery, or outbox-escalation identities.
 - LLM outputs cannot mutate authoritative facts without human-approved commands.
 - External integrations use explicit adapters and fail closed.
+- Employment absence persistence stores only operational `confirmed`/`cancelled` state, binds the same tenant Employment and Person through composite foreign keys, forces tenant RLS, pins database function `search_path`, and keeps sensitive leave-case reasons outside the core relation.
 - Event payloads carry opaque references, not broad PII broadcasts. Durable audit persistence enforces an exact top-level event-field allowlist so a caller cannot expand the retained audit payload with employee names, compensation, free-text evidence, or other mutable HR facts.
 - Audit bytes are append-only and database digest-verified; asynchronous retry/lease/dead-letter state is normalized into a separate delivery relation, and terminal escalation evidence is normalized into its own append-only relation. Neither transport state nor escalation evidence can rewrite the audit fact.
 - A dispatcher lease is an executable capability. Completion and retry require the exact owner of a still-live lease under the active tenant context. Before retry-budget exhaustion, expired ownership must be reclaimed through the guarded claim path; after exhaustion, claim/retry cannot create attempt N+1 and only the exact recorded stable worker reference may use the normal worker terminalization path. If that recorded final worker identity is permanently unavailable, a separately provisioned purpose-bound operator capability may terminalize only an already-expired exhausted lease through the audited recovery function; the operator role has no direct outbox read/write or escalation-insert privilege.
