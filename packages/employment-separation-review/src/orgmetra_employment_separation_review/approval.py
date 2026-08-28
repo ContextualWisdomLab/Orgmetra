@@ -303,8 +303,10 @@ def approve_employment_separation(
         approving_actor_reference=approving_actor_reference,
         approved_at=frozen_approved_at,
     )
-    if packet.canonical_json() != packet_canonical_json:
-        raise ValueError("separation review changed during authority verification")
+    try:
+        packet.canonical_json()
+    except ValueError as error:
+        raise ValueError("separation review changed during authority verification") from error
     if type(verification) is not EmploymentSeparationApprovalVerification:
         raise TypeError("authority must return EmploymentSeparationApprovalVerification")
 
