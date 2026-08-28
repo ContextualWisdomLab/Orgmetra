@@ -133,7 +133,10 @@ def _canonical_timestamp(value: object) -> str:
     """Render one exact datetime with a built-in fixed offset as UTC RFC 3339 text."""
     if type(value) is not datetime or type(value.tzinfo) is not _TIMEZONE_TYPE:
         raise ValueError("recorded_at must use a built-in fixed-offset timezone")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    try:
+        return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    except (OverflowError, ValueError) as exc:
+        raise ValueError("recorded_at must be representable as a UTC datetime") from exc
 
 
 def _validate_issuance_timestamp(value: object) -> None:

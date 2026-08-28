@@ -183,6 +183,12 @@ def test_rejects_noncanonical_temporal_primitives(field_name: str, invalid_value
         build(**{field_name: invalid_value})
 
 
+def test_rejects_unrepresentable_utc_timestamp() -> None:
+    """Normalize fixed-offset timestamps that cannot be represented in UTC."""
+    with pytest.raises(ValueError, match="recorded_at must be representable as a UTC datetime"):
+        build(recorded_at=datetime.max.replace(tzinfo=timezone(timedelta(hours=-14))))
+
+
 class ForgedText(str):
     """Attempt to forge equality, hashing, and namespace checks."""
 
