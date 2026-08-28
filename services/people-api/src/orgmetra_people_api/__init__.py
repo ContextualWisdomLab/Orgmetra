@@ -1,5 +1,13 @@
 """Request-edge, governed read, confirmed-hire, and People mutation contracts."""
 
+from orgmetra_people_api.assignment_history import (
+    AssignmentHistoryIntegrityError,
+    AssignmentHistoryReadPort,
+    AssignmentHistoryRecord,
+    AuthorizedAssignmentHistoryEntry,
+    AuthorizedAssignmentHistoryView,
+    read_assignment_history,
+)
 from orgmetra_people_api.auth import (
     AuthenticatedPrincipal,
     AuthenticationFailed,
@@ -45,13 +53,22 @@ from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
 
 __all__ = [
+    "AssignmentHistoryIntegrityError",
+    "AssignmentHistoryReadPort",
+    "AssignmentHistoryRecord",
+    "AssignmentMutationCommand",
+    "AssignmentMutationResult",
     "AuthenticatedPrincipal",
     "AuthenticationFailed",
+    "AuthorizedAssignmentHistoryEntry",
+    "AuthorizedAssignmentHistoryView",
     "AuthorizedWorkerPeopleView",
+    "EmploymentMutationCommand",
+    "EmploymentMutationResult",
+    "HireAcceptanceAsgiApp",
     "HireAcceptanceCommand",
     "HireAcceptancePort",
     "HireAcceptanceResult",
-    "HireAcceptanceAsgiApp",
     "HireDecisionIntegrityError",
     "HireDecisionNotFound",
     "PeopleAsgiApp",
@@ -67,10 +84,6 @@ __all__ = [
     "PostgresHireAcceptancePort",
     "PostgresPeopleMutationPort",
     "PostgresPeopleReadPort",
-    "AssignmentMutationCommand",
-    "AssignmentMutationResult",
-    "EmploymentMutationCommand",
-    "EmploymentMutationResult",
     "TokenAuthenticator",
     "WorkerPeopleRecord",
     "accept_confirmed_hire",
@@ -79,5 +92,6 @@ __all__ = [
     "create_employment_record",
     "create_position_record",
     "extract_bearer_token",
+    "read_assignment_history",
     "read_worker_people_record",
 ]
