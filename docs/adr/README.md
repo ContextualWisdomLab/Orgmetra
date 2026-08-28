@@ -18,5 +18,5 @@
 | [0014](0014-job-analysis-snapshot-persistence.md) | Persist governed job-analysis snapshots | Accepted on active implementation branch |
 | [0017](0017-governed-offer-approval.md) | Governed offer approval evidence | Proposed |
 | [0025](0025-governed-candidate-evidence-intake.md) | Governed candidate evidence intake | Proposed |
-| [0026](0026-normalized-candidate-application.md) | Normalize candidate applications away from candidate identity | Proposed |
+| [0026](0026-normalized-candidate-application.md) | Normalize the candidate application lifecycle | Accepted on active implementation branch |
 | [0027](0027-governed-candidate-withdrawal.md) | Govern candidate-initiated application withdrawal as immutable evidence | Proposed |
