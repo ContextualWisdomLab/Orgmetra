@@ -2,7 +2,7 @@
 
 ## Status
 
-Active-PR only. This evidence does not describe protected-`develop` product truth until PR #33 integrates.
+Implemented on protected `develop`; the aggregate boundary remains descriptive and does not make employment decisions.
 
 | Requirement | Decision / contract | Production implementation | Executable evidence |
 |---|---|---|---|

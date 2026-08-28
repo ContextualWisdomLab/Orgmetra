@@ -2,7 +2,7 @@
 
 ## Maturity
 
-**Active PR only.** Protected `develop` does not contain this capability until the candidate branch is integrated with fresh protected-head evidence.
+**Implemented on protected `develop`.** This packet remains review evidence rather than an authoritative requisition or approval.
 
 ## Requirement-to-evidence map
 
