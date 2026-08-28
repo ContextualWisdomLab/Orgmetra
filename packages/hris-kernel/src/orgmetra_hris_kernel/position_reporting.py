@@ -67,7 +67,15 @@ def _freeze_known_at(value: datetime) -> datetime:
         tzinfo=timezone.utc,
         fold=value.fold,
     )
-    return wall_time - offset
+    try:
+        return wall_time - offset
+    except (OverflowError, ValueError) as exc:
+        raise PositionReportingHierarchyError(
+            "known_at cannot be represented as a UTC datetime.",
+            next_action=(
+                "Use a representable UTC knowledge cutoff, then rebuild the reporting chart."
+            ),
+        ) from exc
 
 
 @dataclass(frozen=True, slots=True, repr=False)
