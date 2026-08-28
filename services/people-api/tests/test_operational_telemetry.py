@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+import logging
 from typing import Any
 
 import pytest
@@ -265,17 +266,29 @@ def test_missing_response_start_is_bounded_operational_error() -> None:
     assert sink.measurements[0].error_type == "missing_response_status"
 
 
-def test_exporter_failure_never_breaks_people_response() -> None:
+def test_exporter_failure_never_breaks_people_response(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Keep telemetry best-effort so exporter outages cannot deny governed HR work."""
     sink = _RecordingSink(fail=True)
     app = PeopleHttpTelemetryMiddleware(
         app=_success_app(), sink=sink, clock=_Clock([5.0, 5.01])
     )
 
-    sent = _run(app, _scope())
+    with caplog.at_level(logging.WARNING, logger="orgmetra_people_api.telemetry"):
+        sent = _run(app, _scope())
 
     assert sent[0]["status"] == 200
     assert sink.measurements == []
+    records = [
+        record
+        for record in caplog.records
+        if getattr(record, "telemetry_event", None)
+        == "http_server_request_measurement_rejected"
+    ]
+    assert len(records) == 1
+    assert records[0].getMessage() == "People HTTP telemetry measurement was not exported"
+    assert "exporter unavailable" not in records[0].getMessage()
 
 
 def test_non_http_scope_passes_through_without_measurement() -> None:
