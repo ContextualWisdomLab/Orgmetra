@@ -140,6 +140,16 @@ class PeopleOperabilityHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("`SELECT 1`", operability_text)
         self.assertIn("503", operability_text)
 
+    def test_traceability_matches_driver_independent_readiness_row_contract(self) -> None:
+        """Do not let traceability reintroduce the tuple-only readiness contract that production removed."""
+        repository_root = Path(__file__).resolve().parents[3]
+        traceability_text = (
+            repository_root / "docs" / "traceability" / "people-api-operability.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("returns exactly `(1,)`", traceability_text)
+        self.assertIn("produces a row regardless of DB-API row factory", traceability_text)
+
     async def test_health_is_live_without_touching_owned_dependencies(self) -> None:
         """Keep liveness independent from PostgreSQL so orchestration avoids restart loops."""
         probe = FakeReadinessProbe(error=RuntimeError("database is down"))
