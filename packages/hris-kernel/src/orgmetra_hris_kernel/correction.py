@@ -67,6 +67,11 @@ def close_recorded_interval(fact: FactT, *, recorded_to: datetime) -> FactT:
             "Recorded end must be a built-in datetime before chronology is evaluated.",
             next_action="Convert the close instant to a built-in timezone-aware datetime, then retry.",
         )
+    if recorded_to.tzinfo is None or recorded_to.utcoffset() is None:
+        raise CorrectionError(
+            "Recorded end must be timezone-aware before chronology is evaluated.",
+            next_action="Convert the close instant to a built-in timezone-aware datetime, then retry.",
+        )
 
     if recorded.end is not None:
         raise CorrectionError(

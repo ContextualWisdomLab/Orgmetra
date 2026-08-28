@@ -125,3 +125,14 @@ def test_close_recorded_interval_rejects_datetime_subclass_before_ordering(
             jordan_active_employment,
             recorded_to=forged_earlier_end,
         )
+
+
+def test_close_recorded_interval_rejects_naive_datetime_before_ordering(
+    jordan_active_employment,
+) -> None:
+    """A naive close instant cannot leak a raw datetime comparison error."""
+    with pytest.raises(CorrectionError, match="timezone-aware"):
+        close_recorded_interval(
+            jordan_active_employment,
+            recorded_to=datetime(2024, 6, 15, 9),
+        )

@@ -47,6 +47,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Made high-impact selection finalization require non-empty versioned evidence and compute the canonical SHA-256 evidence-set digest inside PostgreSQL before sealing the set to exactly one consuming decision.
 - Serialized evidence-set membership writes and finalization on the evidence-set row before digest computation so concurrently committed evidence cannot be omitted from a sealed decision digest.
 - Protected every current relation with recorded-system-time columns against in-place business mutation or deletion; corrections may only close an open recorded interval before a replacement fact is inserted.
+- Hardened the public recorded-correction boundary to accept only authoritative kernel facts, governed recorded intervals, exact timezone-aware built-in datetimes, and strict chronology before returning a replacement.
 - Tightened CI provenance by documenting the exact setup-node release and rejecting both tracked and untracked validation side effects.
 - Pinned the PostgreSQL 16.14 CI service image to the reviewed Docker Official Image index digest and added a regression that rejects a mutable `postgres:16` service tag.
 - Split employment and position identity from versioned status so corrections no longer mint a new employment or position identifier.
