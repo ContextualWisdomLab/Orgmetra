@@ -187,6 +187,73 @@ INSERT INTO performance_goal_plan_version (
  approving_actor_reference, approved_at, activated_at, effective_from, effective_to, audit_event_record_id
 FROM performance_goal_plan_version WHERE performance_goal_plan_version_id='${PLAN_VERSION_ID}'::uuid;"
 
+expect_failure "null tenant in plan evidence accepted" "plan evidence does not match" "
+WITH forged AS (
+ SELECT version_row.*,
+        pg_catalog.jsonb_set(
+            version_row.plan_evidence_json::jsonb,
+            '{tenant_record_id}',
+            'null'::jsonb
+        )::text AS forged_plan_evidence_json
+ FROM performance_goal_plan_version AS version_row
+ WHERE version_row.performance_goal_plan_version_id='${PLAN_VERSION_ID}'::uuid
+)
+INSERT INTO performance_goal_plan_version (
+ tenant_record_id, performance_goal_plan_version_id, performance_goal_plan_record_id,
+ goal_set_digest_sha256, measurement_definition_digest_sha256, goal_count, feedback_cadence_code,
+ plan_evidence_json, plan_evidence_digest_sha256, activation_reference, activation_evidence_json,
+ activation_evidence_digest_sha256, authority_evidence_reference, authority_evidence_digest_sha256,
+ approving_actor_reference, approved_at, activated_at, effective_from, effective_to, audit_event_record_id
+) SELECT tenant_record_id, '10000000-0000-7000-8000-000000000056', performance_goal_plan_record_id,
+ goal_set_digest_sha256, measurement_definition_digest_sha256, goal_count, feedback_cadence_code,
+ forged_plan_evidence_json,
+ encode(digest(convert_to(forged_plan_evidence_json, 'UTF8'), 'sha256'),'hex'),
+ activation_reference, activation_evidence_json, activation_evidence_digest_sha256,
+ authority_evidence_reference, authority_evidence_digest_sha256, approving_actor_reference,
+ approved_at, activated_at, effective_from, effective_to, audit_event_record_id
+FROM forged;"
+
+with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
+WITH forged_event AS (
+  SELECT pg_catalog.jsonb_set(
+           pg_catalog.jsonb_set(
+             canonical_event_json::jsonb,
+             '{id}',
+             to_jsonb('10000000-0000-7000-8000-000000000060'::text)
+           ),
+           '{orgmetratenant}',
+           'null'::jsonb
+         )::text AS body
+  FROM audit_event_record
+  WHERE audit_event_record_id='${AUDIT_ID}'::uuid
+)
+INSERT INTO audit_event_record (
+  tenant_record_id, audit_event_record_id, canonical_event_json, event_envelope_digest
+)
+SELECT '${TENANT_ID}', '10000000-0000-7000-8000-000000000060', body,
+       encode(digest(convert_to(body, 'UTF8'), 'sha256'),'hex')
+FROM forged_event;
+INSERT INTO outbox_delivery_record (
+  tenant_record_id, outbox_delivery_record_id, audit_event_record_id, delivery_target_code
+) VALUES ('${TENANT_ID}', '10000000-0000-7000-8000-000000000061',
+          '10000000-0000-7000-8000-000000000060', 'integration_hub');
+SQL
+
+expect_failure "null tenant in audit evidence accepted" "audit evidence does not match" "
+INSERT INTO performance_goal_plan_version (
+ tenant_record_id, performance_goal_plan_version_id, performance_goal_plan_record_id,
+ goal_set_digest_sha256, measurement_definition_digest_sha256, goal_count, feedback_cadence_code,
+ plan_evidence_json, plan_evidence_digest_sha256, activation_reference, activation_evidence_json,
+ activation_evidence_digest_sha256, authority_evidence_reference, authority_evidence_digest_sha256,
+ approving_actor_reference, approved_at, activated_at, effective_from, effective_to, audit_event_record_id
+) SELECT tenant_record_id, '10000000-0000-7000-8000-000000000062', performance_goal_plan_record_id,
+ goal_set_digest_sha256, measurement_definition_digest_sha256, goal_count, feedback_cadence_code,
+ plan_evidence_json, plan_evidence_digest_sha256, activation_reference, activation_evidence_json,
+ activation_evidence_digest_sha256, authority_evidence_reference, authority_evidence_digest_sha256,
+ approving_actor_reference, approved_at, activated_at, effective_from, effective_to,
+ '10000000-0000-7000-8000-000000000060'
+FROM performance_goal_plan_version WHERE performance_goal_plan_version_id='${PLAN_VERSION_ID}'::uuid;"
+
 expect_failure "backdated system time accepted" "recorded_from must equal" "
 INSERT INTO performance_goal_plan_version (
  tenant_record_id, performance_goal_plan_version_id, performance_goal_plan_record_id,

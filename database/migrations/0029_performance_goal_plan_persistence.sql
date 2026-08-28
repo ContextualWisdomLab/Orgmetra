@@ -328,12 +328,13 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
-    IF audit_event ->> 'orgmetrapurpose' <> 'performance_goal_plan_persistence'
-       OR audit_event ->> 'orgmetrareason' <> 'activated_goal_plan_record'
-       OR audit_event ->> 'orgmetraactor' <> NEW.approving_actor_reference
-       OR audit_event ->> 'orgmetraevidence' <> NEW.activation_evidence_digest_sha256
-       OR audit_event ->> 'subject' <> anchor_plan_reference
-       OR audit_event #>> '{data,result_code}' <> 'activated_plan_persisted'
+    IF audit_event ->> 'orgmetratenant' IS DISTINCT FROM NEW.tenant_record_id::text
+       OR audit_event ->> 'orgmetrapurpose' IS DISTINCT FROM 'performance_goal_plan_persistence'
+       OR audit_event ->> 'orgmetrareason' IS DISTINCT FROM 'activated_goal_plan_record'
+       OR audit_event ->> 'orgmetraactor' IS DISTINCT FROM NEW.approving_actor_reference
+       OR audit_event ->> 'orgmetraevidence' IS DISTINCT FROM NEW.activation_evidence_digest_sha256
+       OR audit_event ->> 'subject' IS DISTINCT FROM anchor_plan_reference
+       OR audit_event #>> '{data,result_code}' IS DISTINCT FROM 'activated_plan_persisted'
        OR (audit_event #>> '{data,high_impact}')::boolean IS DISTINCT FROM false
        OR (audit_event ->> 'time')::timestamptz IS DISTINCT FROM NEW.activated_at THEN
         RAISE EXCEPTION 'performance-goal plan audit evidence does not match the activated plan scope'

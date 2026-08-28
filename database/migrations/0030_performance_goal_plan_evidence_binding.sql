@@ -136,21 +136,22 @@ BEGIN
        OR (plan_evidence ->> 'contains_performance_rating')::boolean IS DISTINCT FROM false
        OR jsonb_typeof(plan_evidence -> 'human_review_required') <> 'boolean'
        OR (plan_evidence ->> 'human_review_required')::boolean IS DISTINCT FROM true
-       OR plan_evidence ->> 'decision_authority' <> 'not_authorized_for_performance_rating'
-       OR plan_evidence ->> 'employment_decision_authority' <> 'not_authorized_for_employment_decision'
-       OR plan_evidence ->> 'review_state' <> 'requires_human_review'
-       OR plan_evidence ->> 'purpose_code' <> 'performance_goal_plan_review'
-       OR plan_evidence ->> 'reason_code' <> 'goal_plan_activation_review'
-       OR plan_evidence ->> 'tenant_record_id' <> NEW.tenant_record_id::text
-       OR plan_evidence ->> 'performance_goal_plan_reference' <> anchor_plan_reference
-       OR plan_evidence ->> 'employment_record_reference' <> 'employment_record:' || anchor_employment_id::text
-       OR plan_evidence ->> 'job_profile_reference' <> 'job_profile:' || anchor_job_profile_id::text
-       OR plan_evidence ->> 'performance_cycle_reference' <> anchor_cycle_reference
-       OR plan_evidence ->> 'goal_set_digest' <> NEW.goal_set_digest_sha256
-       OR plan_evidence ->> 'measurement_definition_digest' <> NEW.measurement_definition_digest_sha256
-       OR plan_evidence ->> 'feedback_cadence_code' <> NEW.feedback_cadence_code
-       OR plan_evidence ->> 'reviewer_reference' <> NEW.approving_actor_reference
-       OR plan_evidence ->> 'requester_reference' = NEW.approving_actor_reference
+       OR plan_evidence ->> 'decision_authority' IS DISTINCT FROM 'not_authorized_for_performance_rating'
+       OR plan_evidence ->> 'employment_decision_authority' IS DISTINCT FROM 'not_authorized_for_employment_decision'
+       OR plan_evidence ->> 'review_state' IS DISTINCT FROM 'requires_human_review'
+       OR plan_evidence ->> 'purpose_code' IS DISTINCT FROM 'performance_goal_plan_review'
+       OR plan_evidence ->> 'reason_code' IS DISTINCT FROM 'goal_plan_activation_review'
+       OR plan_evidence ->> 'tenant_record_id' IS DISTINCT FROM NEW.tenant_record_id::text
+       OR plan_evidence ->> 'performance_goal_plan_reference' IS DISTINCT FROM anchor_plan_reference
+       OR plan_evidence ->> 'employment_record_reference' IS DISTINCT FROM 'employment_record:' || anchor_employment_id::text
+       OR plan_evidence ->> 'job_profile_reference' IS DISTINCT FROM 'job_profile:' || anchor_job_profile_id::text
+       OR plan_evidence ->> 'performance_cycle_reference' IS DISTINCT FROM anchor_cycle_reference
+       OR plan_evidence ->> 'goal_set_digest' IS DISTINCT FROM NEW.goal_set_digest_sha256
+       OR plan_evidence ->> 'measurement_definition_digest' IS DISTINCT FROM NEW.measurement_definition_digest_sha256
+       OR plan_evidence ->> 'feedback_cadence_code' IS DISTINCT FROM NEW.feedback_cadence_code
+       OR plan_evidence ->> 'reviewer_reference' IS DISTINCT FROM NEW.approving_actor_reference
+       OR jsonb_typeof(plan_evidence -> 'requester_reference') <> 'string'
+       OR plan_evidence ->> 'requester_reference' IS NOT DISTINCT FROM NEW.approving_actor_reference
        OR jsonb_typeof(plan_evidence -> 'goal_count') <> 'number'
        OR (plan_evidence ->> 'goal_count')::integer IS DISTINCT FROM NEW.goal_count
        OR jsonb_typeof(plan_evidence -> 'evidence_version') <> 'number'
@@ -173,16 +174,16 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
-    IF activation_evidence ->> 'tenant_record_id' <> NEW.tenant_record_id::text
-       OR activation_evidence ->> 'performance_goal_plan_reference' <> anchor_plan_reference
-       OR activation_evidence ->> 'plan_digest' <> NEW.plan_evidence_digest_sha256
-       OR activation_evidence ->> 'activation_reference' <> NEW.activation_reference
-       OR activation_evidence ->> 'approving_actor_reference' <> NEW.approving_actor_reference
-       OR activation_evidence ->> 'authority_evidence_reference' <> NEW.authority_evidence_reference
-       OR activation_evidence ->> 'authority_evidence_digest' <> NEW.authority_evidence_digest_sha256
-       OR activation_evidence ->> 'activation_state' <> 'authoritatively_activated'
-       OR activation_evidence ->> 'rating_authority' <> 'not_authorized_for_performance_rating'
-       OR activation_evidence ->> 'employment_decision_authority' <> 'not_authorized_for_employment_decision'
+    IF activation_evidence ->> 'tenant_record_id' IS DISTINCT FROM NEW.tenant_record_id::text
+       OR activation_evidence ->> 'performance_goal_plan_reference' IS DISTINCT FROM anchor_plan_reference
+       OR activation_evidence ->> 'plan_digest' IS DISTINCT FROM NEW.plan_evidence_digest_sha256
+       OR activation_evidence ->> 'activation_reference' IS DISTINCT FROM NEW.activation_reference
+       OR activation_evidence ->> 'approving_actor_reference' IS DISTINCT FROM NEW.approving_actor_reference
+       OR activation_evidence ->> 'authority_evidence_reference' IS DISTINCT FROM NEW.authority_evidence_reference
+       OR activation_evidence ->> 'authority_evidence_digest' IS DISTINCT FROM NEW.authority_evidence_digest_sha256
+       OR activation_evidence ->> 'activation_state' IS DISTINCT FROM 'authoritatively_activated'
+       OR activation_evidence ->> 'rating_authority' IS DISTINCT FROM 'not_authorized_for_performance_rating'
+       OR activation_evidence ->> 'employment_decision_authority' IS DISTINCT FROM 'not_authorized_for_employment_decision'
        OR jsonb_typeof(activation_evidence -> 'evidence_version') <> 'number'
        OR (activation_evidence ->> 'evidence_version')::integer IS DISTINCT FROM 1
        OR jsonb_typeof(activation_evidence -> 'approved_at') <> 'string'
