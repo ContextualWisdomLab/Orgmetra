@@ -35,8 +35,12 @@ def _validate_operational_uuid(field_name: str, value: object) -> None:
 
 
 def _validate_utc_instant(field_name: str, value: object) -> None:
-    """Require one timezone-aware UTC instant for deterministic system-time evidence."""
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() != timedelta(0):
+    """Require an exact datetime with a built-in deterministic zero-offset timezone."""
+    if (
+        type(value) is not datetime
+        or type(value.tzinfo) is not timezone
+        or value.utcoffset() != timedelta(0)
+    ):
         raise ValueError(f"{field_name} must be a timezone-aware UTC datetime.")
 
 
