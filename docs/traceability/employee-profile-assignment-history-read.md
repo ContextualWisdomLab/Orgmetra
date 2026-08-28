@@ -17,6 +17,7 @@ Protected `docs/PRD.md` lists **Employee profile with bitemporal assignment hist
 | --- | --- | --- |
 | Authorize before protected retrieval | `read_assignment_history()` calls `authorize_resource_fields()` before `AssignmentHistoryReadPort` | denied-field test asserts zero port calls |
 | Preserve business and system time separately | `AssignmentHistoryRecord.effective_*` and `.recorded_*` | visible/history ordering and recorded-cutoff regressions |
+| Deterministic UTC trust boundary | `known_at` and recorded instants require an exact `datetime` using Python's built-in fixed-offset `timezone` at zero offset | caller-defined UTC-looking `tzinfo` providers fail before protected retrieval and at persistence-row construction |
 | Tenant/person isolation | service revalidates every returned row | other-tenant and other-person rows fail closed |
 | Half-open system-time visibility | `[recorded_from, recorded_to)` at exact `known_at` | future-recorded and `recorded_to == known_at` rows fail closed |
 | Field minimization | output is built only from `decision.authorized_fields` | effective-only policy does not leak assignment identity |
