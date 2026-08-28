@@ -34,6 +34,7 @@ _LOGGER = logging.getLogger(__name__)
 _ROUTE_PREFIX = ("v1", "tenants")
 _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _FIELD_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+_RFC3339_FULL_DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", flags=re.ASCII)
 _MAX_UUID_INT = (1 << 128) - 1
 _REQUIRED_QUERY_KEYS = frozenset({"effective_on", "purpose", "fields"})
 _MAX_REQUEST_PATH_CHARACTERS = 256
@@ -301,8 +302,11 @@ def _parse_worker_request(path: str, raw_query: object) -> _ParsedWorkerRequest:
     if frozenset(query) != _REQUIRED_QUERY_KEYS:
         raise _InvalidHttpRequest("query parameters are incomplete or unsupported")
 
+    effective_on_raw = query["effective_on"]
+    if _RFC3339_FULL_DATE.fullmatch(effective_on_raw) is None:
+        raise _InvalidHttpRequest("effective_on must be an RFC 3339 full date")
     try:
-        effective_on = date.fromisoformat(query["effective_on"])
+        effective_on = date.fromisoformat(effective_on_raw)
     except ValueError as error:
         raise _InvalidHttpRequest("effective_on must be an ISO business date") from error
 
