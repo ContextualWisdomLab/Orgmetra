@@ -368,6 +368,19 @@ def _validate_database_contract() -> None:
         "CREATE TRIGGER job_analysis_snapshot_append_only_guard",
         "ALTER TABLE job_analysis_snapshot FORCE ROW LEVEL SECURITY",
         "CREATE POLICY job_analysis_snapshot_scope_policy",
+        "CREATE TABLE employment_employing_organization_record",
+        "employment_employing_organization_employment_tenant_fk",
+        "employment_employing_organization_unit_tenant_fk",
+        "CONSTRAINT employment_employing_organization_bitemporal_exclusion",
+        "CREATE FUNCTION validate_employment_employing_organization_scope",
+        "CREATE CONSTRAINT TRIGGER employment_employing_organization_exact_one_employment_guard",
+        "CREATE CONSTRAINT TRIGGER employment_employing_organization_exact_one_relationship_guard",
+        "CREATE CONSTRAINT TRIGGER employment_employing_organization_exact_one_organization_guard",
+        "CREATE TRIGGER employment_employing_organization_bitemporal_guard",
+        "CREATE TRIGGER employment_employing_organization_truncate_guard",
+        "ALTER TABLE employment_employing_organization_record FORCE ROW LEVEL SECURITY",
+        "CREATE POLICY employment_employing_organization_scope_policy",
+        "CREATE INDEX employment_employing_organization_unit_lookup_index",
     ]
     for fragment in required_fragments:
         if fragment not in sql:
