@@ -71,6 +71,7 @@ REQUIRED = [
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
+    "database/migrations/0040_employment_employing_organization.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -92,6 +93,7 @@ REQUIRED = [
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
+    "tests/test_employment_employing_organization_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -270,7 +272,7 @@ def _validate_database_contract() -> None:
         "CREATE FUNCTION protect_bitemporal_history",
         "to_jsonb(NEW) - 'recorded_to' <> to_jsonb(OLD) - 'recorded_to'",
         "CREATE TRIGGER person_record_bitemporal_guard",
-        "CREATE TRIGGER person_name_bitemporal_guard",
+        "CREATE TRIGGER person_name_record_bitemporal_guard",
         "CREATE TRIGGER employment_record_bitemporal_guard",
         "CREATE TRIGGER organization_unit_anchor_bitemporal_guard",
         "CREATE TRIGGER organization_unit_bitemporal_guard",
