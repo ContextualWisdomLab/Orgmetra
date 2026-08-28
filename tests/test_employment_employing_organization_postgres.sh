@@ -36,10 +36,10 @@ INSERT INTO organization_unit_version (
   tenant_record_id, organization_unit_version_id, organization_unit_id,
   unit_name, organization_type_code, effective_from, effective_to, recorded_from
 ) VALUES
-  ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000040', '10000000-0000-7000-8000-000000000030', 'Alpha Legal Employer', 'legal_entity', DATE '2026-01-01', NULL, TIMESTAMPTZ '2026-01-02 00:00:00+00'),
-  ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000041', '10000000-0000-7000-8000-000000000031', 'Alpha Second Employer', 'legal_entity', DATE '2026-01-01', NULL, TIMESTAMPTZ '2026-01-02 00:00:00+00'),
-  ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000042', '10000000-0000-7000-8000-000000000032', 'People Department', 'department', DATE '2026-01-01', NULL, TIMESTAMPTZ '2026-01-02 00:00:00+00'),
-  ('20000000-0000-7000-8000-000000000001', '20000000-0000-7000-8000-000000000040', '20000000-0000-7000-8000-000000000030', 'Beta Legal Employer', 'legal_entity', DATE '2026-01-01', NULL, TIMESTAMPTZ '2026-01-02 00:00:00+00');
+  ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000040', '10000000-0000-7000-8000-000000000030', 'Alpha Legal Employer', 'legal_entity', DATE '2025-01-01', NULL, TIMESTAMPTZ '2026-01-02 00:00:00+00'),
+  ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000041', '10000000-0000-7000-8000-000000000031', 'Alpha Second Employer', 'legal_entity', DATE '2025-01-01', NULL, TIMESTAMPTZ '2026-01-02 00:00:00+00'),
+  ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000042', '10000000-0000-7000-8000-000000000032', 'People Department', 'department', DATE '2025-01-01', NULL, TIMESTAMPTZ '2026-01-02 00:00:00+00'),
+  ('20000000-0000-7000-8000-000000000001', '20000000-0000-7000-8000-000000000040', '20000000-0000-7000-8000-000000000030', 'Beta Legal Employer', 'legal_entity', DATE '2025-01-01', NULL, TIMESTAMPTZ '2026-01-02 00:00:00+00');
 
 INSERT INTO employment_employing_organization_record (
   tenant_record_id, employment_employing_organization_record_id,
@@ -96,7 +96,7 @@ INSERT INTO employment_employing_organization_record (
   '10000000-0000-7000-8000-000000000052',
   '10000000-0000-7000-8000-000000000020',
   '10000000-0000-7000-8000-000000000032',
-  DATE '2025-01-01', DATE '2025-06-01', TIMESTAMPTZ '2026-01-03 00:00:00+00'
+  DATE '2026-01-01', DATE '2026-06-01', TIMESTAMPTZ '2026-01-03 00:00:00+00'
 );
 SQL
 } 2>&1)"
@@ -104,6 +104,27 @@ non_legal_status=$?
 set -e
 [[ ${non_legal_status} -ne 0 && "${non_legal_output}" == *"employing organization must be a legal_entity"* ]] || {
   echo "department was accepted as an employing legal entity: ${non_legal_output}" >&2; exit 1;
+}
+
+set +e
+employment_gap_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO employment_employing_organization_record (
+  tenant_record_id, employment_employing_organization_record_id,
+  employment_record_id, employing_organization_unit_id,
+  effective_from, effective_to, recorded_from
+) VALUES (
+  '10000000-0000-7000-8000-000000000001',
+  '10000000-0000-7000-8000-000000000055',
+  '10000000-0000-7000-8000-000000000020',
+  '10000000-0000-7000-8000-000000000030',
+  DATE '2025-01-01', DATE '2025-06-01', TIMESTAMPTZ '2026-01-03 00:00:00+00'
+);
+SQL
+} 2>&1)"
+employment_gap_status=$?
+set -e
+[[ ${employment_gap_status} -ne 0 && "${employment_gap_output}" == *"employing organization interval must be covered by active or leave Employment truth"* ]] || {
+  echo "employer scope outside active/leave Employment truth was not rejected: ${employment_gap_output}" >&2; exit 1;
 }
 
 set +e
@@ -117,7 +138,7 @@ INSERT INTO employment_employing_organization_record (
   '10000000-0000-7000-8000-000000000053',
   '10000000-0000-7000-8000-000000000020',
   '20000000-0000-7000-8000-000000000030',
-  DATE '2025-01-01', TIMESTAMPTZ '2026-01-03 00:00:00+00'
+  DATE '2026-01-01', TIMESTAMPTZ '2026-01-03 00:00:00+00'
 );
 SQL
 } 2>&1)"
@@ -137,6 +158,14 @@ rewrite_status=$?
 set -e
 [[ ${rewrite_status} -ne 0 && "${rewrite_output}" == *"bitemporal correction may only close an open recorded interval"* ]] || {
   echo "in-place employer rewrite was not rejected: ${rewrite_output}" >&2; exit 1;
+}
+
+set +e
+truncate_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "TRUNCATE employment_employing_organization_record;"; } 2>&1)"
+truncate_status=$?
+set -e
+[[ ${truncate_status} -ne 0 && "${truncate_output}" == *"employment employing-organization history cannot be truncated"* ]] || {
+  echo "employer history TRUNCATE was not rejected: ${truncate_output}" >&2; exit 1;
 }
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
@@ -162,7 +191,7 @@ SET ROLE orgmetra_employer_reader;
 SELECT set_config('orgmetra.tenant_record_id', '10000000-0000-7000-8000-000000000001', false);
 DO $$
 BEGIN
-  IF (SELECT count(*) FROM employment_employing_organization_record) <> 1 THEN
+  IF (SELECT count(*) FROM employment_employing_organization_record WHERE recorded_to IS NULL) <> 1 THEN
     RAISE EXCEPTION 'tenant alpha should see exactly one current-system employer fact';
   END IF;
 END
