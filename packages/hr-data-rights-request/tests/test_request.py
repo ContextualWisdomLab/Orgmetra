@@ -14,7 +14,7 @@ from orgmetra_hr_data_rights_request import (
 
 
 TENANT = "018f2f65-9a8b-7c6d-8e5f-1234567890ab"
-REQUEST = "data_rights_request:12345678-1234-4234-8234-1234567890ab"
+REQUEST = "data_rights_request:12345678-1234-4234-8234-1234567890ac"
 PERSON = "person_record:person_8mTq4W8r"
 REQUESTER = "actor:11111111-1111-4111-8111-111111111111"
 POLICY = "data_rights_policy:policy_7dYk9Q"
