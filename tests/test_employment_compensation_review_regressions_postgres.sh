@@ -11,6 +11,25 @@ if [[ "${relation_present}" != "t" ]]; then
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0018_employment_compensation_core.sql
 fi
 
+trusted_function_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT count(*)
+FROM pg_proc
+WHERE pronamespace = 'public'::regnamespace
+  AND proname IN (
+      'enforce_employment_base_compensation_recorded_from',
+      'enforce_employment_base_compensation_version_anchor_open',
+      'enforce_employment_base_compensation_recorded_to',
+      'enforce_employment_base_compensation_anchor_version_alignment',
+      'reject_employment_base_compensation_truncate',
+      'reject_legacy_compensation_insert'
+  )
+  AND proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp'];
+")"
+if [[ "${trusted_function_count}" != "6" ]]; then
+    echo "base-compensation trigger functions do not pin a trusted search_path" >&2
+    exit 1
+fi
+
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
 VALUES ('30000000-0000-7000-8000-000000000001', 'tenant_review_regression');

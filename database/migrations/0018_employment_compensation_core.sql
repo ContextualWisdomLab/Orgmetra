@@ -2,6 +2,8 @@
 -- independent compensation truth. The legacy person-scoped relation remains
 -- readable for historical compatibility but no longer accepts new writes.
 
+SET search_path = public, pg_catalog;
+
 CREATE TABLE employment_base_compensation_record (
     tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
     employment_base_compensation_record_id uuid PRIMARY KEY,
@@ -74,9 +76,10 @@ CREATE TABLE employment_base_compensation_version (
         )
 );
 
-CREATE FUNCTION enforce_employment_base_compensation_recorded_from()
+CREATE FUNCTION public.enforce_employment_base_compensation_recorded_from()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_to IS NOT NULL THEN
@@ -91,22 +94,23 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION enforce_employment_base_compensation_recorded_from() IS
+COMMENT ON FUNCTION public.enforce_employment_base_compensation_recorded_from() IS
     'Guards new base-compensation anchors and versions: rejects caller-preclosed evidence and requires recorded_from to equal the current PostgreSQL transaction timestamp.';
 
 CREATE TRIGGER employment_base_compensation_record_system_time_guard
 BEFORE INSERT ON employment_base_compensation_record
 FOR EACH ROW
-EXECUTE FUNCTION enforce_employment_base_compensation_recorded_from();
+EXECUTE FUNCTION public.enforce_employment_base_compensation_recorded_from();
 
 CREATE TRIGGER employment_base_compensation_version_system_time_guard
 BEFORE INSERT ON employment_base_compensation_version
 FOR EACH ROW
-EXECUTE FUNCTION enforce_employment_base_compensation_recorded_from();
+EXECUTE FUNCTION public.enforce_employment_base_compensation_recorded_from();
 
-CREATE FUNCTION enforce_employment_base_compensation_version_anchor_open()
+CREATE FUNCTION public.enforce_employment_base_compensation_version_anchor_open()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     PERFORM 1
@@ -124,17 +128,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION enforce_employment_base_compensation_version_anchor_open() IS
+COMMENT ON FUNCTION public.enforce_employment_base_compensation_version_anchor_open() IS
     'Guards new compensation versions: locks and requires the same-tenant compensation anchor to remain open, preventing new recorded truth beneath a closed anchor.';
 
 CREATE TRIGGER employment_base_compensation_version_anchor_open_guard
 BEFORE INSERT ON employment_base_compensation_version
 FOR EACH ROW
-EXECUTE FUNCTION enforce_employment_base_compensation_version_anchor_open();
+EXECUTE FUNCTION public.enforce_employment_base_compensation_version_anchor_open();
 
-CREATE FUNCTION enforce_employment_base_compensation_recorded_to()
+CREATE FUNCTION public.enforce_employment_base_compensation_recorded_to()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_to IS DISTINCT FROM OLD.recorded_to
@@ -146,22 +151,23 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION enforce_employment_base_compensation_recorded_to() IS
+COMMENT ON FUNCTION public.enforce_employment_base_compensation_recorded_to() IS
     'Guards base-compensation history closure: a changed recorded_to is accepted only when it equals the current PostgreSQL transaction timestamp.';
 
 CREATE TRIGGER employment_base_compensation_record_system_time_close_guard
 BEFORE UPDATE ON employment_base_compensation_record
 FOR EACH ROW
-EXECUTE FUNCTION enforce_employment_base_compensation_recorded_to();
+EXECUTE FUNCTION public.enforce_employment_base_compensation_recorded_to();
 
 CREATE TRIGGER employment_base_compensation_version_system_time_close_guard
 BEFORE UPDATE ON employment_base_compensation_version
 FOR EACH ROW
-EXECUTE FUNCTION enforce_employment_base_compensation_recorded_to();
+EXECUTE FUNCTION public.enforce_employment_base_compensation_recorded_to();
 
-CREATE FUNCTION enforce_employment_base_compensation_anchor_version_alignment()
+CREATE FUNCTION public.enforce_employment_base_compensation_anchor_version_alignment()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_to IS NULL OR NEW.recorded_to IS NOT DISTINCT FROM OLD.recorded_to THEN
@@ -182,28 +188,29 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION enforce_employment_base_compensation_anchor_version_alignment() IS
+COMMENT ON FUNCTION public.enforce_employment_base_compensation_anchor_version_alignment() IS
     'Deferred integrity guard for anchor closure: every child version must already have a recorded_to no later than the anchor close instant before the transaction may commit.';
 
 CREATE CONSTRAINT TRIGGER employment_base_compensation_anchor_version_alignment_guard
 AFTER UPDATE ON employment_base_compensation_record
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
-EXECUTE FUNCTION enforce_employment_base_compensation_anchor_version_alignment();
+EXECUTE FUNCTION public.enforce_employment_base_compensation_anchor_version_alignment();
 
 CREATE TRIGGER employment_base_compensation_record_bitemporal_guard
 BEFORE UPDATE OR DELETE ON employment_base_compensation_record
 FOR EACH ROW
-EXECUTE FUNCTION protect_bitemporal_history();
+EXECUTE FUNCTION public.protect_bitemporal_history();
 
 CREATE TRIGGER employment_base_compensation_version_bitemporal_guard
 BEFORE UPDATE OR DELETE ON employment_base_compensation_version
 FOR EACH ROW
-EXECUTE FUNCTION protect_bitemporal_history();
+EXECUTE FUNCTION public.protect_bitemporal_history();
 
-CREATE FUNCTION reject_employment_base_compensation_truncate()
+CREATE FUNCTION public.reject_employment_base_compensation_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'employment base-compensation history cannot be truncated'
@@ -211,25 +218,26 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION reject_employment_base_compensation_truncate() IS
+COMMENT ON FUNCTION public.reject_employment_base_compensation_truncate() IS
     'Rejects table-wide TRUNCATE of Employment-scoped base-compensation anchors or versions so governed history cannot bypass row-level correction guards.';
 
 CREATE TRIGGER employment_base_compensation_record_truncate_guard
 BEFORE TRUNCATE ON employment_base_compensation_record
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_employment_base_compensation_truncate();
+EXECUTE FUNCTION public.reject_employment_base_compensation_truncate();
 
 CREATE TRIGGER employment_base_compensation_version_truncate_guard
 BEFORE TRUNCATE ON employment_base_compensation_version
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_employment_base_compensation_truncate();
+EXECUTE FUNCTION public.reject_employment_base_compensation_truncate();
 
 REVOKE TRUNCATE ON employment_base_compensation_record FROM PUBLIC;
 REVOKE TRUNCATE ON employment_base_compensation_version FROM PUBLIC;
 
-CREATE FUNCTION reject_legacy_compensation_insert()
+CREATE FUNCTION public.reject_legacy_compensation_insert()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'legacy compensation_record is read-only for new writes; use employment_base_compensation_record and employment_base_compensation_version'
@@ -237,13 +245,13 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION reject_legacy_compensation_insert() IS
+COMMENT ON FUNCTION public.reject_legacy_compensation_insert() IS
     'Rejects every new Person-scoped legacy compensation_record insert so new base-compensation truth must use the Employment-scoped relations.';
 
 CREATE TRIGGER compensation_record_legacy_insert_guard
 BEFORE INSERT ON compensation_record
 FOR EACH ROW
-EXECUTE FUNCTION reject_legacy_compensation_insert();
+EXECUTE FUNCTION public.reject_legacy_compensation_insert();
 
 ALTER TABLE employment_base_compensation_record ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employment_base_compensation_record FORCE ROW LEVEL SECURITY;
