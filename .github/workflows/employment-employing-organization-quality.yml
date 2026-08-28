@@ -7,6 +7,8 @@ on:
     paths:
       - "database/migrations/0040_employment_employing_organization.sql"
       - "tests/test_employment_employing_organization_postgres.sh"
+      - "scripts/foundation-contract-core.mjs"
+      - "tests/validate_repository.py"
       - ".github/workflows/employment-employing-organization-quality.yml"
       - "docs/adr/0141-employment-employing-organization.md"
       - "docs/doctoring/employment-employing-organization.md"
@@ -55,6 +57,8 @@ jobs:
         env:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Print exact foundation manifest candidate
+        run: python tests/validate_repository.py --print-manifest
       - name: Prove Employment employing-organization contract
         run: bash tests/test_employment_employing_organization_postgres.sh
       - name: Require clean checkout
