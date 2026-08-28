@@ -20,10 +20,11 @@ Protected `docs/PRD.md` lists **Employee profile with bitemporal assignment hist
 | Tenant/person isolation | service revalidates every returned row | other-tenant and other-person rows fail closed |
 | Half-open system-time visibility | `[recorded_from, recorded_to)` at exact `known_at` | future-recorded and `recorded_to == known_at` rows fail closed |
 | Field minimization | output is built only from `decision.authorized_fields` | effective-only policy does not leak assignment identity |
-| No reflective schema expansion | explicit supported-field encoder | authorized unknown field fails closed |
+| No reflective schema expansion | explicit supported-field encoder requires an exact built-in `str` | unknown fields and string-subclass fields fail closed |
 | Deterministic history | sort by effective start then assignment UUID | reversed persistence order produces deterministic business-time order |
 | Exact allocation evidence | finite four-decimal `Decimal` in `(0, 1.0000]` | NaN, zero, >1, and noncanonical scale rejected |
-| Runtime integrity | immutable tuple + exact record type | mutable container and unsupported row type rejected |
+| Trust-bearing identity integrity | operational identity requires exact built-in `UUID`, not subclasses or sentinel values | UUID subclasses plus Nil/Max sentinels are rejected |
+| Persistence runtime integrity | exact tuple + exact row type + `AssignmentHistoryRecord.assert_runtime_integrity()` immediately after retrieval | mutable container, unsupported row type, and post-construction NaN reinjection fail closed |
 
 ## Scope exclusions
 
