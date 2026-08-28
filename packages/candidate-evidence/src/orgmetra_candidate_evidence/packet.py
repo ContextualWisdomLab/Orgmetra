@@ -88,7 +88,7 @@ def _freeze_timestamp(value: datetime) -> datetime:
 
 def _canonical_timestamp(value: datetime) -> str:
     """Render only a previously detached built-in UTC instant as RFC 3339 text."""
-    if type(value) is not datetime or type(value.tzinfo) is not timezone:
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
         raise ValueError("collected_at must be an exact timezone-aware datetime")
     return value.isoformat().replace("+00:00", "Z")
 

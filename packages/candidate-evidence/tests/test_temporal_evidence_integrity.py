@@ -112,3 +112,15 @@ def test_candidate_evidence_rejects_postconstruction_timezone_reinjection() -> N
     object.__setattr__(packet, "collected_at", datetime(2026, 8, 21, 5, 0, tzinfo=_MutableOffset()))
     with pytest.raises(ValueError, match="collected_at"):
         packet.canonical_json()
+
+
+def test_candidate_evidence_rejects_builtin_non_utc_timezone_reinjection() -> None:
+    """Reject immutable non-UTC offsets that would serialize outside canonical UTC."""
+    packet = _build(datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc))
+    object.__setattr__(
+        packet,
+        "collected_at",
+        datetime(2026, 8, 21, 14, 0, tzinfo=timezone(timedelta(hours=9))),
+    )
+    with pytest.raises(ValueError, match="collected_at"):
+        packet.canonical_json()
