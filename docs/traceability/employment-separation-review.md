@@ -1,6 +1,6 @@
 # Employment separation review traceability
 
-Status: `implemented_on_active_pr` only. This document does not describe protected-`develop` capability until the owning PR is integrated.
+Status: `implemented_on_active_pr` only. This document does not describe protected-`develop` capability until the owning dependency stack is integrated.
 
 | Requirement | Implemented boundary | Evidence | Maturity |
 |---|---|---|---|
@@ -17,11 +17,19 @@ Status: `implemented_on_active_pr` only. This document does not describe protect
 | Preserve accountable human authority | different opaque requester/reviewer references, authoritative resolved-actor separation before approval, mandatory human confirmation, human-only decision authority, review required | actor-separation, tenant-scope-resolution, and immutable-governance regressions | implemented_on_active_pr |
 | Prevent review evidence from masquerading as live HRIS truth or completed owner execution | `requires_authoritative_resolution`, `not_authorized_to_apply`, `not_authorized_to_execute` | direct construction and `dataclasses.replace(...)` regressions | implemented_on_active_pr |
 | Prevent a previously issued review from being rewritten into a different valid separation fact | process-local creation seal is stored outside packet-writable slots; canonical export recomputes the exact payload seal and fails closed on post-construction mutation or missing issuance evidence | `test_post_construction_review_rewrite_cannot_change_canonical_evidence`; `test_missing_process_local_review_issuance_evidence_fails_closed` | implemented_on_active_pr |
-| Produce deterministic immutable correlation evidence | canonical precision-preserving UTC JSON and SHA-256 over exact UTF-8 bytes, creation-bound for each live issued packet | canonicalization/digest and issuance-integrity regressions | implemented_on_active_pr |
+| Preserve accountable human authority before consequential mutation | `approve_employment_separation(...)` requires the exact packet's accountable reviewer, exact approval instant, and `EmploymentSeparationApprovalAuthority` verification of the fresh reviewed scope | `test_authority_receives_the_exact_frozen_approval_instant`; `test_rejects_non_reviewer_approval_before_authority`; wrong-scope verification regressions | implemented_on_stacked_active_pr |
+| Prevent review mutation during authoritative approval | factory snapshots exact review canonical bytes/digest before authority work and rejects any changed packet before receipt issuance | `test_rejects_parent_review_mutation_during_authority_work` | implemented_on_stacked_active_pr |
+| Keep human approval distinct from mutation and downstream execution | `EmploymentSeparationApprovalReceipt` is fixed to `human_approved_for_authoritative_resolution`, `not_authorized_to_apply`, `not_authorized_to_execute` | `test_approved_receipt_is_value_minimized_and_non_authorizing` | implemented_on_stacked_active_pr |
+| Prevent direct/replayed receipt issuance | receipt construction requires factory-only issuance token; returned receipts consume the token so `dataclasses.replace(...)` cannot reissue | direct-construction and replace regressions | implemented_on_stacked_active_pr |
+| Prevent post-issuance live receipt rewriting | HMAC-backed process-local creation seal is stored outside receipt-writable slots and checked against one canonical payload snapshot before export | scope/governance/marker/token/recomputed-seal/missing-registry regressions | implemented_on_stacked_active_pr |
+| Prevent approval evidence from becoming durable authority by implication | README/ADR state process-local seal is defense-in-depth only; durable systems persist already-issued canonical JSON/SHA-256 through immutable audit/outbox and re-authorize before mutation/external execution | documentation contract plus non-authorizing receipt states | implemented_on_stacked_active_pr |
+| Produce deterministic immutable correlation evidence | canonical precision-preserving UTC JSON and SHA-256 over exact UTF-8 bytes, creation-bound for each live issued review packet and approval receipt | canonicalization/digest and issuance-integrity regressions | implemented_on_active_pr |
 | Keep foreign dedicated-writer systems read-only | no provider credentials, no foreign mutation, no cross-service application-table SQL; downstream work only through published owner contracts | package architecture and ADR 0020 | implemented_on_active_pr |
 
-The process-local creation seal is defense-in-depth, not durable cryptographic attestation or cross-process uniqueness. Authoritative persistence must bind the already-issued canonical bytes/digest to immutable audit/outbox evidence and reject conflicting durable reuse of the same review correlation.
+The process-local creation seals are defense-in-depth, not durable cryptographic attestation or cross-process uniqueness. Authoritative persistence must bind the already-issued canonical bytes/digest to immutable audit/outbox evidence, reject conflicting durable reuse of the same correlation, and freshly authorize consequential mutation or external execution.
 
-## Protected-`develop` boundary
+## Dependency and protected-`develop` boundary
 
-Protected `develop` remains authoritative for currently integrated HRIS behavior. This active PR adds only a pre-mutation evidence contract. It does not integrate or claim the unmerged People mutation, Job Analysis, payroll/final-pay, benefits, or identity execution capabilities of other lanes/repositories.
+Protected `develop` remains authoritative for integrated HRIS behavior. Parent PR #46 owns the pre-mutation review packet. This stacked child owns only the explicit human-approval receipt boundary and must remain dependency-first until #46 is integrated. Parent checks/reviews do not transfer. After parent integration, retarget this child to fresh `develop` and rerun every applicable exact-head local/central gate before any readiness claim.
+
+Even an approved receipt is not a termination engine and does not establish durable Employment/Assignment mutation, identity deprovisioning, payroll/final-pay, benefits, or other foreign-owner execution. Those remain later authoritative boundaries with fresh purpose-bound authorization and immutable audit/outbox evidence.
