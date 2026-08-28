@@ -106,6 +106,16 @@ test('denial, stale evidence, scope conflict, and failure explain the next safe 
 
 test('unsupported runtime input fails closed before rendering', () => {
   assert.throws(() => employmentAbsenceViewModel('approved'), /unsupported Employment absence state/);
+  for (const inheritedState of ['constructor', 'toString', '__proto__']) {
+    assert.throws(
+      () => employmentAbsenceViewModel(inheritedState),
+      /unsupported Employment absence state/,
+    );
+    assert.throws(
+      () => employmentAbsenceStateMarkup(inheritedState),
+      /unsupported Employment absence state/,
+    );
+  }
   assert.throws(() => employmentAbsenceViewModel(new String('absent')), /exact built-in string/);
   assert.throws(() => employmentAbsenceStateMarkup(Symbol('notAbsent')), /exact built-in string/);
 });
