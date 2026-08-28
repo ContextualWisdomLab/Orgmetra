@@ -29,7 +29,7 @@ CREATE TABLE employment_employing_organization_record (
         CHECK (is_operational_uuid(tenant_record_id)),
     CONSTRAINT employment_employing_organization_record_operational_uuid_check
         CHECK (is_operational_uuid(employment_employing_organization_record_id)),
-    CONSTRAINT employment_employing_organization_employment_operational_uuid_check
+    CONSTRAINT employment_employing_organization_employment_uuid_check
         CHECK (is_operational_uuid(employment_record_id)),
     CONSTRAINT employment_employing_organization_unit_operational_uuid_check
         CHECK (is_operational_uuid(employing_organization_unit_id)),
