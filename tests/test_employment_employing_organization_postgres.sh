@@ -119,4 +119,86 @@ END $$;
 RESET ROLE;
 SQL
 
+# The exact-one invariant spans Employment, employer relationships, and legal-entity
+# classification. Conflicting tenant-local writes must serialize before deferred
+# validation so two READ COMMITTED transactions cannot validate stale snapshots.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO employment_record (tenant_record_id, employment_record_id, person_record_id)
+VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000024','10000000-0000-7000-8000-000000000010');
+INSERT INTO organization_unit (tenant_record_id, organization_unit_id)
+VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000033');
+INSERT INTO organization_unit_version (
+ tenant_record_id, organization_unit_version_id, organization_unit_id,
+ unit_name, organization_type_code, effective_from, recorded_from
+) VALUES (
+ '10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000043',
+ '10000000-0000-7000-8000-000000000033','Race Legal Employer','legal_entity',
+ DATE '2025-01-01',TIMESTAMPTZ '2026-01-02 00:00:00+00'
+);
+SQL
+
+race_org_log="$(mktemp)"
+(
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+UPDATE organization_unit_version
+SET recorded_to=TIMESTAMPTZ '2026-10-01 00:00:00+00'
+WHERE organization_unit_version_id='10000000-0000-7000-8000-000000000043';
+INSERT INTO organization_unit_version (
+ tenant_record_id, organization_unit_version_id, organization_unit_id,
+ unit_name, organization_type_code, effective_from, recorded_from
+) VALUES (
+ '10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000044',
+ '10000000-0000-7000-8000-000000000033','Race Department','department',
+ DATE '2025-01-01',TIMESTAMPTZ '2026-10-01 00:00:00+00'
+);
+SELECT pg_sleep(3);
+ROLLBACK;
+SQL
+) >"${race_org_log}" 2>&1 &
+race_org_pid=$!
+
+# Give the organization transaction enough time to reach its deliberate hold.
+sleep 1
+set +e
+race_employment_output="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL' 2>&1
+BEGIN;
+SET LOCAL statement_timeout = '750ms';
+INSERT INTO employment_record_version (
+ tenant_record_id, employment_record_version_id, employment_record_id,
+ employment_status_code, employment_concurrency_code, effective_from, recorded_from
+) VALUES (
+ '10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000025',
+ '10000000-0000-7000-8000-000000000024','active','exclusive',
+ DATE '2026-01-01',TIMESTAMPTZ '2026-10-02 00:00:00+00'
+);
+INSERT INTO employment_employing_organization_record (
+ tenant_record_id, employment_employing_organization_record_id,
+ employment_record_id, employing_organization_unit_id, effective_from, recorded_from
+) VALUES (
+ '10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000062',
+ '10000000-0000-7000-8000-000000000024','10000000-0000-7000-8000-000000000033',
+ DATE '2026-01-01',TIMESTAMPTZ '2026-10-02 00:00:00+00'
+);
+COMMIT;
+SQL
+)"
+race_employment_status=$?
+set -e
+wait "${race_org_pid}"
+
+if [[ ${race_employment_status} -eq 0 ]]; then
+  cat "${race_org_log}" >&2
+  rm -f "${race_org_log}"
+  echo "expected concurrent legal-entity and active Employment mutations to serialize, but the competing Employment committed" >&2
+  exit 1
+fi
+if [[ "${race_employment_output}" != *"statement timeout"* ]]; then
+  cat "${race_org_log}" >&2
+  rm -f "${race_org_log}"
+  echo "expected tenant-local invariant serialization wait, got: ${race_employment_output}" >&2
+  exit 1
+fi
+rm -f "${race_org_log}"
+
 echo "Employment employing-organization PostgreSQL contract passed"
