@@ -1,4 +1,4 @@
-"""Request-edge, governed read, confirmed-hire, and People mutation contracts."""
+"""Request-edge, governed read, confirmed-hire, offer-close, and People mutation contracts."""
 
 from orgmetra_people_api.auth import (
     AuthenticatedPrincipal,
@@ -32,6 +32,12 @@ from orgmetra_people_api.mutations import (
     create_employment_record,
     create_position_record,
 )
+from orgmetra_people_api.offer_close import (
+    CandidateOfferHireAuthority,
+    CandidateOfferHireVerification,
+    OfferToHireIntegrityError,
+    close_accepted_offer_to_hire,
+)
 from orgmetra_people_api.people import (
     AuthorizedWorkerPeopleView,
     PeopleReadPort,
@@ -48,12 +54,15 @@ __all__ = [
     "AuthenticatedPrincipal",
     "AuthenticationFailed",
     "AuthorizedWorkerPeopleView",
+    "CandidateOfferHireAuthority",
+    "CandidateOfferHireVerification",
     "HireAcceptanceCommand",
     "HireAcceptancePort",
     "HireAcceptanceResult",
     "HireAcceptanceAsgiApp",
     "HireDecisionIntegrityError",
     "HireDecisionNotFound",
+    "OfferToHireIntegrityError",
     "PeopleAsgiApp",
     "PeopleMutationAsgiApp",
     "PeopleMutationIntegrityError",
@@ -75,6 +84,7 @@ __all__ = [
     "WorkerPeopleRecord",
     "accept_confirmed_hire",
     "authorize_resource_fields",
+    "close_accepted_offer_to_hire",
     "create_assignment_record",
     "create_employment_record",
     "create_position_record",
