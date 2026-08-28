@@ -1,6 +1,6 @@
 # Candidate evidence intake traceability
 
-- **Maturity:** `implemented_on_active_pr`
+- **Maturity:** `implemented_on_protected_main`
 - **Buyer capability:** Candidate Evidence workspace governance boundary
 - **Owned contract:** `CandidateEvidenceIntakePacket`
 
