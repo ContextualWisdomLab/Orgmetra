@@ -9,7 +9,7 @@
 
 The employee profile reads assignment history through a read-only People API boundary that authorizes the exact tenant, person, purpose, operation, and requested field set **before** calling the persistence adapter. The persistence adapter remains injected; this slice does not introduce direct SQL or a second Assignment source of truth.
 
-Each returned row carries separate business-effective (`effective_from`, `effective_to`) and system-recorded (`recorded_from`, `recorded_to`) coordinates. `known_at` selects the half-open recorded interval `[recorded_from, recorded_to)`. Orgmetra then revalidates tenant/person scope, recorded-time visibility, row type, and assignment identity uniqueness because persistence output is untrusted at the service boundary.
+Each returned row carries separate business-effective (`effective_from`, `effective_to`) and system-recorded (`recorded_from`, `recorded_to`) coordinates. `known_at` selects the half-open recorded interval `[recorded_from, recorded_to)`. Trust-bearing system instants require an exact built-in `datetime` paired with Python's built-in fixed-offset `timezone` at zero offset; caller-defined `tzinfo` providers are rejected before protected retrieval or row use so validation, comparison, and canonical rendering cannot depend on mutable user-supplied timezone behavior. Orgmetra then revalidates tenant/person scope, recorded-time visibility, row type, and assignment identity uniqueness because persistence output is untrusted at the service boundary.
 
 Only fields granted by the purpose-bound authorization decision are emitted. Assignment identity is **not** an unconditional envelope field: a caller that is authorized only for `effective_from` receives only `effective_from`. This prevents a row identifier from becoming an accidental side channel around field minimization.
 
@@ -31,8 +31,9 @@ PR #142 must demonstrate:
 
 1. denied fields cause zero persistence calls;
 2. tenant/person or system-time mismatches fail closed;
-3. duplicate visible assignment identities fail closed;
-4. only authorized fields are returned;
-5. canonical allocation/time representations and deterministic ordering;
-6. exact 100% owned People API statement and branch coverage on the current PR head;
-7. applicable Foundation, SAST, Security, Recovery, and central required-workflow evidence before any integration decision.
+3. caller-defined UTC-looking timezone providers fail closed before protected retrieval or persisted row use;
+4. duplicate visible assignment identities fail closed;
+5. only authorized fields are returned;
+6. canonical allocation/time representations and deterministic ordering;
+7. exact 100% owned People API statement and branch coverage on the current PR head;
+8. applicable Foundation, SAST, Security, Recovery, and central required-workflow evidence before any integration decision.
