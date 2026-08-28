@@ -16,7 +16,7 @@ When PR #101 is available, Orgmetra will persist Job-grade truth through three n
 
 The version boundary stores the exact value-minimized canonical `JobGradeDesignReviewPacket` JSON and SHA-256 rather than accepting an unbound digest. Before insert, PostgreSQL re-resolves the open Job anchor, immutable grade definition, same-Job `analysis_validated` Job Analysis snapshot, exact snapshot digest, packet key/value semantics, reviewer/purpose/reason/chronology, immutable audit event, and `integration_hub` outbox correlation.
 
-System-recorded time is PostgreSQL transaction time. Business/effective time remains independent. History is correction-not-rewrite, and owned relations use FORCE RLS with tenant context. A grade assignment is authoritative Job-architecture truth only; it remains `not_authorized_for_compensation_or_employment_decision`.
+System-recorded time is PostgreSQL transaction time. Business/effective time remains independent. History is correction-not-rewrite, owned relations use FORCE RLS with tenant context, and the migration plus trigger functions pin trusted `search_path` values. A grade assignment is authoritative Job-architecture truth only; it remains `not_authorized_for_compensation_or_employment_decision`.
 
 ## Consequences
 

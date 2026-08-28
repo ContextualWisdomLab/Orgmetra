@@ -19,12 +19,12 @@
 | Audit/outbox evidence is immutable and semantically exact | same-tenant `audit_event_record`, exact purpose/reason/reviewer/evidence/subject/time/result, `integration_hub` outbox requirement |
 | Business time and system-recorded time are separate | `effective_from/effective_to` independent from PostgreSQL-owned `recorded_from/recorded_to` |
 | Historical correction is not rewrite | bitemporal exclusion, close-only current-transaction update guard, DELETE/TRUNCATE rejection |
-| Tenant isolation fails closed | ENABLE + FORCE RLS on definition, assignment anchor, and assignment version; `NOSUPERUSER NOBYPASSRLS` regression |
+| Tenant isolation fails closed | ENABLE + FORCE RLS on definition, assignment anchor, and assignment version; `NOSUPERUSER NOBYPASSRLS` regression; migration and trigger functions pin trusted `search_path` |
 | Job grade does not grant high-impact downstream authority | fixed `decision_authority_state=not_authorized_for_compensation_or_employment_decision` |
 
 ## Executable evidence
 
-`tests/test_job_grade_persistence_postgres.sh` is the dedicated PostgreSQL acceptance contract. It covers the happy path plus wrong-grade review binding, cross-Job Job Analysis reuse, caller-backdated system time, in-place history rewrite, immutable definition rewrite, TRUNCATE resistance, and tenant visibility under a `NOSUPERUSER NOBYPASSRLS` reader.
+`tests/test_job_grade_persistence_postgres.sh` is the dedicated PostgreSQL acceptance contract. It covers the happy path plus wrong-grade review binding, cross-Job Job Analysis reuse, caller-backdated system time, in-place history rewrite, immutable definition rewrite, TRUNCATE resistance, trusted trigger `search_path` pinning, and tenant visibility under a `NOSUPERUSER NOBYPASSRLS` reader.
 
 `.github/workflows/job-grade-persistence-quality.yml` checks out the exact PR head, prints deterministic source provenance, runs the PostgreSQL acceptance contract, and requires a clean checkout. Focused stack-local GREEN does not substitute for Foundation/SAST/Security/Recovery and full post-parent-integration evidence.
 

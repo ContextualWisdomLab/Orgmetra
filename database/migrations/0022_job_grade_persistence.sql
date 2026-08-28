@@ -2,6 +2,10 @@
 -- compensation or employment-decision authority. Grade/band definition evidence
 -- is immutable; Job assignment truth is bitemporal and remains tenant scoped.
 
+BEGIN;
+
+SET LOCAL search_path = public, pg_catalog;
+
 CREATE TABLE job_grade_definition_record (
     tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
     job_grade_definition_record_id uuid PRIMARY KEY,
@@ -164,9 +168,10 @@ CREATE TABLE job_grade_assignment_version (
         )
 );
 
-CREATE FUNCTION enforce_job_grade_definition_system_time()
+CREATE FUNCTION public.enforce_job_grade_definition_system_time()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_at IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
@@ -177,17 +182,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION enforce_job_grade_definition_system_time() IS
+COMMENT ON FUNCTION public.enforce_job_grade_definition_system_time() IS
     'Requires PostgreSQL transaction time for immutable enterprise-local Job grade/band definition evidence.';
 
 CREATE TRIGGER job_grade_definition_system_time_guard
 BEFORE INSERT ON job_grade_definition_record
 FOR EACH ROW
-EXECUTE FUNCTION enforce_job_grade_definition_system_time();
+EXECUTE FUNCTION public.enforce_job_grade_definition_system_time();
 
-CREATE FUNCTION enforce_job_grade_assignment_system_time()
+CREATE FUNCTION public.enforce_job_grade_assignment_system_time()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_to IS NOT NULL THEN
@@ -202,22 +208,23 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION enforce_job_grade_assignment_system_time() IS
+COMMENT ON FUNCTION public.enforce_job_grade_assignment_system_time() IS
     'Guards new Job-grade assignment anchors and versions: system-recorded time is PostgreSQL transaction time and new recorded intervals begin open.';
 
 CREATE TRIGGER job_grade_assignment_record_system_time_guard
 BEFORE INSERT ON job_grade_assignment_record
 FOR EACH ROW
-EXECUTE FUNCTION enforce_job_grade_assignment_system_time();
+EXECUTE FUNCTION public.enforce_job_grade_assignment_system_time();
 
 CREATE TRIGGER job_grade_assignment_version_system_time_guard
 BEFORE INSERT ON job_grade_assignment_version
 FOR EACH ROW
-EXECUTE FUNCTION enforce_job_grade_assignment_system_time();
+EXECUTE FUNCTION public.enforce_job_grade_assignment_system_time();
 
-CREATE FUNCTION protect_job_grade_definition_immutability()
+CREATE FUNCTION public.protect_job_grade_definition_immutability()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'Job grade definition evidence is immutable; semantic change requires a new definition record'
@@ -225,17 +232,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION protect_job_grade_definition_immutability() IS
+COMMENT ON FUNCTION public.protect_job_grade_definition_immutability() IS
     'Rejects UPDATE and DELETE so reviewed enterprise grade/band definition evidence cannot be rewritten in place.';
 
 CREATE TRIGGER job_grade_definition_immutability_guard
 BEFORE UPDATE OR DELETE ON job_grade_definition_record
 FOR EACH ROW
-EXECUTE FUNCTION protect_job_grade_definition_immutability();
+EXECUTE FUNCTION public.protect_job_grade_definition_immutability();
 
-CREATE FUNCTION protect_job_grade_assignment_history()
+CREATE FUNCTION public.protect_job_grade_assignment_history()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -255,22 +263,23 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION protect_job_grade_assignment_history() IS
+COMMENT ON FUNCTION public.protect_job_grade_assignment_history() IS
     'Preserves bitemporal Job-grade evidence: DELETE and in-place rewrites fail closed; the only UPDATE is closing an open recorded interval at PostgreSQL transaction time.';
 
 CREATE TRIGGER job_grade_assignment_record_history_guard
 BEFORE UPDATE OR DELETE ON job_grade_assignment_record
 FOR EACH ROW
-EXECUTE FUNCTION protect_job_grade_assignment_history();
+EXECUTE FUNCTION public.protect_job_grade_assignment_history();
 
 CREATE TRIGGER job_grade_assignment_version_history_guard
 BEFORE UPDATE OR DELETE ON job_grade_assignment_version
 FOR EACH ROW
-EXECUTE FUNCTION protect_job_grade_assignment_history();
+EXECUTE FUNCTION public.protect_job_grade_assignment_history();
 
-CREATE FUNCTION enforce_job_grade_assignment_scope()
+CREATE FUNCTION public.enforce_job_grade_assignment_scope()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     anchor_job_profile_id uuid;
@@ -494,17 +503,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION enforce_job_grade_assignment_scope() IS
+COMMENT ON FUNCTION public.enforce_job_grade_assignment_scope() IS
     'Before persisting a Job-grade version, re-resolves its open Job anchor, immutable grade definition, same-Job validated Job Analysis snapshot, exact versioned canonical review packet, reviewer/purpose/reason evidence, and immutable audit/outbox correlation. Persistence does not grant compensation or employment-decision authority.';
 
 CREATE TRIGGER job_grade_assignment_version_scope_guard
 BEFORE INSERT ON job_grade_assignment_version
 FOR EACH ROW
-EXECUTE FUNCTION enforce_job_grade_assignment_scope();
+EXECUTE FUNCTION public.enforce_job_grade_assignment_scope();
 
-CREATE FUNCTION enforce_job_grade_assignment_anchor_alignment()
+CREATE FUNCTION public.enforce_job_grade_assignment_anchor_alignment()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_to IS NULL OR NEW.recorded_to IS NOT DISTINCT FROM OLD.recorded_to THEN
@@ -525,18 +535,19 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION enforce_job_grade_assignment_anchor_alignment() IS
+COMMENT ON FUNCTION public.enforce_job_grade_assignment_anchor_alignment() IS
     'Deferred anchor-closure guard: every Job-grade version must be recorded closed no later than its durable Job assignment anchor before commit.';
 
 CREATE CONSTRAINT TRIGGER job_grade_assignment_anchor_alignment_guard
 AFTER UPDATE ON job_grade_assignment_record
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
-EXECUTE FUNCTION enforce_job_grade_assignment_anchor_alignment();
+EXECUTE FUNCTION public.enforce_job_grade_assignment_anchor_alignment();
 
-CREATE FUNCTION reject_job_grade_persistence_truncate()
+CREATE FUNCTION public.reject_job_grade_persistence_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'Job grade persistence evidence cannot be truncated'
@@ -544,23 +555,23 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION reject_job_grade_persistence_truncate() IS
+COMMENT ON FUNCTION public.reject_job_grade_persistence_truncate() IS
     'Rejects table-wide TRUNCATE so immutable Job grade definition and bitemporal assignment evidence cannot bypass row-level history guards.';
 
 CREATE TRIGGER job_grade_definition_truncate_guard
 BEFORE TRUNCATE ON job_grade_definition_record
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_job_grade_persistence_truncate();
+EXECUTE FUNCTION public.reject_job_grade_persistence_truncate();
 
 CREATE TRIGGER job_grade_assignment_record_truncate_guard
 BEFORE TRUNCATE ON job_grade_assignment_record
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_job_grade_persistence_truncate();
+EXECUTE FUNCTION public.reject_job_grade_persistence_truncate();
 
 CREATE TRIGGER job_grade_assignment_version_truncate_guard
 BEFORE TRUNCATE ON job_grade_assignment_version
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_job_grade_persistence_truncate();
+EXECUTE FUNCTION public.reject_job_grade_persistence_truncate();
 
 REVOKE TRUNCATE ON job_grade_definition_record FROM PUBLIC;
 REVOKE TRUNCATE ON job_grade_assignment_record FROM PUBLIC;
@@ -570,22 +581,22 @@ ALTER TABLE job_grade_definition_record ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_grade_definition_record FORCE ROW LEVEL SECURITY;
 CREATE POLICY job_grade_definition_scope_policy
 ON job_grade_definition_record
-USING (tenant_record_id = current_tenant_record_id())
-WITH CHECK (tenant_record_id = current_tenant_record_id());
+USING (tenant_record_id = public.current_tenant_record_id())
+WITH CHECK (tenant_record_id = public.current_tenant_record_id());
 
 ALTER TABLE job_grade_assignment_record ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_grade_assignment_record FORCE ROW LEVEL SECURITY;
 CREATE POLICY job_grade_assignment_record_scope_policy
 ON job_grade_assignment_record
-USING (tenant_record_id = current_tenant_record_id())
-WITH CHECK (tenant_record_id = current_tenant_record_id());
+USING (tenant_record_id = public.current_tenant_record_id())
+WITH CHECK (tenant_record_id = public.current_tenant_record_id());
 
 ALTER TABLE job_grade_assignment_version ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_grade_assignment_version FORCE ROW LEVEL SECURITY;
 CREATE POLICY job_grade_assignment_version_scope_policy
 ON job_grade_assignment_version
-USING (tenant_record_id = current_tenant_record_id())
-WITH CHECK (tenant_record_id = current_tenant_record_id());
+USING (tenant_record_id = public.current_tenant_record_id())
+WITH CHECK (tenant_record_id = public.current_tenant_record_id());
 
 COMMENT ON TABLE job_grade_definition_record IS
     'Immutable tenant-scoped enterprise-local Job grade/band definition evidence. Semantic change creates a new definition record; this relation grants no compensation or employment-decision authority.';
@@ -595,3 +606,5 @@ COMMENT ON TABLE job_grade_assignment_record IS
 
 COMMENT ON TABLE job_grade_assignment_version IS
     'Human-reviewed bitemporal Job-grade assignment version bound to one immutable grade definition, same-Job validated Job Analysis snapshot, exact versioned canonical JobGradeDesignReviewPacket bytes, and immutable audit/outbox evidence. It remains explicitly unauthorized for compensation or employment decisions.';
+
+COMMIT;

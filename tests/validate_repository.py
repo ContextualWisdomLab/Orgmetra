@@ -71,6 +71,7 @@ REQUIRED = [
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
+    "database/migrations/0022_job_grade_persistence.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -92,6 +93,7 @@ REQUIRED = [
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
+    "tests/test_job_grade_persistence_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -364,6 +366,15 @@ def _validate_database_contract() -> None:
         "CREATE TRIGGER job_analysis_snapshot_append_only_guard",
         "ALTER TABLE job_analysis_snapshot FORCE ROW LEVEL SECURITY",
         "CREATE POLICY job_analysis_snapshot_scope_policy",
+        "CREATE TABLE job_grade_definition_record",
+        "CREATE TABLE job_grade_assignment_record",
+        "CREATE TABLE job_grade_assignment_version",
+        "CREATE FUNCTION public.enforce_job_grade_assignment_scope",
+        "CREATE TRIGGER job_grade_assignment_version_scope_guard",
+        "ALTER TABLE job_grade_assignment_version FORCE ROW LEVEL SECURITY",
+        "CREATE POLICY job_grade_assignment_version_scope_policy",
+        "CREATE FUNCTION public.reject_job_grade_persistence_truncate",
+        "SET search_path = pg_catalog, public, pg_temp",
     ]
     for fragment in required_fragments:
         if fragment not in sql:

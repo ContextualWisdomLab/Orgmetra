@@ -187,6 +187,27 @@ if [[ "${state}" != "authoritative_job_grade_assignment|not_authorized_for_compe
     exit 1
 fi
 
+trusted_search_path_count="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_proc AS procedure_record
+JOIN pg_namespace AS namespace_record
+  ON namespace_record.oid = procedure_record.pronamespace
+WHERE namespace_record.nspname = 'public'
+  AND procedure_record.proname IN (
+      'enforce_job_grade_definition_system_time',
+      'enforce_job_grade_assignment_system_time',
+      'protect_job_grade_definition_immutability',
+      'protect_job_grade_assignment_history',
+      'enforce_job_grade_assignment_scope',
+      'enforce_job_grade_assignment_anchor_alignment',
+      'reject_job_grade_persistence_truncate'
+  )
+  AND procedure_record.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[];")"
+if [[ "${trusted_search_path_count}" != "7" ]]; then
+    echo "Job grade trigger functions do not pin the trusted search_path: ${trusted_search_path_count}/7" >&2
+    exit 1
+fi
+
 set +e
 mismatch_output="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v review_evidence="${review_evidence}" -v review_digest="${review_digest}" <<SQL 2>&1

@@ -68,6 +68,7 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
   'database/migrations/0013_job_analysis_snapshot.sql',
+  'database/migrations/0022_job_grade_persistence.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -89,6 +90,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/test_job_analysis_snapshot_postgres.sh',
+  'tests/test_job_grade_persistence_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -129,7 +131,9 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
   'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
   'outbox_event', 'outbox_delivery_record', 'outbox_delivery_escalation_record',
-  'people_mutation_idempotency_record', 'inbox_event', 'integration_delivery'
+  'people_mutation_idempotency_record', 'inbox_event', 'integration_delivery',
+  'job_grade_definition_record', 'job_grade_assignment_record',
+  'job_grade_assignment_version'
 ]);
 
 /** Migration-backed logical objects whose persisted table identity must not drift. */
