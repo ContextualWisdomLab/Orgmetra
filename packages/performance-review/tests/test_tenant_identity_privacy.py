@@ -1,6 +1,6 @@
 """Privacy and interoperability regression for performance-review tenant identity."""
 from dataclasses import replace
-from datetime import date, datetime, timezone
+from datetime import date
 
 from orgmetra_performance_review import build_performance_review_packet
 
@@ -29,7 +29,6 @@ def _build():
         reason_code="scheduled_cycle_review",
         review_period_start=date(2026, 1, 1),
         review_period_end=date(2026, 6, 30),
-        generated_at=datetime(2026, 8, 19, 5, 15, 30, tzinfo=timezone.utc),
     )
 
 
@@ -41,7 +40,19 @@ def test_authoritative_uuid7_tenant_identity_is_accepted_by_builder_and_replace(
     kwargs = {
         field: getattr(packet, field)
         for field in packet.__dataclass_fields__
-        if field not in {"contains_personal_data", "contains_direct_person_identifiers", "contains_rating_value", "contains_free_form_model_output", "human_confirmation_required", "decision_authority", "review_state", "scope_verification_state", "next_action"}
+        if field
+        not in {
+            "generated_at",
+            "contains_personal_data",
+            "contains_direct_person_identifiers",
+            "contains_rating_value",
+            "contains_free_form_model_output",
+            "human_confirmation_required",
+            "decision_authority",
+            "review_state",
+            "scope_verification_state",
+            "next_action",
+        }
     }
     kwargs["tenant_record_id"] = UUID7_TENANT
     rebuilt = build_performance_review_packet(**kwargs)
