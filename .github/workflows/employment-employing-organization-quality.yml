@@ -8,6 +8,13 @@ on:
       - "database/migrations/0040_employment_employing_organization.sql"
       - "tests/test_employment_employing_organization_postgres.sh"
       - ".github/workflows/employment-employing-organization-quality.yml"
+      - "docs/adr/0141-employment-employing-organization.md"
+      - "docs/doctoring/employment-employing-organization.md"
+      - "docs/DATA_MODEL.md"
+      - "docs/ERD.md"
+      - "docs/TRACEABILITY.md"
+      - "CHANGELOG.md"
+      - "manifest.json"
   workflow_dispatch:
 
 permissions:
