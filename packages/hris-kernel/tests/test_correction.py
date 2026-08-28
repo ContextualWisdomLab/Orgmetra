@@ -108,6 +108,29 @@ def test_close_recorded_interval_rejects_malformed_kernel_recorded_history(
         )
 
 
+def test_close_recorded_interval_rejects_datetime_subclass_in_recorded_history(
+    jordan_active_employment,
+) -> None:
+    """A recorded endpoint subclass cannot control the chronology comparison."""
+    forged_start = _ForgedDateTime(
+        2024,
+        3,
+        1,
+        15,
+        tzinfo=timezone.utc,
+    )
+    malformed_fact = replace(
+        jordan_active_employment,
+        recorded=RecordedInterval(start=forged_start),
+    )
+
+    with pytest.raises(CorrectionError, match="built-in datetime"):
+        close_recorded_interval(
+            malformed_fact,
+            recorded_to=utc(2024, 6, 15, 9),
+        )
+
+
 def test_close_recorded_interval_rejects_datetime_subclass_before_ordering(
     jordan_active_employment,
 ) -> None:

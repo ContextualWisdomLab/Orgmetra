@@ -29,9 +29,10 @@ def close_recorded_interval(fact: FactT, *, recorded_to: datetime) -> FactT:
     """Return a governed fact copy whose recorded interval closes at `recorded_to`.
 
     The correction boundary accepts only the kernel's four authoritative fact
-    runtime types and a built-in ``datetime`` close instant. Exact runtime types
-    are required before attribute access or temporal comparison so caller-owned
-    polymorphism cannot impersonate an HRIS fact or redefine chronology.
+    runtime types and a built-in ``datetime`` close instant. The recorded
+    interval must also contain exact built-in datetime endpoints. Exact runtime
+    types are required before attribute access or temporal comparison so
+    caller-owned polymorphism cannot impersonate an HRIS fact or redefine chronology.
 
     Args:
         fact: An authoritative employment, organization, position, or assignment
@@ -59,6 +60,13 @@ def close_recorded_interval(fact: FactT, *, recorded_to: datetime) -> FactT:
     if type(recorded) is not RecordedInterval:
         raise CorrectionError(
             "Kernel fact recorded history must use the governed RecordedInterval type.",
+            next_action="Reload the authoritative fact from the HRIS kernel before correcting it.",
+        )
+    if type(recorded.start) is not datetime or (
+        recorded.end is not None and type(recorded.end) is not datetime
+    ):
+        raise CorrectionError(
+            "Kernel fact recorded history must use built-in datetime endpoints.",
             next_action="Reload the authoritative fact from the HRIS kernel before correcting it.",
         )
 

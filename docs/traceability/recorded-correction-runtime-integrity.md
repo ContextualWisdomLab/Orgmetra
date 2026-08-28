@@ -13,7 +13,7 @@ Protected `develop@9e3e4847510e1e612b48474ba42b177b8ed824df` exposes `close_reco
 The active repair requires, before attribute access or temporal comparison:
 
 1. the corrected object has exactly one of the four authoritative runtime types: `EmploymentVersion`, `OrganizationUnitVersion`, `PositionVersion`, or `AssignmentFact`;
-2. its recorded history is exactly the governed `RecordedInterval` runtime type; and
+2. its recorded history is exactly the governed `RecordedInterval` runtime type with exact built-in `datetime` endpoints; and
 3. the requested close instant is exactly the built-in `datetime` runtime type.
 
 Only then may the existing rules run: the current recorded interval must still be open and `recorded_to` must be strictly later than `recorded.start`. The function still changes only the recorded interval and returns a dataclass replacement; business columns remain unchanged.
