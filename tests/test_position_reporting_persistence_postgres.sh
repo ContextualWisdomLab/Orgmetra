@@ -15,6 +15,28 @@ for migration in \
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
+guarded_function_count="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_proc AS function_record
+JOIN pg_namespace AS namespace_record
+  ON namespace_record.oid = function_record.pronamespace
+WHERE namespace_record.nspname = 'public'
+  AND function_record.proname IN (
+      'enforce_position_reporting_system_time',
+      'protect_position_reporting_history',
+      'position_reporting_has_staffable_coverage',
+      'enforce_position_reporting_scope',
+      'enforce_position_reporting_anchor_alignment',
+      'reject_position_reporting_truncate'
+  )
+  AND function_record.proconfig @>
+      ARRAY['search_path=pg_catalog, public, pg_temp']::text[];
+")"
+if [[ "${guarded_function_count}" != "6" ]]; then
+    echo "position-reporting governance functions are not all pinned to the trusted search_path: ${guarded_function_count}" >&2
+    exit 1
+fi
+
 TENANT_ID="10000000-0000-7000-8000-000000000001"
 OTHER_TENANT_ID="20000000-0000-7000-8000-000000000002"
 ORG_ID="00000000-0000-7000-8000-000000000011"
@@ -72,6 +94,17 @@ INSERT INTO position_record (
     ('${TENANT_ID}', '${MANAGER_POSITION_ID}', '${ORG_ID}', '${JOB_ID}'),
     ('${TENANT_ID}', '${OTHER_POSITION_ID}', '${ORG_ID}', '${JOB_ID}');
 SQL
+
+expect_failure \
+    "position-reporting anchor accepted a reserved UUID sentinel" \
+    "operational" \
+    "INSERT INTO position_reporting_relationship_record (
+        tenant_record_id, position_reporting_relationship_record_id,
+        subordinate_position_record_id, relationship_type_code
+     ) VALUES (
+        '${TENANT_ID}', '00000000-0000-0000-0000-000000000000',
+        '${SUBORDINATE_POSITION_ID}', 'solid_line'
+     );"
 
 canonical_event="$(python3 - <<PY
 import json

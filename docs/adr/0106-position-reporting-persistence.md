@@ -1,6 +1,7 @@
 # ADR 0106 — Bitemporal Position reporting persistence
 
-- **Status:** Proposed in active PR #106; not protected-main truth
+- Status: Proposed
+- Active PR: #106; not protected-main truth
 - **Decision date:** 2026-08-24
 - **Parent contract:** PR #94, `feat/position-reporting-hierarchy@3f67182bb3065f2fc8fd974bfdd75a390d8a8fdc`
 
@@ -42,7 +43,7 @@ This PR is a Draft descendant of #94 and cannot inherit #94 checks or reviews. I
 
 PR #95 owns the in-memory pre-mutation review packet. This persistence slice does not copy or modify that branch; it accepts the review digest plus immutable application audit evidence as the handoff boundary. A later authorized host adapter may translate a verified review packet into the database command, but direct cross-service SQL is out of scope.
 
-Canonical `docs/DATA_MODEL.md` / `docs/ERD.md` are intentionally not edited in this stacked slice while independent active database PRs also own those high-conflict documents. Integration must reconcile the accepted relationship tables into canonical data-model documentation after dependency ordering is resolved.
+Canonical `docs/DATA_MODEL.md` / `docs/ERD.md` now record the proposed active-PR relationship tables and explicitly distinguish them from protected-main truth. Integration must reconcile the accepted relationship tables and remove the active-PR qualification after dependency ordering is resolved.
 
 ## Consequences
 

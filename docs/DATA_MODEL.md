@@ -14,6 +14,8 @@
 | `job_profile_version` | Bitemporal title, family, and version definition for a job profile. |
 | `position_record` | Durable seat identity that keeps stable organization and job references. |
 | `position_record_version` | Bitemporal position status and effective period. |
+| `position_reporting_relationship_record` | Tenant-scoped durable Position-to-Position solid-line relationship anchor. |
+| `position_reporting_relationship_version` | Reviewed bitemporal manager-Position application bound to immutable audit/outbox evidence. |
 | `assignment_record` | A person's allocation to a position through one employment. |
 | `candidate_profile` | Applicant/candidate record before hire. |
 | `candidate_worker_link` | Legacy append-only candidate-to-worker linkage retained for historical reads; new writes use `candidate_worker_conversion_record`. |
@@ -51,6 +53,8 @@ Effective-dated fact tables use:
 Intervals are half-open and non-empty: an end value, when present, must be strictly later than its start. `effective_*` describes real-world validity. `recorded_*` describes when Orgmetra knew the fact.
 
 Durable anchors such as `organization_unit`, `job_profile`, `employment_record`, and `position_record` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version`, `job_profile_version`, `employment_record_version`, and `position_record_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
+
+Active PR #106 adds `position_reporting_relationship_record` as the stable subordinate-Position/relationship-type anchor and `position_reporting_relationship_version` as the changing manager-Position fact. Both are tenant-qualified and bitemporal; the version requires staffable PositionVersion coverage across its full effective interval plus separate human-review and application evidence. The relation stores no Person, Assignment, compensation, rating, or employment-decision output.
 
 Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
 

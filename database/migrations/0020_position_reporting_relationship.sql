@@ -2,6 +2,8 @@
 -- independent human review and authoritative application. Person, Assignment,
 -- compensation, assessment, and free-form HR values remain outside this model.
 
+SET search_path = public, pg_catalog;
+
 CREATE TABLE position_reporting_relationship_record (
     tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
     position_reporting_relationship_record_id uuid PRIMARY KEY,
@@ -11,6 +13,10 @@ CREATE TABLE position_reporting_relationship_record (
     recorded_to timestamptz,
     CONSTRAINT position_reporting_relationship_record_id_operational_check
         CHECK (public.is_operational_uuid(position_reporting_relationship_record_id)),
+    CONSTRAINT position_reporting_relationship_tenant_operational_check
+        CHECK (public.is_operational_uuid(tenant_record_id)),
+    CONSTRAINT position_reporting_subordinate_operational_check
+        CHECK (public.is_operational_uuid(subordinate_position_record_id)),
     CONSTRAINT position_reporting_subordinate_tenant_fk
         FOREIGN KEY (tenant_record_id, subordinate_position_record_id)
         REFERENCES position_record(tenant_record_id, position_record_id),
@@ -42,6 +48,14 @@ CREATE TABLE position_reporting_relationship_version (
     application_state text NOT NULL DEFAULT 'applied_after_human_review',
     CONSTRAINT position_reporting_version_id_operational_check
         CHECK (public.is_operational_uuid(position_reporting_relationship_version_id)),
+    CONSTRAINT position_reporting_version_tenant_operational_check
+        CHECK (public.is_operational_uuid(tenant_record_id)),
+    CONSTRAINT position_reporting_version_record_operational_check
+        CHECK (public.is_operational_uuid(position_reporting_relationship_record_id)),
+    CONSTRAINT position_reporting_manager_operational_check
+        CHECK (public.is_operational_uuid(manager_position_record_id)),
+    CONSTRAINT position_reporting_audit_event_operational_check
+        CHECK (public.is_operational_uuid(audit_event_record_id)),
     CONSTRAINT position_reporting_version_record_tenant_fk
         FOREIGN KEY (tenant_record_id, position_reporting_relationship_record_id)
         REFERENCES position_reporting_relationship_record(
@@ -94,6 +108,7 @@ CREATE TABLE position_reporting_relationship_version (
 CREATE FUNCTION enforce_position_reporting_system_time()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_to IS NOT NULL THEN
@@ -124,6 +139,7 @@ EXECUTE FUNCTION enforce_position_reporting_system_time();
 CREATE FUNCTION protect_position_reporting_history()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -166,6 +182,7 @@ CREATE FUNCTION position_reporting_has_staffable_coverage(
 RETURNS boolean
 LANGUAGE sql
 STABLE
+SET search_path = pg_catalog, public, pg_temp
 AS $$
     SELECT COALESCE(
         pg_catalog.range_agg(
@@ -194,6 +211,7 @@ COMMENT ON FUNCTION position_reporting_has_staffable_coverage(uuid, uuid, date, 
 CREATE FUNCTION enforce_position_reporting_scope()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     subordinate_position_id uuid;
@@ -349,6 +367,7 @@ EXECUTE FUNCTION enforce_position_reporting_scope();
 CREATE FUNCTION enforce_position_reporting_anchor_alignment()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_to IS NULL OR NEW.recorded_to IS NOT DISTINCT FROM OLD.recorded_to THEN
@@ -382,6 +401,7 @@ EXECUTE FUNCTION enforce_position_reporting_anchor_alignment();
 CREATE FUNCTION reject_position_reporting_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'position-reporting history cannot be truncated'
