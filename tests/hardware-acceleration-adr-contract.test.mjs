@@ -36,8 +36,8 @@ function assertPosixTextFile(path) {
 test('MLX sidecar contract defines container-to-host routing for supported engines', () => {
   const decision = decisionSection(hardwareAccelerationAdr());
 
-  assert.match(decision, /host\.docker\.internal/);
-  assert.match(decision, /host\.containers\.internal/);
+  assert.match(decision, /Docker Desktop and Colima\/Docker use `host\.docker\.internal:<port>`/);
+  assert.match(decision, /Podman uses `host\.containers\.internal:<port>`/);
   assert.match(decision, /host-gateway/);
   assert.match(decision, /Colima/i);
   assert.doesNotMatch(decision, /Containers talk to it over localhost HTTP\/gRPC/);
@@ -50,16 +50,21 @@ test('MLX sidecar contract fails closed instead of silently changing compute pat
   assert.match(decision, /fail(?:s|ure)?[- ]closed/i);
   assert.match(decision, /no silent CPU fallback/i);
   assert.match(decision, /health\/version handshake/i);
-  assert.match(decision, /accelerator_unavailable/);
+  assert.match(decision, /unauthorized operation\/revision.*fails closed as `accelerator_unavailable`/i);
 });
 
 test('MLX sidecar contract authenticates and authorizes callers on an allowlisted ingress path', () => {
   const decision = decisionSection(hardwareAccelerationAdr());
 
-  assert.match(decision, /client identity/i);
-  assert.match(decision, /allowlist/i);
-  assert.match(decision, /authoriz(?:e|ed|ation)/i);
-  assert.match(decision, /accelerator_unavailable/);
+  assert.match(
+    decision,
+    /Every enabled caller authenticates with mutual TLS \(mTLS\) using a deployment-provisioned client certificate\./,
+  );
+  assert.match(
+    decision,
+    /authorizes the authenticated client identity against an allowlist for the exact accelerator contract revision and operation set before reading model or HR payload bytes\./,
+  );
+  assert.match(decision, /disallowed ingress source fails closed as `accelerator_unavailable`/i);
 });
 
 test('hardware acceleration ADR is sealed in the canonical provenance manifest', () => {
