@@ -88,6 +88,51 @@ def test_read_time_verification_rejects_non_object_data_payload() -> None:
         _row(canonical)
 
 
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"high_impact": 1, "result_code": "updated"},
+        {"high_impact": False, "result_code": 7},
+    ],
+)
+def test_read_time_verification_rejects_noncanonical_data_value_types(
+    data: dict[str, object],
+) -> None:
+    """The governed audit data values remain an exact boolean and result-code string."""
+    document = _document()
+    document["data"] = data
+    canonical = json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+    with pytest.raises(ValueError, match="governed audit value types"):
+        _row(canonical)
+
+
+def test_read_time_verification_rejects_nonfinite_json_numbers() -> None:
+    """JSON NaN and Infinity extensions cannot enter canonical evidence."""
+    document = _document()
+    document["data"] = {"high_impact": False, "result_code": float("nan")}
+    canonical = json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+    with pytest.raises(ValueError, match="valid UTF-8 JSON"):
+        _row(canonical)
+
+
+@pytest.mark.parametrize(
+    ("member", "value"),
+    [("source", 7), ("orgmetraconfirmation", 7)],
+)
+def test_read_time_verification_rejects_noncanonical_event_value_types(
+    member: str, value: object,
+) -> None:
+    """CloudEvents members and optional confirmation remain exact strings."""
+    document = _document()
+    document[member] = value
+    canonical = json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+    with pytest.raises(ValueError, match="governed audit value types"):
+        _row(canonical)
+
+
 def test_unencodable_text_fails_closed_as_validation_error() -> None:
     """Malformed caller text does not escape as an implementation encoding exception."""
     malformed = '{"bad":"' + chr(0xD800) + '"}'

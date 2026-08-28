@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
-from typing import Protocol
+from typing import NoReturn, Protocol
 from uuid import UUID
 
 _MAX_UUID_INT = (1 << 128) - 1
@@ -38,6 +38,22 @@ _BASE_EVENT_KEYS = frozenset(
 )
 _CONFIRMATION_KEY = "orgmetraconfirmation"
 _DATA_KEYS = frozenset({"high_impact", "result_code"})
+_EVENT_STRING_KEYS = frozenset(
+    {
+        "datacontenttype",
+        "id",
+        "orgmetraactor",
+        "orgmetraevidence",
+        "orgmetrapurpose",
+        "orgmetrareason",
+        "orgmetratenant",
+        "source",
+        "specversion",
+        "subject",
+        "time",
+        "type",
+    }
+)
 
 
 def _validate_operational_uuid(name: str, value: UUID) -> None:
@@ -72,6 +88,11 @@ def _freeze_timestamp(name: str, value: datetime) -> datetime:
         return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
     except (OverflowError, ValueError) as error:
         raise ValueError(f"{name} cannot be normalized to UTC.") from error
+
+
+def _reject_nonfinite_json_number(value: str) -> NoReturn:
+    """Reject JSON extensions that encode non-finite numbers instead of valid JSON."""
+    raise ValueError(f"non-finite JSON number {value} is not permitted")
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,8 +176,11 @@ class PersistedAuditEvidenceRow:
         if sha256(canonical_bytes).hexdigest() != self.event_envelope_digest:
             raise ValueError("audit event digest does not match persisted canonical bytes.")
         try:
-            document = json.loads(self.canonical_event_json)
-        except (json.JSONDecodeError, UnicodeError) as error:
+            document = json.loads(
+                self.canonical_event_json,
+                parse_constant=_reject_nonfinite_json_number,
+            )
+        except (ValueError, UnicodeError) as error:
             raise ValueError("canonical_event_json must contain valid UTF-8 JSON.") from error
         if type(document) is not dict:
             raise ValueError("canonical_event_json must contain one JSON object.")
@@ -171,6 +195,12 @@ class PersistedAuditEvidenceRow:
         event_data = document.get("data")
         if type(event_data) is not dict or frozenset(event_data) != _DATA_KEYS:
             raise ValueError("canonical_event_json does not match the governed audit data shape.")
+        if any(type(document.get(key)) is not str for key in _EVENT_STRING_KEYS):
+            raise ValueError("canonical_event_json does not match the governed audit value types.")
+        if type(event_data["result_code"]) is not str or type(event_data["high_impact"]) is not bool:
+            raise ValueError("canonical_event_json does not match the governed audit value types.")
+        if _CONFIRMATION_KEY in document and type(document[_CONFIRMATION_KEY]) is not str:
+            raise ValueError("canonical_event_json does not match the governed audit value types.")
         if document.get("specversion") != "1.0" or document.get("datacontenttype") != "application/json":
             raise ValueError("audit event must use the governed CloudEvents 1.0 JSON contract.")
         if document.get("id") != str(self.audit_event_record_id):
