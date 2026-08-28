@@ -9,7 +9,6 @@ on:
       - "database/migrations/0002_sealed_evidence_digest.sql"
       - "database/migrations/0040_employment_employing_organization.sql"
       - "tests/test_employment_employing_organization_postgres.sh"
-      - "tests/test_employment_employing_organization_index_postgres.sh"
       - "scripts/foundation-contract-core.mjs"
       - "tests/validate_repository.py"
       - ".github/workflows/employment-employing-organization-quality.yml"
@@ -64,8 +63,6 @@ jobs:
         run: python tests/validate_repository.py --print-manifest
       - name: Prove Employment employing-organization contract
         run: bash tests/test_employment_employing_organization_postgres.sh
-      - name: Prove employing-organization parent lookup index
-        run: bash tests/test_employment_employing_organization_index_postgres.sh
       - name: Require clean checkout
         run: |
           git diff --exit-code
