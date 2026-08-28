@@ -70,6 +70,21 @@ test('unsupported runtime input fails closed before rendering', () => {
   assert.throws(() => documentRetrievalStateMarkup(Symbol('ready')), /exact built-in string/);
 });
 
+test('prototype-inherited names cannot masquerade as governed retrieval states', () => {
+  for (const inheritedName of ['constructor', 'toString', '__proto__']) {
+    assert.throws(
+      () => documentRetrievalViewModel(inheritedName),
+      /unsupported document retrieval state/,
+      `${inheritedName} must fail closed at the view-model boundary`,
+    );
+    assert.throws(
+      () => documentRetrievalStateMarkup(inheritedName),
+      /unsupported document retrieval state/,
+      `${inheritedName} must fail closed before markup is emitted`,
+    );
+  }
+});
+
 test('Storybook and CSS cover workflow-specific accessibility states', () => {
   for (const storyName of [
     'Idle',
