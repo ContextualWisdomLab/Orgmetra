@@ -14,6 +14,7 @@ on:
       - "services/people-api/CHANGELOG.md"
       - "packages/candidate-offer-response/**"
       - "packages/keyverse-adapter/**"
+      - "packages/hris-kernel/**"
       - "docs/traceability/offer-to-hire-close.md"
       - "docs/doctoring/offer-to-hire-close-references.md"
       - ".github/requirements/foundation-test.txt"
