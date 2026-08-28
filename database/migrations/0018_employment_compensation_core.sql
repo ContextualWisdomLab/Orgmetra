@@ -43,8 +43,6 @@ CREATE TABLE employment_base_compensation_version (
     CONSTRAINT employment_base_compensation_amount_check
         CHECK (
             base_compensation_amount <> 'NaN'::numeric
-            AND base_compensation_amount <> 'Infinity'::numeric
-            AND base_compensation_amount <> '-Infinity'::numeric
             AND base_compensation_amount >= 0
         ),
     CONSTRAINT employment_base_compensation_currency_check
