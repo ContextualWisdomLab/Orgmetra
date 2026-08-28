@@ -90,7 +90,13 @@ jobs:
           PY
       - name: Run Position lifecycle application regressions
         run: bash tests/test_position_lifecycle_application_postgres.sh
+      - name: Create isolated transition-validation database
+        env:
+          ADMIN_DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/postgres
+        run: psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE orgmetra_position_lifecycle_transition'
       - name: Reject forged lifecycle transition evidence
+        env:
+          DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra_position_lifecycle_transition
         run: bash tests/test_position_lifecycle_transition_validation_postgres.sh
       - name: Verify fresh Position and Assignment snapshot evidence
         run: bash tests/test_position_lifecycle_snapshot_integrity_postgres.sh

@@ -87,6 +87,7 @@ CREATE TABLE position_lifecycle_application_record (
         CHECK (
             requester_actor_reference <> reviewer_actor_reference
             AND reviewer_actor_reference <> applied_by_actor_reference
+            AND requester_actor_reference <> applied_by_actor_reference
         ),
     CONSTRAINT position_lifecycle_current_status_check
         CHECK (current_status_code IN ('active', 'open', 'closed', 'frozen', 'abolished')),
@@ -207,7 +208,10 @@ BEGIN
        OR review_payload ->> 'review_outcome_code' <> 'approved_for_authoritative_resolution'
        OR review_payload ->> 'review_state' <> 'human_reviewed'
        OR review_payload ->> 'scope_verification_state' <> 'requires_authoritative_resolution'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'evidence_version') <> 'number'
        OR review_payload ->> 'evidence_version' <> '1'
+       OR review_payload ->> 'next_action'
+          <> 'Re-resolve tenant-qualified Position and Assignment truth at the requested business/system coordinate; require authoritative actor separation, reviewed evidence, staffing safety, and immutable audit/outbox before any lifecycle mutation.'
        OR review_payload ->> 'position_snapshot_digest_sha256' !~ '^[0-9a-f]{64}$'
        OR review_payload ->> 'assignment_snapshot_digest_sha256' !~ '^[0-9a-f]{64}$'
        OR review_payload ->> 'position_lifecycle_change_reference'

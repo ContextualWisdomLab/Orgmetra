@@ -3,6 +3,10 @@ set -euo pipefail
 
 : "${DATABASE_URL:?DATABASE_URL is required}"
 
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation_schema.sql >/dev/null
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evidence_digest.sql >/dev/null
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0003_audit_outbox_persistence.sql >/dev/null
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0023_position_lifecycle_application.sql >/dev/null
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0024_position_lifecycle_transition_hardening.sql >/dev/null
 
 TENANT="0198a412-8000-7000-8000-000000000101"

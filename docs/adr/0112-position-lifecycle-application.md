@@ -23,6 +23,7 @@ The high-impact `apply_position_lifecycle_change(...)` function does not retain 
 ## Consequences
 
 - Business-effective time and system-recorded time remain independent and reconstructable.
+- A later-effective PositionVersion that was already recorded remains a separate scheduled fact; applying a review to an earlier interval does not silently overwrite that future lifecycle state. Any change to that later interval requires its own reviewed application.
 - A review packet never authorizes mutation by itself; current Position and Assignment truth is re-resolved and cryptographically compared with the reviewed snapshots at application time.
 - Canonical review bytes are part of the governed contract; recomputing a digest over a differently encoded but semantically equivalent document does not create acceptable evidence.
 - `closed` and `abolished` fail closed while any current Assignment overlaps the requested effective date or later.
