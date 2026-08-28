@@ -1,6 +1,6 @@
 """Regression coverage for PII-minimized bitemporal Position vacancy evidence."""
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import hashlib
 from uuid import UUID
@@ -187,6 +187,18 @@ def test_direct_snapshot_rejects_naive_time() -> None:
     """Direct construction cannot bypass timezone-aware audit coordinates."""
     with pytest.raises(IntervalError, match="timezone-aware"):
         PositionVacancySnapshot(TENANT, DAY, datetime(2026, 8, 23, 9), 0, 0, 0, 0, Decimal("0"))
+
+
+def test_snapshot_rejects_unrepresentable_utc_time() -> None:
+    """Normalize fixed-offset cutoffs that cannot be represented in UTC."""
+    with pytest.raises(IntervalError, match="representable as UTC"):
+        build_position_vacancy_snapshot(
+            [],
+            [],
+            tenant_record_id=TENANT,
+            effective_on=DAY,
+            known_at=datetime.max.replace(tzinfo=timezone(timedelta(hours=-14))),
+        )
 
 
 @pytest.mark.parametrize("bad_count", [-1, True, 1.5])

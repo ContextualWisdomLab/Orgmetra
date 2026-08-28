@@ -29,6 +29,22 @@ _ZERO = Decimal("0.0000")
 _ONE = Decimal("1.0000")
 
 
+def _canonical_known_at(value: datetime) -> datetime:
+    """Normalize one timezone-aware knowledge cutoff to UTC or fail closed."""
+    if value.utcoffset() is None:
+        raise IntervalError(
+            "Position vacancy knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the vacancy snapshot.",
+        )
+    try:
+        return value.astimezone(timezone.utc)
+    except (OverflowError, ValueError) as exc:
+        raise IntervalError(
+            "Position vacancy knowledge cutoff must be representable as UTC.",
+            next_action="Use a representable UTC knowledge cutoff, then rebuild the vacancy snapshot.",
+        ) from exc
+
+
 @dataclass(frozen=True, slots=True)
 class PositionVacancySnapshot:
     """Aggregate Position fill-state evidence without worker identifiers."""
@@ -44,11 +60,7 @@ class PositionVacancySnapshot:
 
     def __post_init__(self) -> None:
         """Reject internally contradictory direct snapshot construction."""
-        if self.known_at.utcoffset() is None:
-            raise IntervalError(
-                "Position vacancy knowledge cutoff must be timezone-aware.",
-                next_action="Convert the knowledge cutoff to UTC, then rebuild the vacancy snapshot.",
-            )
+        _canonical_known_at(self.known_at)
         counts = (
             self.staffable_position_count,
             self.vacant_position_count,
@@ -86,7 +98,7 @@ class PositionVacancySnapshot:
         payload = {
             "effective_on": self.effective_on.isoformat(),
             "fully_staffed_position_count": self.fully_staffed_position_count,
-            "known_at": self.known_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "known_at": _canonical_known_at(self.known_at).isoformat().replace("+00:00", "Z"),
             "partially_staffed_position_count": self.partially_staffed_position_count,
             "schema_version": "orgmetra.position_vacancy.v1",
             "staffable_position_count": self.staffable_position_count,
@@ -155,11 +167,7 @@ def build_position_vacancy_snapshot(
     capacity rules; a stale assignment to a non-staffable seat therefore fails
     closed rather than making the vacancy metric look plausible.
     """
-    if known_at.utcoffset() is None:
-        raise IntervalError(
-            "Position vacancy knowledge cutoff must be timezone-aware.",
-            next_action="Convert the knowledge cutoff to UTC, then rebuild the vacancy snapshot.",
-        )
+    known_at = _canonical_known_at(known_at)
 
     visible_positions = _visible_positions(
         position_versions,
@@ -224,7 +232,7 @@ def build_position_vacancy_snapshot(
     return PositionVacancySnapshot(
         tenant_record_id=tenant_record_id,
         effective_on=effective_on,
-        known_at=known_at.astimezone(timezone.utc),
+        known_at=known_at,
         staffable_position_count=len(visible_positions),
         vacant_position_count=vacant,
         partially_staffed_position_count=partial,

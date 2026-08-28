@@ -33,7 +33,7 @@ This slice does not implement requisition creation, headcount budget approval, w
 
 ## Verification
 
-`packages/hris-kernel/tests/test_position_vacancy.py` covers tenant isolation, vacant/partial/full classification, fractional multiple membership, bitemporal visibility, unknown status, stale non-staffable Assignment, overfilled Position, duplicate visible Assignment identity, direct snapshot invariants, PII-minimized canonical evidence and deterministic digest. Existing Workforce Intelligence/Foundation/SAST/Security/Recovery gates must pass on one unchanged exact head.
+`packages/hris-kernel/tests/test_position_vacancy.py` covers tenant isolation, vacant/partial/full classification, fractional multiple membership, bitemporal visibility, unknown status, stale non-staffable Assignment, overfilled Position, duplicate visible Assignment identity, direct snapshot invariants, unrepresentable UTC cutoffs, PII-minimized canonical evidence and deterministic digest. Existing Workforce Intelligence/Foundation/SAST/Security/Recovery gates must pass on one unchanged exact head.
 
 ## Reference
 

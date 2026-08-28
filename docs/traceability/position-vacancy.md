@@ -10,7 +10,7 @@
 
 | Requirement | Production boundary | Regression evidence |
 |---|---|---|
-| Preserve effective and system-recorded time | `build_position_vacancy_snapshot` | `test_future_position_and_assignment_are_not_visible`, `test_naive_knowledge_cutoff_fails_before_resolution` |
+| Preserve effective and system-recorded time | `build_position_vacancy_snapshot` | `test_future_position_and_assignment_are_not_visible`, `test_naive_knowledge_cutoff_fails_before_resolution`, `test_snapshot_rejects_unrepresentable_utc_time` |
 | Preserve tenant isolation | Position/Assignment filtering at the explicit tenant coordinate | `test_snapshot_reports_vacant_partial_full_and_excludes_other_tenant_and_closed` |
 | Reuse Position staffing integrity | `validate_assignment_position_coverage`, `validate_position_seat_capacity` | `test_assignment_to_nonstaffable_position_fails_closed`, `test_overfilled_position_fails_closed` |
 | Reject contradictory Assignment identity | visible Assignment identity guard | `test_duplicate_visible_assignment_identity_fails_closed` |
