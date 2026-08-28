@@ -14,6 +14,10 @@ const css = readFileSync(
   new URL('../apps/hr-workspace/job-grade-review-state.css', import.meta.url),
   'utf8',
 );
+const workflow = readFileSync(
+  new URL('../.github/workflows/hr-workspace-job-grade-review-state.yml', import.meta.url),
+  'utf8',
+);
 
 const expectedStates = {
   idle: ['false', 'status', false, 'default', 'Review Job grade evidence'],
@@ -133,4 +137,8 @@ test('Storybook and CSS cover workflow-specific accessibility states', () => {
   assert.match(css, /var\(--orgmetra-focus-ring\)/);
   assert.match(css, /:focus-visible/);
   assert.match(css, /\[aria-busy="true"\]/);
+});
+
+test('the dedicated contract reruns on protected develop after parent integration', () => {
+  assert.match(workflow, /branches:\n\s+- develop\n\s+- feat\/hr-workspace-protected-read-state/);
 });
