@@ -162,10 +162,11 @@ def build_position_vacancy_snapshot(
     """Build one tenant's staffable/vacant/partial/full Position snapshot.
 
     Active and open Positions are staffable. Closed, frozen, and abolished
-    Positions are excluded only when they carry no visible Assignment. Any
-    visible Assignment must still pass the existing Position-coverage and seat
-    capacity rules; a stale assignment to a non-staffable seat therefore fails
-    closed rather than making the vacancy metric look plausible.
+    Positions are excluded from the staffable set when they carry no visible
+    Assignment. Any visible Assignment on a non-staffable seat must still pass
+    the existing Position-coverage and seat-capacity rules, so a stale
+    assignment fails closed rather than making the vacancy metric look
+    plausible.
     """
     known_at = _canonical_known_at(known_at)
 
