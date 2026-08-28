@@ -131,6 +131,7 @@ test('required constants are frozen and use accepted values', () => {
   assert.equal(Object.isFrozen(MATURITY_VALUES), true);
   assert.ok(REQUIRED_FILES.length > 20);
   assert.ok(DATABASE_OBJECT_NAMES.every(isValidDatabaseObjectName));
+  assert.equal(new Set(DATABASE_OBJECT_NAMES).size, DATABASE_OBJECT_NAMES.length);
   assert.ok(DATABASE_OBJECT_NAMES.includes('people_mutation_idempotency_record'));
   assert.ok(MATURITY_VALUES.has('accepted_architecture'));
 });
@@ -391,22 +392,22 @@ test('CLI returns a structured failure report', () => {
 
 test('every migration-created table is inventoried in both object-name sets', () => {
   const createdTableNames = new Set();
-  const foundationTableNamePattern =
-    /CREATE\s+TABLE\s+([a-z_][a-z0-9_]*)\s*\(/g;
+  const createTablePattern =
+    /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)\s*\(/gi;
   const foundationSqlPath = 'database/migrations/0001_foundation_schema.sql';
   const foundationSql = readFileSync(
     new URL(`../${foundationSqlPath}`, import.meta.url),
     'utf8',
   );
   const foundationTableNames = new Set(
-    [...foundationSql.matchAll(foundationTableNamePattern)].map(
+    [...foundationSql.matchAll(createTablePattern)].map(
       (match) => match[1],
     ),
   );
   for (const requiredPath of REQUIRED_FILES) {
     if (!requiredPath.startsWith('database/migrations/')) continue;
     const sql = readFileSync(new URL(`../${requiredPath}`, import.meta.url), 'utf8');
-    for (const match of sql.matchAll(/CREATE\s+TABLE\s+([a-z_][a-z0-9_]*)\s*\(/g)) {
+    for (const match of sql.matchAll(createTablePattern)) {
       createdTableNames.add(match[1]);
     }
   }

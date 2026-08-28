@@ -141,8 +141,8 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'analysis_artifact', 'validity_study_case_record', 'policy_recommendation', 'policy_review_decision',
   'document_record', 'document_version', 'document_segment', 'image_artifact',
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
-  'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
-  'outbox_event', 'outbox_delivery_record', 'outbox_delivery_escalation_record',
+  'authorization_decision', 'audit_event', 'data_rights_request',
+  'outbox_event',
   'people_mutation_idempotency_record', 'inbox_event', 'integration_delivery'
 ]);
 
