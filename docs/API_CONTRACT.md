@@ -41,6 +41,8 @@ High-impact commands additionally require:
 
 For confirmed-hire materialization, those high-impact facts are resolved from the exact already-sealed `selection_decision` and its evidence set inside the tenant-bound transaction rather than accepted again as mutable request-body assertions.
 
+Employment creation requires `employing_organization_unit_id` and atomically records the bitemporal employing-organization relationship for active and leave Employment versions. Confirmed-hire materialization requires the employing organization and relationship record identities in its explicit command, and persists that relationship in the same transaction as the Person, Employment, conversion, and audit/outbox evidence.
+
 The server rejects a reused idempotency key when its method, resource, tenant, actor, purpose, or semantic command digest differs. People employment, position, assignment, and confirmed-hire writes persist that digest on `people_mutation_idempotency_record` in the same transaction as the authoritative HRIS fact and audit/outbox pair. A matching retry returns the first committed record identity without duplicating authoritative or audit/outbox facts. Generated record identifiers are excluded from the employment/position/assignment digest so a retried POST that allocates fresh UUIDs still replays; the confirmed-hire route requires the caller to repeat the exact confirmed identities and rejects a same-key command whose materialization identities differ.
 
 ## Example endpoints

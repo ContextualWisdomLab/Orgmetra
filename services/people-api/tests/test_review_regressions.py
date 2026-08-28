@@ -75,12 +75,14 @@ class CurrentReviewRegressionTests(unittest.TestCase):
         """Confirmed-hire retries need the same durable key boundary as other writes."""
         command = HireAcceptanceCommand(
             tenant_record_id=UUID("0198a412-8000-7000-8000-000000000001"),
+            employing_organization_unit_id=UUID("0198a412-8000-7000-8000-000000000050"),
             candidate_profile_id=UUID("0198a412-8000-7000-8000-000000000002"),
             selection_decision_id=UUID("0198a412-8000-7000-8000-000000000003"),
             person_record_id=UUID("0198a412-8000-7000-8000-000000000004"),
             person_name_record_id=UUID("0198a412-8000-7000-8000-000000000005"),
             employment_record_id=UUID("0198a412-8000-7000-8000-000000000006"),
             employment_record_version_id=UUID("0198a412-8000-7000-8000-000000000007"),
+            employment_employing_organization_record_id=UUID("0198a412-8000-7000-8000-00000000000b"),
             candidate_worker_conversion_record_id=UUID("0198a412-8000-7000-8000-000000000008"),
             audit_event_record_id=UUID("0198a412-8000-7000-8000-000000000009"),
             outbox_delivery_record_id=UUID("0198a412-8000-7000-8000-00000000000a"),
@@ -93,12 +95,14 @@ class CurrentReviewRegressionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             HireAcceptanceCommand(
                 tenant_record_id=command.tenant_record_id,
+                employing_organization_unit_id=command.employing_organization_unit_id,
                 candidate_profile_id=command.candidate_profile_id,
                 selection_decision_id=command.selection_decision_id,
                 person_record_id=command.person_record_id,
                 person_name_record_id=command.person_name_record_id,
                 employment_record_id=command.employment_record_id,
                 employment_record_version_id=command.employment_record_version_id,
+                employment_employing_organization_record_id=command.employment_employing_organization_record_id,
                 candidate_worker_conversion_record_id=command.candidate_worker_conversion_record_id,
                 audit_event_record_id=command.audit_event_record_id,
                 outbox_delivery_record_id=command.outbox_delivery_record_id,

@@ -105,6 +105,17 @@ INSERT INTO public.employment_record_version (
 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
 """.strip()
 
+_INSERT_EMPLOYMENT_EMPLOYING_ORGANIZATION_SQL = """
+INSERT INTO public.employment_employing_organization_record (
+    tenant_record_id,
+    employment_employing_organization_record_id,
+    employment_record_id,
+    employing_organization_unit_id,
+    effective_from,
+    recorded_from
+) VALUES (%s, %s, %s, %s, %s, %s)
+""".strip()
+
 _POSITION_PARENTS_SQL = """
 SELECT
     organization.organization_unit_id,
@@ -601,6 +612,18 @@ class PostgresPeopleMutationPort:
                         recorded_at,
                     ),
                 )
+                if command.employment_status_code in {"active", "leave"}:
+                    cursor.execute(
+                        _INSERT_EMPLOYMENT_EMPLOYING_ORGANIZATION_SQL,
+                        (
+                            command.tenant_record_id,
+                            command.employment_employing_organization_record_id,
+                            command.employment_record_id,
+                            command.employing_organization_unit_id,
+                            command.effective_from,
+                            recorded_at,
+                        ),
+                    )
                 _record_audit(
                     cursor,
                     command_tenant=command.tenant_record_id,

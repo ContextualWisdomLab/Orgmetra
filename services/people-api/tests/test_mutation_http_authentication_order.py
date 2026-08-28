@@ -25,6 +25,7 @@ MUTATION_IDS = [
     UUID("0198a412-8100-7000-8000-000000000031"),
     UUID("0198a412-8100-7000-8000-000000000032"),
     UUID("0198a412-8100-7000-8000-000000000033"),
+    UUID("0198a412-8100-7000-8000-000000000034"),
 ]
 
 
@@ -203,6 +204,7 @@ class PeopleMutationAuthenticationOrderTests(unittest.IsolatedAsyncioTestCase):
         )
         body = json.dumps(
             {
+                "employing_organization_unit_id": "0198a412-8100-7000-8000-000000000022",
                 "person_record_id": str(PERSON),
                 "employment_status_code": "active",
                 "employment_concurrency_code": "exclusive",
@@ -236,7 +238,7 @@ class PeopleMutationAuthenticationOrderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(record.tenant_record_id, str(TENANT))
         self.assertEqual(
             record.correlation_reference,
-            f"audit_event_record:{MUTATION_IDS[2].hex}",
+            f"audit_event_record:{MUTATION_IDS[3].hex}",
         )
         self.assertEqual(record.exception_type, "RuntimeError")
         rendered = " ".join(captured.output)

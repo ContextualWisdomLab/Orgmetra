@@ -14,6 +14,8 @@ TENANT = UUID("0198a412-8200-7000-8000-000000000001")
 PERSON = UUID("0198a412-8200-7000-8000-000000000020")
 EMPLOYMENT = UUID("0198a412-8200-7000-8000-000000000030")
 EMPLOYMENT_VERSION = UUID("0198a412-8200-7000-8000-000000000031")
+ORGANIZATION = UUID("0198a412-8200-7000-8000-000000000050")
+EMPLOYMENT_EMPLOYER = UUID("0198a412-8200-7000-8000-000000000082")
 AUDIT_EVENT = UUID("0198a412-8200-7000-8000-000000000080")
 OUTBOX = UUID("0198a412-8200-7000-8000-000000000081")
 
@@ -22,7 +24,7 @@ class SequentialIdFactory:
     """Return deterministic identifiers for one HTTP command construction."""
 
     def __init__(self) -> None:
-        self._values = iter((EMPLOYMENT, EMPLOYMENT_VERSION, AUDIT_EVENT, OUTBOX))
+        self._values = iter((EMPLOYMENT, EMPLOYMENT_VERSION, EMPLOYMENT_EMPLOYER, AUDIT_EVENT, OUTBOX))
 
     def __call__(self) -> UUID:
         """Return the next deterministic operational UUID."""
@@ -32,6 +34,7 @@ class SequentialIdFactory:
 def employment_payload(evidence_references: list[object]) -> dict[str, object]:
     """Return one otherwise-valid high-impact employment request body."""
     return {
+        "employing_organization_unit_id": str(ORGANIZATION),
         "person_record_id": str(PERSON),
         "employment_status_code": "active",
         "employment_concurrency_code": "exclusive",

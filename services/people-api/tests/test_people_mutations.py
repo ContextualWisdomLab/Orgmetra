@@ -47,9 +47,11 @@ def employment_command(**overrides: object) -> EmploymentMutationCommand:
     """Build one deterministic employment command."""
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
+        "employing_organization_unit_id": ORGANIZATION,
         "person_record_id": PERSON,
         "employment_record_id": EMPLOYMENT,
         "employment_record_version_id": EMPLOYMENT_VERSION,
+        "employment_employing_organization_record_id": UUID("0198a412-8000-7000-8000-000000000051"),
         "audit_event_record_id": AUDIT_EVENT,
         "outbox_delivery_record_id": OUTBOX,
         "employment_status_code": "active",

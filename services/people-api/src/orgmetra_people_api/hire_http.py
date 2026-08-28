@@ -52,12 +52,14 @@ _MAX_JSON_NESTING_DEPTH = 128
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 _REQUIRED_BODY_KEYS = frozenset(
     {
+        "employing_organization_unit_id",
         "candidate_profile_id",
         "selection_decision_id",
         "person_record_id",
         "person_name_record_id",
         "employment_record_id",
         "employment_record_version_id",
+        "employment_employing_organization_record_id",
         "candidate_worker_conversion_record_id",
         "audit_event_record_id",
         "outbox_delivery_record_id",
@@ -512,6 +514,9 @@ def _command_from_payload(
         effective_from = date.fromisoformat(effective_from_raw)
         return HireAcceptanceCommand(
             tenant_record_id=tenant_record_id,
+            employing_organization_unit_id=UUID(
+                _require_string_field(payload, "employing_organization_unit_id")
+            ),
             candidate_profile_id=UUID(_require_string_field(payload, "candidate_profile_id")),
             selection_decision_id=UUID(_require_string_field(payload, "selection_decision_id")),
             person_record_id=UUID(_require_string_field(payload, "person_record_id")),
@@ -519,6 +524,9 @@ def _command_from_payload(
             employment_record_id=UUID(_require_string_field(payload, "employment_record_id")),
             employment_record_version_id=UUID(
                 _require_string_field(payload, "employment_record_version_id")
+            ),
+            employment_employing_organization_record_id=UUID(
+                _require_string_field(payload, "employment_employing_organization_record_id")
             ),
             candidate_worker_conversion_record_id=UUID(
                 _require_string_field(payload, "candidate_worker_conversion_record_id")

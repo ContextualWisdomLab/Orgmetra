@@ -32,6 +32,7 @@ ASSIGNMENT = UUID("0198a412-8100-7000-8000-000000000070")
 IDS = [
     EMPLOYMENT,
     UUID("0198a412-8100-7000-8000-000000000031"),
+    UUID("0198a412-8100-7000-8000-000000000086"),
     UUID("0198a412-8100-7000-8000-000000000080"),
     UUID("0198a412-8100-7000-8000-000000000081"),
     POSITION,
@@ -103,6 +104,7 @@ class RecordingMutationPort:
 def employment_body(**overrides: object) -> bytes:
     """Return one canonical employment command body."""
     payload: dict[str, object] = {
+        "employing_organization_unit_id": str(ORGANIZATION),
         "person_record_id": str(PERSON),
         "employment_status_code": "active",
         "employment_concurrency_code": "exclusive",

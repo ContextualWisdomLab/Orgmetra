@@ -52,12 +52,14 @@ class HireAcceptanceCommand:
     """
 
     tenant_record_id: UUID
+    employing_organization_unit_id: UUID
     candidate_profile_id: UUID
     selection_decision_id: UUID
     person_record_id: UUID
     person_name_record_id: UUID
     employment_record_id: UUID
     employment_record_version_id: UUID
+    employment_employing_organization_record_id: UUID
     candidate_worker_conversion_record_id: UUID
     audit_event_record_id: UUID
     outbox_delivery_record_id: UUID
@@ -70,12 +72,14 @@ class HireAcceptanceCommand:
         """Fail closed before authorization or persistence on malformed input."""
         for field_name in (
             "tenant_record_id",
+            "employing_organization_unit_id",
             "candidate_profile_id",
             "selection_decision_id",
             "person_record_id",
             "person_name_record_id",
             "employment_record_id",
             "employment_record_version_id",
+            "employment_employing_organization_record_id",
             "candidate_worker_conversion_record_id",
             "audit_event_record_id",
             "outbox_delivery_record_id",

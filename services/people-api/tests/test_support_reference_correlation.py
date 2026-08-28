@@ -22,6 +22,7 @@ PERSON = UUID("0198a412-9900-7000-8000-000000000020")
 CANDIDATE = UUID("0198a412-9900-7000-8000-000000000010")
 DECISION = UUID("0198a412-9900-7000-8000-000000000011")
 EMPLOYMENT = UUID("0198a412-9900-7000-8000-000000000030")
+ORGANIZATION = UUID("0198a412-9900-7000-8000-000000000040")
 AUDIT_EVENT = UUID("0198a412-9900-7000-8000-000000000050")
 
 
@@ -78,6 +79,7 @@ class SequentialIdFactory:
             (
                 EMPLOYMENT,
                 UUID("0198a412-9900-7000-8000-000000000031"),
+                UUID("0198a412-9900-7000-8000-000000000032"),
                 AUDIT_EVENT,
                 UUID("0198a412-9900-7000-8000-000000000051"),
             )
@@ -188,12 +190,14 @@ class SupportReferenceCorrelationTests(unittest.IsolatedAsyncioTestCase):
             mutation_port=FailingHirePort(),
         )
         payload = {
+            "employing_organization_unit_id": str(ORGANIZATION),
             "candidate_profile_id": str(CANDIDATE),
             "selection_decision_id": str(DECISION),
             "person_record_id": str(PERSON),
             "person_name_record_id": "0198a412-9900-7000-8000-000000000021",
             "employment_record_id": str(EMPLOYMENT),
             "employment_record_version_id": "0198a412-9900-7000-8000-000000000031",
+            "employment_employing_organization_record_id": "0198a412-9900-7000-8000-000000000032",
             "candidate_worker_conversion_record_id": "0198a412-9900-7000-8000-000000000040",
             "audit_event_record_id": str(AUDIT_EVENT),
             "outbox_delivery_record_id": "0198a412-9900-7000-8000-000000000051",
@@ -232,6 +236,7 @@ class SupportReferenceCorrelationTests(unittest.IsolatedAsyncioTestCase):
             id_factory=SequentialIdFactory(),
         )
         payload = {
+            "employing_organization_unit_id": str(ORGANIZATION),
             "person_record_id": str(PERSON),
             "employment_status_code": "active",
             "employment_concurrency_code": "exclusive",

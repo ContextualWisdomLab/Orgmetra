@@ -23,6 +23,8 @@ PERSON = UUID("0198a412-7200-7000-8000-000000000020")
 PERSON_NAME = UUID("0198a412-7200-7000-8000-000000000021")
 EMPLOYMENT = UUID("0198a412-7200-7000-8000-000000000030")
 EMPLOYMENT_VERSION = UUID("0198a412-7200-7000-8000-000000000031")
+ORGANIZATION = UUID("0198a412-7200-7000-8000-000000000070")
+EMPLOYMENT_EMPLOYER = UUID("0198a412-7200-7000-8000-000000000071")
 CONVERSION = UUID("0198a412-7200-7000-8000-000000000040")
 AUDIT_EVENT = UUID("0198a412-7200-7000-8000-000000000050")
 OUTBOX_DELIVERY = UUID("0198a412-7200-7000-8000-000000000051")
@@ -34,12 +36,14 @@ IDEMPOTENCY_KEY = b"hire-idempotency-key-17"
 def request_body(**overrides: object) -> bytes:
     """Return one canonical UTF-8 JSON hire request body."""
     payload: dict[str, object] = {
+        "employing_organization_unit_id": str(ORGANIZATION),
         "candidate_profile_id": str(CANDIDATE),
         "selection_decision_id": str(DECISION),
         "person_record_id": str(PERSON),
         "person_name_record_id": str(PERSON_NAME),
         "employment_record_id": str(EMPLOYMENT),
         "employment_record_version_id": str(EMPLOYMENT_VERSION),
+        "employment_employing_organization_record_id": str(EMPLOYMENT_EMPLOYER),
         "candidate_worker_conversion_record_id": str(CONVERSION),
         "audit_event_record_id": str(AUDIT_EVENT),
         "outbox_delivery_record_id": str(OUTBOX_DELIVERY),

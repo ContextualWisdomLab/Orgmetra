@@ -49,6 +49,7 @@ _PURPOSE_CODE_PATTERN = re.compile(r"\A[a-z][a-z0-9_]{2,63}\Z", flags=re.ASCII)
 _MAX_UUID_INT = (1 << 128) - 1
 _EMPLOYMENT_BODY_KEYS = frozenset(
     {
+        "employing_organization_unit_id",
         "person_record_id",
         "employment_status_code",
         "employment_concurrency_code",
@@ -544,9 +545,13 @@ def _command_for_route(
             raise _InvalidHttpRequest("employment command fields are incomplete or unsupported")
         return EmploymentMutationCommand(
             tenant_record_id=tenant_record_id,
+            employing_organization_unit_id=UUID(
+                _require_string_field(payload, "employing_organization_unit_id")
+            ),
             person_record_id=UUID(_require_string_field(payload, "person_record_id")),
             employment_record_id=id_factory(),
             employment_record_version_id=id_factory(),
+            employment_employing_organization_record_id=id_factory(),
             audit_event_record_id=id_factory(),
             outbox_delivery_record_id=id_factory(),
             employment_status_code=_require_string_field(payload, "employment_status_code"),

@@ -22,6 +22,8 @@ PERSON = UUID("0198a412-7000-7000-8000-000000000020")
 PERSON_NAME = UUID("0198a412-7000-7000-8000-000000000021")
 EMPLOYMENT = UUID("0198a412-7000-7000-8000-000000000030")
 EMPLOYMENT_VERSION = UUID("0198a412-7000-7000-8000-000000000031")
+ORGANIZATION = UUID("0198a412-7000-7000-8000-000000000070")
+EMPLOYMENT_EMPLOYER = UUID("0198a412-7000-7000-8000-000000000071")
 CONVERSION = UUID("0198a412-7000-7000-8000-000000000040")
 AUDIT_EVENT = UUID("0198a412-7000-7000-8000-000000000050")
 OUTBOX_DELIVERY = UUID("0198a412-7000-7000-8000-000000000051")
@@ -33,12 +35,14 @@ def command(**overrides: object) -> HireAcceptanceCommand:
     """Build one deterministic accepted-hire command for tests."""
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
+        "employing_organization_unit_id": ORGANIZATION,
         "candidate_profile_id": CANDIDATE,
         "selection_decision_id": DECISION,
         "person_record_id": PERSON,
         "person_name_record_id": PERSON_NAME,
         "employment_record_id": EMPLOYMENT,
         "employment_record_version_id": EMPLOYMENT_VERSION,
+        "employment_employing_organization_record_id": EMPLOYMENT_EMPLOYER,
         "candidate_worker_conversion_record_id": CONVERSION,
         "audit_event_record_id": AUDIT_EVENT,
         "outbox_delivery_record_id": OUTBOX_DELIVERY,
