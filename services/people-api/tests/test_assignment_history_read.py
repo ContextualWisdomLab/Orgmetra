@@ -128,12 +128,38 @@ class AssignmentHistoryReadTests(unittest.TestCase):
 
         self.assertEqual(view.resource_reference, f"person_assignment_history:{PERSON.hex}")
         self.assertEqual(port.calls, [(TENANT, PERSON, KNOWN_AT)])
-        self.assertEqual(tuple(entry.assignment_record_id for entry in view.entries), (str(ASSIGNMENT_A), str(ASSIGNMENT_B)))
-        self.assertEqual(view.entries[0].field_values[3], ("effective_from", "2026-01-01"))
-        self.assertEqual(view.entries[0].field_values[4], ("effective_to", "2026-07-01"))
-        self.assertIn(("allocation_ratio", "1.0000"), view.entries[0].field_values)
-        self.assertIn(("effective_to", None), view.entries[1].field_values)
-        self.assertIn(("recorded_to", None), view.entries[1].field_values)
+        rows = tuple(dict(entry.field_values) for entry in view.entries)
+        self.assertEqual(tuple(row["assignment_record_id"] for row in rows), (str(ASSIGNMENT_A), str(ASSIGNMENT_B)))
+        self.assertEqual(rows[0]["effective_from"], "2026-01-01")
+        self.assertEqual(rows[0]["effective_to"], "2026-07-01")
+        self.assertEqual(rows[0]["allocation_ratio"], "1.0000")
+        self.assertIsNone(rows[1]["effective_to"])
+        self.assertIsNone(rows[1]["recorded_to"])
+
+    def test_field_minimization_never_leaks_assignment_identity(self) -> None:
+        port = FakeAssignmentHistoryPort((assignment_record(),))
+        limited_policy = PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="minimal-v1",
+            resource_kind="person_assignment_history",
+            purpose_code="employee_profile_review",
+            operation_code="read_record",
+            required_scope_code="orgmetra.people.assignment_history.read",
+            permitted_fields=frozenset({"effective_from"}),
+        )
+
+        view = read_assignment_history(
+            principal=self.principal,
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            known_at=KNOWN_AT,
+            purpose_code="employee_profile_review",
+            requested_fields=frozenset({"effective_from"}),
+            policy=limited_policy,
+            read_port=port,
+        )
+
+        self.assertEqual(view.entries[0].field_values, (("effective_from", "2026-01-01"),))
 
     def test_denied_field_never_reaches_assignment_repository(self) -> None:
         port = FakeAssignmentHistoryPort((assignment_record(),))
