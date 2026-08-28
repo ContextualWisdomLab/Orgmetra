@@ -105,6 +105,16 @@ test('denial, stale evidence, authoritative-scope conflict, and failure explain 
 
 test('unsupported runtime input fails closed before rendering', () => {
   assert.throws(() => workCapacityReviewViewModel('approved'), /unsupported work-capacity review state/);
+  for (const inheritedState of ['constructor', 'toString', '__proto__']) {
+    assert.throws(
+      () => workCapacityReviewViewModel(inheritedState),
+      /unsupported work-capacity review state/,
+    );
+    assert.throws(
+      () => workCapacityReviewStateMarkup(inheritedState),
+      /unsupported work-capacity review state/,
+    );
+  }
   assert.throws(() => workCapacityReviewViewModel(new String('review')), /exact built-in string/);
   assert.throws(() => workCapacityReviewStateMarkup(Symbol('recorded')), /exact built-in string/);
 });
