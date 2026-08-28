@@ -55,9 +55,10 @@ function requireExactState(value) {
   if (typeof value !== 'string') {
     throw new TypeError('protected read state must be an exact built-in string');
   }
-  const model = STATE_MODELS[value];
-  if (!model) throw new TypeError(`unsupported protected read state: ${value}`);
-  return model;
+  if (!Object.hasOwn(STATE_MODELS, value)) {
+    throw new TypeError(`unsupported protected read state: ${value}`);
+  }
+  return STATE_MODELS[value];
 }
 
 /**
