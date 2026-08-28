@@ -28,6 +28,7 @@ from orgmetra_hris_kernel import (
 )
 from orgmetra_keyverse_adapter import AuthorizationDecision
 
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.mutations import (
     AssignmentMutationCommand,
     AssignmentMutationResult,
@@ -331,8 +332,9 @@ def _require_authorization(
     resource_reference: str,
     resource_kind: str,
     requested_fields: frozenset[str],
+    required_target_scope_code: str | None = None,
 ) -> AuthorizationDecision:
-    """Require an exact allow decision for the intended mutation target."""
+    """Require an exact allow decision for the intended mutation and governed target."""
     if not isinstance(authorization, AuthorizationDecision):
         raise PeopleMutationIntegrityError("people mutation requires a typed authorization decision")
     if (
@@ -343,6 +345,7 @@ def _require_authorization(
         or authorization.operation_code != "create_record"
         or authorization.requested_fields != requested_fields
         or authorization.authorized_fields != requested_fields
+        or authorization.required_target_scope_code != required_target_scope_code
     ):
         raise PeopleMutationIntegrityError("people mutation authorization does not match the exact record")
     return authorization
@@ -553,6 +556,7 @@ class PostgresPeopleMutationPort:
             resource_reference=f"employment_record:{command.employment_record_id.hex}",
             resource_kind="employment_record",
             requested_fields=_EMPLOYMENT_FIELDS,
+            required_target_scope_code=organization_unit_scope_code(command.employing_organization_unit_id),
         )
         with self.connection_factory() as connection:
             with connection.cursor() as cursor:
