@@ -3,6 +3,7 @@ name: HR Workspace Performance Goal Review State Quality
 on:
   pull_request:
     branches:
+      - develop
       - feat/hr-workspace-protected-read-state
     paths:
       - "apps/hr-workspace/performance-goal-review-state.js"

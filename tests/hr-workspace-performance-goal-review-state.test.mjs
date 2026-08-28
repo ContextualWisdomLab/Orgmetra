@@ -14,6 +14,10 @@ const css = readFileSync(
   new URL('../apps/hr-workspace/performance-goal-review-state.css', import.meta.url),
   'utf8',
 );
+const workflow = readFileSync(
+  new URL('../.github/workflows/hr-workspace-performance-goal-review-state.yml', import.meta.url),
+  'utf8',
+);
 
 const expectedStates = {
   idle: ['false', 'status', false, 'default', 'Review performance-goal plan evidence'],
@@ -121,4 +125,8 @@ test('Storybook and CSS cover governed performance-goal review accessibility sta
   assert.match(css, /high-risk-confirmation/);
   assert.match(css, /read-only/);
   assert.match(css, /min-height:\s*44px/);
+});
+
+test('the dedicated contract reruns on protected develop after parent integration', () => {
+  assert.match(workflow, /branches:\n\s+- develop\n\s+- feat\/hr-workspace-protected-read-state/);
 });
