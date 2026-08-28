@@ -5,7 +5,6 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from datetime import date, datetime, timedelta, timezone, tzinfo
 from decimal import Decimal
-from typing import Any
 from uuid import UUID
 
 import pytest
@@ -168,6 +167,7 @@ def test_empty_database_result_returns_immutable_empty_tuple() -> None:
 @pytest.mark.parametrize(
     ("tenant_record_id", "person_record_id", "known_at", "message"),
     [
+        ("not-a-uuid", PERSON_ID, KNOWN_AT, "tenant_record_id must be an operational UUID"),
         (UUID(int=0), PERSON_ID, KNOWN_AT, "tenant_record_id must be an operational UUID"),
         (TENANT_ID, UUID(int=(1 << 128) - 1), KNOWN_AT, "person_record_id must be an operational UUID"),
         (TENANT_ID, PERSON_ID, "2026-08-29", "known_at must be a timezone-aware UTC datetime"),
@@ -205,11 +205,11 @@ def test_invalid_request_identity_or_time_fails_before_database_access(
     assert factory.calls == 0
 
 
-def test_rejects_non_list_fetchall_result() -> None:
+def test_rejects_non_default_fetchall_collection() -> None:
     factory = ConnectionFactory((assignment_row(),))
     port = PostgresAssignmentHistoryReadPort(factory)
 
-    with pytest.raises(AssignmentHistoryIntegrityError, match="immutable row list"):
+    with pytest.raises(AssignmentHistoryIntegrityError, match="default list row collection"):
         port.read_assignment_history(
             tenant_record_id=TENANT_ID,
             person_record_id=PERSON_ID,
