@@ -101,6 +101,16 @@ test('denial, stale evidence, blocked scope, and failure explain the next safe a
 
 test('unsupported runtime input fails closed before rendering', () => {
   assert.throws(() => qualificationRuleReviewViewModel('approved'), /unsupported qualification-rule review state/);
+  for (const inheritedState of ['constructor', 'toString', '__proto__']) {
+    assert.throws(
+      () => qualificationRuleReviewViewModel(inheritedState),
+      /unsupported qualification-rule review state/,
+    );
+    assert.throws(
+      () => qualificationRuleReviewStateMarkup(inheritedState),
+      /unsupported qualification-rule review state/,
+    );
+  }
   assert.throws(() => qualificationRuleReviewViewModel(new String('review')), /exact built-in string/);
   assert.throws(() => qualificationRuleReviewStateMarkup(Symbol('recorded')), /exact built-in string/);
 });
