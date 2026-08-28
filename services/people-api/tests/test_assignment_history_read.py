@@ -31,7 +31,7 @@ RECORDED_FROM = datetime(2026, 8, 20, 0, 0, tzinfo=timezone.utc)
 class FakeAssignmentHistoryPort:
     """Capture read calls so tests can prove authorization-before-retrieval ordering."""
 
-    def __init__(self, records: tuple[AssignmentHistoryRecord, ...]) -> None:
+    def __init__(self, records: object) -> None:
         self.records = records
         self.calls: list[tuple[UUID, UUID, datetime]] = []
 
@@ -41,8 +41,8 @@ class FakeAssignmentHistoryPort:
         tenant_record_id: UUID,
         person_record_id: UUID,
         known_at: datetime,
-    ) -> tuple[AssignmentHistoryRecord, ...]:
-        """Return configured records after recording the exact bitemporal scope."""
+    ) -> object:
+        """Return configured persistence output after recording the exact read scope."""
         self.calls.append((tenant_record_id, person_record_id, known_at))
         return self.records
 
@@ -112,7 +112,7 @@ class AssignmentHistoryReadTests(unittest.TestCase):
             effective_to=None,
             allocation_ratio=Decimal("0.5000"),
         )
-        earlier = assignment_record()
+        earlier = assignment_record(recorded_to=KNOWN_AT.replace(day=30))
         port = FakeAssignmentHistoryPort((later, earlier))
 
         view = read_assignment_history(
@@ -133,6 +133,7 @@ class AssignmentHistoryReadTests(unittest.TestCase):
         self.assertEqual(rows[0]["effective_from"], "2026-01-01")
         self.assertEqual(rows[0]["effective_to"], "2026-07-01")
         self.assertEqual(rows[0]["allocation_ratio"], "1.0000")
+        self.assertEqual(rows[0]["recorded_to"], "2026-08-30T03:00:00Z")
         self.assertIsNone(rows[1]["effective_to"])
         self.assertIsNone(rows[1]["recorded_to"])
 
@@ -209,6 +210,23 @@ class AssignmentHistoryReadTests(unittest.TestCase):
                         read_port=FakeAssignmentHistoryPort((record,)),
                     )
 
+    def test_repository_container_or_row_type_drift_fails_closed(self) -> None:
+        for records, message in (
+            ([assignment_record()], "immutable tuple"),
+            ((object(),), "unsupported row type"),
+        ):
+            with self.subTest(records=records), self.assertRaisesRegex(AssignmentHistoryIntegrityError, message):
+                read_assignment_history(
+                    principal=self.principal,
+                    tenant_record_id=TENANT,
+                    person_record_id=PERSON,
+                    known_at=KNOWN_AT,
+                    purpose_code="employee_profile_review",
+                    requested_fields=frozenset({"effective_from"}),
+                    policy=self.policy,
+                    read_port=FakeAssignmentHistoryPort(records),
+                )
+
     def test_duplicate_visible_assignment_identity_fails_closed(self) -> None:
         duplicate = assignment_record(effective_from=date(2026, 2, 1), effective_to=None)
         with self.assertRaisesRegex(AssignmentHistoryIntegrityError, "duplicate visible assignment"):
@@ -274,8 +292,11 @@ class AssignmentHistoryReadTests(unittest.TestCase):
             {"allocation_ratio": Decimal("NaN")},
             {"allocation_ratio": Decimal("1.00000")},
             {"allocation_ratio": Decimal("0.0000")},
+            {"allocation_ratio": Decimal("1.0001")},
+            {"effective_from": datetime(2026, 1, 1, tzinfo=timezone.utc)},
             {"effective_to": date(2026, 1, 1)},
             {"recorded_from": datetime(2026, 8, 20, 0, 0)},
+            {"recorded_to": datetime(2026, 8, 21, 0, 0)},
             {"recorded_to": RECORDED_FROM},
         )
         for override in invalid_overrides:
