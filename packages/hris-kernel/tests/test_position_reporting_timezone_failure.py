@@ -1,6 +1,6 @@
 """Failure-path coverage for position-reporting system-time normalization."""
 
-from datetime import date, datetime, tzinfo
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from uuid import UUID
 
 import pytest
@@ -36,4 +36,16 @@ def test_timezone_exception_is_normalized_to_governed_error() -> None:
             tenant_record_id=UUID("018f0d35-7b1a-7cc2-8d9c-111111111111"),
             effective_on=date(2026, 8, 23),
             known_at=datetime(2026, 8, 23, 3, 30, tzinfo=ExplodingTimezone()),
+        )
+
+
+def test_timezone_normalization_overflow_is_normalized_to_governed_error() -> None:
+    """An unrepresentable UTC conversion cannot escape as a raw arithmetic error."""
+    with pytest.raises(PositionReportingHierarchyError, match="outside the supported datetime range"):
+        build_position_reporting_snapshot(
+            [],
+            [],
+            tenant_record_id=UUID("018f0d35-7b1a-7cc2-8d9c-111111111111"),
+            effective_on=date(2026, 8, 23),
+            known_at=datetime.min.replace(tzinfo=timezone(timedelta(hours=23, minutes=59))),
         )

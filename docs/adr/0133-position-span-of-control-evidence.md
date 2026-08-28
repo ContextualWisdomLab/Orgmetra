@@ -18,7 +18,7 @@ The boundary:
 
 1. counts direct-report Position seats, never workers;
 2. preserves the parent's explicit `tenant_record_id`, business `effective_on`, and UTC system `known_at` coordinate;
-3. revalidates the parent runtime type, opaque identities, immutable edge shape, one manager per subordinate, self-edge rejection, and cycle rejection so direct dataclass construction cannot forge downstream evidence;
+3. revalidates the parent runtime type, opaque identities, immutable edge shape, unique visible relationship identities, one manager per subordinate, self-edge rejection, and cycle rejection so direct dataclass construction cannot forge downstream evidence;
 4. emits manager Position UUID plus positive direct-report Position count in deterministic UUID order;
 5. binds canonical JSON with SHA-256 for audit correlation while excluding Person, Employment and Assignment identifiers;
 6. labels the result `structural_workforce_evidence` and `not_authorized_for_employment_decision`; and
