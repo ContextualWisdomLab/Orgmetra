@@ -1,7 +1,7 @@
 # ADR-0023: Governed TEPP analysis-request boundary
 
-**Status:** Proposed on active PR  
-**Decision owner:** Orgmetra  
+**Status:** Proposed on active PR
+**Decision owner:** Orgmetra
 **Foreign owner:** TEPP (read-only dependency)
 
 ## Context
