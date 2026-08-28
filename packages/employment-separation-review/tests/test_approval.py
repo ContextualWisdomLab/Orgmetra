@@ -97,16 +97,21 @@ class WrongResultAuthority:
 
 
 class MutatingAuthority:
-    """Rewrite the otherwise frozen parent packet while returning self-consistent evidence."""
+    """Rewrite the otherwise frozen parent packet while returning pre-mutation scope evidence."""
 
     def verify_approval(self, *, packet, approving_actor_reference, approved_at):
+        review_digest = packet.sha256_digest()
+        tenant_record_id = packet.tenant_record_id
+        separation_review_reference = packet.separation_review_reference
+        person_record_reference = packet.person_record_reference
+        employment_record_reference = packet.employment_record_reference
         object.__setattr__(packet, "reason_code", "retirement_transition")
         return EmploymentSeparationApprovalVerification(
-            tenant_record_id=packet.tenant_record_id,
-            separation_review_reference=packet.separation_review_reference,
-            review_digest=packet.sha256_digest(),
-            person_record_reference=packet.person_record_reference,
-            employment_record_reference=packet.employment_record_reference,
+            tenant_record_id=tenant_record_id,
+            separation_review_reference=separation_review_reference,
+            review_digest=review_digest,
+            person_record_reference=person_record_reference,
+            employment_record_reference=employment_record_reference,
             approving_actor_reference=approving_actor_reference,
             approved_at=approved_at,
             authority_evidence_reference=AUTHORITY_REFERENCE,
