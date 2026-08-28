@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date
 
 from orgmetra_performance_review import build_performance_review_packet
 
@@ -24,7 +24,6 @@ def test_repr_redacts_worker_rating_scope_and_evidence() -> None:
         reason_code="scheduled_cycle_review",
         review_period_start=date(2026, 1, 1),
         review_period_end=date(2026, 6, 30),
-        generated_at=datetime(2026, 8, 19, 5, 15, 30, tzinfo=timezone.utc),
     )
 
     rendered = repr(packet)
