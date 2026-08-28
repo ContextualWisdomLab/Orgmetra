@@ -196,7 +196,7 @@ def test_every_reference_and_digest_is_validated() -> None:
 
     for field_name, prefix in reference_fields.items():
         with pytest.raises(ValueError, match=re.escape(f"opaque {prefix}: reference")):
-            replace(packet, **{field_name: f"wrong:11111111-1111-4111-8111-111111111111"})
+            replace(packet, **{field_name: "wrong:11111111-1111-4111-8111-111111111111"})
     for field_name in digest_fields:
         with pytest.raises(ValueError, match="lowercase SHA-256"):
             replace(packet, **{field_name: "z" * 64})
