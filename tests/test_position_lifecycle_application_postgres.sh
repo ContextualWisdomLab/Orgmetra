@@ -198,4 +198,31 @@ SQL
 )"
 test "$force_rls" = "position_lifecycle_application_record:true,position_record_version:true"
 
+search_path_contract="$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 <<'SQL'
+SELECT count(*)
+FROM pg_catalog.pg_proc AS procedure_record
+WHERE procedure_record.oid IN (
+    'public.validate_position_lifecycle_review_evidence(text,text,uuid,uuid,text,text,date)'::regprocedure,
+    'public.protect_position_lifecycle_application_history()'::regprocedure,
+    'public.protect_position_version_history_after_lifecycle_support()'::regprocedure,
+    'public.validate_position_lifecycle_application_audit()'::regprocedure,
+    'public.validate_position_lifecycle_application_successor()'::regprocedure,
+    'public.reject_position_lifecycle_history_truncate()'::regprocedure,
+    'public.apply_position_lifecycle_change(uuid,uuid,uuid,uuid,uuid,text,text,text,uuid,uuid)'::regprocedure
+)
+AND procedure_record.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[];
+SQL
+)"
+test "$search_path_contract" = "7"
+
+if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'TRUNCATE public.position_lifecycle_application_record' >/dev/null 2>&1; then
+  echo "position lifecycle application evidence was truncated" >&2
+  exit 1
+fi
+
+if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'TRUNCATE public.position_record_version' >/dev/null 2>&1; then
+  echo "position version history was truncated" >&2
+  exit 1
+fi
+
 echo "position lifecycle application persistence: PASS"

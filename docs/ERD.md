@@ -18,6 +18,8 @@ erDiagram
     job_profile ||--o{ job_profile_version : has_versions
     job_profile ||--o{ position_record : defines
     position_record ||--o{ position_record_version : has_versions
+    position_record ||--o{ position_lifecycle_application_record : changes_through
+    position_record_version ||--o{ position_lifecycle_application_record : predecessor_or_successor
     employment_record ||--o{ assignment_record : covers
     person_record ||--o{ assignment_record : receives
     position_record ||--o{ assignment_record : assigned_through
@@ -62,6 +64,8 @@ A `validity_study` connects the criterion blueprint to the exact selection decis
 One immutable `audit_event_record` may have multiple `outbox_delivery_record` rows when the same event must reach multiple delivery targets. The unique `(tenant_record_id, audit_event_record_id, delivery_target_code)` key permits at most one delivery lifecycle per target. Delivery retries mutate only the delivery relation; the canonical event bytes and digest are append-only and therefore cannot drift with transport state.
 
 A `people_mutation_idempotency_record` belongs to one tenant and names one created employment, position, or assignment identity for one route and `Idempotency-Key`. The unique `(tenant_record_id, command_route, idempotency_key)` key prevents a retry from creating a second authoritative fact. Tenants do not share keys.
+
+One `position_lifecycle_application_record` binds a human-reviewed lifecycle proposal to the exact tenant-qualified predecessor and successor `position_record_version` rows, immutable review bytes/digest, and one audit/outbox pair. The application record is append-only; the lifecycle function closes the predecessor system-time interval and inserts the successor rather than rewriting Position history.
 
 A delivery can have at most one `outbox_delivery_escalation_record`, enforced by the unique `(tenant_record_id, outbox_delivery_record_id)` key. The escalation row exists only for a terminal `dead_lettered` delivery and records the failure classification, terminal attempt count, recorded time, and an opaque operator/customer escalation reference without copying the event payload. The row is append-only; terminal queue history is not reopened or rewritten.
 

@@ -16,3 +16,4 @@
 | [0012](0012-governed-migration-handoff.md) | Governed migration handoff | Accepted on active implementation branch |
 | [0013](0013-governed-requisition-review-packet.md) | Governed requisition review packet | Accepted on active implementation branch |
 | [0014](0014-job-analysis-snapshot-persistence.md) | Persist governed job-analysis snapshots | Accepted on active implementation branch |
+| [0112](0112-position-lifecycle-application.md) | Apply reviewed Position lifecycle changes as bitemporal truth | Proposed |

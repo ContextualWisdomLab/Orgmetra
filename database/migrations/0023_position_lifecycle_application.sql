@@ -3,12 +3,19 @@
 -- candidate, compensation, assessment, rating, and free-form HR values are not
 -- copied into this relation.
 
+BEGIN;
+
+SET LOCAL search_path = public, pg_catalog;
+
+ALTER TABLE public.position_record_version
+    ADD CONSTRAINT position_version_lifecycle_scope_unique
+    UNIQUE (tenant_record_id, position_record_id, position_record_version_id);
+
 CREATE TABLE position_lifecycle_application_record (
-    tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
+    tenant_record_id uuid NOT NULL REFERENCES public.tenant_record(tenant_record_id),
     position_lifecycle_application_record_id uuid PRIMARY KEY,
     position_record_id uuid NOT NULL,
-    predecessor_position_record_version_id uuid NOT NULL
-        REFERENCES position_record_version(position_record_version_id),
+    predecessor_position_record_version_id uuid NOT NULL,
     successor_position_record_version_id uuid NOT NULL,
     position_lifecycle_change_reference uuid NOT NULL,
     canonical_review_json text NOT NULL,
@@ -38,13 +45,27 @@ CREATE TABLE position_lifecycle_application_record (
         ),
     CONSTRAINT position_lifecycle_position_tenant_fk
         FOREIGN KEY (tenant_record_id, position_record_id)
-        REFERENCES position_record(tenant_record_id, position_record_id),
+        REFERENCES public.position_record(tenant_record_id, position_record_id),
+    CONSTRAINT position_lifecycle_predecessor_scope_fk
+        FOREIGN KEY (tenant_record_id, position_record_id, predecessor_position_record_version_id)
+        REFERENCES public.position_record_version(
+            tenant_record_id,
+            position_record_id,
+            position_record_version_id
+        ),
+    CONSTRAINT position_lifecycle_successor_scope_fk
+        FOREIGN KEY (tenant_record_id, position_record_id, successor_position_record_version_id)
+        REFERENCES public.position_record_version(
+            tenant_record_id,
+            position_record_id,
+            position_record_version_id
+        ) DEFERRABLE INITIALLY DEFERRED,
     CONSTRAINT position_lifecycle_audit_tenant_fk
         FOREIGN KEY (tenant_record_id, audit_event_record_id)
-        REFERENCES audit_event_record(tenant_record_id, audit_event_record_id),
+        REFERENCES public.audit_event_record(tenant_record_id, audit_event_record_id),
     CONSTRAINT position_lifecycle_outbox_tenant_fk
         FOREIGN KEY (tenant_record_id, outbox_delivery_record_id)
-        REFERENCES outbox_delivery_record(tenant_record_id, outbox_delivery_record_id),
+        REFERENCES public.outbox_delivery_record(tenant_record_id, outbox_delivery_record_id),
     CONSTRAINT position_lifecycle_review_digest_check
         CHECK (review_evidence_digest_sha256 ~ '^[0-9a-f]{64}$'),
     CONSTRAINT position_lifecycle_requester_actor_check
@@ -94,18 +115,18 @@ CREATE TABLE position_lifecycle_application_record (
 COMMENT ON TABLE position_lifecycle_application_record IS
     'Immutable application evidence linking one reviewed Position lifecycle proposal to one authoritative successor PositionVersion and atomic audit/outbox evidence.';
 
-ALTER TABLE position_record_version
+ALTER TABLE public.position_record_version
     ADD COLUMN position_lifecycle_application_record_id uuid;
 
-ALTER TABLE position_record_version
+ALTER TABLE public.position_record_version
     ADD CONSTRAINT position_version_lifecycle_application_tenant_fk
     FOREIGN KEY (tenant_record_id, position_lifecycle_application_record_id)
-    REFERENCES position_lifecycle_application_record(
+    REFERENCES public.position_lifecycle_application_record(
         tenant_record_id,
         position_lifecycle_application_record_id
     );
 
-CREATE FUNCTION validate_position_lifecycle_review_evidence(
+CREATE FUNCTION public.validate_position_lifecycle_review_evidence(
     p_canonical_review_json text,
     p_review_digest text,
     p_tenant_record_id uuid,
@@ -118,6 +139,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 STABLE
 STRICT
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     review_json json;
@@ -229,12 +251,13 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION validate_position_lifecycle_review_evidence(text, text, uuid, uuid, text, text, date) IS
+COMMENT ON FUNCTION public.validate_position_lifecycle_review_evidence(text, text, uuid, uuid, text, text, date) IS
     'Validates exact v1 Position lifecycle review shape, digest, tenant/Position/status/effective scope, human approval state, and chronology without granting mutation authority.';
 
-CREATE FUNCTION protect_position_lifecycle_application_history()
+CREATE FUNCTION public.protect_position_lifecycle_application_history()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'position lifecycle application evidence is append-only'
@@ -243,13 +266,14 @@ END;
 $$;
 
 CREATE TRIGGER position_lifecycle_application_append_only_guard
-BEFORE UPDATE OR DELETE ON position_lifecycle_application_record
+BEFORE UPDATE OR DELETE ON public.position_lifecycle_application_record
 FOR EACH ROW
-EXECUTE FUNCTION protect_position_lifecycle_application_history();
+EXECUTE FUNCTION public.protect_position_lifecycle_application_history();
 
-CREATE FUNCTION protect_position_version_history_after_lifecycle_support()
+CREATE FUNCTION public.protect_position_version_history_after_lifecycle_support()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -267,20 +291,22 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION protect_position_version_history_after_lifecycle_support() IS
+COMMENT ON FUNCTION public.protect_position_version_history_after_lifecycle_support() IS
     'Prevents delete/in-place rewrite of PositionVersion facts; an open system-recorded interval may only be closed at PostgreSQL transaction time.';
 
 CREATE TRIGGER position_version_lifecycle_history_guard
-BEFORE UPDATE OR DELETE ON position_record_version
+BEFORE UPDATE OR DELETE ON public.position_record_version
 FOR EACH ROW
-EXECUTE FUNCTION protect_position_version_history_after_lifecycle_support();
+EXECUTE FUNCTION public.protect_position_version_history_after_lifecycle_support();
 
-CREATE FUNCTION validate_position_lifecycle_application_audit()
+CREATE FUNCTION public.validate_position_lifecycle_application_audit()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     audit_payload jsonb;
+    review_payload jsonb;
     outbox_audit_id uuid;
 BEGIN
     IF NEW.recorded_at IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
@@ -300,9 +326,49 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    review_payload := NEW.canonical_review_json::jsonb;
+    IF NEW.position_lifecycle_change_reference IS DISTINCT FROM
+           (review_payload ->> 'position_lifecycle_change_reference')::uuid
+       OR NEW.requester_actor_reference IS DISTINCT FROM
+           review_payload ->> 'requester_actor_reference'
+       OR NEW.reviewer_actor_reference IS DISTINCT FROM
+           review_payload ->> 'reviewer_actor_reference'
+       OR NEW.current_status_code IS DISTINCT FROM
+           review_payload ->> 'current_status_code'
+       OR NEW.proposed_status_code IS DISTINCT FROM
+           review_payload ->> 'proposed_status_code'
+       OR NEW.reason_code IS DISTINCT FROM review_payload ->> 'reason_code'
+       OR NEW.effective_on IS DISTINCT FROM
+           (review_payload ->> 'effective_on')::date
+       OR NEW.reviewed_at IS DISTINCT FROM
+           (review_payload ->> 'reviewed_at')::timestamptz
+       OR NEW.review_packet_recorded_at IS DISTINCT FROM
+           (review_payload ->> 'recorded_at')::timestamptz THEN
+        RAISE EXCEPTION 'position lifecycle application row does not match reviewed evidence'
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM public.position_record_version AS predecessor
+        WHERE predecessor.tenant_record_id = NEW.tenant_record_id
+          AND predecessor.position_record_id = NEW.position_record_id
+          AND predecessor.position_record_version_id = NEW.predecessor_position_record_version_id
+          AND predecessor.position_status_code = NEW.current_status_code
+          AND predecessor.recorded_from <= pg_catalog.transaction_timestamp()
+          AND (predecessor.recorded_to IS NULL
+               OR pg_catalog.transaction_timestamp() < predecessor.recorded_to)
+          AND predecessor.effective_from <= NEW.effective_on
+          AND (predecessor.effective_to IS NULL
+               OR NEW.effective_on < predecessor.effective_to)
+    ) THEN
+        RAISE EXCEPTION 'position lifecycle predecessor is not current at the reviewed effective date'
+            USING ERRCODE = '23514';
+    END IF;
+
     audit_payload := (
         SELECT canonical_event_json::jsonb
-        FROM audit_event_record
+        FROM public.audit_event_record
         WHERE tenant_record_id = NEW.tenant_record_id
           AND audit_event_record_id = NEW.audit_event_record_id
     );
@@ -322,7 +388,7 @@ BEGIN
 
     SELECT audit_event_record_id
     INTO outbox_audit_id
-    FROM outbox_delivery_record
+    FROM public.outbox_delivery_record
     WHERE tenant_record_id = NEW.tenant_record_id
       AND outbox_delivery_record_id = NEW.outbox_delivery_record_id;
     IF outbox_audit_id IS DISTINCT FROM NEW.audit_event_record_id THEN
@@ -335,11 +401,68 @@ END;
 $$;
 
 CREATE TRIGGER position_lifecycle_application_integrity_guard
-BEFORE INSERT ON position_lifecycle_application_record
+BEFORE INSERT ON public.position_lifecycle_application_record
 FOR EACH ROW
-EXECUTE FUNCTION validate_position_lifecycle_application_audit();
+EXECUTE FUNCTION public.validate_position_lifecycle_application_audit();
 
-CREATE FUNCTION apply_position_lifecycle_change(
+CREATE FUNCTION public.validate_position_lifecycle_application_successor()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+DECLARE
+    successor public.position_record_version%ROWTYPE;
+BEGIN
+    SELECT version.*
+    INTO successor
+    FROM public.position_record_version AS version
+    WHERE version.tenant_record_id = NEW.tenant_record_id
+      AND version.position_record_id = NEW.position_record_id
+      AND version.position_record_version_id = NEW.successor_position_record_version_id;
+    IF NOT FOUND
+       OR successor.position_status_code <> NEW.proposed_status_code
+       OR successor.effective_from <> NEW.effective_on
+       OR successor.recorded_from IS DISTINCT FROM pg_catalog.transaction_timestamp()
+       OR successor.recorded_to IS NOT NULL
+       OR successor.position_lifecycle_application_record_id
+          IS DISTINCT FROM NEW.position_lifecycle_application_record_id THEN
+        RAISE EXCEPTION 'position lifecycle successor does not match the application evidence'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER position_lifecycle_application_successor_guard
+AFTER INSERT ON public.position_lifecycle_application_record
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION public.validate_position_lifecycle_application_successor();
+
+CREATE FUNCTION public.reject_position_lifecycle_history_truncate()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+BEGIN
+    RAISE EXCEPTION 'Position lifecycle history cannot be truncated'
+        USING ERRCODE = '55000';
+END;
+$$;
+
+CREATE TRIGGER position_lifecycle_application_truncate_guard
+BEFORE TRUNCATE ON public.position_lifecycle_application_record
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.reject_position_lifecycle_history_truncate();
+
+CREATE TRIGGER position_record_version_lifecycle_truncate_guard
+BEFORE TRUNCATE ON public.position_record_version
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.reject_position_lifecycle_history_truncate();
+
+REVOKE TRUNCATE ON public.position_lifecycle_application_record, public.position_record_version FROM PUBLIC;
+
+CREATE FUNCTION public.apply_position_lifecycle_change(
     p_tenant_record_id uuid,
     p_position_record_id uuid,
     p_expected_predecessor_version_id uuid,
@@ -353,10 +476,11 @@ CREATE FUNCTION apply_position_lifecycle_change(
 )
 RETURNS void
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     review_payload jsonb;
-    predecessor position_record_version%ROWTYPE;
+    predecessor public.position_record_version%ROWTYPE;
     preserved_version_id uuid;
     event_json text;
     event_digest text;
@@ -403,7 +527,7 @@ BEGIN
     END IF;
 
     PERFORM 1
-    FROM position_record
+    FROM public.position_record
     WHERE tenant_record_id = p_tenant_record_id
       AND position_record_id = p_position_record_id
       AND recorded_from <= pg_catalog.transaction_timestamp()
@@ -416,7 +540,7 @@ BEGIN
 
     SELECT version.*
     INTO predecessor
-    FROM position_record_version AS version
+    FROM public.position_record_version AS version
     WHERE version.tenant_record_id = p_tenant_record_id
       AND version.position_record_id = p_position_record_id
       AND version.recorded_from <= pg_catalog.transaction_timestamp()
@@ -450,7 +574,7 @@ BEGIN
     IF proposed_status IN ('closed', 'abolished')
        AND EXISTS (
             SELECT 1
-            FROM assignment_record AS assignment
+            FROM public.assignment_record AS assignment
             WHERE assignment.tenant_record_id = p_tenant_record_id
               AND assignment.position_record_id = p_position_record_id
               AND assignment.recorded_from <= pg_catalog.transaction_timestamp()
@@ -497,7 +621,7 @@ BEGIN
         'orgmetra_domain_events'
     );
 
-    INSERT INTO position_lifecycle_application_record (
+    INSERT INTO public.position_lifecycle_application_record (
         tenant_record_id,
         position_lifecycle_application_record_id,
         position_record_id,
@@ -539,14 +663,14 @@ BEGIN
         p_outbox_delivery_record_id
     );
 
-    UPDATE position_record_version
+    UPDATE public.position_record_version
     SET recorded_to = pg_catalog.transaction_timestamp()
     WHERE tenant_record_id = p_tenant_record_id
       AND position_record_version_id = predecessor.position_record_version_id;
 
     IF predecessor.effective_from < effective_on THEN
         preserved_version_id := pg_catalog.gen_random_uuid();
-        INSERT INTO position_record_version (
+        INSERT INTO public.position_record_version (
             tenant_record_id,
             position_record_version_id,
             position_record_id,
@@ -567,7 +691,7 @@ BEGIN
         );
     END IF;
 
-    INSERT INTO position_record_version (
+    INSERT INTO public.position_record_version (
         tenant_record_id,
         position_record_version_id,
         position_record_id,
@@ -589,12 +713,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION apply_position_lifecycle_change(uuid, uuid, uuid, uuid, uuid, text, text, text, uuid, uuid) IS
+COMMENT ON FUNCTION public.apply_position_lifecycle_change(uuid, uuid, uuid, uuid, uuid, text, text, text, uuid, uuid) IS
     'Atomically validates one approved v1 lifecycle review against locked bitemporal Position/Assignment truth, records immutable audit/outbox evidence, closes the predecessor system-time interval, and inserts preserved/successor PositionVersion truth.';
 
 ALTER TABLE position_lifecycle_application_record ENABLE ROW LEVEL SECURITY;
 ALTER TABLE position_lifecycle_application_record FORCE ROW LEVEL SECURITY;
 CREATE POLICY position_lifecycle_application_scope_policy
-ON position_lifecycle_application_record
-USING (tenant_record_id = current_tenant_record_id())
-WITH CHECK (tenant_record_id = current_tenant_record_id());
+ON public.position_lifecycle_application_record
+USING (tenant_record_id = public.current_tenant_record_id())
+WITH CHECK (tenant_record_id = public.current_tenant_record_id());
+
+REVOKE ALL ON FUNCTION public.apply_position_lifecycle_change(
+    uuid, uuid, uuid, uuid, uuid, text, text, text, uuid, uuid
+) FROM PUBLIC;
+
+COMMIT;

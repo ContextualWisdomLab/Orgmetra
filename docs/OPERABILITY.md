@@ -41,6 +41,12 @@
 - Audit/outbox SQL boundaries pin `search_path` to `pg_catalog, public, pg_temp`, the migration revokes `CREATE` on `public` from `PUBLIC`, and project objects remain in the trusted application schema until schema extraction work explicitly moves them. Normal dispatcher/persistence functions remain security-invoker boundaries; the lost-final-worker recovery function is the sole `SECURITY DEFINER` exception and is owned by the hardened NOLOGIN recovery role rather than a login or superuser role.
 - Exponential/backoff policy selection, policy-specific producer configuration, and external delivery receipts remain release blockers before reliable asynchronous delivery is called production-ready; terminal dead-letter/escalation evidence and lost-final-worker recovery are implemented but do not by themselves prove downstream receipt.
 
+### Position lifecycle application
+
+- Position lifecycle application is a high-impact, transaction-bound operation. It must fail closed on missing or stale Position/Assignment snapshot evidence, forbidden transitions, occupied closure/abolition, tenant/version/audit/outbox mismatch, or unavailable authoritative truth.
+- Deployments apply migrations 0023 through 0025 in order and run the dedicated PostgreSQL contracts against a fresh PostgreSQL 16 database. The application role receives the explicit grant for `apply_position_lifecycle_change(...)` only after purpose-bound authorization is configured; PostgreSQL `PUBLIC` retains no execute privilege.
+- Restore and migration rehearsals must verify the successor/predecessor bitemporal chain, immutable application evidence, audit/outbox pairing, forced RLS, trusted function `search_path`, and append-only/TRUNCATE guards before the Position lifecycle capability is re-enabled.
+
 ### Other dependencies
 
 - Psychometrics Commons unavailable: assessment-result fetches show an unavailable state, not invented scores.

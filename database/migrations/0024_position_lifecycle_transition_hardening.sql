@@ -3,7 +3,11 @@
 -- transition and recompute its SHA-256.  The authoritative persistence boundary
 -- independently enforces the same transition graph as the reviewed evidence type.
 
-CREATE OR REPLACE FUNCTION validate_position_lifecycle_review_evidence(
+BEGIN;
+
+SET LOCAL search_path = public, pg_catalog;
+
+CREATE OR REPLACE FUNCTION public.validate_position_lifecycle_review_evidence(
     p_canonical_review_json text,
     p_review_digest text,
     p_tenant_record_id uuid,
@@ -16,6 +20,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 STABLE
 STRICT
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     review_json json;
@@ -140,5 +145,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION validate_position_lifecycle_review_evidence(text, text, uuid, uuid, text, text, date) IS
+COMMENT ON FUNCTION public.validate_position_lifecycle_review_evidence(text, text, uuid, uuid, text, text, date) IS
     'Validates exact v1 Position lifecycle review shape, digest, tenant/Position/status/effective scope, allowed non-no-op transition graph, human approval state, and chronology without granting mutation authority.';
+
+COMMIT;

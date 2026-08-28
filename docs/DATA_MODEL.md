@@ -14,6 +14,7 @@
 | `job_profile_version` | Bitemporal title, family, and version definition for a job profile. |
 | `position_record` | Durable seat identity that keeps stable organization and job references. |
 | `position_record_version` | Bitemporal position status and effective period. |
+| `position_lifecycle_application_record` | Immutable tenant-scoped correlation of one human-reviewed lifecycle change with its predecessor/successor PositionVersion and audit/outbox evidence. |
 | `assignment_record` | A person's allocation to a position through one employment. |
 | `candidate_profile` | Applicant/candidate record before hire. |
 | `candidate_worker_link` | Legacy append-only candidate-to-worker linkage retained for historical reads; new writes use `candidate_worker_conversion_record`. |
@@ -53,6 +54,8 @@ Intervals are half-open and non-empty: an end value, when present, must be stric
 Durable anchors such as `organization_unit`, `job_profile`, `employment_record`, and `position_record` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version`, `job_profile_version`, `employment_record_version`, and `position_record_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
 
 Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
+
+The reviewed Position lifecycle boundary keeps `position_record` stable and applies only canonical, human-reviewed evidence whose Position and Assignment snapshot digests still match current authoritative truth. It closes the predecessor's system-recorded interval and inserts preserved/successor `position_record_version` segments at one transaction timestamp; it never rewrites status in place. `position_lifecycle_application_record` stores no Person, candidate, compensation, rating, assessment, or free-form HR payload. Its tenant-qualified predecessor/successor bindings, forced RLS, append-only/TRUNCATE guards, and same-transaction audit/outbox references fail closed when review evidence, staffing occupancy, or actor separation is inconsistent.
 
 ## High-impact decision evidence
 

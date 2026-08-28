@@ -3,13 +3,18 @@
 -- JSON bytes are preserved and its value-minimized Position/Assignment digests
 -- still match authoritative bitemporal truth at application time.
 
-CREATE FUNCTION position_lifecycle_review_canonical_json(
+BEGIN;
+
+SET LOCAL search_path = public, pg_catalog;
+
+CREATE FUNCTION public.position_lifecycle_review_canonical_json(
     p_review_json text
 )
 RETURNS text
 LANGUAGE plpgsql
 IMMUTABLE
 STRICT
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     payload jsonb;
@@ -36,10 +41,10 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION position_lifecycle_review_canonical_json(text) IS
+COMMENT ON FUNCTION public.position_lifecycle_review_canonical_json(text) IS
     'Returns the compact C-collation key-sorted JSON object representation required by Position lifecycle review evidence; malformed or non-object input returns NULL.';
 
-CREATE FUNCTION position_lifecycle_position_snapshot_digest(
+CREATE FUNCTION public.position_lifecycle_position_snapshot_digest(
     p_tenant_record_id uuid,
     p_position_record_id uuid,
     p_effective_on date
@@ -48,6 +53,7 @@ RETURNS text
 LANGUAGE sql
 STABLE
 STRICT
+SET search_path = pg_catalog, public, pg_temp
 AS $$
     WITH current_snapshot AS (
         SELECT pg_catalog.jsonb_build_object(
@@ -80,10 +86,10 @@ AS $$
     FROM current_snapshot;
 $$;
 
-COMMENT ON FUNCTION position_lifecycle_position_snapshot_digest(uuid, uuid, date) IS
+COMMENT ON FUNCTION public.position_lifecycle_position_snapshot_digest(uuid, uuid, date) IS
     'Returns a SHA-256 digest of the exact system-visible Position anchor/version truth at one business-effective date, or NULL when no authoritative Position snapshot exists.';
 
-CREATE FUNCTION position_lifecycle_assignment_snapshot_digest(
+CREATE FUNCTION public.position_lifecycle_assignment_snapshot_digest(
     p_tenant_record_id uuid,
     p_position_record_id uuid,
     p_effective_on date
@@ -92,6 +98,7 @@ RETURNS text
 LANGUAGE sql
 STABLE
 STRICT
+SET search_path = pg_catalog, public, pg_temp
 AS $$
     WITH visible_assignments AS (
         SELECT assignment.assignment_record_id,
@@ -130,7 +137,7 @@ AS $$
     FROM snapshot;
 $$;
 
-COMMENT ON FUNCTION position_lifecycle_assignment_snapshot_digest(uuid, uuid, date) IS
+COMMENT ON FUNCTION public.position_lifecycle_assignment_snapshot_digest(uuid, uuid, date) IS
     'Returns a SHA-256 digest of value-minimized system-visible Assignment occupancy truth for one Position at one business-effective date; an empty assignment set has a deterministic digest.';
 
 -- Preserve the already-reviewed transition/shape validator as an internal stage,
@@ -140,7 +147,7 @@ ALTER FUNCTION public.validate_position_lifecycle_review_evidence(
     text, text, uuid, uuid, text, text, date
 ) RENAME TO validate_position_lifecycle_review_evidence_v1_shape;
 
-CREATE FUNCTION validate_position_lifecycle_review_evidence(
+CREATE FUNCTION public.validate_position_lifecycle_review_evidence(
     p_canonical_review_json text,
     p_review_digest text,
     p_tenant_record_id uuid,
@@ -153,6 +160,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 STABLE
 STRICT
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     review_payload jsonb;
@@ -204,10 +212,10 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION validate_position_lifecycle_review_evidence(text, text, uuid, uuid, text, text, date) IS
+COMMENT ON FUNCTION public.validate_position_lifecycle_review_evidence(text, text, uuid, uuid, text, text, date) IS
     'Validates exact canonical v1 review bytes, digest, tenant/Position/status/effective scope, allowed transition graph, human-review chronology, and fresh authoritative Position/Assignment snapshot digests without granting mutation authority.';
 
-COMMENT ON FUNCTION validate_position_lifecycle_review_evidence_v1_shape(text, text, uuid, uuid, text, text, date) IS
+COMMENT ON FUNCTION public.validate_position_lifecycle_review_evidence_v1_shape(text, text, uuid, uuid, text, text, date) IS
     'Internal v1 review shape/transition validator retained beneath the canonical-byte and fresh-snapshot validation boundary.';
 
 -- High-impact lifecycle mutation must never inherit PostgreSQL default PUBLIC
@@ -215,3 +223,5 @@ COMMENT ON FUNCTION validate_position_lifecycle_review_evidence_v1_shape(text, t
 REVOKE ALL ON FUNCTION public.apply_position_lifecycle_change(
     uuid, uuid, uuid, uuid, uuid, text, text, text, uuid, uuid
 ) FROM PUBLIC;
+
+COMMIT;

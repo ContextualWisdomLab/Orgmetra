@@ -156,4 +156,25 @@ SQL
 )"
 test "$public_execute" = "f"
 
+search_path_contract="$(psql "$DATABASE_URL" -At -v ON_ERROR_STOP=1 <<'SQL'
+SELECT count(*)
+FROM pg_catalog.pg_proc AS procedure_record
+WHERE procedure_record.oid IN (
+    'public.validate_position_lifecycle_review_evidence_v1_shape(text,text,uuid,uuid,text,text,date)'::regprocedure,
+    'public.validate_position_lifecycle_review_evidence(text,text,uuid,uuid,text,text,date)'::regprocedure,
+    'public.position_lifecycle_review_canonical_json(text)'::regprocedure,
+    'public.position_lifecycle_position_snapshot_digest(uuid,uuid,date)'::regprocedure,
+    'public.position_lifecycle_assignment_snapshot_digest(uuid,uuid,date)'::regprocedure,
+    'public.protect_position_lifecycle_application_history()'::regprocedure,
+    'public.protect_position_version_history_after_lifecycle_support()'::regprocedure,
+    'public.validate_position_lifecycle_application_audit()'::regprocedure,
+    'public.validate_position_lifecycle_application_successor()'::regprocedure,
+    'public.reject_position_lifecycle_history_truncate()'::regprocedure,
+    'public.apply_position_lifecycle_change(uuid,uuid,uuid,uuid,uuid,text,text,text,uuid,uuid)'::regprocedure
+)
+AND procedure_record.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[];
+SQL
+)"
+test "$search_path_contract" = "11"
+
 echo "position lifecycle snapshot integrity: PASS"
