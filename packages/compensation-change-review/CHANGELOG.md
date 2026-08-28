@@ -13,3 +13,4 @@
 
 - `tenant_record_id` now follows the authoritative Orgmetra canonical non-sentinel operational-UUID contract instead of imposing a duplicate UUIDv4-only leaf policy; the protected-core UUIDv7 tenant form is covered explicitly while RFC 9562 Nil/Max sentinels remain rejected.
 - Canonical export now snapshots all trust-bearing fields once and verifies the exact snapshot against the packet's construction-time SHA-256 seal before returning evidence. This process-local seal is defense in depth only and does not replace durable authorization, signatures, audit/outbox persistence, or correlation uniqueness.
+- Digest evidence now rejects `str` subclasses so packet fields cannot retain caller-defined runtime behavior.

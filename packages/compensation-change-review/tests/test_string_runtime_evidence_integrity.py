@@ -104,6 +104,14 @@ def test_rejects_forged_purpose_and_reason_codes() -> None:
         build_compensation_change_review_packet(**reason_kwargs)
 
 
+def test_rejects_digest_string_subclass_before_pattern_match() -> None:
+    """Digest evidence must not retain caller-defined string behavior."""
+    kwargs = valid_kwargs()
+    kwargs["compensation_policy_digest"] = ForgedGovernanceText("a" * 64)
+    with pytest.raises(ValueError, match="compensation_policy_digest"):
+        build_compensation_change_review_packet(**kwargs)
+
+
 @pytest.mark.parametrize(
     "field_name",
     (
