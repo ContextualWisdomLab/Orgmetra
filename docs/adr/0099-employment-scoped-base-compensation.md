@@ -14,7 +14,7 @@ Introduce `employment_base_compensation_record` as one durable tenant-qualified 
 
 Each new compensation identity must satisfy the canonical Orgmetra operational-UUID contract, so RFC 9562 Nil and Max sentinels cannot become durable anchor or version identities. Each version stores:
 
-- `base_compensation_amount` as fixed-scale `numeric(19,4)` and rejects negative values and PostgreSQL `NaN`;
+- `base_compensation_amount` as fixed-scale `numeric(19,4)` and rejects negative values and PostgreSQL `NaN` or `Infinity`;
 - `currency_code` as a three-letter uppercase transport code;
 - `pay_rate_period_code` from the controlled vocabulary `hour`, `day`, `week`, `biweekly`, `semimonthly`, `month`, or `year`;
 - independent half-open effective and system-recorded intervals.
@@ -31,10 +31,10 @@ ISO 4217:2015 specifies the structure of three-letter alphabetic currency codes.
 
 ## Consequences
 
-Concurrent employments can carry independent base-compensation truth without conflating one Person's employment terms. Historical corrections remain reconstructable across business time and system-recorded time, while a client cannot backdate the system-knowledge start, pre-close a new fact, choose an arbitrary closure instant, persist reserved UUID sentinels, encode `NaN` as compensation, or erase the relations with `TRUNCATE`. The model is deliberately limited to base compensation: bonus, equity, allowance, payroll calculation, taxation, and total-rewards valuation are not implied by these relations.
+Concurrent employments can carry independent base-compensation truth without conflating one Person's employment terms. Historical corrections remain reconstructable across business time and system-recorded time, while a client cannot backdate the system-knowledge start, pre-close a new fact, choose an arbitrary closure instant, persist reserved UUID sentinels, encode `NaN` or `Infinity` as compensation, or erase the relations with `TRUNCATE`. The model is deliberately limited to base compensation: bonus, equity, allowance, payroll calculation, taxation, and total-rewards valuation are not implied by these relations.
 
 PR #48 remains the separate human review/evidence boundary for proposed compensation changes; this ADR does not duplicate that packet or grant mutation authority.
 
 ## Verification
 
-`tests/test_employment_compensation_core_postgres.sh` proves concurrent-employment separation, tenant-qualified references, legacy-write rejection, system-recorded start/closure semantics, controlled amount/currency/rate-period shape, bitemporal non-overlap, correction-not-rewrite, and forced-RLS visibility. `tests/test_employment_compensation_review_regressions_postgres.sh` independently proves reserved UUID sentinel rejection, `NaN` rejection, and table-wide TRUNCATE protection. `.github/workflows/employment-compensation-core-quality.yml` runs both contracts against the exact pull-request head and verifies this ADR remains registered in the canonical ADR index.
+`tests/test_employment_compensation_core_postgres.sh` proves concurrent-employment separation, tenant-qualified references, legacy-write rejection, system-recorded start/closure semantics, controlled amount/currency/rate-period shape, bitemporal non-overlap, correction-not-rewrite, and forced-RLS visibility. `tests/test_employment_compensation_review_regressions_postgres.sh` independently proves reserved UUID sentinel rejection, `NaN` and `Infinity` rejection, and table-wide TRUNCATE protection. `.github/workflows/employment-compensation-core-quality.yml` runs both contracts against the exact pull-request head and verifies this ADR remains registered in the canonical ADR index.

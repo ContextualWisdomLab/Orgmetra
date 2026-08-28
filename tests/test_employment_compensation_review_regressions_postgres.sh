@@ -90,6 +90,11 @@ expect_failure \
     "employment_base_compensation_amount_check" \
     "INSERT INTO employment_base_compensation_version (tenant_record_id, employment_base_compensation_version_id, employment_base_compensation_record_id, base_compensation_amount, currency_code, pay_rate_period_code, effective_from) VALUES ('30000000-0000-7000-8000-000000000001', '30000000-0000-7000-8000-000000000402', '30000000-0000-7000-8000-000000000301', 'NaN'::numeric, 'USD', 'year', DATE '2026-01-01');"
 
+expect_failure \
+    "Infinite base compensation" \
+    "employment_base_compensation_amount_check" \
+    "INSERT INTO employment_base_compensation_version (tenant_record_id, employment_base_compensation_version_id, employment_base_compensation_record_id, base_compensation_amount, currency_code, pay_rate_period_code, effective_from) VALUES ('30000000-0000-7000-8000-000000000001', '30000000-0000-7000-8000-000000000409', '30000000-0000-7000-8000-000000000301', 'Infinity'::numeric, 'USD', 'year', DATE '2026-01-01');"
+
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO employment_base_compensation_version (
     tenant_record_id,
