@@ -1,11 +1,12 @@
 from dataclasses import replace
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from hashlib import sha256
 import inspect
 import json
 
 import pytest
 
+import orgmetra_performance_review.packet as packet_module
 from orgmetra_performance_review import (
     PerformanceReviewPacket,
     build_performance_review_packet,
@@ -30,6 +31,12 @@ DIGEST_D = "d" * 64
 GENERATED_AT = datetime(2026, 8, 19, 5, 15, 30, 123456, tzinfo=timezone.utc)
 
 
+@pytest.fixture(autouse=True)
+def fixed_system_recorded_at(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep packet digests deterministic while production owns issuance time."""
+    monkeypatch.setattr(packet_module, "_system_recorded_at", lambda: GENERATED_AT)
+
+
 def build_valid(**overrides: object) -> PerformanceReviewPacket:
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
@@ -51,7 +58,6 @@ def build_valid(**overrides: object) -> PerformanceReviewPacket:
         "reason_code": "scheduled_cycle_review",
         "review_period_start": date(2026, 1, 1),
         "review_period_end": date(2026, 6, 30),
-        "generated_at": GENERATED_AT,
     }
     values.update(overrides)
     return build_performance_review_packet(**values)
@@ -60,13 +66,14 @@ def build_valid(**overrides: object) -> PerformanceReviewPacket:
 def test_builds_value_minimized_human_review_packet() -> None:
     packet = build_valid()
     assert packet.contains_personal_data is True
-    assert packet.contains_direct_person_identifiers is False
+    assert packet.contains_direct_person_identifiers is True
     assert packet.contains_rating_value is False
     assert packet.contains_free_form_model_output is False
     assert packet.human_confirmation_required is True
     assert packet.decision_authority == "human_review_only"
     assert packet.review_state == "requires_human_review"
     assert packet.scope_verification_state == "requires_authoritative_resolution"
+    assert "reference provenance and opacity" in packet.next_action
     assert "record accountable human rating and feedback" in packet.next_action
 
 
@@ -76,7 +83,7 @@ def test_canonical_json_and_digest_are_deterministic() -> None:
     payload = json.loads(canonical)
     assert payload["person_record_reference"] == PERSON
     assert payload["contains_personal_data"] is True
-    assert payload["contains_direct_person_identifiers"] is False
+    assert payload["contains_direct_person_identifiers"] is True
     assert payload["scope_verification_state"] == "requires_authoritative_resolution"
     assert payload["generated_at"] == "2026-08-19T05:15:30.123456Z"
     assert packet.sha256_digest() == sha256(canonical.encode("utf-8")).hexdigest()
@@ -102,12 +109,11 @@ def test_rejects_invalid_evidence_version(evidence_version: object) -> None:
         build_valid(evidence_version=evidence_version)
 
 
-def test_timestamp_normalizes_to_utc_without_losing_precision() -> None:
-    shifted = GENERATED_AT.astimezone(timezone(timedelta(hours=9)))
-    assert build_valid(generated_at=shifted).canonical_json() == build_valid().canonical_json()
-    later = build_valid(generated_at=GENERATED_AT.replace(microsecond=123457))
-    assert later.canonical_json() != build_valid().canonical_json()
-    assert later.sha256_digest() != build_valid().sha256_digest()
+def test_system_recorded_timestamp_is_bound_to_canonical_evidence() -> None:
+    packet = build_valid()
+    assert packet.generated_at == GENERATED_AT
+    assert packet.generated_at.tzinfo is timezone.utc
+    assert json.loads(packet.canonical_json())["generated_at"] == "2026-08-19T05:15:30.123456Z"
 
 
 def test_optional_development_plan_may_be_absent_as_a_pair() -> None:
@@ -136,7 +142,7 @@ def test_rejects_noncanonical_tenant_identity(tenant: object) -> None:
         ("reviewer_reference", "actor:reviewer-name"),
     ],
 )
-def test_rejects_nonopaque_or_wrong_namespace_references(field: str, value: str) -> None:
+def test_rejects_noncanonical_or_wrong_namespace_references(field: str, value: str) -> None:
     with pytest.raises(ValueError, match=field):
         build_valid(**{field: value})
 
@@ -211,17 +217,11 @@ def test_review_period_must_be_real_dates_in_order() -> None:
         build_valid(review_period_start=date(2026, 7, 1), review_period_end=date(2026, 6, 30))
 
 
-@pytest.mark.parametrize("generated_at", [datetime(2026, 8, 19, 5, 15), "2026-08-19T05:15:00Z"])
-def test_generated_at_must_be_timezone_aware_datetime(generated_at: object) -> None:
-    with pytest.raises(ValueError, match="generated_at"):
-        build_valid(generated_at=generated_at)
-
-
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
         ("contains_personal_data", False, "personal data"),
-        ("contains_direct_person_identifiers", True, "direct person identifiers"),
+        ("contains_direct_person_identifiers", False, "unverified reference provenance"),
         ("contains_rating_value", True, "must not contain rating values"),
         ("contains_free_form_model_output", True, "must not contain free-form model output"),
         ("human_confirmation_required", 1, "human confirmation is mandatory"),
