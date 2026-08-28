@@ -104,22 +104,25 @@ SQL
 build_event() {
     local event_id="$1"
     local subject_id="$2"
+    local event_type="${3:-orgmetra.candidate.worker_converted}"
+    local reason_code="${4:-candidate_hire_confirmed}"
+    local result_code="${5:-worker_created}"
     tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT pg_catalog.jsonb_build_object(
-    'data', pg_catalog.jsonb_build_object('high_impact', true, 'result_code', 'worker_created'),
+    'data', pg_catalog.jsonb_build_object('high_impact', true, 'result_code', '${result_code}'),
     'datacontenttype', 'application/json',
     'id', '${event_id}',
     'orgmetraactor', 'keyverse_subject:01JHIRINGMANAGER',
     'orgmetraconfirmation', 'confirmation:01JHUMANCONFIRM',
     'orgmetraevidence', 'decision_evidence_set:00000000-0000-7000-8000-000000000041',
     'orgmetrapurpose', 'talent_acquisition',
-    'orgmetrareason', 'candidate_hire_confirmed',
+    'orgmetrareason', '${reason_code}',
     'orgmetratenant', '${TENANT_ID}',
     'source', 'urn:orgmetra:talent_core',
     'specversion', '1.0',
     'subject', 'candidate_worker_conversion_record:${subject_id}',
     'time', pg_catalog.to_char(pg_catalog.transaction_timestamp() - INTERVAL '3 minutes', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'),
-    'type', 'orgmetra.candidate.worker_converted'
+    'type', '${event_type}'
 )::text;
 "
 }
@@ -204,6 +207,53 @@ RETURNING recorded_from = pg_catalog.transaction_timestamp();
 ")"
 if [[ "${system_time_match}" != "t" ]]; then
     echo "server-authored candidate conversion did not persist transaction system time" >&2
+    exit 1
+fi
+
+tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+UPDATE candidate_worker_conversion_record
+SET recorded_to = pg_catalog.transaction_timestamp()
+WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'::uuid
+  AND candidate_worker_conversion_record_id = '00000000-0000-7000-8000-000000000082'::uuid;
+SQL
+
+correction_event="$(build_event \
+    '00000000-0000-7000-8000-000000000063' \
+    '00000000-0000-7000-8000-000000000083' \
+    'orgmetra.candidate.worker_conversion_corrected' \
+    'candidate_conversion_corrected' \
+    'worker_conversion_corrected')"
+
+tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v canonical_event="${correction_event}" <<'SQL'
+SELECT record_audit_outbox_event(
+    '10000000-0000-7000-8000-000000000001'::uuid,
+    '00000000-0000-7000-8000-000000000063'::uuid,
+    '00000000-0000-7000-8000-000000000073'::uuid,
+    :'canonical_event',
+    encode(digest(convert_to(:'canonical_event', 'UTF8'), 'sha256'), 'hex'),
+    'talent_event_sink'
+);
+SQL
+
+correction_system_time_match="$(tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+INSERT INTO candidate_worker_conversion_record (
+    tenant_record_id, candidate_worker_conversion_record_id, candidate_profile_id,
+    person_record_id, employment_record_id, selection_decision_id,
+    audit_event_record_id, effective_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000083',
+    '00000000-0000-7000-8000-000000000031',
+    '00000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000011',
+    '00000000-0000-7000-8000-000000000051',
+    '00000000-0000-7000-8000-000000000063',
+    CURRENT_DATE
+)
+RETURNING recorded_from = pg_catalog.transaction_timestamp();
+")"
+if [[ "${correction_system_time_match}" != "t" ]]; then
+    echo "candidate conversion correction did not persist transaction system time" >&2
     exit 1
 fi
 
