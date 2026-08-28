@@ -190,6 +190,16 @@ def build_position_vacancy_snapshot(
                 next_action="Close the superseded recorded Assignment interval, then rebuild the vacancy snapshot.",
             )
         seen_assignment_ids.add(assignment.assignment_record_id)
+        if (
+            type(assignment.allocation_ratio) is not Decimal
+            or not assignment.allocation_ratio.is_finite()
+            or assignment.allocation_ratio <= _ZERO
+            or assignment.allocation_ratio > _ONE
+        ):
+            raise SingleValuedFactError(
+                "Visible allocation ratio is outside the governed 0 < ratio <= 1 band.",
+                next_action="Correct the stored Assignment allocation to between 0.0001 and 1.0000, then rebuild the vacancy snapshot.",
+            )
 
     allocation_by_position: dict[UUID, Decimal] = {}
     for assignment in visible_assignments:
@@ -205,11 +215,6 @@ def build_position_vacancy_snapshot(
             effective_on=effective_on,
             known_at=known_at,
         )
-        if assignment.allocation_ratio <= _ZERO or assignment.allocation_ratio > _ONE:
-            raise SingleValuedFactError(
-                "Visible allocation ratio is outside the governed 0 < ratio <= 1 band.",
-                next_action="Correct the stored Assignment allocation to between 0.0001 and 1.0000, then rebuild the vacancy snapshot.",
-            )
         allocation_by_position[assignment.position_record_id] = (
             allocation_by_position.get(assignment.position_record_id, _ZERO)
             + assignment.allocation_ratio

@@ -24,7 +24,12 @@ _STAFFABLE_POSITION_STATUSES = frozenset({"active", "open"})
 
 def _ratio_is_valid(allocation_ratio: Decimal) -> bool:
     """Return whether one assignment row stays inside (0, 1.0000]."""
-    return allocation_ratio > _ZERO and allocation_ratio <= _ONE
+    return (
+        type(allocation_ratio) is Decimal
+        and allocation_ratio.is_finite()
+        and allocation_ratio > _ZERO
+        and allocation_ratio <= _ONE
+    )
 
 
 def _union_covers(intervals: list[DateInterval], target: DateInterval) -> bool:
@@ -220,6 +225,11 @@ def validate_position_seat_capacity(
         effective_on=effective_on,
         known_at=known_at,
     )
+    if any(not _ratio_is_valid(fact.allocation_ratio) for fact in visible):
+        raise PositionSeatError(
+            "Visible allocation ratios must be finite Decimals greater than 0 and at most 1.0000.",
+            next_action="Correct the stored Assignment allocation to between 0.0001 and 1.0000.",
+        )
     total = sum((fact.allocation_ratio for fact in visible), start=_ZERO)
     if total > _ONE:
         raise PositionSeatError(

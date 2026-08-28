@@ -239,6 +239,18 @@ def test_snapshot_rejects_out_of_band_stored_allocation_ratio() -> None:
         )
 
 
+def test_snapshot_rejects_nonfinite_stored_allocation_ratio() -> None:
+    """Non-finite stored ratios fail closed before Decimal comparison can escape."""
+    with pytest.raises(SingleValuedFactError, match="governed 0 < ratio <= 1 band"):
+        build_position_vacancy_snapshot(
+            [position(P1)],
+            [assignment(P1, "NaN")],
+            tenant_record_id=TENANT,
+            effective_on=DAY,
+            known_at=KNOWN,
+        )
+
+
 @pytest.mark.parametrize("bad_fte", [Decimal("0"), Decimal("1.2")])
 def test_direct_snapshot_rejects_noncanonical_four_place_fte(bad_fte: Decimal) -> None:
     """staffed_fte must carry exactly four decimal places for stable digests."""
