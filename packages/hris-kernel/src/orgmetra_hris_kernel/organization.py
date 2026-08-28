@@ -16,6 +16,15 @@ from orgmetra_hris_kernel.errors import (
 from orgmetra_hris_kernel.facts import OrganizationUnitVersion
 from orgmetra_hris_kernel.resolution import resolve_single_valued_fact
 
+_MAX_UUID_INT = (1 << 128) - 1
+
+
+def _validate_operational_uuid(field_name: str, value: object) -> UUID:
+    """Require one exact, non-sentinel UUID for hierarchy evidence."""
+    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
+        raise ValueError(f"{field_name} must be an operational UUID.")
+    return value
+
 
 def _validate_hierarchy_temporal_coordinate(effective_on: date, known_at: datetime) -> None:
     """Require exact built-in business and recorded-time values before hierarchy use."""
@@ -39,6 +48,7 @@ def _visible_parent_links(
     known_at: datetime,
 ) -> tuple[tuple[UUID, UUID | None], ...]:
     """Resolve one visible parent link per tenant organization unit in stable order."""
+    _validate_operational_uuid("tenant_record_id", tenant_record_id)
     _validate_hierarchy_temporal_coordinate(effective_on, known_at)
     scoped = [
         version
@@ -127,6 +137,14 @@ class OrganizationHierarchySnapshot:
             "parent_links",
             tuple(tuple(parent_link) for parent_link in self.parent_links),
         )
+        _validate_operational_uuid("tenant_record_id", self.tenant_record_id)
+        for parent_link in self.parent_links:
+            if len(parent_link) != 2:
+                raise ValueError("parent_links must contain organization-unit and parent identities.")
+            unit_id, parent_id = parent_link
+            _validate_operational_uuid("organization_unit_id", unit_id)
+            if parent_id is not None:
+                _validate_operational_uuid("parent_organization_unit_id", parent_id)
         unit_ids = tuple(unit_id for unit_id, _parent_id in self.parent_links)
         if len(unit_ids) != len(set(unit_ids)):
             raise SingleValuedFactError(

@@ -169,6 +169,48 @@ def test_direct_snapshot_rejects_naive_cutoff() -> None:
         )
 
 
+@pytest.mark.parametrize("tenant_record_id", ("not-a-uuid", UUID(int=0), UUID(int=(1 << 128) - 1)))
+def test_snapshot_rejects_non_operational_tenant_identity(tenant_record_id: object) -> None:
+    """Hierarchy evidence cannot be attributed to a malformed or reserved tenant."""
+    with pytest.raises(ValueError, match="tenant_record_id must be an operational UUID"):
+        OrganizationHierarchySnapshot(
+            tenant_record_id=tenant_record_id,  # type: ignore[arg-type]
+            effective_on=date(2024, 6, 1),
+            known_at=utc(2024, 6, 1),
+            parent_links=(),
+        )
+
+
+@pytest.mark.parametrize(
+    "parent_links",
+    (
+        (("not-a-uuid", None),),
+        ((UNIT_ROOT, UUID(int=0)),),
+        ((UNIT_ROOT, UUID(int=(1 << 128) - 1)),),
+    ),
+)
+def test_snapshot_rejects_non_operational_unit_identities(parent_links: object) -> None:
+    """Unit and parent anchors must remain canonical operational UUIDs."""
+    with pytest.raises(ValueError, match="operational UUID"):
+        OrganizationHierarchySnapshot(
+            tenant_record_id=TENANT_ALPHA,
+            effective_on=date(2024, 6, 1),
+            known_at=utc(2024, 6, 1),
+            parent_links=parent_links,  # type: ignore[arg-type]
+        )
+
+
+def test_snapshot_rejects_malformed_parent_link_shape() -> None:
+    """Each hierarchy edge must contain exactly one unit and one parent anchor."""
+    with pytest.raises(ValueError, match="parent_links must contain"):
+        OrganizationHierarchySnapshot(
+            tenant_record_id=TENANT_ALPHA,
+            effective_on=date(2024, 6, 1),
+            known_at=utc(2024, 6, 1),
+            parent_links=((UNIT_ROOT,),),  # type: ignore[arg-type]
+        )
+
+
 def test_direct_snapshot_rejects_duplicate_unit_identity() -> None:
     """One snapshot cannot claim two simultaneous parent links for one durable unit."""
     with pytest.raises(SingleValuedFactError, match="duplicate organization unit"):
