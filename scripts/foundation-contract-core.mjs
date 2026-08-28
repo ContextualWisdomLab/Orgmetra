@@ -74,6 +74,7 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0013_job_analysis_snapshot.sql',
   'database/migrations/0014_candidate_application_core.sql',
   'database/migrations/0015_candidate_withdrawal_governance.sql',
+  'database/migrations/0016_candidate_withdrawal_audit_envelope.sql',
   'docs/traceability/candidate-application-core.md',
   'docs/traceability/candidate-withdrawal.md',
   '.github/workflows/candidate-application-quality.yml',
@@ -104,6 +105,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_job_analysis_snapshot_postgres.sh',
   'tests/test_candidate_withdrawal_postgres.sh',
   'tests/test_candidate_withdrawal_security_postgres.sh',
+  'tests/test_candidate_withdrawal_migration_upgrade_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
