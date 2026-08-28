@@ -109,6 +109,7 @@ export const MATURITY_VALUES = Object.freeze(new Set([
 export const DATABASE_OBJECT_NAMES = Object.freeze([
   'tenant_record', 'person_record', 'person_name_record', 'person_contact_record',
   'external_identity_link', 'employment_record', 'employment_record_version',
+  'employment_employing_organization_record',
   'employment_contract', 'employment_status_history', 'employment_transition',
   'legal_entity',
   'organization_unit', 'organization_relation', 'business_location',
@@ -141,11 +142,12 @@ export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
   'job_analysis_task_item',
   'job_analysis_ksao_item',
   'job_analysis_task_ksao_link',
-  'job_analysis_write_command'
+  'job_analysis_write_command',
+  'employment_employing_organization_record'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
-const ADR_STATUS_PATTERN = /^\|\s*\[\d{4}\]\(([^)]+)\)\s*\|.*\|\s*(Proposed|Accepted|Superseded|Rejected)\s*\|$/;
+const ADR_STATUS_PATTERN = /^\|\s*\[\d{4}\]\(([^)]+)\)\s*\|.*\|\s*(Proposed|Accepted|Superseded|Rejected|proposed_on_active_pr)\s*\|$/;
 const LOCAL_LINK_PATTERN = /\[[^\]]+\]\((?!https?:\/\/|mailto:|#)([^)]+)\)/g;
 const CREATE_TABLE_PATTERN = /\bCREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)/gi;
 const DOLLAR_QUOTE_START_PATTERN = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/;

@@ -8,6 +8,7 @@
 | `person_record` | Durable person entity inside Orgmetra, not an authentication subject. |
 | `employment_record` | Durable employment identity for a person. |
 | `employment_record_version` | Bitemporal employment status, exclusive-or-concurrent code, and effective period. |
+| `employment_employing_organization_record` | Bitemporal, tenant-qualified relationship that records an Employment's legal employing Organization independently of Position and Assignment. |
 | `organization_unit` | Durable organizational identity referenced by positions and hierarchy facts. |
 | `organization_unit_version` | Bitemporal organizational name, type, and parent relationship for an organization unit. |
 | `job_profile` | Durable job identity referenced by positions, criteria, and decisions. |
@@ -51,6 +52,8 @@ Effective-dated fact tables use:
 Intervals are half-open and non-empty: an end value, when present, must be strictly later than its start. `effective_*` describes real-world validity. `recorded_*` describes when Orgmetra knew the fact.
 
 Durable anchors such as `organization_unit`, `job_profile`, `employment_record`, and `position_record` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version`, `job_profile_version`, `employment_record_version`, and `position_record_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
+
+`employment_employing_organization_record` is a separate bitemporal Employment-to-Organization fact. At a business-time/system-time coordinate, an Employment has at most one employing Organization; the Organization must be a `legal_entity`, and the relationship interval must be covered by `active` or `leave` Employment truth. Position placement and Assignment allocation do not determine legal-employer identity.
 
 Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
 

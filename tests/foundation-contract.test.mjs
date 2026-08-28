@@ -53,6 +53,11 @@ function writeMigrationBackedTables(root) {
       'CREATE TABLE job_analysis_write_command (tenant_record_id uuid NOT NULL);'
     ].join('\n') + '\n'
   );
+  write(
+    root,
+    'database/migrations/0040_employment_employing_organization.sql',
+    'CREATE TABLE employment_employing_organization_record (tenant_record_id uuid NOT NULL);\n'
+  );
 }
 
 function makeMinimalValidFoundation(root) {
@@ -128,6 +133,8 @@ test('required constants are frozen and use accepted values', () => {
   assert.ok(REQUIRED_FILES.length > 20);
   assert.ok(DATABASE_OBJECT_NAMES.every(isValidDatabaseObjectName));
   assert.ok(DATABASE_OBJECT_NAMES.includes('people_mutation_idempotency_record'));
+  assert.ok(DATABASE_OBJECT_NAMES.includes('employment_employing_organization_record'));
+  assert.ok(MIGRATION_BACKED_DATABASE_OBJECT_NAMES.includes('employment_employing_organization_record'));
   assert.ok(MATURITY_VALUES.has('accepted_architecture'));
 });
 
@@ -287,6 +294,21 @@ test('ADR index reports missing files and status mismatch', () => {
 test('ADR validation is empty when the index is absent', () => {
   const root = temporaryDirectory();
   try {
+    assert.deepEqual(validateAdrIndex(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('ADR index validates the active-PR status used by proposed ADRs', () => {
+  const root = temporaryDirectory();
+  try {
+    write(
+      root,
+      'docs/adr/README.md',
+      '# Index\n| ADR | Title | Status |\n|---|---|---|\n| [0141](0141.md) | Employer | proposed_on_active_pr |\n'
+    );
+    write(root, 'docs/adr/0141.md', '# ADR\n\nStatus: proposed_on_active_pr\n');
     assert.deepEqual(validateAdrIndex(root), []);
   } finally {
     rmSync(root, { recursive: true, force: true });

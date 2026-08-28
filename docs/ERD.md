@@ -12,7 +12,9 @@ erDiagram
     person_record ||--o{ person_name_record : has_names
     person_record ||--o{ employment_record : has
     employment_record ||--o{ employment_record_version : has_versions
+    employment_record ||--o{ employment_employing_organization_record : has_employer_history
     organization_unit ||--o{ organization_unit_version : has_versions
+    organization_unit ||--o{ employment_employing_organization_record : employs
     organization_unit_version }o--o| organization_unit : may_parent
     organization_unit ||--o{ position_record : contains
     job_profile ||--o{ job_profile_version : has_versions
@@ -48,6 +50,8 @@ erDiagram
 ## Cardinality decisions
 
 `organization_unit`, `job_profile`, `employment_record`, and `position_record` are durable anchors. Mutable names, classifications, parent relationships, titles, families, version codes, and employment or position status live in bitemporal version rows. Positions retain stable organization/job references while retroactive corrections append or supersede version facts rather than rewriting identity. An organization version may reference another durable organization as its parent; self-parenting is rejected at the database boundary. An assignment names the employment that covers it, so a person cannot be assigned through another worker's employment. Exclusive employment versions for one person cannot overlap. An assignment day must land on an `active` or `open` position version, and visible allocations for one seat cannot exceed 1.0000.
+
+`employment_employing_organization_record` is the independent legal-employer relationship. It is bitemporal and tenant-qualified, permits at most one employer for an Employment at one effective/system coordinate, requires `legal_entity` classification across the full effective interval, and requires `active` or `leave` Employment coverage. A Position or Assignment therefore cannot silently substitute for legal-employer truth.
 
 Every owned HRIS fact carries `tenant_record_id`. Relationships that cross table boundaries use tenant-qualified foreign keys, and row-level security independently filters every tenant-scoped relation. The tenant column is therefore both a referential-integrity boundary and a runtime isolation boundary, not a caller-supplied business attribute.
 
