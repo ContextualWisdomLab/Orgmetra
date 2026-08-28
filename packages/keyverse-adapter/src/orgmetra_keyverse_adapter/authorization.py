@@ -197,6 +197,12 @@ class AuthorizationDecision:
     authorized_fields: frozenset[str]
     reason_code: str
     next_action: str
+    required_target_scope_code: str | None = None
+
+    def __post_init__(self) -> None:
+        """Reject malformed governed-target evidence on manually constructed decisions."""
+        if self.required_target_scope_code is not None:
+            _validate_scope("required_target_scope_code", self.required_target_scope_code)
 
 
 class AuthorizationDeniedError(PermissionError):
@@ -242,6 +248,7 @@ def _decision(
         authorized_fields=authorized_fields,
         reason_code=reason_code,
         next_action=next_action,
+        required_target_scope_code=request.required_target_scope_code,
     )
 
 
