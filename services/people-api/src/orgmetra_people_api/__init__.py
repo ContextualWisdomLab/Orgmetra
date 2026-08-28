@@ -49,6 +49,7 @@ from orgmetra_people_api.people import (
     read_worker_people_record,
 )
 from orgmetra_people_api.postgres import PostgresPeopleReadPort
+from orgmetra_people_api.postgres_assignment_history import PostgresAssignmentHistoryReadPort
 from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
 
@@ -81,6 +82,7 @@ __all__ = [
     "PeopleRecordNotFound",
     "PositionMutationCommand",
     "PositionMutationResult",
+    "PostgresAssignmentHistoryReadPort",
     "PostgresHireAcceptancePort",
     "PostgresPeopleMutationPort",
     "PostgresPeopleReadPort",
