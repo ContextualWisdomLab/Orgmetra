@@ -3,7 +3,7 @@
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 import json
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -46,8 +46,12 @@ def values() -> dict[str, object]:
 
 
 def build(**overrides: object) -> OrganizationHierarchyChangeReviewPacket:
-    """Build a packet after applying explicit test overrides."""
+    """Build a packet with an isolated default reference for each test case."""
     inputs = values()
+    if "organization_hierarchy_change_reference" not in overrides:
+        inputs["organization_hierarchy_change_reference"] = (
+            f"organization_hierarchy_change:{uuid4()}"
+        )
     inputs.update(overrides)
     return build_organization_hierarchy_change_review_packet(**inputs)
 
