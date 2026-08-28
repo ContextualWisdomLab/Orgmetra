@@ -59,9 +59,10 @@ const STATE_MODELS = Object.freeze({
 
 function requireExactState(value) {
   if (typeof value !== 'string') throw new TypeError('Job grade review state must be an exact built-in string');
-  const model = STATE_MODELS[value];
-  if (!model) throw new TypeError(`unsupported Job grade review state: ${value}`);
-  return model;
+  if (!Object.hasOwn(STATE_MODELS, value)) {
+    throw new TypeError(`unsupported Job grade review state: ${value}`);
+  }
+  return STATE_MODELS[value];
 }
 
 /** Return immutable, value-minimized accessibility semantics for one Job grade review state. */

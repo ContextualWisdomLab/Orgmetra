@@ -101,6 +101,21 @@ test('unsupported runtime input fails closed before rendering', () => {
   assert.throws(() => jobGradeReviewStateMarkup(Symbol('recorded')), /exact built-in string/);
 });
 
+test('prototype-inherited names cannot masquerade as governed review states', () => {
+  for (const inheritedName of ['constructor', 'toString', '__proto__']) {
+    assert.throws(
+      () => jobGradeReviewViewModel(inheritedName),
+      /unsupported Job grade review state/,
+      `${inheritedName} must fail closed at the view-model boundary`,
+    );
+    assert.throws(
+      () => jobGradeReviewStateMarkup(inheritedName),
+      /unsupported Job grade review state/,
+      `${inheritedName} must fail closed before markup is emitted`,
+    );
+  }
+});
+
 test('Storybook and CSS cover workflow-specific accessibility states', () => {
   for (const storyName of [
     'Idle',
