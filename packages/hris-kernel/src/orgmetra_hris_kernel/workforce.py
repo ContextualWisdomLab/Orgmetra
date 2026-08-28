@@ -21,12 +21,21 @@ from orgmetra_hris_kernel.assignment import (
     validate_position_seat_capacity,
 )
 from orgmetra_hris_kernel.employment import validate_person_employment_exclusivity
-from orgmetra_hris_kernel.errors import IntervalError, SingleValuedFactError
+from orgmetra_hris_kernel.errors import IdentityScopeError, IntervalError, SingleValuedFactError
 from orgmetra_hris_kernel.facts import AssignmentFact, EmploymentVersion
 from orgmetra_hris_kernel.resolution import resolve_single_valued_fact
 
 _WORKFORCE_INCLUDED_STATUSES = frozenset({"active", "leave"})
 _ZERO_FTE = Decimal("0.0000")
+
+
+def _validate_snapshot_tenant_id(tenant_record_id: UUID) -> None:
+    """Require one exact, non-sentinel tenant UUID before emitting evidence."""
+    if type(tenant_record_id) is not UUID or tenant_record_id.int in {0, (1 << 128) - 1}:
+        raise IdentityScopeError(
+            "Workforce snapshot tenant_record_id must be a canonical operational UUID.",
+            next_action="Resolve the authoritative non-sentinel tenant UUID, then rebuild the snapshot.",
+        )
 
 
 def _validate_snapshot_temporal_coordinate(effective_on: date, known_at: datetime) -> None:
@@ -65,6 +74,7 @@ class WorkforceCompositionSnapshot:
 
     def __post_init__(self) -> None:
         """Reject non-canonical or internally inconsistent evidence before export."""
+        _validate_snapshot_tenant_id(self.tenant_record_id)
         _validate_snapshot_temporal_coordinate(self.effective_on, self.known_at)
         status_codes = tuple(status for status, _count in self.employment_status_counts)
         if len(status_codes) != len(set(status_codes)):

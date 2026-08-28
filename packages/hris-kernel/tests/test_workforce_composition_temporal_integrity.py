@@ -8,7 +8,7 @@ from uuid import UUID
 
 import pytest
 
-from orgmetra_hris_kernel.errors import IntervalError
+from orgmetra_hris_kernel.errors import IdentityScopeError, IntervalError
 from orgmetra_hris_kernel.workforce import WorkforceCompositionSnapshot
 
 
@@ -59,3 +59,17 @@ def test_rejects_datetime_subclass_that_can_forge_recorded_time_evidence() -> No
     """Canonical snapshots must not invoke caller-overridable datetime rendering."""
     with pytest.raises(IntervalError, match="knowledge cutoff"):
         snapshot(known_at=ForgedDateTime(2026, 8, 21, 4, 30, tzinfo=timezone.utc))
+
+
+@pytest.mark.parametrize(
+    "tenant_record_id",
+    [
+        "not-a-tenant-uuid",
+        UUID(int=0),
+        UUID(int=(1 << 128) - 1),
+    ],
+)
+def test_rejects_non_operational_tenant_identity(tenant_record_id: object) -> None:
+    """Canonical snapshots must not publish malformed or sentinel tenant evidence."""
+    with pytest.raises(IdentityScopeError, match="canonical operational UUID"):
+        snapshot(tenant_record_id=tenant_record_id)
