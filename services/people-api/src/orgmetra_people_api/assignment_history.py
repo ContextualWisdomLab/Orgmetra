@@ -29,8 +29,8 @@ class AssignmentHistoryIntegrityError(RuntimeError):
 
 
 def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require a UUID that is not an Orgmetra protocol sentinel."""
-    if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
+    """Require an exact UUID that is not an Orgmetra protocol sentinel."""
+    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
 
 
@@ -62,7 +62,17 @@ class AssignmentHistoryRecord:
     recorded_to: datetime | None
 
     def __post_init__(self) -> None:
-        """Reject malformed identity, temporal, and allocation evidence."""
+        """Reject malformed identity, temporal, and allocation evidence at construction."""
+        self.assert_runtime_integrity()
+
+    def assert_runtime_integrity(self) -> None:
+        """Revalidate trust-bearing fields after persistence crosses the service boundary.
+
+        ``frozen=True`` prevents ordinary assignment but is not a security boundary:
+        hostile or buggy same-process code can still mutate an instance through
+        low-level Python mechanisms. The read service therefore repeats these
+        checks immediately before using persistence evidence.
+        """
         for field_name in (
             "tenant_record_id",
             "assignment_record_id",
@@ -128,6 +138,8 @@ def _instant_text(value: datetime) -> str:
 
 def _authorized_field_value(record: AssignmentHistoryRecord, field_name: str) -> str | None:
     """Return one explicitly supported assignment-history field without reflection."""
+    if type(field_name) is not str:
+        raise AssignmentHistoryIntegrityError("authorization returned an unsupported assignment-history field")
     if field_name == "allocation_ratio":
         return format(record.allocation_ratio, "f")
     if field_name == "assignment_record_id":
@@ -167,9 +179,9 @@ def read_assignment_history(
 
     The service never retrieves protected rows when purpose, scope, resource, or
     requested fields are denied. Persistence output is treated as untrusted: a
-    row from another tenant/person, outside the requested recorded-time view, or
-    a duplicate visible assignment identity fails closed before any values are
-    returned to the caller.
+    row from another tenant/person, outside the requested recorded-time view, a
+    post-construction-invalid row, or a duplicate visible assignment identity
+    fails closed before any values are returned to the caller.
     """
     _validate_operational_uuid("tenant_record_id", tenant_record_id)
     _validate_operational_uuid("person_record_id", person_record_id)
@@ -201,6 +213,10 @@ def read_assignment_history(
     for record in records:
         if type(record) is not AssignmentHistoryRecord:
             raise AssignmentHistoryIntegrityError("assignment-history persistence returned an unsupported row type")
+        try:
+            record.assert_runtime_integrity()
+        except ValueError as exc:
+            raise AssignmentHistoryIntegrityError("assignment-history row failed runtime integrity") from exc
         if record.tenant_record_id != tenant_record_id or record.person_record_id != person_record_id:
             raise AssignmentHistoryIntegrityError("assignment-history row does not match the authorized target")
         if not _is_recorded_visible(record, known_at):
