@@ -3,6 +3,7 @@ name: HR Workspace Assignment History State Quality
 on:
   pull_request:
     branches:
+      - develop
       - feat/hr-workspace-protected-read-state
     paths:
       - "apps/hr-workspace/assignment-history-state.js"

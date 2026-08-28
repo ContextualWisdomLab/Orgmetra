@@ -14,6 +14,10 @@ const css = readFileSync(
   new URL('../apps/hr-workspace/assignment-history-state.css', import.meta.url),
   'utf8',
 );
+const workflow = readFileSync(
+  new URL('../.github/workflows/hr-workspace-assignment-history-state.yml', import.meta.url),
+  'utf8',
+);
 
 const expectedStates = {
   idle: ['false', 'status', false, 'default', 'Review assignment history'],
@@ -110,4 +114,8 @@ test('Storybook and CSS cover the governed assignment-history accessibility stat
   assert.match(css, /permission-denied/);
   assert.match(css, /validation-error/);
   assert.match(css, /min-height:\s*44px/);
+});
+
+test('the dedicated contract reruns after retargeting to protected develop', () => {
+  assert.match(workflow, /branches:\n\s+- develop\n\s+- feat\/hr-workspace-protected-read-state/);
 });
