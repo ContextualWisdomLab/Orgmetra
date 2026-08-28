@@ -22,7 +22,7 @@ from uuid import UUID, uuid5
 from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessPolicy
 
 from orgmetra_people_api.auth import AuthenticatedPrincipal
-from orgmetra_people_api.authorization import authorize_resource_fields
+from orgmetra_people_api.authorization import authorize_resource_fields, organization_unit_scope_code
 
 _MAX_UUID_INT = (1 << 128) - 1
 _IDEMPOTENCY_MIN = 16
@@ -381,6 +381,7 @@ def create_employment_record(
         resource_kind="employment_record",
         requested_fields=_EMPLOYMENT_FIELDS,
         policy=policy,
+        required_target_scope_code=organization_unit_scope_code(command.employing_organization_unit_id),
     )
     result = port.create_employment(command=command, authorization=authorization)
     if not isinstance(result, EmploymentMutationResult):

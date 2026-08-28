@@ -8,6 +8,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
     HireAcceptanceResult,
@@ -104,7 +105,9 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.principal = AuthenticatedPrincipal(
             tenant_record_id=TENANT,
             actor_reference="keyverse_subject:operator-17",
-            granted_scope_codes=frozenset({"orgmetra.people.materialize_worker"}),
+            granted_scope_codes=frozenset(
+                {"orgmetra.people.materialize_worker", organization_unit_scope_code(ORGANIZATION)}
+            ),
         )
         self.policy = PurposeBoundAccessPolicy(
             tenant_record_id=TENANT,

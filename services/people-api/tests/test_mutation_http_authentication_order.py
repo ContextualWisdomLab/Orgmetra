@@ -8,6 +8,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.mutation_http import PeopleMutationAsgiApp
 from orgmetra_people_api.mutations import (
     AssignmentMutationCommand,
@@ -20,6 +21,7 @@ from orgmetra_people_api.mutations import (
 
 TENANT = UUID("0198a412-8100-7000-8000-000000000001")
 PERSON = UUID("0198a412-8100-7000-8000-000000000020")
+ORGANIZATION = UUID("0198a412-8100-7000-8000-000000000022")
 MUTATION_IDS = [
     UUID("0198a412-8100-7000-8000-000000000030"),
     UUID("0198a412-8100-7000-8000-000000000031"),
@@ -120,7 +122,7 @@ def _principal() -> AuthenticatedPrincipal:
     return AuthenticatedPrincipal(
         tenant_record_id=TENANT,
         actor_reference="keyverse_subject:operator-17",
-        granted_scope_codes=frozenset({"orgmetra.people.write"}),
+        granted_scope_codes=frozenset({"orgmetra.people.write", organization_unit_scope_code(ORGANIZATION)}),
     )
 
 

@@ -11,6 +11,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import AuthorizationDecision
 from orgmetra_people_api.auth import AuthenticatedPrincipal
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.mutations import (
     PeopleMutationIntegrityError,
     PeopleMutationNotFound,
@@ -184,7 +185,13 @@ def covering_position_row() -> tuple[object, ...]:
 PRINCIPAL = AuthenticatedPrincipal(
     tenant_record_id=TENANT,
     actor_reference=ACTOR,
-    granted_scope_codes=frozenset({"orgmetra.people.write", "orgmetra.job_architecture.write"}),
+    granted_scope_codes=frozenset(
+        {
+            "orgmetra.people.write",
+            "orgmetra.job_architecture.write",
+            organization_unit_scope_code(ORGANIZATION),
+        }
+    ),
 )
 
 

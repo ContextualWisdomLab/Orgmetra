@@ -17,7 +17,7 @@ from uuid import UUID
 from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessPolicy
 
 from orgmetra_people_api.auth import AuthenticatedPrincipal
-from orgmetra_people_api.authorization import authorize_resource_fields
+from orgmetra_people_api.authorization import authorize_resource_fields, organization_unit_scope_code
 from orgmetra_people_api.mutations import validate_idempotency_key
 
 _MAX_UUID_INT = (1 << 128) - 1
@@ -166,6 +166,7 @@ def accept_confirmed_hire(
         resource_kind="selection_decision",
         requested_fields=_HIRE_MUTATION_FIELDS,
         policy=policy,
+        required_target_scope_code=organization_unit_scope_code(command.employing_organization_unit_id),
     )
     result = mutation_port.accept_hire(command=command, authorization=authorization)
     if not isinstance(result, HireAcceptanceResult):

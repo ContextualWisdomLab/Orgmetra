@@ -93,11 +93,17 @@ DO $$ BEGIN
  IF (SELECT count(*) FROM employment_employing_organization_record WHERE employment_record_id='10000000-0000-7000-8000-000000000020'::uuid AND tstzrange(recorded_from, recorded_to, '[)') @> TIMESTAMPTZ '2026-09-01 00:00:00+00') <> 1 THEN
    RAISE EXCEPTION 'tenant alpha should see exactly one employer fact at the selected system-time coordinate';
  END IF;
+ IF (SELECT count(*) FROM employment_employing_organization_record WHERE employment_record_id='20000000-0000-7000-8000-000000000020'::uuid) <> 0 THEN
+   RAISE EXCEPTION 'tenant alpha must not see tenant beta employer facts';
+ END IF;
 END $$;
 SELECT set_config('orgmetra.tenant_record_id','20000000-0000-7000-8000-000000000001',false);
 DO $$ BEGIN
  IF (SELECT count(*) FROM employment_employing_organization_record WHERE employment_record_id='20000000-0000-7000-8000-000000000020'::uuid AND tstzrange(recorded_from, recorded_to, '[)') @> TIMESTAMPTZ '2026-09-01 00:00:00+00') <> 1 THEN
    RAISE EXCEPTION 'tenant beta should see exactly one employer fact at the selected system-time coordinate';
+ END IF;
+ IF (SELECT count(*) FROM employment_employing_organization_record WHERE employment_record_id='10000000-0000-7000-8000-000000000020'::uuid) <> 0 THEN
+   RAISE EXCEPTION 'tenant beta must not see tenant alpha employer facts';
  END IF;
 END $$;
 RESET ROLE;

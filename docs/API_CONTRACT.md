@@ -19,6 +19,12 @@ The baseline scope contract is:
 
 Scopes are coarse API capabilities. A caller-supplied business purpose remains a finer authorization input and cannot enlarge a token's scope or authorize itself.
 
+Employment creation and confirmed-hire materialization additionally require the
+exact employing-organization target scope
+`orgmetra.people.write.organization_unit_<organization_unit_id_hex>` in the
+authenticated token. The target scope is checked alongside the operation scope;
+an organization identifier in the request body is never permission by itself.
+
 ## Command requirements
 
 Every mutating request requires:

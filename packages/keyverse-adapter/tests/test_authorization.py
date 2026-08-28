@@ -53,6 +53,35 @@ def test_exact_tenant_purpose_scope_and_field_subset_is_authorized() -> None:
     assert decision.next_action == "Continue with only the authorized fields."
 
 
+def test_exact_target_scope_is_authorized() -> None:
+    """Allow a request only when its additional target scope is explicitly granted."""
+    target_scope = "orgmetra.people.write.organization_unit_0198a412820070008000000000000050"
+    request = replace(
+        REQUEST,
+        granted_scope_codes=REQUEST.granted_scope_codes | {target_scope},
+        required_target_scope_code=target_scope,
+    )
+
+    decision = require_purpose_bound_access(request=request, policy=POLICY)
+
+    assert decision.allowed is True
+
+
+def test_missing_exact_target_scope_is_denied() -> None:
+    """Deny an otherwise valid request when its exact target scope is absent."""
+    request = replace(
+        REQUEST,
+        required_target_scope_code=(
+            "orgmetra.people.write.organization_unit_0198a412820070008000000000000050"
+        ),
+    )
+
+    decision = evaluate_purpose_bound_access(request=request, policy=POLICY)
+
+    assert decision.allowed is False
+    assert decision.reason_code == "required_scope_missing"
+
+
 @pytest.mark.parametrize(
     ("access_request", "reason_code", "next_action"),
     [

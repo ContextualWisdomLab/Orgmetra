@@ -10,6 +10,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
     HireAcceptanceResult,
@@ -136,7 +137,9 @@ def allowed_authorization() -> AuthorizationDecision:
 PRINCIPAL = AuthenticatedPrincipal(
     tenant_record_id=TENANT,
     actor_reference=ACTOR,
-    granted_scope_codes=frozenset({"orgmetra.people.materialize_worker"}),
+    granted_scope_codes=frozenset(
+        {"orgmetra.people.materialize_worker", organization_unit_scope_code(ORGANIZATION)}
+    ),
 )
 
 

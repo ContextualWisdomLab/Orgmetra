@@ -142,9 +142,11 @@ class PurposeBoundAccessRequest:
     ``tenant_record_id`` is the active Orgmetra request context, and
     ``resource_tenant_record_id`` comes from the target record identity. The
     opaque ``resource_reference`` identifies that exact target for audit
-    correlation without copying its PII. All tenant identifiers must match the
-    policy tenant. Only field names are carried here; field values remain behind
-    the authoritative data boundary until access is allowed.
+    correlation without copying its PII. An optional target scope narrows the
+    operation to one exact organization or other governed target. All tenant
+    identifiers must match the policy tenant. Only field names are carried here;
+    field values remain behind the authoritative data boundary until access is
+    allowed.
     """
 
     tenant_record_id: UUID
@@ -157,6 +159,7 @@ class PurposeBoundAccessRequest:
     resource_kind: str
     requested_fields: frozenset[str]
     granted_scope_codes: frozenset[str]
+    required_target_scope_code: str | None = None
 
     def __post_init__(self) -> None:
         """Reject untrusted identity, target, tenant, purpose, field, or scope attributes."""
@@ -174,6 +177,8 @@ class PurposeBoundAccessRequest:
         _validate_code("operation_code", self.operation_code)
         _validate_field_set("requested_fields", self.requested_fields)
         _validate_scope_set(self.granted_scope_codes)
+        if self.required_target_scope_code is not None:
+            _validate_scope("required_target_scope_code", self.required_target_scope_code)
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,6 +285,16 @@ def evaluate_purpose_bound_access(
             reason_code="operation_not_allowed",
         )
     if policy.required_scope_code not in request.granted_scope_codes:
+        return _decision(
+            request=request,
+            policy=policy,
+            allowed=False,
+            reason_code="required_scope_missing",
+        )
+    if (
+        request.required_target_scope_code is not None
+        and request.required_target_scope_code not in request.granted_scope_codes
+    ):
         return _decision(
             request=request,
             policy=policy,

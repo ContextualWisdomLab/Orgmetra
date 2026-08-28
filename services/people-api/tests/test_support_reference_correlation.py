@@ -8,6 +8,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import AuthenticatedPrincipal
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.hire import HireAcceptanceCommand
 from orgmetra_people_api.hire_http import HireAcceptanceAsgiApp
 from orgmetra_people_api.mutation_http import PeopleMutationAsgiApp
@@ -132,6 +133,7 @@ class SupportReferenceCorrelationTests(unittest.IsolatedAsyncioTestCase):
             actor_reference="keyverse_subject:operator-99",
             granted_scope_codes=frozenset(
                 {"orgmetra.people.materialize_worker", "orgmetra.people.write", "orgmetra.job_architecture.write"}
+                | {organization_unit_scope_code(ORGANIZATION)}
             ),
         )
 

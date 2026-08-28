@@ -10,6 +10,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.mutation_http import PeopleMutationAsgiApp
 from orgmetra_people_api.mutations import (
     AssignmentMutationCommand,
@@ -159,7 +160,13 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
         self.principal = AuthenticatedPrincipal(
             tenant_record_id=TENANT,
             actor_reference="keyverse_subject:operator-17",
-            granted_scope_codes=frozenset({"orgmetra.people.write", "orgmetra.job_architecture.write"}),
+            granted_scope_codes=frozenset(
+                {
+                    "orgmetra.people.write",
+                    "orgmetra.job_architecture.write",
+                    organization_unit_scope_code(ORGANIZATION),
+                }
+            ),
         )
         self.employment_policy = PurposeBoundAccessPolicy(
             tenant_record_id=TENANT,
