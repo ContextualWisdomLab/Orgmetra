@@ -22,6 +22,7 @@ from uuid import UUID
 from orgmetra_hris_kernel.audit import AuditOutboxEvent
 from orgmetra_keyverse_adapter import AuthorizationDecision
 
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
     HireAcceptanceResult,
@@ -185,8 +186,9 @@ def _is_aware_datetime(value: object) -> bool:
 
 
 def _validate_authorization(command: HireAcceptanceCommand, authorization: object) -> AuthorizationDecision:
-    """Require an exact allow decision for this immutable selection decision."""
+    """Require an exact allow decision for this selection decision and employer target."""
     expected_reference = f"selection_decision:{command.selection_decision_id.hex}"
+    expected_target_scope = organization_unit_scope_code(command.employing_organization_unit_id)
     if not isinstance(authorization, AuthorizationDecision):
         raise HireDecisionIntegrityError("hire mutation requires a typed authorization decision")
     if (
@@ -197,6 +199,7 @@ def _validate_authorization(command: HireAcceptanceCommand, authorization: objec
         or authorization.operation_code != "materialize_worker"
         or authorization.requested_fields != _HIRE_MUTATION_FIELDS
         or authorization.authorized_fields != _HIRE_MUTATION_FIELDS
+        or authorization.required_target_scope_code != expected_target_scope
     ):
         raise HireDecisionIntegrityError("hire mutation authorization does not match the exact decision")
     return authorization
