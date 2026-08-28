@@ -5,6 +5,7 @@ on:
     branches:
       - develop
     paths:
+      - "database/migrations/0001_foundation_schema.sql"
       - "database/migrations/0040_employment_employing_organization.sql"
       - "tests/test_employment_employing_organization_postgres.sh"
       - "scripts/foundation-contract-core.mjs"
