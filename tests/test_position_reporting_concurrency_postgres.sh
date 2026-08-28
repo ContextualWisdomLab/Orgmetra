@@ -145,13 +145,14 @@ wait "${pid_x}"
 status_x=$?
 set -e
 
-if [[ ${status_x} -ne 0 ]]; then
-    echo "first concurrent position-reporting mutation unexpectedly failed:" >&2
+if ! (
+    [[ ${status_x} -eq 0 && ${status_y} -ne 0 && "$(cat "${log_y}")" == *"cycle"* ]] ||
+    [[ ${status_y} -eq 0 && ${status_x} -ne 0 && "$(cat "${log_x}")" == *"cycle"* ]]
+); then
+    echo "concurrent opposite reporting mutations did not leave exactly one successful edge and one cycle rejection:" >&2
+    echo "X status=${status_x}" >&2
     cat "${log_x}" >&2
-    exit 1
-fi
-if [[ ${status_y} -eq 0 || "$(cat "${log_y}")" != *"cycle"* ]]; then
-    echo "concurrent opposite reporting mutations committed a management cycle instead of serializing fail-closed:" >&2
+    echo "Y status=${status_y}" >&2
     cat "${log_y}" >&2
     exit 1
 fi
