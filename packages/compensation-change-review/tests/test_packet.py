@@ -1,6 +1,6 @@
 """Regression coverage for governed compensation-change review evidence."""
 from dataclasses import replace
-from datetime import date, datetime, timedelta, timezone, tzinfo
+from datetime import datetime, timedelta, timezone, tzinfo
 import json
 import re
 
@@ -12,45 +12,14 @@ from orgmetra_compensation_change_review import (
 )
 
 
-def valid_kwargs() -> dict[str, object]:
-    """Return one complete valid packet input set with opaque deterministic identities."""
-    return {
-        "tenant_record_id": "11111111-1111-4111-8111-111111111111",
-        "compensation_review_reference": "compensation_change_review:22222222-2222-4222-8222-222222222222",
-        "person_record_reference": "person_record:33333333-3333-4333-8333-333333333333",
-        "employment_record_reference": "employment_record:44444444-4444-4444-8444-444444444444",
-        "active_assignment_snapshot_reference": "active_assignment_snapshot:55555555-5555-4555-8555-555555555555",
-        "active_assignment_snapshot_digest": "a" * 64,
-        "current_compensation_snapshot_reference": "compensation_snapshot:66666666-6666-4666-8666-666666666666",
-        "current_compensation_snapshot_digest": "b" * 64,
-        "proposed_compensation_plan_reference": "compensation_plan:77777777-7777-4777-8777-777777777777",
-        "proposed_compensation_plan_digest": "c" * 64,
-        "compensation_policy_reference": "compensation_policy:88888888-8888-4888-8888-888888888888",
-        "compensation_policy_digest": "d" * 64,
-        "pay_equity_review_reference": "pay_equity_review:99999999-9999-4999-8999-999999999999",
-        "pay_equity_review_digest": "e" * 64,
-        "budget_authorization_reference": "budget_authorization:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        "budget_authorization_digest": "f" * 64,
-        "payroll_handoff_plan_reference": "payroll_handoff_plan:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        "payroll_handoff_plan_digest": "1" * 64,
-        "requester_reference": "actor:cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        "reviewer_reference": "actor:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-        "purpose_code": "compensation_change_review",
-        "reason_code": "annual_compensation_review",
-        "proposed_effective_on": date(2026, 10, 1),
-        "generated_at": datetime(2026, 8, 19, 6, 12, 13, 456789, tzinfo=timezone.utc),
-        "evidence_version": 1,
-    }
-
-
-def build_valid() -> CompensationChangeReviewPacket:
+def build_valid(valid_packet_kwargs: dict[str, object]) -> CompensationChangeReviewPacket:
     """Build one valid packet through the supported public builder."""
-    return build_compensation_change_review_packet(**valid_kwargs())
+    return build_compensation_change_review_packet(**valid_packet_kwargs)
 
 
-def test_builds_deterministic_value_minimized_packet() -> None:
+def test_builds_deterministic_value_minimized_packet(valid_packet_kwargs: dict[str, object]) -> None:
     """A valid packet is canonical, human-only, unresolved, and excludes protected values."""
-    packet = build_valid()
+    packet = build_valid(valid_packet_kwargs)
     canonical = json.loads(packet.canonical_json())
 
     assert packet.decision_authority == "human_review_only"
@@ -64,12 +33,12 @@ def test_builds_deterministic_value_minimized_packet() -> None:
     assert canonical["generated_at"] == "2026-08-19T06:12:13.456789Z"
     assert canonical["evidence_version"] == 1
     assert len(packet.sha256_digest()) == 64
-    assert packet.sha256_digest() == build_valid().sha256_digest()
+    assert packet.sha256_digest() == build_valid(valid_packet_kwargs).sha256_digest()
 
 
-def test_canonical_evidence_changes_with_governed_artifact_or_version() -> None:
+def test_canonical_evidence_changes_with_governed_artifact_or_version(valid_packet_kwargs: dict[str, object]) -> None:
     """Changing exact reviewed evidence or its version changes the immutable packet digest."""
-    packet = build_valid()
+    packet = build_valid(valid_packet_kwargs)
     changed_plan = replace(packet, proposed_compensation_plan_digest="2" * 64)
     changed_policy = replace(packet, compensation_policy_digest="3" * 64)
     changed_version = replace(packet, evidence_version=2)
@@ -77,9 +46,9 @@ def test_canonical_evidence_changes_with_governed_artifact_or_version() -> None:
     assert len({packet.sha256_digest(), changed_plan.sha256_digest(), changed_policy.sha256_digest(), changed_version.sha256_digest()}) == 4
 
 
-def test_repr_redacts_personal_and_compensation_correlations() -> None:
+def test_repr_redacts_personal_and_compensation_correlations(valid_packet_kwargs: dict[str, object]) -> None:
     """Normal repr formatting cannot leak worker, actor, or evidence correlation identifiers."""
-    packet = build_valid()
+    packet = build_valid(valid_packet_kwargs)
     rendered = repr(packet)
 
     assert rendered == "CompensationChangeReviewPacket(<redacted>)"
@@ -95,9 +64,9 @@ def test_repr_redacts_personal_and_compensation_correlations() -> None:
         assert sensitive not in rendered
 
 
-def test_next_action_requires_identity_scope_and_evidence_before_approval() -> None:
+def test_next_action_requires_identity_scope_and_evidence_before_approval(valid_packet_kwargs: dict[str, object]) -> None:
     """The canonical operator instruction orders tenant, actor, worker, and evidence checks first."""
-    action = build_valid().next_action
+    action = build_valid(valid_packet_kwargs).next_action
     actor_clause = "verify their resolved actor identities are distinct"
     worker_clause = "prove the Person-to-Employment binding"
     evidence_clause = "verify the current compensation snapshot"
@@ -126,14 +95,19 @@ def test_next_action_requires_identity_scope_and_evidence_before_approval() -> N
         ("next_action", "Send directly to payroll.", "next_action must remain"),
     ],
 )
-def test_direct_constructor_and_replace_fail_closed(field_name: str, value: object, message: str) -> None:
+def test_direct_constructor_and_replace_fail_closed(
+    field_name: str,
+    value: object,
+    message: str,
+    valid_packet_kwargs: dict[str, object],
+) -> None:
     """Both construction paths reject attempts to weaken immutable high-impact guardrails."""
-    direct_kwargs = valid_kwargs()
+    direct_kwargs = valid_packet_kwargs.copy()
     direct_kwargs[field_name] = value
     with pytest.raises(ValueError, match=message):
         CompensationChangeReviewPacket(**direct_kwargs)
 
-    packet = build_valid()
+    packet = build_valid(valid_packet_kwargs)
     with pytest.raises(ValueError, match=message):
         replace(packet, **{field_name: value})
 
@@ -167,17 +141,22 @@ def test_direct_constructor_and_replace_fail_closed(field_name: str, value: obje
         ("evidence_version", 2_147_483_648, "evidence_version must be an integer"),
     ],
 )
-def test_invalid_core_inputs_fail_closed(field_name: str, value: object, message: str) -> None:
+def test_invalid_core_inputs_fail_closed(
+    field_name: str,
+    value: object,
+    message: str,
+    valid_packet_kwargs: dict[str, object],
+) -> None:
     """Malformed identity, evidence, purpose, time, and version inputs are rejected."""
-    kwargs = valid_kwargs()
+    kwargs = valid_packet_kwargs.copy()
     kwargs[field_name] = value
     with pytest.raises(ValueError, match=message):
         build_compensation_change_review_packet(**kwargs)
 
 
-def test_every_reference_and_digest_is_validated() -> None:
+def test_every_reference_and_digest_is_validated(valid_packet_kwargs: dict[str, object]) -> None:
     """Each trust-bearing reference and digest field is individually bound to its namespace."""
-    packet = build_valid()
+    packet = build_valid(valid_packet_kwargs)
     reference_fields = {
         "compensation_review_reference": "compensation_change_review",
         "person_record_reference": "person_record",
@@ -192,7 +171,7 @@ def test_every_reference_and_digest_is_validated() -> None:
         "requester_reference": "actor",
         "reviewer_reference": "actor",
     }
-    digest_fields = [name for name in valid_kwargs() if name.endswith("_digest")]
+    digest_fields = [name for name in valid_packet_kwargs if name.endswith("_digest")]
 
     for field_name, prefix in reference_fields.items():
         with pytest.raises(ValueError, match=re.escape(f"opaque {prefix}: reference")):
@@ -202,17 +181,17 @@ def test_every_reference_and_digest_is_validated() -> None:
             replace(packet, **{field_name: "z" * 64})
 
 
-def test_same_opaque_actor_reference_is_rejected_early() -> None:
+def test_same_opaque_actor_reference_is_rejected_early(valid_packet_kwargs: dict[str, object]) -> None:
     """Exact requester/reviewer reuse is denied before authoritative identity re-resolution."""
-    kwargs = valid_kwargs()
+    kwargs = valid_packet_kwargs.copy()
     kwargs["reviewer_reference"] = kwargs["requester_reference"]
     with pytest.raises(ValueError, match="different actor references"):
         build_compensation_change_review_packet(**kwargs)
 
 
-def test_fractional_and_offset_timestamps_preserve_distinct_instants() -> None:
+def test_fractional_and_offset_timestamps_preserve_distinct_instants(valid_packet_kwargs: dict[str, object]) -> None:
     """Canonical evidence preserves microseconds while normalizing equivalent offsets to UTC."""
-    packet = build_valid()
+    packet = build_valid(valid_packet_kwargs)
     later = replace(packet, generated_at=packet.generated_at.replace(microsecond=456790))
     offset = replace(
         packet,
@@ -235,9 +214,9 @@ class UnknownOffset(tzinfo):
         return None
 
 
-def test_timezone_with_unknown_offset_is_rejected() -> None:
+def test_timezone_with_unknown_offset_is_rejected(valid_packet_kwargs: dict[str, object]) -> None:
     """A tzinfo object is insufficient when it cannot establish an actual UTC offset."""
-    kwargs = valid_kwargs()
+    kwargs = valid_packet_kwargs.copy()
     kwargs["generated_at"] = datetime(2026, 8, 19, 6, 12, tzinfo=UnknownOffset())
     with pytest.raises(ValueError, match="generated_at must be timezone-aware"):
         build_compensation_change_review_packet(**kwargs)
