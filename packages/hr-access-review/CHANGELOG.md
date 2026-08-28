@@ -8,5 +8,6 @@
 - Bind reviewer identity-resolution evidence, the fixed `hr_access_recertification` purpose, and distinct human-review/system-recorded UTC times; reject system-recorded evidence that predates the review.
 - Keep every packet non-enforcing with authoritative re-resolution required before any access mutation.
 - Reject hostile runtime subclasses and post-construction evidence rewrite.
+- Return the exact payload checked by the issuance digest so canonical export cannot race with a valid field rewrite.
 - Add exact-head CI requiring an installable package artifact, 100% owned statement and branch coverage, and a clean checkout.
 - Run installed-wheel tests in a fully isolated virtual environment whose pytest/coverage toolchain is installed from the reviewed hash-pinned repository dependency set; fail closed if the package or those test dependencies resolve outside that environment.

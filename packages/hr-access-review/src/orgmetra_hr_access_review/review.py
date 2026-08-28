@@ -239,27 +239,29 @@ class HrAccessReviewPacket:
             "tenant_record_id": self.tenant_record_id,
         }
 
-    def _payload_digest(self) -> str:
-        """Hash the live canonicalizable payload without consulting issuance state."""
+    def _payload_digest(self, payload: dict[str, Any] | None = None) -> str:
+        """Hash one canonicalizable payload without consulting issuance state."""
+        evidence = self._payload() if payload is None else payload
         encoded = json.dumps(
-            self._payload(), sort_keys=True, separators=(",", ":"), ensure_ascii=True
+            evidence, sort_keys=True, separators=(",", ":"), ensure_ascii=True
         ).encode("utf-8")
         return sha256(encoded).hexdigest()
 
-    def _assert_integrity(self) -> None:
-        """Reject unregistered copies and any post-construction evidence rewrite."""
+    def _assert_integrity(self) -> dict[str, Any]:
+        """Return the checked payload while rejecting copies or evidence rewrites."""
         self._validate()
         with _ISSUANCE_LOCK:
             expected = _ISSUANCE_DIGESTS.get(self)
         if expected is None:
             raise ValueError("access review evidence is not registered as constructed")
-        if not hmac.compare_digest(expected, self._payload_digest()):
+        payload = self._payload()
+        if not hmac.compare_digest(expected, self._payload_digest(payload)):
             raise ValueError("access review evidence changed after construction")
+        return payload
 
     def canonical_document(self) -> dict[str, Any]:
         """Return one verified value-minimized document for immutable audit correlation."""
-        self._assert_integrity()
-        return self._payload()
+        return self._assert_integrity()
 
     def canonical_json(self) -> str:
         """Return deterministic verified canonical JSON for durable audit/outbox evidence."""

@@ -247,6 +247,27 @@ def test_detects_post_construction_evidence_rewrite_and_unregistered_copy() -> N
         copied.canonical_json()
 
 
+def test_canonical_export_reuses_the_integrity_checked_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A valid rewrite after checking cannot change the emitted access-review evidence."""
+    packet = build()
+    original_assert_integrity = HrAccessReviewPacket._assert_integrity
+
+    def rewrite_after_check(self: HrAccessReviewPacket) -> dict[str, object]:
+        """Simulate a field rewrite immediately after the integrity check."""
+        checked_snapshot = original_assert_integrity(self)
+        object.__setattr__(self, "review_recommendation_code", "remove_existing_access")
+        return checked_snapshot
+
+    monkeypatch.setattr(HrAccessReviewPacket, "_assert_integrity", rewrite_after_check)
+
+    document = json.loads(packet.canonical_json())
+    assert document["review_recommendation_code"] == "retain_existing_access"
+    with pytest.raises(ValueError, match="changed after construction"):
+        packet.canonical_json()
+
+
 def test_public_api_has_beginner_readable_docstrings() -> None:
     """Keep the buyer-facing evidence API understandable to new maintainers."""
     assert HrAccessReviewPacket.__doc__
