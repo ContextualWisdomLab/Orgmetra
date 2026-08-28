@@ -3,15 +3,16 @@
 The packet correlates one proposed employee review to Employment and Job references,
 a performance cycle, predetermined criteria and goals, an exact criterion-observation
 snapshot, an optional development plan, and an accountable human reviewer. It does not
-assert that those references resolve to one authoritative scope; that verification must
-occur at the authoritative HRIS/performance boundary before rating. Opaque worker
-references remain personal data because they can be re-associated with an identifiable
-person through the authoritative HRIS boundary. Direct identifiers, rating values,
-free-form feedback, and free-form model output remain outside this envelope.
+assert that those references resolve to one authoritative scope or that caller-supplied
+UUIDv4-shaped references have already been proven opaque; that verification must occur
+at the authoritative HRIS/performance boundary before rating. References are therefore
+personal data and are conservatively classified as potentially containing direct person
+identifier content until trusted provenance resolves them. Rating values, free-form
+feedback, and free-form model output remain outside this envelope.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 import hmac
@@ -32,10 +33,10 @@ _DECISION_AUTHORITY = "human_review_only"
 _REVIEW_STATE = "requires_human_review"
 _SCOPE_VERIFICATION_STATE = "requires_authoritative_resolution"
 _NEXT_ACTION = (
-    "Verify authoritative Employment/Job scope, performance-cycle dates, governed "
-    "criteria and goals, criterion-observation evidence, and any development-plan "
-    "provenance; then record accountable human rating and feedback through the "
-    "authoritative performance workflow."
+    "Verify authoritative reference provenance and opacity, Employment/Job scope, "
+    "performance-cycle dates, governed criteria and goals, criterion-observation "
+    "evidence, and any development-plan provenance; then record accountable human "
+    "rating and feedback through the authoritative performance workflow."
 )
 _PROCESS_PACKET_SEAL_KEY = secrets.token_bytes(32)
 _PACKET_SEALS: dict[int, str] = {}
@@ -67,6 +68,11 @@ def _seal_packet(payload_json: str) -> str:
     return hmac.new(_PROCESS_PACKET_SEAL_KEY, payload_json.encode("utf-8"), "sha256").hexdigest()
 
 
+def _system_recorded_at() -> datetime:
+    """Read the trusted host clock for one packet issuance."""
+    return datetime.now(timezone.utc)
+
+
 def _validate_operational_uuid(value: str, field_name: str) -> None:
     """Require canonical non-sentinel UUID text owned by the authoritative HRIS."""
     if type(value) is not str:
@@ -80,8 +86,8 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require an expected namespace plus a canonical opaque UUIDv4 suffix."""
-    error_message = f"{field_name} must be an opaque {prefix}: reference"
+    """Require an expected namespace plus a canonical UUIDv4-shaped suffix."""
+    error_message = f"{field_name} must be a canonical {prefix}: UUIDv4 reference"
     if (
         type(value) is not str
         or len(value) > 160
@@ -105,7 +111,7 @@ def _validate_digest(value: str, field_name: str) -> None:
 
 
 def _freeze_timestamp(value: datetime) -> datetime:
-    """Resolve caller timezone behavior once and store one immutable UTC instant."""
+    """Resolve the trusted clock once and store one immutable UTC instant."""
     if type(value) is not datetime or value.tzinfo is None:
         raise ValueError("generated_at must be an exact timezone-aware datetime")
     try:
@@ -171,10 +177,10 @@ class PerformanceReviewPacket:
     reason_code: str
     review_period_start: date
     review_period_end: date
-    generated_at: datetime
+    generated_at: datetime = field(init=False)
     evidence_version: int = 1
     contains_personal_data: bool = True
-    contains_direct_person_identifiers: bool = False
+    contains_direct_person_identifiers: bool = True
     contains_rating_value: bool = False
     contains_free_form_model_output: bool = False
     human_confirmation_required: bool = True
@@ -237,12 +243,14 @@ class PerformanceReviewPacket:
         _validate_business_date(self.review_period_end, "review_period_end")
         if self.review_period_start > self.review_period_end:
             raise ValueError("review period start must not be after review period end")
-        object.__setattr__(self, "generated_at", _freeze_timestamp(self.generated_at))
+        object.__setattr__(self, "generated_at", _freeze_timestamp(_system_recorded_at()))
         _validate_evidence_version(self.evidence_version)
         if self.contains_personal_data is not True:
             raise ValueError("performance review packet contains personal data through worker references")
-        if self.contains_direct_person_identifiers is not False:
-            raise ValueError("performance review packet must not contain direct person identifiers")
+        if self.contains_direct_person_identifiers is not True:
+            raise ValueError(
+                "unverified reference provenance must be treated as potentially containing direct person identifiers"
+            )
         if self.contains_rating_value is not False:
             raise ValueError("performance review packet must not contain rating values")
         if self.contains_free_form_model_output is not False:
@@ -334,10 +342,9 @@ def build_performance_review_packet(
     reason_code: str,
     review_period_start: date,
     review_period_end: date,
-    generated_at: datetime,
     evidence_version: int = 1,
 ) -> PerformanceReviewPacket:
-    """Build value-minimized performance-review evidence pending authoritative resolution."""
+    """Build value-minimized performance-review evidence using system-recorded time."""
     return PerformanceReviewPacket(
         tenant_record_id=tenant_record_id,
         performance_review_reference=performance_review_reference,
@@ -358,6 +365,5 @@ def build_performance_review_packet(
         reason_code=reason_code,
         review_period_start=review_period_start,
         review_period_end=review_period_end,
-        generated_at=generated_at,
         evidence_version=evidence_version,
     )
