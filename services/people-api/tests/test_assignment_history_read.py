@@ -28,6 +28,14 @@ KNOWN_AT = datetime(2026, 8, 28, 3, 0, tzinfo=timezone.utc)
 RECORDED_FROM = datetime(2026, 8, 20, 0, 0, tzinfo=timezone.utc)
 
 
+class ForgedUUID(UUID):
+    """Prove trust-bearing identity validators reject subclass behavior."""
+
+
+class ForgedField(str):
+    """Prove authorization output cannot smuggle behavior in a string subclass."""
+
+
 class FakeAssignmentHistoryPort:
     """Capture read calls so tests can prove authorization-before-retrieval ordering."""
 
@@ -227,6 +235,22 @@ class AssignmentHistoryReadTests(unittest.TestCase):
                     read_port=FakeAssignmentHistoryPort(records),
                 )
 
+    def test_post_construction_row_mutation_fails_runtime_integrity(self) -> None:
+        record = assignment_record()
+        object.__setattr__(record, "allocation_ratio", Decimal("NaN"))
+
+        with self.assertRaisesRegex(AssignmentHistoryIntegrityError, "runtime integrity"):
+            read_assignment_history(
+                principal=self.principal,
+                tenant_record_id=TENANT,
+                person_record_id=PERSON,
+                known_at=KNOWN_AT,
+                purpose_code="employee_profile_review",
+                requested_fields=frozenset({"allocation_ratio"}),
+                policy=self.policy,
+                read_port=FakeAssignmentHistoryPort((record,)),
+            )
+
     def test_duplicate_visible_assignment_identity_fails_closed(self) -> None:
         duplicate = assignment_record(effective_from=date(2026, 2, 1), effective_to=None)
         with self.assertRaisesRegex(AssignmentHistoryIntegrityError, "duplicate visible assignment"):
@@ -263,10 +287,35 @@ class AssignmentHistoryReadTests(unittest.TestCase):
                 read_port=FakeAssignmentHistoryPort((assignment_record(),)),
             )
 
+    def test_field_name_subclass_from_authorization_fails_closed(self) -> None:
+        forged_field = ForgedField("effective_from")
+        forged_policy = PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="forged-field-v1",
+            resource_kind="person_assignment_history",
+            purpose_code="employee_profile_review",
+            operation_code="read_record",
+            required_scope_code="orgmetra.people.assignment_history.read",
+            permitted_fields=frozenset({forged_field}),
+        )
+
+        with self.assertRaisesRegex(AssignmentHistoryIntegrityError, "unsupported assignment-history field"):
+            read_assignment_history(
+                principal=self.principal,
+                tenant_record_id=TENANT,
+                person_record_id=PERSON,
+                known_at=KNOWN_AT,
+                purpose_code="employee_profile_review",
+                requested_fields=frozenset({forged_field}),
+                policy=forged_policy,
+                read_port=FakeAssignmentHistoryPort((assignment_record(),)),
+            )
+
     def test_invalid_request_shape_fails_before_repository_access(self) -> None:
         port = FakeAssignmentHistoryPort(())
         invalid = (
             ("tenant_record_id", UUID(int=0)),
+            ("tenant_record_id", ForgedUUID(str(TENANT))),
             ("person_record_id", UUID(int=(1 << 128) - 1)),
             ("known_at", datetime(2026, 8, 28, 3, 0)),
         )
@@ -282,13 +331,14 @@ class AssignmentHistoryReadTests(unittest.TestCase):
                 "read_port": port,
             }
             kwargs[field_name] = value
-            with self.subTest(field_name=field_name), self.assertRaises(ValueError):
+            with self.subTest(field_name=field_name, value_type=type(value).__name__), self.assertRaises(ValueError):
                 read_assignment_history(**kwargs)
         self.assertEqual(port.calls, [])
 
     def test_record_rejects_noncanonical_business_or_time_values(self) -> None:
         invalid_overrides = (
             {"assignment_record_id": "assignment"},
+            {"assignment_record_id": ForgedUUID(str(ASSIGNMENT_A))},
             {"allocation_ratio": Decimal("NaN")},
             {"allocation_ratio": Decimal("1.00000")},
             {"allocation_ratio": Decimal("0.0000")},
