@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 
 import {
   hiringDecisionRecordMarkup,
@@ -53,6 +54,8 @@ const FORBIDDEN_VALUE_KEYS = Object.freeze([
   'prompt',
   'modelOutput',
 ]);
+
+const WORKFLOW = readFileSync(new URL('../.github/workflows/hr-workspace-hiring-decision-record.yml', import.meta.url), 'utf8');
 
 test('hiring decision record exposes only bounded governed workflow states', () => {
   for (const state of STATES) {
@@ -143,4 +146,8 @@ test('hiring decision record fails closed with a concrete next action', () => {
     assert.equal(model.decisionRecorded, false);
     assert.match(model.nextAction, pattern);
   }
+});
+
+test('hiring decision record contract runs on protected develop and dependency parent pull requests', () => {
+  assert.match(WORKFLOW, /branches:\n\s+- develop\n\s+- feat\/hr-workspace-protected-read-state/);
 });
