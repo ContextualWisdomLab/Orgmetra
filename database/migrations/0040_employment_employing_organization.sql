@@ -44,6 +44,12 @@ CREATE TABLE employment_employing_organization_record (
         )
 );
 
+CREATE INDEX employment_employing_organization_unit_lookup_index
+ON employment_employing_organization_record (
+    tenant_record_id,
+    employing_organization_unit_id
+);
+
 CREATE FUNCTION validate_employment_employing_organization_scope()
 RETURNS trigger
 LANGUAGE plpgsql
