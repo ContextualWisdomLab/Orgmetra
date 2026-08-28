@@ -40,10 +40,13 @@ INSERT INTO organization_unit_version (
 INSERT INTO employment_employing_organization_record (
  tenant_record_id, employment_employing_organization_record_id,
  employment_record_id, employing_organization_unit_id, effective_from, recorded_from
-) VALUES (
- '10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000050',
- '10000000-0000-7000-8000-000000000020','10000000-0000-7000-8000-000000000030',
- DATE '2026-01-01',TIMESTAMPTZ '2026-01-03 00:00:00+00');
+) VALUES
+ ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000050',
+  '10000000-0000-7000-8000-000000000020','10000000-0000-7000-8000-000000000030',
+  DATE '2026-01-01',TIMESTAMPTZ '2026-01-03 00:00:00+00'),
+ ('20000000-0000-7000-8000-000000000001','20000000-0000-7000-8000-000000000050',
+  '20000000-0000-7000-8000-000000000020','20000000-0000-7000-8000-000000000030',
+  DATE '2026-01-01',TIMESTAMPTZ '2026-01-03 00:00:00+00');
 SQL
 
 count="$(psql "${DATABASE_URL}" -Atqc "SELECT count(*) FROM employment_employing_organization_record WHERE tenant_record_id='10000000-0000-7000-8000-000000000001'::uuid AND employment_record_id='10000000-0000-7000-8000-000000000020'::uuid AND daterange(effective_from,effective_to,'[)') @> DATE '2026-08-28' AND tstzrange(recorded_from,recorded_to,'[)') @> TIMESTAMPTZ '2026-08-28 00:00:00+00';")"
@@ -74,9 +77,17 @@ CREATE ROLE orgmetra_employer_reader NOSUPERUSER NOBYPASSRLS;
 GRANT SELECT ON employment_employing_organization_record TO orgmetra_employer_reader;
 SET ROLE orgmetra_employer_reader;
 SELECT set_config('orgmetra.tenant_record_id','10000000-0000-7000-8000-000000000001',false);
-DO $$ BEGIN IF (SELECT count(*) FROM employment_employing_organization_record WHERE recorded_to IS NULL) <> 1 THEN RAISE EXCEPTION 'tenant alpha should see one current-system employer fact'; END IF; END $$;
+DO $$ BEGIN
+ IF (SELECT count(*) FROM employment_employing_organization_record WHERE tstzrange(recorded_from, recorded_to, '[)') @> TIMESTAMPTZ '2026-09-01 00:00:00+00') <> 1 THEN
+   RAISE EXCEPTION 'tenant alpha should see exactly one employer fact at the selected system-time coordinate';
+ END IF;
+END $$;
 SELECT set_config('orgmetra.tenant_record_id','20000000-0000-7000-8000-000000000001',false);
-DO $$ BEGIN IF EXISTS (SELECT 1 FROM employment_employing_organization_record) THEN RAISE EXCEPTION 'tenant beta observed tenant alpha employer facts'; END IF; END $$;
+DO $$ BEGIN
+ IF (SELECT count(*) FROM employment_employing_organization_record WHERE tstzrange(recorded_from, recorded_to, '[)') @> TIMESTAMPTZ '2026-09-01 00:00:00+00') <> 1 THEN
+   RAISE EXCEPTION 'tenant beta should see exactly one employer fact at the selected system-time coordinate';
+ END IF;
+END $$;
 RESET ROLE;
 SQL
 
