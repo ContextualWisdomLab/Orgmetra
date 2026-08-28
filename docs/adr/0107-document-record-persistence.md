@@ -31,6 +31,8 @@ The relation stores no document bytes/title, free-form HR text, compensation, ra
 
 Tenant isolation uses enabled and forced PostgreSQL row-level security. A missing tenant context yields no visible rows. The design deliberately keeps Person/Employment/audit/outbox as opaque references so later service extraction does not require changing the persistence contract.
 
+The migration creates the relation under a transaction-local `public, pg_catalog` search path, pins each trusted trigger function to `pg_catalog, public, pg_temp`, and reuses the shared `public.current_tenant_record_id()` policy helper.
+
 ## Consequences
 
 This is an evidence/metadata system of record, not object storage and not authorization to read, export, delete, or use the document in an employment decision. The host must resolve current authorization and foreign references through published owner contracts before persistence or retrieval. Audit/outbox references are correlations to owner-controlled immutable evidence; this relation does not directly query those foreign application tables.

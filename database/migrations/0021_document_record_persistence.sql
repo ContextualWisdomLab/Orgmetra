@@ -2,6 +2,10 @@
 -- boundary. Cross-service Person/Employment/audit/outbox identities remain
 -- opaque published-contract references rather than direct application-table SQL.
 
+BEGIN;
+
+SET LOCAL search_path = public, pg_catalog;
+
 CREATE TABLE document_record (
     tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
     document_record_id uuid PRIMARY KEY,
@@ -122,9 +126,10 @@ CREATE TABLE document_record (
 COMMENT ON TABLE document_record IS
     'Immutable, value-minimized HR document metadata owned by document_records. The exact canonical evidence snapshot is digest-bound to the typed row; Person, Employment, audit, and outbox identities are opaque contract references. Document bytes and employment-decision authority are not stored here.';
 
-CREATE FUNCTION enforce_document_record_system_time()
+CREATE FUNCTION public.enforce_document_record_system_time()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.recorded_at IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
@@ -139,17 +144,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION enforce_document_record_system_time() IS
+COMMENT ON FUNCTION public.enforce_document_record_system_time() IS
     'Requires PostgreSQL-owned system-recorded time and rejects document receipt time later than the durable recording instant.';
 
 CREATE TRIGGER document_record_system_time_guard
 BEFORE INSERT ON document_record
 FOR EACH ROW
-EXECUTE FUNCTION enforce_document_record_system_time();
+EXECUTE FUNCTION public.enforce_document_record_system_time();
 
-CREATE FUNCTION validate_document_record_evidence_binding()
+CREATE FUNCTION public.validate_document_record_evidence_binding()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     evidence_payload jsonb;
@@ -265,17 +271,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION validate_document_record_evidence_binding() IS
+COMMENT ON FUNCTION public.validate_document_record_evidence_binding() IS
     'After insert constraints and system-time checks, validates exact canonical DocumentRecordEvidence bytes, SHA-256 digest, schema/key shape, typed metadata equality, and evidence chronology without reading foreign application tables.';
 
 CREATE TRIGGER document_record_evidence_binding_guard
 AFTER INSERT ON document_record
 FOR EACH ROW
-EXECUTE FUNCTION validate_document_record_evidence_binding();
+EXECUTE FUNCTION public.validate_document_record_evidence_binding();
 
-CREATE FUNCTION protect_document_record_immutability()
+CREATE FUNCTION public.protect_document_record_immutability()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'document metadata is immutable; lifecycle changes require a separate governed relation'
@@ -283,17 +290,18 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION protect_document_record_immutability() IS
+COMMENT ON FUNCTION public.protect_document_record_immutability() IS
     'Rejects UPDATE and DELETE so the artifact/provenance metadata snapshot cannot be rewritten after issuance.';
 
 CREATE TRIGGER document_record_immutability_guard
 BEFORE UPDATE OR DELETE ON document_record
 FOR EACH ROW
-EXECUTE FUNCTION protect_document_record_immutability();
+EXECUTE FUNCTION public.protect_document_record_immutability();
 
-CREATE FUNCTION reject_document_record_truncate()
+CREATE FUNCTION public.reject_document_record_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'document-record history cannot be truncated'
@@ -301,13 +309,13 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION reject_document_record_truncate() IS
+COMMENT ON FUNCTION public.reject_document_record_truncate() IS
     'Rejects table-wide TRUNCATE so immutable document metadata cannot bypass row-level controls.';
 
 CREATE TRIGGER document_record_truncate_guard
 BEFORE TRUNCATE ON document_record
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_document_record_truncate();
+EXECUTE FUNCTION public.reject_document_record_truncate();
 
 REVOKE TRUNCATE ON document_record FROM PUBLIC;
 
@@ -317,14 +325,10 @@ ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
 CREATE POLICY document_record_tenant_isolation_policy
 ON document_record
 USING (
-    tenant_record_id = NULLIF(
-        pg_catalog.current_setting('orgmetra.tenant_record_id', true),
-        ''
-    )::uuid
+    tenant_record_id = public.current_tenant_record_id()
 )
 WITH CHECK (
-    tenant_record_id = NULLIF(
-        pg_catalog.current_setting('orgmetra.tenant_record_id', true),
-        ''
-    )::uuid
+    tenant_record_id = public.current_tenant_record_id()
 );
+
+COMMIT;

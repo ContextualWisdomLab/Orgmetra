@@ -30,8 +30,11 @@ ARTIFACT_DIGEST="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 SOURCE_DIGEST="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 RETENTION_DIGEST="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 APPLICATION_DIGEST="eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-RECEIVED_AT="2026-08-24T05:55:00Z"
-EVIDENCE_RECORDED_AT="2026-08-24T05:58:00Z"
+IFS='|' read -r RECEIVED_AT EVIDENCE_RECORDED_AT < <(psql "${DATABASE_URL}" -Atqc "
+SELECT
+    to_char((pg_catalog.transaction_timestamp() - interval '2 minutes') AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'),
+    to_char((pg_catalog.transaction_timestamp() - interval '1 minute') AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"');
+")
 
 canonical_evidence="$(python3 - <<PY
 import json
@@ -285,6 +288,24 @@ SELECT relrowsecurity::text || '|' || relforcerowsecurity::text
 FROM pg_class WHERE oid = 'document_record'::regclass;")"
 if [[ "${rls_state}" != "true|true" ]]; then
     echo "document-record RLS is not enabled and forced: ${rls_state}" >&2
+    exit 1
+fi
+
+trusted_search_path_count="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_proc AS procedure_record
+JOIN pg_namespace AS namespace_record
+  ON namespace_record.oid = procedure_record.pronamespace
+WHERE namespace_record.nspname = 'public'
+  AND procedure_record.proname IN (
+      'enforce_document_record_system_time',
+      'validate_document_record_evidence_binding',
+      'protect_document_record_immutability',
+      'reject_document_record_truncate'
+  )
+  AND procedure_record.proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[];")"
+if [[ "${trusted_search_path_count}" != "4" ]]; then
+    echo "document-record trigger functions do not pin the trusted search_path: ${trusted_search_path_count}/4" >&2
     exit 1
 fi
 

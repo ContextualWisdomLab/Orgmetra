@@ -18,7 +18,7 @@
 | Reviewed vocabulary | closed document category and fixed persistence purpose/reason | happy path + wrong-reason failure |
 | Business/system time | caller `received_at`; evidence-issued `recorded_at` in canonical payload; PostgreSQL `transaction_timestamp()` durable `recorded_at` | future receipt, evidence chronology, and backdated persistence-time controls |
 | Immutable metadata | UPDATE/DELETE/TRUNCATE guards | three destructive-operation failures |
-| Tenant isolation | ENABLE + FORCE RLS with transaction tenant context | NOSUPERUSER/NOBYPASSRLS reader sees only its tenant; no context sees zero rows |
+| Tenant isolation | ENABLE + FORCE RLS with transaction tenant context and the shared tenant helper | NOSUPERUSER/NOBYPASSRLS reader sees only its tenant; no context sees zero rows; trigger functions pin the trusted search path |
 | Non-decision posture | fixed classification/storage/decision-authority states | persisted-state assertion and canonical payload equality |
 | Exact candidate provenance | pinned PostgreSQL workflow and exact-head checkout | `Document Record Persistence Quality` |
 
