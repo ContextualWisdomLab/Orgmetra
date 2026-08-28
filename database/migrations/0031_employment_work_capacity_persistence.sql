@@ -248,6 +248,7 @@ DECLARE
     reviewed_time timestamptz;
     review_recorded_time timestamptz;
     authoritative_current numeric(5,4);
+    expected_next_action constant text := 'Within tenant_record_id, re-resolve the authoritative Employment and current work-capacity truth at effective_on, verify reviewer identity/authority and the exact reviewed employment-terms and capacity-policy evidence, recalculate Assignment allocation and compensation/payroll impacts, then persist any approved bitemporal capacity change with immutable audit/outbox evidence. This packet does not itself mutate Employment, Assignment, compensation, payroll, leave, or scheduling.';
 BEGIN
     IF NEW.recorded_from IS DISTINCT FROM insertion_time OR NEW.recorded_to IS NOT NULL THEN
         RAISE EXCEPTION 'Employment work-capacity recorded_from must equal transaction time and recorded_to must start open'
@@ -346,15 +347,15 @@ BEGIN
             USING ERRCODE = '22023';
     END IF;
 
-    IF review_payload->>'purpose_code' <> 'employment_work_capacity_review'
-       OR review_payload->>'review_state' <> 'reviewed_for_authoritative_resolution'
-       OR review_payload->>'decision_authority' <>
+    IF review_payload->>'purpose_code' IS DISTINCT FROM 'employment_work_capacity_review'
+       OR review_payload->>'review_state' IS DISTINCT FROM 'reviewed_for_authoritative_resolution'
+       OR review_payload->>'decision_authority' IS DISTINCT FROM
           'not_authorized_to_change_employment_or_compensation'
        OR pg_catalog.jsonb_typeof(review_payload->'human_review_required') <> 'boolean'
        OR (review_payload->>'human_review_required')::boolean IS NOT TRUE
        OR pg_catalog.jsonb_typeof(review_payload->'evidence_version') <> 'number'
-       OR review_payload->>'evidence_version' <> '1'
-       OR pg_catalog.jsonb_typeof(review_payload->'next_action') <> 'string' THEN
+       OR review_payload->>'evidence_version' IS DISTINCT FROM '1'
+       OR review_payload->>'next_action' IS DISTINCT FROM expected_next_action THEN
         RAISE EXCEPTION 'review governance state is unsupported or noncanonical'
             USING ERRCODE = '22023';
     END IF;

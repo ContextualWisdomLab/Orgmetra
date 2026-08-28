@@ -55,6 +55,7 @@ REQUIRED = [
     "docs/adr/0012-governed-migration-handoff.md",
     "docs/adr/0013-governed-requisition-review-packet.md",
     "docs/adr/0014-job-analysis-snapshot-persistence.md",
+    "docs/adr/0131-employment-work-capacity-persistence.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -71,6 +72,9 @@ REQUIRED = [
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
+    "database/migrations/0031_employment_work_capacity_persistence.sql",
+    "database/migrations/0032_employment_work_capacity_forward_chain.sql",
+    "database/migrations/0033_employment_work_capacity_canonical_evidence.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -92,6 +96,9 @@ REQUIRED = [
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
+    "tests/test_employment_work_capacity_canonical_evidence_postgres.sh",
+    "tests/test_employment_work_capacity_persistence_postgres.sh",
+    "tests/test_employment_work_capacity_retroactive_postgres.sh",
     "tests/validate_repository.py",
 ]
 

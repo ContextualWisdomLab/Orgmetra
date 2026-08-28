@@ -103,6 +103,14 @@ fixtures = {
         "reason_code": "business_schedule_change",
         "recorded_at": "2026-08-26T10:00:03Z",
     },
+    "REVIEW_BAD_GOVERNANCE": common | {
+        "current_capacity_ratio": "0.6000",
+        "proposed_capacity_ratio": "0.7000",
+        "effective_on": "2026-11-01",
+        "next_action": "apply now",
+        "reason_code": "business_schedule_change",
+        "recorded_at": "2026-08-26T10:00:04Z",
+    },
 }
 for name, payload in fixtures.items():
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
@@ -216,6 +224,24 @@ if [[ "${sep_state}" != "1.0000" || "${oct_state}" != "0.6000" ]]; then
   echo "effective-point capacity resolution is wrong: Sep=${sep_state}, Oct=${oct_state}" >&2
   exit 1
 fi
+
+expect_failure \
+  "capacity change accepted forged review next action" \
+  "review governance state is unsupported or noncanonical" \
+  "SELECT apply_employment_work_capacity_change(
+     '${TENANT_ID}'::uuid,
+     '${CAPACITY_RECORD_ID}'::uuid,
+     '${CAPACITY_VERSION_BAD}'::uuid,
+     '${EMPLOYMENT_ID}'::uuid,
+     '${REVIEW_BAD_GOVERNANCE_JSON_SQL}',
+     '${REVIEW_BAD_GOVERNANCE_DIGEST}',
+     '${REVIEW_AUDIT}',
+     '${REVIEW_AUDIT_DIGEST}',
+     '${APPLIER}',
+     'audit_event:00000000-0000-4000-8000-000000000054',
+     'outbox_event:00000000-0000-4000-8000-000000000063',
+     '1111111111111111111111111111111111111111111111111111111111111111'
+   );"
 
 expect_failure \
   "capacity change ignored authoritative current capacity" \
