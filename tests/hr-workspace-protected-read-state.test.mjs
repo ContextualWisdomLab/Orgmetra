@@ -61,6 +61,21 @@ test('unsupported request state fails closed before rendering', () => {
   assert.throws(() => protectedReadViewModel(new String('loading')), /exact built-in string/);
 });
 
+test('prototype-inherited names cannot masquerade as governed states', () => {
+  for (const inheritedName of ['constructor', 'toString', '__proto__']) {
+    assert.throws(
+      () => protectedReadViewModel(inheritedName),
+      /unsupported protected read state/,
+      `${inheritedName} must fail closed at the view-model boundary`,
+    );
+    assert.throws(
+      () => protectedReadStateMarkup(inheritedName),
+      /unsupported protected read state/,
+      `${inheritedName} must fail closed before markup is emitted`,
+    );
+  }
+});
+
 test('Storybook covers Figma-required loading, disabled, error, and read-only states', () => {
   for (const storyName of ['Idle', 'Loading', 'LoadedReadOnly', 'PermissionDenied', 'Error']) {
     assert.match(story, new RegExp(`export const ${storyName}`));
