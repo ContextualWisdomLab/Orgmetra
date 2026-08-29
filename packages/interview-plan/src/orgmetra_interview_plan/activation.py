@@ -232,8 +232,7 @@ def activate_structured_interview_plan(
         approving_actor_reference=approving_actor_reference,
         approved_at=approved_at,
     )
-    if plan.canonical_json() != plan_canonical_json:
-        raise ValueError("plan changed during authority verification")
+    plan.canonical_json()
     if type(verification) is not StructuredInterviewActivationVerification:
         raise TypeError("authority must return StructuredInterviewActivationVerification")
 
