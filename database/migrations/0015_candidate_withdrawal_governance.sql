@@ -75,6 +75,9 @@ DECLARE
     audit_event_envelope jsonb;
     audit_event_time timestamptz;
 BEGIN
+    -- recorded_at is database-owned evidence, not a caller-provided timestamp.
+    NEW.recorded_at := pg_catalog.transaction_timestamp();
+
     SELECT application_record.submitted_at
     INTO application_submitted_at
     FROM public.candidate_application_record AS application_record

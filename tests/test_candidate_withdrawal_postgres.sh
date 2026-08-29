@@ -161,7 +161,8 @@ INSERT INTO candidate_withdrawal_record (
     1,
     TIMESTAMPTZ '2026-08-21 09:20:00+00',
     '70000000-0000-7000-8000-000000000001',
-    TIMESTAMPTZ '2026-08-21 09:20:01+00'
+    -- The trigger must replace this caller-supplied future system time.
+    TIMESTAMPTZ '2099-01-01 00:00:00+00'
 );
 SQL
 
@@ -173,6 +174,17 @@ WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'::uuid
 ")"
 if [[ "${persisted_count}" != "1" ]]; then
     echo "governed candidate withdrawal was not persisted exactly once" >&2
+    exit 1
+fi
+
+recorded_at_is_system_time="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT (recorded_at <= transaction_timestamp())::text
+FROM candidate_withdrawal_record
+WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'::uuid
+  AND candidate_withdrawal_record_id = '72000000-0000-7000-8000-000000000001'::uuid;
+")"
+if [[ "${recorded_at_is_system_time}" != "true" ]]; then
+    echo "candidate withdrawal accepted caller-controlled future recorded_at" >&2
     exit 1
 fi
 

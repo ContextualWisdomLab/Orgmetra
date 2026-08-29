@@ -47,9 +47,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "18f999729647bad231b926874af9d85c75cd9ea60a43993fcce11de1baa794bf",
-      "bytes": 18816,
-      "lines": 79
+      "sha256": "3552972c2cbbe2e0c0dd085ed2ff7e7d1828b06e767e6b14e1ca9fda9c2391de",
+      "bytes": 19077,
+      "lines": 80
     },
     {
       "path": "CLAUDE.md",
@@ -161,9 +161,9 @@
     },
     {
       "path": "database/migrations/0015_candidate_withdrawal_governance.sql",
-      "sha256": "54839ddc972040ec30261a78e16aefb173ed6065808bd65783f185ee042bc320",
-      "bytes": 8236,
-      "lines": 192
+      "sha256": "5b5a6fc372734be8fd7e0c994cba5a640e029037f2042bfc8f3f61ba9e29b005",
+      "bytes": 8376,
+      "lines": 195
     },
     {
       "path": "database/migrations/0016_candidate_withdrawal_audit_envelope.sql",
@@ -353,9 +353,9 @@
     },
     {
       "path": "docs/adr/0027-governed-candidate-withdrawal.md",
-      "sha256": "48d7c949989b80646f690d4185150ad50e8c31a3c29761a6be95b09849ba9d72",
-      "bytes": 7850,
-      "lines": 81
+      "sha256": "8170601fba5907bcf055a03941d3e736e6b0c58f7d1b6b57e26d1b2912e210a6",
+      "bytes": 8132,
+      "lines": 86
     },
     {
       "path": "docs/adr/README.md",
@@ -401,8 +401,8 @@
     },
     {
       "path": "docs/traceability/candidate-withdrawal.md",
-      "sha256": "cb83b5ac0daa38a1cdc4c1667660b3d36532811489707d1f0f32b0c548594156",
-      "bytes": 4891,
+      "sha256": "100d752880f0d4341676b05d46334df10709a4b808c76969dd3aa7dfd63e638b",
+      "bytes": 4983,
       "lines": 32
     },
     {
@@ -503,9 +503,9 @@
     },
     {
       "path": "tests/test_candidate_withdrawal_postgres.sh",
-      "sha256": "019e07ca343d90a35f5f879309c53a298d5415b96de01ccfff40586f580510e3",
-      "bytes": 7818,
-      "lines": 228
+      "sha256": "5447dbe60ead96ece5502741888a4696474730c1e8efc4f46577d7ec2990463b",
+      "bytes": 8371,
+      "lines": 240
     },
     {
       "path": "tests/test_candidate_withdrawal_security_postgres.sh",
