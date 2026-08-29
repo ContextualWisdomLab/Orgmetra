@@ -146,7 +146,7 @@ SELECT record_audit_outbox_event(
 SQL
 
 set +e
-backdated_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+backdated_output="$({ tenant_psql "${DATABASE_URL}" --set=VERBOSITY=verbose -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO candidate_worker_conversion_record (
     tenant_record_id, candidate_worker_conversion_record_id, candidate_profile_id,
     person_record_id, employment_record_id, selection_decision_id,
@@ -171,7 +171,7 @@ if [[ ${backdated_status} -eq 0 ]]; then
     echo "candidate conversion accepted caller-authored historical recorded_from" >&2
     exit 1
 fi
-if [[ "${backdated_output}" != *"candidate worker conversion recorded_from must equal system transaction time"* ]]; then
+if [[ "${backdated_output}" != *"ERROR:  23514: candidate worker conversion recorded_from must equal system transaction time"* ]]; then
     echo "backdated candidate conversion failed for an unexpected reason: ${backdated_output}" >&2
     exit 1
 fi
