@@ -16,6 +16,7 @@ import json
 import re
 from secrets import token_bytes
 from uuid import UUID
+from weakref import WeakValueDictionary
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -36,6 +37,7 @@ _NEXT_ACTION = (
     "workflow and before communicating or executing the offer."
 )
 _RUNTIME_EVIDENCE_KEY = token_bytes(32)
+_ISSUED_PACKET_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -125,7 +127,7 @@ def _seal_canonical_json(canonical_json: str) -> bytes:
     ).digest()
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, weakref_slot=True, repr=False)
 class OfferApprovalPacket:
     """Immutable value-free offer review packet awaiting accountable approval."""
 
@@ -162,7 +164,7 @@ class OfferApprovalPacket:
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
-        if hasattr(self, "_issuance_seal"):
+        if _ISSUED_PACKET_IDENTITIES.get(id(self)) is self:
             raise ValueError("offer approval evidence cannot be reissued")
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
@@ -224,6 +226,7 @@ class OfferApprovalPacket:
             "_issuance_seal",
             _seal_canonical_json(self._canonical_json_unchecked()),
         )
+        _ISSUED_PACKET_IDENTITIES[id(self)] = self
 
     def _canonical_json_unchecked(self) -> str:
         """Render current fields only after construction-time contract validation."""
