@@ -247,6 +247,12 @@ def test_detects_post_construction_evidence_rewrite_and_unregistered_copy() -> N
         copied.canonical_json()
 
 
+def test_packet_runtime_is_final() -> None:
+    """Governed review behavior cannot be replaced through subclass overrides."""
+    with pytest.raises(TypeError, match="is final"):
+        type("ForgedPacket", (HrAccessReviewPacket,), {})
+
+
 def test_canonical_export_reuses_the_integrity_checked_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

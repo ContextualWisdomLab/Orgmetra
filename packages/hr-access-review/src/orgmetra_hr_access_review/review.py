@@ -158,6 +158,10 @@ class HrAccessReviewPacket:
     scope_verification_state: str = _SCOPE_VERIFICATION_STATE
     next_action: str = _NEXT_ACTION
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Keep governed review behavior final so subclasses cannot override exports."""
+        raise TypeError("HrAccessReviewPacket is final")
+
     def __post_init__(self) -> None:
         """Validate the full packet and register its creation-time evidence digest."""
         self._validate()
