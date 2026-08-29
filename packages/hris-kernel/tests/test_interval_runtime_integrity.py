@@ -88,6 +88,12 @@ def test_date_interval_rejects_date_subclasses_in_stored_bounds() -> None:
         DateInterval(start=date(2026, 8, 1), end=forged)
 
 
+def test_date_interval_rejects_missing_stored_start() -> None:
+    """A required effective-time start cannot be deferred to a later comparison."""
+    with pytest.raises(IntervalError, match="built-in date"):
+        DateInterval(start=None)  # type: ignore[arg-type]
+
+
 def test_date_interval_rejects_date_subclasses_in_query_coordinate() -> None:
     """A caller-controlled query date cannot decide whether an HR fact is visible."""
     interval = DateInterval(start=date(2026, 8, 1), end=date(2026, 9, 1))
