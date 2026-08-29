@@ -28,6 +28,7 @@ class MutatingAuthority:
             approving_actor_reference=approving_actor_reference,
             authority_evidence_reference=AUTHORITY_EVIDENCE,
             authority_evidence_digest=DIGEST_E,
+            approved_at=approved_at,
         )
 
 
