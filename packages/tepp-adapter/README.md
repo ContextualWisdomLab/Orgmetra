@@ -20,7 +20,7 @@ Model-contract and output-profile strings are syntax-constrained machine codes o
 
 ## Idempotency
 
-Persist the packet's `idempotency_key` together with `request_digest()` in Orgmetra's authoritative audit/outbox transaction before a future executable transport is enabled. An exact retry has the same key and request digest. Reusing the key with a different request digest is a conflict and must fail closed. This package exposes comparison helpers but does not invent a second persistence store.
+Persist the packet's `idempotency_key`, `request_digest()`, and `governance_scope_digest()` together in Orgmetra's authoritative audit/outbox transaction before a future executable transport is enabled. An exact retry has the same key, request digest, and governance-scope digest. Reusing the key with a different request or governance digest is a conflict and must fail closed. This package exposes comparison helpers but does not invent a second persistence store.
 
 ## Test
 
