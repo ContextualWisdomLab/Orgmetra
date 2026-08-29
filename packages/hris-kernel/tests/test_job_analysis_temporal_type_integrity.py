@@ -105,6 +105,14 @@ class _OpaqueText(str):
     """Represent valid evidence text through an untrusted runtime subclass."""
 
 
+class _TaskEvidenceSubclass(TaskEvidence):
+    """Represent a valid task through an untrusted runtime subclass."""
+
+
+class _KSAORequirementSubclass(KSAORequirement):
+    """Represent a valid KSAO requirement through an untrusted runtime subclass."""
+
+
 class _MutableOffset(tzinfo):
     """Expose timezone state that can change after evidence construction."""
 
@@ -264,6 +272,41 @@ def test_snapshot_rejects_reference_string_subclasses_before_canonicalization() 
     )
     with pytest.raises(ValueError, match="reviewed_by_reference must be a string"):
         replace(snapshot, reviewed_by_reference=_OpaqueText("keyverse_subject:01JIOPSYCH"))
+
+
+def test_snapshot_rejects_task_and_ksao_subclasses_before_canonicalization() -> None:
+    """Reject nested evidence subclasses before their fields reach canonical serialization."""
+    snapshot = _snapshot(
+        effective_from=date(2026, 8, 1),
+        recorded_at=RECORDED_AT,
+        reviewed_at=RECORDED_AT,
+    )
+    task = snapshot.tasks[0]
+    forged_task = _TaskEvidenceSubclass(
+        tenant_record_id=task.tenant_record_id,
+        job_record_id=task.job_record_id,
+        task_record_id=task.task_record_id,
+        task_statement=task.task_statement,
+        importance_level=task.importance_level,
+        difficulty_level=task.difficulty_level,
+        source=task.source,
+    )
+    with pytest.raises(ValueError, match="tasks must contain TaskEvidence"):
+        replace(snapshot, tasks=(forged_task,))
+
+    ksao = snapshot.ksao_requirements[0]
+    forged_ksao = _KSAORequirementSubclass(
+        tenant_record_id=ksao.tenant_record_id,
+        job_record_id=ksao.job_record_id,
+        ksao_record_id=ksao.ksao_record_id,
+        category_code=ksao.category_code,
+        requirement_statement=ksao.requirement_statement,
+        importance_level=ksao.importance_level,
+        proficiency_level=ksao.proficiency_level,
+        source=ksao.source,
+    )
+    with pytest.raises(ValueError, match="ksao_requirements must contain KSAORequirement"):
+        replace(snapshot, ksao_requirements=(forged_ksao,))
 
 
 @pytest.mark.parametrize(

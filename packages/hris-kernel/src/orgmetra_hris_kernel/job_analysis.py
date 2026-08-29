@@ -320,6 +320,13 @@ class JobAnalysisSnapshot:
         if type(self.fja_profile) is not FunctionalJobAnalysisProfile:
             raise ValueError("fja_profile must be FunctionalJobAnalysisProfile")
 
+        for task in self.tasks:
+            if type(task) is not TaskEvidence:
+                raise ValueError("tasks must contain TaskEvidence values")
+        for item in self.ksao_requirements:
+            if type(item) is not KSAORequirement:
+                raise ValueError("ksao_requirements must contain KSAORequirement values")
+
         for item in (*self.tasks, *self.ksao_requirements, self.fja_profile):
             if item.tenant_record_id != self.tenant_record_id:
                 raise ValueError("all job-analysis evidence must share tenant_record_id")
