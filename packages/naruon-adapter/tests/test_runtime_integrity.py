@@ -8,6 +8,7 @@ from orgmetra_naruon_adapter import (
     CalendarIntentContext,
     ContractViolation,
     build_calendar_intent,
+    validate_calendar_intent_response,
 )
 
 TENANT_ID = "11111111-1111-4111-8111-111111111111"
@@ -44,6 +45,14 @@ class ForgedResourceReference(str):
 
 class DerivedCalendarIntentContext(CalendarIntentContext):
     """Represent a validation-bypassing subclass of the governed context."""
+
+
+class ForgedResponseLiteral(str):
+    """Pretend an unsupported response literal equals the reviewed value."""
+
+    def __ne__(self, other: object) -> bool:
+        """Claim inequality never holds so direct literal checks can be bypassed."""
+        return False
 
 
 def valid_context(**changes: object) -> CalendarIntentContext:
@@ -96,3 +105,31 @@ def test_rejects_calendar_context_subclasses_at_the_governance_boundary() -> Non
 
     with pytest.raises(ContractViolation, match="governed context type"):
         build_calendar_intent(derived)
+
+
+def test_rejects_forged_response_literals_at_the_transport_boundary() -> None:
+    """Reject response string subclasses that spoof fixed contract semantics."""
+    plan = build_calendar_intent(valid_context())
+    response = {
+        "workspace_id": "workspace-9",
+        "target_source_id": "caldav-source-7",
+        "protocol": ForgedResponseLiteral("webdav"),
+        "writeback_mode": "customer_owned",
+        "requires_if_match": False,
+        "if_match": None,
+        "provenance": {
+            "created_by": "naruon-user-4",
+            "source_provider": "nextcloud",
+            "source_protocol": "caldav",
+        },
+        "audit_event": "calendar.writeback_intent.created",
+        "provider_write_executed": False,
+        "status": "intent_ready",
+        "runner_request_id": None,
+        "provider_status": None,
+        "error_code": None,
+        "retry_item_uid": None,
+    }
+
+    with pytest.raises(ContractViolation, match="protocol"):
+        validate_calendar_intent_response(plan, response)

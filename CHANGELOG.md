@@ -53,6 +53,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Made assignment coverage status-aware: `active` and `leave` remain staffable while `terminated` and other non-eligible employment statuses fail closed.
 - Made organization hierarchy reconstruction fail closed on a cycle at the requested tenant, effective day, and knowledge cutoff while ignoring future-recorded and foreign-tenant facts.
 - Build the outbox due-work index concurrently during migration 0008, requiring that index step to run outside an explicit transaction block so established queues do not block writers while the index is built; pre-index hardening and post-index privileged role setup use separate explicit transactions.
+- Active-PR Naruon calendar intent runtime hardening now rejects forged `str` subclasses in fixed response literals as well as caller-controlled context and metadata values, preserving fail-closed protocol, ownership, audit-event, status, and provider-execution semantics at the adapter boundary.
 
 ### Security
 

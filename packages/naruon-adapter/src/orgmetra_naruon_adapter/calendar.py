@@ -203,6 +203,15 @@ def _require_response_token(response: Mapping[str, object], key: str) -> str:
     return _require_token(response.get(key), key)
 
 
+def _require_exact_response_value(
+    response: Mapping[str, object], key: str, expected: object, message: str
+) -> None:
+    """Require one response literal to use the exact reviewed type and value."""
+    actual = response.get(key)
+    if type(actual) is not type(expected) or actual != expected:
+        raise ContractViolation(message)
+
+
 def validate_calendar_intent_response(
     plan: CalendarIntentPlan, response: Mapping[str, object]
 ) -> ValidatedCalendarIntent:
@@ -218,20 +227,36 @@ def validate_calendar_intent_response(
         raise ContractViolation(
             "calendar intent target source differs from the requested target source"
         )
-    if response.get("protocol") != "caldav":
-        raise ContractViolation("calendar intent protocol must remain caldav")
-    if response.get("writeback_mode") != "customer_owned":
-        raise ContractViolation("calendar intent writeback mode must remain customer_owned")
-    if response.get("requires_if_match") is not False or response.get("if_match") is not None:
-        raise ContractViolation("create intent must not require or carry If-Match")
-    if response.get("audit_event") != "calendar.writeback_intent.created":
-        raise ContractViolation(
-            "calendar intent audit event is not the reviewed intent-only event"
-        )
-    if response.get("provider_write_executed") is not False:
-        raise ContractViolation("calendar intent unexpectedly reports provider execution")
-    if response.get("status") != "intent_ready":
-        raise ContractViolation("calendar intent status is not intent_ready")
+    _require_exact_response_value(
+        response, "protocol", "caldav", "calendar intent protocol must remain caldav"
+    )
+    _require_exact_response_value(
+        response,
+        "writeback_mode",
+        "customer_owned",
+        "calendar intent writeback mode must remain customer_owned",
+    )
+    _require_exact_response_value(
+        response, "requires_if_match", False, "create intent must not require or carry If-Match"
+    )
+    _require_exact_response_value(
+        response, "if_match", None, "create intent must not require or carry If-Match"
+    )
+    _require_exact_response_value(
+        response,
+        "audit_event",
+        "calendar.writeback_intent.created",
+        "calendar intent audit event is not the reviewed intent-only event",
+    )
+    _require_exact_response_value(
+        response,
+        "provider_write_executed",
+        False,
+        "calendar intent unexpectedly reports provider execution",
+    )
+    _require_exact_response_value(
+        response, "status", "intent_ready", "calendar intent status is not intent_ready"
+    )
 
     execution_fields = (
         "runner_request_id",
@@ -250,8 +275,12 @@ def validate_calendar_intent_response(
     source_provider = _require_token(
         provenance.get("source_provider"), "source_provider"
     )
-    if provenance.get("source_protocol") != "caldav":
-        raise ContractViolation("calendar intent provenance protocol must remain caldav")
+    _require_exact_response_value(
+        provenance,
+        "source_protocol",
+        "caldav",
+        "calendar intent provenance protocol must remain caldav",
+    )
     # Validate Naruon's authoritative subject without collapsing it into Keyverse identity.
     del created_by
 
