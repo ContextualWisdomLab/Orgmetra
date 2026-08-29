@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 import hashlib
 import json
@@ -114,7 +114,7 @@ def _canonical_digest(document: dict[str, object]) -> str:
     return hashlib.sha256(_canonical_json(document).encode("utf-8")).hexdigest()
 
 
-@dataclass(frozen=True, slots=True, weakref_slot=True, repr=False, eq=False)
+@dataclass(frozen=True, slots=True, weakref_slot=True, repr=False)
 class HrDataRetentionReviewPacket:
     """Bind one HR retention review while remaining explicitly unauthorized to delete data."""
 
@@ -165,7 +165,7 @@ class HrDataRetentionReviewPacket:
         self._validate_fields()
         creation_digest = _canonical_digest(self._render_canonical_document())
         with _PACKET_SEALS_LOCK:
-            _PACKET_SEALS[self] = creation_digest
+            _store_packet_seal(self, creation_digest)
 
     def _validate_fields(self) -> None:
         """Validate every trust-bearing field without relying on creation-time state."""
@@ -224,7 +224,7 @@ class HrDataRetentionReviewPacket:
         self._validate_fields()
         current_digest = _canonical_digest(self._render_canonical_document())
         with _PACKET_SEALS_LOCK:
-            creation_digest = _PACKET_SEALS.get(self)
+            creation_digest = _load_packet_seal(self)
         if current_digest != creation_digest:
             raise ValueError("retention review evidence changed after construction")
 
@@ -323,9 +323,70 @@ class HrDataRetentionReviewPacket:
         """Hash the exact creation-bound canonical review evidence with SHA-256."""
         return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
+    def __copy__(self) -> HrDataRetentionReviewPacket:
+        """Copy only a packet whose existing creation seal is still verified."""
+        self._assert_integrity()
+        return replace(self)
+
+    def __deepcopy__(self, _memo: dict[int, object]) -> HrDataRetentionReviewPacket:
+        """Deep-copy only a packet whose existing creation seal is still verified."""
+        self._assert_integrity()
+        return replace(self)
+
+    def __reduce_ex__(self, _protocol: int) -> tuple[type[object], tuple[object, ...]]:
+        """Pickle through the governed constructor rather than bypassing its seal."""
+        self._assert_integrity()
+        return (
+            type(self),
+            (
+                self.tenant_record_id,
+                self.retention_review_reference,
+                self.resource_kind,
+                self.resource_reference,
+                self.record_category_code,
+                self.retention_policy_reference,
+                self.retention_policy_digest,
+                self.retention_due_on,
+                self.reviewed_on,
+                self.legal_hold_state,
+                self.legal_hold_reference,
+                self.legal_hold_digest,
+                self.requester_actor_reference,
+                self.reviewer_actor_reference,
+                self.evidence_version,
+                self.recorded_at,
+            ),
+        )
+
     def __repr__(self) -> str:
         """Keep tenant and policy correlation references out of routine logs."""
         return "HrDataRetentionReviewPacket(<redacted>)"
 
 
-_PACKET_SEALS: weakref.WeakKeyDictionary[HrDataRetentionReviewPacket, str] = weakref.WeakKeyDictionary()
+_PACKET_SEALS: dict[int, tuple[weakref.ReferenceType[object], str]] = {}
+
+
+def _remove_packet_seal(reference: weakref.ReferenceType[object], packet_id: int) -> None:
+    """Remove one identity seal only while holding the registry lock."""
+    with _PACKET_SEALS_LOCK:
+        entry = _PACKET_SEALS.get(packet_id)
+        if entry is not None and entry[0] is reference:
+            del _PACKET_SEALS[packet_id]
+
+
+def _store_packet_seal(packet: HrDataRetentionReviewPacket, digest: str) -> None:
+    """Store a seal by object identity without making the registry own the packet."""
+    packet_id = id(packet)
+    reference = weakref.ref(
+        packet,
+        lambda current: _remove_packet_seal(current, packet_id),
+    )
+    _PACKET_SEALS[packet_id] = (reference, digest)
+
+
+def _load_packet_seal(packet: HrDataRetentionReviewPacket) -> str | None:
+    """Return a seal only when the registry entry still refers to this object."""
+    entry = _PACKET_SEALS.get(id(packet))
+    if entry is None or entry[0]() is not packet:
+        return None
+    return entry[1]

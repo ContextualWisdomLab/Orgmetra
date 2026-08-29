@@ -2,11 +2,15 @@
 
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
+from copy import copy, deepcopy
+import pickle
 from uuid import uuid1
+import weakref
 
 import pytest
 
 from orgmetra_hr_data_retention.review import HrDataRetentionReviewPacket
+import orgmetra_hr_data_retention.review as review_module
 
 
 TENANT = "0198f0a1-7b2c-7abc-8def-0123456789ab"
@@ -215,3 +219,37 @@ def test_replace_revalidates_governed_invariants() -> None:
         replace(review, reviewer_actor_reference=REQUESTER)
     with pytest.raises(ValueError):
         replace(review, legal_hold_reference=HOLD)
+
+
+def test_equivalent_packets_compare_equal_and_keep_separate_seals() -> None:
+    """Value equality remains public while identity seals remain independently addressable."""
+    first = packet()
+    second = packet()
+    assert first == second
+    object.__setattr__(first, "retention_policy_digest", "c" * 64)
+    with pytest.raises(ValueError, match="changed after construction"):
+        first.canonical_json()
+    assert second.canonical_json() == packet().canonical_json()
+
+
+def test_copy_and_pickle_rebuild_a_governed_packet_with_a_fresh_seal() -> None:
+    """Supported copies preserve valid evidence and reject later mutation independently."""
+    original = packet()
+    copies = (copy(original), deepcopy(original), pickle.loads(pickle.dumps(original)))
+    for clone in copies:
+        assert clone == original
+        assert clone.canonical_json() == original.canonical_json()
+        object.__setattr__(clone, "retention_policy_digest", "c" * 64)
+        with pytest.raises(ValueError, match="changed after construction"):
+            clone.canonical_json()
+
+
+def test_missing_or_mismatched_registry_seals_fail_closed() -> None:
+    """An identity collision or missing lifecycle entry cannot authorize evidence."""
+    review = packet()
+    review_module._remove_packet_seal(weakref.ref(review), id(review))
+    assert review.canonical_json() == packet().canonical_json()
+    with review_module._PACKET_SEALS_LOCK:
+        review_module._PACKET_SEALS.pop(id(review))
+    with pytest.raises(ValueError, match="retention review evidence changed after construction"):
+        review.canonical_json()
