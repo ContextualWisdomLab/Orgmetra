@@ -18,7 +18,7 @@ Allen (1983) treats interval overlap as a first-class relation. Diez-Roux (1998)
 ## Decision
 
 - `employment_record_version.employment_concurrency_code` is `exclusive` or `concurrent`. Exclusive periods for one person cannot overlap.
-- `orgmetra_hris_kernel` 0.4.0 rejects assignments that are not covered by an `active` or `open` position version. At one recorded knowledge cutoff, overlapping effective position versions fail closed only when their statuses differ; repeated evidence for one unchanged status is not treated as contradictory.
+- `orgmetra_hris_kernel` 0.4.0 rejects assignments that are not covered by an `active` or `open` position version. At one recorded knowledge cutoff, any overlapping effective position versions for the same seat fail closed because a position is a single-valued fact, including repeated evidence for one unchanged status.
 - Visible allocations for one `position_record_id` cannot exceed 1.0000 on a reconstructed day.
 - `POST /v1/employment-records`, `POST /v1/position-records`, and `POST /v1/assignment-records` reuse the same Keyverse mutation context, human confirmation, and versioned evidence composition as other high-impact commands.
 
