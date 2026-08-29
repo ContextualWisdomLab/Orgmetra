@@ -1,6 +1,6 @@
 """Test the governed Rust execution request and recovery evidence contracts."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from dataclasses import replace
 import json
 
@@ -19,6 +19,111 @@ EXECUTION = "validity_execution:11111111-1111-4111-8111-111111111111"
 HANDOFF_DIGEST = "a" * 64
 DATASET_DIGEST = "b" * 64
 COMPLETED_AT = datetime(2026, 8, 21, 7, 10, 11, 123456, tzinfo=timezone.utc)
+
+
+class ForgedReference(str):
+    """Expose one namespace while feeding another UUID to the parser."""
+
+    def startswith(self, prefix: str, *args: object) -> bool:
+        """Forge the expected namespace check."""
+        del prefix, args
+        return True
+
+    def split(self, separator: str | None = None, maxsplit: int = -1) -> list[str]:
+        """Feed a valid UUID suffix while retaining unsafe serialized text."""
+        if separator == ":" and maxsplit == 1:
+            return ["validity_execution", "11111111-1111-4111-8111-111111111111"]
+        return super().split(separator, maxsplit)
+
+
+class ForgedDesign(str):
+    """Pretend an unsupported design is the reviewed runnable design."""
+
+    def __eq__(self, other: object) -> bool:
+        """Forge membership and branch comparisons."""
+        return other == "nested_multilevel"
+
+    def __hash__(self) -> int:
+        """Use the reviewed design's hash bucket."""
+        return hash("nested_multilevel")
+
+
+class ForgedFixedText(str):
+    """Pretend unsafe worker text equals a reviewed fixed value."""
+
+    def __new__(cls, raw_value: str, accepted_value: str):
+        """Store the serialized value and the value forged during comparison."""
+        instance = super().__new__(cls, raw_value)
+        instance.accepted_value = accepted_value
+        return instance
+
+    def __eq__(self, other: object) -> bool:
+        """Forge the reviewed fixed-value comparison."""
+        return other == self.accepted_value
+
+    def __hash__(self) -> int:
+        """Use the reviewed value's hash bucket."""
+        return hash(self.accepted_value)
+
+
+class MutableReal(float):
+    """Expose numeric state that can change after evidence construction."""
+
+    def __new__(cls, value: float):
+        """Create one mutable numeric test value."""
+        instance = super().__new__(cls, value)
+        instance.current_value = value
+        return instance
+
+    def __float__(self) -> float:
+        """Return the current caller-controlled numeric value."""
+        return self.current_value
+
+
+class ExplodingOffset(tzinfo):
+    """Raise provider behavior so completion-time normalization is exercised."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Raise an arbitrary provider failure."""
+        del dt
+        raise RuntimeError("provider details must not escape")
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Return a fixed daylight-saving offset if queried."""
+        del dt
+        return timedelta(0)
+
+
+class UnknownOffset(tzinfo):
+    """Return no offset so the completion-time boundary rejects it."""
+
+    def utcoffset(self, dt: datetime | None) -> None:
+        """Return an unresolved UTC offset."""
+        del dt
+        return None
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Return a fixed daylight-saving offset if queried."""
+        del dt
+        return timedelta(0)
+
+
+class MutableOffset(tzinfo):
+    """Expose timezone state that can change after evidence construction."""
+
+    def __init__(self) -> None:
+        """Start with a UTC-equivalent offset."""
+        self.offset = timedelta(0)
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Return the current mutable offset."""
+        del dt
+        return self.offset
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Keep daylight saving fixed."""
+        del dt
+        return timedelta(0)
 
 
 def request(**overrides: object) -> RustExecutionRequest:
@@ -167,6 +272,20 @@ def test_request_rejects_malformed_governance_fields(field: str, value: object) 
         request(**{field: value})
 
 
+def test_request_rejects_forged_reference_and_design_text() -> None:
+    """Do not let subclass methods make canonical request evidence disagree with validation."""
+    with pytest.raises(ValueError):
+        request(
+            execution_reference=ForgedReference(
+                "shadow:11111111-1111-4111-8111-111111111111"
+            )
+        )
+    with pytest.raises(ValueError):
+        request(design_code=ForgedDesign("unsupported_design"))
+    with pytest.raises(ValueError):
+        request(handoff_digest=ForgedFixedText("b" * 64, "a" * 64))
+
+
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
@@ -303,6 +422,7 @@ def test_evidence_rejects_governance_drift_after_worker_build() -> None:
     invalid = [
         ("fast_mlsirm_revision", "0" * 40),
         ("design_code", "multiple_membership"),
+        ("design_code", ForgedDesign("unsupported_design")),
         ("backend", "numpy"),
         ("rust_device", "tpu"),
         ("model_code", "other_model"),
@@ -326,3 +446,90 @@ def test_evidence_accepts_cross_sectional_without_cluster_count() -> None:
         completed_at=COMPLETED_AT,
     )
     assert evidence.cluster_count is None
+
+
+def test_evidence_detaches_mutable_completion_timezone() -> None:
+    """Keep canonical recovery evidence stable after caller timezone state mutates."""
+    zone = MutableOffset()
+    evidence = build_rust_recovery_evidence(
+        request(), worker_output(), completed_at=datetime(2026, 8, 21, 7, 10, tzinfo=zone)
+    )
+    first_json = evidence.canonical_json()
+    first_digest = evidence.sha256_digest()
+
+    zone.offset = timedelta(hours=9)
+
+    assert evidence.completed_at.tzinfo is timezone.utc
+    assert evidence.canonical_json() == first_json
+    assert evidence.sha256_digest() == first_digest
+
+
+@pytest.mark.parametrize(
+    "completed_at",
+    [
+        datetime.min.replace(tzinfo=timezone(timedelta(hours=1))),
+        datetime.max.replace(tzinfo=timezone(-timedelta(hours=1))),
+    ],
+)
+def test_evidence_rejects_unrepresentable_completion_utc(completed_at: datetime) -> None:
+    """Normalize out-of-range completion UTC conversion into a boundary error."""
+    with pytest.raises(ValueError, match="completed_at"):
+        build_rust_recovery_evidence(request(), worker_output(), completed_at=completed_at)
+
+
+def test_evidence_normalizes_completion_timezone_provider_failure() -> None:
+    """Do not leak arbitrary timezone-provider exceptions from evidence construction."""
+    with pytest.raises(ValueError, match="completed_at"):
+        build_rust_recovery_evidence(
+            request(),
+            worker_output(),
+            completed_at=datetime(2026, 8, 21, 7, 10, tzinfo=ExplodingOffset()),
+        )
+
+
+def test_evidence_rejects_unknown_completion_timezone_offset() -> None:
+    """Reject completion times whose timezone cannot resolve an absolute instant."""
+    with pytest.raises(ValueError, match="completed_at"):
+        build_rust_recovery_evidence(
+            request(),
+            worker_output(),
+            completed_at=datetime(2026, 8, 21, 7, 10, tzinfo=UnknownOffset()),
+        )
+
+
+def test_evidence_rejects_reinjected_non_utc_completion_timezone() -> None:
+    """Reject low-level reinjection that would escape canonical UTC evidence."""
+    evidence = build_rust_recovery_evidence(
+        request(), worker_output(), completed_at=COMPLETED_AT
+    )
+    object.__setattr__(
+        evidence,
+        "completed_at",
+        datetime(2026, 8, 21, 16, 10, tzinfo=timezone(timedelta(hours=9))),
+    )
+    with pytest.raises(ValueError, match="completed_at"):
+        evidence.canonical_json()
+
+
+def test_evidence_normalizes_numeric_runtime_values() -> None:
+    """Detach mutable numeric subclasses before canonical recovery evidence is stored."""
+    objective = MutableReal(1.0)
+    evidence = build_rust_recovery_evidence(
+        request(), worker_output(objective=objective), completed_at=COMPLETED_AT
+    )
+    first_json = evidence.canonical_json()
+    objective.current_value = 99.0
+
+    assert type(evidence.objective_value) is float
+    assert evidence.objective_value == 1.0
+    assert evidence.canonical_json() == first_json
+
+
+def test_builder_rejects_forged_worker_fixed_text() -> None:
+    """Do not let worker subclasses bypass model identity validation."""
+    with pytest.raises(ValueError, match="worker model"):
+        build_rust_recovery_evidence(
+            request(),
+            worker_output(model=ForgedFixedText("shadow_model", "MLS2PLM")),
+            completed_at=COMPLETED_AT,
+        )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from math import isfinite
 from numbers import Real
@@ -43,10 +43,16 @@ class UnsupportedExecutionDesign(ValueError):
     """Indicate that a valid design contract has no reviewed estimator yet."""
 
 
+def _validate_fixed_text(value: object, expected: str, field_name: str) -> None:
+    """Require exact built-in text before fixed-value comparisons or serialization."""
+    if type(value) is not str or value != expected:
+        raise ValueError(f"{field_name} must remain {expected}")
+
+
 def _validate_reference(value: object, prefix: str, field_name: str) -> None:
     """Require an opaque UUID-shaped reference in the expected namespace."""
     if (
-        not isinstance(value, str)
+        type(value) is not str
         or not value.startswith(f"{prefix}:")
         or _REFERENCE_PATTERN.fullmatch(value) is None
     ):
@@ -61,7 +67,7 @@ def _validate_reference(value: object, prefix: str, field_name: str) -> None:
 
 def _validate_digest(value: object, field_name: str) -> None:
     """Require a lowercase SHA-256 digest without carrying the source values."""
-    if not isinstance(value, str) or _DIGEST_PATTERN.fullmatch(value) is None:
+    if type(value) is not str or _DIGEST_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
@@ -95,11 +101,27 @@ def _finite_nonnegative_number(value: object, field_name: str) -> float:
     return number
 
 
+def _freeze_timestamp(value: object, field_name: str) -> datetime:
+    """Detach caller-controlled timezone behavior and store one immutable UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime") from exc
+    if type(offset) is not timedelta:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
+    try:
+        return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime") from exc
+
+
 def _canonical_timestamp(value: object, field_name: str) -> str:
-    """Render one timezone-aware instant as precision-preserving UTC text."""
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+    """Render only a previously detached built-in UTC instant as RFC 3339 text."""
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
         raise ValueError(f"{field_name} must be timezone-aware")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -128,13 +150,17 @@ class RustExecutionRequest:
         )
         _validate_digest(self.handoff_digest, "handoff_digest")
         _validate_digest(self.dataset_digest, "dataset_digest")
-        if self.fast_mlsirm_revision != REVIEWED_FAST_MLSIRM_REVISION:
-            raise ValueError("fast_mlsirm_revision must equal the reviewed immutable revision")
+        _validate_fixed_text(
+            self.fast_mlsirm_revision,
+            REVIEWED_FAST_MLSIRM_REVISION,
+            "fast_mlsirm_revision",
+        )
+        if type(self.design_code) is not str:
+            raise ValueError("design_code must be exact built-in text")
         if self.design_code not in _DESIGN_CODES:
             raise ValueError("design_code is not a governed execution design")
-        if self.backend != "rust":
-            raise ValueError("backend must remain rust for this execution lane")
-        if self.rust_device not in {"cpu", "gpu"}:
+        _validate_fixed_text(self.backend, "rust", "backend")
+        if type(self.rust_device) is not str or self.rust_device not in {"cpu", "gpu"}:
             raise ValueError("rust_device must be cpu or gpu")
         _validate_positive_integer(self.sample_size, "sample_size")
         _validate_positive_integer(self.item_count, "item_count")
@@ -242,40 +268,53 @@ class RustRecoveryEvidence:
             "evidence_reference",
         )
         _validate_digest(self.request_digest, "request_digest")
-        if self.fast_mlsirm_revision != REVIEWED_FAST_MLSIRM_REVISION:
-            raise ValueError("fast_mlsirm_revision must equal the reviewed immutable revision")
+        _validate_fixed_text(
+            self.fast_mlsirm_revision,
+            REVIEWED_FAST_MLSIRM_REVISION,
+            "fast_mlsirm_revision",
+        )
+        if type(self.design_code) is not str:
+            raise ValueError("design_code must be exact built-in text")
         if self.design_code not in _RUNNABLE_DESIGNS:
             raise ValueError("recovery evidence requires a runnable design")
-        if self.backend != "rust":
-            raise ValueError("backend must remain rust")
-        if self.rust_device not in {"cpu", "gpu"}:
+        _validate_fixed_text(self.backend, "rust", "backend")
+        if type(self.rust_device) is not str or self.rust_device not in {"cpu", "gpu"}:
             raise ValueError("rust_device must be cpu or gpu")
-        if self.model_code != "mlsirm_recovery":
-            raise ValueError("model_code must remain mlsirm_recovery")
+        _validate_fixed_text(self.model_code, "mlsirm_recovery", "model_code")
         _validate_positive_integer(self.sample_size, "sample_size")
         _validate_positive_integer(self.item_count, "item_count")
         _validate_nonnegative_integer(self.seed, "seed")
         if self.cluster_count is not None:
             _validate_positive_integer(self.cluster_count, "cluster_count")
-        if not isinstance(self.convergence_status, str) or self.convergence_status not in {
+        if type(self.convergence_status) is not str or self.convergence_status not in {
             "converged",
             "max_iter_reached",
         }:
             raise ValueError("convergence_status is not a governed worker state")
         _validate_positive_integer(self.iterations, "iterations")
-        _finite_number(self.objective_value, "objective_value")
+        object.__setattr__(
+            self,
+            "objective_value",
+            _finite_number(self.objective_value, "objective_value"),
+        )
         for field_name in (
             "parameter_rmse_mean",
             "latent_rmse",
             "distance_rmse",
             "gamma_abs_error",
         ):
-            _finite_nonnegative_number(getattr(self, field_name), field_name)
-        _canonical_timestamp(self.completed_at, "completed_at")
-        if self.result_authority != "scientific_evidence_only":
-            raise ValueError("result_authority must remain scientific_evidence_only")
-        if self.execution_state != "completed":
-            raise ValueError("execution_state must remain completed")
+            object.__setattr__(
+                self,
+                field_name,
+                _finite_nonnegative_number(getattr(self, field_name), field_name),
+            )
+        object.__setattr__(self, "completed_at", _freeze_timestamp(self.completed_at, "completed_at"))
+        _validate_fixed_text(
+            self.result_authority,
+            "scientific_evidence_only",
+            "result_authority",
+        )
+        _validate_fixed_text(self.execution_state, "completed", "execution_state")
         if self.contains_raw_person_level_values is not False:
             raise ValueError("recovery evidence must not contain raw person-level values")
         if self.human_review_required is not True:
@@ -336,18 +375,16 @@ def build_rust_recovery_evidence(
         raise ValueError("recovery_summary must be a mapping")
     if frozenset(summary) != _RECOVERY_FIELDS:
         raise ValueError("recovery_summary fields do not match the governed schema")
-    if worker_output["model"] != "MLS2PLM":
-        raise ValueError("worker model must be MLS2PLM")
-    if worker_output["backend"] != request.backend:
-        raise ValueError("worker backend does not match the request")
-    if worker_output["rust_device"] != request.rust_device:
-        raise ValueError("worker rust_device does not match the request")
-    if worker_output["n_persons"] != request.sample_size:
-        raise ValueError("worker n_persons does not match the request")
-    if worker_output["n_items"] != request.item_count:
-        raise ValueError("worker n_items does not match the request")
-    if worker_output["n_clusters"] != request.cluster_count:
-        raise ValueError("worker n_clusters does not match the request")
+    _validate_fixed_text(worker_output["model"], "MLS2PLM", "worker model")
+    _validate_fixed_text(worker_output["backend"], request.backend, "worker backend")
+    _validate_fixed_text(worker_output["rust_device"], request.rust_device, "worker rust_device")
+    for field_name, expected in (
+        ("n_persons", request.sample_size),
+        ("n_items", request.item_count),
+        ("n_clusters", request.cluster_count),
+    ):
+        if type(worker_output[field_name]) is not type(expected) or worker_output[field_name] != expected:
+            raise ValueError(f"worker {field_name} does not match the request")
     evidence_reference = request.execution_reference.replace(
         "validity_execution:", "validity_recovery_evidence:", 1
     )

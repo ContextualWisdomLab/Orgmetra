@@ -15,7 +15,6 @@ from math import isfinite
 from numbers import Real
 
 from .handoff import (
-    REVIEWED_FAST_MLSIRM_REVISION,
     _canonical_timestamp,
     _validate_code,
     _validate_digest,

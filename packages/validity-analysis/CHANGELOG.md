@@ -12,3 +12,4 @@
 - Make the package-local `uv` and pytest source configuration canonical so the quality workflow does not depend on a manually supplied `PYTHONPATH`.
 - Add fail-closed cross-sectional, nested multilevel, multiple-membership, and longitudinal execution contracts plus aggregate Rust recovery evidence.
 - Add an exact-revision read-only runner for bounded fast-mlsirm Rust CPU recovery smoke evidence; recovery metrics remain separate from criterion-related validity results.
+- Harden execution and recovery-evidence canonicalization against string/design forgery, mutable timezone state, UTC conversion overflow, and numeric runtime subclasses.
