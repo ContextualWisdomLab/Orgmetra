@@ -378,6 +378,7 @@ def verify_exact_delivery_attempt(
     if type(evidence) is not ExternalDeliveryReceiptEvidence:
         raise TypeError("evidence must be ExternalDeliveryReceiptEvidence")
 
+    evidence_digest = evidence.sha256_digest()
     expected = (
         _validate_operational_uuid(tenant_record_id, "tenant_record_id"),
         _validate_operational_uuid(outbox_delivery_record_id, "outbox_delivery_record_id"),
@@ -394,4 +395,4 @@ def verify_exact_delivery_attempt(
     )
     if actual != expected:
         raise ValueError("receipt evidence does not match the exact outbox delivery attempt")
-    return evidence.sha256_digest()
+    return evidence_digest
