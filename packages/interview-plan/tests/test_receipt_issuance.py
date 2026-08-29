@@ -13,20 +13,29 @@ from orgmetra_interview_plan import (
 from test_activation import APPROVED_AT, APPROVER, AllowingAuthority, plan, verification_for
 
 
+def direct_receipt() -> StructuredInterviewActivationReceipt:
+    """Return one syntactically valid receipt that never crossed the authority factory."""
+    return StructuredInterviewActivationReceipt(
+        tenant_record_id="10000000-0000-7000-8000-000000000001",
+        interview_plan_reference="interview_plan:11111111-1111-4111-8111-111111111111",
+        plan_digest="a" * 64,
+        approving_actor_reference="actor:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        authority_evidence_reference=(
+            "activation_verification:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        ),
+        authority_evidence_digest="e" * 64,
+        approved_at=datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc),
+    )
+
+
 def test_activation_receipt_cannot_be_minted_without_verified_factory_path():
-    """Reject valid-looking approval evidence that never crossed the authority boundary."""
-    with pytest.raises(TypeError, match="activate_structured_interview_plan"):
-        StructuredInterviewActivationReceipt(
-            tenant_record_id="10000000-0000-7000-8000-000000000001",
-            interview_plan_reference="interview_plan:11111111-1111-4111-8111-111111111111",
-            plan_digest="a" * 64,
-            approving_actor_reference="actor:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-            authority_evidence_reference=(
-                "activation_verification:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-            ),
-            authority_evidence_digest="e" * 64,
-            approved_at=datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc),
-        )
+    """Directly constructed values cannot export authoritative activation evidence."""
+    receipt = direct_receipt()
+
+    with pytest.raises(ValueError, match="changed after activation receipt issuance"):
+        receipt.canonical_json()
+    with pytest.raises(ValueError, match="changed after activation receipt issuance"):
+        receipt.sha256_digest()
 
 
 def test_private_module_sentinel_cannot_mint_verified_receipt_directly():
@@ -47,7 +56,7 @@ def test_private_module_sentinel_cannot_mint_verified_receipt_directly():
 
 
 def test_issued_activation_receipt_cannot_be_replaced_with_unverified_scope():
-    """Reject dataclass replacement that would reuse issuance proof for changed scope."""
+    """Dataclass replacement creates unissued values rather than reusable trust evidence."""
     candidate_plan = plan()
     receipt = activate_structured_interview_plan(
         plan=candidate_plan,
@@ -56,8 +65,13 @@ def test_issued_activation_receipt_cannot_be_replaced_with_unverified_scope():
         approved_at=APPROVED_AT,
     )
 
-    with pytest.raises(TypeError, match="activate_structured_interview_plan"):
-        replace(receipt, plan_digest="b" * 64)
+    replacement = replace(receipt, plan_digest="b" * 64)
+
+    with pytest.raises(ValueError, match="changed after activation receipt issuance"):
+        replacement.canonical_json()
+    with pytest.raises(ValueError, match="changed after activation receipt issuance"):
+        replacement.sha256_digest()
+    assert receipt.canonical_json()
 
 
 def test_issued_activation_receipt_rejects_post_issuance_rewrite():
