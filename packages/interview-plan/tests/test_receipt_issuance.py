@@ -29,6 +29,23 @@ def test_activation_receipt_cannot_be_minted_without_verified_factory_path():
         )
 
 
+def test_private_module_sentinel_cannot_mint_verified_receipt_directly():
+    """A module-private sentinel must not be usable as authority evidence by callers."""
+    with pytest.raises(TypeError, match="_issuance_token"):
+        StructuredInterviewActivationReceipt(
+            tenant_record_id="10000000-0000-7000-8000-000000000001",
+            interview_plan_reference="interview_plan:11111111-1111-4111-8111-111111111111",
+            plan_digest="a" * 64,
+            approving_actor_reference="actor:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            authority_evidence_reference=(
+                "activation_verification:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+            ),
+            authority_evidence_digest="e" * 64,
+            approved_at=datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc),
+            _issuance_token=activation_module._ACTIVATION_RECEIPT_ISSUANCE_TOKEN,
+        )
+
+
 def test_issued_activation_receipt_cannot_be_replaced_with_unverified_scope():
     """Reject dataclass replacement that would reuse issuance proof for changed scope."""
     candidate_plan = plan()
