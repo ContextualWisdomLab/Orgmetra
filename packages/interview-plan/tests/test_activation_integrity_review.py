@@ -6,6 +6,7 @@ import json
 
 import pytest
 
+import orgmetra_interview_plan.activation as activation_module
 from orgmetra_interview_plan import (
     StructuredInterviewActivationVerification,
     activate_structured_interview_plan,
@@ -132,6 +133,30 @@ def test_existing_plan_identity_cannot_renew_issuance_seal_after_mutation():
             approving_actor_reference=APPROVER,
             approved_at=APPROVED_AT,
         )
+
+
+def test_existing_receipt_identity_cannot_renew_issuance_seal_after_mutation():
+    """Repeated receipt initialization must not legitimize changed post-authority evidence."""
+    candidate_plan = plan()
+    receipt = activate_structured_interview_plan(
+        plan=candidate_plan,
+        authority=AllowingAuthority(verification_for(candidate_plan)),
+        approving_actor_reference=APPROVER,
+        approved_at=APPROVED_AT,
+    )
+    object.__setattr__(receipt, "plan_digest", "f" * 64)
+    object.__setattr__(
+        receipt,
+        "_issuance_token",
+        activation_module._ACTIVATION_RECEIPT_ISSUANCE_TOKEN,
+    )
+
+    with pytest.raises(ValueError, match="issuance evidence already exists"):
+        receipt.__post_init__()
+
+    object.__setattr__(receipt, "_issuance_token", None)
+    with pytest.raises(ValueError, match="changed after activation receipt issuance"):
+        receipt.canonical_json()
 
 
 def test_activation_rejects_naive_approval_time_before_authority_work():
