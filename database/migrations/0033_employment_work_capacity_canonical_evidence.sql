@@ -6,6 +6,7 @@
 CREATE FUNCTION enforce_employment_work_capacity_canonical_review_evidence()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     review_payload jsonb;

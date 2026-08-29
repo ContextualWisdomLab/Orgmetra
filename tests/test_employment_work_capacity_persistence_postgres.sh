@@ -15,6 +15,29 @@ for migration in \
   psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
+unhardened_functions="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_proc
+WHERE pronamespace = 'public'::regnamespace
+  AND proname = ANY (ARRAY[
+    'enforce_employment_work_capacity_anchor_system_time',
+    'resolve_employment_work_capacity',
+    'validate_employment_work_capacity_version_insert',
+    'apply_employment_work_capacity_change',
+    'protect_employment_work_capacity_anchor_immutability',
+    'protect_employment_work_capacity_version_history',
+    'reject_employment_work_capacity_truncate',
+    'enforce_employment_work_capacity_forward_chain'
+  ])
+  AND NOT COALESCE(
+    proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[],
+    false
+  );")"
+if [[ "${unhardened_functions}" != "0" ]]; then
+  echo "work-capacity functions inherit caller-controlled search_path: ${unhardened_functions}" >&2
+  exit 1
+fi
+
 TENANT_ID="10000000-0000-7000-8000-000000000001"
 OTHER_TENANT_ID="20000000-0000-7000-8000-000000000002"
 PERSON_ID="10000000-0000-7000-8000-000000000011"

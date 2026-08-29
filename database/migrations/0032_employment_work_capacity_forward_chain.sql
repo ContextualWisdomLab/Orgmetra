@@ -7,6 +7,7 @@
 CREATE FUNCTION enforce_employment_work_capacity_forward_chain()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     insertion_time timestamptz := pg_catalog.transaction_timestamp();

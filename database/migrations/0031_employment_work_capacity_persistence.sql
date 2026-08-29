@@ -162,6 +162,7 @@ COMMENT ON TABLE employment_work_capacity_version IS
 CREATE FUNCTION enforce_employment_work_capacity_anchor_system_time()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.created_at IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
@@ -189,6 +190,7 @@ CREATE FUNCTION resolve_employment_work_capacity(
 RETURNS numeric(5,4)
 LANGUAGE sql
 STABLE
+SET search_path = pg_catalog, public, pg_temp
 AS $$
     SELECT capacity_version.capacity_ratio
     FROM employment_work_capacity_record AS capacity_record
@@ -216,6 +218,7 @@ REVOKE ALL ON FUNCTION resolve_employment_work_capacity(uuid, uuid, date, timest
 CREATE FUNCTION validate_employment_work_capacity_version_insert()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     insertion_time timestamptz := pg_catalog.transaction_timestamp();
@@ -450,6 +453,7 @@ CREATE FUNCTION apply_employment_work_capacity_change(
 )
 RETURNS uuid
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     session_tenant_id uuid;
@@ -627,6 +631,7 @@ REVOKE ALL ON FUNCTION apply_employment_work_capacity_change(uuid, uuid, uuid, u
 CREATE FUNCTION protect_employment_work_capacity_anchor_immutability()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'Employment work-capacity identity is immutable'
@@ -645,6 +650,7 @@ EXECUTE FUNCTION protect_employment_work_capacity_anchor_immutability();
 CREATE FUNCTION protect_employment_work_capacity_version_history()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -676,6 +682,7 @@ EXECUTE FUNCTION protect_employment_work_capacity_version_history();
 CREATE FUNCTION reject_employment_work_capacity_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'Employment work-capacity history cannot be truncated'

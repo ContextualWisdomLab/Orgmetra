@@ -23,6 +23,20 @@ for migration in "${migrations[@]}"; do
   psql "${CANONICAL_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
+unhardened_functions="$(psql "${CANONICAL_URL}" -Atqc "
+SELECT count(*)
+FROM pg_proc
+WHERE pronamespace = 'public'::regnamespace
+  AND proname = 'enforce_employment_work_capacity_canonical_review_evidence'
+  AND NOT COALESCE(
+    proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[],
+    false
+  );")"
+if [[ "${unhardened_functions}" != "0" ]]; then
+  echo "canonical work-capacity evidence trigger inherits caller-controlled search_path: ${unhardened_functions}" >&2
+  exit 1
+fi
+
 TENANT_ID="40000000-0000-7000-8000-000000000001"
 PERSON_ID="40000000-0000-7000-8000-000000000011"
 EMPLOYMENT_ID="40000000-0000-7000-8000-000000000021"
