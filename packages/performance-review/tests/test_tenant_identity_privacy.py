@@ -46,6 +46,7 @@ def test_authoritative_uuid7_tenant_identity_is_accepted_by_builder_and_replace(
             "contains_personal_data",
             "contains_direct_person_identifiers",
             "contains_rating_value",
+            "contains_free_form_feedback",
             "contains_free_form_model_output",
             "human_confirmation_required",
             "decision_authority",
