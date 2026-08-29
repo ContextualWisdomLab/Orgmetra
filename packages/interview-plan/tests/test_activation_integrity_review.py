@@ -47,6 +47,22 @@ class MutableOffsetTimezone(tzinfo):
         return "MutableOffsetTimezone"
 
 
+class UnknownOffsetTimezone(tzinfo):
+    """Timezone fixture that cannot establish an authoritative UTC offset."""
+
+    def utcoffset(self, value):
+        """Return no offset so activation must fail before authority work."""
+        return None
+
+    def dst(self, value):
+        """Return no daylight-saving value for the deliberately invalid fixture."""
+        return None
+
+    def tzname(self, value):
+        """Return a stable diagnostic name for the invalid timezone fixture."""
+        return "UnknownOffsetTimezone"
+
+
 class ApprovalTimeMutatingAuthority:
     """Mutate caller-owned timezone state only after receiving the approval snapshot."""
 
@@ -85,6 +101,28 @@ def test_existing_plan_identity_cannot_renew_issuance_seal_after_mutation():
             authority=RejectingAuthority(),
             approving_actor_reference=APPROVER,
             approved_at=APPROVED_AT,
+        )
+
+
+def test_activation_rejects_naive_approval_time_before_authority_work():
+    """A caller must supply an aware approval instant before authoritative review."""
+    with pytest.raises(ValueError, match="approved_at must be an exact timezone-aware datetime"):
+        activate_structured_interview_plan(
+            plan=plan(),
+            authority=RejectingAuthority(),
+            approving_actor_reference=APPROVER,
+            approved_at=datetime(2026, 8, 21, 5, 0, 0),
+        )
+
+
+def test_activation_rejects_approval_time_with_unknown_offset():
+    """An aware-looking timestamp without a concrete UTC offset is not auditable evidence."""
+    with pytest.raises(ValueError, match="approved_at must be an exact timezone-aware datetime"):
+        activate_structured_interview_plan(
+            plan=plan(),
+            authority=RejectingAuthority(),
+            approving_actor_reference=APPROVER,
+            approved_at=datetime(2026, 8, 21, 5, 0, 0, tzinfo=UnknownOffsetTimezone()),
         )
 
 
@@ -151,3 +189,20 @@ def test_verification_contract_explicitly_binds_reviewed_approval_time():
     field_names = {field.name for field in fields(StructuredInterviewActivationVerification)}
 
     assert "approved_at" in field_names
+
+
+def test_activation_rejects_verification_for_different_approval_time():
+    """Do not accept authority evidence that attests a different approval instant."""
+    candidate_plan = plan()
+    verification = verification_for(
+        candidate_plan,
+        approved_at=APPROVED_AT + timedelta(seconds=1),
+    )
+
+    with pytest.raises(ValueError, match="different plan or actor or approval time"):
+        activate_structured_interview_plan(
+            plan=candidate_plan,
+            authority=AllowingAuthority(verification),
+            approving_actor_reference=APPROVER,
+            approved_at=APPROVED_AT,
+        )
