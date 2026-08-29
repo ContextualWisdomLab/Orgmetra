@@ -2,7 +2,7 @@
 
 ## Status
 
-Active-PR only. This evidence does not describe protected-`develop` product truth until PR #33 integrates.
+Protected `develop` capability. This evidence describes the bitemporal workforce-composition snapshot shipped on protected `develop`; it is aggregate descriptive evidence, not a recommendation or employment decision.
 
 | Requirement | Decision / contract | Production implementation | Executable evidence |
 |---|---|---|---|
