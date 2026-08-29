@@ -7,7 +7,7 @@ candidate PII or candidate response/score and remains pending explicit human app
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import hmac
 import json
@@ -105,6 +105,17 @@ def _validate_digest(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
+def _snapshot_utc_datetime(value: datetime, field_name: str) -> datetime:
+    """Detach one caller-owned aware datetime into an immutable built-in UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
+    offset = value.utcoffset()
+    if type(offset) is not timedelta:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
+    local_naive = value.replace(tzinfo=None)
+    return (local_naive - offset).replace(tzinfo=timezone.utc)
+
+
 def _canonical_timestamp(value: datetime, field_name: str = "generated_at") -> str:
     """Render an aware instant as UTC RFC 3339 text with a field-specific error."""
     if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
@@ -179,7 +190,8 @@ class StructuredInterviewPlan:
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive interview-plan reason")
-        _canonical_timestamp(self.generated_at)
+        generated_at_snapshot = _snapshot_utc_datetime(self.generated_at, "generated_at")
+        object.__setattr__(self, "generated_at", generated_at_snapshot)
         if type(self.evidence_version) is not int or not 1 <= self.evidence_version <= _MAX_EVIDENCE_VERSION:
             raise ValueError("evidence_version must be an integer from 1 through 2147483647")
         if self.human_confirmation_required is not True:
