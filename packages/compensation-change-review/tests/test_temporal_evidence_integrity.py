@@ -70,6 +70,21 @@ def test_rejects_timezone_without_resolvable_utc_offset(
         build_compensation_change_review_packet(**kwargs)
 
 
+def test_corrupted_post_issuance_time_fails_closed_before_canonical_export(
+    valid_packet_kwargs: dict[str, object],
+) -> None:
+    """Low-level mutation must not make an indeterminate recorded time exportable."""
+    packet = build_compensation_change_review_packet(**valid_packet_kwargs)
+    object.__setattr__(
+        packet,
+        "generated_at",
+        datetime(2026, 8, 21, 4, 25, tzinfo=MissingOffsetTimezone()),
+    )
+
+    with pytest.raises(ValueError, match="generated_at"):
+        packet.canonical_json()
+
+
 def test_freezes_mutable_timezone_before_issuing_recorded_time_evidence(
     valid_packet_kwargs: dict[str, object],
 ) -> None:
