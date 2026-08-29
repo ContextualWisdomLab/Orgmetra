@@ -167,6 +167,20 @@ def test_activation_rejects_utc_normalization_beyond_datetime_max_before_authori
         )
 
 
+def test_activation_receipt_normalizes_hostile_timezone_failure() -> None:
+    """Receipt construction must not leak arbitrary caller timezone exceptions."""
+    with pytest.raises(ValueError, match="approved_at must be an exact timezone-aware datetime"):
+        StructuredInterviewActivationReceipt(
+            tenant_record_id="12345678-1234-4234-8234-123456789abc",
+            interview_plan_reference="interview_plan:11111111-1111-4111-8111-111111111111",
+            plan_digest="a" * 64,
+            approving_actor_reference="actor:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            authority_evidence_reference="activation_verification:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            authority_evidence_digest="e" * 64,
+            approved_at=datetime(2026, 8, 21, 5, 0, tzinfo=ExplodingOffsetTimezone()),
+        )
+
+
 def test_activation_receipt_names_approved_at_when_recorded_time_is_invalid() -> None:
     """Tell callers which approval timestamp must be repaired before activation can proceed."""
     with pytest.raises(ValueError, match="approved_at must be an exact timezone-aware datetime"):
