@@ -10,6 +10,7 @@ import {
   REQUIRED_FILES,
   collectMarkdownFiles,
   countCodeFences,
+  extractCreatedTableNames,
   extractMaturityCells,
   extractSection,
   findUnfinishedMarker,
@@ -392,24 +393,16 @@ test('CLI returns a structured failure report', () => {
 
 test('every migration-created table is inventoried in both object-name sets', () => {
   const createdTableNames = new Set();
-  const createTablePattern =
-    /CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)\s*\(/gi;
   const foundationSqlPath = 'database/migrations/0001_foundation_schema.sql';
   const foundationSql = readFileSync(
     new URL(`../${foundationSqlPath}`, import.meta.url),
     'utf8',
   );
-  const foundationTableNames = new Set(
-    [...foundationSql.matchAll(createTablePattern)].map(
-      (match) => match[1],
-    ),
-  );
+  const foundationTableNames = extractCreatedTableNames(foundationSql);
   for (const requiredPath of REQUIRED_FILES) {
     if (!requiredPath.startsWith('database/migrations/')) continue;
     const sql = readFileSync(new URL(`../${requiredPath}`, import.meta.url), 'utf8');
-    for (const match of sql.matchAll(createTablePattern)) {
-      createdTableNames.add(match[1]);
-    }
+    for (const tableName of extractCreatedTableNames(sql)) createdTableNames.add(tableName);
   }
   assert.ok(createdTableNames.size > 0, 'migration table discovery found no tables');
   for (const tableName of createdTableNames) {

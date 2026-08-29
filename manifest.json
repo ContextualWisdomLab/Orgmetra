@@ -11,9 +11,9 @@
     },
     {
       "path": ".github/workflows/candidate-withdrawal-quality.yml",
-      "sha256": "817757efe58a1ee94662d2537dfa9fa6f28ae27499eb36209d664bb5174e1544",
-      "bytes": 3949,
-      "lines": 106
+      "sha256": "02599129aaa235f308f4d028c8a5aec4a912a890e0464c4a8bfb6f71ea0285ad",
+      "bytes": 4021,
+      "lines": 107
     },
     {
       "path": ".github/workflows/foundation-ci.yml",
@@ -449,9 +449,9 @@
     },
     {
       "path": "tests/foundation-contract.test.mjs",
-      "sha256": "3d7deb18dc5f4107e22d61718bab8eab5d7f04a46bd0c02d3873a3687da803f4",
-      "bytes": 16371,
-      "lines": 427
+      "sha256": "8379a54da48316cf3e2c96015a7d140463d874e8ed5c37cf066567e84a1708e1",
+      "bytes": 16196,
+      "lines": 420
     },
     {
       "path": "tests/openapi-contract.test.mjs",
@@ -485,9 +485,9 @@
     },
     {
       "path": "tests/test_candidate_application_postgres.sh",
-      "sha256": "69e18d46a76a35afa0d97e855bff79100a51f4f2ab603707db2be8e552b5c686",
-      "bytes": 14311,
-      "lines": 236
+      "sha256": "c8865795dd1d53fb534c8a9e0ca9fb7c226fd86dba8f39cf6ec21dc7c1d5e5e4",
+      "bytes": 14893,
+      "lines": 241
     },
     {
       "path": "tests/test_candidate_application_rls_postgres.sh",

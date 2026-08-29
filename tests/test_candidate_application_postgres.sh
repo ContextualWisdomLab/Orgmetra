@@ -109,6 +109,11 @@ INSERT INTO candidate_application_record (
 SQL
 
 assert_sql_rejected \
+    "candidate application scope cannot predate application submission" \
+    "application scope before submission" \
+    "INSERT INTO candidate_application_record_version (tenant_record_id,candidate_application_record_version_id,candidate_application_record_id,job_profile_id,position_record_id,effective_from,recorded_from) VALUES ('${TENANT_ALPHA}'::uuid,'10000000-0000-7000-8000-000000000076'::uuid,'${APPLICATION_THREE}'::uuid,'10000000-0000-7000-8000-000000000021'::uuid,NULL,TIMESTAMPTZ '2026-08-21 09:11:00+00',TIMESTAMPTZ '2026-08-21 11:00:00+00');"
+
+assert_sql_rejected \
     "candidate_application_version_position_job_tenant_fk" \
     "Position/Job mismatch" \
     "INSERT INTO candidate_application_record_version (tenant_record_id,candidate_application_record_version_id,candidate_application_record_id,job_profile_id,position_record_id,effective_from,recorded_from) VALUES ('${TENANT_ALPHA}'::uuid,'10000000-0000-7000-8000-000000000073'::uuid,'${APPLICATION_THREE}'::uuid,'10000000-0000-7000-8000-000000000021'::uuid,'10000000-0000-7000-8000-000000000042'::uuid,TIMESTAMPTZ '2026-08-21 09:12:00+00',TIMESTAMPTZ '2026-08-21 11:00:00+00');"
