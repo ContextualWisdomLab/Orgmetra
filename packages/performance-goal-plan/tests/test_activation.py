@@ -172,6 +172,20 @@ def test_activation_rejects_approval_before_review_evidence_exists() -> None:
     assert authority.calls == 0
 
 
+def test_activation_rejects_future_approval_before_authority_work() -> None:
+    """An activation approval cannot claim a time that has not occurred."""
+    item = packet()
+    authority = Authority(item)
+    with pytest.raises(ValueError, match="future"):
+        activate_performance_goal_plan(
+            item,
+            approving_actor_reference=item.reviewer_reference,
+            approved_at=datetime(2099, 1, 1, 1, 1, tzinfo=timezone.utc),
+            authority=authority,
+        )
+    assert authority.calls == 0
+
+
 def test_activation_rejects_non_verification_authority_result() -> None:
     """Authority results must use the exact governed verification runtime type."""
     item = packet()
@@ -255,6 +269,8 @@ def test_verification_rejects_invalid_chronology_and_governance() -> None:
         replace(valid, activation_state=object())  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="cadence"):
         replace(valid, feedback_cadence_code="weekly_check_in")
+    with pytest.raises(ValueError, match="future"):
+        replace(valid, verified_at=datetime(2099, 1, 1, 1, 2, tzinfo=timezone.utc))
 
 
 @pytest.mark.parametrize("evidence_version", [True, 2])

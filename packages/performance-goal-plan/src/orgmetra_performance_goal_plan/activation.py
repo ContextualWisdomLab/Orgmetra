@@ -35,10 +35,13 @@ _TIMEZONE_TYPE = type(timezone.utc)
 
 
 def _freeze_timestamp(value: object, field_name: str) -> datetime:
-    """Require an exact datetime with built-in fixed offset and detach it to UTC."""
+    """Require a non-future exact datetime with built-in fixed offset in UTC."""
     if type(value) is not datetime or type(value.tzinfo) is not _TIMEZONE_TYPE:
         raise ValueError(f"{field_name} must use an exact built-in fixed-offset datetime")
-    return value.astimezone(timezone.utc)
+    frozen = value.astimezone(timezone.utc)
+    if frozen > datetime.now(timezone.utc):
+        raise ValueError(f"{field_name} must not be in the future")
+    return frozen
 
 
 def _canonical_timestamp(value: datetime) -> str:
