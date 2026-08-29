@@ -61,9 +61,13 @@ def _discard_activation_receipt_seal(receipt_id: int) -> None:
 
 
 def _register_activation_receipt_seal(receipt: object, seal: str) -> None:
-    """Bind one live receipt identity to evidence outside receipt-writable slots."""
+    """Bind one live receipt identity once to evidence outside receipt-writable slots."""
     receipt_id = id(receipt)
     with _ACTIVATION_RECEIPT_SEALS_LOCK:
+        if receipt_id in _ACTIVATION_RECEIPT_SEALS:
+            raise ValueError(
+                "structured interview activation receipt issuance evidence already exists"
+            )
         _ACTIVATION_RECEIPT_SEALS[receipt_id] = seal
     finalize(receipt, _discard_activation_receipt_seal, receipt_id)
 
