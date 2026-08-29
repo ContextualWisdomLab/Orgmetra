@@ -50,7 +50,9 @@ function writeMigrationBackedTables(root) {
       'CREATE TABLE job_analysis_task_item (tenant_record_id uuid NOT NULL);',
       'CREATE TABLE job_analysis_ksao_item (tenant_record_id uuid NOT NULL);',
       'CREATE TABLE job_analysis_task_ksao_link (tenant_record_id uuid NOT NULL);',
-      'CREATE TABLE job_analysis_write_command (tenant_record_id uuid NOT NULL);'
+      'CREATE TABLE job_analysis_write_command (tenant_record_id uuid NOT NULL);',
+      'CREATE TABLE employment_absence_record (tenant_record_id uuid NOT NULL);',
+      'CREATE TABLE employment_absence_version (tenant_record_id uuid NOT NULL);'
     ].join('\n') + '\n'
   );
 }

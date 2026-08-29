@@ -41,6 +41,12 @@
 - Audit/outbox SQL boundaries pin `search_path` to `pg_catalog, public, pg_temp`, the migration revokes `CREATE` on `public` from `PUBLIC`, and project objects remain in the trusted application schema until schema extraction work explicitly moves them. Normal dispatcher/persistence functions remain security-invoker boundaries; the lost-final-worker recovery function is the sole `SECURITY DEFINER` exception and is owned by the hardened NOLOGIN recovery role rather than a login or superuser role.
 - Exponential/backoff policy selection, policy-specific producer configuration, and external delivery receipts remain release blockers before reliable asynchronous delivery is called production-ready; terminal dead-letter/escalation evidence and lost-final-worker recovery are implemented but do not by themselves prove downstream receipt.
 
+### Employment absence persistence
+
+- Migration `0026_employment_absence_persistence.sql` stores only reason-free operational absence state. Confirmed versions require full active/leave Employment coverage; cancelled versions may correct history after coverage ends.
+- The persistence contract runs against a fresh PostgreSQL 16 database and must pass tenant-qualified foreign-key, bitemporal exclusion, database-owned-time, immutable closure/TRUNCATE, forced-RLS, sensitive-column, and trusted-search-path checks before this slice is treated as operational evidence.
+- Absence persistence is not a leave-entitlement, payroll, benefit, discipline, scheduling, or other high-impact decision engine. Those downstream workflows must re-authorize purpose and actor and retain their own human-accountable evidence.
+
 ### Other dependencies
 
 - Psychometrics Commons unavailable: assessment-result fetches show an unavailable state, not invented scores.

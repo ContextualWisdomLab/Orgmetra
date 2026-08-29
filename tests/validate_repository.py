@@ -25,6 +25,7 @@ REQUIRED = [
     "package.json",
     ".github/workflows/foundation-ci.yml",
     ".github/workflows/job-analysis-api-quality.yml",
+    ".github/workflows/employment-absence-persistence-quality.yml",
     "docs/PRD.md",
     "docs/TRD.md",
     "docs/USER_STORIES.md",
@@ -56,6 +57,9 @@ REQUIRED = [
     "docs/adr/0013-governed-requisition-review-packet.md",
     "docs/adr/0014-job-analysis-snapshot-persistence.md",
     "docs/doctoring/REFERENCES.md",
+    "docs/adr/0114-employment-absence-persistence.md",
+    "docs/doctoring/employment-absence-persistence-references.md",
+    "docs/traceability/employment-absence-persistence.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
     "database/migrations/0001_foundation_schema.sql",
@@ -71,6 +75,7 @@ REQUIRED = [
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
+    "database/migrations/0026_employment_absence_persistence.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -92,6 +97,7 @@ REQUIRED = [
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
+    "tests/test_employment_absence_persistence_postgres.sh",
     "tests/validate_repository.py",
 ]
 

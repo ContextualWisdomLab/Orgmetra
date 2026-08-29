@@ -22,6 +22,7 @@ export const REQUIRED_FILES = Object.freeze([
   'package.json',
   '.github/workflows/foundation-ci.yml',
   '.github/workflows/job-analysis-api-quality.yml',
+  '.github/workflows/employment-absence-persistence-quality.yml',
   'docs/PRD.md',
   'docs/TRD.md',
   'docs/USER_STORIES.md',
@@ -53,6 +54,9 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0013-governed-requisition-review-packet.md',
   'docs/adr/0014-job-analysis-snapshot-persistence.md',
   'docs/doctoring/REFERENCES.md',
+  'docs/adr/0114-employment-absence-persistence.md',
+  'docs/doctoring/employment-absence-persistence-references.md',
+  'docs/traceability/employment-absence-persistence.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
   'database/migrations/0001_foundation_schema.sql',
@@ -68,6 +72,7 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
   'database/migrations/0013_job_analysis_snapshot.sql',
+  'database/migrations/0026_employment_absence_persistence.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -89,6 +94,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/test_job_analysis_snapshot_postgres.sh',
+  'tests/test_employment_absence_persistence_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -107,6 +113,7 @@ export const MATURITY_VALUES = Object.freeze(new Set([
 export const DATABASE_OBJECT_NAMES = Object.freeze([
   'tenant_record', 'person_record', 'person_name_record', 'person_contact_record',
   'external_identity_link', 'employment_record', 'employment_record_version',
+  'employment_absence_record', 'employment_absence_version',
   'employment_contract', 'employment_status_history', 'employment_transition',
   'legal_entity',
   'organization_unit', 'organization_relation', 'business_location',
@@ -139,7 +146,9 @@ export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
   'job_analysis_task_item',
   'job_analysis_ksao_item',
   'job_analysis_task_ksao_link',
-  'job_analysis_write_command'
+  'job_analysis_write_command',
+  'employment_absence_record',
+  'employment_absence_version'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;

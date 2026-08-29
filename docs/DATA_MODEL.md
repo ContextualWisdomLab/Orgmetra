@@ -8,6 +8,8 @@
 | `person_record` | Durable person entity inside Orgmetra, not an authentication subject. |
 | `employment_record` | Durable employment identity for a person. |
 | `employment_record_version` | Bitemporal employment status, exclusive-or-concurrent code, and effective period. |
+| `employment_absence_record` | Active-PR durable reason-free absence identity bound to one same-tenant Employment and Person. |
+| `employment_absence_version` | Active-PR bitemporal `confirmed`/`cancelled` operational absence status with immutable evidence correlations. |
 | `organization_unit` | Durable organizational identity referenced by positions and hierarchy facts. |
 | `organization_unit_version` | Bitemporal organizational name, type, and parent relationship for an organization unit. |
 | `job_profile` | Durable job identity referenced by positions, criteria, and decisions. |
@@ -51,6 +53,8 @@ Effective-dated fact tables use:
 Intervals are half-open and non-empty: an end value, when present, must be strictly later than its start. `effective_*` describes real-world validity. `recorded_*` describes when Orgmetra knew the fact.
 
 Durable anchors such as `organization_unit`, `job_profile`, `employment_record`, and `position_record` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version`, `job_profile_version`, `employment_record_version`, and `position_record_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
+
+The active stacked migration `0026_employment_absence_persistence.sql` adds `employment_absence_record` and `employment_absence_version` as separate 3NF relations. The anchor binds a same-tenant Employment/Person pair; the version stores only `confirmed` or `cancelled`, effective/recorded periods, opaque audit/outbox references, evidence digests, and fixed non-decision governance state. Confirmed versions require active/leave Employment coverage for their full effective interval. Cancelled versions are correction evidence and may be recorded after current Employment coverage ends so termination cannot strand history correction. The bitemporal exclusion, database-owned timestamps, immutable closure trigger, forced tenant RLS, and trusted function search paths remain active-PR behavior until the migration is integrated into protected `develop`.
 
 Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
 
