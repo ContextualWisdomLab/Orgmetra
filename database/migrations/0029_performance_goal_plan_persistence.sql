@@ -149,6 +149,7 @@ COMMENT ON TABLE performance_goal_plan_version IS
 CREATE FUNCTION enforce_performance_goal_plan_anchor_system_time()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF NEW.created_at IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
@@ -177,6 +178,7 @@ CREATE FUNCTION performance_goal_plan_employment_has_coverage(
 RETURNS boolean
 LANGUAGE sql
 STABLE
+SET search_path = pg_catalog, public, pg_temp
 AS $$
     SELECT COALESCE(
         daterange(requested_effective_from, requested_effective_to, '[)') <@
@@ -211,6 +213,7 @@ CREATE FUNCTION performance_goal_plan_job_has_coverage(
 RETURNS boolean
 LANGUAGE sql
 STABLE
+SET search_path = pg_catalog, public, pg_temp
 AS $$
     SELECT COALESCE(
         daterange(requested_effective_from, requested_effective_to, '[)') <@
@@ -237,6 +240,7 @@ COMMENT ON FUNCTION performance_goal_plan_job_has_coverage(uuid, uuid, date, dat
 CREATE FUNCTION validate_performance_goal_plan_version_insert()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     insertion_time timestamptz := pg_catalog.transaction_timestamp();
@@ -356,6 +360,7 @@ EXECUTE FUNCTION validate_performance_goal_plan_version_insert();
 CREATE FUNCTION protect_performance_goal_plan_anchor_immutability()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'performance-goal plan identity is immutable'
@@ -374,6 +379,7 @@ EXECUTE FUNCTION protect_performance_goal_plan_anchor_immutability();
 CREATE FUNCTION protect_performance_goal_plan_version_history()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -405,6 +411,7 @@ EXECUTE FUNCTION protect_performance_goal_plan_version_history();
 CREATE FUNCTION reject_performance_goal_plan_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'performance-goal plan history cannot be truncated'

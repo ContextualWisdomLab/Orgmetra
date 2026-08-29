@@ -172,6 +172,55 @@ SQL
 persisted="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atqc "SELECT persistence_state || '|' || rating_authority_state || '|' || employment_decision_authority_state FROM performance_goal_plan_version WHERE performance_goal_plan_version_id='${PLAN_VERSION_ID}'::uuid;")"
 [[ "${persisted}" == "authoritatively_persisted|not_authorized_for_performance_rating|not_authorized_for_employment_decision" ]] || { echo "unsafe persisted state: ${persisted}" >&2; exit 1; }
 
+with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+SET search_path = pg_temp, public;
+CREATE TEMP TABLE employment_record_version (
+  tenant_record_id uuid,
+  employment_record_id uuid,
+  employment_status_code text,
+  effective_from date,
+  effective_to date,
+  recorded_from timestamptz,
+  recorded_to timestamptz
+);
+CREATE TEMP TABLE job_profile_version (
+  tenant_record_id uuid,
+  job_profile_id uuid,
+  effective_from date,
+  effective_to date,
+  recorded_from timestamptz,
+  recorded_to timestamptz
+);
+INSERT INTO employment_record_version VALUES (
+  '10000000-0000-7000-8000-000000000001',
+  '10000000-0000-7000-8000-000000000021',
+  'active', DATE '2030-01-01', DATE '2031-01-01', now() - interval '1 minute', NULL
+);
+INSERT INTO job_profile_version VALUES (
+  '10000000-0000-7000-8000-000000000001',
+  '10000000-0000-7000-8000-000000000031',
+  DATE '2030-01-01', DATE '2031-01-01', now() - interval '1 minute', NULL
+);
+DO $$
+BEGIN
+  IF public.performance_goal_plan_employment_has_coverage(
+       '10000000-0000-7000-8000-000000000001'::uuid,
+       '10000000-0000-7000-8000-000000000021'::uuid,
+       DATE '2030-02-01', DATE '2030-03-01', now()
+     ) THEN
+    RAISE EXCEPTION 'temporary Employment table shadowed the authoritative coverage relation';
+  END IF;
+  IF public.performance_goal_plan_job_has_coverage(
+       '10000000-0000-7000-8000-000000000001'::uuid,
+       '10000000-0000-7000-8000-000000000031'::uuid,
+       DATE '2030-02-01', DATE '2030-03-01', now()
+     ) THEN
+    RAISE EXCEPTION 'temporary Job table shadowed the authoritative coverage relation';
+  END IF;
+END;
+$$;
+SQL
+
 expect_failure "forged normalized goal-set evidence accepted" "plan evidence does not match" "
 INSERT INTO performance_goal_plan_version (
  tenant_record_id, performance_goal_plan_version_id, performance_goal_plan_record_id,

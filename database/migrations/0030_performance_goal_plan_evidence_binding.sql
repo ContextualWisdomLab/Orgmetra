@@ -14,6 +14,7 @@ ALTER TABLE performance_goal_plan_version
 CREATE FUNCTION validate_performance_goal_plan_evidence_binding()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     anchor_plan_reference text;
