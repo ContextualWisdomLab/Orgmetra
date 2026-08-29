@@ -1,5 +1,7 @@
 """Regression tests for post-construction structured-interview plan integrity."""
 
+from copy import copy
+
 import pytest
 
 from test_activation import plan
@@ -24,3 +26,13 @@ def test_plan_canonical_evidence_fails_closed_after_low_level_mutation():
 
     assert original_json
     assert len(original_digest) == 64
+
+
+def test_copied_plan_has_no_transferable_process_local_issuance_evidence():
+    """Copying fields must not manufacture a second issued plan identity."""
+    copied_plan = copy(plan())
+
+    with pytest.raises(ValueError, match="issuance evidence is unavailable"):
+        copied_plan.canonical_json()
+    with pytest.raises(ValueError, match="issuance evidence is unavailable"):
+        copied_plan.sha256_digest()
