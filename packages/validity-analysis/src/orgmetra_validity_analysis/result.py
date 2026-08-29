@@ -16,6 +16,7 @@ from numbers import Real
 
 from .handoff import (
     _canonical_timestamp,
+    _freeze_timestamp,
     _validate_code,
     _validate_digest,
     _validate_kernel_revision,
@@ -111,18 +112,20 @@ class ConvergenceDiagnostics:
         if type(self.converged) is not bool:
             raise ValueError("converged must be a boolean")
         _validate_positive_integer(self.iterations, "iterations")
-        _finite_number(self.objective_value, "objective_value")
+        objective = _finite_number(self.objective_value, "objective_value")
         gradient = _finite_number(self.maximum_gradient, "maximum_gradient")
         if gradient < 0:
             raise ValueError("maximum_gradient must be non-negative")
         if self.converged and self.failure_code is not None:
             raise ValueError("failure_code must be absent for a converged result")
         if not self.converged and (
-            not isinstance(self.failure_code, str) or not self.failure_code
+            type(self.failure_code) is not str or not self.failure_code
         ):
             raise ValueError("failure_code is required for a nonconverged result")
         if self.failure_code is not None:
             _validate_code(self.failure_code, "failure_code")
+        object.__setattr__(self, "objective_value", objective)
+        object.__setattr__(self, "maximum_gradient", gradient)
 
     def to_dict(self) -> dict[str, object]:
         """Return deterministic convergence fields for the canonical result JSON."""
@@ -170,9 +173,9 @@ class ValidationAnalysisResult:
         _validate_digest(self.provenance_digest, "provenance_digest")
         _validate_kernel_revision(self.fast_mlsirm_revision)
         _validate_code(self.model_code, "model_code")
-        if self.backend not in _ALLOWED_BACKENDS:
+        if type(self.backend) is not str or self.backend not in _ALLOWED_BACKENDS:
             raise ValueError("backend must be rust_cpu or rust_gpu")
-        if self.precision not in _ALLOWED_PRECISIONS:
+        if type(self.precision) is not str or self.precision not in _ALLOWED_PRECISIONS:
             raise ValueError("precision must be f64 or f32")
         estimate = _finite_number(self.effect_estimate, "effect_estimate")
         lower = _finite_number(self.uncertainty_lower, "uncertainty_lower")
@@ -188,10 +191,10 @@ class ValidationAnalysisResult:
             raise ValueError("convergence_diagnostics must be ConvergenceDiagnostics")
         if self.sample_size != self.missingness_summary.total_observations:
             raise ValueError("sample_size must match total_observations")
-        _canonical_timestamp(self.completed_at, "completed_at")
-        if self.result_authority != _RESULT_AUTHORITY:
+        completed_at = _freeze_timestamp(self.completed_at, "completed_at")
+        if type(self.result_authority) is not str or self.result_authority != _RESULT_AUTHORITY:
             raise ValueError("result_authority must remain scientific_evidence_only")
-        if self.execution_state != _EXECUTION_STATE:
+        if type(self.execution_state) is not str or self.execution_state != _EXECUTION_STATE:
             raise ValueError("execution_state must remain completed")
         if self.contains_raw_person_level_values is not False:
             raise ValueError("result must not contain raw person-level values")
@@ -199,6 +202,10 @@ class ValidationAnalysisResult:
             raise ValueError("human review is mandatory for validity interpretation")
         if type(self.evidence_version) is not int or self.evidence_version != 1:
             raise ValueError("evidence_version must remain 1")
+        object.__setattr__(self, "effect_estimate", estimate)
+        object.__setattr__(self, "uncertainty_lower", lower)
+        object.__setattr__(self, "uncertainty_upper", upper)
+        object.__setattr__(self, "completed_at", completed_at)
 
     def __repr__(self) -> str:
         """Return a redacted representation suitable for routine application logs."""

@@ -8,7 +8,7 @@ analysis without silently changing the study definition.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
@@ -46,8 +46,10 @@ _NEXT_ACTION = (
 )
 
 
-def _validate_operational_uuid(value: str, field_name: str) -> None:
+def _validate_operational_uuid(value: object, field_name: str) -> None:
     """Require canonical non-sentinel UUID text owned by authoritative Orgmetra."""
+    if type(value) is not str:
+        raise ValueError(f"{field_name} must be canonical UUID text")
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as exc:
@@ -56,11 +58,11 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be a canonical operational UUID")
 
 
-def _validate_reference(value: str, prefix: str, field_name: str) -> None:
+def _validate_reference(value: object, prefix: str, field_name: str) -> None:
     """Require the expected namespace plus a canonical opaque UUIDv4 suffix."""
     error_message = f"{field_name} must be an opaque {prefix}: UUIDv4 reference"
     if (
-        not isinstance(value, str)
+        type(value) is not str
         or len(value) > 160
         or not _REFERENCE_PATTERN.fullmatch(value)
         or not value.startswith(f"{prefix}:")
@@ -75,31 +77,47 @@ def _validate_reference(value: str, prefix: str, field_name: str) -> None:
         raise ValueError(error_message)
 
 
-def _validate_digest(value: str, field_name: str) -> None:
+def _validate_digest(value: object, field_name: str) -> None:
     """Require lowercase SHA-256 hexadecimal evidence."""
-    if not isinstance(value, str) or not _DIGEST_PATTERN.fullmatch(value):
+    if type(value) is not str or not _DIGEST_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
-def _validate_code(value: str, field_name: str) -> None:
+def _validate_code(value: object, field_name: str) -> None:
     """Require bounded descriptive lower snake_case governance codes."""
-    if not isinstance(value, str) or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
+    if type(value) is not str or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be bounded two-or-more-word lower snake_case")
 
 
-def _validate_kernel_revision(value: str) -> None:
+def _validate_kernel_revision(value: object) -> None:
     """Require the exact externally reviewed immutable fast-mlsirm revision."""
-    if not isinstance(value, str) or not _REVISION_PATTERN.fullmatch(value):
+    if type(value) is not str or not _REVISION_PATTERN.fullmatch(value):
         raise ValueError("fast_mlsirm_revision must be lowercase 40-character Git commit hex")
     if value != REVIEWED_FAST_MLSIRM_REVISION:
         raise ValueError("fast_mlsirm_revision must equal the reviewed immutable revision")
 
 
-def _canonical_timestamp(value: datetime, field_name: str) -> str:
-    """Render an exact built-in aware instant with field-correct diagnostics."""
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+def _freeze_timestamp(value: object, field_name: str) -> datetime:
+    """Detach caller-controlled timezone behavior and store one immutable UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime") from exc
+    if type(offset) is not timedelta:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
+    try:
+        return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime") from exc
+
+
+def _canonical_timestamp(value: object, field_name: str) -> str:
+    """Render a previously detached built-in UTC instant as RFC 3339 text."""
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
         raise ValueError(f"{field_name} must be timezone-aware")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -139,6 +157,8 @@ class ValidationAnalysisHandoff:
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed handoff."""
+        requested_at = _freeze_timestamp(self.requested_at, "requested_at")
+        object.__setattr__(self, "requested_at", requested_at)
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         for value, prefix, field_name in (
             (self.handoff_reference, "validation_analysis_handoff", "handoff_reference"),
@@ -173,23 +193,27 @@ class ValidationAnalysisHandoff:
             raise ValueError("reason_code must remain criterion_related_validation")
         if type(self.evidence_version) is not int or not 1 <= self.evidence_version <= 2_147_483_647:
             raise ValueError("evidence_version must be an integer from 1 through 2147483647")
-        if self.validation_strategy != _VALIDATION_STRATEGY:
+        if type(self.validation_strategy) is not str or self.validation_strategy != _VALIDATION_STRATEGY:
             raise ValueError("validation_strategy must remain criterion_related")
-        if self.kernel_repository != _KERNEL_REPOSITORY:
+        if type(self.kernel_repository) is not str or self.kernel_repository != _KERNEL_REPOSITORY:
             raise ValueError("kernel_repository must remain ContextualWisdomLab/fast-mlsirm")
-        if self.kernel_boundary != _KERNEL_BOUNDARY:
+        if type(self.kernel_boundary) is not str or self.kernel_boundary != _KERNEL_BOUNDARY:
             raise ValueError("kernel_boundary must remain read_only_pinned_revision")
-        if self.execution_state != _EXECUTION_STATE:
+        if type(self.execution_state) is not str or self.execution_state != _EXECUTION_STATE:
             raise ValueError("execution_state must remain not_executed")
         if self.contains_raw_person_level_values is not False:
             raise ValueError("handoff must not contain raw person-level values")
         if self.human_review_required is not True:
             raise ValueError("human review is mandatory for selection-validity interpretation")
-        if self.result_authority != _RESULT_AUTHORITY:
+        if type(self.result_authority) is not str or self.result_authority != _RESULT_AUTHORITY:
             raise ValueError("result_authority must remain scientific_evidence_only")
-        if self.required_result_evidence != _REQUIRED_RESULT_EVIDENCE:
+        if (
+            type(self.required_result_evidence) is not tuple
+            or any(type(item) is not str for item in self.required_result_evidence)
+            or self.required_result_evidence != _REQUIRED_RESULT_EVIDENCE
+        ):
             raise ValueError("required_result_evidence must remain the reviewed evidence set")
-        if self.next_action != _NEXT_ACTION:
+        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed validation instruction")
 
     def __repr__(self) -> str:

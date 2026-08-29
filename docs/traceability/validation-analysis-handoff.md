@@ -15,7 +15,7 @@ Can an organization send one exact, reviewable validation study to its statistic
 | Scientific evidence | effect estimate, uncertainty interval, sample size, internally possible aggregate missingness, convergence diagnostics | immutable required-result-evidence regression plus impossible-missingness rejection |
 | Numerical result boundary | handoff digest, pinned fast-mlsirm revision, Rust CPU/GPU backend, precision, finite estimate/interval, aggregate missingness, explicit convergence state | `ValidationAnalysisResult` invariant/canonicalization regressions and exact-runtime-type checks |
 | Execution boundary | `not_executed`, `scientific_evidence_only`, read-only pinned foreign dependency | immutable governance regressions |
-| Reproducibility | canonical RFC 3339 time, canonical JSON, SHA-256 handoff digest | deterministic serialization/digest tests |
+| Reproducibility | construction-time UTC timestamp snapshots, finite numeric snapshots, canonical RFC 3339 time, canonical JSON, SHA-256 handoff digest | mutable timezone/numeric and UTC-boundary regressions plus deterministic serialization/digest tests |
 
 ## Maturity
 
