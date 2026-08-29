@@ -162,6 +162,19 @@ class OfferApprovalPacket:
         """Return a representation that never emits candidate or compensation evidence."""
         return "OfferApprovalPacket(<redacted>)"
 
+    def __copy__(self) -> OfferApprovalPacket:
+        """Return this immutable issued packet without minting a new evidence identity."""
+        return self
+
+    def __deepcopy__(self, memo: dict[int, object]) -> OfferApprovalPacket:
+        """Return this immutable issued packet without minting a new evidence identity."""
+        memo[id(self)] = self
+        return self
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        """Reject pickle because process-local issuance identity cannot cross serialization."""
+        raise TypeError("offer approval evidence cannot be pickled")
+
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
         if _ISSUED_PACKET_IDENTITIES.get(id(self)) is self:
