@@ -7,6 +7,7 @@ from decimal import Decimal
 import unittest
 from uuid import UUID
 
+import orgmetra_people_api
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.mutations import (
@@ -129,6 +130,10 @@ class RecordingMutationPort:
 
 class VacancyFillTests(unittest.TestCase):
     """Prove vacancy evidence is re-resolved before authoritative Assignment mutation."""
+
+    def test_orchestration_is_exported_from_people_api(self) -> None:
+        """The public People API package must expose the vacancy-fill boundary."""
+        self.assertIs(fill_position_vacancy, orgmetra_people_api.fill_position_vacancy)
 
     def test_fill_authorizes_then_resolves_then_persists_exact_assignment(self) -> None:
         authority = RecordingVacancyAuthority()

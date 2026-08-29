@@ -122,6 +122,12 @@ class VacancyFillRuntimeIntegrityTests(unittest.TestCase):
             ("tenant_record_id", "not-a-uuid"),
             ("effective_from", type("ForgedDate", (date,), {})(2026, 8, 24)),
             ("allocation_ratio", type("ForgedDecimal", (Decimal,), {})("1.0000")),
+            ("allocation_ratio", Decimal("0")),
+            ("allocation_ratio", Decimal("1.0001")),
+            ("allocation_ratio", Decimal("0.12345")),
+            ("confirmation_reference", "not-namespaced"),
+            ("evidence_version_code", ""),
+            ("idempotency_key", "too-short"),
         ):
             with self.subTest(field_name=field_name):
                 forged = command()

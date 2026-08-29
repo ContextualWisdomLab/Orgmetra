@@ -29,6 +29,7 @@ from orgmetra_people_api.mutations import (
     AssignmentMutationResult,
     PeopleMutationPort,
     create_assignment_record,
+    validate_idempotency_key,
 )
 
 _STAFFABLE_POSITION_STATUSES = frozenset({"active", "open"})
@@ -138,11 +139,19 @@ def _validate_command_runtime(command: AssignmentMutationCommand) -> None:
         _validate_operational_uuid(field_name, getattr(command, field_name))
     if type(command.effective_from) is not date or type(command.allocation_ratio) is not Decimal:
         raise TypeError("AssignmentMutationCommand trust-bearing fields must use exact runtime primitives")
-    if not command.allocation_ratio.is_finite():
+    ratio = command.allocation_ratio
+    if not ratio.is_finite():
         raise ValueError("allocation_ratio must be a finite Decimal before vacancy resolution")
+    if ratio <= Decimal("0") or ratio > Decimal("1.0000"):
+        raise ValueError("allocation_ratio must be greater than 0 and at most 1.0000")
+    if ratio.as_tuple().exponent < -4:
+        raise ValueError("allocation_ratio must have at most four decimal places")
     for value in (command.confirmation_reference, command.evidence_version_code, command.idempotency_key):
         if type(value) is not str:
             raise TypeError("AssignmentMutationCommand trust-bearing fields must use exact runtime primitives")
+    _validate_reference("confirmation_reference", command.confirmation_reference)
+    _validate_version(command.evidence_version_code)
+    validate_idempotency_key(command.idempotency_key)
 
 
 def _require_matching_verification(
