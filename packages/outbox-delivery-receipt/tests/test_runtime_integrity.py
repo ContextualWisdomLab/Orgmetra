@@ -28,6 +28,11 @@ class _NoOffsetTimezone(tzinfo):
         return None
 
 
+class _ExplosiveEquality:
+    def __eq__(self, other: object) -> bool:
+        raise RuntimeError("untrusted evidence equality executed")
+
+
 def _kwargs() -> dict[str, object]:
     return {
         "tenant_record_id": str(uuid4()),
@@ -90,6 +95,23 @@ def test_exact_attempt_verification_rejects_receipt_subclasses() -> None:
     with pytest.raises(TypeError, match="ExternalDeliveryReceiptEvidence"):
         verify_exact_delivery_attempt(
             forged,
+            tenant_record_id=evidence.tenant_record_id,
+            outbox_delivery_record_id=evidence.outbox_delivery_record_id,
+            audit_event_record_id=evidence.audit_event_record_id,
+            delivery_target_code=evidence.delivery_target_code,
+            delivery_attempt_count=evidence.delivery_attempt_count,
+        )
+
+
+def test_exact_attempt_verification_validates_evidence_before_scope_comparison() -> None:
+    evidence = build_external_delivery_receipt_evidence(**_kwargs())
+    raw_values = list(evidence)
+    raw_values[0] = _ExplosiveEquality()
+    reconstructed = tuple.__new__(ExternalDeliveryReceiptEvidence, tuple(raw_values))
+
+    with pytest.raises(ValueError, match="tenant_record_id"):
+        verify_exact_delivery_attempt(
+            reconstructed,
             tenant_record_id=evidence.tenant_record_id,
             outbox_delivery_record_id=evidence.outbox_delivery_record_id,
             audit_event_record_id=evidence.audit_event_record_id,
