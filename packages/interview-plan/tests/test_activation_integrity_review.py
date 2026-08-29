@@ -2,6 +2,7 @@
 
 from dataclasses import fields
 from datetime import datetime, timedelta, timezone, tzinfo
+from hashlib import sha256
 from threading import Event, Thread
 import json
 
@@ -84,6 +85,31 @@ class ApprovalTimeMutatingAuthority:
             authority_evidence_digest=DIGEST_E,
             approved_at=approved_at,
         )
+
+
+class DetachedPlanEvidenceAuthority:
+    """Accept only immutable creation-bound plan evidence, never the caller's live plan object."""
+
+    def __init__(self, verification: StructuredInterviewActivationVerification) -> None:
+        """Store one matching verification result and initialize the call audit list."""
+        self.verification = verification
+        self.calls = []
+
+    def verify_activation(
+        self,
+        *,
+        plan_canonical_json: str,
+        plan_digest: str,
+        approving_actor_reference: str,
+        approved_at: datetime,
+    ) -> StructuredInterviewActivationVerification:
+        """Prove authority work is bound to detached canonical bytes and their exact digest."""
+        assert type(plan_canonical_json) is str
+        payload = json.loads(plan_canonical_json)
+        assert payload["question_count"] == 4
+        assert plan_digest == sha256(plan_canonical_json.encode("utf-8")).hexdigest()
+        self.calls.append((plan_canonical_json, plan_digest, approving_actor_reference, approved_at))
+        return self.verification
 
 
 def test_existing_plan_identity_cannot_renew_issuance_seal_after_mutation():
@@ -182,6 +208,38 @@ def test_verification_mutation_after_validation_cannot_rewrite_receipt(monkeypat
     payload = json.loads(receipt.canonical_json())
     assert payload["authority_evidence_reference"] == AUTHORITY_EVIDENCE
     assert payload["authority_evidence_digest"] == DIGEST_E
+
+
+def test_activation_authority_receives_detached_creation_bound_plan_evidence():
+    """Do not expose a live plan that can be changed and restored while authority work runs."""
+    candidate_plan = plan()
+    verification = verification_for(candidate_plan)
+    authority = DetachedPlanEvidenceAuthority(verification)
+
+    receipt = activate_structured_interview_plan(
+        plan=candidate_plan,
+        authority=authority,
+        approving_actor_reference=APPROVER,
+        approved_at=APPROVED_AT,
+    )
+
+    assert len(authority.calls) == 1
+    plan_canonical_json, plan_digest, actor_reference, approved_at = authority.calls[0]
+    assert json.loads(plan_canonical_json)["interview_plan_reference"] == candidate_plan.interview_plan_reference
+    assert plan_digest == candidate_plan.sha256_digest()
+    assert actor_reference == APPROVER
+    assert approved_at == APPROVED_AT
+    assert receipt.plan_digest == plan_digest
+
+
+def test_verification_contract_cannot_be_rewritten_with_object_setattr():
+    """Authority evidence must be runtime-immutable so field reads cannot mix revisions."""
+    verification = verification_for(plan())
+
+    with pytest.raises((AttributeError, TypeError)):
+        object.__setattr__(verification, "authority_evidence_reference", ALTERNATE_AUTHORITY_EVIDENCE)
+
+    assert verification.authority_evidence_reference == AUTHORITY_EVIDENCE
 
 
 def test_verification_contract_explicitly_binds_reviewed_approval_time():
