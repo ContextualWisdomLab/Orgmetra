@@ -55,6 +55,8 @@ REQUIRED = [
     "docs/adr/0012-governed-migration-handoff.md",
     "docs/adr/0013-governed-requisition-review-packet.md",
     "docs/adr/0014-job-analysis-snapshot-persistence.md",
+    "docs/adr/0017-governed-offer-approval.md",
+    "docs/adr/0025-governed-candidate-evidence-intake.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
