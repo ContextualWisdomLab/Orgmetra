@@ -16,7 +16,7 @@
 
 | Requirement | Regression |
 | --- | --- |
-| Foreign-tenant and future-recorded facts cannot leak into the requested snapshot | `test_snapshot_exposes_only_visible_tenant_structure_with_deterministic_evidence` |
+| Foreign-tenant and future-recorded facts cannot enter visible resolution; bare UUID collisions do not infer foreign ownership | `test_snapshot_exposes_only_visible_tenant_structure_with_deterministic_evidence`; `test_snapshot_retains_parent_anchor_when_uuid_collides_across_tenants` |
 | Input ordering cannot change evidence bytes or digest | `test_snapshot_is_independent_of_input_version_order` |
 | A timezone-naive knowledge cutoff fails closed even for empty input | `test_builder_rejects_naive_cutoff_even_when_no_units_are_visible` |
 | Mutable, unrepresentable, or provider-controlled knowledge cutoffs cannot rewrite evidence | `test_snapshot_detaches_mutable_timezone_before_canonicalization`; temporal-integrity regressions |

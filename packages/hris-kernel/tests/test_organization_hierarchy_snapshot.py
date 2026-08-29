@@ -268,8 +268,8 @@ def test_builder_rejects_two_visible_parent_versions_for_one_unit() -> None:
         )
 
 
-def test_snapshot_rejects_parent_anchor_known_only_in_another_tenant() -> None:
-    """A known foreign organization identity cannot leak through a tenant hierarchy edge."""
+def test_snapshot_retains_parent_anchor_when_uuid_collides_across_tenants() -> None:
+    """A bare parent UUID cannot prove foreign ownership when tenant IDs differ."""
     versions = [
         _unit(
             version_id="53000000-0000-7000-8000-000000000001",
@@ -284,10 +284,11 @@ def test_snapshot_rejects_parent_anchor_known_only_in_another_tenant() -> None:
         ),
     ]
 
-    with pytest.raises(OrganizationHierarchyError, match="another tenant"):
-        build_organization_hierarchy_snapshot(
-            versions,
-            tenant_record_id=TENANT_ALPHA,
-            effective_on=date(2024, 6, 1),
-            known_at=utc(2024, 6, 1),
-        )
+    snapshot = build_organization_hierarchy_snapshot(
+        versions,
+        tenant_record_id=TENANT_ALPHA,
+        effective_on=date(2024, 6, 1),
+        known_at=utc(2024, 6, 1),
+    )
+
+    assert snapshot.parent_links == ((UNIT_CHILD, UNIT_FOREIGN),)

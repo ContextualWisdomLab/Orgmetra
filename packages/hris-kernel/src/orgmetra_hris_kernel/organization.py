@@ -78,12 +78,6 @@ def _visible_parent_links(
         {version.organization_unit_id for version in scoped},
         key=str,
     )
-    scoped_unit_ids = set(unit_ids)
-    foreign_unit_ids = {
-        version.organization_unit_id
-        for version in organization_versions
-        if version.tenant_record_id != tenant_record_id
-    }
     parent_links: list[tuple[UUID, UUID | None]] = []
     for unit_id in unit_ids:
         visible = resolve_single_valued_fact(
@@ -96,17 +90,6 @@ def _visible_parent_links(
         )
         if visible is not None:
             parent_id = visible.parent_organization_unit_id
-            if (
-                parent_id is not None
-                and parent_id not in scoped_unit_ids
-                and parent_id in foreign_unit_ids
-            ):
-                raise OrganizationHierarchyError(
-                    "Visible organization parent anchor resolves only to another tenant.",
-                    next_action=(
-                        "Correct the parent organization unit to one owned by this tenant, then rebuild the hierarchy snapshot."
-                    ),
-                )
             parent_links.append((unit_id, parent_id))
     return tuple(parent_links)
 
@@ -240,9 +223,10 @@ def validate_organization_hierarchy(
     bitemporal rule, so two simultaneously visible versions fail closed before
     graph traversal. Parent anchors without a visible version terminate the
     currently known chain rather than importing facts from another tenant or a
-    future knowledge state. A parent identity that is absent from this tenant's
-    history but is known in another supplied tenant fails closed instead of
-    leaking a foreign organization identity into this tenant's hierarchy.
+    future knowledge state. Because parent identities are tenant-qualified and
+    the parent field is an opaque UUID without its own tenant qualifier, a UUID
+    collision across tenants is retained as an unproven parent anchor rather
+    than misclassified as foreign.
 
     Args:
         organization_versions: Candidate parent-link versions, including other tenants.
@@ -253,7 +237,7 @@ def validate_organization_hierarchy(
     Raises:
         IntervalError: The temporal coordinate is not an exact supported date/datetime pair.
         SingleValuedFactError: One unit has two visible versions at the coordinate.
-        OrganizationHierarchyError: Visible parent links contain a cycle or a known foreign-tenant anchor.
+        OrganizationHierarchyError: Visible parent links contain a cycle.
     """
     parent_links = _visible_parent_links(
         organization_versions,
@@ -274,8 +258,8 @@ def build_organization_hierarchy_snapshot(
     """Build deterministic tenant organization structure at one effective/recorded coordinate.
 
     The builder reuses the authoritative single-valued bitemporal resolution and
-    cycle rules. It fails closed when supplied source truth proves that a visible
-    parent anchor belongs only to another tenant. It does not infer names,
+    cycle rules. It preserves an opaque parent anchor when the source does not
+    provide enough tenant-qualified evidence to resolve that parent. It does not infer names,
     headcount, managerial authority, legal reporting lines, or employment
     decisions. Downstream consumers receive only the tenant identity, opaque
     unit/parent identities, the exact business date, and the exact system-knowledge
