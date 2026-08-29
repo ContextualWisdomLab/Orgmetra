@@ -20,7 +20,7 @@ The request must:
 5. permit only a closed disposition-action vocabulary;
 6. preserve tenant/resource scope with opaque references and no HR payload values;
 7. remain `not_authorized_to_execute` and require authoritative scope/actor/policy/hold re-resolution plus separate human execution approval;
-8. produce deterministic canonical evidence with serialization-time integrity revalidation; and
+8. produce deterministic canonical evidence with creation-time sealing outside packet-writable state and serialization-time integrity revalidation; and
 9. record `media_sanitization_state=not_claimed` because storage-media sanitization and its validation belong to the storage/infrastructure owning boundary.
 
 No direct cross-service application-table SQL is permitted. No LLM output can authorize disposition.

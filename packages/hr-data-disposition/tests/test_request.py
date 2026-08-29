@@ -275,6 +275,21 @@ def test_revalidates_recorded_time_before_digesting() -> None:
         packet.evidence_digest()
 
 
+def test_rejects_valid_post_construction_evidence_replacement() -> None:
+    """A different valid policy digest cannot rewrite issued request evidence."""
+    packet = request()
+    object.__setattr__(packet, "retention_policy_digest", "c" * 64)
+    with pytest.raises(ValueError, match="changed after construction"):
+        packet.canonical_json()
+
+
+def test_creation_seal_is_not_packet_writable() -> None:
+    """A caller cannot replace an in-object seal because creation evidence is external."""
+    packet = request()
+    with pytest.raises(AttributeError):
+        object.__setattr__(packet, "_creation_evidence_digest", "f" * 64)
+
+
 def test_replace_cannot_bypass_post_due_or_actor_separation() -> None:
     """Dataclass replacement follows the same governed validation boundary."""
     packet = request()

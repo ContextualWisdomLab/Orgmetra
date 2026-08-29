@@ -7,11 +7,14 @@ from datetime import date, datetime, timezone
 import hashlib
 import json
 import re
+from threading import Lock
 from typing import ClassVar
 from uuid import UUID
+import weakref
 
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _UUID_MAX = (1 << 128) - 1
+_PACKET_SEALS_LOCK = Lock()
 
 
 def _require_text(value: object, field_name: str, *, max_length: int = 200) -> str:
@@ -96,7 +99,17 @@ def _validate_recorded_at(value: object) -> datetime:
     return value
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+def _canonical_json(document: dict[str, object]) -> str:
+    """Serialize one deterministic governance document without hidden fields."""
+    return json.dumps(document, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+
+def _canonical_digest(document: dict[str, object]) -> str:
+    """Hash one deterministic governance document for creation-time integrity binding."""
+    return hashlib.sha256(_canonical_json(document).encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True, repr=False, eq=False)
 class HrDataDispositionExecutionRequest:
     """Bind one post-retention disposition request while remaining unauthorized to execute."""
 
@@ -157,10 +170,13 @@ class HrDataDispositionExecutionRequest:
         raise TypeError("HrDataDispositionExecutionRequest is final and cannot be subclassed")
 
     def __post_init__(self) -> None:
-        """Fail closed on stale retention state, legal holds, chronology, or malformed scope."""
-        self._assert_integrity()
+        """Validate fields and seal creation evidence outside packet-writable state."""
+        self._validate_fields()
+        creation_digest = _canonical_digest(self._render_canonical_document())
+        with _PACKET_SEALS_LOCK:
+            _PACKET_SEALS[self] = creation_digest
 
-    def _assert_integrity(self) -> None:
+    def _validate_fields(self) -> None:
         """Revalidate all trust-bearing evidence at construction and canonicalization time."""
         _validate_tenant(self.tenant_record_id)
         _validate_reference(
@@ -230,6 +246,15 @@ class HrDataDispositionExecutionRequest:
             self.UPSTREAM_AUTHORIZATION_STATES,
         )
 
+    def _assert_integrity(self) -> None:
+        """Reject malformed fields or valid-looking evidence changed after construction."""
+        self._validate_fields()
+        current_digest = _canonical_digest(self._render_canonical_document())
+        with _PACKET_SEALS_LOCK:
+            creation_digest = _PACKET_SEALS.get(self)
+        if current_digest != creation_digest:
+            raise ValueError("disposition request evidence changed after construction")
+
     @property
     def purpose_code(self) -> str:
         """Return the fixed review purpose."""
@@ -265,9 +290,8 @@ class HrDataDispositionExecutionRequest:
             "Do not treat this request as deletion authority or media-sanitization evidence."
         )
 
-    def canonical_document(self) -> dict[str, object]:
-        """Return deterministic, value-minimized request evidence after live revalidation."""
-        self._assert_integrity()
+    def _render_canonical_document(self) -> dict[str, object]:
+        """Render current request fields without validation or seal comparison."""
         return {
             "tenant_record_id": self.tenant_record_id,
             "disposition_request_reference": self.disposition_request_reference,
@@ -296,14 +320,14 @@ class HrDataDispositionExecutionRequest:
             "next_action": self.next_action,
         }
 
+    def canonical_document(self) -> dict[str, object]:
+        """Return deterministic, value-minimized request evidence after live revalidation."""
+        self._assert_integrity()
+        return self._render_canonical_document()
+
     def canonical_json(self) -> str:
         """Serialize request evidence with stable ordering and no whitespace ambiguity."""
-        return json.dumps(
-            self.canonical_document(),
-            ensure_ascii=True,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
+        return _canonical_json(self.canonical_document())
 
     def evidence_digest(self) -> str:
         """Hash the exact canonical request evidence with SHA-256."""
@@ -312,3 +336,6 @@ class HrDataDispositionExecutionRequest:
     def __repr__(self) -> str:
         """Keep tenant, actor, resource, and policy correlation out of routine logs."""
         return "HrDataDispositionExecutionRequest(<redacted>)"
+
+
+_PACKET_SEALS: weakref.WeakKeyDictionary[HrDataDispositionExecutionRequest, str] = weakref.WeakKeyDictionary()

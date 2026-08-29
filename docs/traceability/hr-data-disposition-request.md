@@ -20,7 +20,7 @@
 | Requester and reviewer are distinct | `test_requires_distinct_requester_and_reviewer` and replacement-path regression |
 | Tenant/resource/policy/review evidence is opaque, canonical, and value-minimized | malformed text/reference/digest regressions plus `test_request_is_explicitly_non_authorizing_and_value_minimized` |
 | Caller-defined scalar behavior cannot forge validation | `test_rejects_caller_defined_scalar_subclasses` |
-| Canonical evidence cannot be forged after construction | `test_revalidates_live_state_before_serialization`, `test_revalidates_recorded_time_before_digesting` |
+| Canonical evidence cannot be forged after construction | `test_revalidates_live_state_before_serialization`, `test_revalidates_recorded_time_before_digesting`, `test_rejects_valid_post_construction_evidence_replacement`, `test_creation_seal_is_not_packet_writable` |
 | A request never grants execution authority | `test_request_is_explicitly_non_authorizing_and_value_minimized` and closed action regressions |
 | Application disposition does not claim media sanitization | `media_sanitization_state == "not_claimed"` regression in `test_request_is_explicitly_non_authorizing_and_value_minimized` |
 | Owned production statement/branch coverage | `HR Data Disposition Quality` exact-head workflow with `--cov-branch --cov-fail-under=100` |
@@ -30,3 +30,5 @@
 PR #76 is the dependency root for this slice and must integrate first. Descendant checks are never transferred as protected-base evidence. After the parent integrates, this PR must be retargeted to a fresh protected `develop` tip and rerun on its new exact head.
 
 The request binds only Orgmetra-owned opaque evidence. It does not mutate Keyverse, Naruon, MHTML ETL Gateway, mightyETL, or any other dedicated-writer repository and does not use cross-service application-table SQL.
+
+Creation evidence is sealed in a process-local weak registry outside request-writable state. Canonical serialization rejects malformed mutation and independently valid replacement after construction; durable audit/outbox persistence remains the system-of-record boundary.
