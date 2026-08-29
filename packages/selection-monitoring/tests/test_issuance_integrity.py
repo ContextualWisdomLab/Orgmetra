@@ -77,3 +77,17 @@ def test_copied_or_serialized_plan_fails_closed_without_issuance_evidence() -> N
     for clone in clones:
         with pytest.raises(ValueError, match="issuance evidence is unavailable"):
             clone.canonical_json()
+
+
+def test_reinitialization_cannot_renew_issuance_evidence_after_valid_value_rewrite() -> None:
+    """Keep one live plan identity bound to its original construction evidence."""
+    plan = _build_plan()
+    original = plan.canonical_json()
+
+    object.__setattr__(plan, "population_snapshot_digest", "f" * 64)
+
+    with pytest.raises(ValueError, match="issuance evidence already exists"):
+        plan.__post_init__()
+    with pytest.raises(ValueError, match="changed after issuance"):
+        plan.canonical_json()
+    assert original != plan_module._canonical_plan_json_unchecked(plan)
