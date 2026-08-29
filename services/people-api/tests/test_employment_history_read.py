@@ -238,9 +238,12 @@ class EmploymentHistoryReadTests(unittest.TestCase):
                     read_port=FakeEmploymentHistoryPort(records),
                 )
 
-    def test_post_construction_row_mutation_fails_runtime_integrity(self) -> None:
+    def test_low_level_invalid_row_reconstruction_fails_runtime_integrity(self) -> None:
         record = employment_record()
-        object.__setattr__(record, "employment_status_code", "forged")
+        raw_values = list(record)
+        raw_values[4] = "forged"
+        forged = tuple.__new__(EmploymentHistoryRecord, tuple(raw_values))
+        self.assertIs(type(forged), EmploymentHistoryRecord)
         with self.assertRaisesRegex(EmploymentHistoryIntegrityError, "runtime integrity"):
             read_employment_history(
                 principal=self.principal,
@@ -250,7 +253,7 @@ class EmploymentHistoryReadTests(unittest.TestCase):
                 purpose_code="employee_profile_review",
                 requested_fields=frozenset({"employment_status_code"}),
                 policy=self.policy,
-                read_port=FakeEmploymentHistoryPort((record,)),
+                read_port=FakeEmploymentHistoryPort((forged,)),
             )
 
     def test_duplicate_version_identity_or_overlapping_effective_truth_fails_closed(self) -> None:
