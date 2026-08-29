@@ -188,6 +188,10 @@ class HrDataRightsRequestPacket:
     mutation_state: str = _MUTATION_STATE
     next_action: str = _NEXT_ACTION
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Keep governed request behavior final so subclasses cannot override exports."""
+        raise TypeError("HrDataRightsRequestPacket is final")
+
     def __post_init__(self) -> None:
         """Validate fields and reject conflicting live evidence for one request identity."""
         self._validate()

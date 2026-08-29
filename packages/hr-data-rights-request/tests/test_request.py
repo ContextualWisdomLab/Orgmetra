@@ -323,6 +323,12 @@ def test_rejects_post_construction_evidence_rewrite() -> None:
         packet.canonical_json()
 
 
+def test_packet_runtime_is_final() -> None:
+    """Governed request behavior cannot be replaced through subclass overrides."""
+    with pytest.raises(TypeError, match="is final"):
+        type("ForgedPacket", (HrDataRightsRequestPacket,), {})
+
+
 def test_rejects_unregistered_copy() -> None:
     """Do not let a shallow copy inherit process-local issuance evidence."""
     copied = copy(build())
