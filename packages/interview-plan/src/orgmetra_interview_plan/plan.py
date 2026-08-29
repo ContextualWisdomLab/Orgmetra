@@ -109,7 +109,10 @@ def _snapshot_utc_datetime(value: datetime, field_name: str) -> datetime:
     """Detach one caller-owned aware datetime into a representable built-in UTC instant."""
     if type(value) is not datetime or value.tzinfo is None:
         raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
-    offset = value.utcoffset()
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime") from exc
     if type(offset) is not timedelta:
         raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
     local_naive = value.replace(tzinfo=None)
