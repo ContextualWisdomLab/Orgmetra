@@ -40,14 +40,18 @@ _ACTIVATION_RECEIPT_SEALS_LOCK = RLock()
 
 
 def _snapshot_utc_datetime(value: datetime, field_name: str) -> datetime:
-    """Detach one caller-owned aware datetime into an immutable built-in UTC instant."""
+    """Detach one caller-owned aware datetime into a representable built-in UTC instant."""
     if type(value) is not datetime or value.tzinfo is None:
         raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
     offset = value.utcoffset()
     if type(offset) is not timedelta:
         raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
     local_naive = value.replace(tzinfo=None)
-    return (local_naive - offset).replace(tzinfo=timezone.utc)
+    try:
+        normalized = local_naive - offset
+    except OverflowError as exc:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime") from exc
+    return normalized.replace(tzinfo=timezone.utc)
 
 
 def _discard_activation_receipt_seal(receipt_id: int) -> None:
