@@ -106,6 +106,21 @@ def test_candidate_evidence_normalizes_timezone_provider_exceptions() -> None:
         _build(datetime(2026, 8, 21, 5, 0, tzinfo=_ExplodingOffset()))
 
 
+@pytest.mark.parametrize(
+    "collected_at",
+    [
+        datetime.min.replace(tzinfo=timezone(timedelta(hours=1))),
+        datetime.max.replace(tzinfo=timezone(-timedelta(hours=1))),
+    ],
+)
+def test_candidate_evidence_normalizes_unrepresentable_utc_overflow(
+    collected_at: datetime,
+) -> None:
+    """Normalize out-of-range UTC conversion into the packet's boundary error."""
+    with pytest.raises(ValueError, match="collected_at"):
+        _build(collected_at)
+
+
 def test_candidate_evidence_rejects_postconstruction_timezone_reinjection() -> None:
     """Fail closed if low-level mutation reintroduces executable timezone behavior."""
     packet = _build(datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc))

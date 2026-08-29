@@ -83,7 +83,10 @@ def _freeze_timestamp(value: datetime) -> datetime:
         raise ValueError("collected_at must be an exact timezone-aware datetime") from exc
     if type(offset) is not timedelta:
         raise ValueError("collected_at must be an exact timezone-aware datetime")
-    return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    try:
+        return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise ValueError("collected_at must be an exact timezone-aware datetime") from exc
 
 
 def _canonical_timestamp(value: datetime) -> str:
