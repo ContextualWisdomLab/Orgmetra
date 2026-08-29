@@ -6,7 +6,6 @@ import json
 
 import pytest
 
-import orgmetra_interview_plan.activation as activation_module
 from orgmetra_interview_plan import (
     StructuredInterviewActivationVerification,
     activate_structured_interview_plan,
@@ -144,14 +143,15 @@ def test_existing_receipt_identity_cannot_renew_issuance_seal_after_mutation():
         approving_actor_reference=APPROVER,
         approved_at=APPROVED_AT,
     )
-    original_seal = activation_module._authoritative_activation_receipt_seal(receipt)
+    original_canonical = receipt.canonical_json()
     object.__setattr__(receipt, "plan_digest", "f" * 64)
 
     receipt.__post_init__()
 
-    assert activation_module._authoritative_activation_receipt_seal(receipt) == original_seal
     with pytest.raises(ValueError, match="changed after activation receipt issuance"):
         receipt.canonical_json()
+    object.__setattr__(receipt, "plan_digest", json.loads(original_canonical)["plan_digest"])
+    assert receipt.canonical_json() == original_canonical
 
 
 def test_activation_rejects_naive_approval_time_before_authority_work():
