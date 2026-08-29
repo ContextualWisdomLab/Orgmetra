@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
+import json
 
 import pytest
 
@@ -22,6 +23,26 @@ class ForgedDateTime(datetime):
     def isoformat(self, *args, **kwargs) -> str:  # type: ignore[no-untyped-def]
         """Return an instant different from the underlying plan evidence."""
         return "2099-12-31T23:59:59+00:00"
+
+
+class MutableOffsetTimezone(tzinfo):
+    """Timezone fixture whose offset can change after plan construction."""
+
+    def __init__(self, offset_hours: int) -> None:
+        """Store the mutable offset used by the temporal-integrity regression."""
+        self.offset_hours = offset_hours
+
+    def utcoffset(self, value):  # type: ignore[no-untyped-def]
+        """Return the currently configured offset."""
+        return timedelta(hours=self.offset_hours)
+
+    def dst(self, value):  # type: ignore[no-untyped-def]
+        """Return zero daylight-saving offset for deterministic behavior."""
+        return timedelta(0)
+
+    def tzname(self, value):  # type: ignore[no-untyped-def]
+        """Return a stable diagnostic name for the mutable test timezone."""
+        return "MutableOffsetTimezone"
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -61,6 +82,20 @@ def test_rejects_datetime_subclasses_that_can_forge_recorded_time_evidence() -> 
 
     with pytest.raises(ValueError, match="generated_at"):
         build_structured_interview_plan(**kwargs)
+
+
+def test_plan_detaches_mutable_generated_at_timezone_before_sealing() -> None:
+    """Caller timezone mutation must not change or invalidate already-issued plan evidence."""
+    mutable_timezone = MutableOffsetTimezone(1)
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 8, 21, 5, 30, 0, 123456, tzinfo=mutable_timezone)
+
+    candidate_plan = build_structured_interview_plan(**kwargs)
+    mutable_timezone.offset_hours = 2
+
+    assert candidate_plan.generated_at.tzinfo is timezone.utc
+    assert candidate_plan.generated_at == datetime(2026, 8, 21, 4, 30, 0, 123456, tzinfo=timezone.utc)
+    assert json.loads(candidate_plan.canonical_json())["generated_at"] == "2026-08-21T04:30:00.123456Z"
 
 
 def test_activation_receipt_names_approved_at_when_recorded_time_is_invalid() -> None:
