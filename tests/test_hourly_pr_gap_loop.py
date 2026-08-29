@@ -11,6 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "hourly-pr-gap-loop.yml"
 SCRIPT = ROOT / "scripts" / "ops" / "gap_baseline_freshness.py"
 CENTRAL_SCHEDULER = "pr-review-merge-scheduler.yml"
+BASELINE = (
+    "Inventory date: 2026-08-25 (Asia/Seoul).\n"
+    "At this snapshot, 4 pull requests and one non-PR issue are open.\n"
+)
 
 
 def _load_script() -> ModuleType:
@@ -32,6 +36,7 @@ def test_hourly_audit_does_not_create_a_second_pr_writer() -> None:
     assert "id-token: write" not in text
     assert "secrets: inherit" not in text
     assert "permissions:\n  contents: read\n  pull-requests: read\n  issues: read" in text
+    assert "ref: ${{ github.event.repository.default_branch }}" in text
 
 
 def test_live_queue_counts_request_all_pages(monkeypatch) -> None:
@@ -107,7 +112,9 @@ def test_future_inventory_date_is_nonpassing_without_live_read(
     """A future-dated buyer snapshot cannot be accepted as current repository truth."""
     module = _load_script()
     baseline = tmp_path / "product-technical-gap-baseline.md"
-    baseline.write_text("Inventory date: 2999-12-31 (Asia/Seoul).\n", encoding="utf-8")
+    baseline.write_text(
+        BASELINE.replace("2026-08-25", "2999-12-31"), encoding="utf-8"
+    )
     live_calls = 0
 
     def live_state() -> dict[str, object]:
@@ -137,7 +144,7 @@ def test_same_inventory_day_integration_is_not_newer(
     """A same-Korea-calendar-day commit must not make a date-only snapshot stale."""
     module = _load_script()
     baseline = tmp_path / "product-technical-gap-baseline.md"
-    baseline.write_text("Inventory date: 2026-08-25 (Asia/Seoul).\n", encoding="utf-8")
+    baseline.write_text(BASELINE, encoding="utf-8")
     monkeypatch.setattr(
         module,
         "_live_state",
@@ -163,7 +170,7 @@ def test_next_korea_calendar_day_integration_requires_refresh(
     """UTC timestamps crossing midnight in Korea must stale the prior local date."""
     module = _load_script()
     baseline = tmp_path / "product-technical-gap-baseline.md"
-    baseline.write_text("Inventory date: 2026-08-25 (Asia/Seoul).\n", encoding="utf-8")
+    baseline.write_text(BASELINE, encoding="utf-8")
     monkeypatch.setattr(
         module,
         "_live_state",
@@ -187,7 +194,7 @@ def test_live_state_failure_is_nonpassing(monkeypatch, tmp_path, capsys) -> None
     """An unavailable live control plane must fail closed instead of silently passing."""
     module = _load_script()
     baseline = tmp_path / "product-technical-gap-baseline.md"
-    baseline.write_text("Inventory date: 2026-08-25 (Asia/Seoul).\n", encoding="utf-8")
+    baseline.write_text(BASELINE, encoding="utf-8")
 
     def fail_live_state() -> dict[str, object]:
         raise RuntimeError("GitHub API unavailable")
@@ -203,3 +210,71 @@ def test_live_state_failure_is_nonpassing(monkeypatch, tmp_path, capsys) -> None
     output = capsys.readouterr().out.lower()
     assert "fail live-state fetch" in output
     assert "github api unavailable" in output
+
+
+def test_queue_change_is_reported_as_refresh_candidate(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    """A changed live queue makes the point-in-time baseline a refresh candidate."""
+    module = _load_script()
+    baseline = tmp_path / "product-technical-gap-baseline.md"
+    baseline.write_text(BASELINE, encoding="utf-8")
+    monkeypatch.setattr(
+        module,
+        "_live_state",
+        lambda: {
+            "open_pull_requests": 5,
+            "open_issues": 1,
+            "newest_develop_commit_date": "2026-08-25T12:00:00Z",
+        },
+    )
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        ["gap-baseline-freshness", "--baseline", str(baseline)],
+    )
+
+    assert module.main() == 0
+    assert "refresh candidate" in capsys.readouterr().out.lower()
+
+
+def test_empty_develop_commit_payload_fails_closed(monkeypatch) -> None:
+    """An empty develop response cannot establish a current integration point."""
+    module = _load_script()
+
+    class Completed:
+        returncode = 0
+        stderr = ""
+        stdout = "[]"
+
+    monkeypatch.setattr(module.subprocess, "run", lambda *_args, **_kwargs: Completed())
+    try:
+        module._live_state()
+    except RuntimeError as error:
+        assert "empty" in str(error)
+    else:
+        raise AssertionError("empty develop payload was accepted")
+
+
+def test_invalid_develop_timestamp_fails_closed(monkeypatch, tmp_path, capsys) -> None:
+    """Malformed integration timestamps cannot be reported as a current audit."""
+    module = _load_script()
+    baseline = tmp_path / "product-technical-gap-baseline.md"
+    baseline.write_text(BASELINE, encoding="utf-8")
+    monkeypatch.setattr(
+        module,
+        "_live_state",
+        lambda: {
+            "open_pull_requests": 4,
+            "open_issues": 1,
+            "newest_develop_commit_date": "not-a-timestamp",
+        },
+    )
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        ["gap-baseline-freshness", "--baseline", str(baseline)],
+    )
+
+    assert module.main() == 2
+    assert "invalid develop timestamp" in capsys.readouterr().out.lower()

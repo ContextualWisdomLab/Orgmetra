@@ -30,8 +30,27 @@ from zoneinfo import ZoneInfo
 INVENTORY_DATE_PATTERN = re.compile(
     r"^Inventory date:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE
 )
+SNAPSHOT_QUEUE_PATTERN = re.compile(
+    r"^At this snapshot,\s+(?P<open_pull_requests>\d+)\s+pull requests\s+"
+    r"and\s+(?P<open_issues>\d+|zero|one|two|three|four|five|six|seven|"
+    r"eight|nine|ten)\s+non-PR issues?(?:\s+\([^)]*\))?\s+are open\b",
+    re.MULTILINE,
+)
 REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 BASELINE_TIMEZONE = ZoneInfo("Asia/Seoul")
+COUNT_WORDS = {
+    "zero": 0,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+}
 
 
 def _run_gh_json(
@@ -74,6 +93,18 @@ def _live_repository() -> str:
     return repository
 
 
+def _snapshot_queue_counts(baseline_text: str) -> tuple[int, int]:
+    """Read the recorded open PR and non-PR issue counts from the baseline."""
+    match = SNAPSHOT_QUEUE_PATTERN.search(baseline_text)
+    if match is None:
+        raise RuntimeError("missing snapshot open queue counts")
+    issue_count = match.group("open_issues")
+    parsed_issue_count = (
+        int(issue_count) if issue_count.isdigit() else COUNT_WORDS[issue_count]
+    )
+    return int(match.group("open_pull_requests")), parsed_issue_count
+
+
 def _live_state() -> dict[str, object]:
     """Fetch complete live open PR/issue queues and newest develop integration."""
     repository = _live_repository()
@@ -90,6 +121,8 @@ def _live_state() -> dict[str, object]:
     commits = _run_gh_json(
         ["api", f"repos/{repository}/commits?sha=develop&per_page=1"]
     )
+    if not commits:
+        raise RuntimeError("develop commit payload is empty")
     newest_commit_date = None
     if commits:
         commit = commits[0].get("commit")
@@ -141,6 +174,13 @@ def main() -> int:
         )
         return 2
     age_days = (now_date - inventory_date).days
+    try:
+        snapshot_open_pull_requests, snapshot_open_issues = _snapshot_queue_counts(
+            baseline_text
+        )
+    except (RuntimeError, ValueError) as error:
+        print(f"gap-baseline freshness: FAIL malformed baseline: {error}")
+        return 2
 
     lines = [
         "## Gap baseline freshness",
@@ -148,6 +188,8 @@ def main() -> int:
         f"- Baseline file: `{baseline_path.as_posix()}`",
         f"- Inventory date: {inventory_date.isoformat()} "
         f"(age {float(age_days):.1f} days)",
+        f"- Snapshot open pull requests: {snapshot_open_pull_requests}",
+        f"- Snapshot open issues: {snapshot_open_issues}",
     ]
 
     try:
@@ -168,20 +210,37 @@ def main() -> int:
 
     newest_integration = state.get("newest_develop_commit_date")
     integrations_after_snapshot = False
-    if isinstance(newest_integration, str):
+    try:
+        if not isinstance(newest_integration, str):
+            raise ValueError("newest develop integration timestamp is missing")
         integration_time = datetime.fromisoformat(
             newest_integration.replace("Z", "+00:00")
         )
         integrations_after_snapshot = (
             integration_time.astimezone(BASELINE_TIMEZONE).date() > inventory_date
         )
+    except (TypeError, ValueError) as error:
+        lines.append(f"- FAIL live-state fetch: invalid develop timestamp: {error}")
+        print("\n".join(lines))
+        return 2
 
-    if integrations_after_snapshot:
+    queue_changed = (
+        state["open_pull_requests"] != snapshot_open_pull_requests
+        or state["open_issues"] != snapshot_open_issues
+    )
+
+    if integrations_after_snapshot or queue_changed:
+        reasons = []
+        if integrations_after_snapshot:
+            reasons.append("develop integrated commits after the recorded inventory date")
+        if queue_changed:
+            reasons.append("the live open PR/issue queue differs from the snapshot")
         lines.append(
-            "- Result: **refresh candidate** — `develop` integrated commits after "
-            "the recorded inventory date. Per the execution loop, refresh the "
-            "baseline only when buyer/product-visible truth changed; otherwise "
-            "record this audit as observed."
+            "- Result: **refresh candidate** — "
+            + " and ".join(reasons)
+            + ". Per the execution loop, refresh the baseline only when "
+            "buyer/product-visible truth changed; otherwise record this audit "
+            "as observed."
         )
     else:
         lines.append(
