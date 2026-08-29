@@ -142,3 +142,17 @@ def test_rejects_runtime_issuance_seal_removal() -> None:
 
     with pytest.raises(ValueError, match="changed after issuance"):
         packet.canonical_json()
+
+
+def test_rejects_reissue_after_seal_deletion_and_evidence_mutation() -> None:
+    """Deleting the seal must not make an already-issued packet eligible for reissuance."""
+    packet = build_offer_approval_packet(**valid_kwargs())
+    object.__delattr__(packet, "_issuance_seal")
+    object.__setattr__(packet, "offer_terms_digest", "d" * 64)
+
+    with pytest.raises(ValueError, match="cannot be reissued"):
+        packet.__post_init__()
+    with pytest.raises(ValueError, match="changed after issuance"):
+        packet.canonical_json()
+    with pytest.raises(ValueError, match="changed after issuance"):
+        packet.sha256_digest()
