@@ -30,7 +30,10 @@ artifact, provider-reported delivery time, host observation time, and evidence v
 External transport evidence remains explicitly untrusted and carries
 `not_authorized_to_mutate_delivery_state`. It excludes raw provider responses and protected
 HR values. Canonical export revalidates every trust-bearing field, including instances
-created through copy or low-level tuple construction.
+created through copy or low-level tuple construction, so those construction paths cannot
+bypass fixed safety-state, shape, chronology, or identifier invariants. Separately
+constructed receipts remain untrusted and still require authoritative exact-attempt and
+artifact reconciliation.
 
 ## Why not modify the outbox migration here
 

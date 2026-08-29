@@ -11,7 +11,7 @@
 | Exact provider artifact correlation | digest parametrization | `_validate_digest`, `transport_receipt_digest` |
 | Temporal evidence is aware and canonical UTC; observation cannot predate reported delivery | timestamp and chronology regressions | `_canonical_timestamp`, `_validate_contract` |
 | Retry replay cannot cross attempt boundaries | exact-attempt mismatch regression | `delivery_attempt_count` in reconciliation tuple |
-| Copy/low-level reconstruction cannot create a second accepted canonical truth | `test_copy_bypass_cannot_create_a_second_canonical_truth` | canonical export revalidation |
+| Copy/low-level reconstruction cannot bypass fixed safety/trust invariants | `test_copy_bypass_cannot_create_a_second_canonical_truth` | canonical export revalidation |
 | Structural mutation is rejected | `test_evidence_is_structurally_immutable_after_construction` | tuple-backed evidence type |
 | Exact owned statement/branch coverage | hosted `Outbox Delivery Receipt Quality` | pytest-cov gate at 100% |
 

@@ -35,8 +35,10 @@ lease, authorization, audit, and persistence checks.
 
 The public evidence type is a tuple-backed immutable value. Ordinary mutation through
 `setattr` or `object.__setattr__` fails. Canonical export also revalidates every
-trust-bearing field, so copy helpers or low-level tuple construction cannot turn a modified
-instance into a second accepted canonical truth.
+trust-bearing field, so copy helpers or low-level tuple construction cannot bypass the
+fixed safety-state, shape, chronology, or identifier invariants. A separately constructed
+receipt is still untrusted evidence and must independently match the authoritative exact
+attempt plus the external receipt artifact before any governed completion can occur.
 
 This is an application evidence contract, not a digital-signature scheme. Durable
 cross-process authenticity and retention belong to the authoritative persistence and
