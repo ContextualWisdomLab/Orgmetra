@@ -50,9 +50,13 @@ class DerivedCalendarIntentContext(CalendarIntentContext):
 class ForgedResponseLiteral(str):
     """Pretend an unsupported response literal equals the reviewed value."""
 
+    def __eq__(self, other: object) -> bool:
+        """Claim equality with the reviewed protocol while retaining other text."""
+        return other == "caldav"
+
     def __ne__(self, other: object) -> bool:
         """Claim inequality never holds so direct literal checks can be bypassed."""
-        return False
+        return not self.__eq__(other)
 
 
 def valid_context(**changes: object) -> CalendarIntentContext:
