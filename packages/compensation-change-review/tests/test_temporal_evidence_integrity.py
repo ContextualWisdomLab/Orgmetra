@@ -36,12 +36,35 @@ class MutableOffsetTimezone(tzinfo):
         return timedelta(0)
 
 
+class MissingOffsetTimezone(tzinfo):
+    """Timezone object that cannot establish a concrete UTC offset."""
+
+    def utcoffset(self, dt):  # type: ignore[no-untyped-def]
+        """Signal that the recorded instant cannot be resolved."""
+        return None
+
+    def dst(self, dt):  # type: ignore[no-untyped-def]
+        """Keep daylight-saving behavior absent for this invalid timezone."""
+        return None
+
+
 def test_rejects_datetime_subclasses_that_can_forge_recorded_time_evidence(
     valid_packet_kwargs: dict[str, object],
 ) -> None:
     """Canonical audit evidence must not call caller-overridable datetime methods."""
     kwargs = valid_packet_kwargs.copy()
     kwargs["generated_at"] = ForgedDateTime(2026, 8, 21, 4, 25, tzinfo=timezone.utc)
+
+    with pytest.raises(ValueError, match="generated_at"):
+        build_compensation_change_review_packet(**kwargs)
+
+
+def test_rejects_timezone_without_resolvable_utc_offset(
+    valid_packet_kwargs: dict[str, object],
+) -> None:
+    """Recorded-time evidence must fail closed when its UTC instant is indeterminate."""
+    kwargs = valid_packet_kwargs.copy()
+    kwargs["generated_at"] = datetime(2026, 8, 21, 4, 25, tzinfo=MissingOffsetTimezone())
 
     with pytest.raises(ValueError, match="generated_at"):
         build_compensation_change_review_packet(**kwargs)
