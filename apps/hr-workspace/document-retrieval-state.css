@@ -1,0 +1,54 @@
+.document-retrieval-state {
+  display: grid;
+  gap: var(--orgmetra-space-md);
+  max-width: 40rem;
+  padding: var(--orgmetra-space-lg);
+  border: 1px solid var(--orgmetra-border-subtle);
+  border-radius: var(--orgmetra-radius-md);
+  background: var(--orgmetra-surface-card);
+  color: var(--orgmetra-text-primary);
+}
+
+.document-retrieval-status,
+.document-retrieval-next-action {
+  display: grid;
+  gap: var(--orgmetra-space-xs);
+  margin: 0;
+}
+
+.document-retrieval-status span,
+.document-retrieval-next-action span {
+  color: var(--orgmetra-text-muted);
+}
+
+.document-retrieval-state[data-interaction-state="permission-denied"],
+.document-retrieval-state[data-interaction-state="validation-error"],
+.document-retrieval-state[data-interaction-state="error"] {
+  border-color: var(--orgmetra-danger);
+}
+
+.document-retrieval-state[aria-busy="true"] {
+  cursor: progress;
+}
+
+.document-retrieval-submit {
+  justify-self: start;
+  min-height: 44px;
+  padding: var(--orgmetra-space-sm) var(--orgmetra-space-md);
+  border: 0;
+  border-radius: var(--orgmetra-radius-sm);
+  background: var(--orgmetra-action-review);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.document-retrieval-submit:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.document-retrieval-submit:focus-visible {
+  outline: 3px solid var(--orgmetra-focus-ring);
+  outline-offset: 3px;
+}
