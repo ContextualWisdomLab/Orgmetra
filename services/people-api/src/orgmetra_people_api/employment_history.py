@@ -165,6 +165,29 @@ def _reject_effective_overlap(records: list[EmploymentHistoryRecord]) -> None:
         previous_by_employment[record.employment_record_id] = record
 
 
+def _snapshot_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHistoryRecord:
+    """Detach one untrusted persistence-owned row before validation and later use.
+
+    ``frozen=True`` prevents ordinary assignment but is not an ownership boundary:
+    code retaining the returned row can still invoke ``object.__setattr__``.  A
+    service-owned reconstruction binds the primitive values to a new object whose
+    alias is never returned to the persistence adapter.  The constructor validates
+    the resulting snapshot before any authorization-visible value is consumed.
+    """
+    return EmploymentHistoryRecord(
+        tenant_record_id=record.tenant_record_id,
+        person_record_id=record.person_record_id,
+        employment_record_id=record.employment_record_id,
+        employment_record_version_id=record.employment_record_version_id,
+        employment_status_code=record.employment_status_code,
+        employment_concurrency_code=record.employment_concurrency_code,
+        effective_from=record.effective_from,
+        effective_to=record.effective_to,
+        recorded_from=record.recorded_from,
+        recorded_to=record.recorded_to,
+    )
+
+
 def read_employment_history(
     *,
     principal: AuthenticatedPrincipal,
@@ -179,9 +202,10 @@ def read_employment_history(
     """Authorize then return bitemporal Employment history for one Person.
 
     A denied purpose, scope, target, or field request causes zero protected reads.
-    After retrieval, every row must still match the authorized tenant/person and
-    requested system-time view. Duplicate version identities and overlapping
-    business-time truth for one Employment fail closed instead of being guessed.
+    After retrieval, every row is detached from its persistence-owned alias and
+    must still match the authorized tenant/person and requested system-time view.
+    Duplicate version identities and overlapping business-time truth for one
+    Employment fail closed instead of being guessed.
     """
     _validate_operational_uuid("tenant_record_id", tenant_record_id)
     _validate_operational_uuid("person_record_id", person_record_id)
@@ -214,17 +238,17 @@ def read_employment_history(
         if type(record) is not EmploymentHistoryRecord:
             raise EmploymentHistoryIntegrityError("Employment-history persistence returned an unsupported row type")
         try:
-            record.assert_runtime_integrity()
+            trusted_record = _snapshot_persistence_record(record)
         except ValueError as exc:
             raise EmploymentHistoryIntegrityError("Employment-history row failed runtime integrity") from exc
-        if record.tenant_record_id != tenant_record_id or record.person_record_id != person_record_id:
+        if trusted_record.tenant_record_id != tenant_record_id or trusted_record.person_record_id != person_record_id:
             raise EmploymentHistoryIntegrityError("Employment-history row does not match the authorized target")
-        if not _is_recorded_visible(record, known_at):
+        if not _is_recorded_visible(trusted_record, known_at):
             raise EmploymentHistoryIntegrityError("Employment-history row is not visible at the requested knowledge cutoff")
-        if record.employment_record_version_id in seen_version_ids:
+        if trusted_record.employment_record_version_id in seen_version_ids:
             raise EmploymentHistoryIntegrityError("duplicate Employment version identity")
-        seen_version_ids.add(record.employment_record_version_id)
-        verified.append(record)
+        seen_version_ids.add(trusted_record.employment_record_version_id)
+        verified.append(trusted_record)
 
     _reject_effective_overlap(verified)
     authorized_fields = tuple(sorted(decision.authorized_fields))
