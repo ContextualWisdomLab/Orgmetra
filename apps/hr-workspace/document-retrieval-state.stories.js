@@ -6,17 +6,15 @@ export default {
   tags: ['autodocs'],
 };
 
-function renderState(state) {
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = documentRetrievalStateMarkup(state);
-  return wrapper.firstElementChild;
+function story(state) {
+  return () => documentRetrievalStateMarkup(state);
 }
 
-export const Idle = { render: () => renderState('idle') };
-export const Authorizing = { render: () => renderState('authorizing') };
-export const Reading = { render: () => renderState('reading') };
-export const Auditing = { render: () => renderState('auditing') };
-export const ReadyReadOnly = { render: () => renderState('ready') };
-export const PermissionDenied = { render: () => renderState('denied') };
-export const AuthorizationExpired = { render: () => renderState('stale') };
-export const Error = { render: () => renderState('error') };
+export const Idle = story('idle');
+export const Authorizing = story('authorizing');
+export const Reading = story('reading');
+export const Auditing = story('auditing');
+export const ReadyReadOnly = story('ready');
+export const PermissionDenied = story('denied');
+export const AuthorizationExpired = story('stale');
+export const Error = story('error');
