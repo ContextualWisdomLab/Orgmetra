@@ -6,10 +6,12 @@
 | --- | --- | --- |
 | Exact tenant/outbox/audit/target/attempt binding | `test_verifies_only_the_exact_outbox_attempt` | `verify_exact_delivery_attempt` |
 | No HR payload, destination, or credential in the canonical evidence | `test_builds_value_minimized_untrusted_transport_evidence`; fixed-contract parametrization | `ExternalDeliveryReceiptEvidence` fixed safety fields |
-| External receipt remains untrusted and non-authorizing | fixed-contract parametrization | `trust_state`, `reconciliation_state`, `mutation_authority` |
+| External receipt remains untrusted and non-authorizing | fixed-contract parametrization; hostile trust-state subclass regression | exact-type fixed-state validation |
 | Opaque normalized receipt identity | receipt-reference parametrization | `_validate_receipt_reference` |
 | Exact provider artifact correlation | digest parametrization | `_validate_digest`, `transport_receipt_digest` |
-| Temporal evidence is aware and canonical UTC; observation cannot predate reported delivery | timestamp and chronology regressions | `_canonical_timestamp`, `_validate_contract` |
+| Temporal evidence is detached from caller-owned timezone behavior and canonical UTC; observation cannot predate reported delivery | UTC precision, mutable-timezone, provider-failure, no-offset, and chronology regressions | `_freeze_timestamp`, `_canonical_timestamp`, `_validate_contract` |
+| Trust-bearing text cannot retain behavior-overriding `str` subclasses | exact-attempt equality and fixed trust-state subclass regressions | exact built-in primitive validation |
+| Receipt subclasses cannot override verification/digest behavior | `test_exact_attempt_verification_rejects_receipt_subclasses` | exact-type check in `verify_exact_delivery_attempt` |
 | Retry replay cannot cross attempt boundaries | exact-attempt mismatch regression | `delivery_attempt_count` in reconciliation tuple |
 | Copy/low-level reconstruction cannot bypass fixed safety/trust invariants | `test_copy_bypass_cannot_create_a_second_canonical_truth` | canonical export revalidation |
 | Structural mutation is rejected | `test_evidence_is_structurally_immutable_after_construction` | tuple-backed evidence type |
