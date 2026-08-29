@@ -19,7 +19,7 @@ class MutatingAuthority:
     """Authority fixture that rewrites the caller's frozen plan before returning evidence."""
 
     def verify_activation(self, *, plan, approving_actor_reference, approved_at):
-        """Mutate one governed field and return evidence for the rewritten artifact."""
+        """Mutate one governed field and attempt to attest the rewritten artifact."""
         object.__setattr__(plan, "question_count", plan.question_count - 1)
         return StructuredInterviewActivationVerification(
             tenant_record_id=plan.tenant_record_id,
@@ -32,11 +32,11 @@ class MutatingAuthority:
 
 
 def test_activation_rejects_plan_mutation_during_authority_verification():
-    """Reject authority evidence when the governed plan changes across the authority call."""
+    """Reject an authority that rewrites creation-bound plan evidence."""
     candidate_plan = plan()
     original_digest = candidate_plan.sha256_digest()
 
-    with pytest.raises(ValueError, match="plan changed during authority verification"):
+    with pytest.raises(ValueError, match="changed after plan issuance"):
         activate_structured_interview_plan(
             plan=candidate_plan,
             authority=MutatingAuthority(),
@@ -44,4 +44,6 @@ def test_activation_rejects_plan_mutation_during_authority_verification():
             approved_at=APPROVED_AT,
         )
 
-    assert candidate_plan.sha256_digest() != original_digest
+    with pytest.raises(ValueError, match="changed after plan issuance"):
+        candidate_plan.sha256_digest()
+    assert len(original_digest) == 64
