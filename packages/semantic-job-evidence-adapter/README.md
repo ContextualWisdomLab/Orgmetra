@@ -25,7 +25,7 @@ Orgmetra does not read Semantic Data Portal application tables. The foreign serv
 
 ## Evidence integrity
 
-Trust-bearing text, integers, and timestamps must be exact built-in runtime types before equality, membership, bounds, UUID parsing, or serialization. Packet-owned references use canonical UUIDv4 suffixes; the tenant ID follows Orgmetra's canonical non-sentinel operational UUID contract. The envelope is final and detects post-construction rewriting before canonical evidence leaves the boundary. Its packet-owned HMAC is only a consistency value: the authoritative creation seal is held in a lock-protected process-local issuance registry outside envelope-writable slots, so rewriting both payload and packet seal still fails closed.
+Trust-bearing text, integers, and timestamps must be exact built-in runtime types before equality, membership, bounds, UUID parsing, or serialization. Packet-owned references, including actor correlations, use canonical UUIDv4 suffixes; the tenant ID follows Orgmetra's canonical non-sentinel operational UUID contract. The envelope is final and detects post-construction rewriting before canonical evidence leaves the boundary. Its packet-owned HMAC is only a consistency value: the authoritative creation seal is held in a lock-protected process-local issuance registry outside envelope-writable slots, so rewriting both payload and packet seal still fails closed.
 
 Canonical export returns the exact payload snapshot whose seal was verified; it does not re-read live fields after the integrity decision. This closes a same-process mutation window in which the checked bytes and emitted bytes could otherwise diverge.
 

@@ -20,7 +20,6 @@ _PROCESS_SEAL_KEY = secrets.token_bytes(32)
 _NEW_ISSUANCE_MARKER = object()
 _USED_ISSUANCE_MARKER = object()
 _DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}")
-_ACTOR_PATTERN = re.compile(r"actor:[A-Za-z0-9._~-]{1,128}")
 _ALLOWED_RESOLUTION_USES = frozenset({"job_analysis_source_evidence"})
 _CREATION_SEALS: dict[int, str] = {}
 _CREATION_SEALS_LOCK = RLock()
@@ -82,11 +81,8 @@ def _validate_reference(value: object, field_name: str, namespace: str) -> str:
 
 
 def _validate_actor_reference(value: object, field_name: str) -> str:
-    """Require bounded opaque actor correlation without treating syntax as authentication."""
-    text = _require_text(value, field_name)
-    if _ACTOR_PATTERN.fullmatch(text) is None:
-        raise ValueError(f"{field_name} must be a bounded actor: reference")
-    return text
+    """Require opaque actor correlation with a canonical UUIDv4 suffix."""
+    return _validate_reference(value, field_name, "actor")
 
 
 def _validate_digest(value: object, field_name: str) -> str:

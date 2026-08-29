@@ -44,6 +44,7 @@ def test_canonical_evidence_is_value_minimized_and_deterministic(
         ("ontology_request_reference", f"ontology_request:{uuid1()}"),
         ("ontology_request_reference", "ontology_request:not-a-uuid"),
         ("requesting_actor_reference", "staff:analyst"),
+        ("requesting_actor_reference", "actor:hr-analyst"),
         ("reviewing_actor_reference", "actor:has space"),
         ("query_term_digest", "A" * 64),
         ("response_evidence_digest", "b" * 63),

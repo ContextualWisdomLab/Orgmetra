@@ -16,7 +16,7 @@ Orgmetra owns a final, immutable `SemanticJobEvidenceEnvelope` that binds:
 
 1. tenant and Job Analysis scope;
 2. an opaque Orgmetra ontology-request reference;
-3. distinct requesting and human-reviewing actor references;
+3. distinct requesting and human-reviewing opaque `actor:` UUIDv4 references;
 4. the closed use `job_analysis_source_evidence`;
 5. SHA-256 digests for query-term evidence, response evidence, and source-catalog state;
 6. the reviewed Semantic Data Portal revision `e48aa13c4af7a4875d4b53e6a60b50405c265a2f` and `POST /ontology/resolve` operation;

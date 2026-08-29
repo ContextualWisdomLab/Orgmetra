@@ -8,7 +8,7 @@
 |---|---|---|
 | Consume only a published foreign contract | reviewed Semantic Data Portal revision `e48aa13c4af7a4875d4b53e6a60b50405c265a2f`; exact `POST /ontology/resolve` operation | read-only dependency; no foreign table access |
 | Bind source evidence to Orgmetra scope | canonical tenant, `job_analysis:` and `ontology_request:` references | Orgmetra-owned evidence envelope |
-| Require accountable human review | distinct `actor:` requester and reviewer; canonical state `requires_human_review` | syntax is correlation only; host identity/scope resolution remains authoritative |
+| Require accountable human review | distinct `actor:` UUIDv4 requester and reviewer; canonical state `requires_human_review` | syntax is correlation only; host identity/scope resolution remains authoritative |
 | Prevent semantic evidence from becoming a decision | canonical state `not_authorized_for_job_or_employment_decision` | source evidence cannot authorize Job/employment action |
 | Minimize HR/audit exposure | query term, response and source catalog represented only by SHA-256 digests | no raw query/response, PII, credential, score, or decision in canonical evidence |
 | Preserve exact source provenance | foreign revision, API operation, source-system/trust-state, evidence version, UTC recorded time | provider drift fails closed |
