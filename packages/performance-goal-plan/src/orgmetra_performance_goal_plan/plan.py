@@ -180,6 +180,10 @@ class PerformanceGoalPlanPacket:
     employment_decision_authority: str = _EMPLOYMENT_DECISION_AUTHORITY
     next_action: str = _NEXT_ACTION
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Keep governed packet behavior final so subclasses cannot override exports."""
+        raise TypeError("PerformanceGoalPlanPacket is final")
+
     def __repr__(self) -> str:
         """Return a representation that never emits worker or goal correlation evidence."""
         return "PerformanceGoalPlanPacket(<redacted>)"

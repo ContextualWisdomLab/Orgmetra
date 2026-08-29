@@ -223,6 +223,12 @@ def test_detects_post_construction_evidence_mutation() -> None:
         item.canonical_json()
 
 
+def test_packet_runtime_is_final() -> None:
+    """Governed packet behavior cannot be replaced through subclass overrides."""
+    with pytest.raises(TypeError, match="is final"):
+        type("ForgedPacket", (PerformanceGoalPlanPacket,), {})
+
+
 def test_accepts_operational_non_v4_core_references() -> None:
     """Authoritative core HRIS references are not incorrectly restricted to UUIDv4."""
     core = "01890f3d-4d6a-7cc0-8a9d-9a83bb1cc001"
