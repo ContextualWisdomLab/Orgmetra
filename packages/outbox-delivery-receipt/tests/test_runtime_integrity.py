@@ -64,6 +64,18 @@ def test_timezone_provider_without_offset_fails_closed() -> None:
         build_external_delivery_receipt_evidence(**values)
 
 
+def test_low_level_reconstruction_with_nonfrozen_timestamp_fails_closed() -> None:
+    evidence = build_external_delivery_receipt_evidence(**_kwargs())
+    raw_values = list(evidence)
+    raw_values[8] = datetime(
+        2026, 8, 29, 10, 2, 3, tzinfo=timezone(timedelta(hours=9))
+    )
+    reconstructed = tuple.__new__(ExternalDeliveryReceiptEvidence, tuple(raw_values))
+
+    with pytest.raises(ValueError, match="transport_delivered_at"):
+        reconstructed.canonical_json()
+
+
 def test_exact_attempt_verification_rejects_receipt_subclasses() -> None:
     evidence = build_external_delivery_receipt_evidence(**_kwargs())
 
