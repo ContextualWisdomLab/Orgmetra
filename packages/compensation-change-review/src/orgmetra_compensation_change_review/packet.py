@@ -90,6 +90,17 @@ def _validate_digest(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
+def _freeze_recorded_timestamp(value: datetime) -> datetime:
+    """Detach one recorded-time instant from caller-owned timezone state."""
+    if type(value) is not datetime or value.tzinfo is None:
+        raise ValueError("generated_at must be timezone-aware exact datetime")
+    offset = value.utcoffset()
+    if offset is None:
+        raise ValueError("generated_at must be timezone-aware exact datetime")
+    utc_naive = value.replace(tzinfo=None) - offset
+    return utc_naive.replace(tzinfo=timezone.utc)
+
+
 def _canonical_timestamp(value: datetime) -> str:
     """Render an aware instant as precision-preserving UTC RFC 3339 text."""
     if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
@@ -257,6 +268,7 @@ class CompensationChangeReviewPacket:
         if type(self.reason_code) is not str or self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must be an approved non-sensitive compensation-review category")
         _validate_business_date(self.proposed_effective_on, "proposed_effective_on")
+        object.__setattr__(self, "generated_at", _freeze_recorded_timestamp(self.generated_at))
         _canonical_timestamp(self.generated_at)
         _validate_evidence_version(self.evidence_version)
         if self.contains_personal_data is not True:
