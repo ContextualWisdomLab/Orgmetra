@@ -16,6 +16,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 addopts = [
   "--cov=orgmetra_keyverse_identity_lifecycle_adapter",
   "--cov-branch",
