@@ -136,7 +136,7 @@ def test_existing_plan_identity_cannot_renew_issuance_seal_after_mutation():
 
 
 def test_existing_receipt_identity_cannot_renew_issuance_seal_after_mutation():
-    """Repeated receipt initialization must not legitimize changed post-authority evidence."""
+    """Receipt revalidation must not create new issuance evidence after factory issuance."""
     candidate_plan = plan()
     receipt = activate_structured_interview_plan(
         plan=candidate_plan,
@@ -144,17 +144,12 @@ def test_existing_receipt_identity_cannot_renew_issuance_seal_after_mutation():
         approving_actor_reference=APPROVER,
         approved_at=APPROVED_AT,
     )
+    original_seal = activation_module._authoritative_activation_receipt_seal(receipt)
     object.__setattr__(receipt, "plan_digest", "f" * 64)
-    object.__setattr__(
-        receipt,
-        "_issuance_token",
-        activation_module._ACTIVATION_RECEIPT_ISSUANCE_TOKEN,
-    )
 
-    with pytest.raises(ValueError, match="issuance evidence already exists"):
-        receipt.__post_init__()
+    receipt.__post_init__()
 
-    object.__setattr__(receipt, "_issuance_token", None)
+    assert activation_module._authoritative_activation_receipt_seal(receipt) == original_seal
     with pytest.raises(ValueError, match="changed after activation receipt issuance"):
         receipt.canonical_json()
 
