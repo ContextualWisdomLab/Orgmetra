@@ -21,6 +21,7 @@ Status: **active PR / proposed capability**, not protected-main truth.
 | Prevent a second canonical truth after issuance | Process-local HMAC issuance evidence is stored outside packet-writable slots over exact construction-time canonical JSON; export verifies one snapshot and fails closed after a valid-value rewrite or missing issuance state | `test_issuance_integrity.py`; defense-in-depth only, not durable cross-process authorization/persistence |
 | Preserve deterministic immutable correlation evidence | issuance-verified canonical JSON plus SHA-256 | Implemented on active PR |
 | Exact 100% owned statement/branch coverage | `packages/performance-review/pyproject.toml`, `.github/workflows/performance-review-quality.yml` | Required on exact PR head |
+| Keep package-quality evidence current after shared repository test/runtime configuration changes | `test_quality_workflow_retriggers_on_shared_test_configuration` requires the package workflow to retrigger on shared Python/test/clean-checkout configuration as well as package-owned paths | Implemented on active PR; supplements rather than replaces central required workflows |
 | Canonical documentation discoverability | ADR 0018 is indexed; root README/CHANGELOG identify the capability as active-PR truth | Required before review completion |
 | Standards/research basis | ADR 0018; `docs/doctoring/performance-review-references.md` | Documented on active PR |
 
