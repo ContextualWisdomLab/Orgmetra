@@ -124,10 +124,8 @@ def _snapshot_utc_datetime(value: datetime, field_name: str) -> datetime:
 
 
 def _canonical_timestamp(value: datetime, field_name: str = "generated_at") -> str:
-    """Render an aware instant as UTC RFC 3339 text with a field-specific error."""
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    """Render an aware instant as UTC RFC 3339 text after fail-closed detachment."""
+    return _snapshot_utc_datetime(value, field_name).isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
