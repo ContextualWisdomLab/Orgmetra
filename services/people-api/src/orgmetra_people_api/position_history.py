@@ -242,10 +242,11 @@ def _is_recorded_visible(record: PositionHistoryRecord, known_at: datetime) -> b
 
 
 def _business_intervals_overlap(left: PositionHistoryRecord, right: PositionHistoryRecord) -> bool:
-    """Return whether two half-open business intervals overlap."""
-    left_end = date.max if left.effective_to is None else left.effective_to
-    right_end = date.max if right.effective_to is None else right.effective_to
-    return left.effective_from < right_end and right.effective_from < left_end
+    """Return whether two half-open business intervals overlap without finite infinity sentinels."""
+    return (
+        (right.effective_to is None or left.effective_from < right.effective_to)
+        and (left.effective_to is None or right.effective_from < left.effective_to)
+    )
 
 
 def read_position_history(
