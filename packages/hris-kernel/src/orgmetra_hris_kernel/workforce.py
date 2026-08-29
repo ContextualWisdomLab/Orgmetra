@@ -139,6 +139,29 @@ class WorkforceCompositionSnapshot:
                 "Workforce snapshot aggregate values are internally inconsistent.",
                 next_action="Rebuild the snapshot from authoritative HRIS facts with a finite non-negative FTE.",
             )
+        if self.staffed_fte > Decimal(self.staffed_assignment_count):
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action=(
+                    "Rebuild the snapshot so staffed FTE does not exceed one full allocation per "
+                    "staffed assignment."
+                ),
+            )
+        if self.staffed_assignment_count > 0 and self.staffed_fte <= _ZERO_FTE:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot so every staffed assignment contributes positive FTE.",
+            )
+        if self.staffed_assignment_count > 0 and self.employment_count == 0:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot with reportable employment for every staffed assignment.",
+            )
+        if self.staffed_assignment_count > 0 and self.person_headcount == 0:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot with a reportable person for every staffed assignment.",
+            )
         if not all(
             type(count) is int and count >= 0
             for _status, count in self.employment_status_counts
