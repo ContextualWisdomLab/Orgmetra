@@ -46,6 +46,22 @@ class MutableOffsetTimezone(tzinfo):
         return "MutableOffsetTimezone"
 
 
+class ExplodingOffsetTimezone(tzinfo):
+    """Timezone fixture that raises while caller-controlled UTC offset is evaluated."""
+
+    def utcoffset(self, value):  # type: ignore[no-untyped-def]
+        """Simulate hostile or broken caller timezone code at the trust boundary."""
+        raise RuntimeError("hostile utcoffset evaluation")
+
+    def dst(self, value):  # type: ignore[no-untyped-def]
+        """Return zero daylight-saving offset when queried independently."""
+        return timedelta(0)
+
+    def tzname(self, value):  # type: ignore[no-untyped-def]
+        """Return a stable diagnostic name without evaluating the hostile offset."""
+        return "ExplodingOffsetTimezone"
+
+
 class RejectUnexpectedAuthorityCall:
     """Fail if activation reaches authority work after invalid time evidence."""
 
@@ -107,6 +123,15 @@ def test_plan_detaches_mutable_generated_at_timezone_before_sealing() -> None:
     assert json.loads(candidate_plan.canonical_json())["generated_at"] == "2026-08-21T04:30:00.123456Z"
 
 
+def test_plan_normalizes_hostile_timezone_failure_to_validation_error() -> None:
+    """Caller timezone code must not leak arbitrary exceptions through plan validation."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 8, 21, 4, 30, tzinfo=ExplodingOffsetTimezone())
+
+    with pytest.raises(ValueError, match="generated_at must be an exact timezone-aware datetime"):
+        build_structured_interview_plan(**kwargs)
+
+
 def test_plan_rejects_utc_normalization_beyond_datetime_min_as_validation_error() -> None:
     """Out-of-range UTC conversion must fail as governed plan validation, not OverflowError."""
     kwargs = valid_kwargs()
@@ -114,6 +139,19 @@ def test_plan_rejects_utc_normalization_beyond_datetime_min_as_validation_error(
 
     with pytest.raises(ValueError, match="generated_at must be an exact timezone-aware datetime"):
         build_structured_interview_plan(**kwargs)
+
+
+def test_activation_normalizes_hostile_timezone_failure_before_authority() -> None:
+    """Approval-time timezone failures must remain validation errors before side effects."""
+    candidate_plan = build_structured_interview_plan(**valid_kwargs())
+
+    with pytest.raises(ValueError, match="approved_at must be an exact timezone-aware datetime"):
+        activate_structured_interview_plan(
+            plan=candidate_plan,
+            authority=RejectUnexpectedAuthorityCall(),
+            approving_actor_reference="actor:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            approved_at=datetime(2026, 8, 21, 5, 0, tzinfo=ExplodingOffsetTimezone()),
+        )
 
 
 def test_activation_rejects_utc_normalization_beyond_datetime_max_before_authority() -> None:
