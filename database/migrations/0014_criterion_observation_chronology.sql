@@ -163,6 +163,11 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    IF NEW.recorded_from > statement_timestamp() THEN
+        RAISE EXCEPTION 'criterion observation cannot be recorded in the future'
+            USING ERRCODE = '23514';
+    END IF;
+
     RETURN NEW;
 END;
 $$;

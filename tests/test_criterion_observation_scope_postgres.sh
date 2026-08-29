@@ -380,6 +380,35 @@ if [[ "${future_observation_output}" != *"criterion observation cannot be observ
     exit 1
 fi
 
+set +e
+future_recording_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO criterion_observation (
+    tenant_record_id, criterion_observation_id, criterion_blueprint_id,
+    performance_cycle_id, person_record_id, observed_value,
+    observed_at, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000101',
+    '10000000-0000-7000-8000-000000000135',
+    '10000000-0000-7000-8000-000000000110',
+    '10000000-0000-7000-8000-000000000109',
+    '10000000-0000-7000-8000-000000000102',
+    4.0,
+    TIMESTAMPTZ '2026-08-15 12:00:00+00',
+    statement_timestamp() + INTERVAL '2 days'
+);
+SQL
+} 2>&1)"
+future_recording_status=$?
+set -e
+if [[ ${future_recording_status} -eq 0 ]]; then
+    echo "criterion observation accepted a future-dated recorded_from" >&2
+    exit 1
+fi
+if [[ "${future_recording_output}" != *"criterion observation cannot be recorded in the future"* ]]; then
+    echo "future-dated recording failed for an unexpected reason: ${future_recording_output}" >&2
+    exit 1
+fi
+
 tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO criterion_observation (
     tenant_record_id, criterion_observation_id, criterion_blueprint_id,
