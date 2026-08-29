@@ -194,3 +194,56 @@ def test_creation_metadata_cannot_be_supplied_or_rewritten() -> None:
     object.__setattr__(envelope, "_issuance_marker", object())
     with pytest.raises(ValueError, match="changed after construction"):
         envelope.evidence_digest()
+
+
+def test_canonical_json_emits_the_exact_integrity_checked_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Do not reread live result evidence after its canonical bytes are verified."""
+    envelope = valid_envelope()
+    original_payload = PsychometricsResultEvidenceEnvelope._payload
+    calls = 0
+    forged_digest = "c" * 64
+
+    def payload_with_interleaving(
+        self: PsychometricsResultEvidenceEnvelope,
+    ) -> dict[str, object]:
+        """Return forged evidence only if export performs an unsafe second payload read."""
+        nonlocal calls
+        calls += 1
+        payload = original_payload(self)
+        if calls == 2:
+            payload["result_snapshot_digest"] = forged_digest
+        return payload
+
+    monkeypatch.setattr(PsychometricsResultEvidenceEnvelope, "_payload", payload_with_interleaving)
+    canonical = envelope.canonical_json()
+    assert calls == 1
+    assert f'"result_snapshot_digest":"{HEX_B}"' in canonical
+    assert forged_digest not in canonical
+
+
+def test_canonical_document_returns_the_exact_integrity_checked_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Return the verified result document instead of rebuilding it from live fields."""
+    envelope = valid_envelope()
+    original_payload = PsychometricsResultEvidenceEnvelope._payload
+    calls = 0
+    forged_digest = "c" * 64
+
+    def payload_with_interleaving(
+        self: PsychometricsResultEvidenceEnvelope,
+    ) -> dict[str, object]:
+        """Return forged evidence only if document export performs a second payload read."""
+        nonlocal calls
+        calls += 1
+        payload = original_payload(self)
+        if calls == 2:
+            payload["result_snapshot_digest"] = forged_digest
+        return payload
+
+    monkeypatch.setattr(PsychometricsResultEvidenceEnvelope, "_payload", payload_with_interleaving)
+    document = envelope.canonical_document()
+    assert calls == 1
+    assert document["result_snapshot_digest"] == HEX_B

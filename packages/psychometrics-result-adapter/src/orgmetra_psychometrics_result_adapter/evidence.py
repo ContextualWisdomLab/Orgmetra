@@ -305,14 +305,16 @@ class PsychometricsResultEvidenceEnvelope:
         """Serialize live evidence deterministically without trusting its creation seal."""
         return json.dumps(self._payload(), sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
-    def _assert_integrity(self) -> None:
-        """Reject post-construction rewriting before evidence can leave this boundary."""
+    def _assert_integrity(self) -> tuple[dict[str, object], str]:
+        """Return the exact checked snapshot while rejecting post-construction rewriting."""
         self._validate_fields()
         if self._issuance_marker is not _USED_ISSUANCE_MARKER:
             raise ValueError("psychometrics result evidence changed after construction")
         packet_seal = self._creation_seal
         authoritative_seal = _authoritative_creation_seal(self)
-        live_seal = _seal(self._canonical_payload_json())
+        payload = self._payload()
+        payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        live_seal = _seal(payload_json)
         if (
             type(packet_seal) is not str
             or type(authoritative_seal) is not str
@@ -320,16 +322,17 @@ class PsychometricsResultEvidenceEnvelope:
             or not hmac.compare_digest(live_seal, authoritative_seal)
         ):
             raise ValueError("psychometrics result evidence changed after construction")
+        return payload, payload_json
 
     def canonical_document(self) -> dict[str, object]:
-        """Return a fresh canonical document only while issuance evidence remains intact."""
-        self._assert_integrity()
-        return self._payload()
+        """Return the exact canonical document snapshot that passed integrity verification."""
+        payload, _ = self._assert_integrity()
+        return payload
 
     def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit/outbox correlation."""
-        self._assert_integrity()
-        return self._canonical_payload_json()
+        """Return the exact JSON snapshot that passed integrity verification."""
+        _, payload_json = self._assert_integrity()
+        return payload_json
 
     def evidence_digest(self) -> str:
         """Return SHA-256 of the exact canonical evidence bytes."""

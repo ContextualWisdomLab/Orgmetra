@@ -37,7 +37,7 @@ Every envelope is explicitly `external_measurement_evidence`, `requires_human_re
 - The owner-published engine artifact must use its canonical `sha256:<64 lowercase hex>` format.
 - Result evidence cannot claim that Orgmetra recorded it before the owner's result creation timestamp.
 - A result cannot supersede itself.
-- Canonical evidence is deterministically serialized and detects post-construction rewriting in-process. Durable immutability still belongs to Orgmetra audit/outbox and persistence controls; the in-process seal is not represented as a storage signature.
+- Canonical evidence is deterministically serialized from the exact payload snapshot whose creation seal was verified, and detects post-construction rewriting in-process. Durable immutability still belongs to Orgmetra audit/outbox and persistence controls; the in-process seal is not represented as a storage signature.
 - Exact built-in runtime primitives are required at trust-bearing Python boundaries to prevent caller-defined equality, hashing, comparison, or serialization behavior from changing validated meaning.
 
 ## Consequences

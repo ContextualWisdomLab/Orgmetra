@@ -10,7 +10,7 @@ Status: **implemented on active PR #85 only**. Protected `develop` remains the a
 | Preserve consent and exact-result identity without copying value-bearing payload | Orgmetra integration boundary | `consent_snapshot_set_digest`, `result_snapshot_digest` | SHA-256 format regressions; raw consent refs and score observations absent | implemented_on_active_pr |
 | Keep employment decisions human-governed | Orgmetra decision boundary | distinct requester/reviewer, `requires_human_review`, `not_authorized_for_employment_decision` | actor separation and fixed-state assertions | implemented_on_active_pr |
 | Preserve source/result chronology and correction lineage | Psychometrics Commons result provenance + Orgmetra recorded time | `result_created_at_unix_ms`, `recorded_at`, optional superseded snapshot ref | future-source and self-supersession rejection | implemented_on_active_pr |
-| Resist runtime evidence forgery | Orgmetra Python trust boundary | exact primitives, final envelope type, deterministic canonical JSON, external process-local creation seal | hostile subtype, `replace()`, payload+seal rewrite and issuance-marker regressions | implemented_on_active_pr |
+| Resist runtime evidence forgery | Orgmetra Python trust boundary | exact primitives, final envelope type, deterministic canonical JSON, external process-local creation seal, verified export snapshot | hostile subtype, `replace()`, payload+seal rewrite, issuance-marker, and checked-vs-emitted snapshot regressions | implemented_on_active_pr |
 | Preserve dedicated-writer ownership | Federated CWL integration | published/result export evidence only; no cross-service table SQL | code/document review; dependency revision is read-only | implemented_on_active_pr |
 
 ## Next boundary
