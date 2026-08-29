@@ -16,6 +16,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 addopts = [
   "--cov=orgmetra_validity_analysis",
   "--cov-branch",

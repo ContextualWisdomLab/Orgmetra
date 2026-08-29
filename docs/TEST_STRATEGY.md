@@ -77,7 +77,7 @@ Orgmetra does not combine fast-mlsirm and TEPP into one dependency.
 ### fast-mlsirm
 
 - Canonical repository: `ContextualWisdomLab/fast-mlsirm`.
-- Reviewed immutable revision for this baseline: `fb67ced09d8ee00542c05d56374537a9a7239751`.
+- Reviewed immutable revision for this baseline: `04d0bc21a2a20693bcf16108cd76d394fe844d23`.
 - Orgmetra contract identifier: `orgmetra.fast_mlsirm.v1`.
 - Owner: `workforce_validation`; the normal online path consumes a Psychometrics Commons immutable result snapshot rather than calling the kernel from a role workspace.
 - Backend: Rust production arithmetic with bounded CPU multithreading and GPU parity for material kernels. NumPy is a reference/parity path only.

@@ -50,7 +50,6 @@ jobs:
         run: python -m compileall -q packages/validity-analysis/src packages/validity-analysis/tests
       - name: Test governed handoff with exact statement and branch coverage
         env:
-          PYTHONPATH: packages/validity-analysis/src
           COVERAGE_FILE: /tmp/orgmetra-validity-analysis.coverage
         run: python -m pytest -c packages/validity-analysis/pyproject.toml packages/validity-analysis/tests
       - name: Require clean checkout
