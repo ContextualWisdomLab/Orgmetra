@@ -442,15 +442,18 @@ def retrieve_hr_document(
 
     request = _query_snapshot(query)
 
-    scope = _scope_snapshot(metadata_resolver.resolve_document_scope(request))
+    resolver_request = _query_snapshot(request)
+    scope = _scope_snapshot(metadata_resolver.resolve_document_scope(resolver_request))
     if (
         scope.tenant_record_id != request.tenant_record_id
         or scope.document_record_reference != request.document_record_reference
     ):
         raise _fail("resolved document metadata does not match the requested tenant/document scope")
 
+    authority_request = _query_snapshot(request)
+    authority_scope = _scope_snapshot(scope)
     authorization = _authorization_snapshot(
-        authority.authorize_document_retrieval(request, scope)
+        authority.authorize_document_retrieval(authority_request, authority_scope)
     )
     if (
         authorization.tenant_record_id != request.tenant_record_id

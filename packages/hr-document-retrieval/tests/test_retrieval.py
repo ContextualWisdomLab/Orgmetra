@@ -312,6 +312,71 @@ def test_resolver_authority_and_artifact_outputs_are_revalidated_after_mutation(
         execute(reader=Reader(mutated_artifact))
 
 
+def test_callbacks_cannot_widen_the_authoritative_byte_limit() -> None:
+    observed: list[int] = []
+
+    class MutatingResolver:
+        def resolve_document_scope(self, request: DocumentRetrievalQuery) -> DocumentRetrievalScope:
+            object.__setattr__(request, "max_bytes", 2048)
+            return scope()
+
+    class EchoingAuthority:
+        def authorize_document_retrieval(
+            self,
+            request: DocumentRetrievalQuery,
+            resolved: DocumentRetrievalScope,
+        ) -> DocumentRetrievalAuthorization:
+            assert resolved.artifact_reference == ARTIFACT
+            return authorization(authorized_max_bytes=request.max_bytes)
+
+    class RecordingReader:
+        def read_document_artifact(self, artifact_reference: str, max_bytes: int) -> DocumentArtifact:
+            assert artifact_reference == ARTIFACT
+            observed.append(max_bytes)
+            return DocumentArtifact(CONTENT, CONTENT_DIGEST)
+
+    execute(
+        resolver=MutatingResolver(),
+        auth=EchoingAuthority(),
+        reader=RecordingReader(),
+    )
+
+    assert observed == [1024]
+
+
+def test_callbacks_cannot_redirect_the_authoritative_artifact() -> None:
+    redirected_content = b"redirected-artifact"
+    redirected_digest = sha256(redirected_content).hexdigest()
+    redirected_artifact = f"document_artifact:{uuid4()}"
+    calls: list[str] = []
+
+    class MutatingAuthority:
+        def authorize_document_retrieval(
+            self,
+            request: DocumentRetrievalQuery,
+            resolved: DocumentRetrievalScope,
+        ) -> DocumentRetrievalAuthorization:
+            object.__setattr__(resolved, "artifact_reference", redirected_artifact)
+            object.__setattr__(resolved, "artifact_digest_sha256", redirected_digest)
+            return authorization(
+                artifact_reference=redirected_artifact,
+                artifact_digest_sha256=redirected_digest,
+            )
+
+    class RecordingReader:
+        def read_document_artifact(self, artifact_reference: str, max_bytes: int) -> DocumentArtifact:
+            calls.append(artifact_reference)
+            return DocumentArtifact(redirected_content, redirected_digest)
+
+    with pytest.raises(HrDocumentRetrievalError, match="exact retrieval scope"):
+        execute(
+            auth=MutatingAuthority(),
+            reader=RecordingReader(),
+        )
+
+    assert calls == []
+
+
 def test_capability_validation_occurs_before_protected_metadata_resolution() -> None:
     calls: list[str] = []
     resolver = Resolver(calls=calls)
