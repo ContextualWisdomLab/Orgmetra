@@ -12,8 +12,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from hashlib import sha256
+import hmac
 import json
+import secrets
+from threading import RLock
 from typing import Protocol
+from weakref import finalize
 
 from .plan import (
     StructuredInterviewPlan,
@@ -29,6 +33,38 @@ _REASON_CODE = "human_approved_plan_activation"
 _ACTIVATION_STATE = "approved_for_use"
 _MAX_EVIDENCE_VERSION = 2_147_483_647
 _ACTIVATION_RECEIPT_ISSUANCE_TOKEN = object()
+_PROCESS_ACTIVATION_RECEIPT_SEAL_KEY = secrets.token_bytes(32)
+_ACTIVATION_RECEIPT_SEALS: dict[int, str] = {}
+_ACTIVATION_RECEIPT_SEALS_LOCK = RLock()
+
+
+def _discard_activation_receipt_seal(receipt_id: int) -> None:
+    """Discard process-local activation issuance evidence after receipt collection."""
+    with _ACTIVATION_RECEIPT_SEALS_LOCK:
+        _ACTIVATION_RECEIPT_SEALS.pop(receipt_id, None)
+
+
+def _register_activation_receipt_seal(receipt: object, seal: str) -> None:
+    """Bind one live receipt identity to evidence outside receipt-writable slots."""
+    receipt_id = id(receipt)
+    with _ACTIVATION_RECEIPT_SEALS_LOCK:
+        _ACTIVATION_RECEIPT_SEALS[receipt_id] = seal
+    finalize(receipt, _discard_activation_receipt_seal, receipt_id)
+
+
+def _authoritative_activation_receipt_seal(receipt: object) -> str | None:
+    """Return process-local issuance evidence without trusting receipt-owned state."""
+    with _ACTIVATION_RECEIPT_SEALS_LOCK:
+        return _ACTIVATION_RECEIPT_SEALS.get(id(receipt))
+
+
+def _seal_activation_receipt(payload_json: str) -> str:
+    """Bind one process-local activation issuance to exact canonical payload bytes."""
+    return hmac.new(
+        _PROCESS_ACTIVATION_RECEIPT_SEAL_KEY,
+        payload_json.encode("utf-8"),
+        "sha256",
+    ).hexdigest()
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -60,7 +96,7 @@ class StructuredInterviewActivationAuthority(Protocol):
         """Return exact-scope evidence only after reviewing the exact approval instant."""
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class StructuredInterviewActivationReceipt:
     """Immutable evidence that an accountable human activated one exact reviewed plan."""
 
@@ -116,13 +152,17 @@ class StructuredInterviewActivationReceipt:
                 "StructuredInterviewActivationReceipt can only be issued by "
                 "activate_structured_interview_plan"
             )
+        _register_activation_receipt_seal(
+            self,
+            _seal_activation_receipt(self._canonical_json_unchecked()),
+        )
 
     def __repr__(self) -> str:
         """Return a redacted representation suitable for routine logs."""
         return "StructuredInterviewActivationReceipt(<redacted>)"
 
-    def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit correlation."""
+    def _canonical_json_unchecked(self) -> str:
+        """Render canonical activation bytes without process-local issuance state."""
         payload = {
             "activation_state": self.activation_state,
             "approved_at": _canonical_timestamp(self.approved_at, "approved_at"),
@@ -139,8 +179,24 @@ class StructuredInterviewActivationReceipt:
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
+    def canonical_json(self) -> str:
+        """Return creation-bound canonical JSON for immutable audit correlation."""
+        canonical = self._canonical_json_unchecked()
+        authoritative_seal = _authoritative_activation_receipt_seal(self)
+        if (
+            type(authoritative_seal) is not str
+            or not hmac.compare_digest(
+                _seal_activation_receipt(canonical),
+                authoritative_seal,
+            )
+        ):
+            raise ValueError(
+                "structured interview activation receipt changed after activation receipt issuance"
+            )
+        return canonical
+
     def sha256_digest(self) -> str:
-        """Return SHA-256 over the exact canonical UTF-8 activation receipt."""
+        """Return SHA-256 over the exact creation-bound activation receipt."""
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
