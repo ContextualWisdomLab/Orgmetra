@@ -1,10 +1,10 @@
-"""Regression for persistence-held Employment-history row aliases.
+"""Regressions for persistence-held Employment-history row aliases.
 
-A persistence adapter may retain a reference to a row after returning it.  Frozen
+A persistence adapter may retain a reference to a row after returning it. Frozen
 ``dataclass`` syntax alone is not an integrity boundary because Python's
-``object.__setattr__`` can still rewrite a frozen instance.  The People service
-must therefore use a validated local snapshot rather than the persistence-owned
-object when producing an authorized response.
+``object.__setattr__`` can still rewrite a frozen instance. The People service
+must therefore use a validated service-owned snapshot, reject source changes
+observed across its capture window, and never serialize the persistence alias.
 """
 
 from __future__ import annotations
