@@ -287,7 +287,7 @@ def read_audit_evidence(
     if type(query) is not AuditEvidenceQuery:
         raise TypeError("query must be an exact AuditEvidenceQuery.")
     verified_query = _snapshot_query(query)
-    authorization = authority.authorize(verified_query)
+    authorization = authority.authorize(_snapshot_query(verified_query))
     if type(authorization) is not AuditEvidenceReadAuthorization:
         raise TypeError("authority must return AuditEvidenceReadAuthorization.")
     verified_authorization = _snapshot_authorization(authorization)
@@ -306,7 +306,7 @@ def read_audit_evidence(
     if actual_scope != expected_scope or not verified_authorization.permitted:
         raise PermissionError("audit evidence review is not authorized for the exact query scope.")
 
-    rows = reader.read_rows(verified_query)
+    rows = reader.read_rows(_snapshot_query(verified_query))
     if type(rows) is not tuple:
         raise TypeError("reader must return an immutable tuple.")
     if len(rows) > verified_query.limit:

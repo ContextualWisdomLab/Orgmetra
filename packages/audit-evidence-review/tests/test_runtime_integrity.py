@@ -17,6 +17,7 @@ from orgmetra_audit_evidence_review import (
 )
 
 TENANT = UUID("10000000-0000-7000-8000-000000000001")
+OTHER_TENANT = UUID("20000000-0000-7000-8000-000000000002")
 EVENT = UUID("11111111-1111-4111-8111-111111111111")
 QUERY_REF = "audit_review:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 REQUESTER = "actor:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
@@ -121,6 +122,65 @@ def test_post_construction_query_mutation_is_revalidated_before_authority_or_sto
 
     assert authority.calls == 0
     assert reader.calls == 0
+
+
+def test_authority_callback_cannot_mutate_the_authoritative_query() -> None:
+    """The host callback receives a snapshot, so its object-level mutation cannot widen the read."""
+    query = _query()
+    captured: list[AuditEvidenceQuery] = []
+
+    class MutatingAuthority:
+        """Attempt to rewrite every query field exposed to the authorization callback."""
+
+        def authorize(self, callback_query: AuditEvidenceQuery) -> AuditEvidenceReadAuthorization:
+            """Mutate only the callback snapshot and return authorization for the original query."""
+            object.__setattr__(callback_query, "tenant_record_id", OTHER_TENANT)
+            object.__setattr__(callback_query, "recorded_from", datetime(2026, 1, 1, tzinfo=timezone.utc))
+            object.__setattr__(callback_query, "limit", 200)
+            return _authorization(query)
+
+    class CapturingReader:
+        """Capture the query that reaches the store boundary."""
+
+        def read_rows(self, reader_query: AuditEvidenceQuery) -> tuple[PersistedAuditEvidenceRow, ...]:
+            """Return no rows after recording the authoritative query snapshot."""
+            captured.append(reader_query)
+            return ()
+
+    page = read_audit_evidence(
+        query=query,
+        authority=MutatingAuthority(),
+        reader=CapturingReader(),
+    )
+
+    assert page.records == ()
+    assert captured[0].tenant_record_id == TENANT
+    assert captured[0].recorded_from == START
+    assert captured[0].limit == 50
+
+
+def test_reader_callback_cannot_mutate_the_authoritative_query() -> None:
+    """The store callback receives a snapshot, so returned-page checks keep the authorized scope."""
+    query = _query()
+
+    class MutatingReader:
+        """Attempt to widen the query after the store callback receives it."""
+
+        def read_rows(self, callback_query: AuditEvidenceQuery) -> tuple[PersistedAuditEvidenceRow, ...]:
+            """Rewrite callback-only fields before returning one valid row."""
+            object.__setattr__(callback_query, "query_reference", "audit_review:cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+            object.__setattr__(callback_query, "recorded_from", datetime(2020, 1, 1, tzinfo=timezone.utc))
+            object.__setattr__(callback_query, "limit", 0)
+            return (_row(),)
+
+    page = read_audit_evidence(
+        query=query,
+        authority=_Authority(_authorization(query)),
+        reader=MutatingReader(),
+    )
+
+    assert page.query_reference == QUERY_REF
+    assert len(page.records) == 1
 
 
 def test_post_construction_authorization_mutation_cannot_turn_non_boolean_into_permission() -> None:
