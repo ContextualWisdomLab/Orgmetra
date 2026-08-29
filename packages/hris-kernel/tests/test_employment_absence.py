@@ -8,6 +8,7 @@ import pytest
 from orgmetra_hris_kernel import (
     DateInterval,
     EmploymentAbsenceError,
+    EmploymentAbsenceSnapshot,
     EmploymentAbsenceVersion,
     EmploymentVersion,
     RecordedInterval,
@@ -223,3 +224,25 @@ def test_snapshot_rejects_naive_knowledge_cutoff() -> None:
     """System-knowledge coordinates must remain timezone-aware."""
     with pytest.raises(EmploymentAbsenceError, match="timezone-aware"):
         snapshot([], known_at=datetime(2026, 8, 25))
+
+
+def test_snapshot_rejects_reserved_uuid_sentinels() -> None:
+    """Reserved Nil and Max UUIDs cannot become absence snapshot identities."""
+    with pytest.raises(EmploymentAbsenceError, match="operational built-in UUID"):
+        EmploymentAbsenceSnapshot(
+            tenant_record_id=UUID(int=0),
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=utc(25),
+            is_absent=False,
+            employment_absence_record_id=None,
+        )
+    with pytest.raises(EmploymentAbsenceError, match="operational built-in UUID"):
+        EmploymentAbsenceSnapshot(
+            tenant_record_id=TENANT,
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=utc(25),
+            is_absent=True,
+            employment_absence_record_id=UUID(int=(1 << 128) - 1),
+        )

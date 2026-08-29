@@ -20,13 +20,14 @@ from orgmetra_hris_kernel.resolution import resolve_single_valued_fact
 
 _KNOWN_ABSENCE_STATUSES = frozenset({"confirmed", "cancelled"})
 _ABSENCE_ELIGIBLE_EMPLOYMENT_STATUSES = frozenset({"active", "leave"})
+_MAX_UUID_INT = (1 << 128) - 1
 
 
 def _require_uuid(value: UUID, field_name: str) -> UUID:
     """Reject caller-defined UUID behavior before scope comparison or rendering."""
-    if type(value) is not UUID:
+    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
         raise EmploymentAbsenceError(
-            f"{field_name} must be a built-in UUID.",
+            f"{field_name} must be an operational built-in UUID.",
             next_action="Reload canonical HRIS identity evidence, then rebuild the absence snapshot.",
         )
     return value
@@ -74,7 +75,7 @@ def _freeze_known_at(value: datetime) -> datetime:
 def _validate_absence_fact_identities(version: EmploymentAbsenceVersion) -> None:
     """Reject executable UUID subclasses before tenant/Employment scope comparisons."""
     if not all(
-        type(value) is UUID
+        type(value) is UUID and value.int not in (0, _MAX_UUID_INT)
         for value in (
             version.tenant_record_id,
             version.employment_absence_record_id,
@@ -92,7 +93,7 @@ def _validate_absence_fact_identities(version: EmploymentAbsenceVersion) -> None
 def _validate_employment_fact_identities(version: EmploymentVersion) -> None:
     """Reject executable UUID subclasses before Employment scope comparisons."""
     if not all(
-        type(value) is UUID
+        type(value) is UUID and value.int not in (0, _MAX_UUID_INT)
         for value in (
             version.tenant_record_id,
             version.employment_record_id,

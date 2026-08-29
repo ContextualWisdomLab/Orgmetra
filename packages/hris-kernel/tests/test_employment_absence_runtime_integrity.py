@@ -103,7 +103,7 @@ def test_employment_status_runtime_subclass_cannot_forge_active_state() -> None:
 def test_builder_rejects_uuid_subclass_before_tenant_scope_comparison() -> None:
     """A hostile query UUID cannot forge cross-tenant equality before scope resolution."""
     forged_tenant = ForgedUuid("20000000-0000-7000-8000-000000002001")
-    with pytest.raises(EmploymentAbsenceError, match="tenant_record_id must be a built-in UUID"):
+    with pytest.raises(EmploymentAbsenceError, match="tenant_record_id must be an operational built-in UUID"):
         build_employment_absence_snapshot(
             [_absence("confirmed")],
             [_employment()],
@@ -149,10 +149,40 @@ def test_builder_rejects_employment_fact_uuid_subclass_before_scope_comparison()
         )
 
 
+def test_builder_rejects_reserved_absence_fact_uuid() -> None:
+    """Reserved UUID sentinels cannot enter an absence fact collection."""
+    forged_absence = replace(_absence("confirmed"), employment_absence_version_id=UUID(int=0))
+    with pytest.raises(EmploymentAbsenceError, match="absence fact identities"):
+        build_employment_absence_snapshot(
+            [forged_absence],
+            [_employment()],
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+        )
+
+
+def test_builder_rejects_reserved_employment_fact_uuid() -> None:
+    """Reserved UUID sentinels cannot enter an Employment fact collection."""
+    forged_employment = replace(_employment(), employment_record_version_id=UUID(int=(1 << 128) - 1))
+    with pytest.raises(EmploymentAbsenceError, match="Employment fact identities"):
+        build_employment_absence_snapshot(
+            [_absence("confirmed")],
+            [forged_employment],
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            employment_record_id=EMPLOYMENT,
+            effective_on=date(2026, 8, 25),
+            known_at=datetime(2026, 8, 25, tzinfo=timezone.utc),
+        )
+
+
 def test_direct_snapshot_rejects_uuid_subclass_before_canonicalization() -> None:
     """Direct evidence cannot retain executable UUID display/equality behavior."""
     forged_tenant = ForgedUuid("20000000-0000-7000-8000-000000002001")
-    with pytest.raises(EmploymentAbsenceError, match="tenant_record_id must be a built-in UUID"):
+    with pytest.raises(EmploymentAbsenceError, match="tenant_record_id must be an operational built-in UUID"):
         EmploymentAbsenceSnapshot(
             tenant_record_id=forged_tenant,
             employment_record_id=EMPLOYMENT,
