@@ -51,6 +51,22 @@ class _FixedOffsetTimezone(tzinfo):
         return "CALLER+09"
 
 
+class _OffsetlessTimezone(tzinfo):
+    """Caller-owned timezone object that deliberately resolves to no UTC offset."""
+
+    def utcoffset(self, value: datetime | None) -> None:
+        """Make an apparently aware datetime behave as offsetless."""
+        return None
+
+    def dst(self, value: datetime | None) -> timedelta:
+        """Return no daylight-saving adjustment when queried independently."""
+        return timedelta(0)
+
+    def tzname(self, value: datetime | None) -> str:
+        """Identify the offsetless timezone for the regression."""
+        return "OFFSETLESS"
+
+
 class _ExplodingTimezone(tzinfo):
     """Caller-owned timezone that raises while its UTC offset is resolved."""
 
@@ -215,6 +231,19 @@ def test_close_recorded_interval_detaches_caller_owned_timezone_before_ordering(
     assert closed.recorded.end.tzinfo is not recorded_to.tzinfo
 
 
+def test_close_recorded_interval_rejects_offsetless_timezone_object(
+    jordan_active_employment,
+) -> None:
+    """A tzinfo object returning no offset is rejected before chronology is evaluated."""
+    recorded_to = datetime(2024, 6, 15, 18, tzinfo=_OffsetlessTimezone())
+
+    with pytest.raises(CorrectionError, match="timezone-aware"):
+        close_recorded_interval(
+            jordan_active_employment,
+            recorded_to=recorded_to,
+        )
+
+
 def test_close_recorded_interval_normalizes_timezone_resolution_failure(
     jordan_active_employment,
 ) -> None:
@@ -225,4 +254,21 @@ def test_close_recorded_interval_normalizes_timezone_resolution_failure(
         close_recorded_interval(
             jordan_active_employment,
             recorded_to=recorded_to,
+        )
+
+
+def test_close_recorded_interval_normalizes_stored_timezone_resolution_failure(
+    jordan_active_employment,
+) -> None:
+    """Persisted start corruption cannot execute arbitrary timezone behavior unchecked."""
+    hostile_start = datetime(2024, 3, 1, 15, tzinfo=_ExplodingTimezone())
+    malformed_fact = replace(
+        jordan_active_employment,
+        recorded=RecordedInterval(start=hostile_start),
+    )
+
+    with pytest.raises(CorrectionError, match="Recorded start timezone"):
+        close_recorded_interval(
+            malformed_fact,
+            recorded_to=utc(2024, 6, 15, 9),
         )
