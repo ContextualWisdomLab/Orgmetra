@@ -35,6 +35,16 @@ bypass fixed safety-state, shape, chronology, or identifier invariants. Separate
 constructed receipts remain untrusted and still require authoritative exact-attempt and
 artifact reconciliation.
 
+Trust-bearing primitive values are accepted only as their exact built-in Python types,
+not caller-defined subclasses whose equality or serialization behavior can be overridden.
+Caller-owned aware datetimes are normalized once during construction into detached,
+built-in UTC `datetime` values before the evidence object retains them. Later changes to a
+caller-owned timezone provider therefore cannot rewrite the canonical JSON or digest.
+Canonical export rejects low-level reconstructed evidence unless both stored timestamps
+are already those frozen built-in UTC values. Exact-attempt verification likewise accepts
+only the exact `ExternalDeliveryReceiptEvidence` type so a subclass cannot override the
+returned digest or other trust behavior.
+
 ## Why not modify the outbox migration here
 
 Open Orgmetra stacks already carry many provisional database migrations. Adding another
@@ -52,6 +62,8 @@ history.
 - Provider raw payloads, addresses, credentials, HR content, and employment decisions stay
   out of governance evidence.
 - Receipt replay across retry attempts fails exact-attempt reconciliation.
+- Mutable timezone providers and behavior-overriding primitive subclasses cannot remain
+  embedded in canonical receipt evidence after construction.
 - The contract remains independently extractable as an MSA/API boundary.
 
 ## Cryptographic and time references
