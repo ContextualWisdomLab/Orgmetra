@@ -13,6 +13,12 @@ on:
       - "docs/adr/0119-organization-hierarchy-change-application.md"
       - "docs/traceability/organization-hierarchy-change-application.md"
       - "docs/doctoring/organization-hierarchy-change-application-references.md"
+      - "ARCHITECTURE.md"
+      - "CHANGELOG.md"
+      - "docs/API_CONTRACT.md"
+      - "docs/SECURITY.md"
+      - "docs/TEST_STRATEGY.md"
+      - "docs/OPERABILITY.md"
       - ".github/workflows/organization-hierarchy-change-application-quality.yml"
   workflow_dispatch:
 
@@ -72,6 +78,12 @@ jobs:
               "docs/adr/0119-organization-hierarchy-change-application.md",
               "docs/traceability/organization-hierarchy-change-application.md",
               "docs/doctoring/organization-hierarchy-change-application-references.md",
+              "ARCHITECTURE.md",
+              "CHANGELOG.md",
+              "docs/API_CONTRACT.md",
+              "docs/SECURITY.md",
+              "docs/TEST_STRATEGY.md",
+              "docs/OPERABILITY.md",
           ]
           rows = []
           for path_text in required + [path for path in optional if Path(path).is_file()]:

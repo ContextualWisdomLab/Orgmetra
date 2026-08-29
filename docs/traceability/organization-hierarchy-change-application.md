@@ -17,12 +17,13 @@
 | Tenant isolation | tenant-qualified FKs; application table FORCE RLS; same-tenant Organization lookups | Alpha/Beta/no-tenant RLS regression |
 | Effective and system-recorded time remain separate | reviewed `effective_on`; PostgreSQL-owned system intervals; correction by predecessor close + preserved/new business-time versions | prior-parent preservation and successor-parent regression |
 | Current-parent evidence cannot go stale silently | lock current target version; expected predecessor id/current parent check; recomputed target/hierarchy digests | stale-current-parent regression |
-| Graph invariants survive concurrency | tenant-scoped transaction advisory lock plus stale-transaction cutoff guard | earlier-transaction/later-commit concurrency regression and cycle check |
+| Graph invariants survive concurrency and future scheduling | tenant-scoped transaction advisory lock plus stale-transaction cutoff guard and effective-time-boundary recursive walk | earlier-transaction/later-commit concurrency regression, sequential cycle check, and future-effective cycle regression |
+| Application evidence cannot bind unrelated versions | tenant/unit-qualified predecessor and successor foreign keys; deferred successor reverse-application binding | direct cross-unit predecessor and missing-successor insert regressions |
 | Self-parent/cycle/missing parent fail closed | authoritative same-tenant parent resolution and recursive ancestor walk | sequential descendant-as-parent regression; contract checks |
 | Human accountability is immutable | requester/reviewer/applier separation; controlled reason; high-impact confirmation; exact review digest; audit/outbox binding | application evidence query plus audit guard |
 | Application evidence cannot be rewritten | append-only UPDATE/DELETE guard; TRUNCATE guard | mutation and TRUNCATE regressions |
 | PII is minimized | application evidence carries Organization correlations and governance digests/states only | schema review; parent packet flags require no Person/worker/employment-decision data |
-| Evidence is deterministic | exact v1 key shape, SHA-256 review digest, deterministic Organization/hierarchy snapshot digests | dedicated exact-head workflow provenance and PostgreSQL regressions |
+| Evidence is deterministic and structurally faithful | exact v1 key shape, JSON type/null checks, fixed `next_action`, SHA-256 review digest, deterministic Organization/hierarchy snapshot digests, and field-for-field application binding | malformed-packet, direct-column-mismatch, dedicated exact-head workflow provenance, and PostgreSQL regressions |
 
 ## Concurrency defect and repair provenance
 

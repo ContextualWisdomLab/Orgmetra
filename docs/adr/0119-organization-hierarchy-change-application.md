@@ -16,7 +16,7 @@ The application transaction:
 3. takes one tenant-scoped transaction-level advisory lock before graph validation so authoritative hierarchy changes that use this boundary serialize;
 4. rejects a transaction whose system-time cutoff predates a hierarchy fact committed after that transaction began, requiring a retry rather than allowing stale pre-lock truth to commit;
 5. verifies exact v1 value-minimized review evidence, its SHA-256 digest, reason, reviewed current parent, and independently recomputed target-unit and whole-hierarchy snapshot digests;
-6. fails closed on missing/ambiguous same-tenant truth, stale current-parent evidence, self-parenting, missing proposed parents, or cycles;
+6. fails closed on missing/ambiguous same-tenant truth, stale current-parent evidence, self-parenting, missing proposed parents, or cycles at every effective-time boundary in the successor interval;
 7. records high-impact human-confirmed audit/outbox evidence in the same transaction;
 8. closes only the predecessor system-recorded interval, preserves earlier business-time truth when the change is future-effective, and inserts the reviewed successor parent fact;
 9. stores no Person, worker, compensation, rating, candidate, free-form HR, prompt, model-output, or credential values in application evidence;
@@ -34,6 +34,6 @@ Organization parent changes are graph mutations. Two individually valid edges ca
 
 ## Security and privacy consequences
 
-The application relation is governance evidence, not a copy of HR data. FORCE RLS and tenant-qualified foreign keys constrain row scope. The predecessor version is a direct foreign key; the successor UUID is captured before the successor row exists and is completed by the successor version's reverse application-record foreign key. A future-effective change can therefore bind both its preserved and new successor rows to one application record. The authoritative function is not granted to `PUBLIC`; a deployment must grant it only to the intended Orgmetra mutation role. High-impact audit evidence binds actor, purpose, controlled reason, reviewed evidence digest, human confirmation, subject, result, and outbox delivery atomically.
+The application relation is governance evidence, not a copy of HR data. FORCE RLS and tenant-qualified foreign keys constrain row scope. Predecessor and successor version references are tenant/unit-qualified; the successor reference is deferred so the application row can be inserted before the new version, while a deferred trigger requires that version to point back to the exact application record. The reviewed JSON is type-checked, null-safe, and bound field-for-field to the application row. A future-effective change is checked across every effective-time boundary in the successor interval, so a later scheduled edge cannot close a cycle unnoticed. The authoritative function is not granted to `PUBLIC`; a deployment must grant it only to the intended Orgmetra mutation role. High-impact audit evidence binds actor, purpose, controlled reason, reviewed evidence digest, human confirmation, subject, result, and outbox delivery atomically.
 
 This ADR does not claim certification, release readiness, or protected-main integration. It is active-PR architecture until #119 is integrated and revalidated on the final protected head.

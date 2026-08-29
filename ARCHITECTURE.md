@@ -86,6 +86,10 @@ The initial deployment may share one physical PostgreSQL cluster. Logical isolat
 
 A service role may read and write only its owned application tables. Cross-service foreign identifiers are opaque references or explicitly approved database constraints inside the modular deployment. A service must never query another service's application tables directly. Cross-boundary reads and commands use generated OpenAPI clients; asynchronous propagation uses versioned AsyncAPI/CloudEvents contracts. Extraction into separate databases must not change those contracts.
 
+### Organization hierarchy mutation boundary
+
+The active stacked Organization hierarchy application boundary in PR #119 is owned by `organization_core`. Migration `0027_organization_hierarchy_change_application.sql` applies only an exact, human-reviewed Organization Unit parent proposal through one tenant-scoped PostgreSQL transaction; migration `0028_organization_hierarchy_change_concurrency_hardening.sql` rejects stale transaction cutoffs. The boundary re-resolves bitemporal truth, validates the graph at every effective-time boundary in the successor interval, binds predecessor and successor versions with tenant/unit-qualified constraints, and records immutable audit/outbox evidence. It is not a public authorization shortcut or an autonomous employment decision.
+
 ## Evidence object and search store ownership
 
 Non-relational stores never become a back door around service ownership. `document_records` owns canonical document/image artifact objects and their retention/export/delete lifecycle. `workforce_validation` may own immutable derived analysis artifacts. Each object key is bound to one opaque tenant identifier, one owning bounded context, one classification, one retention policy, and one immutable provenance reference. Clients receive short-lived, purpose-bound access through the owning service; bucket- or collection-wide credentials are not exposed to workspaces or peer services.

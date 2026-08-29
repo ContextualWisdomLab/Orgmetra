@@ -43,6 +43,10 @@ For confirmed-hire materialization, those high-impact facts are resolved from th
 
 The server rejects a reused idempotency key when its method, resource, tenant, actor, purpose, or semantic command digest differs. People employment, position, assignment, and confirmed-hire writes persist that digest on `people_mutation_idempotency_record` in the same transaction as the authoritative HRIS fact and audit/outbox pair. A matching retry returns the first committed record identity without duplicating authoritative or audit/outbox facts. Generated record identifiers are excluded from the employment/position/assignment digest so a retried POST that allocates fresh UUIDs still replays; the confirmed-hire route requires the caller to repeat the exact confirmed identities and rejects a same-key command whose materialization identities differ.
 
+## Organization hierarchy application
+
+The active PR #119 database boundary is an internal `organization_core` mutation contract, not a public endpoint or a review-packet authorization. An authenticated Orgmetra command handler must pass the exact tenant and Organization Unit, expected predecessor version, successor identity, canonical review JSON and SHA-256 digest, distinct reviewer/applier correlations, and preallocated audit/outbox identities to `apply_organization_hierarchy_change(...)`. The function re-resolves current bitemporal truth and rejects stale evidence, missing or cross-unit version bindings, self-parenting, cycles at effective-time boundaries, and malformed review JSON. A serialization failure (`40001`) requires the caller to retry the complete command in a fresh transaction; no partial HRIS mutation is successful.
+
 ## Example endpoints
 
 ```text

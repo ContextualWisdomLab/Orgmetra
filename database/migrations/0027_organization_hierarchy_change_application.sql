@@ -2,12 +2,15 @@
 -- HRIS truth. The relation stores value-minimized governance evidence only; it
 -- does not copy Person, worker, compensation, rating, or free-form HR values.
 
+ALTER TABLE organization_unit_version
+    ADD CONSTRAINT organization_unit_version_tenant_unit_version_unique
+    UNIQUE (tenant_record_id, organization_unit_id, organization_unit_version_id);
+
 CREATE TABLE organization_hierarchy_change_application_record (
     tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
     organization_hierarchy_change_application_record_id uuid PRIMARY KEY,
     organization_unit_id uuid NOT NULL,
-    predecessor_organization_unit_version_id uuid NOT NULL
-        REFERENCES organization_unit_version(organization_unit_version_id),
+    predecessor_organization_unit_version_id uuid NOT NULL,
     successor_organization_unit_version_id uuid NOT NULL,
     organization_hierarchy_change_reference uuid NOT NULL,
     current_parent_organization_unit_id uuid,
@@ -39,6 +42,28 @@ CREATE TABLE organization_hierarchy_change_application_record (
     CONSTRAINT organization_hierarchy_application_unit_tenant_fk
         FOREIGN KEY (tenant_record_id, organization_unit_id)
         REFERENCES organization_unit(tenant_record_id, organization_unit_id),
+    CONSTRAINT organization_hierarchy_application_predecessor_fk
+        FOREIGN KEY (
+            tenant_record_id,
+            organization_unit_id,
+            predecessor_organization_unit_version_id
+        )
+        REFERENCES organization_unit_version(
+            tenant_record_id,
+            organization_unit_id,
+            organization_unit_version_id
+        ),
+    CONSTRAINT organization_hierarchy_application_successor_fk
+        FOREIGN KEY (
+            tenant_record_id,
+            organization_unit_id,
+            successor_organization_unit_version_id
+        )
+        REFERENCES organization_unit_version(
+            tenant_record_id,
+            organization_unit_id,
+            organization_unit_version_id
+        ) DEFERRABLE INITIALLY DEFERRED,
     CONSTRAINT organization_hierarchy_application_current_parent_tenant_fk
         FOREIGN KEY (tenant_record_id, current_parent_organization_unit_id)
         REFERENCES organization_unit(tenant_record_id, organization_unit_id),
@@ -233,7 +258,6 @@ CREATE FUNCTION validate_organization_hierarchy_change_review_evidence(
 RETURNS boolean
 LANGUAGE plpgsql
 STABLE
-STRICT
 SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
@@ -268,7 +292,24 @@ DECLARE
         'scope_verification_state',
         'tenant_record_id'
     ];
+    expected_next_action constant text :=
+        'Within tenant_record_id, re-resolve the Organization Unit, current parent, proposed parent, '
+        'and current hierarchy through authoritative Orgmetra HRIS boundaries at effective_on and the '
+        'current system-recorded cutoff; prove every referenced Organization Unit is same-tenant and '
+        'valid, verify the reviewed unit and hierarchy snapshot digests plus reason, prove requester/'
+        'reviewer authoritative actor separation, reject self-parenting, cycles, multiple visible parents, '
+        'or stale current-parent evidence, then invoke the authoritative organization-hierarchy mutation '
+        'boundary with immutable audit/outbox evidence. This packet is review evidence only and is not '
+        'authorization to mutate HRIS truth or make an employment decision.';
 BEGIN
+    IF p_canonical_review_json IS NULL
+       OR p_review_digest IS NULL
+       OR p_tenant_record_id IS NULL
+       OR p_organization_unit_id IS NULL
+       OR p_effective_on IS NULL THEN
+        RETURN false;
+    END IF;
+
     IF p_review_digest !~ '^[0-9a-f]{64}$'
        OR encode(
             public.digest(pg_catalog.convert_to(p_canonical_review_json, 'UTF8'), 'sha256'),
@@ -284,7 +325,7 @@ BEGIN
         RETURN false;
     END;
 
-    IF pg_catalog.jsonb_typeof(review_payload) <> 'object' THEN
+    IF pg_catalog.jsonb_typeof(review_payload) IS DISTINCT FROM 'object' THEN
         RETURN false;
     END IF;
 
@@ -296,28 +337,82 @@ BEGIN
     END IF;
 
     unit_reference := 'organization_unit:' || p_organization_unit_id::text;
-    IF review_payload ->> 'tenant_record_id' <> p_tenant_record_id::text
-       OR review_payload ->> 'organization_unit_reference' <> unit_reference
-       OR review_payload ->> 'effective_on' <> p_effective_on::text
-       OR review_payload ->> 'purpose_code' <> 'organization_hierarchy_change_review'
-       OR review_payload ->> 'evidence_version' <> '1'
-       OR review_payload ->> 'review_state' <> 'requires_human_review'
-       OR review_payload ->> 'scope_verification_state' <> 'requires_authoritative_resolution'
-       OR review_payload ->> 'mutation_state' <> 'not_authorized_to_apply'
-       OR review_payload ->> 'decision_authority' <> 'human_review_only'
-       OR review_payload ->> 'human_review_required' <> 'true'
-       OR review_payload ->> 'contains_person_identifier' <> 'false'
-       OR review_payload ->> 'contains_worker_value' <> 'false'
-       OR review_payload ->> 'contains_employment_decision' <> 'false'
+    IF pg_catalog.jsonb_typeof(review_payload -> 'tenant_record_id') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'organization_unit_reference') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'effective_on') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'purpose_code') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'evidence_version') IS DISTINCT FROM 'number'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'review_state') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'scope_verification_state') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'mutation_state') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'decision_authority') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'next_action') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'human_review_required') IS DISTINCT FROM 'boolean'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'contains_person_identifier') IS DISTINCT FROM 'boolean'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'contains_worker_value') IS DISTINCT FROM 'boolean'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'contains_employment_decision') IS DISTINCT FROM 'boolean'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'organization_unit_snapshot_digest') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'hierarchy_snapshot_digest') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'organization_hierarchy_change_reference') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'requester_reference') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'reviewer_reference') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'reason_code') IS DISTINCT FROM 'string'
+       OR pg_catalog.jsonb_typeof(review_payload -> 'recorded_at') IS DISTINCT FROM 'string'
+       OR (
+            pg_catalog.jsonb_typeof(review_payload -> 'current_parent_organization_unit_reference')
+                IS DISTINCT FROM 'string'
+            AND pg_catalog.jsonb_typeof(review_payload -> 'current_parent_organization_unit_reference')
+                IS DISTINCT FROM 'null'
+       )
+       OR (
+            pg_catalog.jsonb_typeof(review_payload -> 'proposed_parent_organization_unit_reference')
+                IS DISTINCT FROM 'string'
+            AND pg_catalog.jsonb_typeof(review_payload -> 'proposed_parent_organization_unit_reference')
+                IS DISTINCT FROM 'null'
+       )
+       OR (
+            pg_catalog.jsonb_typeof(review_payload -> 'current_parent_organization_unit_reference') = 'string'
+            AND review_payload ->> 'current_parent_organization_unit_reference'
+                !~ '^organization_unit:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+       )
+       OR (
+            pg_catalog.jsonb_typeof(review_payload -> 'proposed_parent_organization_unit_reference') = 'string'
+            AND review_payload ->> 'proposed_parent_organization_unit_reference'
+                !~ '^organization_unit:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+       )
+       OR review_payload ->> 'tenant_record_id' IS DISTINCT FROM p_tenant_record_id::text
+       OR review_payload ->> 'organization_unit_reference' IS DISTINCT FROM unit_reference
+       OR review_payload ->> 'effective_on' IS DISTINCT FROM p_effective_on::text
+       OR review_payload ->> 'purpose_code' IS DISTINCT FROM 'organization_hierarchy_change_review'
+       OR review_payload ->> 'evidence_version' IS DISTINCT FROM '1'
+       OR review_payload ->> 'review_state' IS DISTINCT FROM 'requires_human_review'
+       OR review_payload ->> 'scope_verification_state' IS DISTINCT FROM 'requires_authoritative_resolution'
+       OR review_payload ->> 'mutation_state' IS DISTINCT FROM 'not_authorized_to_apply'
+       OR review_payload ->> 'decision_authority' IS DISTINCT FROM 'human_review_only'
+       OR review_payload ->> 'next_action' IS DISTINCT FROM expected_next_action
+       OR review_payload ->> 'human_review_required' IS DISTINCT FROM 'true'
+       OR review_payload ->> 'contains_person_identifier' IS DISTINCT FROM 'false'
+       OR review_payload ->> 'contains_worker_value' IS DISTINCT FROM 'false'
+       OR review_payload ->> 'contains_employment_decision' IS DISTINCT FROM 'false'
+       OR review_payload ->> 'organization_unit_snapshot_digest' IS NULL
        OR review_payload ->> 'organization_unit_snapshot_digest' !~ '^[0-9a-f]{64}$'
+       OR review_payload ->> 'hierarchy_snapshot_digest' IS NULL
        OR review_payload ->> 'hierarchy_snapshot_digest' !~ '^[0-9a-f]{64}$'
+       OR review_payload ->> 'organization_hierarchy_change_reference'
+          IS NULL
        OR review_payload ->> 'organization_hierarchy_change_reference'
           !~ '^organization_hierarchy_change:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
        OR review_payload ->> 'requester_reference'
+          IS NULL
+       OR review_payload ->> 'requester_reference'
           !~ '^actor:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
        OR review_payload ->> 'reviewer_reference'
+          IS NULL
+       OR review_payload ->> 'reviewer_reference'
           !~ '^actor:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
-       OR review_payload ->> 'requester_reference' = review_payload ->> 'reviewer_reference'
+       OR review_payload ->> 'requester_reference'
+          IS NOT DISTINCT FROM review_payload ->> 'reviewer_reference'
+       OR review_payload ->> 'reason_code' IS NULL
        OR review_payload ->> 'reason_code' NOT IN (
             'administrative_correction',
             'legal_entity_restructure',
@@ -385,6 +480,8 @@ SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     audit_payload jsonb;
+    review_payload jsonb;
+    review_recorded_at timestamptz;
     outbox_audit_id uuid;
 BEGIN
     IF NEW.recorded_at IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
@@ -400,6 +497,38 @@ BEGIN
         NEW.effective_on
     ) THEN
         RAISE EXCEPTION 'organization hierarchy review evidence is invalid or out of scope'
+            USING ERRCODE = '23514';
+    END IF;
+
+    review_payload := NEW.canonical_review_json::jsonb;
+    review_recorded_at := (review_payload ->> 'recorded_at')::timestamptz;
+    IF review_payload ->> 'organization_hierarchy_change_reference'
+           IS DISTINCT FROM 'organization_hierarchy_change:' || NEW.organization_hierarchy_change_reference::text
+       OR review_payload ->> 'current_parent_organization_unit_reference'
+           IS DISTINCT FROM (
+               CASE
+                WHEN NEW.current_parent_organization_unit_id IS NULL THEN NULL
+                ELSE 'organization_unit:' || NEW.current_parent_organization_unit_id::text
+               END
+           )
+       OR review_payload ->> 'proposed_parent_organization_unit_reference'
+           IS DISTINCT FROM (
+               CASE
+                WHEN NEW.proposed_parent_organization_unit_id IS NULL THEN NULL
+                ELSE 'organization_unit:' || NEW.proposed_parent_organization_unit_id::text
+               END
+           )
+       OR review_payload ->> 'organization_unit_snapshot_digest'
+           IS DISTINCT FROM NEW.organization_unit_snapshot_digest_sha256
+       OR review_payload ->> 'hierarchy_snapshot_digest'
+           IS DISTINCT FROM NEW.hierarchy_snapshot_digest_sha256
+       OR review_payload ->> 'requester_reference'
+           IS DISTINCT FROM NEW.requester_actor_reference
+       OR review_payload ->> 'reviewer_reference'
+           IS DISTINCT FROM NEW.reviewer_actor_reference
+       OR review_payload ->> 'reason_code' IS DISTINCT FROM NEW.reason_code
+       OR review_recorded_at IS DISTINCT FROM NEW.review_packet_recorded_at THEN
+        RAISE EXCEPTION 'organization hierarchy application columns do not match the reviewed evidence'
             USING ERRCODE = '23514';
     END IF;
 
@@ -442,6 +571,34 @@ BEFORE INSERT ON organization_hierarchy_change_application_record
 FOR EACH ROW
 EXECUTE FUNCTION validate_organization_hierarchy_application_audit();
 
+CREATE FUNCTION validate_organization_hierarchy_application_successor()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM organization_unit_version AS version
+        WHERE version.tenant_record_id = NEW.tenant_record_id
+          AND version.organization_unit_id = NEW.organization_unit_id
+          AND version.organization_unit_version_id = NEW.successor_organization_unit_version_id
+          AND version.organization_hierarchy_change_application_record_id =
+              NEW.organization_hierarchy_change_application_record_id
+    ) THEN
+        RAISE EXCEPTION 'organization hierarchy successor version is not bound to its application'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER organization_hierarchy_application_successor_guard
+AFTER INSERT ON organization_hierarchy_change_application_record
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION validate_organization_hierarchy_application_successor();
+
 CREATE FUNCTION apply_organization_hierarchy_change(
     p_tenant_record_id uuid,
     p_organization_unit_id uuid,
@@ -476,6 +633,11 @@ DECLARE
     event_json text;
     event_digest text;
 BEGIN
+    IF public.current_tenant_record_id() IS DISTINCT FROM p_tenant_record_id THEN
+        RAISE EXCEPTION 'organization hierarchy application tenant context does not match the request'
+            USING ERRCODE = '42501';
+    END IF;
+
     IF public.is_operational_uuid(p_tenant_record_id) IS NOT TRUE
        OR public.is_operational_uuid(p_organization_unit_id) IS NOT TRUE
        OR public.is_operational_uuid(p_expected_predecessor_version_id) IS NOT TRUE
@@ -618,19 +780,54 @@ BEGIN
     END IF;
 
     IF proposed_parent_id IS NOT NULL THEN
-        WITH RECURSIVE parent_path(organization_unit_id, parent_organization_unit_id) AS (
-            SELECT
-                version.organization_unit_id,
-                version.parent_organization_unit_id
+        WITH RECURSIVE effective_boundaries(effective_coordinate) AS (
+            SELECT effective_on
+            UNION
+            SELECT version.effective_from
             FROM organization_unit_version AS version
             WHERE version.tenant_record_id = p_tenant_record_id
-              AND version.organization_unit_id = proposed_parent_id
               AND version.recorded_from <= pg_catalog.transaction_timestamp()
               AND (version.recorded_to IS NULL OR pg_catalog.transaction_timestamp() < version.recorded_to)
-              AND version.effective_from <= effective_on
-              AND (version.effective_to IS NULL OR effective_on < version.effective_to)
+              AND version.effective_from > effective_on
+              AND (
+                    predecessor.effective_to IS NULL
+                    OR version.effective_from < predecessor.effective_to
+              )
+            UNION
+            SELECT version.effective_to
+            FROM organization_unit_version AS version
+            WHERE version.tenant_record_id = p_tenant_record_id
+              AND version.recorded_from <= pg_catalog.transaction_timestamp()
+              AND (version.recorded_to IS NULL OR pg_catalog.transaction_timestamp() < version.recorded_to)
+              AND version.effective_to IS NOT NULL
+              AND version.effective_to > effective_on
+              AND (
+                    predecessor.effective_to IS NULL
+                    OR version.effective_to < predecessor.effective_to
+              )
+        ), parent_path(
+            effective_coordinate,
+            organization_unit_id,
+            parent_organization_unit_id
+        ) AS (
+            SELECT
+                boundary.effective_coordinate,
+                version.organization_unit_id,
+                version.parent_organization_unit_id
+            FROM effective_boundaries AS boundary
+            JOIN organization_unit_version AS version
+              ON version.tenant_record_id = p_tenant_record_id
+             AND version.organization_unit_id = proposed_parent_id
+             AND version.recorded_from <= pg_catalog.transaction_timestamp()
+             AND (version.recorded_to IS NULL OR pg_catalog.transaction_timestamp() < version.recorded_to)
+             AND version.effective_from <= boundary.effective_coordinate
+             AND (
+                    version.effective_to IS NULL
+                    OR boundary.effective_coordinate < version.effective_to
+             )
             UNION
             SELECT
+                path.effective_coordinate,
                 version.organization_unit_id,
                 version.parent_organization_unit_id
             FROM parent_path AS path
@@ -639,8 +836,11 @@ BEGIN
              AND version.organization_unit_id = path.parent_organization_unit_id
              AND version.recorded_from <= pg_catalog.transaction_timestamp()
              AND (version.recorded_to IS NULL OR pg_catalog.transaction_timestamp() < version.recorded_to)
-             AND version.effective_from <= effective_on
-             AND (version.effective_to IS NULL OR effective_on < version.effective_to)
+             AND version.effective_from <= path.effective_coordinate
+             AND (
+                    version.effective_to IS NULL
+                    OR path.effective_coordinate < version.effective_to
+             )
             WHERE path.parent_organization_unit_id IS NOT NULL
         )
         SELECT EXISTS (

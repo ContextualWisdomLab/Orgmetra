@@ -29,15 +29,15 @@
     },
     {
       "path": "ARCHITECTURE.md",
-      "sha256": "52d68786f7359c1a50d804996021e4c70e90accd2fff6f1a27c91de1dd8df850",
-      "bytes": 7864,
-      "lines": 107
+      "sha256": "74040c9716b19bf32ea9c7d275a69018b225f3180b21454f0d3bfebe80e1e015",
+      "bytes": 8640,
+      "lines": 111
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "32cc4ef78d1eca557fa01731026840be01211a043eb0ada552e4e6cb9eace353",
-      "bytes": 17295,
-      "lines": 76
+      "sha256": "144c139c277ab3f9f45f75e31fcaf66ab328bf13f351f452008997398c032381",
+      "bytes": 17735,
+      "lines": 77
     },
     {
       "path": "CLAUDE.md",
@@ -143,9 +143,9 @@
     },
     {
       "path": "database/migrations/0027_organization_hierarchy_change_application.sql",
-      "sha256": "d9e3058047714160ec14519bdcdd00f78b3c423daa9661bb1195d11bd39258df",
-      "bytes": 35152,
-      "lines": 808
+      "sha256": "77fde8c9890e94ef9ed5a122d86a06db53ff7d0a10ed0522019c3e918d56f858",
+      "bytes": 46020,
+      "lines": 1008
     },
     {
       "path": "database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql",
@@ -155,9 +155,9 @@
     },
     {
       "path": "docs/API_CONTRACT.md",
-      "sha256": "63533dff785da62b89e585d742a158e2aeb05913644f2bf9fb6486f281c2e589",
-      "bytes": 4555,
-      "lines": 76
+      "sha256": "67ddca386c01a5d5b60f5f10d0aa529bfc0f24a35d7a0a65c74d828947b9e615",
+      "bytes": 5401,
+      "lines": 80
     },
     {
       "path": "docs/DATA_MODEL.md",
@@ -173,9 +173,9 @@
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "82b2d3e70cec371ef35e9e0f982ac40fef84351976bc04b863b81d27023d5a62",
-      "bytes": 11189,
-      "lines": 71
+      "sha256": "a3a63230c9f6cf6469c01d6c9db44fa2ce228357443f837cd807ab527f4bae2a",
+      "bytes": 11559,
+      "lines": 72
     },
     {
       "path": "docs/PRD.md",
@@ -185,9 +185,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "01918512d8882060e9cff0c4aa8206e0eccbdfb61cfd7f829331123c7a9fe6ac",
-      "bytes": 11185,
-      "lines": 64
+      "sha256": "4d821c23be1f43bf4bf8d4384d537419ca87df3deaf477c1260ee77066e3e337",
+      "bytes": 12169,
+      "lines": 67
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -203,9 +203,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "d0a0bc3b54ed0fc7973747987f1afb117d6144c390b51ed9370eb571972a33f8",
-      "bytes": 16534,
-      "lines": 135
+      "sha256": "bf78a8bd0e6516d0fa67ef5536ef55b97a2c407a8ddd96d3fb6b191784071a31",
+      "bytes": 17328,
+      "lines": 137
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -329,8 +329,8 @@
     },
     {
       "path": "docs/adr/0119-organization-hierarchy-change-application.md",
-      "sha256": "92409053ecc59c26c6525bbad4b8bba415371516bd488ff951155529cffc9698",
-      "bytes": 5556,
+      "sha256": "bb79d6fa8039e096b87ee0251d923084fca8d7e17b8920626444c484d7d29313",
+      "bytes": 5825,
       "lines": 39
     },
     {
@@ -467,9 +467,9 @@
     },
     {
       "path": "tests/test_organization_hierarchy_change_application_postgres.sh",
-      "sha256": "2c5c362fa691f7ff9604d400073ee4f60658937bf9c30b6491306ba64cf2b1ad",
-      "bytes": 15097,
-      "lines": 317
+      "sha256": "6a94d01064058a1f5674a0938791a07f40e52e050554ff1968b119464832d13b",
+      "bytes": 27966,
+      "lines": 579
     },
     {
       "path": "tests/test_outbox_claim_postgres.sh",

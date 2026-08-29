@@ -28,6 +28,7 @@
 - Credentials and passkeys remain in Keyverse or external secret managers.
 - Service database roles cannot query another service's application tables.
 - Client error responses expose a random `support_reference`, never an internal trace/span identifier or encoded infrastructure context.
+- Reviewed Organization hierarchy changes remain non-authorizing evidence until the tenant-scoped mutation boundary independently re-resolves current truth. Tenant/unit-qualified version foreign keys, a deferred successor binding guard, exact JSON type/null validation, and effective-time-boundary cycle checks prevent direct rows from manufacturing false application evidence.
 
 ## Purpose-bound PII authorization
 
@@ -48,6 +49,8 @@ All mutation families additionally require resource-scoped authorization and a v
 `people_mutation_idempotency_record` stores the tenant, route, idempotency key, semantic-command digest, committed resource identity, and transaction time in the same transaction as the authoritative HRIS fact and governed audit/outbox pair. A transaction-scoped advisory lock serializes concurrent requests for the exact tenant/route/key. A same-key same-command replay returns the first committed identity without repeating Person, Employment, candidate-worker conversion, audit, or outbox writes; a changed command under the same key fails closed. A rolled-back command leaves no successful replay marker. The idempotency relation is tenant-RLS isolated and append-only, including TRUNCATE protection.
 
 A caller-controlled purpose value cannot substitute for a missing token scope. The OpenAPI contract is executable input to generated gateway and server validation; an implementation that accepts a request outside its published contract fails CI.
+
+The Organization hierarchy application function is an internal database command boundary, not a substitute for gateway authentication. Its RLS policy and explicit tenant-context match rely on the existing trusted application-boundary contract: the authenticated handler supplies the tenant context, while database roles remain separately privilege-scoped. The function additionally requires the review packet's exact fixed states, JSON types, null-safe field values, and controlled `next_action`, and binds the reviewed columns to the immutable application row before the bitemporal successor is written.
 
 Internal traces remain in restricted telemetry. Customer-facing failures return a bounded `error_code`, actionable `message`, `next_action`, and random `support_reference`; the support lookup is access-controlled and retention-bound.
 
