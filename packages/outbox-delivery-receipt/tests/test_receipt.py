@@ -228,3 +228,17 @@ def test_evidence_is_structurally_immutable_after_construction() -> None:
     evidence = build_external_delivery_receipt_evidence(**_kwargs())
     with pytest.raises(AttributeError):
         object.__setattr__(evidence, "delivery_attempt_count", 99)
+
+
+def test_copy_bypass_cannot_create_a_second_canonical_truth() -> None:
+    evidence = build_external_delivery_receipt_evidence(**_kwargs())
+
+    replaced = evidence._replace(trust_state="trusted_transport_evidence")
+    with pytest.raises(ValueError, match="trust_state"):
+        replaced.canonical_json()
+
+    raw_values = list(evidence)
+    raw_values[11] = True
+    reconstructed = tuple.__new__(ExternalDeliveryReceiptEvidence, tuple(raw_values))
+    with pytest.raises(ValueError, match="contains_hr_payload"):
+        reconstructed.sha256_digest()

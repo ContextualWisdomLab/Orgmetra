@@ -10,6 +10,7 @@ on:
       - ".github/workflows/outbox-delivery-receipt-quality.yml"
       - "docs/adr/0151-governed-external-delivery-receipt.md"
       - "docs/traceability/outbox-delivery-receipt.md"
+      - "docs/doctoring/outbox-delivery-receipt-references.md"
   workflow_dispatch:
 
 permissions:
