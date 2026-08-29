@@ -8,6 +8,7 @@ visibility before any authorized values are returned.
 
 from __future__ import annotations
 
+from collections import namedtuple
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Protocol, runtime_checkable
@@ -43,9 +44,27 @@ def _validate_utc_instant(field_name: str, value: object) -> None:
         raise ValueError(f"{field_name} must be a timezone-aware UTC datetime.")
 
 
-@dataclass(frozen=True, slots=True)
-class EmploymentHistoryRecord:
-    """One Employment version visible at a caller-selected system-time cutoff."""
+_EmploymentHistoryRecordTuple = namedtuple(
+    "_EmploymentHistoryRecordTuple",
+    (
+        "tenant_record_id",
+        "person_record_id",
+        "employment_record_id",
+        "employment_record_version_id",
+        "employment_status_code",
+        "employment_concurrency_code",
+        "effective_from",
+        "effective_to",
+        "recorded_from",
+        "recorded_to",
+    ),
+)
+
+
+class EmploymentHistoryRecord(_EmploymentHistoryRecordTuple):
+    """One structurally immutable Employment version at a system-time cutoff."""
+
+    __slots__ = ()
 
     tenant_record_id: UUID
     person_record_id: UUID
@@ -58,9 +77,36 @@ class EmploymentHistoryRecord:
     recorded_from: datetime
     recorded_to: datetime | None
 
-    def __post_init__(self) -> None:
-        """Reject malformed identity, code, business-time, and system-time evidence."""
-        self.assert_runtime_integrity()
+    def __new__(
+        cls,
+        *,
+        tenant_record_id: UUID,
+        person_record_id: UUID,
+        employment_record_id: UUID,
+        employment_record_version_id: UUID,
+        employment_status_code: str,
+        employment_concurrency_code: str,
+        effective_from: date,
+        effective_to: date | None,
+        recorded_from: datetime,
+        recorded_to: datetime | None,
+    ) -> EmploymentHistoryRecord:
+        """Build one validated row whose tuple storage cannot be rewritten in place."""
+        instance = super().__new__(
+            cls,
+            tenant_record_id,
+            person_record_id,
+            employment_record_id,
+            employment_record_version_id,
+            employment_status_code,
+            employment_concurrency_code,
+            effective_from,
+            effective_to,
+            recorded_from,
+            recorded_to,
+        )
+        instance.assert_runtime_integrity()
+        return instance
 
     def assert_runtime_integrity(self) -> None:
         """Revalidate a row after it crosses the untrusted persistence boundary."""
@@ -166,7 +212,7 @@ def _reject_effective_overlap(records: list[EmploymentHistoryRecord]) -> None:
 
 
 def _capture_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHistoryRecord:
-    """Copy and validate one pass over a persistence-owned Employment row."""
+    """Reconstruct and validate one persistence-owned Employment row."""
     return EmploymentHistoryRecord(
         tenant_record_id=record.tenant_record_id,
         person_record_id=record.person_record_id,
@@ -182,25 +228,17 @@ def _capture_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHi
 
 
 def _snapshot_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHistoryRecord:
-    """Detach one stable validated row from an untrusted persistence-owned alias.
+    """Detach and revalidate structurally immutable persistence evidence.
 
-    ``frozen=True`` prevents ordinary assignment but is not an ownership boundary:
-    code retaining the returned row can still invoke ``object.__setattr__``. Two
-    consecutive validated captures must therefore agree before the second,
-    service-owned object is trusted. A mutation that crosses the capture window
-    fails closed instead of silently authorizing a torn mix of row states.
+    ``EmploymentHistoryRecord`` stores its fields in immutable tuple storage, so a
+    persistence adapter retaining the returned object cannot rewrite that alias in
+    place through ``object.__setattr__``. Reconstruction is still mandatory because
+    low-level tuple construction can bypass the public validating constructor.
 
-    This guard detects in-process source changes across the two captures; it is not
-    a substitute for a transactional database snapshot or the persistence layer's
-    own concurrency controls.
+    This in-process integrity boundary does not replace a transactional database
+    snapshot, MVCC, locking, or the persistence layer's own concurrency controls.
     """
-    first_capture = _capture_persistence_record(record)
-    second_capture = _capture_persistence_record(record)
-    if first_capture != second_capture:
-        raise EmploymentHistoryIntegrityError(
-            "Employment-history row changed while being snapshotted"
-        )
-    return second_capture
+    return _capture_persistence_record(record)
 
 
 def read_employment_history(
