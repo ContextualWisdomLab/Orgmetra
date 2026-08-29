@@ -32,8 +32,8 @@ _NEXT_ACTION = (
 
 
 def _validate_operational_uuid(value: object, field_name: str) -> str:
-    """Return canonical operational UUID text or fail closed."""
-    if not isinstance(value, str):
+    """Return canonical built-in UUID text or fail closed."""
+    if type(value) is not str:
         raise ValueError(f"{field_name} must be canonical UUID text")
     try:
         parsed = UUID(value)
@@ -45,8 +45,8 @@ def _validate_operational_uuid(value: object, field_name: str) -> str:
 
 
 def _validate_code(value: object, field_name: str) -> str:
-    """Return a bounded descriptive two-or-more-word lower snake_case code."""
-    if not isinstance(value, str) or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
+    """Return a bounded built-in two-or-more-word lower snake_case code."""
+    if type(value) is not str or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be bounded two-or-more-word lower snake_case")
     return value
 
@@ -59,9 +59,9 @@ def _validate_positive_int(value: object, field_name: str) -> int:
 
 
 def _validate_receipt_reference(value: object) -> str:
-    """Require an Orgmetra-normalized opaque UUIDv4 receipt reference."""
+    """Require a built-in Orgmetra-normalized opaque UUIDv4 receipt reference."""
     message = "transport_receipt_reference must be an opaque transport_receipt: UUIDv4 reference"
-    if not isinstance(value, str) or len(value) > 160 or not value.startswith(f"{_RECEIPT_PREFIX}:"):
+    if type(value) is not str or len(value) > 160 or not value.startswith(f"{_RECEIPT_PREFIX}:"):
         raise ValueError(message)
     suffix = value.split(":", 1)[1]
     try:
@@ -74,17 +74,41 @@ def _validate_receipt_reference(value: object) -> str:
 
 
 def _validate_digest(value: object) -> str:
-    """Require lowercase SHA-256 evidence for the external receipt artifact."""
-    if not isinstance(value, str) or not _DIGEST_PATTERN.fullmatch(value):
+    """Require built-in lowercase SHA-256 evidence for the external receipt artifact."""
+    if type(value) is not str or not _DIGEST_PATTERN.fullmatch(value):
         raise ValueError("transport_receipt_digest must be lowercase SHA-256 hex")
     return value
 
 
-def _canonical_timestamp(value: object, field_name: str) -> str:
-    """Return precision-preserving UTC RFC 3339 text for an aware datetime."""
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+def _freeze_timestamp(value: object, field_name: str) -> datetime:
+    """Detach caller-owned timezone behavior into one built-in UTC datetime."""
+    if type(value) is not datetime or value.tzinfo is None:
         raise ValueError(f"{field_name} must be timezone-aware")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    try:
+        if value.utcoffset() is None:
+            raise ValueError(f"{field_name} must be timezone-aware")
+        normalized = value.astimezone(timezone.utc)
+    except Exception as exc:
+        if isinstance(exc, ValueError) and str(exc) == f"{field_name} must be timezone-aware":
+            raise
+        raise ValueError(f"{field_name} must be safely normalizable to UTC") from exc
+    return datetime(
+        normalized.year,
+        normalized.month,
+        normalized.day,
+        normalized.hour,
+        normalized.minute,
+        normalized.second,
+        normalized.microsecond,
+        tzinfo=timezone.utc,
+    )
+
+
+def _canonical_timestamp(value: object, field_name: str) -> str:
+    """Return canonical text only for already-frozen built-in UTC evidence."""
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
+        raise ValueError(f"{field_name} must be frozen built-in UTC datetime evidence")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 def _validate_contract(
@@ -122,7 +146,7 @@ def _validate_contract(
         transport_delivered_at, "transport_delivered_at"
     )
     observed_at_utc = _canonical_timestamp(observed_at, "observed_at")
-    if observed_at.astimezone(timezone.utc) < transport_delivered_at.astimezone(timezone.utc):
+    if observed_at < transport_delivered_at:
         raise ValueError("observed_at cannot precede transport_delivered_at")
     _validate_positive_int(evidence_version, "evidence_version")
 
@@ -137,7 +161,7 @@ def _validate_contract(
         "next_action": (next_action, _NEXT_ACTION),
     }
     for field_name, (actual, required) in fixed_values.items():
-        if actual != required:
+        if type(actual) is not type(required) or actual != required:
             raise ValueError(f"{field_name} must remain fixed by the governed receipt contract")
     return transport_delivered_at_utc, observed_at_utc
 
@@ -196,6 +220,10 @@ class ExternalDeliveryReceiptEvidence(_BaseReceipt):
         mutation_authority: str = _MUTATION_AUTHORITY,
         next_action: str = _NEXT_ACTION,
     ) -> "ExternalDeliveryReceiptEvidence":
+        frozen_transport_delivered_at = _freeze_timestamp(
+            transport_delivered_at, "transport_delivered_at"
+        )
+        frozen_observed_at = _freeze_timestamp(observed_at, "observed_at")
         _validate_contract(
             tenant_record_id=tenant_record_id,
             outbox_delivery_record_id=outbox_delivery_record_id,
@@ -205,8 +233,8 @@ class ExternalDeliveryReceiptEvidence(_BaseReceipt):
             transport_provider_code=transport_provider_code,
             transport_receipt_reference=transport_receipt_reference,
             transport_receipt_digest=transport_receipt_digest,
-            transport_delivered_at=transport_delivered_at,
-            observed_at=observed_at,
+            transport_delivered_at=frozen_transport_delivered_at,
+            observed_at=frozen_observed_at,
             evidence_version=evidence_version,
             contains_hr_payload=contains_hr_payload,
             contains_destination=contains_destination,
@@ -228,8 +256,8 @@ class ExternalDeliveryReceiptEvidence(_BaseReceipt):
             transport_provider_code,
             transport_receipt_reference,
             transport_receipt_digest,
-            transport_delivered_at,
-            observed_at,
+            frozen_transport_delivered_at,
+            frozen_observed_at,
             evidence_version,
             contains_hr_payload,
             contains_destination,
@@ -347,7 +375,7 @@ def verify_exact_delivery_attempt(
     delivery_attempt_count: int,
 ) -> str:
     """Fail closed unless receipt evidence matches the exact authoritative attempt scope."""
-    if not isinstance(evidence, ExternalDeliveryReceiptEvidence):
+    if type(evidence) is not ExternalDeliveryReceiptEvidence:
         raise TypeError("evidence must be ExternalDeliveryReceiptEvidence")
 
     expected = (
