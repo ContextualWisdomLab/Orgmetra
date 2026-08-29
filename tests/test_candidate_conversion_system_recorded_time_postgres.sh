@@ -121,7 +121,10 @@ SELECT pg_catalog.jsonb_build_object(
     'source', 'urn:orgmetra:talent_core',
     'specversion', '1.0',
     'subject', 'candidate_worker_conversion_record:${subject_id}',
-    'time', pg_catalog.to_char(pg_catalog.transaction_timestamp() - INTERVAL '3 minutes', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'),
+    'time', pg_catalog.to_char(
+        (pg_catalog.transaction_timestamp() AT TIME ZONE 'UTC') - INTERVAL '3 minutes',
+        'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'
+    ),
     'type', '${event_type}'
 )::text;
 "
