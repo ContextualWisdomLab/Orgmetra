@@ -277,7 +277,7 @@ def build_organization_hierarchy_snapshot(
     Raises:
         IntervalError: The temporal coordinate is not an exact supported date/datetime pair.
         SingleValuedFactError: One unit has contradictory visible versions.
-        OrganizationHierarchyError: Visible parent links contain a cycle or a known foreign-tenant anchor.
+        OrganizationHierarchyError: Visible parent links contain a cycle.
     """
     known_at = _validate_hierarchy_temporal_coordinate(effective_on, known_at)
     return OrganizationHierarchySnapshot(
