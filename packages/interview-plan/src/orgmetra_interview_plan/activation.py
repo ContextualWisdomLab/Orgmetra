@@ -10,7 +10,7 @@ Any failed authoritative check must raise instead of returning verification evid
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import hmac
 import json
@@ -36,6 +36,17 @@ _ACTIVATION_RECEIPT_ISSUANCE_TOKEN = object()
 _PROCESS_ACTIVATION_RECEIPT_SEAL_KEY = secrets.token_bytes(32)
 _ACTIVATION_RECEIPT_SEALS: dict[int, str] = {}
 _ACTIVATION_RECEIPT_SEALS_LOCK = RLock()
+
+
+def _snapshot_utc_datetime(value: datetime, field_name: str) -> datetime:
+    """Detach one caller-owned aware datetime into an immutable built-in UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
+    offset = value.utcoffset()
+    if type(offset) is not timedelta:
+        raise ValueError(f"{field_name} must be an exact timezone-aware datetime")
+    local_naive = value.replace(tzinfo=None)
+    return (local_naive - offset).replace(tzinfo=timezone.utc)
 
 
 def _discard_activation_receipt_seal(receipt_id: int) -> None:
@@ -77,6 +88,7 @@ class StructuredInterviewActivationVerification:
     approving_actor_reference: str
     authority_evidence_reference: str
     authority_evidence_digest: str
+    approved_at: datetime
 
     def __repr__(self) -> str:
         """Return a redacted representation suitable for routine logs and failures."""
@@ -93,7 +105,7 @@ class StructuredInterviewActivationAuthority(Protocol):
         approving_actor_reference: str,
         approved_at: datetime,
     ) -> StructuredInterviewActivationVerification:
-        """Return exact-scope evidence only after reviewing the exact approval instant."""
+        """Return exact-scope evidence bound to the reviewed UTC approval instant."""
 
 
 @dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
@@ -106,7 +118,7 @@ class StructuredInterviewActivationReceipt:
     approving_actor_reference: str
     authority_evidence_reference: str
     authority_evidence_digest: str
-    approved_at: object
+    approved_at: datetime
     purpose_code: str = _PURPOSE_CODE
     reason_code: str = _REASON_CODE
     evidence_version: int = 1
@@ -211,18 +223,21 @@ def activate_structured_interview_plan(
 
     The authority implementation is responsible for the actual tenant-scoped
     re-resolution, relationship/provenance/panel checks, and review of the exact
-    approval instant. This function rejects a non-contract result or evidence bound
-    to a different plan/actor and emits a value-minimized immutable human-approval
-    receipt only for the exact verified scope.
+    approval instant. This function detaches caller/authority-owned runtime values
+    before using them as audit evidence, rejects a non-contract result or evidence
+    bound to a different plan/actor/time, and emits a value-minimized immutable
+    human-approval receipt only for the exact verified scope.
     """
     if type(plan) is not StructuredInterviewPlan:
         raise TypeError("plan must be a StructuredInterviewPlan")
-    _canonical_timestamp(approved_at, "approved_at")
-    if approved_at < plan.generated_at:
-        raise ValueError("approved_at must not precede plan generated_at")
+    approved_at_snapshot = _snapshot_utc_datetime(approved_at, "approved_at")
     _validate_reference(approving_actor_reference, "actor", "approving_actor_reference")
 
     plan_canonical_json = plan.canonical_json()
+    plan_payload = json.loads(plan_canonical_json)
+    plan_generated_at = datetime.fromisoformat(plan_payload["generated_at"].replace("Z", "+00:00"))
+    if approved_at_snapshot < plan_generated_at:
+        raise ValueError("approved_at must not precede plan generated_at")
     plan_digest = sha256(plan_canonical_json.encode("utf-8")).hexdigest()
     plan_tenant_record_id = plan.tenant_record_id
     interview_plan_reference = plan.interview_plan_reference
@@ -230,54 +245,66 @@ def activate_structured_interview_plan(
     verification = authority.verify_activation(
         plan=plan,
         approving_actor_reference=approving_actor_reference,
-        approved_at=approved_at,
+        approved_at=approved_at_snapshot,
     )
     plan.canonical_json()
     if type(verification) is not StructuredInterviewActivationVerification:
         raise TypeError("authority must return StructuredInterviewActivationVerification")
 
-    _validate_operational_uuid(verification.tenant_record_id, "tenant_record_id")
+    verified_tenant_record_id = verification.tenant_record_id
+    verified_interview_plan_reference = verification.interview_plan_reference
+    verified_plan_digest = verification.plan_digest
+    verified_approving_actor_reference = verification.approving_actor_reference
+    verified_authority_evidence_reference = verification.authority_evidence_reference
+    verified_authority_evidence_digest = verification.authority_evidence_digest
+    verified_approved_at = _snapshot_utc_datetime(verification.approved_at, "approved_at")
+
+    _validate_operational_uuid(verified_tenant_record_id, "tenant_record_id")
     _validate_reference(
-        verification.interview_plan_reference,
+        verified_interview_plan_reference,
         "interview_plan",
         "interview_plan_reference",
     )
-    _validate_digest(verification.plan_digest, "plan_digest")
+    _validate_digest(verified_plan_digest, "plan_digest")
     _validate_reference(
-        verification.approving_actor_reference,
+        verified_approving_actor_reference,
         "actor",
         "approving_actor_reference",
     )
     _validate_reference(
-        verification.authority_evidence_reference,
+        verified_authority_evidence_reference,
         "activation_verification",
         "authority_evidence_reference",
     )
-    _validate_digest(verification.authority_evidence_digest, "authority_evidence_digest")
+    _validate_digest(verified_authority_evidence_digest, "authority_evidence_digest")
 
     expected_scope = (
         plan_tenant_record_id,
         interview_plan_reference,
         plan_digest,
         approving_actor_reference,
+        approved_at_snapshot,
     )
     verified_scope = (
-        verification.tenant_record_id,
-        verification.interview_plan_reference,
-        verification.plan_digest,
-        verification.approving_actor_reference,
+        verified_tenant_record_id,
+        verified_interview_plan_reference,
+        verified_plan_digest,
+        verified_approving_actor_reference,
+        verified_approved_at,
     )
     if verified_scope != expected_scope:
-        raise ValueError("activation authority returned evidence for a different plan or actor")
+        raise ValueError(
+            "activation authority returned evidence for a different plan or actor or approval time"
+        )
 
     receipt = StructuredInterviewActivationReceipt(
         tenant_record_id=plan_tenant_record_id,
         interview_plan_reference=interview_plan_reference,
         plan_digest=plan_digest,
         approving_actor_reference=approving_actor_reference,
-        authority_evidence_reference=verification.authority_evidence_reference,
-        authority_evidence_digest=verification.authority_evidence_digest,
-        approved_at=approved_at,
+        authority_evidence_reference=verified_authority_evidence_reference,
+        authority_evidence_digest=verified_authority_evidence_digest,
+        approved_at=approved_at_snapshot,
         _issuance_token=_ACTIVATION_RECEIPT_ISSUANCE_TOKEN,
     )
     object.__setattr__(receipt, "_issuance_token", None)
