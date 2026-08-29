@@ -8,7 +8,7 @@ on:
       - main
     paths:
       - "packages/validity-analysis/**"
-      - "docs/adr/0027-governed-selection-validity-analysis-handoff.md"
+      - "docs/adr/**"
       - "docs/doctoring/validation-analysis-handoff-references.md"
       - "docs/traceability/validation-analysis-handoff.md"
       - ".github/requirements/foundation-test.txt"
