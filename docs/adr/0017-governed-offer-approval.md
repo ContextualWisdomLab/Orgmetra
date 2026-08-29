@@ -10,6 +10,8 @@ Protected `develop` can govern candidate, requisition, selection, and employment
 
 Offer review is high-impact employment workflow. A governance envelope must not become an alternate decision authority, a salary-value cache, or a channel that lets generated/model material masquerade as an approved offer. Different opaque requester/approver references also do not prove that the authoritative actor boundary resolves them to different people, and UUID syntax does not prove that the referenced candidate, requisition, Job/Position, selection decision, compensation package, or offer terms belong to the packet tenant. Packet-owned UUIDv1 references also carry timestamp/node-derived correlation metadata. The authoritative tenant identifier is different: it is issued by Orgmetra core, so this leaf package must accept the canonical non-sentinel operational UUID contract owned by that boundary rather than silently imposing a second version policy.
 
+A frozen Python dataclass alone is not an evidence-integrity boundary: low-level runtime mutation such as `object.__setattr__` can replace an already-validated field with a different valid value after issuance. If canonical JSON is regenerated from that altered object without an issuance binding, the resulting bytes describe evidence that was never issued under the original validation event. Re-running `__post_init__()` after mutation must not be allowed to legitimize that altered packet.
+
 ISO 30405:2023 provides current recruitment guidance across planning, assessment, employment, stakeholder management, and review. EEOC guidance on tests and selection procedures emphasizes job-related use and employer responsibility for selection procedures. Those sources support a conservative evidence-and-human-review boundary; they do not by themselves certify this package or decide the legality of any offer.
 
 ## Decision
@@ -24,11 +26,15 @@ Every packet is fixed to purpose `offer_approval_review`, reviewed reason `selec
 
 `evidence_version` accepts only real integers from `1` through `2147483647`; booleans, text, zero, negative values, and overflow values fail closed. It versions the immutable pre-send evidence envelope and does not itself prove source-version resolution, approval, or delivery.
 
-Canonical JSON and SHA-256 are audit-correlation evidence only. The packet does not approve, communicate, send, execute, persist an offer, or prove authoritative reference/actor identity.
+After all construction-time checks and UTC timestamp detachment succeed, the packet computes a process-local HMAC over the exact canonical JSON and stores that issuance seal in a non-init field. Every later `canonical_json()` or `sha256_digest()` call recomputes the HMAC over the current fields and compares it in constant time with the issuance seal. A changed field, missing seal, or attempted second `__post_init__()` invocation fails closed instead of emitting changed canonical evidence. The random process-local HMAC key intentionally does not cross a process boundary and is not exposed as an externally verifiable signature.
+
+Canonical JSON and SHA-256 are audit-correlation evidence only. The process-local HMAC is runtime mutation defense-in-depth only. Neither mechanism proves that referenced evidence is true, creates a durable signature or attestation, persists an offer, replaces immutable audit/outbox storage, or grants approval/delivery authority. The packet does not approve, communicate, send, execute, persist an offer, or prove authoritative reference/actor identity.
 
 ## Consequences
 
 A buyer can review one deterministic, PII-minimized envelope before an offer moves to the authoritative offer workflow. Compensation values stay in their purpose-bound owner boundary, while Orgmetra keeps exact provenance references, evidence version, and human accountability. Packet-owned UUIDv1/non-v4 references fail closed before serialization without making this leaf package incompatible with authoritative Orgmetra tenant UUIDs. Cross-tenant evidence mixing is fail-closed at the host approval boundary because every packet reference must resolve in the exact tenant. Requester/approver separation is proven only after tenant-scoped authoritative actor resolution. New offer-review reason categories require an explicit contract change and regression evidence rather than accepting arbitrary caller text.
+
+Within one Python process, post-issuance low-level mutation cannot silently produce a new canonical packet: evidence export fails closed, and calling `__post_init__()` again cannot renew the issuance seal. Durable integrity remains an owner-bound persistence concern; hosts must retain canonical bytes/digests and immutable audit/outbox evidence rather than treating the runtime HMAC as a portable signature.
 
 Downstream offer persistence/execution must independently enforce authorization, tenant-scoped source-evidence resolution, idempotency where applicable, and immutable audit/outbox evidence. This ADR remains proposed active-PR truth until integrated into protected `develop`.
 

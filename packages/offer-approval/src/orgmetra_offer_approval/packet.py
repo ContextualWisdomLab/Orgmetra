@@ -8,11 +8,13 @@ assessment scores, and free-form model output remain outside this envelope.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+from hmac import compare_digest, new as hmac_new
 import json
 import re
+from secrets import token_bytes
 from uuid import UUID
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
@@ -33,6 +35,7 @@ _NEXT_ACTION = (
     "provenance before recording accountable human approval through the authoritative offer "
     "workflow and before communicating or executing the offer."
 )
+_RUNTIME_EVIDENCE_KEY = token_bytes(32)
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -113,6 +116,15 @@ def _validate_fixed_text(value: str, expected: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must remain {expected}")
 
 
+def _seal_canonical_json(canonical_json: str) -> bytes:
+    """Bind one issued packet to its exact in-process canonical audit bytes."""
+    return hmac_new(
+        _RUNTIME_EVIDENCE_KEY,
+        canonical_json.encode("utf-8"),
+        sha256,
+    ).digest()
+
+
 @dataclass(frozen=True, slots=True, repr=False)
 class OfferApprovalPacket:
     """Immutable value-free offer review packet awaiting accountable approval."""
@@ -142,6 +154,7 @@ class OfferApprovalPacket:
     review_state: str = _REVIEW_STATE
     delivery_state: str = _DELIVERY_STATE
     next_action: str = _NEXT_ACTION
+    _issuance_seal: bytes = field(init=False, repr=False, compare=False)
 
     def __repr__(self) -> str:
         """Return a representation that never emits candidate or compensation evidence."""
@@ -149,6 +162,8 @@ class OfferApprovalPacket:
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
+        if hasattr(self, "_issuance_seal"):
+            raise ValueError("offer approval evidence cannot be reissued")
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.offer_approval_reference,
@@ -204,9 +219,14 @@ class OfferApprovalPacket:
         _validate_fixed_text(self.delivery_state, _DELIVERY_STATE, "delivery_state")
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed offer-approval instruction")
+        object.__setattr__(
+            self,
+            "_issuance_seal",
+            _seal_canonical_json(self._canonical_json_unchecked()),
+        )
 
-    def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit correlation."""
+    def _canonical_json_unchecked(self) -> str:
+        """Render current fields only after construction-time contract validation."""
         payload = {
             "approver_reference": self.approver_reference,
             "candidate_profile_reference": self.candidate_profile_reference,
@@ -235,6 +255,17 @@ class OfferApprovalPacket:
             "tenant_record_id": self.tenant_record_id,
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    def canonical_json(self) -> str:
+        """Return deterministic canonical JSON only while issued evidence remains intact."""
+        current = self._canonical_json_unchecked()
+        issuance_seal = getattr(self, "_issuance_seal", None)
+        if type(issuance_seal) is not bytes or not compare_digest(
+            issuance_seal,
+            _seal_canonical_json(current),
+        ):
+            raise ValueError("offer approval evidence changed after issuance")
+        return current
 
     def sha256_digest(self) -> str:
         """Return SHA-256 over the exact canonical UTF-8 offer-approval packet."""

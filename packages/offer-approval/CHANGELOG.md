@@ -10,4 +10,5 @@
 - Bind a bounded positive `evidence_version` into canonical JSON and SHA-256 correlation evidence so high-impact offer-review evidence versions are explicit and fail closed.
 - Reject caller-defined string subclasses for tenant/reference/governance evidence before UUID parsing, reference parsing, reviewed comparisons, or canonical audit serialization.
 - Detach `generated_at` into an immutable UTC instant before canonical JSON/SHA-256 generation and normalize timezone-provider, UTC-overflow, and post-construction timezone reinjection failures.
+- Seal exact canonical packet bytes at issuance with a process-local HMAC and fail closed on post-issuance field mutation, seal removal, or attempted `__post_init__()` reissuance; this is runtime mutation defense-in-depth, not a durable signature or persistence boundary.
 - Keep every packet `requires_human_approval` and `not_authorized_to_send`.

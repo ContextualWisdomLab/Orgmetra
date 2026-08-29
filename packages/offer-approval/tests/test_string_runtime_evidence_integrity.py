@@ -122,3 +122,23 @@ def test_rejects_post_issuance_runtime_evidence_mutation() -> None:
     with pytest.raises(ValueError, match="changed after issuance"):
         packet.sha256_digest()
     assert issued_digest != "d" * 64
+
+
+def test_rejects_attempt_to_reseal_mutated_runtime_evidence() -> None:
+    """Calling post-init again must never legitimize altered high-impact evidence."""
+    packet = build_offer_approval_packet(**valid_kwargs())
+    object.__setattr__(packet, "offer_terms_digest", "d" * 64)
+
+    with pytest.raises(ValueError, match="cannot be reissued"):
+        packet.__post_init__()
+    with pytest.raises(ValueError, match="changed after issuance"):
+        packet.canonical_json()
+
+
+def test_rejects_runtime_issuance_seal_removal() -> None:
+    """Deleting the process-local issuance seal must make canonical export fail closed."""
+    packet = build_offer_approval_packet(**valid_kwargs())
+    object.__delattr__(packet, "_issuance_seal")
+
+    with pytest.raises(ValueError, match="changed after issuance"):
+        packet.canonical_json()
