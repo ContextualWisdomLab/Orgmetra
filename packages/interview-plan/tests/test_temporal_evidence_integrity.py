@@ -9,6 +9,7 @@ import pytest
 
 from orgmetra_interview_plan import (
     StructuredInterviewActivationReceipt,
+    activate_structured_interview_plan,
     build_structured_interview_plan,
 )
 
@@ -43,6 +44,14 @@ class MutableOffsetTimezone(tzinfo):
     def tzname(self, value):  # type: ignore[no-untyped-def]
         """Return a stable diagnostic name for the mutable test timezone."""
         return "MutableOffsetTimezone"
+
+
+class RejectUnexpectedAuthorityCall:
+    """Fail if activation reaches authority work after invalid time evidence."""
+
+    def verify_activation(self, **kwargs):  # type: ignore[no-untyped-def]
+        """Prove invalid approval-time normalization fails before authority work."""
+        raise AssertionError("authority must not run for out-of-range approval time")
 
 
 def valid_kwargs() -> dict[str, object]:
@@ -96,6 +105,28 @@ def test_plan_detaches_mutable_generated_at_timezone_before_sealing() -> None:
     assert candidate_plan.generated_at.tzinfo is timezone.utc
     assert candidate_plan.generated_at == datetime(2026, 8, 21, 4, 30, 0, 123456, tzinfo=timezone.utc)
     assert json.loads(candidate_plan.canonical_json())["generated_at"] == "2026-08-21T04:30:00.123456Z"
+
+
+def test_plan_rejects_utc_normalization_beyond_datetime_min_as_validation_error() -> None:
+    """Out-of-range UTC conversion must fail as governed plan validation, not OverflowError."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime.min.replace(tzinfo=timezone(timedelta(hours=1)))
+
+    with pytest.raises(ValueError, match="generated_at must be an exact timezone-aware datetime"):
+        build_structured_interview_plan(**kwargs)
+
+
+def test_activation_rejects_utc_normalization_beyond_datetime_max_before_authority() -> None:
+    """Out-of-range approval UTC conversion must fail before authoritative side effects."""
+    candidate_plan = build_structured_interview_plan(**valid_kwargs())
+
+    with pytest.raises(ValueError, match="approved_at must be an exact timezone-aware datetime"):
+        activate_structured_interview_plan(
+            plan=candidate_plan,
+            authority=RejectUnexpectedAuthorityCall(),
+            approving_actor_reference="actor:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            approved_at=datetime.max.replace(tzinfo=timezone(-timedelta(hours=1))),
+        )
 
 
 def test_activation_receipt_names_approved_at_when_recorded_time_is_invalid() -> None:
