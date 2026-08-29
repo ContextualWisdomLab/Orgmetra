@@ -9,4 +9,5 @@
 - Close `reason_code` to the reviewed value-free `selected_candidate_offer_review` contract so arbitrary candidate, compensation, or offer-term text cannot enter canonical evidence.
 - Bind a bounded positive `evidence_version` into canonical JSON and SHA-256 correlation evidence so high-impact offer-review evidence versions are explicit and fail closed.
 - Reject caller-defined string subclasses for tenant/reference/governance evidence before UUID parsing, reference parsing, reviewed comparisons, or canonical audit serialization.
+- Detach `generated_at` into an immutable UTC instant before canonical JSON/SHA-256 generation and normalize timezone-provider, UTC-overflow, and post-construction timezone reinjection failures.
 - Keep every packet `requires_human_approval` and `not_authorized_to_send`.

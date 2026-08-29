@@ -9,7 +9,7 @@ assessment scores, and free-form model output remain outside this envelope.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
@@ -78,11 +78,27 @@ def _validate_digest(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
-def _canonical_timestamp(value: datetime) -> str:
-    """Render an exact built-in aware instant as precision-preserving UTC RFC 3339 text."""
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+def _freeze_timestamp(value: datetime) -> datetime:
+    """Detach caller-controlled timezone behavior and store one immutable UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
         raise ValueError("generated_at must be an exact timezone-aware datetime")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
+    if type(offset) is not timedelta:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    try:
+        return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
+
+
+def _canonical_timestamp(value: datetime) -> str:
+    """Render only a previously detached built-in UTC instant as RFC 3339 text."""
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 def _validate_evidence_version(value: int) -> None:
@@ -175,7 +191,7 @@ class OfferApprovalPacket:
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive offer reason")
-        _canonical_timestamp(self.generated_at)
+        object.__setattr__(self, "generated_at", _freeze_timestamp(self.generated_at))
         _validate_evidence_version(self.evidence_version)
         if self.contains_candidate_pii is not False:
             raise ValueError("offer approval packet must not contain candidate PII")

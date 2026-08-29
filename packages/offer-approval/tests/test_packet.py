@@ -290,6 +290,38 @@ class NullOffsetTz(tzinfo):
         return "NULL"
 
 
+class ExplodingOffsetTz(tzinfo):
+    """Raise provider behavior so the timestamp boundary's normalization is exercised."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Raise an arbitrary provider failure."""
+        del dt
+        raise RuntimeError("provider details must not escape")
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Return a fixed daylight-saving offset if queried."""
+        del dt
+        return timedelta(0)
+
+
+class MutableOffsetTz(tzinfo):
+    """Provide timezone state that can change after packet construction."""
+
+    def __init__(self) -> None:
+        """Start with a UTC-equivalent offset."""
+        self.offset = timedelta(0)
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Return the current caller-controlled offset."""
+        del dt
+        return self.offset
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        """Keep daylight saving fixed while testing offset detachment."""
+        del dt
+        return timedelta(0)
+
+
 @pytest.mark.parametrize(
     "value",
     [
@@ -297,12 +329,28 @@ class NullOffsetTz(tzinfo):
         "2026-08-19T05:10:00Z",
         1,
         datetime(2026, 8, 19, 5, 10).replace(tzinfo=NullOffsetTz()),
+        datetime(2026, 8, 19, 5, 10).replace(tzinfo=ExplodingOffsetTz()),
     ],
 )
 def test_rejects_nonaware_generation_time(value: object) -> None:
     kwargs = valid_kwargs()
     kwargs["generated_at"] = value
     with pytest.raises(ValueError, match="timezone-aware"):
+        build_offer_approval_packet(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        datetime.min.replace(tzinfo=timezone(timedelta(hours=1))),
+        datetime.max.replace(tzinfo=timezone(-timedelta(hours=1))),
+    ],
+)
+def test_rejects_unrepresentable_utc_generation_time(value: datetime) -> None:
+    """Normalize out-of-range UTC conversion into the packet's boundary error."""
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = value
+    with pytest.raises(ValueError, match="generated_at"):
         build_offer_approval_packet(**kwargs)
 
 
@@ -358,3 +406,31 @@ def test_timezone_is_normalized_without_losing_precision() -> None:
 
     payload = json.loads(packet.canonical_json())
     assert payload["generated_at"] == "2026-08-19T05:10:00.654321Z"
+
+
+def test_timezone_state_is_detached_before_canonical_evidence() -> None:
+    """Keep canonical offer evidence stable after caller-owned timezone state mutates."""
+    zone = MutableOffsetTz()
+    kwargs = valid_kwargs()
+    kwargs["generated_at"] = datetime(2026, 8, 19, 5, 10, tzinfo=zone)
+    packet = build_offer_approval_packet(**kwargs)
+    first_json = packet.canonical_json()
+    first_digest = packet.sha256_digest()
+
+    zone.offset = timedelta(hours=9)
+
+    assert packet.generated_at.tzinfo is timezone.utc
+    assert packet.canonical_json() == first_json
+    assert packet.sha256_digest() == first_digest
+
+
+def test_canonicalization_rejects_reinjected_non_utc_timezone() -> None:
+    """Reject low-level reinjection that would bypass detached UTC evidence."""
+    packet = build_valid()
+    object.__setattr__(
+        packet,
+        "generated_at",
+        datetime(2026, 8, 19, 14, 10, tzinfo=timezone(timedelta(hours=9))),
+    )
+    with pytest.raises(ValueError, match="generated_at"):
+        packet.canonical_json()
