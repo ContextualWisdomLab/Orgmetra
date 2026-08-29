@@ -10,7 +10,7 @@ verification evidence.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import hmac
@@ -33,6 +33,7 @@ _PURPOSE_CODE = "structured_interview_activation"
 _REASON_CODE = "human_approved_plan_activation"
 _ACTIVATION_STATE = "approved_for_use"
 _MAX_EVIDENCE_VERSION = 2_147_483_647
+# Legacy private sentinel retained only so regression proves it confers no issuance authority.
 _ACTIVATION_RECEIPT_ISSUANCE_TOKEN = object()
 _PROCESS_ACTIVATION_RECEIPT_SEAL_KEY = secrets.token_bytes(32)
 _ACTIVATION_RECEIPT_SEALS: dict[int, str] = {}
@@ -122,7 +123,7 @@ class StructuredInterviewActivationAuthority(Protocol):
 
 @dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class StructuredInterviewActivationReceipt:
-    """Immutable evidence that an accountable human activated one exact reviewed plan."""
+    """Value-minimized activation receipt whose trusted export requires factory issuance."""
 
     tenant_record_id: str
     interview_plan_reference: str
@@ -136,10 +137,9 @@ class StructuredInterviewActivationReceipt:
     evidence_version: int = 1
     human_confirmation: bool = True
     activation_state: str = _ACTIVATION_STATE
-    _issuance_token: object = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        """Reject forged, ambiguous, weakened, or non-authoritatively issued evidence."""
+        """Reject forged, ambiguous, or weakened receipt values before possible issuance."""
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.interview_plan_reference,
@@ -171,15 +171,6 @@ class StructuredInterviewActivationReceipt:
             raise ValueError("human confirmation is mandatory for interview-plan activation")
         if self.activation_state != _ACTIVATION_STATE:
             raise ValueError("activation_state must remain approved_for_use")
-        if self._issuance_token is not _ACTIVATION_RECEIPT_ISSUANCE_TOKEN:
-            raise TypeError(
-                "StructuredInterviewActivationReceipt can only be issued by "
-                "activate_structured_interview_plan"
-            )
-        _register_activation_receipt_seal(
-            self,
-            _seal_activation_receipt(self._canonical_json_unchecked()),
-        )
 
     def __repr__(self) -> str:
         """Return a redacted representation suitable for routine logs."""
@@ -204,7 +195,7 @@ class StructuredInterviewActivationReceipt:
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
     def canonical_json(self) -> str:
-        """Return creation-bound canonical JSON for immutable audit correlation."""
+        """Return factory-issued canonical JSON for immutable audit correlation."""
         canonical = self._canonical_json_unchecked()
         authoritative_seal = _authoritative_activation_receipt_seal(self)
         if (
@@ -220,7 +211,7 @@ class StructuredInterviewActivationReceipt:
         return canonical
 
     def sha256_digest(self) -> str:
-        """Return SHA-256 over the exact creation-bound activation receipt."""
+        """Return SHA-256 over the exact factory-issued activation receipt."""
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
@@ -238,7 +229,8 @@ def activate_structured_interview_plan(
     It receives only detached creation-bound canonical plan bytes plus their digest,
     never the caller's live plan object. Authority results are runtime-immutable tuple
     evidence; this function validates those exact values and emits a value-minimized
-    human-approval receipt only for the exact verified scope.
+    human-approval receipt only for the exact verified scope. Process-local issuance
+    evidence is registered only after all authoritative checks and scope matching pass.
     """
     if type(plan) is not StructuredInterviewPlan:
         raise TypeError("plan must be a StructuredInterviewPlan")
@@ -321,7 +313,9 @@ def activate_structured_interview_plan(
         authority_evidence_reference=verified_authority_evidence_reference,
         authority_evidence_digest=verified_authority_evidence_digest,
         approved_at=approved_at_snapshot,
-        _issuance_token=_ACTIVATION_RECEIPT_ISSUANCE_TOKEN,
     )
-    object.__setattr__(receipt, "_issuance_token", None)
+    _register_activation_receipt_seal(
+        receipt,
+        _seal_activation_receipt(receipt._canonical_json_unchecked()),
+    )
     return receipt
