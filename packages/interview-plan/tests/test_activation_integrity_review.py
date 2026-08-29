@@ -1,14 +1,11 @@
 """Regressions for current-head structured-interview activation integrity findings."""
 
-from dataclasses import fields
 from datetime import datetime, timedelta, timezone, tzinfo
 from hashlib import sha256
-from threading import Event, Thread
 import json
 
 import pytest
 
-import orgmetra_interview_plan.activation as activation_module
 from orgmetra_interview_plan import (
     StructuredInterviewActivationVerification,
     activate_structured_interview_plan,
@@ -25,7 +22,6 @@ from test_activation import (
 )
 
 ALTERNATE_AUTHORITY_EVIDENCE = "activation_verification:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
-ALTERNATE_AUTHORITY_DIGEST = "f" * 64
 
 
 class MutableOffsetTimezone(tzinfo):
@@ -71,15 +67,23 @@ class ApprovalTimeMutatingAuthority:
         """Keep the caller timezone so authority work can mutate it deterministically."""
         self.source_timezone = source_timezone
 
-    def verify_activation(self, *, plan, approving_actor_reference, approved_at):
+    def verify_activation(
+        self,
+        *,
+        plan_canonical_json,
+        plan_digest,
+        approving_actor_reference,
+        approved_at,
+    ):
         """Require immutable built-in UTC evidence, then mutate the caller timezone."""
         assert approved_at.tzinfo is timezone.utc
         assert approved_at == APPROVED_AT
         self.source_timezone.offset_hours = 2
+        payload = json.loads(plan_canonical_json)
         return StructuredInterviewActivationVerification(
-            tenant_record_id=plan.tenant_record_id,
-            interview_plan_reference=plan.interview_plan_reference,
-            plan_digest=plan.sha256_digest(),
+            tenant_record_id=payload["tenant_record_id"],
+            interview_plan_reference=payload["interview_plan_reference"],
+            plan_digest=plan_digest,
             approving_actor_reference=approving_actor_reference,
             authority_evidence_reference=AUTHORITY_EVIDENCE,
             authority_evidence_digest=DIGEST_E,
@@ -171,45 +175,6 @@ def test_activation_freezes_mutable_timezone_before_authority_and_receipt():
     assert receipt.approved_at == APPROVED_AT
 
 
-def test_verification_mutation_after_validation_cannot_rewrite_receipt(monkeypatch):
-    """Receipt construction must use one detached verification snapshot after authority return."""
-    candidate_plan = plan()
-    verification = verification_for(candidate_plan)
-    validation_finished = Event()
-    mutation_finished = Event()
-    original_validate_digest = activation_module._validate_digest
-
-    def synchronized_validate_digest(value, field_name):
-        """Pause after evidence-digest validation so a retained authority alias can mutate."""
-        original_validate_digest(value, field_name)
-        if field_name == "authority_evidence_digest":
-            validation_finished.set()
-            assert mutation_finished.wait(timeout=2)
-
-    def mutate_retained_verification():
-        """Rewrite valid authority evidence only after the activation boundary validated it."""
-        assert validation_finished.wait(timeout=2)
-        object.__setattr__(verification, "authority_evidence_reference", ALTERNATE_AUTHORITY_EVIDENCE)
-        object.__setattr__(verification, "authority_evidence_digest", ALTERNATE_AUTHORITY_DIGEST)
-        mutation_finished.set()
-
-    monkeypatch.setattr(activation_module, "_validate_digest", synchronized_validate_digest)
-    mutator = Thread(target=mutate_retained_verification, daemon=True)
-    mutator.start()
-    receipt = activate_structured_interview_plan(
-        plan=candidate_plan,
-        authority=AllowingAuthority(verification),
-        approving_actor_reference=APPROVER,
-        approved_at=APPROVED_AT,
-    )
-    mutator.join(timeout=2)
-    assert not mutator.is_alive()
-
-    payload = json.loads(receipt.canonical_json())
-    assert payload["authority_evidence_reference"] == AUTHORITY_EVIDENCE
-    assert payload["authority_evidence_digest"] == DIGEST_E
-
-
 def test_activation_authority_receives_detached_creation_bound_plan_evidence():
     """Do not expose a live plan that can be changed and restored while authority work runs."""
     candidate_plan = plan()
@@ -244,7 +209,7 @@ def test_verification_contract_cannot_be_rewritten_with_object_setattr():
 
 def test_verification_contract_explicitly_binds_reviewed_approval_time():
     """Authority verification must expose the exact approval instant it attests."""
-    field_names = {field.name for field in fields(StructuredInterviewActivationVerification)}
+    field_names = set(StructuredInterviewActivationVerification._fields)
 
     assert "approved_at" in field_names
 

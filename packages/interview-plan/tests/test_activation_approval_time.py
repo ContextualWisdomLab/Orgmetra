@@ -1,6 +1,7 @@
 """Regression for authoritative structured-interview approval-time binding."""
 
 from datetime import datetime, timezone
+import json
 
 from orgmetra_interview_plan import (
     StructuredInterviewActivationVerification,
@@ -48,17 +49,25 @@ class TimestampRecordingAuthority:
     """Require the candidate approval instant to cross the authoritative boundary."""
 
     def __init__(self, candidate_plan) -> None:
-        """Capture the plan and initialize the authoritative-call audit list."""
+        """Keep the expected plan only for test-side correlation and initialize calls."""
         self.candidate_plan = candidate_plan
         self.calls = []
 
-    def verify_activation(self, *, plan, approving_actor_reference, approved_at):
-        """Record and attest the exact approval instant before returning evidence."""
-        self.calls.append((plan, approving_actor_reference, approved_at))
+    def verify_activation(
+        self,
+        *,
+        plan_canonical_json,
+        plan_digest,
+        approving_actor_reference,
+        approved_at,
+    ):
+        """Record and attest detached plan evidence plus the exact approval instant."""
+        payload = json.loads(plan_canonical_json)
+        self.calls.append((plan_canonical_json, plan_digest, approving_actor_reference, approved_at))
         return StructuredInterviewActivationVerification(
-            tenant_record_id=plan.tenant_record_id,
-            interview_plan_reference=plan.interview_plan_reference,
-            plan_digest=plan.sha256_digest(),
+            tenant_record_id=payload["tenant_record_id"],
+            interview_plan_reference=payload["interview_plan_reference"],
+            plan_digest=plan_digest,
             approving_actor_reference=approving_actor_reference,
             authority_evidence_reference=AUTHORITY_EVIDENCE,
             authority_evidence_digest="e" * 64,
@@ -78,5 +87,10 @@ def test_activation_sends_approval_time_through_authoritative_verification():
         approved_at=APPROVED_AT,
     )
 
-    assert authority.calls == [(candidate_plan, APPROVER, APPROVED_AT)]
+    assert len(authority.calls) == 1
+    plan_canonical_json, plan_digest, actor_reference, approved_at = authority.calls[0]
+    assert json.loads(plan_canonical_json)["interview_plan_reference"] == INTERVIEW_PLAN
+    assert plan_digest == candidate_plan.sha256_digest()
+    assert actor_reference == APPROVER
+    assert approved_at == APPROVED_AT
     assert "2026-08-21T05:00:00.123456Z" in receipt.canonical_json()

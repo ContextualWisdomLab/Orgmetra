@@ -1,11 +1,12 @@
 """Executable human-approval boundary for governed structured-interview plans.
 
 The authority adapter is owned by the Orgmetra host. It MUST return verification
-only after re-resolving the plan inside the exact tenant, proving the
-requisition-to-Job-to-job-analysis binding, verifying question/mapping/rating
-provenance, resolving distinct panel actors, confirming panel eligibility and
-training, and reviewing the exact approval instant carried into the receipt.
-Any failed authoritative check must raise instead of returning verification evidence.
+only after re-resolving detached creation-bound plan evidence inside the exact
+tenant, proving the requisition-to-Job-to-job-analysis binding, verifying
+question/mapping/rating provenance, resolving distinct panel actors, confirming
+panel eligibility and training, and reviewing the exact approval instant carried
+into the receipt. Any failed authoritative check must raise instead of returning
+verification evidence.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ import hmac
 import json
 import secrets
 from threading import RLock
-from typing import Protocol
+from typing import NamedTuple, Protocol
 from weakref import finalize
 
 from .plan import (
@@ -78,9 +79,8 @@ def _seal_activation_receipt(payload_json: str) -> str:
     ).hexdigest()
 
 
-@dataclass(frozen=True, slots=True, repr=False)
-class StructuredInterviewActivationVerification:
-    """Authoritative host evidence returned only after all activation checks pass."""
+class StructuredInterviewActivationVerification(NamedTuple):
+    """Runtime-immutable authoritative host evidence returned after activation checks pass."""
 
     tenant_record_id: str
     interview_plan_reference: str
@@ -101,11 +101,12 @@ class StructuredInterviewActivationAuthority(Protocol):
     def verify_activation(
         self,
         *,
-        plan: StructuredInterviewPlan,
+        plan_canonical_json: str,
+        plan_digest: str,
         approving_actor_reference: str,
         approved_at: datetime,
     ) -> StructuredInterviewActivationVerification:
-        """Return exact-scope evidence bound to the reviewed UTC approval instant."""
+        """Verify detached creation-bound plan bytes and return exact-scope evidence."""
 
 
 @dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
@@ -221,11 +222,11 @@ def activate_structured_interview_plan(
 ) -> StructuredInterviewActivationReceipt:
     """Activate one exact plan only after authoritative host verification succeeds.
 
-    The authority implementation is responsible for the actual tenant-scoped
-    re-resolution, relationship/provenance/panel checks, and review of the exact
-    approval instant. This function detaches caller/authority-owned runtime values
-    before using them as audit evidence, rejects a non-contract result or evidence
-    bound to a different plan/actor/time, and emits a value-minimized immutable
+    The authority implementation is responsible for tenant-scoped re-resolution,
+    relationship/provenance/panel checks, and review of the exact approval instant.
+    It receives only detached creation-bound canonical plan bytes plus their digest,
+    never the caller's live plan object. Authority results are runtime-immutable tuple
+    evidence; this function validates those exact values and emits a value-minimized
     human-approval receipt only for the exact verified scope.
     """
     if type(plan) is not StructuredInterviewPlan:
@@ -239,11 +240,12 @@ def activate_structured_interview_plan(
     if approved_at_snapshot < plan_generated_at:
         raise ValueError("approved_at must not precede plan generated_at")
     plan_digest = sha256(plan_canonical_json.encode("utf-8")).hexdigest()
-    plan_tenant_record_id = plan.tenant_record_id
-    interview_plan_reference = plan.interview_plan_reference
+    plan_tenant_record_id = plan_payload["tenant_record_id"]
+    interview_plan_reference = plan_payload["interview_plan_reference"]
 
     verification = authority.verify_activation(
-        plan=plan,
+        plan_canonical_json=plan_canonical_json,
+        plan_digest=plan_digest,
         approving_actor_reference=approving_actor_reference,
         approved_at=approved_at_snapshot,
     )
@@ -251,13 +253,16 @@ def activate_structured_interview_plan(
     if type(verification) is not StructuredInterviewActivationVerification:
         raise TypeError("authority must return StructuredInterviewActivationVerification")
 
-    verified_tenant_record_id = verification.tenant_record_id
-    verified_interview_plan_reference = verification.interview_plan_reference
-    verified_plan_digest = verification.plan_digest
-    verified_approving_actor_reference = verification.approving_actor_reference
-    verified_authority_evidence_reference = verification.authority_evidence_reference
-    verified_authority_evidence_digest = verification.authority_evidence_digest
-    verified_approved_at = _snapshot_utc_datetime(verification.approved_at, "approved_at")
+    (
+        verified_tenant_record_id,
+        verified_interview_plan_reference,
+        verified_plan_digest,
+        verified_approving_actor_reference,
+        verified_authority_evidence_reference,
+        verified_authority_evidence_digest,
+        verification_approved_at,
+    ) = verification
+    verified_approved_at = _snapshot_utc_datetime(verification_approved_at, "approved_at")
 
     _validate_operational_uuid(verified_tenant_record_id, "tenant_record_id")
     _validate_reference(
