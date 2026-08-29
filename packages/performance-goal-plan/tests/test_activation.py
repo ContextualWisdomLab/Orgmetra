@@ -3,11 +3,13 @@
 from copy import copy
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 import json
 from uuid import uuid4
 
 import pytest
 
+import orgmetra_performance_goal_plan.activation as activation_module
 from orgmetra_performance_goal_plan import (
     PerformanceGoalPlanActivationReceipt,
     PerformanceGoalPlanActivationVerification,
@@ -299,6 +301,21 @@ def issued_receipt() -> PerformanceGoalPlanActivationReceipt:
         approved_at=datetime(2026, 8, 23, 1, 1, tzinfo=timezone.utc),
         authority=Authority(item),
     )
+
+
+def test_issued_receipt_remains_readable_after_clock_rollback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A sealed receipt remains readable when the admission wall clock moves backward."""
+    receipt = issued_receipt()
+    monkeypatch.setattr(
+        activation_module,
+        "_current_utc_time",
+        lambda: datetime(2020, 1, 1, tzinfo=timezone.utc),
+    )
+    canonical = receipt.canonical_json()
+    assert json.loads(canonical)["activated_at"] == "2026-08-23T01:02:00Z"
+    assert receipt.sha256_digest() == sha256(canonical.encode()).hexdigest()
 
 
 def receipt_values() -> dict[str, object]:

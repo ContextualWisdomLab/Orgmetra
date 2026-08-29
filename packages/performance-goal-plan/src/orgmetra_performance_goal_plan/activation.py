@@ -34,12 +34,22 @@ _RECEIPT_SEALS_LOCK = RLock()
 _TIMEZONE_TYPE = type(timezone.utc)
 
 
-def _freeze_timestamp(value: object, field_name: str) -> datetime:
-    """Require a non-future exact datetime with built-in fixed offset in UTC."""
+def _validate_sealed_timestamp(value: object, field_name: str) -> datetime:
+    """Normalize one exact sealed timestamp without consulting the wall clock."""
     if type(value) is not datetime or type(value.tzinfo) is not _TIMEZONE_TYPE:
         raise ValueError(f"{field_name} must use an exact built-in fixed-offset datetime")
-    frozen = value.astimezone(timezone.utc)
-    if frozen > datetime.now(timezone.utc):
+    return value.astimezone(timezone.utc)
+
+
+def _current_utc_time() -> datetime:
+    """Return the current UTC wall-clock time for admission checks."""
+    return datetime.now(timezone.utc)
+
+
+def _freeze_timestamp(value: object, field_name: str) -> datetime:
+    """Require a non-future exact datetime with built-in fixed offset in UTC."""
+    frozen = _validate_sealed_timestamp(value, field_name)
+    if frozen > _current_utc_time():
         raise ValueError(f"{field_name} must not be in the future")
     return frozen
 
@@ -233,8 +243,8 @@ def _receipt_payload(receipt: PerformanceGoalPlanActivationReceipt) -> dict[str,
         "performance_goal_plan_reference": receipt.performance_goal_plan_reference,
         "plan_digest": receipt.plan_digest,
         "approving_actor_reference": receipt.approving_actor_reference,
-        "approved_at": _freeze_timestamp(receipt.approved_at, "approved_at"),
-        "activated_at": _freeze_timestamp(receipt.activated_at, "activated_at"),
+        "approved_at": _validate_sealed_timestamp(receipt.approved_at, "approved_at"),
+        "activated_at": _validate_sealed_timestamp(receipt.activated_at, "activated_at"),
         "authority_evidence_reference": receipt.authority_evidence_reference,
         "authority_evidence_digest": receipt.authority_evidence_digest,
         "activation_state": receipt.activation_state,
