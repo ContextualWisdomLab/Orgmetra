@@ -12,4 +12,5 @@
 - Detach `generated_at` into an immutable UTC instant before canonical JSON/SHA-256 generation and normalize timezone-provider, UTC-overflow, and post-construction timezone reinjection failures.
 - Seal exact canonical packet bytes at issuance with a process-local HMAC and live identity registry; fail closed on post-issuance field mutation, seal removal, or attempted `__post_init__()` reissuance even after seal deletion.
 - Preserve the same immutable issuance identity across shallow/deep copy and reject pickle serialization so copied or cross-process objects cannot become renewable evidence identities. This remains runtime defense-in-depth, not a durable signature or persistence boundary.
+- Bind issuance to a one-time live constructor identity and require exact live issued identity before export, so slot-for-slot `object.__new__` clones cannot reuse copied seal bytes or mint replacement evidence.
 - Keep every packet `requires_human_approval` and `not_authorized_to_send`.
