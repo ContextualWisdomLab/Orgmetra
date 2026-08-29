@@ -23,7 +23,7 @@ The governing references are already recorded in `docs/doctoring/REFERENCES.md` 
 9. Existing bitemporal mutation guards remain authoritative. This ADR adds insert-time scope integrity; it does not weaken correction history or row-level tenant isolation.
 10. No additional PII is copied into the scope check. It operates only on opaque record identifiers, status codes, and temporal/job relationships.
 11. Any downstream high-impact employment decision that consumes a performance outcome still requires the separately governed human confirmation, actor, purpose, reason, evidence-version, and immutable audit controls. Passing this scope guard is necessary evidence hygiene, never sufficient authority for a decision.
-12. An observation's system-recorded instant must not precede its `observed_at` instant. The trigger rejects that impossible chronology before it uses the observation's business-time coordinate for any scope lookup.
+12. An observation's system-recorded instant must not precede its `observed_at` instant, and `observed_at` must not be later than the database statement time. The trigger rejects both impossible timestamp orderings without removing support for explicitly backdated historical facts.
 13. Migration `0014_criterion_observation_chronology.sql` applies this chronology guard to databases that already installed migration `0011`; it replaces the function body without dropping or recreating `criterion_observation_scope_guard`.
 
 ## Rejected alternatives

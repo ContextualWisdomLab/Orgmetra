@@ -156,7 +156,13 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    -- A caller may order both supplied timestamps after one another while still
+    -- claiming an event that has not happened at the database's current time.
+    IF NEW.observed_at > statement_timestamp() THEN
+        RAISE EXCEPTION 'criterion observation cannot be observed in the future'
+            USING ERRCODE = '23514';
+    END IF;
+
     RETURN NEW;
 END;
 $$;
-
