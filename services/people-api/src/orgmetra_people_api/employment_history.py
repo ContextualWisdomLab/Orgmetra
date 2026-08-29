@@ -165,15 +165,8 @@ def _reject_effective_overlap(records: list[EmploymentHistoryRecord]) -> None:
         previous_by_employment[record.employment_record_id] = record
 
 
-def _snapshot_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHistoryRecord:
-    """Detach one untrusted persistence-owned row before validation and later use.
-
-    ``frozen=True`` prevents ordinary assignment but is not an ownership boundary:
-    code retaining the returned row can still invoke ``object.__setattr__``.  A
-    service-owned reconstruction binds the primitive values to a new object whose
-    alias is never returned to the persistence adapter.  The constructor validates
-    the resulting snapshot before any authorization-visible value is consumed.
-    """
+def _capture_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHistoryRecord:
+    """Copy and validate one pass over a persistence-owned Employment row."""
     return EmploymentHistoryRecord(
         tenant_record_id=record.tenant_record_id,
         person_record_id=record.person_record_id,
@@ -186,6 +179,28 @@ def _snapshot_persistence_record(record: EmploymentHistoryRecord) -> EmploymentH
         recorded_from=record.recorded_from,
         recorded_to=record.recorded_to,
     )
+
+
+def _snapshot_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHistoryRecord:
+    """Detach one stable validated row from an untrusted persistence-owned alias.
+
+    ``frozen=True`` prevents ordinary assignment but is not an ownership boundary:
+    code retaining the returned row can still invoke ``object.__setattr__``. Two
+    consecutive validated captures must therefore agree before the second,
+    service-owned object is trusted. A mutation that crosses the capture window
+    fails closed instead of silently authorizing a torn mix of row states.
+
+    This guard detects in-process source changes across the two captures; it is not
+    a substitute for a transactional database snapshot or the persistence layer's
+    own concurrency controls.
+    """
+    first_capture = _capture_persistence_record(record)
+    second_capture = _capture_persistence_record(record)
+    if first_capture != second_capture:
+        raise EmploymentHistoryIntegrityError(
+            "Employment-history row changed while being snapshotted"
+        )
+    return second_capture
 
 
 def read_employment_history(
