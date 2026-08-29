@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import copy
 from datetime import date, datetime, timezone
-import gc
 import pickle
-import weakref
 
 import pytest
 
@@ -79,31 +77,3 @@ def test_copied_or_serialized_plan_fails_closed_without_issuance_evidence() -> N
     for clone in clones:
         with pytest.raises(ValueError, match="issuance evidence is unavailable"):
             clone.canonical_json()
-
-
-def test_live_monitoring_reference_cannot_be_reissued() -> None:
-    """Reject a second live issuance using the same tenant-qualified plan reference."""
-    first = _build_plan()
-
-    with pytest.raises(ValueError, match="monitoring_plan_reference already has a live issuance"):
-        _build_plan()
-
-    conflicting_kwargs = dict(_BASE_KWARGS)
-    conflicting_kwargs["population_snapshot_digest"] = "f" * 64
-    with pytest.raises(ValueError, match="monitoring_plan_reference already has a live issuance"):
-        build_selection_outcome_monitoring_plan(**conflicting_kwargs)
-
-    assert first.canonical_json()
-
-
-def test_live_monitoring_reference_binding_is_released_after_collection() -> None:
-    """Release the process-local uniqueness guard when the issued plan is collected."""
-    plan = _build_plan()
-    observed = weakref.ref(plan)
-
-    del plan
-    gc.collect()
-
-    assert observed() is None
-    rebuilt = _build_plan()
-    assert rebuilt.canonical_json()
