@@ -247,6 +247,53 @@ WHERE tenant_record_id = :'tenant_alpha'::uuid
   AND recorded_to IS NULL;
 SQL
 
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_alpha="${TENANT_ALPHA}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_alpha';
+INSERT INTO outbox_retry_policy_record (
+    tenant_record_id,
+    outbox_retry_policy_record_id,
+    delivery_target_code,
+    policy_version,
+    base_delay_seconds,
+    maximum_delay_seconds,
+    recorded_from
+)
+VALUES (
+    :'tenant_alpha'::uuid,
+    '00000000-0000-4000-8000-0000000001a2'::uuid,
+    'payroll_gateway',
+    2,
+    4,
+    16,
+    transaction_timestamp()
+);
+SQL
+
+set +e
+backdated_close_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -v tenant_alpha="${TENANT_ALPHA}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_alpha';
+UPDATE outbox_retry_policy_record
+SET recorded_to = recorded_from + interval '1 microsecond'
+WHERE tenant_record_id = :'tenant_alpha'::uuid
+  AND outbox_retry_policy_record_id = '00000000-0000-4000-8000-0000000001a2'::uuid;
+SQL
+} 2>&1)"
+backdated_close_status=$?
+set -e
+if [[ ${backdated_close_status} -eq 0 || "${backdated_close_output}" != *"recorded_to must equal current transaction time"* ]]; then
+    echo "retry policy accepted a forged historical recorded_to or failed for the wrong reason: ${backdated_close_output}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v tenant_alpha="${TENANT_ALPHA}" <<'SQL'
+SET orgmetra.tenant_record_id = :'tenant_alpha';
+UPDATE outbox_retry_policy_record
+SET recorded_to = transaction_timestamp()
+WHERE tenant_record_id = :'tenant_alpha'::uuid
+  AND outbox_retry_policy_record_id = '00000000-0000-4000-8000-0000000001a2'::uuid;
+SQL
+
 set +e
 missing_policy_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -v tenant_alpha="${TENANT_ALPHA}" \

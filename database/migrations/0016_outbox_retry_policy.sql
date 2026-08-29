@@ -102,8 +102,8 @@ BEGIN
 
     IF OLD.recorded_to IS NOT NULL
        OR NEW.recorded_to IS NULL
-       OR NEW.recorded_to > transaction_timestamp() THEN
-        RAISE EXCEPTION 'outbox retry policy update may only close one active recorded interval'
+       OR NEW.recorded_to IS DISTINCT FROM transaction_timestamp() THEN
+        RAISE EXCEPTION 'outbox retry policy recorded_to must equal current transaction time when closing an active interval'
             USING ERRCODE = '55000';
     END IF;
 

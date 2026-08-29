@@ -10,7 +10,7 @@ This document distinguishes shipped repository truth from the active retry-polic
 | Caller-independent tenant/target retry delay | `0016_outbox_retry_policy.sql`, `test_outbox_retry_policy_postgres.sh` | implemented_on_active_pr |
 | One active policy per tenant and delivery target | partial unique index plus adversarial PostgreSQL contract | implemented_on_active_pr |
 | Tenant-isolated retry-policy evidence | FORCE RLS plus NOBYPASSRLS cross-tenant regression | implemented_on_active_pr |
-| System-recorded retry-policy issuance time | INSERT guard requires `recorded_from = transaction_timestamp()` and an open recorded interval; adversarial historical timestamp regression fails closed | implemented_on_active_pr |
+| System-recorded retry-policy interval | INSERT guard requires `recorded_from = transaction_timestamp()` and an open interval; UPDATE requires `recorded_to = transaction_timestamp()`; adversarial historical timestamp regressions fail closed | implemented_on_active_pr |
 | Fail-closed retry when no active policy exists | transition trigger and governed retry wrapper regression | implemented_on_active_pr |
 | Capped exponential delay | deterministic calculation contract | implemented_on_active_pr |
 | Jittered retry scheduling | not implemented by this PR | planned |
@@ -28,7 +28,7 @@ PR #51 (`docs/protected-truth-refresh`) is the dependency parent for canonical b
 
 PR #82 introduces `outbox_retry_policy_record`, a capped exponential delay calculator, a database transition guard that rejects caller-selected retry timing, and `retry_outbox_delivery_with_policy(...)`. A raw legacy retry call cannot bypass policy because the actual leased-to-pending state transition is checked at the database owner boundary.
 
-New retry-policy evidence is issued at PostgreSQL transaction time rather than accepting a caller-authored historical `recorded_from`. The insertion guard also requires `recorded_to` to be null so the system-recorded interval begins open. This protects policy provenance without changing the separate business/effective-time semantics used by HRIS records.
+New retry-policy evidence is issued and closed at PostgreSQL transaction time rather than accepting caller-authored historical `recorded_from` or `recorded_to`. The insertion guard also requires `recorded_to` to be null so the system-recorded interval begins open. This protects policy provenance without changing the separate business/effective-time semantics used by HRIS records.
 
 The new delay policy does not replace the protected `maximum_attempt_count` budget. Attempt exhaustion remains governed by the existing durable delivery record; this PR governs only when a nonterminal retry may become eligible again.
 
@@ -41,7 +41,7 @@ The dedicated PostgreSQL contract requires:
 - exact tenant isolation under a non-BYPASSRLS reader role;
 - deterministic capped delay sequence `2,4,8,8,8,8` for the fixture policy;
 - rejection of a forged raw retry delay before state mutation;
-- rejection of a backdated retry-policy `recorded_from` before policy evidence can be inserted;
+- rejection of backdated retry-policy `recorded_from` and `recorded_to` before policy evidence can be inserted or closed;
 - policy-version evidence returned by the governed retry wrapper;
 - fail-closed behavior after the active policy is closed; and
 - rejection of multiple simultaneously active policies for one tenant/target.
