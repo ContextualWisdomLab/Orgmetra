@@ -185,58 +185,7 @@ class EmploymentWorkCapacityReviewPacket:
 
     def __post_init__(self) -> None:
         """Validate all trust-bearing fields and seal creation-time evidence."""
-        _validate_operational_uuid_text(self.tenant_record_id, "tenant_record_id")
-        _validate_reference(
-            self.employment_record_reference,
-            "employment_record",
-            "employment_record_reference",
-            require_uuid4=False,
-        )
-        current = _validate_capacity_ratio(self.current_capacity_ratio, "current_capacity_ratio")
-        proposed = _validate_capacity_ratio(self.proposed_capacity_ratio, "proposed_capacity_ratio")
-        if current == proposed:
-            raise ValueError("proposed_capacity_ratio must differ from current_capacity_ratio")
-        _validate_effective_date(self.effective_on)
-        _validate_digest(self.employment_terms_evidence_digest, "employment_terms_evidence_digest")
-        _validate_digest(self.capacity_policy_evidence_digest, "capacity_policy_evidence_digest")
-        _validate_digest(self.reviewer_identity_evidence_digest, "reviewer_identity_evidence_digest")
-        _validate_reference(
-            self.requester_actor_reference,
-            "actor",
-            "requester_actor_reference",
-            require_uuid4=True,
-        )
-        _validate_reference(
-            self.reviewer_actor_reference,
-            "actor",
-            "reviewer_actor_reference",
-            require_uuid4=True,
-        )
-        if self.requester_actor_reference == self.reviewer_actor_reference:
-            raise ValueError("requester and reviewer must be different actor references")
-        _validate_reason_code(self.reason_code)
-        _validate_evidence_version(self.evidence_version)
-        reviewed_at = _validate_utc_timestamp(self.reviewed_at, "reviewed_at")
-        recorded_at = _validate_utc_timestamp(self.recorded_at, "recorded_at")
-        if recorded_at < reviewed_at:
-            raise ValueError("recorded_at cannot precede reviewed_at")
-        if type(self.purpose_code) is not str or self.purpose_code != _PURPOSE_CODE:
-            raise ValueError("purpose_code must remain employment_work_capacity_review")
-        if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
-            raise ValueError("review_state must remain reviewed_for_authoritative_resolution")
-        if (
-            type(self.decision_authority) is not str
-            or self.decision_authority != _DECISION_AUTHORITY
-        ):
-            raise ValueError(
-                "decision_authority must remain not_authorized_to_change_employment_or_compensation"
-            )
-        if self.human_review_required is not True:
-            raise ValueError("human review is mandatory for Employment work-capacity evidence")
-        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
-            raise ValueError("next_action must remain the governed work-capacity instruction")
-
-        payload = self._payload()
+        payload = self._validated_payload()
         digest = sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
         with self._issuance_lock:
             self._issuance_digests[self] = digest
@@ -245,33 +194,97 @@ class EmploymentWorkCapacityReviewPacket:
         """Return a fully redacted representation safe for routine logs."""
         return "EmploymentWorkCapacityReviewPacket(<redacted>)"
 
-    def _payload(self) -> dict[str, object]:
-        """Snapshot every canonical evidence field exactly once."""
+    def _validated_payload(self) -> dict[str, object]:
+        """Revalidate and snapshot every trust-bearing field before any export."""
+        tenant_record_id = _validate_operational_uuid_text(
+            self.tenant_record_id, "tenant_record_id"
+        )
+        employment_record_reference = _validate_reference(
+            self.employment_record_reference,
+            "employment_record",
+            "employment_record_reference",
+            require_uuid4=False,
+        )
+        current = _validate_capacity_ratio(
+            self.current_capacity_ratio, "current_capacity_ratio"
+        )
+        proposed = _validate_capacity_ratio(
+            self.proposed_capacity_ratio, "proposed_capacity_ratio"
+        )
+        if current == proposed:
+            raise ValueError("proposed_capacity_ratio must differ from current_capacity_ratio")
+        effective_on = _validate_effective_date(self.effective_on)
+        employment_terms_evidence_digest = _validate_digest(
+            self.employment_terms_evidence_digest, "employment_terms_evidence_digest"
+        )
+        capacity_policy_evidence_digest = _validate_digest(
+            self.capacity_policy_evidence_digest, "capacity_policy_evidence_digest"
+        )
+        reviewer_identity_evidence_digest = _validate_digest(
+            self.reviewer_identity_evidence_digest, "reviewer_identity_evidence_digest"
+        )
+        requester_actor_reference = _validate_reference(
+            self.requester_actor_reference,
+            "actor",
+            "requester_actor_reference",
+            require_uuid4=True,
+        )
+        reviewer_actor_reference = _validate_reference(
+            self.reviewer_actor_reference,
+            "actor",
+            "reviewer_actor_reference",
+            require_uuid4=True,
+        )
+        if requester_actor_reference == reviewer_actor_reference:
+            raise ValueError("requester and reviewer must be different actor references")
+        reason_code = _validate_reason_code(self.reason_code)
+        evidence_version = _validate_evidence_version(self.evidence_version)
+        reviewed_at = _validate_utc_timestamp(self.reviewed_at, "reviewed_at")
+        recorded_at = _validate_utc_timestamp(self.recorded_at, "recorded_at")
+        if recorded_at < reviewed_at:
+            raise ValueError("recorded_at cannot precede reviewed_at")
+        purpose_code = _require_exact_text(self.purpose_code, "purpose_code")
+        if purpose_code != _PURPOSE_CODE:
+            raise ValueError("purpose_code must remain employment_work_capacity_review")
+        review_state = _require_exact_text(self.review_state, "review_state")
+        if review_state != _REVIEW_STATE:
+            raise ValueError("review_state must remain reviewed_for_authoritative_resolution")
+        decision_authority = _require_exact_text(self.decision_authority, "decision_authority")
+        if decision_authority != _DECISION_AUTHORITY:
+            raise ValueError(
+                "decision_authority must remain not_authorized_to_change_employment_or_compensation"
+            )
+        if self.human_review_required is not True:
+            raise ValueError("human review is mandatory for Employment work-capacity evidence")
+        next_action = _require_exact_text(self.next_action, "next_action")
+        if next_action != _NEXT_ACTION:
+            raise ValueError("next_action must remain the governed work-capacity instruction")
+
         return {
-            "capacity_policy_evidence_digest": self.capacity_policy_evidence_digest,
-            "current_capacity_ratio": format(self.current_capacity_ratio, "f"),
-            "decision_authority": self.decision_authority,
-            "effective_on": self.effective_on.isoformat(),
-            "employment_record_reference": self.employment_record_reference,
-            "employment_terms_evidence_digest": self.employment_terms_evidence_digest,
-            "evidence_version": self.evidence_version,
+            "capacity_policy_evidence_digest": capacity_policy_evidence_digest,
+            "current_capacity_ratio": format(current, "f"),
+            "decision_authority": decision_authority,
+            "effective_on": effective_on.isoformat(),
+            "employment_record_reference": employment_record_reference,
+            "employment_terms_evidence_digest": employment_terms_evidence_digest,
+            "evidence_version": evidence_version,
             "human_review_required": self.human_review_required,
-            "next_action": self.next_action,
-            "proposed_capacity_ratio": format(self.proposed_capacity_ratio, "f"),
-            "purpose_code": self.purpose_code,
-            "reason_code": self.reason_code,
-            "recorded_at": _canonical_timestamp(self.recorded_at),
-            "requester_actor_reference": self.requester_actor_reference,
-            "review_state": self.review_state,
-            "reviewed_at": _canonical_timestamp(self.reviewed_at),
-            "reviewer_actor_reference": self.reviewer_actor_reference,
-            "reviewer_identity_evidence_digest": self.reviewer_identity_evidence_digest,
-            "tenant_record_id": self.tenant_record_id,
+            "next_action": next_action,
+            "proposed_capacity_ratio": format(proposed, "f"),
+            "purpose_code": purpose_code,
+            "reason_code": reason_code,
+            "recorded_at": _canonical_timestamp(recorded_at),
+            "requester_actor_reference": requester_actor_reference,
+            "review_state": review_state,
+            "reviewed_at": _canonical_timestamp(reviewed_at),
+            "reviewer_actor_reference": reviewer_actor_reference,
+            "reviewer_identity_evidence_digest": reviewer_identity_evidence_digest,
+            "tenant_record_id": tenant_record_id,
         }
 
     def _verified_payload(self) -> dict[str, object]:
         """Return one verified snapshot or fail closed after post-issuance mutation."""
-        payload = self._payload()
+        payload = self._validated_payload()
         digest = sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
         with self._issuance_lock:
             issued_digest = self._issuance_digests.get(self)

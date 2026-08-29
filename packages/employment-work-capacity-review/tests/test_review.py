@@ -154,6 +154,10 @@ class ForgedText(str):
 class ForgedDecimal(Decimal):
     """Decimal subclass used to prove exact-runtime fail-closed behavior."""
 
+    def __format__(self, format_spec: str) -> str:
+        """Attempt to preserve the old canonical text after changing the live value."""
+        return format(Decimal("1.0000"), format_spec)
+
 
 def test_runtime_subclasses_fail_closed() -> None:
     with pytest.raises(ValueError, match="exact string"):
@@ -171,6 +175,15 @@ def test_post_issuance_mutation_fails_closed_and_document_is_detached() -> None:
     with pytest.raises(ValueError, match="modified after issuance"):
         packet.canonical_document()
     with pytest.raises(ValueError, match="modified after issuance"):
+        packet.canonical_json()
+
+
+def test_post_issuance_decimal_subclass_cannot_preserve_sealed_digest() -> None:
+    """A hostile Decimal subtype cannot hide a changed live capacity ratio."""
+    packet = build()
+    object.__setattr__(packet, "current_capacity_ratio", ForgedDecimal("0.5000"))
+
+    with pytest.raises(ValueError, match="exact Decimal"):
         packet.canonical_json()
 
 
