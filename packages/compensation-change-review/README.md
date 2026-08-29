@@ -8,6 +8,8 @@ The packet correlates one authoritative Orgmetra tenant, Person, Employment, act
 
 The envelope intentionally **does not carry salary, wage, bonus, benefit, equity, protected-attribute, credential, or free-form case/model values**. Opaque Person/Employment and evidence references still create sensitive personal-data correlation, so the packet explicitly reports `contains_personal_data = true` rather than claiming anonymity.
 
+Recorded-time evidence is normalized at construction: Orgmetra resolves the supplied aware `datetime` to one concrete instant and stores a detached exact built-in UTC `datetime`. This means an application-owned mutable timezone object cannot later rewrite or invalidate an already-issued packet. Inputs whose UTC offset cannot be resolved, and `datetime` subclasses that could override trust-bearing conversion or formatting behavior, fail closed.
+
 ## Human and system boundary
 
 A valid packet is not an approval. It remains:
