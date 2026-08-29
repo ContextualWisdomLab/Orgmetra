@@ -27,7 +27,7 @@ Protected `develop` already provides the authoritative data-model separation nee
 | Authorize before retrieval | `read_position_history()` calls the purpose-bound authorization boundary before `PositionHistoryReadPort` | denied fields prove the port is never called |
 | Tenant/context isolation | exact tenant and Position are rechecked on every returned row | wrong-tenant and wrong-Position rows fail closed |
 | Bitemporal system truth | half-open `recorded_from`/`recorded_to` at exact UTC `known_at` | future and already-closed rows fail closed |
-| Business-time consistency | visible effective intervals may not overlap | overlap regression fails closed |
+| Business-time consistency | visible half-open effective intervals may not overlap; absent ends remain semantically unbounded rather than mapped to `date.max` | ordinary-overlap and `date.max` open-interval regressions fail closed |
 | Immutable evidence | exact tuple container and exact `PositionHistoryRecord`; runtime revalidation after low-level reconstruction | unsupported container/type, forged values, and short low-level row all fail closed |
 | Opaque identifiers | exact operational UUIDs; nil/max protocol sentinels and subclasses rejected | invalid request/record regressions |
 | Field minimization | explicit serializer whitelist over authorized fields only | one-field policy returns one field; unknown/subclass fields fail closed |
@@ -37,14 +37,16 @@ Protected `develop` already provides the authoritative data-model separation nee
 
 ## Test-first chain
 
-1. **Test-only head:** `d751f117e37e2169015004ab89fa728731b2a7ec`.
-2. **Hosted RED:** People API Quality run `33267334677`, job `99139623454`, failed during collection because `orgmetra_people_api.position_history` did not exist.
+1. **Initial test-only head:** `d751f117e37e2169015004ab89fa728731b2a7ec`.
+2. **Initial hosted RED:** People API Quality run `33267334677`, job `99139623454`, failed during collection because `orgmetra_people_api.position_history` did not exist.
 3. **Root implementation:** `f633aa3d008d7832759bb83dead8d4e5a6977a8b` added the smallest Orgmetra-owned read boundary.
-4. **Near-GREEN gate:** run `33267487363`, job `99140037925`, passed all 156 tests but correctly failed exact coverage because one deliberate malformed-row branch remained unexecuted.
-5. **Regression strengthening:** `cbb343a40864694ac243946615aee5f91685beda` adds a low-level short-row reconstruction regression.
-6. **Exact GREEN at that head:** People API Quality run `33267577477`, job `99140279359`: 157 tests; 1,543/1,543 statements; 504/504 branches; compile and clean-checkout GREEN.
+4. **Coverage gate held:** run `33267487363`, job `99140037925`, passed all 156 tests but correctly failed exact coverage because one deliberate malformed-row branch remained unexecuted.
+5. **Regression strengthening:** `cbb343a40864694ac243946615aee5f91685beda` added a low-level short-row reconstruction regression.
+6. **Exact GREEN at that predecessor:** People API Quality run `33267577477`, job `99140279359`: 157 tests; 1,543/1,543 statements; 504/504 branches; compile and clean-checkout GREEN.
+7. **Extreme-date integrity RED:** source review found that `_business_intervals_overlap()` substituted finite `date.max` for an absent business end. Test-only head `af8d0b9b88c50f17c87eb8ecf1eea29918835dce` added a valid `[date.max, ∞)` overlap case. People API Quality run `33267978859`, job `99141335635`, checked out that exact SHA and failed exactly that regression: **1 failed / 157 passed** while owned production coverage remained **1,544/1,544 statements and 504/504 branches = 100.00%**. The service returned instead of raising `PositionHistoryIntegrityError`, proving a real business-time integrity defect rather than a coverage artifact.
+8. **Extreme-date root repair:** `955956f838c467c06c25b63127b7c6e976dea812` removes the finite-infinity sentinel and compares optional interval endpoints directly. Open-ended intervals therefore remain unbounded even at the maximum representable finite date.
 
-Later documentation/export commits invalidate that head as merge evidence. The final PR head must receive its own fresh evidence before advancement.
+Documentation commits after the root repair invalidate predecessor GREEN as merge evidence. The final exact PR head must receive its own fresh hosted evidence before advancement.
 
 ## Security/privacy invariants
 
@@ -52,6 +54,7 @@ Later documentation/export commits invalidate that head as merge evidence. The f
 - No dynamic attribute access is used to serialize policy-controlled field names.
 - Caller-controlled UUID/string/timezone subclasses do not participate in identity, authorization, chronology, or output canonicalization.
 - Persistence is an injected boundary and its output is revalidated.
+- Open-ended business-time semantics are represented explicitly; runtime maximum dates are never overloaded as infinity.
 - Application checks do not claim to replace database snapshot/MVCC semantics for concurrent writes.
 
 ## Out of scope / planned separately
