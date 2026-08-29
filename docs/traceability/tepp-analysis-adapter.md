@@ -12,6 +12,7 @@
 | High-impact human review | fixed `human_scientific_review_only`, `untrusted_draft_evidence`, governed `next_action` | authority-expansion regressions | implemented_on_active_pr |
 | Foreign runtime maturity is not overstated | `transport_state=requires_published_tepp_service_contract` | fixed-state regression and package/ADR documentation | implemented_on_active_pr |
 | Exact owned production coverage | package pytest-cov gate | 100% statement + branch coverage | implemented_on_active_pr |
+| Keep adapter-quality evidence current when shared repository test/runtime configuration changes | package quality workflow explicitly retriggers on shared Python/test/clean-checkout configuration inputs | `tests/test_quality_workflow_trigger.py`; supplemental to central required workflows | implemented_on_active_pr |
 
 ## Foreign evidence snapshot
 
