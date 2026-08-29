@@ -106,7 +106,13 @@ done
 package_line_is_present() {
   local package_name="$1"
   shift
-  printf '%s\n' "$@" | grep -Eq "^${package_name}=="
+  local package_line
+  for package_line in "$@"; do
+    if [[ "${package_line}" == "${package_name}=="* ]]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 stress_package_lines=()
