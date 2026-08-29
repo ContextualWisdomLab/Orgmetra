@@ -86,11 +86,13 @@ def _validate_business_date(value: object, field_name: str) -> date:
 
 
 def _validate_recorded_at(value: object) -> datetime:
-    """Require exact UTC system time without executing caller-defined timezone behavior."""
+    """Require exact, non-future UTC system time without caller-defined behavior."""
     if type(value) is not datetime:
         raise ValueError("recorded_at must be exact built-in datetime")
     if value.tzinfo is not timezone.utc:
         raise ValueError("recorded_at must use datetime.timezone.utc exactly")
+    if value > datetime.now(timezone.utc):
+        raise ValueError("recorded_at cannot be in the future")
     return value
 
 

@@ -169,6 +169,11 @@ def test_accepts_only_reviewed_disposition_actions(requested_disposition_action:
             datetime(2026, 7, 31, 23, 59, tzinfo=timezone.utc),
             "cannot precede reviewed_on",
         ),
+        (
+            "recorded_at",
+            datetime(2099, 8, 1, 10, 30, tzinfo=timezone.utc),
+            "cannot be in the future",
+        ),
     ],
 )
 def test_rejects_invalid_chronology_hold_or_scalar_evidence(
