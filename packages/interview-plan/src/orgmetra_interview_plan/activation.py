@@ -109,13 +109,13 @@ def _build_activation_surface():
             receipt_seals.pop(receipt_id, None)
 
     def register_receipt_seal(receipt: object, payload_json: str) -> None:
-        """Register issuance once, only from the verified activation factory below."""
+        """Register one fresh receipt after verified factory activation succeeds.
+
+        This lexical helper has one call site, after constructing a fresh receipt. Repeated
+        ``__post_init__`` validation therefore cannot reach it or renew issuance evidence.
+        """
         receipt_id = id(receipt)
         with receipt_seals_lock:
-            if receipt_id in receipt_seals:
-                raise ValueError(
-                    "structured interview activation receipt issuance evidence already exists"
-                )
             receipt_seals[receipt_id] = seal_receipt(payload_json)
         finalize(receipt, discard_receipt_seal, receipt_id)
 
@@ -281,7 +281,7 @@ def _build_activation_surface():
         _validate_reference(
             verified_approving_actor_reference,
             "actor",
-            "approving_actor_reference",
+            "verified_approving_actor_reference",
         )
         _validate_reference(
             verified_authority_evidence_reference,
