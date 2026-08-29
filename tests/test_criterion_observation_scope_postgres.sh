@@ -3,6 +3,8 @@ set -euo pipefail
 
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
 
+# Apply the protected-base trigger version, then the sequential upgrade that
+# replaces its function without dropping the existing trigger binding.
 for migration in \
     database/migrations/0001_foundation_schema.sql \
     database/migrations/0002_sealed_evidence_digest.sql \
@@ -13,9 +15,23 @@ for migration in \
     database/migrations/0007_outbox_retry_exhaustion.sql \
     database/migrations/0008_audit_outbox_review_hardening.sql \
     database/migrations/0009_candidate_worker_conversion_governance.sql \
-    database/migrations/0011_criterion_observation_scope.sql; do
+    database/migrations/0010_validity_study_case_integrity.sql \
+    database/migrations/0011_criterion_observation_scope.sql \
+    database/migrations/0012_people_mutation_idempotency.sql \
+    database/migrations/0013_job_analysis_snapshot.sql \
+    database/migrations/0014_criterion_observation_chronology.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
+
+trigger_definition="$(psql "${DATABASE_URL}" -Atq -c "
+    SELECT pg_catalog.pg_get_triggerdef(oid)
+    FROM pg_catalog.pg_trigger
+    WHERE tgname = 'criterion_observation_scope_guard'
+")"
+if [[ "${trigger_definition}" != *"enforce_criterion_observation_scope"* ]]; then
+    echo "criterion chronology upgrade replaced the trigger binding unexpectedly" >&2
+    exit 1
+fi
 
 TENANT_ID="10000000-0000-7000-8000-000000000101"
 tenant_psql() {

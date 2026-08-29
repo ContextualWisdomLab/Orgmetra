@@ -1,12 +1,8 @@
--- Bind performance criterion observations to the worker's actual job context.
---
--- criterion_observation is downstream evidence for performance management and
--- criterion-related validity. A same-tenant foreign key alone cannot prove that
--- the selected criterion belongs to a job the observed worker actually held at
--- the business-time coordinate being measured. This trigger closes that gap
--- without turning an observation into an automated employment decision.
+-- Add chronology protection without rewriting the already released 0011 migration.
+-- CREATE OR REPLACE preserves criterion_observation_scope_guard's binding while
+-- upgrading databases that have already installed enforce_criterion_observation_scope().
 
-CREATE FUNCTION enforce_criterion_observation_scope()
+CREATE OR REPLACE FUNCTION enforce_criterion_observation_scope()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
@@ -15,6 +11,14 @@ DECLARE
     observation_effective_date date;
     criterion_job_profile_id uuid;
 BEGIN
+    -- An immutable performance observation cannot truthfully enter system time
+    -- before the event it claims to have observed. Reject impossible chronology
+    -- before using the claimed observation instant for any scope lookup.
+    IF NEW.recorded_from < NEW.observed_at THEN
+        RAISE EXCEPTION 'criterion observation cannot be recorded before it was observed'
+            USING ERRCODE = '23514';
+    END IF;
+
     -- Effective periods in the current foundation are date-granular. Convert
     -- the evidence instant through UTC explicitly so session TimeZone cannot
     -- move an observation across a date boundary and bypass temporal checks.
@@ -156,10 +160,3 @@ BEGIN
 END;
 $$;
 
--- Foundation CI proves closed recorded_to rejection for every lookup above and
--- UTC calendar-date conversion under non-UTC session TimeZone, including the
--- UTC midnight assignment-start accept path and the pre-assignment reject path.
-CREATE TRIGGER criterion_observation_scope_guard
-BEFORE INSERT ON criterion_observation
-FOR EACH ROW
-EXECUTE FUNCTION enforce_criterion_observation_scope();
