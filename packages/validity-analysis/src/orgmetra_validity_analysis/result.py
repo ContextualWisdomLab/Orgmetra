@@ -43,10 +43,13 @@ def _validate_positive_integer(value: object, field_name: str) -> None:
 
 
 def _finite_number(value: object, field_name: str) -> float:
-    """Return one finite real number and reject booleans or non-numeric text."""
+    """Return one finite real number and normalize invalid numerics to ValueError."""
     if isinstance(value, bool) or not isinstance(value, Real):
         raise ValueError(f"{field_name} must be a finite number")
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be a finite number") from exc
     if not isfinite(number):
         raise ValueError(f"{field_name} must be a finite number")
     return number
