@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+import orgmetra_hr_document_retrieval.retrieval as retrieval_module
 from orgmetra_hr_document_retrieval import (
     DocumentArtifact,
     DocumentRetrievalAuthorization,
@@ -237,6 +238,26 @@ def test_artifact_digest_and_size_fail_before_audit() -> None:
 def test_audit_failure_blocks_byte_release() -> None:
     with pytest.raises(OSError, match="audit unavailable"):
         execute(audit=Audit(failure=OSError("audit unavailable")))
+
+
+def test_authorization_expiring_during_audit_blocks_byte_release(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A slow audit append cannot release bytes after authorization expires."""
+    clock = iter(
+        (
+            NOW,
+            NOW + timedelta(minutes=1),
+            NOW + timedelta(minutes=10),
+        )
+    )
+    monkeypatch.setattr(retrieval_module, "_now_utc", lambda: next(clock))
+    calls: list[str] = []
+
+    with pytest.raises(HrDocumentRetrievalError, match="expired before byte release"):
+        execute(reader=Reader(calls=calls), audit=Audit(calls))
+
+    assert calls == ["artifact", "audit"]
 
 
 def test_expired_future_or_actor_colliding_authorization_fails_closed() -> None:

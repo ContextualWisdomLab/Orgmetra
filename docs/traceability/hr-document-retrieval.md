@@ -11,7 +11,7 @@ Separate active Orgmetra PRs own document metadata evidence/persistence and expo
 | Requirement | Active-PR implementation / evidence |
 |---|---|
 | Purpose-bound authorization on every read | `retrieve_hr_document(...)` invokes `DocumentRetrievalAuthority` for the exact freshly resolved scope before artifact access. |
-| Authorization remains current through protected storage access | The boundary validates authorization freshness after authority resolution, then rechecks expiry after artifact verification and immediately before immutable audit/byte release. The post-verification instant is the receipt `recorded_at`. |
+| Authorization remains current through protected storage access and release | The boundary validates authorization freshness after authority resolution, rechecks expiry after artifact verification, and checks again after immutable audit append immediately before byte release. The post-verification instant is the receipt `recorded_at`. |
 | Exact tenant/document scope | Query and fresh scope must match tenant + document; authorization must also match Person, Employment, artifact, retention, classification, requester, purpose, reason, delivery context, and byte limit. |
 | Current retention/legal-hold state | Fresh scope and authorization must agree on `retained_record` or `legal_hold_record`; disposed/unknown states fail closed. |
 | Necessary PII remains usable | Authorized content is returned as exact bytes; the boundary does not indiscriminately mask document content. |

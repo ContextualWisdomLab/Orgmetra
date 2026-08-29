@@ -19,7 +19,7 @@ Implement one standalone transport-neutral execution boundary with four injected
 3. **Artifact reader** — performs only the bounded read for the authorized artifact reference.
 4. **Immutable audit writer** — durably appends a value-minimized canonical retrieval receipt before content can be returned.
 
-Execution order is security-significant: capability validation → request snapshot → fresh metadata resolution → exact-scope authorization → bounded read → artifact SHA-256 verification → authorization freshness recheck → immutable audit append → byte release.
+Execution order is security-significant: capability validation → request snapshot → fresh metadata resolution → exact-scope authorization → bounded read → artifact SHA-256 verification → authorization freshness recheck → immutable audit append → final authorization freshness recheck → byte release.
 
 Authorization is bound to tenant, document, Person, Employment, artifact reference/digest, current retention state, `restricted_hr` classification, requester/reviewer separation, purpose/reason, `authenticated_hr_session`, and exact byte bound. `retained_record` and `legal_hold_record` are eligible states; neither grants disposition authority. Denial, expiry, drift, malformed evidence, oversize, digest mismatch, or audit failure is fail-closed.
 

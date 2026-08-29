@@ -500,6 +500,8 @@ def retrieve_hr_document(
         recorded_at=release_time,
     )
     audit_writer.append_document_retrieval_receipt(receipt_json)
+    if authorization.expires_at <= _now_utc():
+        raise _fail("document retrieval authorization expired before byte release")
     receipt_digest = sha256(receipt_json.encode("utf-8")).hexdigest()
     return DocumentRetrievalResult(
         content=artifact.content,
