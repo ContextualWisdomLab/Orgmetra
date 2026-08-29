@@ -108,3 +108,17 @@ def test_rejects_forged_reference_parser_behavior() -> None:
 
     with pytest.raises(ValueError):
         build_offer_approval_packet(**kwargs)
+
+
+def test_rejects_post_issuance_runtime_evidence_mutation() -> None:
+    """Canonical audit bytes must remain bound to the exact packet that was issued."""
+    packet = build_offer_approval_packet(**valid_kwargs())
+    issued_digest = packet.sha256_digest()
+
+    object.__setattr__(packet, "offer_terms_digest", "d" * 64)
+
+    with pytest.raises(ValueError, match="changed after issuance"):
+        packet.canonical_json()
+    with pytest.raises(ValueError, match="changed after issuance"):
+        packet.sha256_digest()
+    assert issued_digest != "d" * 64
