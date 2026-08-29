@@ -16,7 +16,6 @@ from uuid import UUID
 import orgmetra_people_api.employment_history as employment_history_module
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
-from orgmetra_people_api.employment_history import EmploymentHistoryRecord, read_employment_history
 
 TENANT = UUID("0198a412-7100-7000-8000-000000000001")
 PERSON = UUID("0198a412-7100-7000-8000-000000000010")
@@ -28,7 +27,7 @@ KNOWN_AT = datetime(2026, 8, 29, 0, 0, tzinfo=timezone.utc)
 class AliasHoldingPort:
     """Return a row while deliberately retaining the persistence-side alias."""
 
-    def __init__(self, record: EmploymentHistoryRecord) -> None:
+    def __init__(self, record: employment_history_module.EmploymentHistoryRecord) -> None:
         self.record = record
 
     def read_employment_history(
@@ -37,14 +36,14 @@ class AliasHoldingPort:
         tenant_record_id: UUID,
         person_record_id: UUID,
         known_at: datetime,
-    ) -> tuple[EmploymentHistoryRecord, ...]:
+    ) -> tuple[employment_history_module.EmploymentHistoryRecord, ...]:
         """Return the retained row exactly as an in-process adapter could."""
         return (self.record,)
 
 
 def test_persistence_alias_cannot_rewrite_authorized_value_after_validation() -> None:
     """A post-validation alias rewrite must not change the authorized response."""
-    record = EmploymentHistoryRecord(
+    record = employment_history_module.EmploymentHistoryRecord(
         tenant_record_id=TENANT,
         person_record_id=PERSON,
         employment_record_id=EMPLOYMENT,
@@ -73,7 +72,9 @@ def test_persistence_alias_cannot_rewrite_authorized_value_after_validation() ->
 
     original_overlap_check = employment_history_module._reject_effective_overlap
 
-    def mutate_retained_alias_after_validation(records: list[EmploymentHistoryRecord]) -> None:
+    def mutate_retained_alias_after_validation(
+        records: list[employment_history_module.EmploymentHistoryRecord],
+    ) -> None:
         """Deterministically model a concurrent persistence-side alias rewrite."""
         original_overlap_check(records)
         object.__setattr__(record, "employment_status_code", "leave")
@@ -83,7 +84,7 @@ def test_persistence_alias_cannot_rewrite_authorized_value_after_validation() ->
         "_reject_effective_overlap",
         side_effect=mutate_retained_alias_after_validation,
     ):
-        view = read_employment_history(
+        view = employment_history_module.read_employment_history(
             principal=principal,
             tenant_record_id=TENANT,
             person_record_id=PERSON,
