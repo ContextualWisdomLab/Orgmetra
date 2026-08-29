@@ -13,30 +13,10 @@ from orgmetra_hris_kernel.errors import IdentityScopeError, IntervalError
 from orgmetra_hris_kernel.facts import AssignmentFact, EmploymentVersion
 from orgmetra_hris_kernel.workforce import (
     WorkforceCompositionSnapshot,
+    _exact_decimal_total,
     _validate_snapshot_temporal_coordinate,
     build_workforce_composition_snapshot,
 )
-
-
-def _exact_decimal_difference(closing: Decimal, opening: Decimal) -> Decimal:
-    """Subtract two finite Decimal values without using ambient precision."""
-    closing_parts = closing.as_tuple()
-    opening_parts = opening.as_tuple()
-    common_exponent = min(closing_parts.exponent, opening_parts.exponent)
-    closing_coefficient = int("".join(map(str, closing_parts.digits)))
-    opening_coefficient = int("".join(map(str, opening_parts.digits)))
-    closing_coefficient *= (1, -1)[closing_parts.sign]
-    opening_coefficient *= (1, -1)[opening_parts.sign]
-    closing_coefficient *= 10 ** (closing_parts.exponent - common_exponent)
-    opening_coefficient *= 10 ** (opening_parts.exponent - common_exponent)
-    difference = closing_coefficient - opening_coefficient
-    return Decimal(
-        (
-            int(difference < 0),
-            tuple(int(digit) for digit in str(abs(difference))),
-            common_exponent,
-        )
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,9 +81,11 @@ class WorkforceCompositionChangeSnapshot:
     @property
     def staffed_fte_change(self) -> Decimal:
         """Return exact closing staffed FTE minus opening staffed FTE."""
-        return _exact_decimal_difference(
-            self.closing_snapshot.staffed_fte,
-            self.opening_snapshot.staffed_fte,
+        return _exact_decimal_total(
+            (
+                self.closing_snapshot.staffed_fte,
+                self.opening_snapshot.staffed_fte.copy_negate(),
+            )
         )
 
     @property

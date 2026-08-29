@@ -156,6 +156,65 @@ def test_staffed_fte_change_is_independent_of_decimal_context_precision() -> Non
     assert low_precision[0] == Decimal("0.1111")
 
 
+def test_workforce_fte_evidence_is_independent_of_decimal_context_precision() -> None:
+    """Endpoint totals and change evidence must preserve every allocation digit."""
+    employments = [
+        _employment(101, 1001, 11, effective_start=date(2026, 1, 1)),
+        _employment(102, 1002, 12, effective_start=date(2026, 1, 1)),
+        _employment(103, 1003, 13, effective_start=date(2026, 1, 1)),
+    ]
+    assignments = [
+        _assignment(201, 101, 11, effective_start=date(2026, 1, 1), ratio="0.1234"),
+        _assignment(202, 102, 12, effective_start=date(2026, 1, 1), ratio="0.2345"),
+        _assignment(203, 103, 13, effective_start=date(2026, 1, 1), ratio="0.3456"),
+    ]
+
+    with localcontext() as context:
+        context.prec = 2
+        low_precision_snapshot = build_workforce_composition_change_snapshot(
+            employments,
+            assignments,
+            tenant_record_id=_id(1),
+            from_effective_on=date(2026, 1, 15),
+            to_effective_on=date(2026, 2, 15),
+            known_at=datetime(2026, 2, 20, tzinfo=timezone.utc),
+        )
+        low_precision_evidence = (
+            low_precision_snapshot.opening_snapshot.staffed_fte,
+            low_precision_snapshot.opening_snapshot.canonical_json(),
+            low_precision_snapshot.closing_snapshot.canonical_json(),
+            low_precision_snapshot.staffed_fte_change,
+            low_precision_snapshot.canonical_json(),
+            low_precision_snapshot.opening_snapshot.content_digest(),
+            low_precision_snapshot.closing_snapshot.content_digest(),
+            low_precision_snapshot.content_digest(),
+        )
+    with localcontext() as context:
+        context.prec = 28
+        normal_precision_snapshot = build_workforce_composition_change_snapshot(
+            employments,
+            assignments,
+            tenant_record_id=_id(1),
+            from_effective_on=date(2026, 1, 15),
+            to_effective_on=date(2026, 2, 15),
+            known_at=datetime(2026, 2, 20, tzinfo=timezone.utc),
+        )
+        normal_precision_evidence = (
+            normal_precision_snapshot.opening_snapshot.staffed_fte,
+            normal_precision_snapshot.opening_snapshot.canonical_json(),
+            normal_precision_snapshot.closing_snapshot.canonical_json(),
+            normal_precision_snapshot.staffed_fte_change,
+            normal_precision_snapshot.canonical_json(),
+            normal_precision_snapshot.opening_snapshot.content_digest(),
+            normal_precision_snapshot.closing_snapshot.content_digest(),
+            normal_precision_snapshot.content_digest(),
+        )
+
+    assert low_precision_evidence == normal_precision_evidence
+    assert low_precision_evidence[0] == Decimal("0.7035")
+    assert low_precision_evidence[3] == Decimal("0.0000")
+
+
 def test_change_builder_freezes_one_cutoff_before_building_both_endpoints() -> None:
     """Both change endpoints must use one detached instant from a mutable provider."""
     provider = _SequencedOffsetTimezone()

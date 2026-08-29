@@ -29,6 +29,27 @@ _WORKFORCE_INCLUDED_STATUSES = frozenset({"active", "leave"})
 _ZERO_FTE = Decimal("0.0000")
 
 
+def _exact_decimal_total(values: tuple[Decimal, ...]) -> Decimal:
+    """Sum finite Decimal values exactly without using ambient precision."""
+    if not values:
+        return _ZERO_FTE
+    parts = tuple(value.as_tuple() for value in values)
+    common_exponent = min(part.exponent for part in parts)
+    coefficient = sum(
+        (1, -1)[part.sign]
+        * int("".join(map(str, part.digits)))
+        * 10 ** (part.exponent - common_exponent)
+        for part in parts
+    )
+    return Decimal(
+        (
+            int(coefficient < 0),
+            tuple(int(digit) for digit in str(abs(coefficient))),
+            common_exponent,
+        )
+    )
+
+
 def _validate_snapshot_tenant_id(tenant_record_id: UUID) -> None:
     """Require one exact, non-sentinel tenant UUID before emitting evidence."""
     if type(tenant_record_id) is not UUID or tenant_record_id.int in {0, (1 << 128) - 1}:
@@ -396,7 +417,6 @@ def build_workforce_composition_snapshot(
     portfolio_keys: set[tuple[UUID, UUID]] = set()
     position_record_ids: set[UUID] = set()
     staffed_people: set[UUID] = set()
-    staffed_fte = _ZERO_FTE
     staffed_assignment_count = 0
 
     for assignment in visible_assignments:
@@ -408,7 +428,6 @@ def build_workforce_composition_snapshot(
         portfolio_keys.add((assignment.person_record_id, assignment.employment_record_id))
         position_record_ids.add(assignment.position_record_id)
         staffed_people.add(assignment.person_record_id)
-        staffed_fte += assignment.allocation_ratio
         staffed_assignment_count += 1
 
     for person_record_id, employment_record_id in portfolio_keys:
@@ -438,7 +457,9 @@ def build_workforce_composition_snapshot(
         person_headcount=len(workforce_people),
         employment_count=len(visible_employments),
         staffed_assignment_count=staffed_assignment_count,
-        staffed_fte=staffed_fte,
+        staffed_fte=_exact_decimal_total(
+            tuple(assignment.allocation_ratio for assignment in visible_assignments)
+        ),
         unassigned_person_count=len(workforce_people - staffed_people),
         employment_status_counts=tuple(sorted(status_counts.items())),
     )
