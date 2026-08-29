@@ -35,6 +35,8 @@ All notable changes to Orgmetra will be documented in this file.
 - Manifest digest, byte-count, and line-count validation with regressions preventing Python/Node foundation-artifact inventories and all executable PostgreSQL migration/contract provenance from drifting apart.
 - Deterministic unfinished-work marker regressions that reject explicit TODO/TBD/FIXME markers while allowing ordinary explanatory prose.
 
+- Candidate-worker conversion system-recorded-time enforcement: migration `0017_candidate_conversion_system_recorded_time.sql` defaults `recorded_from` to `pg_catalog.transaction_timestamp()`, rejects caller-supplied backdating with SQLSTATE `23514`, and adds a targeted PostgreSQL contract for UTC serialization, valid insertion, and bitemporal correction behavior.
+
 ### Changed
 
 - New predictive-validity membership must use one normalized worker-level case; the three independent validity-study decision/evidence/outcome link relations are historical read surfaces only and can no longer accept new rows. A case insert also rejects a criterion observation whose recorded interval is already closed at `linked_at`.
