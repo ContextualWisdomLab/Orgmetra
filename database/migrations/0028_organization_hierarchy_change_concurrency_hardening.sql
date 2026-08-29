@@ -8,6 +8,7 @@
 CREATE FUNCTION reject_stale_organization_hierarchy_transaction()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     IF EXISTS (

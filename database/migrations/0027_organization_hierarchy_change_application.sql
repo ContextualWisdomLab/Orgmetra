@@ -135,6 +135,7 @@ RETURNS text
 LANGUAGE sql
 STABLE
 STRICT
+SET search_path = pg_catalog, public, pg_temp
 AS $$
     WITH visible AS (
         SELECT pg_catalog.jsonb_build_object(
@@ -184,6 +185,7 @@ RETURNS text
 LANGUAGE sql
 STABLE
 STRICT
+SET search_path = pg_catalog, public, pg_temp
 AS $$
     WITH visible AS (
         SELECT
@@ -232,6 +234,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 STABLE
 STRICT
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     review_json json;
@@ -344,6 +347,7 @@ COMMENT ON FUNCTION validate_organization_hierarchy_change_review_evidence(text,
 CREATE FUNCTION protect_organization_hierarchy_application_history()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'organization hierarchy application evidence is append-only'
@@ -359,6 +363,7 @@ EXECUTE FUNCTION protect_organization_hierarchy_application_history();
 CREATE FUNCTION reject_organization_hierarchy_application_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
     RAISE EXCEPTION 'organization hierarchy application evidence cannot be truncated'
@@ -376,6 +381,7 @@ REVOKE TRUNCATE ON organization_hierarchy_change_application_record FROM PUBLIC;
 CREATE FUNCTION validate_organization_hierarchy_application_audit()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     audit_payload jsonb;
@@ -450,6 +456,7 @@ CREATE FUNCTION apply_organization_hierarchy_change(
 )
 RETURNS void
 LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 DECLARE
     review_payload jsonb;

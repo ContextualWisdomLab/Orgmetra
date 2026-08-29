@@ -15,6 +15,28 @@ for migration in \
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
+unhardened_functions="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_proc
+WHERE pronamespace = 'public'::regnamespace
+  AND proname = ANY (ARRAY[
+    'organization_unit_review_snapshot_digest',
+    'organization_hierarchy_review_snapshot_digest',
+    'validate_organization_hierarchy_change_review_evidence',
+    'protect_organization_hierarchy_application_history',
+    'reject_organization_hierarchy_application_truncate',
+    'validate_organization_hierarchy_application_audit',
+    'apply_organization_hierarchy_change'
+  ])
+  AND NOT COALESCE(
+    proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[],
+    false
+  );")"
+if [[ "${unhardened_functions}" != "0" ]]; then
+    echo "organization hierarchy functions inherit caller-controlled search_path: ${unhardened_functions}" >&2
+    exit 1
+fi
+
 TENANT_ID="10000000-0000-7000-8000-000000000001"
 OTHER_TENANT_ID="20000000-0000-7000-8000-000000000002"
 UNIT_ID="00000000-0000-7000-8000-000000000011"

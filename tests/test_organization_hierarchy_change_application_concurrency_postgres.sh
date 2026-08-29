@@ -66,6 +66,20 @@ if [[ "$(psql "${DATABASE_URL}" -Atqc "SELECT to_regprocedure('apply_organizatio
     exit 1
 fi
 
+unhardened_functions="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_proc
+WHERE pronamespace = 'public'::regnamespace
+  AND proname = 'reject_stale_organization_hierarchy_transaction'
+  AND NOT COALESCE(
+    proconfig @> ARRAY['search_path=pg_catalog, public, pg_temp']::text[],
+    false
+  );")"
+if [[ "${unhardened_functions}" != "0" ]]; then
+    echo "organization hierarchy concurrency guard inherits caller-controlled search_path: ${unhardened_functions}" >&2
+    exit 1
+fi
+
 with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
 VALUES ('${TENANT_ID}', 'tenant_concurrency');
