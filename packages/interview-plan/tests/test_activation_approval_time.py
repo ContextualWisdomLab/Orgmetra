@@ -53,7 +53,7 @@ class TimestampRecordingAuthority:
         self.calls = []
 
     def verify_activation(self, *, plan, approving_actor_reference, approved_at):
-        """Record the exact approval instant before returning matching evidence."""
+        """Record and attest the exact approval instant before returning evidence."""
         self.calls.append((plan, approving_actor_reference, approved_at))
         return StructuredInterviewActivationVerification(
             tenant_record_id=plan.tenant_record_id,
@@ -62,6 +62,7 @@ class TimestampRecordingAuthority:
             approving_actor_reference=approving_actor_reference,
             authority_evidence_reference=AUTHORITY_EVIDENCE,
             authority_evidence_digest="e" * 64,
+            approved_at=approved_at,
         )
 
 
