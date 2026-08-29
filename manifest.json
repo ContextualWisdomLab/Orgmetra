@@ -359,8 +359,8 @@
     },
     {
       "path": "docs/adr/README.md",
-      "sha256": "19a52a0f8fc381d32258811b630a10e6aec550e750fa60f70c9b7075e37a731e",
-      "bytes": 2310,
+      "sha256": "213125c10cd13a30cfd5c2a3c62b64a1863b0b8735618377786763763139d23b",
+      "bytes": 2278,
       "lines": 22
     },
     {
