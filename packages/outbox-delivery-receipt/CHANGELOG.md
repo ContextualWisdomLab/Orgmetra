@@ -9,3 +9,7 @@
 - Require canonical UTC chronology, opaque normalized receipt references, SHA-256 artifact
   correlation, structural immutability, copy-bypass revalidation, and exact 100% owned
   statement/branch coverage.
+- Detach caller-owned timezone behavior into built-in UTC timestamps before evidence is
+  retained, reject behavior-overriding trust/identifier string subclasses, and reject
+  receipt subclasses at exact-attempt verification so canonical evidence and returned
+  digests cannot be rewritten through caller-controlled runtime behavior.
