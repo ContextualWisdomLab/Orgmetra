@@ -281,7 +281,7 @@ def _build_activation_surface():
         _validate_reference(
             verified_approving_actor_reference,
             "actor",
-            "verified_approving_actor_reference",
+            "approving_actor_reference",
         )
         _validate_reference(
             verified_authority_evidence_reference,
