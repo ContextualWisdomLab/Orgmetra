@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from orgmetra_hris_kernel.errors import IntervalError
 
@@ -45,7 +45,18 @@ def _canonical_datetime(value: datetime, *, field_name: str) -> datetime:
             f"{field_name} must be timezone-aware.",
             next_action="Convert the knowledge cutoff to UTC before recording or querying.",
         )
-    fixed_zone = timezone.utc if offset == timezone.utc.utcoffset(None) else timezone(offset)
+    if type(offset) is not timedelta:
+        raise IntervalError(
+            f"{field_name} must resolve to a built-in timedelta offset.",
+            next_action="Convert the timezone offset to an exact Python timedelta, then retry.",
+        )
+    try:
+        fixed_zone = timezone.utc if offset == timedelta(0) else timezone(offset)
+    except Exception as exc:
+        raise IntervalError(
+            f"{field_name} must resolve to a valid UTC offset.",
+            next_action="Convert the knowledge cutoff to a valid fixed-offset datetime, then retry.",
+        ) from exc
     return value.replace(tzinfo=fixed_zone)
 
 

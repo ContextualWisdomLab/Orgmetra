@@ -3,6 +3,7 @@
 from datetime import date, datetime, timedelta, timezone, tzinfo
 
 import pytest
+import orgmetra_hris_kernel.intervals as interval_module
 
 from orgmetra_hris_kernel import DateInterval, IntervalError, RecordedInterval
 
@@ -68,6 +69,50 @@ class _OneShotZone(tzinfo):
     def tzname(self, _value: datetime | None) -> str:
         """Return a stable diagnostic name for the test-only zone."""
         return "one_shot"
+
+
+class _LyingOffset(timedelta):
+    """A timedelta subtype whose equality must never reach the interval boundary."""
+
+    def __new__(cls) -> "_LyingOffset":
+        """Create a nonzero offset that falsely compares equal to UTC."""
+        return super().__new__(cls, hours=9)
+
+    def __eq__(self, _other: object) -> bool:
+        """Lie about equality so unsafe UTC detection becomes observable."""
+        return True
+
+
+class _RaisingOffset(timedelta):
+    """A timedelta subtype whose equality must never execute."""
+
+    def __new__(cls) -> "_RaisingOffset":
+        """Create a nonzero offset that raises if compared."""
+        return super().__new__(cls, hours=9)
+
+    def __eq__(self, _other: object) -> bool:
+        """Raise if the boundary performs polymorphic offset comparison."""
+        raise RuntimeError("hostile offset equality")
+
+
+class _SubclassOffsetZone(tzinfo):
+    """Return a caller-controlled timedelta subtype from ``utcoffset``."""
+
+    def __init__(self, offset: timedelta) -> None:
+        """Store the hostile test offset for one timezone resolution."""
+        self.offset = offset
+
+    def utcoffset(self, _value: datetime | None) -> timedelta:
+        """Return the hostile offset subtype."""
+        return self.offset
+
+    def dst(self, _value: datetime | None) -> timedelta:
+        """Return no daylight-saving adjustment."""
+        return timedelta(0)
+
+    def tzname(self, _value: datetime | None) -> str:
+        """Return a stable diagnostic name for the test-only zone."""
+        return "subclass_offset"
 
 
 def test_interval_runtime_types_cannot_be_subclassed() -> None:
@@ -166,6 +211,33 @@ def test_recorded_interval_normalizes_hostile_timezone_failures() -> None:
         RecordedInterval(start=hostile)
 
 
+@pytest.mark.parametrize("offset", [_LyingOffset(), _RaisingOffset()])
+def test_recorded_interval_rejects_polymorphic_timezone_offsets(offset: timedelta) -> None:
+    """Offset subclasses cannot influence canonicalization through equality overrides."""
+    hostile = datetime(2026, 8, 22, 3, 0, tzinfo=_SubclassOffsetZone(offset))
+
+    with pytest.raises(IntervalError, match="built-in timedelta"):
+        RecordedInterval(start=hostile)
+
+
+def test_recorded_interval_normalizes_fixed_timezone_construction_failures(monkeypatch) -> None:
+    """Unexpected fixed-timezone construction failures become stable interval errors."""
+    class _BrokenTimezone:
+        """Test-only replacement that fails for every non-UTC fixed offset."""
+
+        utc = timezone.utc
+
+        def __call__(self, _offset: timedelta) -> timezone:
+            """Raise instead of constructing a fixed timezone."""
+            raise RuntimeError("broken fixed timezone")
+
+    monkeypatch.setattr(interval_module, "timezone", _BrokenTimezone())
+    valid_offset = datetime(2026, 8, 22, 3, 0, tzinfo=timezone(timedelta(hours=9)))
+
+    with pytest.raises(IntervalError, match="valid UTC offset"):
+        RecordedInterval(start=valid_offset)
+
+
 def test_recorded_interval_detaches_validated_custom_timezone_code() -> None:
     """A timezone object cannot regain control during later stored/query comparisons."""
     stored_zone = _OneShotZone()
@@ -193,4 +265,6 @@ def test_recorded_interval_preserves_nonzero_fixed_offset_without_custom_code() 
     assert interval.start.utcoffset() == timedelta(hours=9)
     assert interval.end is not None
     assert interval.end.utcoffset() == timedelta(hours=9)
+    assert interval.start.astimezone(timezone.utc) == datetime(2026, 8, 22, 0, tzinfo=timezone.utc)
+    assert interval.end.astimezone(timezone.utc) == datetime(2026, 8, 22, 9, tzinfo=timezone.utc)
     assert interval.contains(datetime(2026, 8, 22, 12, 0, tzinfo=plus_nine)) is True
