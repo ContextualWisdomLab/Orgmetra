@@ -19,6 +19,7 @@ Orgmetra will expose a pure `WorkforceCompositionSnapshot` derived from authorit
 - Employment count preserves the number of visible reportable employment relationships.
 - Before aggregation, the snapshot reuses the HRIS employment-concurrency invariant at the report coordinate. Two overlapping `exclusive` employments or an unknown concurrency code fail closed instead of being normalized into plausible headcount.
 - Staffed assignment count and staffed FTE are computed from visible assignments after reusing the existing assignment-to-employment coverage, per-employment allocation, and position-seat capacity integrity rules.
+- Direct aggregate construction repeats the resulting staffing relationships: zero assignments require zero FTE, staffed assignments require positive FTE and reportable employment/person totals, and staffed FTE cannot exceed the assignment count.
 - One overfilled Position seat therefore remains a data-integrity failure even when the aggregate FTE total itself looks plausible.
 - Unassigned-person count surfaces a buyer-actionable staffing gap without serializing row-level worker identity.
 - Status counts are aggregate employment evidence, sorted deterministically.
