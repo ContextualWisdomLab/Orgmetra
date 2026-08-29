@@ -1,7 +1,7 @@
 """Retroactive correction tests: close recorded time, then insert a replacement."""
 
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from uuid import UUID
 
 import pytest
@@ -33,6 +33,38 @@ class _ForgedDateTime(datetime):
     def __gt__(self, other: object) -> bool:
         """Keep strict ordering adversarial and consistent for the regression."""
         return False
+
+
+class _FixedOffsetTimezone(tzinfo):
+    """Caller-owned timezone with a valid offset that must not survive the boundary."""
+
+    def utcoffset(self, value: datetime | None) -> timedelta:
+        """Return a valid fixed offset using the built-in trusted primitive."""
+        return timedelta(hours=9)
+
+    def dst(self, value: datetime | None) -> timedelta:
+        """Return no daylight-saving adjustment."""
+        return timedelta(0)
+
+    def tzname(self, value: datetime | None) -> str:
+        """Identify the caller-owned timezone for the regression."""
+        return "CALLER+09"
+
+
+class _ExplodingTimezone(tzinfo):
+    """Caller-owned timezone that raises while its UTC offset is resolved."""
+
+    def utcoffset(self, value: datetime | None) -> timedelta:
+        """Simulate an untrusted timezone implementation failure."""
+        raise RuntimeError("caller-controlled timezone exploded")
+
+    def dst(self, value: datetime | None) -> timedelta:
+        """Return no daylight-saving adjustment when queried independently."""
+        return timedelta(0)
+
+    def tzname(self, value: datetime | None) -> str:
+        """Identify the hostile timezone without resolving its offset."""
+        return "EXPLODING"
 
 
 def test_close_recorded_interval_keeps_business_columns(
@@ -158,4 +190,39 @@ def test_close_recorded_interval_rejects_naive_datetime_before_ordering(
         close_recorded_interval(
             jordan_active_employment,
             recorded_to=datetime(2024, 6, 15, 9),
+        )
+
+
+def test_close_recorded_interval_detaches_caller_owned_timezone_before_ordering(
+    jordan_active_employment,
+) -> None:
+    """A valid caller timezone contributes only its offset, never a live object reference."""
+    recorded_to = datetime(2024, 6, 15, 18, tzinfo=_FixedOffsetTimezone())
+
+    closed = close_recorded_interval(
+        jordan_active_employment,
+        recorded_to=recorded_to,
+    )
+
+    assert closed.recorded.end == datetime(
+        2024,
+        6,
+        15,
+        18,
+        tzinfo=timezone(timedelta(hours=9)),
+    )
+    assert type(closed.recorded.end.tzinfo) is timezone
+    assert closed.recorded.end.tzinfo is not recorded_to.tzinfo
+
+
+def test_close_recorded_interval_normalizes_timezone_resolution_failure(
+    jordan_active_employment,
+) -> None:
+    """A hostile timezone cannot leak its arbitrary exception through the correction API."""
+    recorded_to = datetime(2024, 6, 15, 18, tzinfo=_ExplodingTimezone())
+
+    with pytest.raises(CorrectionError, match="timezone"):
+        close_recorded_interval(
+            jordan_active_employment,
+            recorded_to=recorded_to,
         )
