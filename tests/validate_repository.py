@@ -72,6 +72,7 @@ REQUIRED = [
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
     "database/migrations/0014_criterion_observation_chronology.sql",
+    "database/migrations/0015_criterion_observation_statement_default.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",

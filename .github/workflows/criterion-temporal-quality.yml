@@ -9,6 +9,7 @@ on:
     paths:
       - "database/migrations/0011_criterion_observation_scope.sql"
       - "database/migrations/0014_criterion_observation_chronology.sql"
+      - "database/migrations/0015_criterion_observation_statement_default.sql"
       - "tests/test_criterion_observation_scope_postgres.sh"
       - ".github/workflows/criterion-temporal-quality.yml"
   workflow_dispatch:

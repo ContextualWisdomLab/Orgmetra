@@ -3,8 +3,8 @@ set -euo pipefail
 
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
 
-# Apply the protected-base trigger version, then the sequential upgrade that
-# replaces its function without dropping the existing trigger binding.
+# Apply the protected-base trigger version, then sequential upgrades that
+# preserve the existing trigger binding and its recorded-time default contract.
 for migration in \
     database/migrations/0001_foundation_schema.sql \
     database/migrations/0002_sealed_evidence_digest.sql \
@@ -19,7 +19,8 @@ for migration in \
     database/migrations/0011_criterion_observation_scope.sql \
     database/migrations/0012_people_mutation_idempotency.sql \
     database/migrations/0013_job_analysis_snapshot.sql \
-    database/migrations/0014_criterion_observation_chronology.sql; do
+    database/migrations/0014_criterion_observation_chronology.sql \
+    database/migrations/0015_criterion_observation_statement_default.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
@@ -434,6 +435,37 @@ WHERE tenant_record_id = '${TENANT_ID}'::uuid
 ")"
 if [[ "${valid_count}" != "1" ]]; then
     echo "valid in-cycle criterion observation for the worker's assigned job was not persisted" >&2
+    exit 1
+fi
+
+# The transaction begins before the observation is made. Omitting recorded_from
+# must still use the insert statement's time, not the older transaction time.
+tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+SELECT pg_sleep(0.1);
+INSERT INTO criterion_observation (
+    tenant_record_id, criterion_observation_id, criterion_blueprint_id,
+    performance_cycle_id, person_record_id, observed_value, observed_at
+) VALUES (
+    '10000000-0000-7000-8000-000000000101',
+    '10000000-0000-7000-8000-000000000136',
+    '10000000-0000-7000-8000-000000000110',
+    '10000000-0000-7000-8000-000000000109',
+    '10000000-0000-7000-8000-000000000102', 4.9,
+    clock_timestamp() - INTERVAL '1 second'
+);
+COMMIT;
+SQL
+
+long_transaction_count="$(tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT count(*)
+FROM criterion_observation
+WHERE tenant_record_id = '${TENANT_ID}'::uuid
+  AND criterion_observation_id = '10000000-0000-7000-8000-000000000136'::uuid
+  AND recorded_from >= observed_at;
+")"
+if [[ "${long_transaction_count}" != "1" ]]; then
+    echo "long-transaction criterion observation did not use a statement-time default" >&2
     exit 1
 fi
 
