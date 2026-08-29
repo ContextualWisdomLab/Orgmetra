@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from uuid import UUID
 
 import pytest
@@ -113,6 +113,30 @@ def test_riley_cannot_take_a_full_icu_seat_already_held_by_jordan(
             effective_on=date(2024, 4, 15),
             known_at=utc(2024, 4, 15),
         )
+
+
+def test_position_rejects_exact_overallocation_under_low_decimal_precision(
+    jordan_icu_assignment,
+) -> None:
+    """Seat limits must use exact totals even when Decimal precision is low."""
+    riley = replace(
+        jordan_icu_assignment,
+        assignment_record_id=UUID("10000000-0000-7000-8000-000000000311"),
+        employment_record_id=RILEY_EMPLOYMENT,
+        person_record_id=RILEY,
+        allocation_ratio=Decimal("0.5040"),
+    )
+    jordan = replace(jordan_icu_assignment, allocation_ratio=Decimal("0.5040"))
+    with localcontext() as context:
+        context.prec = 2
+        with pytest.raises(PositionSeatError, match="1.0000"):
+            validate_position_seat_capacity(
+                [jordan, riley],
+                tenant_record_id=TENANT,
+                position_record_id=ICU_POSITION,
+                effective_on=date(2024, 4, 15),
+                known_at=utc(2024, 4, 15),
+            )
 
 
 def test_foreign_tenant_assignment_does_not_consume_local_seat_capacity(

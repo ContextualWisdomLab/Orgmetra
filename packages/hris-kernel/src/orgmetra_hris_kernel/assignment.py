@@ -18,8 +18,30 @@ from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts
 
 _ONE = Decimal("1.0000")
 _ZERO = Decimal("0")
+_ZERO_FTE = Decimal("0.0000")
 _ASSIGNMENT_ELIGIBLE_EMPLOYMENT_STATUSES = frozenset({"active", "leave"})
 _STAFFABLE_POSITION_STATUSES = frozenset({"active", "open"})
+
+
+def _exact_decimal_total(values: tuple[Decimal, ...]) -> Decimal:
+    """Sum finite Decimal values exactly without using ambient precision."""
+    if not values:
+        return _ZERO_FTE
+    parts = tuple(value.as_tuple() for value in values)
+    common_exponent = min(part.exponent for part in parts)
+    coefficient = sum(
+        (1, -1)[part.sign]
+        * int("".join(map(str, part.digits)))
+        * 10 ** (part.exponent - common_exponent)
+        for part in parts
+    )
+    return Decimal(
+        (
+            int(coefficient < 0),
+            tuple(int(digit) for digit in str(abs(coefficient))),
+            common_exponent,
+        )
+    )
 
 
 def _ratio_is_valid(allocation_ratio: Decimal) -> bool:
@@ -83,7 +105,7 @@ def validate_assignment_portfolio(
         effective_on=effective_on,
         known_at=known_at,
     )
-    total = sum((fact.allocation_ratio for fact in visible), start=_ZERO)
+    total = _exact_decimal_total(tuple(fact.allocation_ratio for fact in visible))
     if total > _ONE:
         raise AssignmentPortfolioError(
             "Visible allocations for one employment exceed 1.0000.",
@@ -220,7 +242,7 @@ def validate_position_seat_capacity(
         effective_on=effective_on,
         known_at=known_at,
     )
-    total = sum((fact.allocation_ratio for fact in visible), start=_ZERO)
+    total = _exact_decimal_total(tuple(fact.allocation_ratio for fact in visible))
     if total > _ONE:
         raise PositionSeatError(
             "Visible allocations for one position exceed 1.0000.",

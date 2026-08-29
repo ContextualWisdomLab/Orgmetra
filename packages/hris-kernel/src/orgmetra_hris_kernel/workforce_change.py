@@ -9,11 +9,11 @@ import hashlib
 import json
 from uuid import UUID
 
+from orgmetra_hris_kernel.assignment import _exact_decimal_total
 from orgmetra_hris_kernel.errors import IdentityScopeError, IntervalError
 from orgmetra_hris_kernel.facts import AssignmentFact, EmploymentVersion
 from orgmetra_hris_kernel.workforce import (
     WorkforceCompositionSnapshot,
-    _exact_decimal_total,
     _validate_snapshot_temporal_coordinate,
     build_workforce_composition_snapshot,
 )

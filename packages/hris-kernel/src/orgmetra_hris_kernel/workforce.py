@@ -16,6 +16,7 @@ import json
 from uuid import UUID
 
 from orgmetra_hris_kernel.assignment import (
+    _exact_decimal_total,
     validate_assignment_employment_coverage,
     validate_assignment_portfolio,
     validate_position_seat_capacity,
@@ -27,27 +28,6 @@ from orgmetra_hris_kernel.resolution import resolve_single_valued_fact
 
 _WORKFORCE_INCLUDED_STATUSES = frozenset({"active", "leave"})
 _ZERO_FTE = Decimal("0.0000")
-
-
-def _exact_decimal_total(values: tuple[Decimal, ...]) -> Decimal:
-    """Sum finite Decimal values exactly without using ambient precision."""
-    if not values:
-        return _ZERO_FTE
-    parts = tuple(value.as_tuple() for value in values)
-    common_exponent = min(part.exponent for part in parts)
-    coefficient = sum(
-        (1, -1)[part.sign]
-        * int("".join(map(str, part.digits)))
-        * 10 ** (part.exponent - common_exponent)
-        for part in parts
-    )
-    return Decimal(
-        (
-            int(coefficient < 0),
-            tuple(int(digit) for digit in str(abs(coefficient))),
-            common_exponent,
-        )
-    )
 
 
 def _validate_snapshot_tenant_id(tenant_record_id: UUID) -> None:
