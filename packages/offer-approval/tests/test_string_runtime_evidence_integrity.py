@@ -1,7 +1,9 @@
 """Adversarial runtime-integrity tests for governed offer-approval text evidence."""
 from __future__ import annotations
 
+import copy
 from datetime import datetime, timezone
+import pickle
 
 import pytest
 
@@ -156,3 +158,25 @@ def test_rejects_reissue_after_seal_deletion_and_evidence_mutation() -> None:
         packet.canonical_json()
     with pytest.raises(ValueError, match="changed after issuance"):
         packet.sha256_digest()
+
+
+def test_shallow_copy_cannot_create_renewable_evidence_identity() -> None:
+    """An immutable issued packet must not gain a second renewable identity via copy.copy."""
+    packet = build_offer_approval_packet(**valid_kwargs())
+
+    assert copy.copy(packet) is packet
+
+
+def test_deep_copy_cannot_create_renewable_evidence_identity() -> None:
+    """An immutable issued packet must not gain a second renewable identity via deepcopy."""
+    packet = build_offer_approval_packet(**valid_kwargs())
+
+    assert copy.deepcopy(packet) is packet
+
+
+def test_pickle_cannot_create_unregistered_issued_evidence() -> None:
+    """Process-local issuance evidence must reject pickle round trips that lose identity."""
+    packet = build_offer_approval_packet(**valid_kwargs())
+
+    with pytest.raises(TypeError, match="cannot be pickled"):
+        pickle.dumps(packet)
