@@ -31,6 +31,14 @@ class _ForgedUUID(UUID):
         return "candidate-controlled-identity"
 
 
+class _ForgedText(str):
+    """Attempt to bypass a string validation method through subclass dispatch."""
+
+    def strip(self) -> str:
+        """Pretend blank display text is usable."""
+        return "forged"
+
+
 class _UnvalidatedWorkerRecord(WorkerPeopleRecord):
     """Attempt to bypass persistence-result validation through subclass dispatch."""
 
@@ -109,6 +117,35 @@ def test_worker_record_rejects_uuid_subclasses_before_authorized_rendering(field
     forged = _ForgedUUID("0198a412-6000-7000-8000-000000000123")
     with pytest.raises(ValueError, match=f"{field_name} must be an operational UUID"):
         _record(**{field_name: forged})
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [("display_name", _ForgedText("   ")), ("employment_status_code", _ForgedText("not valid"))],
+)
+def test_worker_record_rejects_text_subclasses_before_authorized_rendering(
+    field_name: str, value: str
+) -> None:
+    """Business strings cannot override validation methods at the persistence boundary."""
+    with pytest.raises(ValueError, match=field_name):
+        _record(**{field_name: value})
+
+
+def test_people_read_rejects_malformed_principal_before_repository_access() -> None:
+    """A direct service caller cannot replace authenticated identity with an arbitrary object."""
+    port = _ReadPort(_record())
+    with pytest.raises(TypeError, match="AuthenticatedPrincipal"):
+        read_worker_people_record(
+            principal=object(),  # type: ignore[arg-type]
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            effective_on=EFFECTIVE_ON,
+            purpose_code="people_read",
+            requested_fields=frozenset({"display_name"}),
+            policy=_policy("display_name"),
+            read_port=port,
+        )
+    assert port.calls == []
 
 
 def test_people_read_requires_exact_business_date_before_repository_access() -> None:

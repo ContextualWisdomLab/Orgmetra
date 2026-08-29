@@ -43,6 +43,15 @@ class StaticAuthenticator:
         )
 
 
+class MalformedPrincipalAuthenticator:
+    """Return an invalid identity object to exercise the transport contract."""
+
+    async def authenticate(self, bearer_token: str) -> AuthenticatedPrincipal:
+        """Violate the annotated return contract without exposing a secret."""
+        del bearer_token
+        return object()  # type: ignore[return-value]
+
+
 class RecordingReadPort:
     """Record whether protected HR data was touched after authentication failed."""
 
@@ -134,6 +143,7 @@ class PeopleReadBackendFailureTests(unittest.IsolatedAsyncioTestCase):
         messages: list[dict[str, object]],
         captured: Any,
         expected_message: str,
+        expected_exception_type: str = "RuntimeError",
     ) -> None:
         """Require one non-disclosing 500 whose support reference matches its ERROR log."""
         start, body = messages
@@ -152,7 +162,7 @@ class PeopleReadBackendFailureTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(record.getMessage(), expected_message)
         self.assertEqual(getattr(record, "route"), "people")
         self.assertEqual(getattr(record, "tenant_record_id"), str(TENANT))
-        self.assertEqual(getattr(record, "exception_type"), "RuntimeError")
+        self.assertEqual(getattr(record, "exception_type"), expected_exception_type)
         self.assertEqual(getattr(record, "support_reference"), payload["support_reference"])
         logged = repr(record.__dict__)
         self.assertNotIn("password", logged)
@@ -176,6 +186,26 @@ class PeopleReadBackendFailureTests(unittest.IsolatedAsyncioTestCase):
             messages=messages,
             captured=captured,
             expected_message="People read authentication backend failed",
+        )
+        self.assertEqual(read_port.calls, [])
+
+    async def test_malformed_identity_result_is_normalized_without_protected_read(self) -> None:
+        """Treat a malformed authenticator result as an identity backend failure."""
+        read_port = RecordingReadPort()
+        app = PeopleAsgiApp(
+            authenticator=MalformedPrincipalAuthenticator(),
+            policy=policy(),
+            read_port=read_port,
+        )
+
+        with self.assertLogs("orgmetra_people_api.http", level="ERROR") as captured:
+            messages = await exercise(app)
+
+        self.assert_correlated_failure(
+            messages=messages,
+            captured=captured,
+            expected_message="People read authentication backend failed",
+            expected_exception_type="TypeError",
         )
         self.assertEqual(read_port.calls, [])
 
