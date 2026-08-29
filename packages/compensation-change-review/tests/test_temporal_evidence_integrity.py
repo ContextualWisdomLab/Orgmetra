@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -21,6 +21,21 @@ class ForgedDateTime(datetime):
         return "2099-12-31T23:59:59+00:00"
 
 
+class MutableOffsetTimezone(tzinfo):
+    """Timezone whose offset can change after a packet has been issued."""
+
+    def __init__(self, offset_hours: int) -> None:
+        self.offset_hours = offset_hours
+
+    def utcoffset(self, dt):  # type: ignore[no-untyped-def]
+        """Return the current mutable offset."""
+        return timedelta(hours=self.offset_hours)
+
+    def dst(self, dt):  # type: ignore[no-untyped-def]
+        """Keep daylight-saving behavior deterministic for the regression."""
+        return timedelta(0)
+
+
 def test_rejects_datetime_subclasses_that_can_forge_recorded_time_evidence(
     valid_packet_kwargs: dict[str, object],
 ) -> None:
@@ -30,3 +45,24 @@ def test_rejects_datetime_subclasses_that_can_forge_recorded_time_evidence(
 
     with pytest.raises(ValueError, match="generated_at"):
         build_compensation_change_review_packet(**kwargs)
+
+
+def test_freezes_mutable_timezone_before_issuing_recorded_time_evidence(
+    valid_packet_kwargs: dict[str, object],
+) -> None:
+    """Caller-owned tzinfo mutation must not rewrite or invalidate issued audit evidence."""
+    mutable_timezone = MutableOffsetTimezone(9)
+    kwargs = valid_packet_kwargs.copy()
+    kwargs["generated_at"] = datetime(2026, 8, 21, 13, 25, tzinfo=mutable_timezone)
+
+    packet = build_compensation_change_review_packet(**kwargs)
+    canonical_before = packet.canonical_json()
+    digest_before = packet.sha256_digest()
+
+    assert packet.generated_at.tzinfo is timezone.utc
+    assert '"generated_at":"2026-08-21T04:25:00Z"' in canonical_before
+
+    mutable_timezone.offset_hours = -5
+
+    assert packet.canonical_json() == canonical_before
+    assert packet.sha256_digest() == digest_before
