@@ -10,7 +10,7 @@
 
 | Requirement | Owner boundary | Evidence | Verification |
 |---|---|---|---|
-| Exact candidate identity | release-readiness review | 40-hex `candidate_revision_sha` | exact runtime type and canonical lower-hex regression |
+| Exact candidate identity | release-readiness review | non-null 40-hex `candidate_revision_sha` | exact runtime type, canonical lower-hex, and Git null-OID rejection regressions |
 | Complete reviewed release evidence | release-readiness review | source, SBOM, provenance, tests, coverage, security, SAST, recovery, operability, accessibility, migration/rollback, package-reproducibility SHA-256 digests | each digest is independently required and validated |
 | Human accountability | release-readiness review | distinct pseudonymous requester/reviewer plus `reviewed_at` | UUIDv4-format actor correlation, separation, exact UTC time |
 | System time | release-readiness review | `recorded_at` | Orgmetra-owned UTC issuance; cannot precede human review |
