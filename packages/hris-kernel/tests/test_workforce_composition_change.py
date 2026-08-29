@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone, tzinfo
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from uuid import UUID
 
 import pytest
@@ -16,6 +16,7 @@ from orgmetra_hris_kernel import (
     IntervalError,
     RecordedInterval,
     WorkforceCompositionChangeSnapshot,
+    WorkforceCompositionSnapshot,
     build_workforce_composition_change_snapshot,
     build_workforce_composition_snapshot,
 )
@@ -78,6 +79,21 @@ def _source_facts() -> tuple[list[EmploymentVersion], list[AssignmentFact]]:
     return employments, assignments
 
 
+def _aggregate_snapshot(effective_on: date, staffed_fte: str) -> WorkforceCompositionSnapshot:
+    """Build one valid aggregate endpoint with a controlled FTE spelling."""
+    return WorkforceCompositionSnapshot(
+        tenant_record_id=_id(1),
+        effective_on=effective_on,
+        known_at=datetime(2026, 2, 20, tzinfo=timezone.utc),
+        person_headcount=1,
+        employment_count=1,
+        staffed_assignment_count=1,
+        staffed_fte=Decimal(staffed_fte),
+        unassigned_person_count=0,
+        employment_status_counts=(("active", 1),),
+    )
+
+
 class _SequencedOffsetTimezone(tzinfo):
     """Timezone provider that changes its offset on each request."""
 
@@ -112,6 +128,32 @@ def test_change_snapshot_compares_two_effective_dates_at_one_knowledge_cutoff() 
     assert '"schema_version":"orgmetra.workforce_composition_change.v1"' in snapshot.canonical_json()
     assert "person_record_id" not in snapshot.canonical_json()
     assert len(snapshot.content_digest()) == 64
+
+
+def test_staffed_fte_change_is_independent_of_decimal_context_precision() -> None:
+    """FTE deltas and their evidence must not depend on a caller's Decimal precision."""
+    snapshot = WorkforceCompositionChangeSnapshot(
+        _aggregate_snapshot(date(2026, 1, 15), "0.1234"),
+        _aggregate_snapshot(date(2026, 2, 15), "0.2345"),
+    )
+
+    with localcontext() as context:
+        context.prec = 2
+        low_precision = (
+            snapshot.staffed_fte_change,
+            snapshot.canonical_json(),
+            snapshot.content_digest(),
+        )
+    with localcontext() as context:
+        context.prec = 28
+        normal_precision = (
+            snapshot.staffed_fte_change,
+            snapshot.canonical_json(),
+            snapshot.content_digest(),
+        )
+
+    assert low_precision == normal_precision
+    assert low_precision[0] == Decimal("0.1111")
 
 
 def test_change_builder_freezes_one_cutoff_before_building_both_endpoints() -> None:
