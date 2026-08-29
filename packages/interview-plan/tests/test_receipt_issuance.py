@@ -38,8 +38,23 @@ def test_activation_receipt_cannot_be_minted_without_verified_factory_path():
         receipt.sha256_digest()
 
 
-def test_private_module_sentinel_cannot_mint_verified_receipt_directly():
-    """A module-private sentinel must not be usable as authority evidence by callers."""
+def test_receipt_issuance_capabilities_are_not_module_attributes():
+    """Do not publish callables or secrets that can mint verified receipt evidence."""
+    forbidden_names = (
+        "_ACTIVATION_RECEIPT_ISSUANCE_TOKEN",
+        "_PROCESS_ACTIVATION_RECEIPT_SEAL_KEY",
+        "_ACTIVATION_RECEIPT_SEALS",
+        "_register_activation_receipt_seal",
+        "_seal_activation_receipt",
+        "_discard_activation_receipt_seal",
+        "_authoritative_activation_receipt_seal",
+    )
+
+    assert all(not hasattr(activation_module, name) for name in forbidden_names)
+
+
+def test_private_constructor_argument_cannot_mint_verified_receipt_directly():
+    """Constructor-private-looking keywords must never act as issuance authority."""
     with pytest.raises(TypeError, match="_issuance_token"):
         StructuredInterviewActivationReceipt(
             tenant_record_id="10000000-0000-7000-8000-000000000001",
@@ -51,7 +66,7 @@ def test_private_module_sentinel_cannot_mint_verified_receipt_directly():
             ),
             authority_evidence_digest="e" * 64,
             approved_at=datetime(2026, 8, 21, 5, 0, tzinfo=timezone.utc),
-            _issuance_token=activation_module._ACTIVATION_RECEIPT_ISSUANCE_TOKEN,
+            _issuance_token=object(),
         )
 
 
@@ -89,18 +104,3 @@ def test_issued_activation_receipt_rejects_post_issuance_rewrite():
         receipt.canonical_json()
     with pytest.raises(ValueError, match="changed after activation receipt issuance"):
         receipt.sha256_digest()
-
-
-def test_missing_process_local_activation_receipt_issuance_evidence_fails_closed():
-    """Reject canonical export when process-local issuance evidence is unavailable."""
-    candidate_plan = plan()
-    receipt = activate_structured_interview_plan(
-        plan=candidate_plan,
-        authority=AllowingAuthority(verification_for(candidate_plan)),
-        approving_actor_reference=APPROVER,
-        approved_at=APPROVED_AT,
-    )
-    activation_module._discard_activation_receipt_seal(id(receipt))
-
-    with pytest.raises(ValueError, match="changed after activation receipt issuance"):
-        receipt.canonical_json()
