@@ -190,6 +190,40 @@ def test_direct_snapshot_rejects_fte_above_staffed_assignment_count() -> None:
         )
 
 
+def test_direct_snapshot_rejects_assigned_person_without_staffing() -> None:
+    """A person counted as assigned requires at least one staffed assignment."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            unassigned_person_count=0,
+        )
+
+
+def test_direct_snapshot_rejects_staffing_when_every_person_is_unassigned() -> None:
+    """Staffed assignments cannot coexist with an entirely unassigned workforce."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            staffed_assignment_count=1,
+            staffed_fte=Decimal("0.5000"),
+            unassigned_person_count=1,
+        )
+
+
+def test_direct_snapshot_rejects_more_assigned_people_than_assignments() -> None:
+    """Distinct assigned people cannot exceed the number of staffed assignments."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            person_headcount=2,
+            employment_count=2,
+            employment_status_counts=(("active", 2),),
+            staffed_assignment_count=1,
+            staffed_fte=Decimal("0.5000"),
+            unassigned_person_count=0,
+        )
+
+
 def test_direct_snapshot_rejects_boolean_status_counts() -> None:
     """Boolean values must not serialize as employment counts."""
     with pytest.raises(SingleValuedFactError, match="internally inconsistent"):

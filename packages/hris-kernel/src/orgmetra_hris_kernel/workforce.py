@@ -178,6 +178,22 @@ class WorkforceCompositionSnapshot:
                     "unassigned-person totals reconcile."
                 ),
             )
+        assigned_person_count = self.person_headcount - self.unassigned_person_count
+        if self.staffed_assignment_count == 0 and assigned_person_count != 0:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot so people without assignments are counted as unassigned.",
+            )
+        if self.staffed_assignment_count > 0 and assigned_person_count == 0:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot with an assigned person for every staffed workforce.",
+            )
+        if assigned_person_count > self.staffed_assignment_count:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot so every assigned person has a staffed assignment.",
+            )
         if any(status not in _WORKFORCE_INCLUDED_STATUSES for status in status_codes):
             raise SingleValuedFactError(
                 "Workforce snapshot aggregate values are internally inconsistent.",
