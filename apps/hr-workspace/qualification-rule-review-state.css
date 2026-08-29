@@ -1,0 +1,58 @@
+.qualification-rule-review-state {
+  display: grid;
+  gap: var(--orgmetra-space-md);
+  max-width: 40rem;
+  padding: var(--orgmetra-space-lg);
+  border: 1px solid var(--orgmetra-border-subtle);
+  border-radius: var(--orgmetra-radius-md);
+  background: var(--orgmetra-surface-card);
+  color: var(--orgmetra-text-primary);
+}
+
+.qualification-rule-review-status,
+.qualification-rule-review-next-action {
+  display: grid;
+  gap: var(--orgmetra-space-xs);
+  margin: 0;
+}
+
+.qualification-rule-review-status span,
+.qualification-rule-review-next-action span {
+  color: var(--orgmetra-text-muted);
+}
+
+.qualification-rule-review-state[data-interaction-state="high-risk-confirmation"] {
+  border-color: var(--orgmetra-action-review);
+}
+
+.qualification-rule-review-state[data-interaction-state="permission-denied"],
+.qualification-rule-review-state[data-interaction-state="validation-error"],
+.qualification-rule-review-state[data-interaction-state="error"] {
+  border-color: var(--orgmetra-danger);
+}
+
+.qualification-rule-review-state[aria-busy="true"] {
+  cursor: progress;
+}
+
+.qualification-rule-review-submit {
+  justify-self: start;
+  min-height: 44px;
+  padding: var(--orgmetra-space-sm) var(--orgmetra-space-md);
+  border: 0;
+  border-radius: var(--orgmetra-radius-sm);
+  background: var(--orgmetra-action-review);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.qualification-rule-review-submit:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.qualification-rule-review-submit:focus-visible {
+  outline: 3px solid var(--orgmetra-focus-ring);
+  outline-offset: 3px;
+}
