@@ -14,11 +14,11 @@ def test_traceability_matches_executable_activation_boundary() -> None:
 
     assert "implements an executable activation orchestration boundary" in text
     assert "`StructuredInterviewActivationAuthority`" in text
-    assert "exact UTC approval snapshot" in text
+    assert "built-in UTC approval snapshot" in text
     assert "`test_activation_executes_authority_and_returns_immutable_human_receipt`" in text
     assert "`test_authority_rejection_blocks_activation`" in text
     assert "`test_activation_rejects_authority_evidence_for_other_scope`" in text
-    assert "`test_activation_rejects_plan_mutation_during_authority_verification`" in text
+    assert "`test_activation_detaches_plan_evidence_from_authority_time_aba_mutation`" in text
     assert "pre-call request" in text
     assert "A concrete production adapter remains responsible" in text
     assert "do **not** prove that a particular deployed adapter already performs database/API resolution correctly" in text
