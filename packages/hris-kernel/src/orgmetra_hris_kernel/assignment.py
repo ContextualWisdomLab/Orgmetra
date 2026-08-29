@@ -160,9 +160,8 @@ def validate_assignment_position_coverage(
     ``active`` and ``open`` seats remain staffable. ``closed``, ``frozen``, and
     ``abolished`` seats cannot receive new or continuing allocations. A matching
     position identifier in another tenant never supplies local staffing coverage.
-    Simultaneously recorded-visible position versions with different statuses may
-    not overlap the assignment interval because contradictory seat-state evidence
-    must fail closed.
+    Simultaneously recorded-visible position versions may not overlap the
+    assignment interval because a position is a single-valued seat-state fact.
 
     Raises:
         PositionCoverageError: Choose an open seat or correct contradictory position history.
@@ -181,10 +180,7 @@ def validate_assignment_position_coverage(
     ]
     for index, left in enumerate(assignment_visible):
         for right in assignment_visible[index + 1 :]:
-            if (
-                left.effective.overlaps(right.effective)
-                and left.position_status_code != right.position_status_code
-            ):
+            if left.effective.overlaps(right.effective):
                 raise PositionCoverageError(
                     "Assignment intersects contradictory position versions in this tenant.",
                     next_action=(

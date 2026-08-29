@@ -110,19 +110,20 @@ def test_assignment_rejects_contradictory_visible_position_versions(
         )
 
 
-def test_assignment_allows_overlapping_visible_position_versions_with_same_status(
+def test_assignment_rejects_overlapping_visible_position_versions_with_same_status(
     jordan_icu_assignment,
 ) -> None:
-    """Repeated evidence for one unchanged seat status is not contradictory."""
+    """A single-valued seat cannot have overlapping visible versions, even unchanged."""
     duplicate = replace(
         _open_icu(),
         position_record_version_id=UUID("10000000-0000-7000-8000-000000000402"),
     )
-    validate_assignment_position_coverage(
-        jordan_icu_assignment,
-        [_open_icu(), duplicate],
-        known_at=utc(2024, 5, 1),
-    )
+    with pytest.raises(PositionCoverageError, match="contradictory position versions"):
+        validate_assignment_position_coverage(
+            jordan_icu_assignment,
+            [_open_icu(), duplicate],
+            known_at=utc(2024, 5, 1),
+        )
 
 
 def test_riley_cannot_take_a_full_icu_seat_already_held_by_jordan(
