@@ -58,14 +58,46 @@ if [[ ! -f "${requirements_path}" ]]; then
   exit 1
 fi
 
-mapfile -t package_lines < <(grep -Ev '^[[:space:]]*(#|$)' "${requirements_path}")
+# pip requirements may carry multiple platform-specific hashes on backslash-
+# continued physical lines. Validate and count logical requirements so adding
+# reviewed wheel hashes cannot be misclassified as extra packages.
+mapfile -t package_lines < <(
+  awk '
+    /^[[:space:]]*(#|$)/ { next }
+    {
+      line=$0
+      sub(/^[[:space:]]+/, "", line)
+      continues=(line ~ /\\[[:space:]]*$/)
+      sub(/[[:space:]]*\\[[:space:]]*$/, "", line)
+      if (logical == "") {
+        logical=line
+      } else {
+        logical=logical " " line
+      }
+      if (!continues) {
+        print logical
+        logical=""
+      }
+    }
+    END {
+      if (logical != "") {
+        print "__UNTERMINATED__ " logical
+      }
+    }
+  ' "${requirements_path}"
+)
+
 if [[ "${#package_lines[@]}" -ne 7 ]]; then
   printf 'Foundation CI requirements must contain the seven reviewed direct/runtime test packages.\n' >&2
   exit 1
 fi
 
 for package_line in "${package_lines[@]}"; do
-  if [[ ! "${package_line}" =~ ^[A-Za-z0-9._-]+==[0-9][A-Za-z0-9._-]*[[:space:]]--hash=sha256:[0-9a-f]{64}$ ]]; then
+  if [[ "${package_line}" == __UNTERMINATED__* ]]; then
+    printf 'Foundation CI requirement has an unterminated continuation: %s\n' "${package_line#__UNTERMINATED__ }" >&2
+    exit 1
+  fi
+  if [[ ! "${package_line}" =~ ^[A-Za-z0-9._-]+==[0-9][A-Za-z0-9._-]*([[:space:]]--hash=sha256:[0-9a-f]{64})+$ ]]; then
     printf 'Unpinned or unhashed Foundation CI requirement: %s\n' "${package_line}" >&2
     exit 1
   fi
