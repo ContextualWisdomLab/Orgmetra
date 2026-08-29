@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+import orgmetra_interview_plan.activation as activation_module
 from orgmetra_interview_plan import (
     StructuredInterviewActivationReceipt,
     activate_structured_interview_plan,
@@ -40,3 +41,35 @@ def test_issued_activation_receipt_cannot_be_replaced_with_unverified_scope():
 
     with pytest.raises(TypeError, match="activate_structured_interview_plan"):
         replace(receipt, plan_digest="b" * 64)
+
+
+def test_issued_activation_receipt_rejects_post_issuance_rewrite():
+    """Reject low-level rewriting of already-issued canonical activation evidence."""
+    candidate_plan = plan()
+    receipt = activate_structured_interview_plan(
+        plan=candidate_plan,
+        authority=AllowingAuthority(verification_for(candidate_plan)),
+        approving_actor_reference=APPROVER,
+        approved_at=APPROVED_AT,
+    )
+    object.__setattr__(receipt, "plan_digest", "b" * 64)
+
+    with pytest.raises(ValueError, match="changed after activation receipt issuance"):
+        receipt.canonical_json()
+    with pytest.raises(ValueError, match="changed after activation receipt issuance"):
+        receipt.sha256_digest()
+
+
+def test_missing_process_local_activation_receipt_issuance_evidence_fails_closed():
+    """Reject canonical export when process-local issuance evidence is unavailable."""
+    candidate_plan = plan()
+    receipt = activate_structured_interview_plan(
+        plan=candidate_plan,
+        authority=AllowingAuthority(verification_for(candidate_plan)),
+        approving_actor_reference=APPROVER,
+        approved_at=APPROVED_AT,
+    )
+    activation_module._discard_activation_receipt_seal(id(receipt))
+
+    with pytest.raises(ValueError, match="changed after activation receipt issuance"):
+        receipt.canonical_json()
