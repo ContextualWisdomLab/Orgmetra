@@ -37,8 +37,10 @@ Consequences:
 
 | Merged PR | Capability |
 |---|---|
+| #23 | Governed audit/outbox envelope and durable delivery evidence |
 | #25 | Governed Job Analysis evidence boundary |
 | #26 | `validity_study_case_record` integrity |
+| #27 | Purpose-bound PII authorization and least-privilege capability boundary |
 | #28 | Performance-criterion Job-scope guard |
 | #31 | Governed People mutation API |
 | #32 | Governed Naruon calendar intent adapter |
