@@ -39,6 +39,7 @@ _NEXT_ACTION = (
 )
 _PROCESS_PLAN_SEAL_KEY = secrets.token_bytes(32)
 _PLAN_SEALS: dict[int, str] = {}
+_PLAN_REFERENCE_BINDINGS: set[tuple[str, str]] = set()
 _PLAN_SEALS_LOCK = RLock()
 
 
@@ -46,6 +47,22 @@ def _discard_plan_seal(plan_id: int) -> None:
     """Discard process-local issuance evidence after its monitoring plan is collected."""
     with _PLAN_SEALS_LOCK:
         _PLAN_SEALS.pop(plan_id, None)
+
+
+def _discard_plan_reference_binding(binding: tuple[str, str]) -> None:
+    """Release one process-local tenant-qualified monitoring-plan reference binding."""
+    with _PLAN_SEALS_LOCK:
+        _PLAN_REFERENCE_BINDINGS.discard(binding)
+
+
+def _register_plan_reference_binding(plan: SelectionOutcomeMonitoringPlan) -> None:
+    """Reject ambiguous simultaneous issuance under one tenant-qualified plan reference."""
+    binding = (plan.tenant_record_id, plan.monitoring_plan_reference)
+    with _PLAN_SEALS_LOCK:
+        if binding in _PLAN_REFERENCE_BINDINGS:
+            raise ValueError("monitoring_plan_reference already has a live issuance")
+        _PLAN_REFERENCE_BINDINGS.add(binding)
+    finalize(plan, _discard_plan_reference_binding, binding)
 
 
 def _register_plan_seal(plan: object, seal: str) -> None:
@@ -247,6 +264,7 @@ class SelectionOutcomeMonitoringPlan:
             raise ValueError("review_state must remain requires_human_review")
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed monitoring instruction")
+        _register_plan_reference_binding(self)
         _register_plan_seal(self, _seal_plan(_canonical_plan_json_unchecked(self)))
 
     def __repr__(self) -> str:
