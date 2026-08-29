@@ -12,6 +12,7 @@
 - Fail-closed prevention of Person PII, compensation values, free-form model output, noncanonical references, malformed evidence digests, free-form sensitive reason metadata, invalid evidence versions, and direct-construction governance bypasses.
 - Issuance-time normalization of `generated_at` to a detached built-in UTC instant, with rejection of future instants and fail-closed handling of mutable, missing, raising, or overflowing timezone providers so canonical evidence cannot change after issuance through caller-owned timezone behavior.
 - Process-local HMAC issuance evidence stored outside packet-writable slots over exact construction-time canonical JSON; valid-value post-issuance rewrites and missing issuance state now fail closed before canonical JSON/SHA-256 export. Durable uniqueness, authorization, and immutable audit/outbox remain authoritative host/persistence responsibilities.
+- `Assignment Change Review Quality` now retriggers on shared repository Python/test/clean-checkout configuration, with an executable regression that prevents package-quality evidence from staying stale after shared tooling changes.
 
 ### Changed
 
