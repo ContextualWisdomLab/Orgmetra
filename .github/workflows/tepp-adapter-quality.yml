@@ -13,6 +13,14 @@ on:
       - "docs/traceability/tepp-analysis-adapter.md"
       - ".github/requirements/foundation-test.txt"
       - ".github/workflows/tepp-adapter-quality.yml"
+      - ".gitignore"
+      - ".python-version"
+      - "conftest.py"
+      - "packages/conftest.py"
+      - "pyproject.toml"
+      - "pytest.ini"
+      - "setup.cfg"
+      - "tox.ini"
   workflow_dispatch:
 
 permissions:
