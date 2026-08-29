@@ -9,6 +9,7 @@ on:
       - "database/migrations/**"
       - "tests/test_candidate_withdrawal_postgres.sh"
       - "tests/test_candidate_withdrawal_security_postgres.sh"
+      - "tests/test_candidate_withdrawal_migration_upgrade_postgres.sh"
       - ".github/workflows/candidate-withdrawal-quality.yml"
       - "docs/adr/0027-governed-candidate-withdrawal.md"
       - "docs/traceability/candidate-withdrawal.md"
