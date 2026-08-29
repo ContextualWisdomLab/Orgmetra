@@ -19,11 +19,12 @@
 | Foreign-tenant and future-recorded facts cannot leak into the requested snapshot | `test_snapshot_exposes_only_visible_tenant_structure_with_deterministic_evidence` |
 | Input ordering cannot change evidence bytes or digest | `test_snapshot_is_independent_of_input_version_order` |
 | A timezone-naive knowledge cutoff fails closed even for empty input | `test_builder_rejects_naive_cutoff_even_when_no_units_are_visible` |
+| Mutable, unrepresentable, or provider-controlled knowledge cutoffs cannot rewrite evidence | `test_snapshot_detaches_mutable_timezone_before_canonicalization`; temporal-integrity regressions |
 | Public snapshot construction cannot bypass awareness, unique-unit, canonical-order, or acyclic-graph invariants | `test_direct_snapshot_rejects_*` |
 | Two simultaneously visible versions for one organization unit fail closed | `test_builder_rejects_two_visible_parent_versions_for_one_unit` |
 | Opaque parent anchors missing from the visible coordinate are retained rather than silently promoted to roots | deterministic parent-link assertion in the primary snapshot regression |
 
-All listed regressions are in `packages/hris-kernel/tests/test_organization_hierarchy_snapshot.py`. The existing `Workforce Intelligence Quality` workflow runs the complete HRIS kernel with exact statement and branch coverage requirements whenever `packages/hris-kernel/**` changes.
+The listed structural regressions are in `packages/hris-kernel/tests/test_organization_hierarchy_snapshot.py`; temporal hardening is in `packages/hris-kernel/tests/test_organization_hierarchy_temporal_integrity.py`. The existing `Workforce Intelligence Quality` workflow runs the complete HRIS kernel with exact statement and branch coverage requirements whenever `packages/hris-kernel/**` changes.
 
 ## Data and decision boundary
 
