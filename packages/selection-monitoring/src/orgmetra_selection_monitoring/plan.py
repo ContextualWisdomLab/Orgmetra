@@ -49,9 +49,11 @@ def _discard_plan_seal(plan_id: int) -> None:
 
 
 def _register_plan_seal(plan: object, seal: str) -> None:
-    """Bind one live monitoring-plan identity to evidence outside writable slots."""
+    """Bind one live monitoring-plan identity exactly once outside writable slots."""
     plan_id = id(plan)
     with _PLAN_SEALS_LOCK:
+        if plan_id in _PLAN_SEALS:
+            raise ValueError("selection monitoring plan issuance evidence already exists")
         _PLAN_SEALS[plan_id] = seal
     finalize(plan, _discard_plan_seal, plan_id)
 
