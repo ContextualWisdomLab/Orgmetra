@@ -19,6 +19,10 @@ ALTER TABLE public.position_record
 ADD CONSTRAINT position_record_tenant_position_job_unique
 UNIQUE (tenant_record_id, position_record_id, job_profile_id);
 
+-- Table creation stays search-path-qualified rather than schema-qualified because
+-- the repository foundation validator applies the same descriptive two-word
+-- snake_case rule to an explicit schema token. SET LOCAL search_path above keeps
+-- these objects owned by public without weakening that repository-wide check.
 -- The durable application identity is immutable. The candidate/requisition pair
 -- identifies the application; correctable Job/Position scope belongs to the
 -- bitemporal version relation below so stage history never has to change anchor.

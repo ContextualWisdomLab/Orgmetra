@@ -53,8 +53,10 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0013-governed-requisition-review-packet.md',
    'docs/adr/0014-job-analysis-snapshot-persistence.md',
    'docs/adr/0026-normalized-candidate-application.md',
+   'docs/adr/0027-governed-candidate-withdrawal.md',
    'docs/doctoring/REFERENCES.md',
    'docs/doctoring/candidate-application-references.md',
+   'docs/doctoring/candidate-withdrawal-references.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
   'database/migrations/0001_foundation_schema.sql',
@@ -70,10 +72,14 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
   'database/migrations/0013_job_analysis_snapshot.sql',
-   'database/migrations/0014_candidate_application_core.sql',
-   'docs/traceability/candidate-application-core.md',
-   '.github/workflows/candidate-application-quality.yml',
-   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
+  'database/migrations/0014_candidate_application_core.sql',
+  'database/migrations/0015_candidate_withdrawal_governance.sql',
+  'database/migrations/0016_candidate_withdrawal_audit_envelope.sql',
+  'docs/traceability/candidate-application-core.md',
+  'docs/traceability/candidate-withdrawal.md',
+  '.github/workflows/candidate-application-quality.yml',
+  '.github/workflows/candidate-withdrawal-quality.yml',
+  'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
   'scripts/foundation-contract-core.mjs',
@@ -97,6 +103,9 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/test_job_analysis_snapshot_postgres.sh',
+  'tests/test_candidate_withdrawal_postgres.sh',
+  'tests/test_candidate_withdrawal_security_postgres.sh',
+  'tests/test_candidate_withdrawal_migration_upgrade_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -124,7 +133,7 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'job_analysis_snapshot', 'job_analysis_task_item', 'job_analysis_ksao_item',
   'job_analysis_task_ksao_link', 'job_analysis_write_command',
   'candidate_application_record', 'candidate_application_record_version',
-  'candidate_application_stage_record',
+  'candidate_application_stage_record', 'candidate_withdrawal_record',
   'qualification_rule', 'candidate_profile',
   'requisition_record', 'application_record', 'application_stage_history',
   'decision_evidence_set', 'selection_decision_evidence',
@@ -161,7 +170,8 @@ export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
   'validity_study_case_record',
   'candidate_application_record',
   'candidate_application_record_version',
-  'candidate_application_stage_record'
+  'candidate_application_stage_record',
+  'candidate_withdrawal_record'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
