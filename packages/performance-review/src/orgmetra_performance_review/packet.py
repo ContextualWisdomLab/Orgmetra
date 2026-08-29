@@ -182,6 +182,7 @@ class PerformanceReviewPacket:
     contains_personal_data: bool = True
     contains_direct_person_identifiers: bool = True
     contains_rating_value: bool = False
+    contains_free_form_feedback: bool = False
     contains_free_form_model_output: bool = False
     human_confirmation_required: bool = True
     decision_authority: str = _DECISION_AUTHORITY
@@ -253,6 +254,8 @@ class PerformanceReviewPacket:
             )
         if self.contains_rating_value is not False:
             raise ValueError("performance review packet must not contain rating values")
+        if self.contains_free_form_feedback is not False:
+            raise ValueError("performance review packet must not contain free-form feedback")
         if self.contains_free_form_model_output is not False:
             raise ValueError("performance review packet must not contain free-form model output")
         if self.human_confirmation_required is not True:
@@ -288,6 +291,7 @@ def _canonical_packet_json_unchecked(packet: PerformanceReviewPacket) -> str:
     """Render canonical bytes without consulting process-local issuance state."""
     payload = {
         "contains_direct_person_identifiers": packet.contains_direct_person_identifiers,
+        "contains_free_form_feedback": packet.contains_free_form_feedback,
         "contains_free_form_model_output": packet.contains_free_form_model_output,
         "contains_personal_data": packet.contains_personal_data,
         "contains_rating_value": packet.contains_rating_value,
