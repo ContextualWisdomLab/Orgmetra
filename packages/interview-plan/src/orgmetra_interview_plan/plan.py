@@ -9,9 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
+import hmac
 import json
 import re
+import secrets
+from threading import RLock
 from uuid import UUID
+from weakref import finalize
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -27,6 +31,38 @@ _NEXT_ACTION = (
     "this structured interview plan."
 )
 _MAX_EVIDENCE_VERSION = 2_147_483_647
+_PROCESS_PLAN_SEAL_KEY = secrets.token_bytes(32)
+_PLAN_SEALS: dict[int, str] = {}
+_PLAN_SEALS_LOCK = RLock()
+
+
+def _discard_plan_seal(plan_id: int) -> None:
+    """Discard process-local issuance evidence after the plan is collected."""
+    with _PLAN_SEALS_LOCK:
+        _PLAN_SEALS.pop(plan_id, None)
+
+
+def _register_plan_seal(plan: object, seal: str) -> None:
+    """Bind one live plan identity to evidence outside plan-writable slots."""
+    plan_id = id(plan)
+    with _PLAN_SEALS_LOCK:
+        _PLAN_SEALS[plan_id] = seal
+    finalize(plan, _discard_plan_seal, plan_id)
+
+
+def _authoritative_plan_seal(plan: object) -> str | None:
+    """Return process-local issuance evidence without trusting plan-owned state."""
+    with _PLAN_SEALS_LOCK:
+        return _PLAN_SEALS.get(id(plan))
+
+
+def _seal_plan(payload_json: str) -> str:
+    """Bind one process-local plan issuance to exact canonical payload bytes."""
+    return hmac.new(
+        _PROCESS_PLAN_SEAL_KEY,
+        payload_json.encode("utf-8"),
+        "sha256",
+    ).hexdigest()
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -74,7 +110,7 @@ def _canonical_timestamp(value: datetime, field_name: str = "generated_at") -> s
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
 class StructuredInterviewPlan:
     """Immutable candidate-neutral interview-plan evidence awaiting human approval."""
 
@@ -150,13 +186,14 @@ class StructuredInterviewPlan:
             raise ValueError("review_state must remain requires_human_approval")
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed interview-plan instruction")
+        _register_plan_seal(self, _seal_plan(self._canonical_json_unchecked()))
 
     def __repr__(self) -> str:
         """Return a fully redacted representation safe for routine logs and assertions."""
         return "StructuredInterviewPlan(<redacted>)"
 
-    def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit correlation."""
+    def _canonical_json_unchecked(self) -> str:
+        """Render canonical plan bytes without process-local issuance state."""
         payload = {
             "competency_references": list(self.competency_references),
             "evidence_version": self.evidence_version,
@@ -183,8 +220,18 @@ class StructuredInterviewPlan:
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
+    def canonical_json(self) -> str:
+        """Return creation-bound canonical JSON for immutable audit correlation."""
+        canonical = self._canonical_json_unchecked()
+        authoritative_seal = _authoritative_plan_seal(self)
+        if type(authoritative_seal) is not str:
+            raise ValueError("structured interview plan issuance evidence is unavailable")
+        if not hmac.compare_digest(_seal_plan(canonical), authoritative_seal):
+            raise ValueError("structured interview plan changed after plan issuance")
+        return canonical
+
     def sha256_digest(self) -> str:
-        """Return SHA-256 over the exact canonical UTF-8 plan."""
+        """Return SHA-256 over the exact creation-bound canonical UTF-8 plan."""
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
