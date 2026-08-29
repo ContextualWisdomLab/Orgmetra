@@ -249,6 +249,7 @@ def test_requested_fields_are_bounded_sorted_unique_exact_tuple(fields: object) 
         ForgedDateTime(2026, 8, 22, 4, 0, tzinfo=timezone.utc),
         datetime(2026, 8, 22, 4, 0, tzinfo=OffsetlessTimezone()),
         datetime(2026, 8, 22, 4, 0, tzinfo=ExplodingTimezone()),
+        datetime(2099, 8, 22, 4, 0, tzinfo=timezone.utc),
     ],
 )
 def test_generated_at_requires_safe_timezone_aware_builtin_datetime(

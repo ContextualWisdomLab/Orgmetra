@@ -7,6 +7,7 @@ All notable package-local changes are documented here. Protected-repository rele
 ### Added
 
 - Value-minimized `HrDataExportReviewPacket` for pre-export HR data review.
+- Reject future values for the system-recorded generation timestamp.
 - Exact tenant/resource/authorization provenance correlation without HR field values.
 - Explicit bounded field minimization, requester/reviewer separation, closed reason/format/destination vocabularies, and human-review-required state.
 - UTC timestamp detachment from caller-controlled timezone providers and serialization-time integrity revalidation.

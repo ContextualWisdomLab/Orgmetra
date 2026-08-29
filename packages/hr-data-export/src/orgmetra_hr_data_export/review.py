@@ -255,6 +255,8 @@ class HrDataExportReviewPacket:
             object.__setattr__(self, "generated_at", _freeze_timestamp(self.generated_at))
         else:
             _validate_frozen_timestamp(self.generated_at)
+        if self.generated_at > datetime.now(timezone.utc):
+            raise ValueError("generated_at cannot be in the future")
         _validate_evidence_version(self.evidence_version)
         if self.contains_pii_values is not False:
             raise ValueError("HR data export review packet must not contain PII values")
