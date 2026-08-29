@@ -74,4 +74,4 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Notes
 
-- Protected `develop` at `e7ddb7a78a5e1460410005d10f43ebf18c5e12e4` includes normalized validity-study and criterion integrity, bitemporal workforce composition, governed candidate-to-worker conversion, purpose-bound PII authorization, GET-only People reads, governed People mutation/idempotency API, and the accepted ADR 0001–0003 source expansion integrated by #37. Job Analysis persistence/API and the selection-review packet remain active-PR truth until their unchanged exact heads satisfy fresh gates and merge.
+- Protected `develop` at `9e3e4847510e1e612b48474ba42b177b8ed824df` includes normalized validity-study and criterion integrity, bitemporal workforce composition, governed candidate-to-worker conversion, purpose-bound PII authorization, GET-only People reads, governed People mutation/idempotency API, and the accepted ADR 0001–0003 source expansion integrated by #37. Job Analysis persistence/API and the selection-review packet remain active-PR truth until their unchanged exact heads satisfy fresh gates and merge.
