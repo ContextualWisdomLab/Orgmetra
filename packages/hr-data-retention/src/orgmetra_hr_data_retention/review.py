@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 import hashlib
 import json
 import re
+from threading import Lock
 from typing import ClassVar
 from uuid import UUID
+import weakref
 
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _UUID_MAX = (1 << 128) - 1
+_PACKET_SEALS_LOCK = Lock()
 
 
 def _require_text(value: object, field_name: str, *, max_length: int = 200) -> str:
@@ -111,7 +114,7 @@ def _canonical_digest(document: dict[str, object]) -> str:
     return hashlib.sha256(_canonical_json(document).encode("utf-8")).hexdigest()
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+@dataclass(frozen=True, slots=True, weakref_slot=True, repr=False, eq=False)
 class HrDataRetentionReviewPacket:
     """Bind one HR retention review while remaining explicitly unauthorized to delete data."""
 
@@ -152,20 +155,17 @@ class HrDataRetentionReviewPacket:
     reviewer_actor_reference: str
     evidence_version: int
     recorded_at: datetime
-    _creation_evidence_digest: str = field(init=False, repr=False, compare=False)
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         """Keep trust-bearing derived authority from being overridden by subclasses."""
         raise TypeError("HrDataRetentionReviewPacket is final and cannot be subclassed")
 
     def __post_init__(self) -> None:
-        """Validate fields and seal the exact creation-time canonical evidence digest."""
+        """Validate fields and seal creation evidence outside packet-writable state."""
         self._validate_fields()
-        object.__setattr__(
-            self,
-            "_creation_evidence_digest",
-            _canonical_digest(self._render_canonical_document()),
-        )
+        creation_digest = _canonical_digest(self._render_canonical_document())
+        with _PACKET_SEALS_LOCK:
+            _PACKET_SEALS[self] = creation_digest
 
     def _validate_fields(self) -> None:
         """Validate every trust-bearing field without relying on creation-time state."""
@@ -222,7 +222,10 @@ class HrDataRetentionReviewPacket:
     def _assert_integrity(self) -> None:
         """Reject malformed fields or valid-looking evidence changed after construction."""
         self._validate_fields()
-        if _canonical_digest(self._render_canonical_document()) != self._creation_evidence_digest:
+        current_digest = _canonical_digest(self._render_canonical_document())
+        with _PACKET_SEALS_LOCK:
+            creation_digest = _PACKET_SEALS.get(self)
+        if current_digest != creation_digest:
             raise ValueError("retention review evidence changed after construction")
 
     @property
@@ -323,3 +326,6 @@ class HrDataRetentionReviewPacket:
     def __repr__(self) -> str:
         """Keep tenant and policy correlation references out of routine logs."""
         return "HrDataRetentionReviewPacket(<redacted>)"
+
+
+_PACKET_SEALS: weakref.WeakKeyDictionary[HrDataRetentionReviewPacket, str] = weakref.WeakKeyDictionary()

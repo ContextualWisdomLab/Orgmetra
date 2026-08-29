@@ -92,3 +92,10 @@ def test_canonicalization_rejects_valid_legal_hold_evidence_replacement() -> Non
     object.__setattr__(review, "legal_hold_digest", "b" * 64)
     with pytest.raises(ValueError, match="changed after construction"):
         review.canonical_json()
+
+
+def test_creation_seal_is_not_packet_writable() -> None:
+    """A caller cannot replace an in-object seal because creation evidence is external."""
+    review = _packet()
+    with pytest.raises(AttributeError):
+        object.__setattr__(review, "_creation_evidence_digest", "f" * 64)
