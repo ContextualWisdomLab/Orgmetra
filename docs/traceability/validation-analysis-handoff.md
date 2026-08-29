@@ -17,6 +17,7 @@ Can an organization send one exact, reviewable validation study to its statistic
 | Execution boundary | `not_executed`, `scientific_evidence_only`, read-only pinned foreign dependency | immutable governance regressions |
 | Reproducibility | construction-time UTC timestamp snapshots, finite numeric snapshots, canonical RFC 3339 time, canonical JSON, SHA-256 handoff digest | mutable timezone/numeric and UTC-boundary regressions plus deterministic serialization/digest tests |
 | Decision-record integrity | ADR numbers remain unique repository-wide and any `docs/adr/**` change reaches the validity quality gate | ADR uniqueness regression plus workflow-trigger contract regression |
+| Quality-evidence freshness | package quality reruns whenever shared repository Python/test/clean-checkout configuration can alter execution or tracked-tree cleanliness | `test_quality_workflow_retriggers_on_shared_test_configuration` plus `.github/workflows/validity-analysis-quality.yml`; this supplemental package gate does not replace central required workflows |
 
 ## Maturity
 
