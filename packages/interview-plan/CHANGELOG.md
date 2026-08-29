@@ -19,6 +19,7 @@
 - Validate `approved_at` before authoritative activation work, reject approval evidence that predates the reviewed plan's `generated_at`, and pass that exact instant into `StructuredInterviewActivationAuthority.verify_activation(...)` so receipt chronology cannot be minted from a timestamp the authoritative adapter never reviewed.
 - Require the exact governed `StructuredInterviewPlan` runtime type before any activation authority work, preventing duck-typed or subclassed plan-shaped objects from bypassing construction invariants and producing approval evidence.
 - Snapshot the exact canonical plan evidence before calling the injected activation authority, reject any plan mutation observed across that call, and build verification scope plus the activation receipt from the pre-call snapshot so authority-time in-memory rewriting cannot become approved audit evidence.
+- Bind every successfully issued activation receipt to a process-local HMAC seal stored outside receipt-writable slots; canonical JSON and SHA-256 export now fail closed if already-issued receipt fields are rewritten or the creation-bound issuance evidence is unavailable.
 
 ### Security and privacy
 
@@ -26,4 +27,5 @@
 - Close plan `reason_code` to `approved_requisition_interview` and activation governance to fixed `structured_interview_activation` / `human_approved_plan_activation` codes.
 - Require exact built-in tuple containers for competency/panel reference collections and exact built-in strings for fixed `review_state` / `next_action` evidence before canonicalization, preventing caller-controlled runtime subclasses from passing validation and later switching serialized immutable evidence.
 - Redact both `StructuredInterviewPlan` and `StructuredInterviewActivationReceipt` representations so routine logs and assertion failures do not expose sensitive correlations or evidence digests.
-- State explicitly that UUID/digest correlation, reference-string inequality, and the authority protocol do not by themselves prove tenant ownership, authoritative relationship validity, actor identity separation, scientific validity, fairness, or legal compliance.
+- Treat the process-local activation-receipt seal strictly as in-memory issuance-integrity evidence, not as a durable audit store, portable signature, cross-process verification key, or substitute for the host's immutable audit/outbox contract.
+- State explicitly that UUID/digest correlation, reference-string inequality, runtime receipt seals, and the authority protocol do not by themselves prove tenant ownership, authoritative relationship validity, actor identity separation, scientific validity, fairness, or legal compliance.
