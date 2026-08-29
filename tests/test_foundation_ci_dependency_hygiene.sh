@@ -103,8 +103,23 @@ for package_line in "${package_lines[@]}"; do
   fi
 done
 
+package_line_is_present() {
+  local package_name="$1"
+  shift
+  printf '%s\n' "$@" | grep -Eq "^${package_name}=="
+}
+
+stress_package_lines=()
+for _ in {1..128}; do
+  stress_package_lines+=("${package_lines[@]}")
+done
+if ! package_line_is_present coverage "${stress_package_lines[@]}"; then
+  printf 'Foundation CI required-package lookup must remain reliable under pipefail after an early match.\n' >&2
+  exit 1
+fi
+
 for package_name in coverage iniconfig packaging pluggy Pygments pytest pytest-cov; do
-  if ! printf '%s\n' "${package_lines[@]}" | grep -Eq "^${package_name}=="; then
+  if ! package_line_is_present "${package_name}" "${package_lines[@]}"; then
     printf 'Foundation CI requirement is missing: %s\n' "${package_name}" >&2
     exit 1
   fi
