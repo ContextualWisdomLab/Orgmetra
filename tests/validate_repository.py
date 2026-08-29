@@ -55,6 +55,7 @@ REQUIRED = [
     "docs/adr/0012-governed-migration-handoff.md",
     "docs/adr/0013-governed-requisition-review-packet.md",
     "docs/adr/0014-job-analysis-snapshot-persistence.md",
+    "docs/adr/0125-performance-goal-plan-persistence.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -71,6 +72,8 @@ REQUIRED = [
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
+    "database/migrations/0029_performance_goal_plan_persistence.sql",
+    "database/migrations/0030_performance_goal_plan_evidence_binding.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -92,6 +95,7 @@ REQUIRED = [
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
+    "tests/test_performance_goal_plan_persistence_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -139,7 +143,7 @@ def _expected_manifest_document() -> dict[str, Any]:
     return {
         "package": "orgmetra-foundation-pack",
         "version": "0.1.0",
-        "generated_for_branch": "feat/audit-outbox-envelope",
+        "generated_for_branch": "feat/performance-goal-plan-persistence",
         "files": files,
     }
 
@@ -153,10 +157,10 @@ def _manifest_entries() -> dict[str, dict[str, Any]]:
 
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         _fail("manifest.json must contain a files array")
-    if manifest.get("generated_for_branch") != "feat/audit-outbox-envelope":
+    if manifest.get("generated_for_branch") != "feat/performance-goal-plan-persistence":
         _fail(
             "manifest generated_for_branch must identify the active generation branch "
-            "feat/audit-outbox-envelope"
+            "feat/performance-goal-plan-persistence"
         )
 
     entries: dict[str, dict[str, Any]] = {}
