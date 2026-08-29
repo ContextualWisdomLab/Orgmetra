@@ -139,6 +139,7 @@ class ForgedText(str):
         ("recorded_at", date(2026, 8, 22)),
         ("recorded_at", datetime(2026, 8, 22, 6, 0)),
         ("recorded_at", datetime(2026, 8, 22, 15, 0, tzinfo=timezone(timedelta(hours=9)))),
+        ("recorded_at", datetime(2099, 8, 22, 6, 0, tzinfo=timezone.utc)),
     ],
 )
 def test_rejects_noncanonical_or_unreviewable_governance_values(

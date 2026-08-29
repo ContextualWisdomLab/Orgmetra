@@ -15,15 +15,15 @@ def test_review_exactly_on_due_date_still_requires_retention() -> None:
         record_category_code="candidate_employment_record",
         retention_policy_reference="retention_policy:550e8400-e29b-41d4-a716-446655440001",
         retention_policy_digest="a" * 64,
-        retention_due_on=date(2026, 8, 31),
-        reviewed_on=date(2026, 8, 31),
+        retention_due_on=date(2025, 8, 31),
+        reviewed_on=date(2025, 8, 31),
         legal_hold_state="clear",
         legal_hold_reference=None,
         legal_hold_digest=None,
         requester_actor_reference="actor:550e8400-e29b-41d4-a716-446655440002",
         reviewer_actor_reference="actor:550e8400-e29b-41d4-a716-446655440005",
         evidence_version=1,
-        recorded_at=datetime(2026, 8, 31, 12, 0, tzinfo=timezone.utc),
+        recorded_at=datetime(2025, 8, 31, 12, 0, tzinfo=timezone.utc),
     )
 
     assert packet.retention_window_state == "retain_until_due"
