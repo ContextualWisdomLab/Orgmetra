@@ -10,3 +10,4 @@
 - Reject impossible aggregate missingness where complete observations overlap either predictor-missing or criterion-missing counts beyond the sample total.
 - Require exact governed missingness/convergence runtime types so subclass method overrides cannot inject unreviewed or person-level fields into canonical result evidence.
 - Freeze exact UTC timestamps and finite numeric values at construction, and reject runtime-type forgery before canonical evidence serialization.
+- Make `Validity Analysis Handoff Quality` retrigger on shared repository Python/test/clean-checkout configuration, with an executable regression preventing stale package-quality evidence after shared tooling changes.
