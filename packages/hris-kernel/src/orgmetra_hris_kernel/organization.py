@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 from uuid import UUID
@@ -26,18 +26,37 @@ def _validate_operational_uuid(field_name: str, value: object) -> UUID:
     return value
 
 
-def _validate_hierarchy_temporal_coordinate(effective_on: date, known_at: datetime) -> None:
-    """Require exact built-in business and recorded-time values before hierarchy use."""
+def _validate_hierarchy_temporal_coordinate(effective_on: date, known_at: object) -> datetime:
+    """Validate and detach exact business and recorded-time values before hierarchy use."""
     if type(effective_on) is not date:
         raise IntervalError(
             "Organization hierarchy snapshot effective date must be a calendar date.",
             next_action="Provide an exact business date, then rebuild the hierarchy snapshot.",
         )
-    if type(known_at) is not datetime or known_at.utcoffset() is None:
+    if type(known_at) is not datetime or known_at.tzinfo is None:
         raise IntervalError(
             "Organization hierarchy snapshot knowledge cutoff must be timezone-aware.",
             next_action="Convert the knowledge cutoff to UTC, then rebuild the hierarchy snapshot.",
         )
+    try:
+        offset = known_at.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise IntervalError(
+            "Organization hierarchy snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the hierarchy snapshot.",
+        ) from exc
+    if type(offset) is not timedelta:
+        raise IntervalError(
+            "Organization hierarchy snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the hierarchy snapshot.",
+        )
+    try:
+        return (known_at.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise IntervalError(
+            "Organization hierarchy snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the hierarchy snapshot.",
+        ) from exc
 
 
 def _visible_parent_links(
@@ -49,7 +68,7 @@ def _visible_parent_links(
 ) -> tuple[tuple[UUID, UUID | None], ...]:
     """Resolve one visible parent link per tenant organization unit in stable order."""
     _validate_operational_uuid("tenant_record_id", tenant_record_id)
-    _validate_hierarchy_temporal_coordinate(effective_on, known_at)
+    known_at = _validate_hierarchy_temporal_coordinate(effective_on, known_at)
     scoped = [
         version
         for version in organization_versions
@@ -131,7 +150,8 @@ class OrganizationHierarchySnapshot:
 
     def __post_init__(self) -> None:
         """Detach caller-owned containers and reject ambiguous hierarchy evidence."""
-        _validate_hierarchy_temporal_coordinate(self.effective_on, self.known_at)
+        known_at = _validate_hierarchy_temporal_coordinate(self.effective_on, self.known_at)
+        object.__setattr__(self, "known_at", known_at)
         object.__setattr__(
             self,
             "parent_links",
@@ -175,9 +195,18 @@ class OrganizationHierarchySnapshot:
 
     def canonical_json(self) -> str:
         """Return deterministic hierarchy evidence for audit and reporting correlation."""
+        if (
+            type(self.effective_on) is not date
+            or type(self.known_at) is not datetime
+            or self.known_at.tzinfo is not timezone.utc
+        ):
+            raise IntervalError(
+                "Organization hierarchy snapshot temporal evidence is not detached UTC data.",
+                next_action="Rebuild the hierarchy snapshot from exact temporal coordinates.",
+            )
         payload = {
             "effective_on": self.effective_on.isoformat(),
-            "known_at": self.known_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "known_at": self.known_at.isoformat().replace("+00:00", "Z"),
             "parent_links": [
                 {
                     "organization_unit_id": str(unit_id),
@@ -266,6 +295,7 @@ def build_organization_hierarchy_snapshot(
         SingleValuedFactError: One unit has contradictory visible versions.
         OrganizationHierarchyError: Visible parent links contain a cycle or a known foreign-tenant anchor.
     """
+    known_at = _validate_hierarchy_temporal_coordinate(effective_on, known_at)
     return OrganizationHierarchySnapshot(
         tenant_record_id=tenant_record_id,
         effective_on=effective_on,
