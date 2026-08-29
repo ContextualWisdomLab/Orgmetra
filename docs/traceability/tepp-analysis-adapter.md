@@ -4,7 +4,7 @@
 |---|---|---|---|
 | No foreign table access or duplicated TEPP kernels | `orgmetra_tepp_adapter.analysis` contains only request/governance binding logic | package source review; no TEPP runtime dependency | implemented_on_active_pr |
 | Exact TEPP analysis-run v1 request shape | `TeppAnalysisRequestPacket.tepp_request()` | exact seven-field regression against reviewed TEPP DTO | implemented_on_active_pr |
-| Temporal cutoff provenance | timezone-aware `knowledge_cutoff` → canonical RFC 3339 UTC | offset conversion, naive/null-offset rejection tests | implemented_on_active_pr |
+| Temporal cutoff provenance | timezone-aware `knowledge_cutoff` and `generated_at` → detached exact UTC instants and canonical RFC 3339 UTC | mutable-timezone stability, provider-failure, malformed-offset, arithmetic-overflow, naive/null-offset, and datetime-subclass rejection tests | implemented_on_active_pr |
 | Tenant/study/actor governance | authoritative canonical non-sentinel operational tenant UUID plus namespaced UUIDv4 Orgmetra references | protected-core UUIDv7 interoperability plus nil/max/noncanonical tenant rejection; wrong-namespace/reference-version regressions | implemented_on_active_pr |
 | Immutable analytical snapshot evidence | opaque TEPP snapshot ID plus independent SHA-256 `snapshot_digest` | digest format and governance-evidence regressions | implemented_on_active_pr |
 | Durable idempotency handoff | `idempotency_key` + deterministic `request_digest()` | exact-retry and same-key conflict regressions | implemented_on_active_pr |

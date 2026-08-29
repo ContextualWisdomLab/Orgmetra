@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import re
@@ -74,16 +74,26 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
-def _validate_aware_datetime(value: datetime, field_name: str) -> None:
-    """Require an exact built-in datetime with a real UTC offset."""
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+def _validate_aware_datetime(value: datetime, field_name: str) -> datetime:
+    """Validate and detach an exact built-in datetime to a UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
         raise ValueError(f"{field_name} must be a timezone-aware datetime")
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise ValueError(f"{field_name} must be a timezone-aware datetime") from exc
+    if type(offset) is not timedelta:
+        raise ValueError(f"{field_name} must be a timezone-aware datetime")
+    try:
+        return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise ValueError(f"{field_name} must be a timezone-aware datetime") from exc
 
 
-def _canonical_rfc3339(value: datetime) -> str:
+def _canonical_rfc3339(value: datetime, field_name: str = "knowledge_cutoff") -> str:
     """Render an aware instant as deterministic RFC 3339 UTC text."""
-    _validate_aware_datetime(value, "knowledge_cutoff")
-    return value.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    canonical = _validate_aware_datetime(value, field_name)
+    return canonical.isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def _validate_opaque_identifier(value: str, field_name: str, maximum_length: int = 256) -> None:
@@ -152,6 +162,16 @@ class TeppAnalysisRequestPacket:
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed boundary."""
+        object.__setattr__(
+            self,
+            "knowledge_cutoff",
+            _validate_aware_datetime(self.knowledge_cutoff, "knowledge_cutoff"),
+        )
+        object.__setattr__(
+            self,
+            "generated_at",
+            _validate_aware_datetime(self.generated_at, "generated_at"),
+        )
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(self.validation_study_reference, "validation_study", "validation_study_reference")
         _validate_reference(self.requested_by_actor_reference, "actor", "requested_by_actor_reference")
@@ -159,10 +179,8 @@ class TeppAnalysisRequestPacket:
         _validate_opaque_identifier(self.tepp_snapshot_id, "tepp_snapshot_id")
         _validate_digest(self.snapshot_digest, "snapshot_digest")
         _validate_idempotency_key(self.idempotency_key)
-        _validate_aware_datetime(self.knowledge_cutoff, "knowledge_cutoff")
         _validate_governed_code(self.model_contract_version, "model_contract_version")
         _validate_governed_code(self.output_profile, "output_profile")
-        _validate_aware_datetime(self.generated_at, "generated_at")
         if self.generated_at < self.knowledge_cutoff:
             raise ValueError("generated_at must not precede knowledge_cutoff")
         if self.tepp_workspace_id == self.tepp_snapshot_id:
@@ -260,7 +278,7 @@ class TeppAnalysisRequestPacket:
             "tepp_snapshot_id": self.tepp_snapshot_id,
             "snapshot_digest": self.snapshot_digest,
             "evidence_version": self.evidence_version,
-            "generated_at": _canonical_rfc3339(self.generated_at),
+            "generated_at": _canonical_rfc3339(self.generated_at, "generated_at"),
             "purpose_code": self.purpose_code,
             "tepp_contract_version": self.tepp_contract_version,
             "tepp_protected_revision": self.tepp_protected_revision,

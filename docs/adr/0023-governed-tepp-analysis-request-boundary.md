@@ -17,7 +17,7 @@ Orgmetra owns a small pre-transport adapter that:
 1. emits exactly the seven fields accepted by TEPP `AnalysisRunRequest` v1;
 2. pins the reviewed TEPP protected revision and contract version as evidence, not as permission to mutate TEPP;
 3. binds the request to an Orgmetra tenant, validation study, accountable actor, immutable snapshot digest, evidence version, and deterministic request digest;
-4. canonicalizes the temporal cutoff to RFC 3339 UTC and rejects naive instants;
+4. detaches the knowledge cutoff and generation instant to exact UTC datetimes, canonicalizes them to RFC 3339 UTC, and rejects naive or unusable instants;
 5. distinguishes exact same-key retries from same-key semantic conflicts;
 6. treats opaque correlations as linkable personal/governance data while refusing direct identity values, source text, and credentials at this boundary;
 7. performs no network transport until the host proves a compatible executable TEPP service contract is published and authorized; and
