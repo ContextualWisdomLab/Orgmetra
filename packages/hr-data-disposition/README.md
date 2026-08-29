@@ -19,7 +19,7 @@ The request binds only governance metadata and opaque references:
 
 No candidate/worker name, email, salary, assessment score, free-form HR payload, copied policy text, credential, or secret is part of the request. The request type is runtime-final so a caller cannot subclass it and replace derived non-authorizing properties with forged execution authority before canonical serialization.
 
-Construction seals the canonical request digest in a process-local identity-keyed weak registry outside packet-writable state. Canonicalization revalidates live fields and rejects a different valid policy, actor, date, or upstream-evidence value instead of creating a second audit fact; a caller cannot replace an in-object seal. Durable append-only audit, replay/idempotency, and execution authorization remain separate authoritative responsibilities.
+Construction seals the canonical request digest in a process-local identity-keyed weak registry outside packet-writable state. Canonicalization revalidates live fields, computes one verified document snapshot, and returns that same snapshot so a concurrent low-level mutation cannot replace the document after the seal check; a different valid policy, actor, date, or upstream-evidence value is rejected instead of creating a second audit fact. A caller cannot replace an in-object seal. Durable append-only audit, replay/idempotency, and execution authorization remain separate authoritative responsibilities.
 
 ## Closed actions
 

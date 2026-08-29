@@ -10,3 +10,4 @@
 - Keep execution explicitly `not_authorized_to_execute`, require authoritative re-resolution before any executor acts, and emit `media_sanitization_state=not_claimed` so application disposition cannot be mistaken for storage-media sanitization.
 - Require deterministic canonical JSON/SHA-256 evidence and exact 100% owned production statement/branch coverage.
 - Seal creation-time request evidence outside packet-writable state so a forged in-object digest cannot authorize a rewritten canonical request.
+- Return the exact document snapshot used by integrity verification so a mutation between verification and serialization cannot produce a different canonical request.

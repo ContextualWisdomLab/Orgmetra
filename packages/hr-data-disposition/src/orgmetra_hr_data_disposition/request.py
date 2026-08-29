@@ -246,14 +246,16 @@ class HrDataDispositionExecutionRequest:
             self.UPSTREAM_AUTHORIZATION_STATES,
         )
 
-    def _assert_integrity(self) -> None:
-        """Reject malformed fields or valid-looking evidence changed after construction."""
+    def _assert_integrity(self) -> dict[str, object]:
+        """Validate and return the one request snapshot bound to the integrity check."""
         self._validate_fields()
-        current_digest = _canonical_digest(self._render_canonical_document())
+        current_document = self._render_canonical_document()
+        current_digest = _canonical_digest(current_document)
         with _PACKET_SEALS_LOCK:
             creation_digest = _PACKET_SEALS.get(self)
         if current_digest != creation_digest:
             raise ValueError("disposition request evidence changed after construction")
+        return current_document
 
     @property
     def purpose_code(self) -> str:
@@ -322,8 +324,7 @@ class HrDataDispositionExecutionRequest:
 
     def canonical_document(self) -> dict[str, object]:
         """Return deterministic, value-minimized request evidence after live revalidation."""
-        self._assert_integrity()
-        return self._render_canonical_document()
+        return self._assert_integrity()
 
     def canonical_json(self) -> str:
         """Serialize request evidence with stable ordering and no whitespace ambiguity."""

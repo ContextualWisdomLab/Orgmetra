@@ -9,6 +9,7 @@ import json
 import pytest
 
 from orgmetra_hr_data_disposition import HrDataDispositionExecutionRequest
+import orgmetra_hr_data_disposition.request as request_module
 
 
 TENANT = "018f7f76-8b7b-7c74-8f4d-1c91262926ba"
@@ -273,6 +274,23 @@ def test_revalidates_recorded_time_before_digesting() -> None:
     object.__setattr__(packet, "recorded_at", datetime(2026, 8, 1, 10, 30))
     with pytest.raises(ValueError):
         packet.evidence_digest()
+
+
+def test_canonical_document_returns_the_verified_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A mutation after digesting cannot change the document returned by that verification."""
+    packet = request()
+    original_digest = request_module._canonical_digest
+
+    def mutate_after_snapshot(document: dict[str, object]) -> str:
+        """Simulate a concurrent low-level mutation between verification and serialization."""
+        object.__setattr__(packet, "retention_policy_digest", "c" * 64)
+        return original_digest(document)
+
+    monkeypatch.setattr(request_module, "_canonical_digest", mutate_after_snapshot)
+    document = packet.canonical_document()
+
+    assert document["retention_policy_digest"] == DIGEST_B
+    assert packet.retention_policy_digest == "c" * 64
 
 
 def test_rejects_valid_post_construction_evidence_replacement() -> None:
