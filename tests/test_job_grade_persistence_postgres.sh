@@ -326,14 +326,27 @@ GRANT USAGE ON SCHEMA public TO orgmetra_job_grade_reader;
 GRANT SELECT ON job_grade_definition_record, job_grade_assignment_record, job_grade_assignment_version TO orgmetra_job_grade_reader;
 SQL
 
+reader_database_url="$(DATABASE_URL="${DATABASE_URL}" python3 - <<'PY'
+from os import environ
+from urllib.parse import urlsplit, urlunsplit
+
+database_url = urlsplit(environ["DATABASE_URL"])
+host = database_url.hostname or ""
+if ":" in host and not host.startswith("["):
+    host = f"[{host}]"
+port = f":{database_url.port}" if database_url.port is not None else ""
+print(urlunsplit(database_url._replace(netloc=f"orgmetra_job_grade_reader@{host}{port}")))
+PY
+)"
+
 alpha_count="$(PGPASSWORD=orgmetra_job_grade_reader PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" \
-    psql -h localhost -U orgmetra_job_grade_reader -d orgmetra -Atqc \
+    psql "${reader_database_url}" -Atqc \
     'SELECT count(*) FROM job_grade_assignment_version;')"
 beta_count="$(PGPASSWORD=orgmetra_job_grade_reader PGOPTIONS="-c orgmetra.tenant_record_id=${OTHER_TENANT_ID}" \
-    psql -h localhost -U orgmetra_job_grade_reader -d orgmetra -Atqc \
+    psql "${reader_database_url}" -Atqc \
     'SELECT count(*) FROM job_grade_assignment_version;')"
 missing_count="$(PGPASSWORD=orgmetra_job_grade_reader \
-    psql -h localhost -U orgmetra_job_grade_reader -d orgmetra -Atqc \
+    psql "${reader_database_url}" -Atqc \
     'SELECT count(*) FROM job_grade_assignment_version;')"
 
 if [[ "${alpha_count}" != "1" || "${beta_count}" != "0" || "${missing_count}" != "0" ]]; then
