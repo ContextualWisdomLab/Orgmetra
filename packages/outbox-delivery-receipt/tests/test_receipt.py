@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from uuid import UUID, uuid4
 
 import pytest
@@ -10,6 +10,27 @@ from orgmetra_outbox_delivery_receipt import (
     build_external_delivery_receipt_evidence,
     verify_exact_delivery_attempt,
 )
+
+
+class _MutableTimezone(tzinfo):
+    def __init__(self, offset: timedelta) -> None:
+        self.offset = offset
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        return self.offset
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        return timedelta(0)
+
+
+class _EqualityForgingStr(str):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+    __hash__ = str.__hash__
 
 
 def _uuid() -> str:
@@ -69,6 +90,39 @@ def test_canonicalizes_aware_timestamps_to_utc_without_losing_precision() -> Non
 
     assert evidence.transport_delivered_at_utc == "2026-08-29T01:02:03.456789Z"
     assert evidence.observed_at_utc == "2026-08-29T01:02:04.000123Z"
+
+
+def test_freezes_caller_owned_timezone_before_evidence_is_retained() -> None:
+    mutable_timezone = _MutableTimezone(timedelta(hours=9))
+    values = _kwargs()
+    values["transport_delivered_at"] = datetime(
+        2026, 8, 29, 10, 2, 3, 456789, tzinfo=mutable_timezone
+    )
+    evidence = build_external_delivery_receipt_evidence(**values)
+    original_json = evidence.canonical_json()
+    original_digest = evidence.sha256_digest()
+
+    mutable_timezone.offset = timedelta(0)
+
+    assert evidence.transport_delivered_at.tzinfo is timezone.utc
+    assert evidence.canonical_json() == original_json
+    assert evidence.sha256_digest() == original_digest
+
+
+def test_rejects_string_subclass_that_can_forge_exact_attempt_equality() -> None:
+    values = _kwargs()
+    values["delivery_target_code"] = _EqualityForgingStr("naruon_calendar")
+
+    with pytest.raises(ValueError, match="delivery_target_code"):
+        build_external_delivery_receipt_evidence(**values)
+
+
+def test_rejects_string_subclass_that_can_forge_fixed_trust_state() -> None:
+    values = _kwargs()
+    values["trust_state"] = _EqualityForgingStr("trusted_transport_evidence")
+
+    with pytest.raises(ValueError, match="trust_state"):
+        ExternalDeliveryReceiptEvidence(**values)
 
 
 def test_verifies_only_the_exact_outbox_attempt() -> None:
