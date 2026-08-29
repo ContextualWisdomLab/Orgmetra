@@ -413,8 +413,6 @@ def test_clock_failure_at_request_start_logs_degradation_exactly_once(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """One degraded request must emit exactly one value-free warning record."""
-    import logging
-
     sink = _RecordingSink()
     middleware = PeopleHttpTelemetryMiddleware(
         app=_success_app(),
