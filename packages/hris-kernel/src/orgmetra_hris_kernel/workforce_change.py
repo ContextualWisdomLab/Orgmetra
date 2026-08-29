@@ -13,6 +13,7 @@ from orgmetra_hris_kernel.errors import IdentityScopeError, IntervalError
 from orgmetra_hris_kernel.facts import AssignmentFact, EmploymentVersion
 from orgmetra_hris_kernel.workforce import (
     WorkforceCompositionSnapshot,
+    _validate_snapshot_temporal_coordinate,
     build_workforce_composition_snapshot,
 )
 
@@ -148,6 +149,7 @@ def build_workforce_composition_change_snapshot(
     Returns:
         Aggregate-only deterministic change evidence.
     """
+    known_at = _validate_snapshot_temporal_coordinate(from_effective_on, known_at)
     opening = build_workforce_composition_snapshot(
         employment_versions,
         assignments,

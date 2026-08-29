@@ -22,6 +22,7 @@ Orgmetra will expose a pure `WorkforceCompositionSnapshot` derived from authorit
 - One overfilled Position seat therefore remains a data-integrity failure even when the aggregate FTE total itself looks plausible.
 - Unassigned-person count surfaces a buyer-actionable staffing gap without serializing row-level worker identity.
 - Status counts are aggregate employment evidence, sorted deterministically.
+- The snapshot freezes the timezone-aware knowledge cutoff to an exact UTC datetime and detaches status-count containers before validation, so mutable caller objects cannot change canonical evidence after construction.
 - Two visible versions of one Employment or Assignment identity fail closed. Invalid assignment coverage or over-allocation remains a data-integrity error rather than becoming a plausible metric.
 - The canonical JSON contains the opaque tenant identifier, report coordinates, aggregate metrics, and schema version only. It excludes person, employment, assignment, and position identifiers and all human-readable PII.
 - SHA-256 addresses the exact canonical UTF-8 representation so a caller can correlate a report with immutable audit evidence without copying source rows.

@@ -16,6 +16,7 @@ Orgmetra adds a pure `WorkforceCompositionChangeSnapshot` and builder in the HRI
 - Both endpoint snapshots must belong to the same authoritative tenant.
 - The opening effective date must be strictly earlier than the closing effective date.
 - Both endpoint snapshots must use one exact `known_at` recorded-time cutoff. Effective-time change is therefore compared while knowledge time is held constant.
+- The builder resolves that cutoff once to a detached UTC datetime before constructing either endpoint; caller-owned timezone providers cannot cause the two endpoint reconstructions to observe different recorded times.
 - Each endpoint is built through the existing workforce-composition function, so contradictory bitemporal facts, invalid assignment coverage, impossible employment concurrency, over-allocation, and overfilled Position capacity continue to fail closed before aggregation.
 - The comparison exposes net changes in distinct-person headcount, reportable employment count, staffed assignment count, staffed FTE, unassigned-person count, and deterministic per-status counts.
 - The contract deliberately does **not** label a net change as a hire, separation, transfer, turnover event, cause, forecast, protected-attribute effect, or recommendation. Those claims require event-specific governed evidence that this aggregate comparison does not possess.

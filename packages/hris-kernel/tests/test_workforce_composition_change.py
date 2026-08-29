@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from decimal import Decimal
 from uuid import UUID
 
@@ -78,6 +78,18 @@ def _source_facts() -> tuple[list[EmploymentVersion], list[AssignmentFact]]:
     return employments, assignments
 
 
+class _SequencedOffsetTimezone(tzinfo):
+    """Timezone provider that changes its offset on each request."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def utcoffset(self, value: datetime | None) -> timedelta:
+        """Return different offsets to detect duplicate cutoff resolution."""
+        self.calls += 1
+        return timedelta(hours=self.calls - 1)
+
+
 def test_change_snapshot_compares_two_effective_dates_at_one_knowledge_cutoff() -> None:
     employments, assignments = _source_facts()
     snapshot = build_workforce_composition_change_snapshot(
@@ -100,6 +112,23 @@ def test_change_snapshot_compares_two_effective_dates_at_one_knowledge_cutoff() 
     assert '"schema_version":"orgmetra.workforce_composition_change.v1"' in snapshot.canonical_json()
     assert "person_record_id" not in snapshot.canonical_json()
     assert len(snapshot.content_digest()) == 64
+
+
+def test_change_builder_freezes_one_cutoff_before_building_both_endpoints() -> None:
+    """Both change endpoints must use one detached instant from a mutable provider."""
+    provider = _SequencedOffsetTimezone()
+    snapshot = build_workforce_composition_change_snapshot(
+        [],
+        [],
+        tenant_record_id=_id(1),
+        from_effective_on=date(2026, 1, 15),
+        to_effective_on=date(2026, 2, 15),
+        known_at=datetime(2026, 2, 20, tzinfo=provider),
+    )
+
+    assert provider.calls == 1
+    assert snapshot.opening_snapshot.known_at == snapshot.closing_snapshot.known_at
+    assert snapshot.opening_snapshot.known_at == datetime(2026, 2, 20, tzinfo=timezone.utc)
 
 
 def test_change_snapshot_is_deterministic_for_reordered_source_facts() -> None:

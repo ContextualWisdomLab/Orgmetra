@@ -2,7 +2,7 @@
 
 | Requirement | Orgmetra evidence | Verification | Maturity |
 |---|---|---|---|
-| Compare business-time workforce states without knowledge-time drift | `WorkforceCompositionChangeSnapshot` requires identical endpoint `known_at` values | different-cutoff rejection regression | implemented_on_active_pr |
+| Compare business-time workforce states without knowledge-time drift | `WorkforceCompositionChangeSnapshot` requires identical endpoint `known_at` values and the builder freezes one cutoff before both endpoints | different-cutoff and sequenced-timezone-provider regressions | implemented_on_active_pr |
 | Preserve tenant isolation | endpoint tenants must match; builder supplies one tenant to both existing snapshots | cross-tenant direct-construction rejection | implemented_on_active_pr |
 | Require a real forward comparison | opening `effective_on` must be earlier than closing `effective_on` | equal-date rejection plus buyer-readable next action | implemented_on_active_pr |
 | Reuse authoritative HRIS integrity | both endpoints call `build_workforce_composition_snapshot(...)` | existing complete HRIS-kernel workforce/integrity suite plus change regression | implemented_on_active_pr |

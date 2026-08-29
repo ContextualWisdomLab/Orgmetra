@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import hashlib
 import json
@@ -38,18 +38,37 @@ def _validate_snapshot_tenant_id(tenant_record_id: UUID) -> None:
         )
 
 
-def _validate_snapshot_temporal_coordinate(effective_on: date, known_at: datetime) -> None:
-    """Require exact built-in business and recorded-time values before evidence use."""
+def _validate_snapshot_temporal_coordinate(effective_on: date, known_at: datetime) -> datetime:
+    """Validate and detach exact business and recorded-time values before evidence use."""
     if type(effective_on) is not date:
         raise IntervalError(
             "Workforce snapshot effective date must be a calendar date.",
             next_action="Provide an exact business date, then rebuild the snapshot.",
         )
-    if type(known_at) is not datetime or known_at.utcoffset() is None:
+    if type(known_at) is not datetime or known_at.tzinfo is None:
         raise IntervalError(
             "Workforce snapshot knowledge cutoff must be timezone-aware.",
             next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
         )
+    try:
+        offset = known_at.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise IntervalError(
+            "Workforce snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+        ) from exc
+    if type(offset) is not timedelta:
+        raise IntervalError(
+            "Workforce snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+        )
+    try:
+        return (known_at.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise IntervalError(
+            "Workforce snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+        ) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,8 +93,17 @@ class WorkforceCompositionSnapshot:
 
     def __post_init__(self) -> None:
         """Reject non-canonical or internally inconsistent evidence before export."""
+        object.__setattr__(
+            self,
+            "known_at",
+            _validate_snapshot_temporal_coordinate(self.effective_on, self.known_at),
+        )
+        object.__setattr__(
+            self,
+            "employment_status_counts",
+            tuple(tuple(status_count) for status_count in self.employment_status_counts),
+        )
         _validate_snapshot_tenant_id(self.tenant_record_id)
-        _validate_snapshot_temporal_coordinate(self.effective_on, self.known_at)
         status_codes = tuple(status for status, _count in self.employment_status_counts)
         if len(status_codes) != len(set(status_codes)):
             raise SingleValuedFactError(
@@ -143,6 +171,13 @@ class WorkforceCompositionSnapshot:
 
     def canonical_json(self) -> str:
         """Return deterministic aggregate evidence suitable for audit correlation."""
+        if type(self.effective_on) is not date or (
+            type(self.known_at) is not datetime or self.known_at.tzinfo is not timezone.utc
+        ):
+            raise IntervalError(
+                "Workforce snapshot temporal evidence is not canonical.",
+                next_action="Rebuild the snapshot through its validated constructor, then export it again.",
+            )
         payload = {
             "effective_on": self.effective_on.isoformat(),
             "employment_count": self.employment_count,
@@ -153,9 +188,7 @@ class WorkforceCompositionSnapshot:
                 }
                 for status, count in self.employment_status_counts
             ],
-            "known_at": self.known_at.astimezone(timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z"),
+            "known_at": self.known_at.isoformat().replace("+00:00", "Z"),
             "person_headcount": self.person_headcount,
             "schema_version": "orgmetra.workforce_composition.v1",
             "staffed_assignment_count": self.staffed_assignment_count,
@@ -300,7 +333,7 @@ def build_workforce_composition_snapshot(
         AssignmentPortfolioError: Existing allocation integrity rejects visible FTE.
         PositionSeatError: Existing position-capacity integrity rejects visible FTE.
     """
-    _validate_snapshot_temporal_coordinate(effective_on, known_at)
+    known_at = _validate_snapshot_temporal_coordinate(effective_on, known_at)
 
     _validate_visible_employment_portfolios(
         employment_versions,
