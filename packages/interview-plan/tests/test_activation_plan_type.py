@@ -46,6 +46,7 @@ class RecordingAuthority:
             approving_actor_reference=approving_actor_reference,
             authority_evidence_reference=AUTHORITY_EVIDENCE,
             authority_evidence_digest=AUTHORITY_DIGEST,
+            approved_at=approved_at,
         )
 
 
