@@ -67,6 +67,7 @@ def verification_for(candidate_plan, **changes):
         approving_actor_reference=APPROVER,
         authority_evidence_reference=AUTHORITY_EVIDENCE,
         authority_evidence_digest=DIGEST_E,
+        approved_at=APPROVED_AT,
     )
     values.update(changes)
     return StructuredInterviewActivationVerification(**values)
@@ -209,6 +210,7 @@ def test_activation_rejects_verification_subclass_before_evidence_reads_can_dive
         approving_actor_reference=base.approving_actor_reference,
         authority_evidence_reference=base.authority_evidence_reference,
         authority_evidence_digest=base.authority_evidence_digest,
+        approved_at=base.approved_at,
     )
     object.__setattr__(verification, "_authority_reference_reads", 0)
 
@@ -314,7 +316,7 @@ def test_direct_receipt_construction_fails_closed(field, bad, match):
 
 
 def test_authority_verification_repr_redacts_correlation_evidence():
-    """Keep tenant, plan, actor, and evidence correlation identifiers out of routine logs."""
+    """Keep tenant, plan, actor, evidence, and reviewed time out of routine logs."""
     candidate_plan = plan()
     verification = verification_for(candidate_plan)
 
@@ -328,5 +330,6 @@ def test_authority_verification_repr_redacts_correlation_evidence():
         APPROVER,
         AUTHORITY_EVIDENCE,
         DIGEST_E,
+        APPROVED_AT.isoformat(),
     ):
         assert sensitive_value not in text
