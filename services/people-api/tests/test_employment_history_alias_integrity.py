@@ -43,6 +43,27 @@ class AliasHoldingPort:
         return (self.record,)
 
 
+def test_persistence_record_is_structurally_immutable_against_object_setattr() -> None:
+    """A retained persistence alias must not support low-level in-place field rewriting."""
+    record = employment_history_module.EmploymentHistoryRecord(
+        tenant_record_id=TENANT,
+        person_record_id=PERSON,
+        employment_record_id=EMPLOYMENT,
+        employment_record_version_id=VERSION,
+        employment_status_code="active",
+        employment_concurrency_code="exclusive",
+        effective_from=date(2025, 1, 1),
+        effective_to=None,
+        recorded_from=datetime(2026, 8, 20, 0, 0, tzinfo=timezone.utc),
+        recorded_to=None,
+    )
+
+    with pytest.raises((AttributeError, TypeError)):
+        object.__setattr__(record, "employment_status_code", "leave")
+
+    assert record.employment_status_code == "active"
+
+
 def test_persistence_alias_cannot_rewrite_authorized_value_after_validation() -> None:
     """A post-validation alias rewrite must not change the authorized response."""
     record = employment_history_module.EmploymentHistoryRecord(
