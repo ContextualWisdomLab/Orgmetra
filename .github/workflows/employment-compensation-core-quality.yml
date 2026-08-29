@@ -134,7 +134,7 @@ jobs:
           undocumented = [
               function_name
               for function_name in required_function_docs
-    if f"COMMENT ON FUNCTION public.{function_name}() IS" not in migration_text
+              if f"COMMENT ON FUNCTION public.{function_name}() IS" not in migration_text
           ]
           if undocumented:
               raise SystemExit(
