@@ -37,6 +37,7 @@ _NEXT_ACTION = (
     "workflow and before communicating or executing the offer."
 )
 _RUNTIME_EVIDENCE_KEY = token_bytes(32)
+_CONSTRUCTING_PACKET_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
 _ISSUED_PACKET_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
 
 
@@ -158,6 +159,12 @@ class OfferApprovalPacket:
     next_action: str = _NEXT_ACTION
     _issuance_seal: bytes = field(init=False, repr=False, compare=False)
 
+    def __new__(cls, *_args: object, **_kwargs: object) -> OfferApprovalPacket:
+        """Mark only instances created through the governed class constructor as eligible."""
+        instance = object.__new__(cls)
+        _CONSTRUCTING_PACKET_IDENTITIES[id(instance)] = instance
+        return instance
+
     def __repr__(self) -> str:
         """Return a representation that never emits candidate or compensation evidence."""
         return "OfferApprovalPacket(<redacted>)"
@@ -179,6 +186,8 @@ class OfferApprovalPacket:
         """Fail closed when direct construction drifts from the governed contract."""
         if _ISSUED_PACKET_IDENTITIES.get(id(self)) is self:
             raise ValueError("offer approval evidence cannot be reissued")
+        if _CONSTRUCTING_PACKET_IDENTITIES.get(id(self)) is not self:
+            raise ValueError("offer approval evidence must use governed construction")
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.offer_approval_reference,
@@ -240,6 +249,7 @@ class OfferApprovalPacket:
             _seal_canonical_json(self._canonical_json_unchecked()),
         )
         _ISSUED_PACKET_IDENTITIES[id(self)] = self
+        _CONSTRUCTING_PACKET_IDENTITIES.pop(id(self), None)
 
     def _canonical_json_unchecked(self) -> str:
         """Render current fields only after construction-time contract validation."""
@@ -274,6 +284,8 @@ class OfferApprovalPacket:
 
     def canonical_json(self) -> str:
         """Return deterministic canonical JSON only while issued evidence remains intact."""
+        if _ISSUED_PACKET_IDENTITIES.get(id(self)) is not self:
+            raise ValueError("offer approval evidence was not issued by governed construction")
         current = self._canonical_json_unchecked()
         issuance_seal = getattr(self, "_issuance_seal", None)
         if type(issuance_seal) is not bytes or not compare_digest(
