@@ -26,7 +26,7 @@
 | Purpose-bound PII access | Security architecture / Keyverse adapter boundary | `PurposeBoundAccessPolicy`, `PurposeBoundAccessRequest.resource_reference`, `AuthorizationDecision.resource_reference` | exact tenant/actor/resource binding, exact opaque target correlation for allow/deny audit evidence, resource/purpose/operation matching, operation-specific scope, field-subset minimization, malformed-attribute rejection, reserved-UUID rejection, PII-minimized denial evidence, and exact 100% owned statement/branch coverage | ADR-0008 | implemented_on_protected_main |
 | Least-privilege API capability | Keyverse gateway boundary | operation scope conceptual | structural per-operation scope and confused-deputy contract tests | ADR-0002 | implemented_on_protected_main |
 | Client-safe failure correlation | API error boundary | `support_reference` conceptual | error disclosure and support-lookup tests | ADR-0002 | implemented_on_protected_main |
-| Foundation artifact integrity | Repository governance | deterministic `manifest.json` file inventory | SHA-256/byte/line validation plus Python/Node inventory-equivalence regression and explicit dispatcher/validity/criterion/job-analysis migration and execution-contract provenance regression | ADR-0001 | implemented_on_active_pr |
+| Foundation artifact integrity | Repository governance | deterministic `manifest.json` file inventory | SHA-256/byte/line validation plus Python/Node inventory-equivalence regression and explicit dispatcher/validity/criterion/job-analysis migration and execution-contract provenance regression | ADR-0001 | implemented_on_protected_main |
 
 ## 4. CWL integration traceability
 
