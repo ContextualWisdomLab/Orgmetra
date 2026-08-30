@@ -12,7 +12,6 @@ from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import (
     AuthenticatedPrincipal,
     AuthenticationFailed,
-    PositionHistoryIntegrityError,
     PositionHistoryRecord,
 )
 from orgmetra_people_api.position_history_http import PositionHistoryAsgiApp
@@ -221,6 +220,7 @@ class PositionHistoryHttpRouteTests(unittest.IsolatedAsyncioTestCase):
             {"query": b"known_at=2026-08-30T00:00:00+00:00&purpose=workforce_position_review&fields=effective_from"},
             {"query": b"known_at=2026-08-30&purpose=workforce_position_review&fields=effective_from"},
             {"query": b"known_at=not-a-time&purpose=workforce_position_review&fields=effective_from"},
+            {"query": b"known_at=2026-02-30T00:00:00Z&purpose=workforce_position_review&fields=effective_from"},
             {"query": b"known_at=2026-08-30T00:00:00Z&purpose=WorkforceReview&fields=effective_from"},
             {"query": b"known_at=2026-08-30T00:00:00Z&purpose=&fields=effective_from"},
             {"query": b"known_at=2026-08-30T00:00:00Z&purpose=workforce_position_review&fields="},
