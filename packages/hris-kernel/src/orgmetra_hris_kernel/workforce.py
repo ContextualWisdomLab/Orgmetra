@@ -28,6 +28,7 @@ from orgmetra_hris_kernel.resolution import resolve_single_valued_fact
 
 _WORKFORCE_INCLUDED_STATUSES = frozenset({"active", "leave"})
 _ZERO_FTE = Decimal("0.0000")
+_CANONICAL_FTE_EXPONENT = -4
 
 
 def _validate_snapshot_tenant_id(tenant_record_id: UUID) -> None:
@@ -72,6 +73,30 @@ def _validate_snapshot_temporal_coordinate(effective_on: date, known_at: datetim
         ) from exc
 
 
+def _canonicalize_staffed_fte(staffed_fte: Decimal) -> Decimal:
+    """Return one fixed four-decimal FTE representation without ambient rounding."""
+    if type(staffed_fte) is not Decimal or not staffed_fte.is_finite() or staffed_fte < _ZERO_FTE:
+        raise SingleValuedFactError(
+            "Workforce snapshot staffed FTE must be a finite non-negative Decimal.",
+            next_action="Provide a finite non-negative Decimal FTE, then rebuild the snapshot.",
+        )
+    parts = staffed_fte.as_tuple()
+    if parts.exponent < _CANONICAL_FTE_EXPONENT:
+        raise SingleValuedFactError(
+            "Workforce snapshot staffed FTE must use at most four decimal places.",
+            next_action="Round source allocation evidence to the governed four-decimal scale, then rebuild.",
+        )
+    if parts.exponent == _CANONICAL_FTE_EXPONENT:
+        return staffed_fte
+    return Decimal(
+        (
+            parts.sign,
+            parts.digits + (0,) * (parts.exponent - _CANONICAL_FTE_EXPONENT),
+            _CANONICAL_FTE_EXPONENT,
+        )
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class WorkforceCompositionSnapshot:
     """One aggregate workforce view at an effective day and knowledge cutoff.
@@ -104,6 +129,7 @@ class WorkforceCompositionSnapshot:
             "employment_status_counts",
             tuple(tuple(status_count) for status_count in self.employment_status_counts),
         )
+        object.__setattr__(self, "staffed_fte", _canonicalize_staffed_fte(self.staffed_fte))
         self._validate_canonical_invariants()
 
     def _validate_canonical_invariants(self) -> None:
@@ -146,10 +172,11 @@ class WorkforceCompositionSnapshot:
             type(self.staffed_fte) is not Decimal
             or not self.staffed_fte.is_finite()
             or self.staffed_fte < _ZERO_FTE
+            or self.staffed_fte.as_tuple().exponent != _CANONICAL_FTE_EXPONENT
         ):
             raise SingleValuedFactError(
-                "Workforce snapshot aggregate values are internally inconsistent.",
-                next_action="Rebuild the snapshot from authoritative HRIS facts with a finite non-negative FTE.",
+                "Workforce snapshot staffed FTE is not canonical four-decimal evidence.",
+                next_action="Rebuild the snapshot from governed four-decimal allocation evidence.",
             )
         if self.staffed_fte > Decimal(self.staffed_assignment_count):
             raise SingleValuedFactError(
