@@ -1,0 +1,64 @@
+.validation-dashboard-state {
+  display: grid;
+  gap: var(--orgmetra-space-md);
+  max-width: 42rem;
+  padding: var(--orgmetra-space-lg);
+  border: 1px solid var(--orgmetra-border-subtle);
+  border-radius: var(--orgmetra-radius-md);
+  background: var(--orgmetra-surface-card);
+  color: var(--orgmetra-text-primary);
+}
+
+.validation-dashboard-status,
+.validation-dashboard-exact-values,
+.validation-dashboard-next-action {
+  display: grid;
+  gap: var(--orgmetra-space-xs);
+  margin: 0;
+}
+
+.validation-dashboard-status span,
+.validation-dashboard-exact-values span,
+.validation-dashboard-next-action span {
+  color: var(--orgmetra-text-muted);
+}
+
+.validation-dashboard-state[data-interaction-state="read-only"] {
+  border-color: var(--orgmetra-border-subtle);
+}
+
+.validation-dashboard-state[data-interaction-state="permission-denied"],
+.validation-dashboard-state[data-interaction-state="validation-error"],
+.validation-dashboard-state[data-interaction-state="error"] {
+  border-color: var(--orgmetra-danger);
+}
+
+.validation-dashboard-state[aria-busy="true"] {
+  cursor: progress;
+}
+
+.validation-dashboard-action {
+  justify-self: start;
+  min-height: 44px;
+  padding: var(--orgmetra-space-sm) var(--orgmetra-space-md);
+  border: 0;
+  border-radius: var(--orgmetra-radius-sm);
+  background: var(--orgmetra-action-review);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.validation-dashboard-action:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.validation-dashboard-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.validation-dashboard-action:focus-visible {
+  outline: 3px solid var(--orgmetra-focus-ring);
+  outline-offset: 3px;
+}
