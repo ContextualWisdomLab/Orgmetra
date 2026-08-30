@@ -56,7 +56,7 @@ def test_portfolio_rejects_allocation_above_one_for_one_employment(
         assignment_record_id=UUID("10000000-0000-7000-8000-000000000303"),
         allocation_ratio=Decimal("0.3000"),
     )
-    with pytest.raises(AssignmentPortfolioError, match="1.0000"):
+    with pytest.raises(AssignmentPortfolioError, match=r"1\.0000"):
         validate_assignment_portfolio(
             [jordan_icu_assignment, jordan_float_assignment, extra],
             tenant_record_id=TENANT,
@@ -76,7 +76,7 @@ def test_portfolio_rejects_exact_overallocation_under_low_decimal_precision(
     second = replace(jordan_float_assignment, allocation_ratio=Decimal("0.5040"))
     with localcontext() as context:
         context.prec = 2
-        with pytest.raises(AssignmentPortfolioError, match="1.0000"):
+        with pytest.raises(AssignmentPortfolioError, match=r"1\.0000"):
             validate_assignment_portfolio(
                 [first, second],
                 tenant_record_id=TENANT,
