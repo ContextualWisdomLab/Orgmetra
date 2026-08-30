@@ -52,6 +52,7 @@ POST /v1/tenants/{tenant_record_id}/candidate-worker-conversions?purpose=candida
 POST /v1/employment-records
 POST /v1/position-records
 POST /v1/assignment-records
+GET  /v1/tenants/{tenant_record_id}/people/{person_record_id}/employment-history?known_at=...&purpose=...&fields=...
 POST /v1/job-profiles
 POST /v1/job-profiles/{job_profile_id}/publish
 POST /v1/candidate-profiles
@@ -60,7 +61,7 @@ POST /v1/criterion-observations
 POST /v1/validity-studies
 ```
 
-The foundation OpenAPI contract covers the shared command vocabulary and baseline person, employment, position, assignment, job-profile, and selection-decision operations. Runtime services must publish any additional path-specific contract before release and may not weaken the shared `Idempotency-Key`, least-privilege scope, authorization, evidence, or error semantics. Employment and assignment writes fail closed when exclusive jobs overlap, a seat is not staffable, or visible seat allocations exceed 1.0000.
+The foundation OpenAPI contract covers the shared command vocabulary and baseline person, employment, position, assignment, job-profile, selection-decision, and purpose-bound Employment-history read operations. Runtime services must publish any additional path-specific contract before release and may not weaken the shared `Idempotency-Key`, least-privilege scope, authorization, evidence, or error semantics. Employment and assignment writes fail closed when exclusive jobs overlap, a seat is not staffable, or visible seat allocations exceed 1.0000. The Employment-history read requires `orgmetra.people.employment_history.read`, an exact `known_at` UTC cutoff, a business purpose, and an explicit field list; it returns only policy-authorized entries and never mutates HRIS truth.
 
 ## Error shape
 

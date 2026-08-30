@@ -39,6 +39,16 @@ Evaluation fails closed unless request, actor, resource, and policy tenants all 
 
 Authorization evidence contains only governance metadata, including the opaque actor and exact target-resource references, plus field names, never protected values. A denial returns a stable reason code and next safe action. An allow decision returns only the exact requested field subset, not every field the policy could permit. Both allow and denial evidence preserve the exact target reference so immutable audit correlation cannot collapse distinct person or employment records into one resource-kind-level event. These rules implement the Orgmetra side of the NIST SP 800-162 ABAC shape and attribute-integrity principles from NIST SP 800-205; ADR 0008 records the boundary.
 
+The Employment-history HTTP read applies this boundary at the customer route:
+`GET /v1/tenants/{tenant_record_id}/people/{person_record_id}/employment-history`.
+It validates the tenant, Person, UTC `known_at`, purpose, and explicit fields
+before authentication; then the authenticated principal and
+`orgmetra.people.employment_history.read` scope are evaluated by the existing
+Employment-history service. The response contains only authorized
+`entries[].fields`, uses `Cache-Control: no-store` and `Vary: Authorization`,
+and maps integrity or unexpected backend failures to client-safe opaque support
+references. The route adds no mutation or employment-decision authority.
+
 ## Mutation security contract
 
 Every mutating HTTP operation and its server-side command handler requires one validated `Idempotency-Key` that crosses the command boundary into durable transactional replay state. The published OpenAPI employment, position, assignment, person, job-profile, and selection-decision command families require `X-Tenant-Reference`, `X-Actor-Reference`, and `X-Purpose-Code`; those values must match the authenticated Keyverse principal and the operation-specific least-privilege scope. The executable People mutation handlers added on this branch currently implement employment, position, and assignment creation with those headers. Person, job-profile, and selection-decision remain published foundation API contracts until their server handlers are integrated; their OpenAPI presence is not runtime evidence. Confirmed-hire materialization instead binds the tenant in `/v1/tenants/{tenant_record_id}/candidate-worker-conversions`, the business purpose in its exact query parameter, and the actor through the authenticated principal. It does not accept weaker duplicate actor/tenant/purpose header authorities.

@@ -535,6 +535,45 @@ def _validate_openapi_contract() -> None:
         "least-privilege read scope",
     )
 
+    employment_history_read_block = _yaml_block(
+        openapi,
+        "  /tenants/{tenant_record_id}/people/{person_record_id}/employment-history:",
+    )
+    if not employment_history_read_block:
+        _fail("readEmploymentHistory: path block is missing")
+    _require_in_block(
+        employment_history_read_block,
+        "readEmploymentHistory",
+        "operationId: readEmploymentHistory",
+        "operationId",
+    )
+    _require_in_block(
+        employment_history_read_block,
+        "readEmploymentHistory",
+        "            - orgmetra.people.employment_history.read",
+        "least-privilege read scope",
+    )
+    for parameter_name in ("tenant_record_id", "person_record_id", "known_at", "purpose", "fields"):
+        _require_in_block(
+            employment_history_read_block,
+            "readEmploymentHistory",
+            f"        - name: {parameter_name}",
+            f"required {parameter_name} parameter",
+        )
+    for response in ("        '200':", "        '400':", "        '401':", "        '403':", "        '409':"):
+        _require_in_block(
+            employment_history_read_block,
+            "readEmploymentHistory",
+            response,
+            f"response {response.strip()}",
+        )
+    _require_in_block(
+        employment_history_read_block,
+        "readEmploymentHistory",
+        "$ref: '#/components/schemas/EmploymentHistoryResponse'",
+        "response schema",
+    )
+
     for schema_name in (
         "CreateJobProfileCommand",
         "RecordSelectionDecisionCommand",
