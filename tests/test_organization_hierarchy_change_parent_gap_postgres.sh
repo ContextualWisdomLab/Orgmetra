@@ -165,3 +165,215 @@ if [[ "${event_source}" != "urn:orgmetra:organization_core" ]]; then
     echo "organization hierarchy event attributed the wrong owner: ${event_source}" >&2
     exit 1
 fi
+
+# Direct-DML evidence must describe the exact reviewed bitemporal change, not merely
+# point at same-tenant/same-unit rows. These regressions intentionally bypass the
+# authoritative function and commit the deferred constraints so immutable evidence
+# cannot be forged by a table-capable maintenance path.
+UNRELATED_PREDECESSOR_VERSION_ID="30000000-0000-7000-8000-000000000028"
+DIRECT_SUCCESSOR_VERSION_ID="30000000-0000-7000-8000-000000000029"
+DIRECT_APPLICATION_ID="30000000-0000-7000-8000-000000000033"
+DIRECT_AUDIT_ID="30000000-0000-4000-8000-000000000045"
+DIRECT_OUTBOX_ID="30000000-0000-4000-8000-000000000046"
+
+with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO organization_unit_version (
+    tenant_record_id, organization_unit_version_id, organization_unit_id,
+    unit_name, organization_type_code, parent_organization_unit_id,
+    effective_from, effective_to
+) VALUES (
+    '${TENANT_ID}', '${UNRELATED_PREDECESSOR_VERSION_ID}', '${GAP_CHILD_ID}',
+    'Historical unrelated child', 'department', NULL,
+    DATE '2010-01-01', DATE '2011-01-01'
+);
+SQL
+
+expect_direct_evidence_failure() {
+    local label="$1"
+    local needle="$2"
+    local predecessor_id="$3"
+    local event_source_value="$4"
+    local event_type_value="$5"
+    local close_current="$6"
+    local successor_from="$7"
+    local successor_to="$8"
+    local successor_name="$9"
+    local output status close_sql successor_to_sql
+
+    close_sql=""
+    if [[ "${close_current}" == "yes" ]]; then
+        close_sql="UPDATE organization_unit_version SET recorded_to = pg_catalog.transaction_timestamp() WHERE tenant_record_id = '${TENANT_ID}'::uuid AND organization_unit_version_id = '${GAP_CHILD_VERSION_ID}'::uuid;"
+    fi
+    successor_to_sql="NULL"
+    if [[ -n "${successor_to}" ]]; then
+        successor_to_sql="DATE '${successor_to}'"
+    fi
+
+    set +e
+    output="$(
+        with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+            -v review_json="${gap_review_json}" -v review_digest="${gap_review_sha256}" <<SQL 2>&1
+BEGIN;
+WITH event AS (
+    SELECT pg_catalog.jsonb_build_object(
+        'data', pg_catalog.jsonb_build_object(
+            'high_impact', true,
+            'result_code', 'organization_hierarchy_changed'
+        ),
+        'datacontenttype', 'application/json',
+        'id', '${DIRECT_AUDIT_ID}',
+        'orgmetraactor', '${APPLIER}',
+        'orgmetraconfirmation', 'human_confirmation:30000000-0000-4000-8000-000000000051',
+        'orgmetraevidence', :'review_digest',
+        'orgmetrapurpose', 'organization_hierarchy_change_apply',
+        'orgmetrareason', 'organizational_realignment',
+        'orgmetratenant', '${TENANT_ID}',
+        'source', '${event_source_value}',
+        'specversion', '1.0',
+        'subject', 'organization_unit:${GAP_CHILD_ID}',
+        'time', to_char(
+            pg_catalog.transaction_timestamp() AT TIME ZONE 'UTC',
+            'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+        ),
+        'type', '${event_type_value}'
+    )::text AS event_json
+), recorded AS (
+    SELECT event_json, encode(
+        public.digest(pg_catalog.convert_to(event_json, 'UTF8'), 'sha256'),
+        'hex'
+    ) AS event_digest
+    FROM event
+)
+SELECT public.record_audit_outbox_event(
+    '${TENANT_ID}'::uuid,
+    '${DIRECT_AUDIT_ID}'::uuid,
+    '${DIRECT_OUTBOX_ID}'::uuid,
+    event_json,
+    event_digest,
+    'orgmetra_domain_events'
+)
+FROM recorded;
+
+INSERT INTO organization_hierarchy_change_application_record (
+    tenant_record_id,
+    organization_hierarchy_change_application_record_id,
+    organization_unit_id,
+    predecessor_organization_unit_version_id,
+    successor_organization_unit_version_id,
+    organization_hierarchy_change_reference,
+    current_parent_organization_unit_id,
+    proposed_parent_organization_unit_id,
+    canonical_review_json,
+    review_evidence_digest_sha256,
+    organization_unit_snapshot_digest_sha256,
+    hierarchy_snapshot_digest_sha256,
+    requester_actor_reference,
+    reviewer_actor_reference,
+    applied_by_actor_reference,
+    reason_code,
+    effective_on,
+    review_packet_recorded_at,
+    audit_event_record_id,
+    outbox_delivery_record_id
+) VALUES (
+    '${TENANT_ID}'::uuid,
+    '${DIRECT_APPLICATION_ID}'::uuid,
+    '${GAP_CHILD_ID}'::uuid,
+    '${predecessor_id}'::uuid,
+    '${DIRECT_SUCCESSOR_VERSION_ID}'::uuid,
+    '30000000-0000-4000-8000-000000000051'::uuid,
+    NULL,
+    '${GAP_PARENT_ID}'::uuid,
+    :'review_json',
+    :'review_digest',
+    :'review_json'::jsonb ->> 'organization_unit_snapshot_digest',
+    :'review_json'::jsonb ->> 'hierarchy_snapshot_digest',
+    :'review_json'::jsonb ->> 'requester_reference',
+    :'review_json'::jsonb ->> 'reviewer_reference',
+    '${APPLIER}',
+    'organizational_realignment',
+    DATE '${EFFECTIVE_ON}',
+    (:'review_json'::jsonb ->> 'recorded_at')::timestamptz,
+    '${DIRECT_AUDIT_ID}'::uuid,
+    '${DIRECT_OUTBOX_ID}'::uuid
+);
+
+${close_sql}
+
+INSERT INTO organization_unit_version (
+    tenant_record_id,
+    organization_unit_version_id,
+    organization_unit_id,
+    unit_name,
+    organization_type_code,
+    parent_organization_unit_id,
+    effective_from,
+    effective_to,
+    recorded_from,
+    organization_hierarchy_change_application_record_id
+) VALUES (
+    '${TENANT_ID}'::uuid,
+    '${DIRECT_SUCCESSOR_VERSION_ID}'::uuid,
+    '${GAP_CHILD_ID}'::uuid,
+    '${successor_name}',
+    'department',
+    '${GAP_PARENT_ID}'::uuid,
+    DATE '${successor_from}',
+    ${successor_to_sql},
+    pg_catalog.transaction_timestamp(),
+    '${DIRECT_APPLICATION_ID}'::uuid
+);
+COMMIT;
+SQL
+    )"
+    status=$?
+    set -e
+    if [[ ${status} -eq 0 || "${output}" != *"${needle}"* ]]; then
+        echo "${label}: ${output}" >&2
+        exit 1
+    fi
+}
+
+expect_direct_evidence_failure \
+    "direct application evidence accepted a same-unit predecessor outside effective_on" \
+    "predecessor" \
+    "${UNRELATED_PREDECESSOR_VERSION_ID}" \
+    "urn:orgmetra:organization_core" \
+    "orgmetra.organization.hierarchy_changed" \
+    "no" \
+    "2011-01-01" \
+    "2012-01-01" \
+    "Historical forged successor"
+
+expect_direct_evidence_failure \
+    "direct application evidence accepted a semantically unrelated successor" \
+    "successor" \
+    "${GAP_CHILD_VERSION_ID}" \
+    "urn:orgmetra:organization_core" \
+    "orgmetra.organization.hierarchy_changed" \
+    "yes" \
+    "2026-09-16" \
+    "" \
+    "Forged successor"
+
+expect_direct_evidence_failure \
+    "direct application evidence accepted an audit event from the wrong bounded context" \
+    "audit event" \
+    "${GAP_CHILD_VERSION_ID}" \
+    "urn:orgmetra:people_api" \
+    "orgmetra.organization.hierarchy_changed" \
+    "yes" \
+    "2026-09-15" \
+    "" \
+    "Gap child"
+
+expect_direct_evidence_failure \
+    "direct application evidence accepted the wrong audit event family" \
+    "audit event" \
+    "${GAP_CHILD_VERSION_ID}" \
+    "urn:orgmetra:organization_core" \
+    "orgmetra.organization.unrelated" \
+    "yes" \
+    "2026-09-15" \
+    "" \
+    "Gap child"
