@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import fields
 from datetime import date, datetime, timezone
 
 import pytest
@@ -76,3 +77,16 @@ def test_missing_process_local_issuance_evidence_fails_closed() -> None:
 
     with pytest.raises(ValueError, match="issuance evidence is unavailable"):
         packet.canonical_json()
+
+
+def test_object_new_clone_cannot_mint_assignment_change_issuance() -> None:
+    """Copying valid fields into an allocator-bypassed object must not create issuance."""
+    issued_packet = _build_packet()
+    forged_packet = object.__new__(packet_module.AssignmentChangeReviewPacket)
+    for field in fields(issued_packet):
+        object.__setattr__(forged_packet, field.name, getattr(issued_packet, field.name))
+
+    with pytest.raises(ValueError, match="constructor provenance is unavailable"):
+        forged_packet.__post_init__()
+    with pytest.raises(ValueError, match="issuance evidence is unavailable"):
+        forged_packet.canonical_json()
