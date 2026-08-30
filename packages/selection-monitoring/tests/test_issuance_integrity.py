@@ -91,3 +91,18 @@ def test_reinitialization_cannot_renew_issuance_evidence_after_valid_value_rewri
     with pytest.raises(ValueError, match="changed after issuance"):
         plan.canonical_json()
     assert original != plan_module._canonical_plan_json_unchecked(plan)
+
+
+def test_discarded_seal_cannot_be_renewed_after_valid_value_rewrite() -> None:
+    """Do not let seal loss reset the live plan's single-use issuance lifecycle."""
+    plan = _build_plan()
+    original = plan.canonical_json()
+
+    plan_module._discard_plan_seal(id(plan))
+    object.__setattr__(plan, "population_snapshot_digest", "f" * 64)
+
+    with pytest.raises(ValueError, match="issuance evidence already exists"):
+        plan.__post_init__()
+    with pytest.raises(ValueError, match="issuance evidence is unavailable"):
+        plan.canonical_json()
+    assert original != plan_module._canonical_plan_json_unchecked(plan)
