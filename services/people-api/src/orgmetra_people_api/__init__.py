@@ -51,6 +51,7 @@ from orgmetra_people_api.position_history import (
 from orgmetra_people_api.postgres import PostgresPeopleReadPort
 from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
+from orgmetra_people_api.postgres_position_history import PostgresPositionHistoryReadPort
 
 __all__ = [
     "AuthenticatedPrincipal",
@@ -80,6 +81,7 @@ __all__ = [
     "PostgresHireAcceptancePort",
     "PostgresPeopleMutationPort",
     "PostgresPeopleReadPort",
+    "PostgresPositionHistoryReadPort",
     "AssignmentMutationCommand",
     "AssignmentMutationResult",
     "EmploymentMutationCommand",

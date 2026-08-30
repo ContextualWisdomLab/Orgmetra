@@ -297,7 +297,7 @@ def test_rejects_row_outside_requested_tenant_or_position(row: tuple[object, ...
 @pytest.mark.parametrize(
     "row",
     [
-        position_row(recorded_from=datetime(2026, 8, 30)),
+        position_row(recorded_from=datetime(2026, 8, 31)),
         position_row(recorded_to=datetime(2026, 8, 30)),
     ],
 )
@@ -325,4 +325,3 @@ def test_open_recorded_interval_is_visible_at_known_at() -> None:
 
     assert records[0].recorded_to is None
     assert isinstance(records, tuple)
-
