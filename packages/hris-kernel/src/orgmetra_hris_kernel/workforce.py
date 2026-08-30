@@ -73,12 +73,59 @@ def _validate_snapshot_temporal_coordinate(effective_on: date, known_at: datetim
         ) from exc
 
 
-def _canonicalize_staffed_fte(staffed_fte: Decimal) -> Decimal:
-    """Return one fixed four-decimal FTE representation without ambient rounding."""
+def _status_values(value: object) -> tuple[object, ...]:
+    """Detach one caller-owned status container or fail with the public domain error."""
+    try:
+        return tuple(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as exc:
+        raise SingleValuedFactError(
+            "Workforce snapshot employment status evidence must contain status/count pairs.",
+            next_action="Rebuild the snapshot with two-value status/count pairs.",
+        ) from exc
+
+
+def _freeze_employment_status_counts(value: object) -> tuple[tuple[str, int], ...]:
+    """Detach status rows, reject malformed values, and omit semantic zero rows."""
+    frozen: list[tuple[str, int]] = []
+    for raw_row in _status_values(value):
+        row = _status_values(raw_row)
+        if len(row) != 2:
+            raise SingleValuedFactError(
+                "Workforce snapshot employment status evidence must contain status/count pairs.",
+                next_action="Rebuild the snapshot with exactly two values in every status/count pair.",
+            )
+        status, count = row
+        if type(status) is not str or type(count) is not int or count < 0:
+            raise SingleValuedFactError(
+                "Workforce snapshot employment status evidence must contain valid status/count pairs.",
+                next_action="Rebuild the snapshot with string status codes and non-negative integer counts.",
+            )
+        if count == 0:
+            continue
+        frozen.append((status, count))
+    return tuple(frozen)
+
+
+def _canonicalize_staffed_fte(staffed_fte: Decimal, staffed_assignment_count: int) -> Decimal:
+    """Return bounded four-decimal FTE evidence without exponent-proportional work."""
+    if type(staffed_assignment_count) is not int or staffed_assignment_count < 0:
+        raise SingleValuedFactError(
+            "Workforce snapshot aggregate values are internally inconsistent.",
+            next_action="Rebuild the snapshot with a non-negative integer staffed-assignment count.",
+        )
     if type(staffed_fte) is not Decimal or not staffed_fte.is_finite() or staffed_fte < _ZERO_FTE:
         raise SingleValuedFactError(
             "Workforce snapshot staffed FTE must be a finite non-negative Decimal.",
             next_action="Provide a finite non-negative Decimal FTE, then rebuild the snapshot.",
+        )
+    if staffed_fte.is_zero():
+        return _ZERO_FTE
+    if staffed_fte > Decimal(staffed_assignment_count):
+        raise SingleValuedFactError(
+            "Workforce snapshot aggregate values are internally inconsistent.",
+            next_action=(
+                "Rebuild the snapshot so staffed FTE does not exceed one full allocation per staffed assignment."
+            ),
         )
     parts = staffed_fte.as_tuple()
     if parts.exponent < _CANONICAL_FTE_EXPONENT:
@@ -90,7 +137,7 @@ def _canonicalize_staffed_fte(staffed_fte: Decimal) -> Decimal:
         return staffed_fte
     return Decimal(
         (
-            parts.sign,
+            0,
             parts.digits + (0,) * (parts.exponent - _CANONICAL_FTE_EXPONENT),
             _CANONICAL_FTE_EXPONENT,
         )
@@ -127,9 +174,13 @@ class WorkforceCompositionSnapshot:
         object.__setattr__(
             self,
             "employment_status_counts",
-            tuple(tuple(status_count) for status_count in self.employment_status_counts),
+            _freeze_employment_status_counts(self.employment_status_counts),
         )
-        object.__setattr__(self, "staffed_fte", _canonicalize_staffed_fte(self.staffed_fte))
+        object.__setattr__(
+            self,
+            "staffed_fte",
+            _canonicalize_staffed_fte(self.staffed_fte, self.staffed_assignment_count),
+        )
         self._validate_canonical_invariants()
 
     def _validate_canonical_invariants(self) -> None:
@@ -142,17 +193,6 @@ class WorkforceCompositionSnapshot:
                 next_action="Rebuild the snapshot through its validated constructor, then export it again.",
             )
         _validate_snapshot_tenant_id(self.tenant_record_id)
-        status_codes = tuple(status for status, _count in self.employment_status_counts)
-        if len(status_codes) != len(set(status_codes)):
-            raise SingleValuedFactError(
-                "Workforce snapshot contains a duplicate status code.",
-                next_action="Aggregate each employment status once, then rebuild the snapshot.",
-            )
-        if status_codes != tuple(sorted(status_codes)):
-            raise SingleValuedFactError(
-                "Workforce snapshot status codes must use canonical status order.",
-                next_action="Sort employment status counts by status code, then rebuild the snapshot.",
-            )
 
         aggregate_counts = (
             self.person_headcount,
@@ -168,23 +208,33 @@ class WorkforceCompositionSnapshot:
                     "non-negative integer."
                 ),
             )
-        if (
-            type(self.staffed_fte) is not Decimal
-            or not self.staffed_fte.is_finite()
-            or self.staffed_fte < _ZERO_FTE
-            or self.staffed_fte.as_tuple().exponent != _CANONICAL_FTE_EXPONENT
-        ):
+
+        canonical_status_counts = _freeze_employment_status_counts(self.employment_status_counts)
+        if canonical_status_counts != self.employment_status_counts:
+            raise SingleValuedFactError(
+                "Workforce snapshot employment status evidence is not canonical.",
+                next_action="Rebuild the snapshot so zero-count or mutable status rows cannot reach export.",
+            )
+        status_codes = tuple(status for status, _count in canonical_status_counts)
+        if len(status_codes) != len(set(status_codes)):
+            raise SingleValuedFactError(
+                "Workforce snapshot contains a duplicate status code.",
+                next_action="Aggregate each employment status once, then rebuild the snapshot.",
+            )
+        if status_codes != tuple(sorted(status_codes)):
+            raise SingleValuedFactError(
+                "Workforce snapshot status codes must use canonical status order.",
+                next_action="Sort employment status counts by status code, then rebuild the snapshot.",
+            )
+
+        canonical_staffed_fte = _canonicalize_staffed_fte(
+            self.staffed_fte,
+            self.staffed_assignment_count,
+        )
+        if self.staffed_fte.as_tuple() != canonical_staffed_fte.as_tuple():
             raise SingleValuedFactError(
                 "Workforce snapshot staffed FTE is not canonical four-decimal evidence.",
                 next_action="Rebuild the snapshot from governed four-decimal allocation evidence.",
-            )
-        if self.staffed_fte > Decimal(self.staffed_assignment_count):
-            raise SingleValuedFactError(
-                "Workforce snapshot aggregate values are internally inconsistent.",
-                next_action=(
-                    "Rebuild the snapshot so staffed FTE does not exceed one full allocation per "
-                    "staffed assignment."
-                ),
             )
         if self.staffed_assignment_count > 0 and self.staffed_fte <= _ZERO_FTE:
             raise SingleValuedFactError(
@@ -200,14 +250,6 @@ class WorkforceCompositionSnapshot:
             raise SingleValuedFactError(
                 "Workforce snapshot aggregate values are internally inconsistent.",
                 next_action="Rebuild the snapshot with a reportable person for every staffed assignment.",
-            )
-        if not all(
-            type(count) is int and count >= 0
-            for _status, count in self.employment_status_counts
-        ):
-            raise SingleValuedFactError(
-                "Workforce snapshot aggregate values are internally inconsistent.",
-                next_action="Rebuild the snapshot with non-negative integer employment status counts.",
             )
         if self.person_headcount > self.employment_count or self.unassigned_person_count > self.person_headcount:
             raise SingleValuedFactError(
@@ -238,7 +280,7 @@ class WorkforceCompositionSnapshot:
                 "Workforce snapshot aggregate values are internally inconsistent.",
                 next_action="Rebuild the snapshot using only reportable workforce employment statuses.",
             )
-        if sum(count for _status, count in self.employment_status_counts) != self.employment_count:
+        if sum(count for _status, count in canonical_status_counts) != self.employment_count:
             raise SingleValuedFactError(
                 "Workforce snapshot aggregate values are internally inconsistent.",
                 next_action=(
