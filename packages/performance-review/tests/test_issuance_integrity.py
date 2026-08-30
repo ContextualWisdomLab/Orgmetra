@@ -58,6 +58,21 @@ def test_missing_process_local_issuance_evidence_fails_closed() -> None:
         packet.canonical_json()
 
 
+def test_seal_loss_cannot_reset_live_issuance_lifecycle() -> None:
+    """Keep a live packet single-issued even after its process-local seal is lost."""
+    packet = _build_packet()
+    original = packet.canonical_json()
+
+    packet_module._discard_packet_seal(id(packet))
+    object.__setattr__(packet, "goal_plan_digest", "f" * 64)
+
+    with pytest.raises(ValueError, match="issuance evidence already exists"):
+        packet.__post_init__()
+    with pytest.raises(ValueError, match="issuance evidence is unavailable"):
+        packet.canonical_json()
+    assert original != packet_module._canonical_packet_json_unchecked(packet)
+
+
 def test_reinitialization_cannot_renew_issuance_evidence_after_valid_value_rewrite() -> None:
     """Keep one live packet identity bound to its original construction evidence."""
     packet = _build_packet()
