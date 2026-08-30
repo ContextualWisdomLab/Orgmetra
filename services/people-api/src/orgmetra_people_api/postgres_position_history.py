@@ -175,4 +175,3 @@ class PostgresPositionHistoryReadPort:
                 )
             records.append(record)
         return tuple(records)
-

@@ -39,4 +39,3 @@ The adapter reads only Position anchor lineage and Position-version fields. It d
 - Assignment/Employment history joins.
 - Database migrations; the protected schema already owns these relations and RLS policies.
 - Release, tag, publication, or protected-default-branch authority.
-

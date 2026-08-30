@@ -46,4 +46,3 @@ Purpose-bound field authorization remains in the parent service. This adapter pe
 The contract-first child test head `bf93924e` fails during collection while the adapter module is absent. The final child must show exact-current-head full People API coverage, invalid-input zero-connection behavior, transaction ordering, explicit SQL scope, UTC projection, malformed-row rejection, target/visibility rechecks, immutable results, and a clean checkout. Parent #152 evidence and reviews do not transfer.
 
 The implementation follows PostgreSQL 18 transaction access-mode guidance and the existing protected Orgmetra RLS contract. These controls are defense in depth and do not authorize a merge or protected-main representation while this PR is Draft or central gates lack authoritative verdicts.
-

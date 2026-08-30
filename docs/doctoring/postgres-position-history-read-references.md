@@ -23,4 +23,3 @@ RFC 3339 and explicit UTC projection support one interoperable representation fo
 ## Research classification
 
 These references constrain the accepted adapter architecture for PR #153. They do not authorize scope expansion into worker data, Assignment joins, compensation, candidate, performance, or employment-decision automation.
-
