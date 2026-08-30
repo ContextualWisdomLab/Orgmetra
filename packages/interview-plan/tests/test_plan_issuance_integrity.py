@@ -1,6 +1,7 @@
 """Regression tests for post-construction structured-interview plan integrity."""
 
 from copy import copy
+from dataclasses import fields
 
 import pytest
 
@@ -48,3 +49,16 @@ def test_copied_plan_has_no_transferable_process_local_issuance_evidence():
         copied_plan.canonical_json()
     with pytest.raises(ValueError, match="issuance evidence is unavailable"):
         copied_plan.sha256_digest()
+
+
+def test_object_new_clone_cannot_acquire_plan_issuance_evidence():
+    """A constructor-bypassing clone must not mint fresh creation evidence."""
+    issued_plan = plan()
+    forged_plan = object.__new__(type(issued_plan))
+    for field in fields(issued_plan):
+        object.__setattr__(forged_plan, field.name, getattr(issued_plan, field.name))
+
+    with pytest.raises(ValueError, match="constructor provenance is unavailable"):
+        forged_plan.__post_init__()
+    with pytest.raises(ValueError, match="issuance evidence is unavailable"):
+        forged_plan.canonical_json()
