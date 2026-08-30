@@ -10,6 +10,7 @@ on:
       - "database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql"
       - "tests/test_organization_hierarchy_change_application_postgres.sh"
       - "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh"
+      - "tests/test_organization_hierarchy_change_parent_gap_postgres.sh"
       - "docs/adr/0119-organization-hierarchy-change-application.md"
       - "docs/traceability/organization-hierarchy-change-application.md"
       - "docs/doctoring/organization-hierarchy-change-application-references.md"
@@ -72,6 +73,7 @@ jobs:
               "database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql",
               "tests/test_organization_hierarchy_change_application_postgres.sh",
               "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh",
+              "tests/test_organization_hierarchy_change_parent_gap_postgres.sh",
               ".github/workflows/organization-hierarchy-change-application-quality.yml",
           ]
           optional = [
@@ -98,6 +100,8 @@ jobs:
           PY
       - name: Run organization-hierarchy application regressions
         run: bash tests/test_organization_hierarchy_change_application_postgres.sh
+      - name: Run future-parent continuity and event-owner regressions
+        run: bash tests/test_organization_hierarchy_change_parent_gap_postgres.sh
       - name: Apply stale-transaction concurrency hardening
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql
       - name: Run stale-transaction concurrency regression
