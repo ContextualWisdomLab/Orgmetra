@@ -556,7 +556,11 @@ class PostgresPeopleMutationPort:
             resource_reference=f"employment_record:{command.employment_record_id.hex}",
             resource_kind="employment_record",
             requested_fields=_EMPLOYMENT_FIELDS,
-            required_target_scope_code=organization_unit_scope_code(command.employing_organization_unit_id),
+            required_target_scope_code=(
+                organization_unit_scope_code(command.employing_organization_unit_id)
+                if command.employing_organization_unit_id is not None
+                else None
+            ),
         )
         with self.connection_factory() as connection:
             with connection.cursor() as cursor:
@@ -617,6 +621,8 @@ class PostgresPeopleMutationPort:
                     ),
                 )
                 if command.employment_status_code in {"active", "leave"}:
+                    assert command.employing_organization_unit_id is not None
+                    assert command.employment_employing_organization_record_id is not None
                     cursor.execute(
                         _INSERT_EMPLOYMENT_EMPLOYING_ORGANIZATION_SQL,
                         (

@@ -123,7 +123,11 @@ def mutation_command_digest(
             "confirmation_reference": command.confirmation_reference,
             "effective_from": command.effective_from.isoformat(),
             "employment_concurrency_code": command.employment_concurrency_code,
-            "employing_organization_unit_id": str(command.employing_organization_unit_id),
+            "employing_organization_unit_id": (
+                None
+                if command.employing_organization_unit_id is None
+                else str(command.employing_organization_unit_id)
+            ),
             "employment_status_code": command.employment_status_code,
             "evidence_version_code": command.evidence_version_code,
             "person_record_id": str(command.person_record_id),
@@ -167,11 +171,11 @@ class EmploymentMutationCommand:
     """Opaque identities and high-impact evidence needed to create one employment."""
 
     tenant_record_id: UUID
-    employing_organization_unit_id: UUID
+    employing_organization_unit_id: UUID | None
     person_record_id: UUID
     employment_record_id: UUID
     employment_record_version_id: UUID
-    employment_employing_organization_record_id: UUID
+    employment_employing_organization_record_id: UUID | None
     audit_event_record_id: UUID
     outbox_delivery_record_id: UUID
     employment_status_code: str
@@ -185,19 +189,30 @@ class EmploymentMutationCommand:
         """Fail closed before authorization or persistence on malformed input."""
         for field_name in (
             "tenant_record_id",
-            "employing_organization_unit_id",
             "person_record_id",
             "employment_record_id",
             "employment_record_version_id",
-            "employment_employing_organization_record_id",
             "audit_event_record_id",
             "outbox_delivery_record_id",
         ):
             _validate_operational_uuid(field_name, getattr(self, field_name))
+        if (self.employing_organization_unit_id is None) != (
+            self.employment_employing_organization_record_id is None
+        ):
+            raise ValueError("employing organization fields must be supplied together.")
+        for field_name in (
+            "employing_organization_unit_id",
+            "employment_employing_organization_record_id",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                _validate_operational_uuid(field_name, value)
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
         if not isinstance(self.employment_status_code, str) or self.employment_status_code not in _EMPLOYMENT_STATUSES:
             raise ValueError("employment_status_code must be active, leave, or terminated.")
+        if self.employment_status_code in {"active", "leave"} and self.employing_organization_unit_id is None:
+            raise ValueError("active or leave employment requires an employing organization.")
         if (
             not isinstance(self.employment_concurrency_code, str)
             or self.employment_concurrency_code not in _CONCURRENCY_CODES
@@ -381,7 +396,11 @@ def create_employment_record(
         resource_kind="employment_record",
         requested_fields=_EMPLOYMENT_FIELDS,
         policy=policy,
-        required_target_scope_code=organization_unit_scope_code(command.employing_organization_unit_id),
+        required_target_scope_code=(
+            organization_unit_scope_code(command.employing_organization_unit_id)
+            if command.employing_organization_unit_id is not None
+            else None
+        ),
     )
     result = port.create_employment(command=command, authorization=authorization)
     if not isinstance(result, EmploymentMutationResult):

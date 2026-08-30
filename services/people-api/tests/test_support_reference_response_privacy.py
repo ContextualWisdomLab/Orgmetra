@@ -50,7 +50,7 @@ class SupportReferenceResponsePrivacyTests(unittest.IsolatedAsyncioTestCase):
             scope={
                 "type": "http",
                 "method": "POST",
-                "path": f"/v1/tenants/{_SUPPORT.TENANT}/candidate-worker-conversions",
+                "path": f"/v2/tenants/{_SUPPORT.TENANT}/candidate-worker-conversions",
                 "query_string": b"purpose=candidate_hire",
                 "headers": [
                     (b"authorization", b"Bearer opaque-token"),
@@ -92,7 +92,7 @@ class SupportReferenceResponsePrivacyTests(unittest.IsolatedAsyncioTestCase):
             scope={
                 "type": "http",
                 "method": "POST",
-                "path": "/v1/employment-records",
+                "path": "/v2/employment-records",
                 "query_string": b"",
                 "headers": [
                     (b"authorization", b"Bearer opaque-token"),

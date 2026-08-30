@@ -55,7 +55,7 @@ def _payload(*, decision_reason: str, evidence_references: list[dict[str, str]] 
 def _command(payload: dict[str, object]) -> EmploymentMutationCommand:
     """Build one deterministic employment command through the HTTP mapping boundary."""
     command = _command_for_route(
-        "employment-records",
+        "employment-records-v2",
         TENANT,
         payload,
         _id_factory(iter(GENERATED_IDS)),

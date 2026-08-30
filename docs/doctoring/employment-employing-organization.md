@@ -18,6 +18,8 @@ The active PR instead records a tenant-scoped, bitemporal `employment_employing_
 
 The People employment mutation and confirmed-hire materializer write this relationship in the same tenant-bound transaction that creates the Employment version. Terminated Employment creation does not create a relationship row because the database contract requires employers only for active/leave Employment coordinates.
 
+The API boundary follows the versioning and path/schema semantics of OpenAPI Specification v3.2.0: the former `/v1` payload remains available for legacy terminated writes, while employer-required Employment and confirmed-hire commands are exposed under `/v2`. An active or leave V1 request without employer facts is rejected before persistence with a V2 migration action, preserving both legacy wire compatibility and the exact-one database invariant.
+
 This is an HRIS source-of-truth relationship, not a claim of payroll or statutory-system ownership.
 
 ## Reference (APA 7)

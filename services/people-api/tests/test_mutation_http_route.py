@@ -227,7 +227,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
         app: PeopleMutationAsgiApp,
         *,
         method: str = "POST",
-        path: object = "/v1/employment-records",
+        path: object = "/v2/employment-records",
         headers: object | None = None,
         body: object | None = None,
         more_body: bool = False,
@@ -296,7 +296,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
         employment_status, employment_headers, employment_payload = await self._request(app)
         self.assertEqual(employment_status, 201)
         self.assertEqual(employment_payload, {"employment_record_id": str(EMPLOYMENT)})
-        self.assertEqual(employment_headers[b"location"], f"/v1/employment-records/{EMPLOYMENT}".encode("ascii"))
+        self.assertEqual(employment_headers[b"location"], f"/v2/employment-records/{EMPLOYMENT}".encode("ascii"))
         self.assertEqual(employment_headers[b"cache-control"], b"no-store")
         command = port.employment_calls[0][0]
         self.assertEqual(command.person_record_id, PERSON)

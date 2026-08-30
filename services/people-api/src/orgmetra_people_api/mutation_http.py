@@ -47,7 +47,18 @@ _LOGGER = logging.getLogger(__name__)
 _RFC3339_FULL_DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", flags=re.ASCII)
 _PURPOSE_CODE_PATTERN = re.compile(r"\A[a-z][a-z0-9_]{2,63}\Z", flags=re.ASCII)
 _MAX_UUID_INT = (1 << 128) - 1
-_EMPLOYMENT_BODY_KEYS = frozenset(
+_EMPLOYMENT_V1_BODY_KEYS = frozenset(
+    {
+        "person_record_id",
+        "employment_status_code",
+        "employment_concurrency_code",
+        "effective_from",
+        "decision_reason",
+        "confirmation_reference",
+        "evidence_references",
+    }
+)
+_EMPLOYMENT_V2_BODY_KEYS = frozenset(
     {
         "employing_organization_unit_id",
         "person_record_id",
@@ -142,11 +153,12 @@ async def _send_error(
 
 @dataclass(frozen=True, slots=True)
 class PeopleMutationAsgiApp:
-    """Expose the three governed People mutation routes through one ASGI app.
+    """Expose governed People mutation routes through one ASGI app.
 
     Supported routes::
 
-        POST /v1/employment-records
+        POST /v1/employment-records (legacy terminated payload)
+        POST /v2/employment-records
         POST /v1/position-records
         POST /v1/assignment-records
 
@@ -203,7 +215,7 @@ class PeopleMutationAsgiApp:
                 status=404,
                 payload={
                     "error": "route_not_found",
-                    "message": "Use /v1/employment-records, /v1/position-records, or /v1/assignment-records.",
+                    "message": "Use /v1/employment-records, /v2/employment-records, /v1/position-records, or /v1/assignment-records.",
                 },
             )
             return
@@ -221,7 +233,7 @@ class PeopleMutationAsgiApp:
                 },
             )
             return
-        except (_InvalidHttpRequest, ValueError, TypeError):
+        except (ValueError, TypeError):
             await _send_error(
                 send,
                 status=400,
@@ -303,13 +315,13 @@ class PeopleMutationAsgiApp:
                 },
             )
             return
-        except (_InvalidHttpRequest, ValueError, TypeError):
+        except (_InvalidHttpRequest, ValueError, TypeError) as error:
             await _send_error(
                 send,
                 status=400,
                 payload={
                     "error": "invalid_request",
-                    "message": "Correct the tenant, actor, purpose, confirmation, evidence, and command fields, then retry.",
+                    "message": str(error),
                 },
             )
             return
@@ -388,7 +400,11 @@ def _mutation_route(path: object) -> str | None:
     if not isinstance(path, str):
         return None
     parts = path.strip("/").split("/")
-    if len(parts) != 2 or parts[0] != "v1":
+    if len(parts) != 2:
+        return None
+    if parts[0] == "v2" and parts[1] == "employment-records":
+        return "employment-records-v2"
+    if parts[0] != "v1":
         return None
     if parts[1] in {"employment-records", "position-records", "assignment-records"}:
         return parts[1]
@@ -540,21 +556,30 @@ def _command_for_route(
     evidence_version_code = _governance_evidence_binding(payload)
     confirmation_reference = _require_confirmation_reference(payload)
     effective_from = _parse_effective_date(payload)
-    if route == "employment-records":
-        if frozenset(payload) != _EMPLOYMENT_BODY_KEYS:
+    if route in {"employment-records", "employment-records-v2"}:
+        is_v2 = route == "employment-records-v2"
+        expected_keys = _EMPLOYMENT_V2_BODY_KEYS if is_v2 else _EMPLOYMENT_V1_BODY_KEYS
+        if frozenset(payload) != expected_keys:
             raise _InvalidHttpRequest("employment command fields are incomplete or unsupported")
+        employment_status_code = _require_string_field(payload, "employment_status_code")
+        if not is_v2 and employment_status_code in {"active", "leave"}:
+            raise _InvalidHttpRequest(
+                "active or leave Employment requires /v2/employment-records with employing_organization_unit_id"
+            )
         return EmploymentMutationCommand(
             tenant_record_id=tenant_record_id,
-            employing_organization_unit_id=UUID(
-                _require_string_field(payload, "employing_organization_unit_id")
+            employing_organization_unit_id=(
+                UUID(_require_string_field(payload, "employing_organization_unit_id"))
+                if is_v2
+                else None
             ),
             person_record_id=UUID(_require_string_field(payload, "person_record_id")),
             employment_record_id=id_factory(),
             employment_record_version_id=id_factory(),
-            employment_employing_organization_record_id=id_factory(),
+            employment_employing_organization_record_id=id_factory() if is_v2 else None,
             audit_event_record_id=id_factory(),
             outbox_delivery_record_id=id_factory(),
-            employment_status_code=_require_string_field(payload, "employment_status_code"),
+            employment_status_code=employment_status_code,
             employment_concurrency_code=_require_string_field(payload, "employment_concurrency_code"),
             effective_from=effective_from,
             confirmation_reference=confirmation_reference,
@@ -605,7 +630,7 @@ def _dispatch_mutation(
     app: PeopleMutationAsgiApp,
 ) -> tuple[dict[str, str], str]:
     """Invoke the authorized application function for the matched route."""
-    if route == "employment-records":
+    if route in {"employment-records", "employment-records-v2"}:
         if not isinstance(command, EmploymentMutationCommand):
             raise TypeError("employment route requires EmploymentMutationCommand")
         result = create_employment_record(
@@ -616,7 +641,8 @@ def _dispatch_mutation(
             mutation_port=app.mutation_port,
         )
         created = str(result.employment_record_id)
-        return {"employment_record_id": created}, f"/v1/employment-records/{created}"
+        version = "v2" if route == "employment-records-v2" else "v1"
+        return {"employment_record_id": created}, f"/{version}/employment-records/{created}"
     if route == "position-records":
         if not isinstance(command, PositionMutationCommand):
             raise TypeError("position route requires PositionMutationCommand")

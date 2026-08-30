@@ -52,14 +52,14 @@ class HireAcceptanceCommand:
     """
 
     tenant_record_id: UUID
-    employing_organization_unit_id: UUID
+    employing_organization_unit_id: UUID | None
     candidate_profile_id: UUID
     selection_decision_id: UUID
     person_record_id: UUID
     person_name_record_id: UUID
     employment_record_id: UUID
     employment_record_version_id: UUID
-    employment_employing_organization_record_id: UUID
+    employment_employing_organization_record_id: UUID | None
     candidate_worker_conversion_record_id: UUID
     audit_event_record_id: UUID
     outbox_delivery_record_id: UUID
@@ -72,19 +72,28 @@ class HireAcceptanceCommand:
         """Fail closed before authorization or persistence on malformed input."""
         for field_name in (
             "tenant_record_id",
-            "employing_organization_unit_id",
             "candidate_profile_id",
             "selection_decision_id",
             "person_record_id",
             "person_name_record_id",
             "employment_record_id",
             "employment_record_version_id",
-            "employment_employing_organization_record_id",
             "candidate_worker_conversion_record_id",
             "audit_event_record_id",
             "outbox_delivery_record_id",
         ):
             _validate_operational_uuid(field_name, getattr(self, field_name))
+        if (self.employing_organization_unit_id is None) != (
+            self.employment_employing_organization_record_id is None
+        ):
+            raise ValueError("employing organization fields must be supplied together.")
+        for field_name in (
+            "employing_organization_unit_id",
+            "employment_employing_organization_record_id",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                _validate_operational_uuid(field_name, value)
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
         if not isinstance(self.display_name, str):
@@ -103,6 +112,8 @@ class HireAcceptanceCommand:
             or _STATUS_CODE_PATTERN.fullmatch(self.employment_status_code) is None
         ):
             raise ValueError("employment_status_code must be a lower snake_case code.")
+        if self.employment_status_code in {"active", "leave"} and self.employing_organization_unit_id is None:
+            raise ValueError("active or leave hire requires an employing organization.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +177,11 @@ def accept_confirmed_hire(
         resource_kind="selection_decision",
         requested_fields=_HIRE_MUTATION_FIELDS,
         policy=policy,
-        required_target_scope_code=organization_unit_scope_code(command.employing_organization_unit_id),
+        required_target_scope_code=(
+            organization_unit_scope_code(command.employing_organization_unit_id)
+            if command.employing_organization_unit_id is not None
+            else None
+        ),
     )
     result = mutation_port.accept_hire(command=command, authorization=authorization)
     if not isinstance(result, HireAcceptanceResult):

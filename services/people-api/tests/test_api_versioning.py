@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from uuid import UUID
 
 import pytest
@@ -123,4 +124,51 @@ def test_active_v1_payload_without_employer_is_rejected_with_migration_guidance(
             _employment_payload(status="active", include_employer=False),
             lambda: UUID("0198a412-8200-7000-8000-000000000042"),
             IDEMPOTENCY_KEY,
+        )
+
+
+def test_commands_reject_partial_or_missing_active_employer_facts() -> None:
+    """Keep core commands fail-closed even when callers bypass the HTTP parsers."""
+    employment = _command_for_route(
+        "employment-records-v2",
+        TENANT,
+        _employment_payload(status="active", include_employer=True),
+        lambda: UUID("0198a412-8200-7000-8000-000000000043"),
+        IDEMPOTENCY_KEY,
+    )
+    with pytest.raises(ValueError, match="supplied together"):
+        replace(employment, employment_employing_organization_record_id=None)
+    with pytest.raises(ValueError, match="requires an employing organization"):
+        replace(
+            employment,
+            employing_organization_unit_id=None,
+            employment_employing_organization_record_id=None,
+        )
+
+    hire = _command_from_payload(
+        TENANT,
+        _hire_payload(status="active", include_employer=True),
+        IDEMPOTENCY_KEY,
+    )
+    with pytest.raises(ValueError, match="supplied together"):
+        replace(hire, employment_employing_organization_record_id=None)
+    with pytest.raises(ValueError, match="requires an employing organization"):
+        replace(
+            hire,
+            employing_organization_unit_id=None,
+            employment_employing_organization_record_id=None,
+        )
+    with pytest.raises(ValueError, match="unsupported hire API version"):
+        _command_from_payload(
+            TENANT,
+            _hire_payload(status="terminated", include_employer=False),
+            IDEMPOTENCY_KEY,
+            api_version="v3",
+        )
+    with pytest.raises(ValueError, match="v2"):
+        _command_from_payload(
+            TENANT,
+            _hire_payload(status="active", include_employer=False),
+            IDEMPOTENCY_KEY,
+            api_version="v1",
         )

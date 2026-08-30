@@ -142,7 +142,7 @@ def _scope() -> dict[str, object]:
     return {
         "type": "http",
         "method": "POST",
-        "path": "/v1/employment-records",
+        "path": "/v2/employment-records",
         "query_string": b"",
         "headers": [
             (b"authorization", b"Bearer opaque-token"),
@@ -236,7 +236,7 @@ class PeopleMutationAuthenticationOrderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((start["status"], payload["error_code"]), (500, "internal_error"))
         self.assertEqual(len(captured.records), 1)
         record = captured.records[0]
-        self.assertEqual(record.route, "employment-records")
+        self.assertEqual(record.route, "employment-records-v2")
         self.assertEqual(record.tenant_record_id, str(TENANT))
         self.assertEqual(
             record.correlation_reference,

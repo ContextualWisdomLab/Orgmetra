@@ -19,6 +19,19 @@ test('canonical OpenAPI passes structural operation validation', () => {
   assert.deepEqual(validateOpenApiContract(canonical), []);
 });
 
+test('employment command schemas preserve V1 compatibility and require employer in V2', () => {
+  const v1 = canonical.slice(
+    canonical.indexOf('    CreateEmploymentRecordCommand:\n'),
+    canonical.indexOf('    CreateEmploymentRecordCommandV2:\n')
+  );
+  const v2 = canonical.slice(
+    canonical.indexOf('    CreateEmploymentRecordCommandV2:\n'),
+    canonical.indexOf('    CreatedEmploymentRecord:\n')
+  );
+  assert.doesNotMatch(v1, /- employing_organization_unit_id\n/);
+  assert.match(v2, /- employing_organization_unit_id\n/);
+});
+
 for (const testCase of [
   {
     name: 'createPersonRecord path',
@@ -164,7 +177,7 @@ for (const testCase of [
   {
     name: 'assignment confirmation requirement',
     fragment: '        - confirmation_reference\n',
-    occurrence: 5,
+    occurrence: 6,
     expected: /CreateAssignmentRecordCommand.*confirmation/
   }
 ]) {
