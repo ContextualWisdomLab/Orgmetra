@@ -62,9 +62,11 @@ def _discard_packet_seal(packet_id: int) -> None:
 
 
 def _register_packet_seal(packet: object, seal: str) -> None:
-    """Bind one live review-packet identity to evidence outside writable slots."""
+    """Bind one live review-packet identity to exactly one issuance seal."""
     packet_id = id(packet)
     with _PACKET_SEALS_LOCK:
+        if packet_id in _PACKET_SEALS:
+            raise ValueError("assignment change review packet has already been issued")
         _PACKET_SEALS[packet_id] = seal
     finalize(packet, _discard_packet_seal, packet_id)
 
