@@ -16,7 +16,7 @@ import re
 import secrets
 from threading import RLock
 from uuid import UUID
-from weakref import finalize
+from weakref import WeakValueDictionary, finalize
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -39,11 +39,12 @@ _NEXT_ACTION = (
 )
 _PROCESS_PLAN_SEAL_KEY = secrets.token_bytes(32)
 _PLAN_SEALS: dict[int, str] = {}
+_ISSUED_PLAN_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
 _PLAN_SEALS_LOCK = RLock()
 
 
 def _discard_plan_seal(plan_id: int) -> None:
-    """Discard process-local issuance evidence after its monitoring plan is collected."""
+    """Discard process-local seal bytes without resetting live issuance identity."""
     with _PLAN_SEALS_LOCK:
         _PLAN_SEALS.pop(plan_id, None)
 
@@ -173,6 +174,9 @@ class SelectionOutcomeMonitoringPlan:
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
+        with _PLAN_SEALS_LOCK:
+            if _ISSUED_PLAN_IDENTITIES.get(id(self)) is self:
+                raise ValueError("selection monitoring plan issuance evidence already exists")
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.monitoring_plan_reference,
@@ -250,6 +254,8 @@ class SelectionOutcomeMonitoringPlan:
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed monitoring instruction")
         _register_plan_seal(self, _seal_plan(_canonical_plan_json_unchecked(self)))
+        with _PLAN_SEALS_LOCK:
+            _ISSUED_PLAN_IDENTITIES[id(self)] = self
 
     def __repr__(self) -> str:
         """Return a fully redacted representation safe for routine logs and assertions."""
