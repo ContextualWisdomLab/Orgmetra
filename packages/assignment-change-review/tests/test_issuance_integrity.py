@@ -55,6 +55,20 @@ def test_post_issuance_valid_value_rewrite_cannot_emit_new_canonical_truth() -> 
     assert original != packet_module._canonical_packet_json_unchecked(packet)
 
 
+def test_post_issuance_mutation_cannot_be_resealed_by_reinitialization() -> None:
+    """Reject renewing process-local issuance evidence after a valid-value rewrite."""
+    packet = _build_packet()
+    original = packet.canonical_json()
+
+    object.__setattr__(packet, "allocation_plan_digest", "f" * 64)
+
+    with pytest.raises(ValueError, match="already been issued"):
+        packet.__post_init__()
+    with pytest.raises(ValueError, match="changed after issuance"):
+        packet.canonical_json()
+    assert original != packet_module._canonical_packet_json_unchecked(packet)
+
+
 def test_missing_process_local_issuance_evidence_fails_closed() -> None:
     """Reject canonical export when process-local issuance evidence is unavailable."""
     packet = _build_packet()
