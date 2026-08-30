@@ -52,9 +52,22 @@ def test_copied_plan_has_no_transferable_process_local_issuance_evidence():
 
 
 def test_object_new_clone_cannot_acquire_plan_issuance_evidence():
-    """A constructor-bypassing clone must not mint fresh creation evidence."""
+    """An object.__new__ clone must not mint fresh creation evidence."""
     issued_plan = plan()
     forged_plan = object.__new__(type(issued_plan))
+    for field in fields(issued_plan):
+        object.__setattr__(forged_plan, field.name, getattr(issued_plan, field.name))
+
+    with pytest.raises(ValueError, match="constructor provenance is unavailable"):
+        forged_plan.__post_init__()
+    with pytest.raises(ValueError, match="issuance evidence is unavailable"):
+        forged_plan.canonical_json()
+
+
+def test_direct_class_new_clone_cannot_acquire_plan_issuance_evidence():
+    """Calling the class allocator directly must not grant constructor provenance."""
+    issued_plan = plan()
+    forged_plan = type(issued_plan).__new__(type(issued_plan))
     for field in fields(issued_plan):
         object.__setattr__(forged_plan, field.name, getattr(issued_plan, field.name))
 
