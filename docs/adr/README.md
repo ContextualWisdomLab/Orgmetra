@@ -16,3 +16,6 @@
 | [0012](0012-governed-migration-handoff.md) | Governed migration handoff | Accepted on active implementation branch |
 | [0013](0013-governed-requisition-review-packet.md) | Governed requisition review packet | Accepted on active implementation branch |
 | [0014](0014-job-analysis-snapshot-persistence.md) | Persist governed job-analysis snapshots | Accepted on active implementation branch |
+| [0152](0152-purpose-bound-position-history-read.md) | Purpose-bound Position-history read contract | Accepted on active implementation branch |
+| [0153](0153-postgres-position-history-read.md) | Read Position history from canonical PostgreSQL truth | Proposed on active stacked implementation branch |
+| [0154](0154-position-history-http-read.md) | Expose governed Position history through a read-only HTTP boundary | Proposed on active stacked implementation branch |

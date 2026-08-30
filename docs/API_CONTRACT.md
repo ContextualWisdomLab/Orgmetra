@@ -14,6 +14,7 @@ The baseline scope contract is:
 |---|---|
 | People mutations | `orgmetra.people.write` |
 | Confirmed-hire materialization | `orgmetra.people.materialize_worker` |
+| Position-history reads | `orgmetra.people.position_history.read` |
 | Job-architecture mutations | `orgmetra.job_architecture.write` |
 | Talent-acquisition mutations | `orgmetra.talent_acquisition.write` |
 
@@ -49,6 +50,7 @@ The server rejects a reused idempotency key when its method, resource, tenant, a
 POST /v1/person-records
 GET  /v1/person-records/{person_record_id}
 POST /v1/tenants/{tenant_record_id}/candidate-worker-conversions?purpose=candidate_hire
+GET  /v1/tenants/{tenant_record_id}/positions/{position_record_id}/history?known_at=2026-08-30T00:00:00Z&purpose=workforce_position_review&fields=effective_from,position_status_code
 POST /v1/employment-records
 POST /v1/position-records
 POST /v1/assignment-records
@@ -61,6 +63,8 @@ POST /v1/validity-studies
 ```
 
 The foundation OpenAPI contract covers the shared command vocabulary and baseline person, employment, position, assignment, job-profile, and selection-decision operations. Runtime services must publish any additional path-specific contract before release and may not weaken the shared `Idempotency-Key`, least-privilege scope, authorization, evidence, or error semantics. Employment and assignment writes fail closed when exclusive jobs overlap, a seat is not staffable, or visible seat allocations exceed 1.0000.
+
+Position-history reads are read-only and bitemporal. The route requires an RFC 3339 UTC `known_at` system-recorded cutoff with a trailing `Z`, an explicit business `purpose`, and a comma-separated `fields` set. The service authorizes the exact `position_history:{position_record_id}` target and returns only the authorized fields for Position versions visible at that cutoff; an empty visible history is a successful empty `entries` collection. The route performs no Person, Employment, Assignment, compensation, candidate, performance, credential, or employment-decision expansion.
 
 ## Error shape
 

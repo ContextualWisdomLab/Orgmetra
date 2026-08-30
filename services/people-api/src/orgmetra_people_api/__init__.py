@@ -18,6 +18,7 @@ from orgmetra_people_api.hire import (
 from orgmetra_people_api.hire_http import HireAcceptanceAsgiApp
 from orgmetra_people_api.http import PeopleAsgiApp
 from orgmetra_people_api.mutation_http import PeopleMutationAsgiApp
+from orgmetra_people_api.position_history_http import PositionHistoryAsgiApp
 from orgmetra_people_api.mutations import (
     AssignmentMutationCommand,
     AssignmentMutationResult,
@@ -67,6 +68,7 @@ __all__ = [
     "HireDecisionNotFound",
     "PeopleAsgiApp",
     "PeopleMutationAsgiApp",
+    "PositionHistoryAsgiApp",
     "PeopleMutationIntegrityError",
     "PeopleMutationNotFound",
     "PeopleMutationPort",
