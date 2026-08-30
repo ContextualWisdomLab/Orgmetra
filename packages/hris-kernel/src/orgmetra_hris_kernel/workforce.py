@@ -93,7 +93,7 @@ class WorkforceCompositionSnapshot:
     employment_status_counts: tuple[tuple[str, int], ...]
 
     def __post_init__(self) -> None:
-        """Reject non-canonical or internally inconsistent evidence before export."""
+        """Freeze caller-owned values, then reject inconsistent evidence."""
         object.__setattr__(
             self,
             "known_at",
@@ -104,6 +104,17 @@ class WorkforceCompositionSnapshot:
             "employment_status_counts",
             tuple(tuple(status_count) for status_count in self.employment_status_counts),
         )
+        self._validate_canonical_invariants()
+
+    def _validate_canonical_invariants(self) -> None:
+        """Revalidate every portable evidence invariant without mutating the snapshot."""
+        if type(self.effective_on) is not date or (
+            type(self.known_at) is not datetime or self.known_at.tzinfo is not timezone.utc
+        ):
+            raise IntervalError(
+                "Workforce snapshot temporal evidence is not canonical.",
+                next_action="Rebuild the snapshot through its validated constructor, then export it again.",
+            )
         _validate_snapshot_tenant_id(self.tenant_record_id)
         status_codes = tuple(status for status, _count in self.employment_status_counts)
         if len(status_codes) != len(set(status_codes)):
@@ -211,13 +222,7 @@ class WorkforceCompositionSnapshot:
 
     def canonical_json(self) -> str:
         """Return deterministic aggregate evidence suitable for audit correlation."""
-        if type(self.effective_on) is not date or (
-            type(self.known_at) is not datetime or self.known_at.tzinfo is not timezone.utc
-        ):
-            raise IntervalError(
-                "Workforce snapshot temporal evidence is not canonical.",
-                next_action="Rebuild the snapshot through its validated constructor, then export it again.",
-            )
+        self._validate_canonical_invariants()
         payload = {
             "effective_on": self.effective_on.isoformat(),
             "employment_count": self.employment_count,
