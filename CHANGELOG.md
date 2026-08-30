@@ -54,9 +54,11 @@ All notable changes to Orgmetra will be documented in this file.
 - Made assignment coverage status-aware: `active` and `leave` remain staffable while `terminated` and other non-eligible employment statuses fail closed.
 - Made organization hierarchy reconstruction fail closed on a cycle at the requested tenant, effective day, and knowledge cutoff while ignoring future-recorded and foreign-tenant facts.
 - Build the outbox due-work index concurrently during migration 0008, requiring that index step to run outside an explicit transaction block so established queues do not block writers while the index is built; pre-index hardening and post-index privileged role setup use separate explicit transactions.
+- Workforce allocation validation now requires exact finite Decimal ratios in `(0, 1.0000]` with at most four fractional places before exact employment-portfolio or Position-seat aggregation, keeping the kernel aligned with persisted allocation scale and bounded arithmetic.
 
 ### Security
 
+- Workforce canonical JSON and digest export now revalidate the full temporal, tenant, status, count, staffing, and reconciliation contract immediately before serialization, so post-construction low-level mutation cannot mint contradictory aggregate evidence.
 - Predictive-validity cases fail closed when selection evidence, Job scope, study criterion, converted worker, or system-recorded visibility does not match; the normalized case relation is tenant-qualified, append-only, TRUNCATE-protected, and forced through row-level security.
 - Purpose-bound PII authorization now fails closed across active tenant, authenticated actor tenant, resource tenant, resource kind, purpose, operation, operation-specific Keyverse scope, and requested-field subset; malformed/wildcard-like attributes, mutable field/scope collections, reserved UUID sentinels, and cross-tenant confused-deputy contexts are rejected before protected values are returned. Authorization requests and allow/deny evidence now also require and preserve one namespaced opaque target-resource reference, so immutable audit correlation identifies the exact HR record without copying its protected values. Authorization evidence otherwise contains governance metadata and field names only, with stable denial reasons and actionable next steps rather than PII.
 - LLM output constrained to draft evidence.
@@ -74,4 +76,4 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Notes
 
-- Protected `develop` at `e7ddb7a78a5e1460410005d10f43ebf18c5e12e4` includes normalized validity-study and criterion integrity, bitemporal workforce composition, governed candidate-to-worker conversion, purpose-bound PII authorization, GET-only People reads, governed People mutation/idempotency API, and the accepted ADR 0001–0003 source expansion integrated by #37. Job Analysis persistence/API and the selection-review packet remain active-PR truth until their unchanged exact heads satisfy fresh gates and merge.
+- Protected `develop` at `9e3e4847510e1e612b48474ba42b177b8ed824df` includes the merged workforce-composition baseline from #33. Same-cutoff workforce change evidence and the export/allocation hardening in #54 remain active-PR truth until the unchanged exact head satisfies fresh required gates and independent review; predecessor PR or workflow evidence does not transfer.
