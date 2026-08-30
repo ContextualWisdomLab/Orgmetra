@@ -105,7 +105,7 @@ def test_riley_cannot_take_a_full_icu_seat_already_held_by_jordan(
         allocation_ratio=Decimal("1.0000"),
         effective=effective(date(2024, 4, 1)),
     )
-    with pytest.raises(PositionSeatError, match="1.0000"):
+    with pytest.raises(PositionSeatError, match=r"1\.0000"):
         validate_position_seat_capacity(
             [jordan_icu_assignment, riley],
             tenant_record_id=TENANT,
@@ -129,7 +129,7 @@ def test_position_rejects_exact_overallocation_under_low_decimal_precision(
     jordan = replace(jordan_icu_assignment, allocation_ratio=Decimal("0.5040"))
     with localcontext() as context:
         context.prec = 2
-        with pytest.raises(PositionSeatError, match="1.0000"):
+        with pytest.raises(PositionSeatError, match=r"1\.0000"):
             validate_position_seat_capacity(
                 [jordan, riley],
                 tenant_record_id=TENANT,
@@ -246,7 +246,7 @@ def test_assignment_write_composes_employment_position_and_seat_rules(
         person_record_id=RILEY,
         employment_record_version_id=UUID("10000000-0000-7000-8000-000000000226"),
     )
-    with pytest.raises(PositionSeatError, match="1.0000"):
+    with pytest.raises(PositionSeatError, match=r"1\.0000"):
         validate_assignment_write(
             riley,
             [jordan_icu_assignment, riley],
