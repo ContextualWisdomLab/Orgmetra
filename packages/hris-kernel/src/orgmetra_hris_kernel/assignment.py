@@ -19,12 +19,13 @@ from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts
 _ONE = Decimal("1.0000")
 _ZERO = Decimal("0")
 _ZERO_FTE = Decimal("0.0000")
+_MAX_ALLOCATION_DECIMAL_PLACES = 4
 _ASSIGNMENT_ELIGIBLE_EMPLOYMENT_STATUSES = frozenset({"active", "leave"})
 _STAFFABLE_POSITION_STATUSES = frozenset({"active", "open"})
 
 
 def _exact_decimal_total(values: tuple[Decimal, ...]) -> Decimal:
-    """Sum finite Decimal values exactly without using ambient precision."""
+    """Sum finite, scale-bounded Decimal values exactly without ambient precision."""
     if not values:
         return _ZERO_FTE
     parts = tuple(value.as_tuple() for value in values)
@@ -45,8 +46,30 @@ def _exact_decimal_total(values: tuple[Decimal, ...]) -> Decimal:
 
 
 def _ratio_is_valid(allocation_ratio: Decimal) -> bool:
-    """Return whether one assignment row stays inside (0, 1.0000]."""
+    """Return whether one allocation is an exact finite Decimal in (0, 1.0000]."""
+    if type(allocation_ratio) is not Decimal:
+        return False
+    if not allocation_ratio.is_finite():
+        return False
+    if allocation_ratio.as_tuple().exponent < -_MAX_ALLOCATION_DECIMAL_PLACES:
+        return False
     return allocation_ratio > _ZERO and allocation_ratio <= _ONE
+
+
+def _raise_invalid_portfolio_ratio() -> None:
+    """Raise the governed row-level allocation error used by portfolio validation."""
+    raise AssignmentPortfolioError(
+        "allocation_ratio must be a finite Decimal greater than 0, at most 1.0000, and use at most four decimal places.",
+        next_action="Enter an allocation between 0.0001 and 1.0000 with at most four decimal places, then save.",
+    )
+
+
+def _raise_invalid_position_ratio() -> None:
+    """Raise the governed row-level allocation error used by seat validation."""
+    raise PositionSeatError(
+        "allocation_ratio must be a finite Decimal greater than 0, at most 1.0000, and use at most four decimal places.",
+        next_action="Enter an allocation between 0.0001 and 1.0000 with at most four decimal places, then save.",
+    )
 
 
 def _union_covers(intervals: list[DateInterval], target: DateInterval) -> bool:
@@ -82,7 +105,7 @@ def validate_assignment_portfolio(
         known_at: The knowledge cutoff used for the review.
 
     Raises:
-        AssignmentPortfolioError: Reduce one allocation, then save again.
+        AssignmentPortfolioError: Reduce or correct one allocation, then save again.
     """
     scoped = [
         fact
@@ -93,10 +116,7 @@ def validate_assignment_portfolio(
     ]
     for fact in scoped:
         if not _ratio_is_valid(fact.allocation_ratio):
-            raise AssignmentPortfolioError(
-                "allocation_ratio must be greater than 0 and at most 1.0000.",
-                next_action="Enter an allocation between 0.0001 and 1.0000, then save.",
-            )
+            _raise_invalid_portfolio_ratio()
     visible = resolve_bitemporal_facts(
         scoped,
         tenant_record_id=tenant_record_id,
@@ -226,7 +246,7 @@ def validate_position_seat_capacity(
         known_at: The knowledge cutoff used for the review.
 
     Raises:
-        PositionSeatError: Reduce one allocation so the seat total is at most 1.0000.
+        PositionSeatError: Correct or reduce one allocation, then save again.
     """
     scoped = [
         fact
@@ -242,6 +262,9 @@ def validate_position_seat_capacity(
         effective_on=effective_on,
         known_at=known_at,
     )
+    for fact in visible:
+        if not _ratio_is_valid(fact.allocation_ratio):
+            _raise_invalid_position_ratio()
     total = _exact_decimal_total(tuple(fact.allocation_ratio for fact in visible))
     if total > _ONE:
         raise PositionSeatError(
