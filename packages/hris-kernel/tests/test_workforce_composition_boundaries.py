@@ -118,7 +118,7 @@ def test_direct_snapshot_rejects_unassigned_count_above_headcount() -> None:
 
 def test_direct_snapshot_rejects_nonfinite_staffed_fte() -> None:
     """NaN or infinite FTE values cannot enter deterministic audit evidence."""
-    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+    with pytest.raises(SingleValuedFactError, match="staffed FTE"):
         _direct_snapshot(
             known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
             staffed_fte=Decimal("NaN"),
@@ -127,7 +127,7 @@ def test_direct_snapshot_rejects_nonfinite_staffed_fte() -> None:
 
 def test_direct_snapshot_rejects_non_decimal_staffed_fte() -> None:
     """FTE evidence must remain Decimal so finite and canonical formatting are guaranteed."""
-    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+    with pytest.raises(SingleValuedFactError, match="staffed FTE"):
         _direct_snapshot(
             known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
             staffed_fte=0,  # type: ignore[arg-type]
