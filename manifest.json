@@ -455,9 +455,9 @@
     },
     {
       "path": "tests/test_employment_work_capacity_persistence_postgres.sh",
-      "sha256": "54f35571bd28c348424950c7ae86ccd05f7eb37ac89c80ec12e36e6597c3b9b0",
-      "bytes": 17086,
-      "lines": 420
+      "sha256": "d62eba936d2ab573d859d84a9c70d91154e67dcf312d7d14232303dce7342897",
+      "bytes": 17193,
+      "lines": 421
     },
     {
       "path": "tests/test_employment_work_capacity_retroactive_postgres.sh",
