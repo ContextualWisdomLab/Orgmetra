@@ -40,13 +40,15 @@ Because this package cannot prove independently supplied reference provenance, `
 
 `generated_at` is constructed from a trusted internal clock adapter. The resulting exact built-in timezone-aware `datetime` is normalized once to UTC and then sealed; future instants, missing/raising offsets, normalization overflow, datetime subclasses, or post-construction non-UTC reinjection fail closed. Tests may replace the internal clock adapter to make canonical bytes deterministic, but production callers cannot provide the issuance timestamp.
 
+The process-local HMAC issuance seal is registered exactly once for each live packet identity. Re-entering `__post_init__()` on the same object after a valid-value rewrite MUST fail before a replacement seal can be installed, so validation re-entry cannot turn mutated runtime state into a second issued canonical truth. Canonical export continues to compare the current deterministic bytes against the original external seal. This registry is in-process mutation defense only and is not a portable signature, distributed uniqueness service, authorization record, or durable audit/outbox substitute.
+
 Canonical JSON and SHA-256 are immutable correlation evidence only. They do not prove the correctness of source evidence, authoritative cross-record scope, substantive validity or fairness of a criterion, lawful use, human completion, reference provenance, or the final rating.
 
 ## Consequences
 
 Buyers can present a review-ready correlation envelope while keeping authoritative Employment/Job and performance evidence separable from the later human rating/feedback event. The envelope itself now carries explicit canonical proof that rating values, free-form feedback, and free-form model output are excluded from this pre-rating evidence boundary. A consumer cannot truthfully treat the packet itself as proof that all referenced records belong to the same employee/job/cycle or that UUIDv4-shaped values are opaque. Until authoritative provenance verification occurs, the packet receives the more restrictive identifier-risk classification rather than a false no-direct-identifier assertion.
 
-The system-recorded timestamp can no longer be backdated through public packet construction. Hosts still own purpose-bound authorization, durable immutable audit/outbox, retention/export controls, and the authoritative clock/runtime environment.
+The system-recorded timestamp can no longer be backdated through public packet construction, and one live packet cannot renew its process-local issuance seal after mutation. Hosts still own purpose-bound authorization, durable immutable audit/outbox, retention/export controls, and the authoritative clock/runtime environment.
 
 This slice adds no database migration, no rating computation, no cross-service table access, and no automated employment decision. The pre-rating packet preserves actor, purpose, reviewed reason, evidence version, conservative identifier-risk classification, system-recorded issuance time, and explicit content-exclusion flags in its immutable correlation evidence; later authoritative rating persistence must independently preserve those values plus human confirmation, audit/outbox, temporal scope, authoritative scope/provenance resolution evidence, and any applicable policy requirements.
 
