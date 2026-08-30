@@ -2,13 +2,37 @@
 
 from __future__ import annotations
 
-from dataclasses import fields
-from datetime import date, datetime, timezone
+from dataclasses import fields, replace
+from datetime import date, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
 from orgmetra_assignment_change_review import build_assignment_change_review_packet
 from orgmetra_assignment_change_review import packet as packet_module
+
+
+class ReentrantPacketAllocatorTimezone(tzinfo):
+    """Retain a packet allocated while caller-owned timezone code is executing."""
+
+    def __init__(self) -> None:
+        """Start without a retained allocator-bypassed packet."""
+        self.forged_packet: object | None = None
+
+    def utcoffset(self, _dt: datetime | None) -> timedelta:
+        """Allocate once while the legitimate constructor freezes generated_at."""
+        if self.forged_packet is None:
+            self.forged_packet = packet_module.AssignmentChangeReviewPacket.__new__(
+                packet_module.AssignmentChangeReviewPacket
+            )
+        return timedelta(0)
+
+    def dst(self, _dt: datetime | None) -> timedelta:
+        """Use no daylight-saving adjustment in the test timezone."""
+        return timedelta(0)
+
+    def tzname(self, _dt: datetime | None) -> str:
+        """Return a descriptive test-only timezone name."""
+        return "REENTRANT"
 
 
 def _build_packet():
@@ -83,6 +107,25 @@ def test_object_new_clone_cannot_mint_assignment_change_issuance() -> None:
     """Copying valid fields into an allocator-bypassed object must not create issuance."""
     issued_packet = _build_packet()
     forged_packet = object.__new__(packet_module.AssignmentChangeReviewPacket)
+    for field in fields(issued_packet):
+        object.__setattr__(forged_packet, field.name, getattr(issued_packet, field.name))
+
+    with pytest.raises(ValueError, match="constructor provenance is unavailable"):
+        forged_packet.__post_init__()
+    with pytest.raises(ValueError, match="issuance evidence is unavailable"):
+        forged_packet.canonical_json()
+
+
+def test_timezone_callback_cannot_retain_assignment_change_constructor_privilege() -> None:
+    """Caller timezone code must not retain an allocator-created issuance-capable object."""
+    callback_timezone = ReentrantPacketAllocatorTimezone()
+    issued_packet = replace(
+        _build_packet(),
+        generated_at=datetime(2026, 8, 19, 7, 30, 15, tzinfo=callback_timezone),
+    )
+    forged_packet = callback_timezone.forged_packet
+    assert forged_packet is not None
+
     for field in fields(issued_packet):
         object.__setattr__(forged_packet, field.name, getattr(issued_packet, field.name))
 
