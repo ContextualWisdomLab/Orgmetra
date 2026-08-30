@@ -62,3 +62,14 @@ def test_object_new_clone_cannot_acquire_plan_issuance_evidence():
         forged_plan.__post_init__()
     with pytest.raises(ValueError, match="issuance evidence is unavailable"):
         forged_plan.canonical_json()
+
+
+def test_existing_plan_seal_cannot_be_replaced_by_secondary_registration():
+    """A second seal registration must not overwrite an already issued plan."""
+    issued_plan = plan()
+    original_json = issued_plan.canonical_json()
+
+    with pytest.raises(ValueError, match="issuance evidence already exists"):
+        plan_module._register_plan_seal(issued_plan, "0" * 64)
+
+    assert issued_plan.canonical_json() == original_json
