@@ -6,6 +6,7 @@ candidate PII or candidate response/score and remains pending explicit human app
 """
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
@@ -35,6 +36,7 @@ _PROCESS_PLAN_SEAL_KEY = secrets.token_bytes(32)
 _PLAN_SEALS: dict[int, str] = {}
 _CONSTRUCTING_PLAN_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
 _ISSUED_PLAN_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
+_ACTIVE_PLAN_CONSTRUCTOR = ContextVar("_ACTIVE_PLAN_CONSTRUCTOR", default=None)
 _PLAN_SEALS_LOCK = RLock()
 
 
@@ -130,8 +132,20 @@ def _canonical_timestamp(value: datetime, field_name: str = "generated_at") -> s
     return _snapshot_utc_datetime(value, field_name).isoformat().replace("+00:00", "Z")
 
 
+class _StructuredInterviewPlanMeta(type):
+    """Gate plan provenance on the normal full class-construction path."""
+
+    def __call__(cls, *args: object, **kwargs: object) -> object:
+        """Arm provenance only while Python runs this class's full constructor."""
+        token = _ACTIVE_PLAN_CONSTRUCTOR.set(cls)
+        try:
+            return super().__call__(*args, **kwargs)
+        finally:
+            _ACTIVE_PLAN_CONSTRUCTOR.reset(token)
+
+
 @dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
-class StructuredInterviewPlan:
+class StructuredInterviewPlan(metaclass=_StructuredInterviewPlanMeta):
     """Immutable candidate-neutral interview-plan evidence awaiting human approval."""
 
     tenant_record_id: str
@@ -158,10 +172,11 @@ class StructuredInterviewPlan:
     next_action: str = _NEXT_ACTION
 
     def __new__(cls, *_args: object, **_kwargs: object) -> StructuredInterviewPlan:
-        """Mark only instances entering through the governed constructor as eligible."""
+        """Register eligibility only during the governed full constructor call."""
         instance = object.__new__(cls)
-        with _PLAN_SEALS_LOCK:
-            _CONSTRUCTING_PLAN_IDENTITIES[id(instance)] = instance
+        if _ACTIVE_PLAN_CONSTRUCTOR.get() is cls:
+            with _PLAN_SEALS_LOCK:
+                _CONSTRUCTING_PLAN_IDENTITIES[id(instance)] = instance
         return instance
 
     def __post_init__(self) -> None:
