@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on active PR #33 only. This document is not protected-`develop` product truth until the owning PR integrates.
+Accepted on protected `develop` through merged PR #33. Active PR #54 strengthens the accepted contract's deterministic arithmetic and canonical-evidence integrity; those strengthening changes are not protected-`develop` truth until #54 integrates.
 
 ## Context
 
@@ -24,8 +24,10 @@ Orgmetra will expose a pure `WorkforceCompositionSnapshot` derived from authorit
 - Unassigned-person count surfaces a buyer-actionable staffing gap without serializing row-level worker identity.
 - Status counts are aggregate employment evidence, sorted deterministically.
 - The snapshot freezes the timezone-aware knowledge cutoff to an exact UTC datetime and detaches status-count containers before validation, so mutable caller objects cannot change canonical evidence after construction.
+- Canonical JSON and digest export re-run the same non-mutating temporal, tenant, status, count, staffing, and reconciliation invariants used after construction, so low-level runtime mutation cannot silently mint contradictory workforce evidence.
 - Endpoint FTE totals and workforce-change deltas align finite Decimal coefficients before arithmetic, so the caller's ambient Decimal precision cannot change endpoint evidence, the reported delta, canonical JSON, or content digest.
 - Employment-portfolio and Position-seat limits use the same exact Decimal coefficient total, so low caller precision cannot admit an overallocated staffing total.
+- Allocation rows must be exact finite `Decimal` values in `(0, 1.0000]` with no more than four fractional places before exact coefficient aggregation. This keeps the kernel aligned with the People/API persistence scale contract and prevents hostile or accidental extreme exponents from creating unbounded integer-coefficient work.
 - Two visible versions of one Employment or Assignment identity fail closed. Invalid assignment coverage or over-allocation remains a data-integrity error rather than becoming a plausible metric.
 - The canonical JSON contains the opaque tenant identifier, report coordinates, aggregate metrics, and schema version only. It excludes person, employment, assignment, and position identifiers and all human-readable PII.
 - SHA-256 addresses the exact canonical UTF-8 representation so a caller can correlate a report with immutable audit evidence without copying source rows.
@@ -50,7 +52,7 @@ Orgmetra will expose a pure `WorkforceCompositionSnapshot` derived from authorit
 
 ## Verification
 
-`packages/hris-kernel/tests/test_workforce_composition.py`, `packages/hris-kernel/tests/test_workforce_composition_boundaries.py`, `packages/hris-kernel/tests/test_workforce_position_capacity.py`, `packages/hris-kernel/tests/test_workforce_composition_change.py`, and `packages/hris-kernel/tests/test_assignment_portfolio.py` require tenant isolation, concurrent-employment person deduplication, active/leave composition, terminated exclusion, future-effective and late-recorded exclusion, FTE and unassigned-person reporting, deterministic canonical evidence, context-independent endpoint and workforce-change FTE arithmetic, historical recorded-time reconstruction, duplicate-version rejection, overlapping-exclusive-employment rejection, position-seat over-allocation rejection, low-precision allocation-limit rejection, assignment-person integrity, per-employment allocation-integrity reuse, and timezone-aware knowledge cutoffs. `.github/workflows/workforce-intelligence-quality.yml` checks out the exact candidate SHA and runs the complete HRIS kernel with the package's 100% statement and branch coverage threshold.
+`packages/hris-kernel/tests/test_workforce_composition.py`, `packages/hris-kernel/tests/test_workforce_composition_boundaries.py`, `packages/hris-kernel/tests/test_workforce_position_capacity.py`, `packages/hris-kernel/tests/test_workforce_composition_change.py`, `packages/hris-kernel/tests/test_assignment_portfolio.py`, `packages/hris-kernel/tests/test_position_coverage.py`, and `packages/hris-kernel/tests/test_allocation_and_snapshot_export_regressions.py` require tenant isolation, concurrent-employment person deduplication, active/leave composition, terminated exclusion, future-effective and late-recorded exclusion, FTE and unassigned-person reporting, deterministic canonical evidence, post-construction export revalidation, context-independent endpoint and workforce-change FTE arithmetic, historical recorded-time reconstruction, duplicate-version rejection, overlapping-exclusive-employment rejection, position-seat over-allocation rejection, low-precision allocation-limit rejection, allocation type/finiteness/scale rejection, assignment-person integrity, per-employment allocation-integrity reuse, and timezone-aware knowledge cutoffs. `.github/workflows/workforce-intelligence-quality.yml` checks out the exact candidate SHA and runs the complete HRIS kernel with the package's 100% statement and branch coverage threshold.
 
 ## References
 
