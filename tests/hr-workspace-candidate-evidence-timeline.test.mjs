@@ -11,6 +11,10 @@ const workflow = readFileSync(
   new URL('../.github/workflows/hr-workspace-candidate-evidence-timeline.yml', import.meta.url),
   'utf8',
 );
+const css = readFileSync(
+  new URL('../apps/hr-workspace/candidate-evidence-timeline.css', import.meta.url),
+  'utf8',
+);
 
 const STATES = Object.freeze([
   'idle',
@@ -85,6 +89,8 @@ test('candidate evidence timeline evidence is value-minimized and non-authorizin
 });
 
 test('candidate evidence timeline renders Figma-correlated accessible state evidence', () => {
+  assert.match(css, /:hover:not\(:disabled\)/);
+  assert.match(css, /:focus-visible/);
   const loading = candidateEvidenceTimelineMarkup('loading');
   assert.match(loading, /data-figma-node-id="1:64"/);
   assert.match(loading, /aria-busy="true"/);

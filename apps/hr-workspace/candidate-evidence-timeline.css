@@ -47,6 +47,10 @@
   cursor: pointer;
 }
 
+.candidate-evidence-action:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
 .candidate-evidence-action:disabled {
   cursor: not-allowed;
   opacity: 0.62;
