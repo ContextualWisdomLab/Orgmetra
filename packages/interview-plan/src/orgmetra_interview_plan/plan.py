@@ -133,10 +133,10 @@ def _canonical_timestamp(value: datetime, field_name: str = "generated_at") -> s
 
 
 class _StructuredInterviewPlanMeta(type):
-    """Gate plan provenance on the normal full class-construction path."""
+    """Gate plan provenance on one allocator ticket per normal class construction."""
 
     def __call__(cls, *args: object, **kwargs: object) -> object:
-        """Arm provenance only while Python runs this class's full constructor."""
+        """Arm one allocator ticket before Python enters this class's constructor."""
         token = _ACTIVE_PLAN_CONSTRUCTOR.set(cls)
         try:
             return super().__call__(*args, **kwargs)
@@ -172,9 +172,10 @@ class StructuredInterviewPlan(metaclass=_StructuredInterviewPlanMeta):
     next_action: str = _NEXT_ACTION
 
     def __new__(cls, *_args: object, **_kwargs: object) -> StructuredInterviewPlan:
-        """Register eligibility only during the governed full constructor call."""
+        """Consume constructor eligibility before caller-controlled validation can run."""
         instance = object.__new__(cls)
         if _ACTIVE_PLAN_CONSTRUCTOR.get() is cls:
+            _ACTIVE_PLAN_CONSTRUCTOR.set(None)
             with _PLAN_SEALS_LOCK:
                 _CONSTRUCTING_PLAN_IDENTITIES[id(instance)] = instance
         return instance
