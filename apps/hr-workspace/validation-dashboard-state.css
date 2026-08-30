@@ -49,6 +49,10 @@
   cursor: pointer;
 }
 
+.validation-dashboard-action:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
 .validation-dashboard-action:disabled {
   cursor: not-allowed;
   opacity: 0.62;

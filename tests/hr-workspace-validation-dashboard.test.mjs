@@ -11,6 +11,10 @@ const workflow = readFileSync(
   new URL('../.github/workflows/hr-workspace-validation-dashboard.yml', import.meta.url),
   'utf8',
 );
+const css = readFileSync(
+  new URL('../apps/hr-workspace/validation-dashboard-state.css', import.meta.url),
+  'utf8',
+);
 
 const STATES = Object.freeze([
   'idle',
@@ -93,6 +97,8 @@ test('validation dashboard evidence is value-minimized and non-authorizing', () 
 });
 
 test('validation dashboard renders Figma-correlated accessible metric-shell evidence', () => {
+  assert.match(css, /:hover:not\(:disabled\)/);
+  assert.match(css, /:focus-visible/);
   const loading = validationDashboardMarkup('loading');
   assert.match(loading, /data-figma-node-id="1:64"/);
   assert.match(loading, /data-figma-component="ValidationMetric"/);
