@@ -109,6 +109,7 @@ test('Storybook and CSS cover governed legal-employer accessibility states', () 
   assert.match(story, /legalEmployerHistoryStateMarkup/);
   assert.match(css, /var\(--orgmetra-focus-ring\)/);
   assert.match(css, /:focus-visible/);
+  assert.match(css, /:hover:not\(:disabled\)/);
   assert.match(css, /\[aria-busy="true"\]/);
   assert.match(css, /read-only/);
   assert.match(css, /permission-denied/);

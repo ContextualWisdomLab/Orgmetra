@@ -47,6 +47,10 @@
   cursor: pointer;
 }
 
+.legal-employer-history-action:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
 .legal-employer-history-action:disabled {
   cursor: not-allowed;
   opacity: 0.62;
