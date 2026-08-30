@@ -69,6 +69,20 @@ def test_valid_value_mutation_cannot_rewrite_emitted_evidence() -> None:
     assert "44444444-4444-4444-8444-444444444444" in original
 
 
+def test_reinitialization_cannot_renew_issuance_after_valid_value_rewrite() -> None:
+    """One live packet identity must never mint a second canonical truth."""
+    packet = _packet()
+    original = packet.canonical_json()
+    object.__setattr__(packet, "reason_code", "operational_continuity_review")
+
+    with pytest.raises(ValueError, match="integrity"):
+        packet.__post_init__()
+
+    with pytest.raises(ValueError, match="integrity"):
+        packet.canonical_json()
+    assert "policy_entitlement_review" in original
+
+
 def test_shallow_copy_does_not_inherit_process_local_issuance_evidence() -> None:
     """An unsupported copied object must fail closed instead of inheriting issuance trust."""
     packet = _packet()
