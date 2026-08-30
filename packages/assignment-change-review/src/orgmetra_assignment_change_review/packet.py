@@ -10,6 +10,7 @@ at the authoritative Orgmetra HRIS/People boundary.
 """
 from __future__ import annotations
 
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
@@ -19,7 +20,7 @@ import re
 import secrets
 from threading import RLock
 from uuid import UUID
-from weakref import finalize
+from weakref import WeakValueDictionary, finalize
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -52,6 +53,9 @@ _NEXT_ACTION = (
 )
 _PROCESS_PACKET_SEAL_KEY = secrets.token_bytes(32)
 _PACKET_SEALS: dict[int, str] = {}
+_CONSTRUCTING_PACKET_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
+_ISSUED_PACKET_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
+_ACTIVE_PACKET_CONSTRUCTOR = ContextVar("_ACTIVE_PACKET_CONSTRUCTOR", default=None)
 _PACKET_SEALS_LOCK = RLock()
 
 
@@ -163,8 +167,20 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
+class _AssignmentChangeReviewPacketMeta(type):
+    """Grant one constructor ticket only to a normal full packet construction."""
+
+    def __call__(cls, *args: object, **kwargs: object) -> object:
+        """Arm one allocator ticket that the exact packet allocator must consume."""
+        token = _ACTIVE_PACKET_CONSTRUCTOR.set(cls)
+        try:
+            return super().__call__(*args, **kwargs)
+        finally:
+            _ACTIVE_PACKET_CONSTRUCTOR.reset(token)
+
+
 @dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
-class AssignmentChangeReviewPacket:
+class AssignmentChangeReviewPacket(metaclass=_AssignmentChangeReviewPacketMeta):
     """Immutable assignment-change evidence that cannot itself authorize a mutation."""
 
     tenant_record_id: str
@@ -203,12 +219,26 @@ class AssignmentChangeReviewPacket:
     mutation_state: str = _MUTATION_STATE
     next_action: str = _NEXT_ACTION
 
+    def __new__(cls, *_args: object, **_kwargs: object) -> AssignmentChangeReviewPacket:
+        """Consume constructor provenance before validation invokes caller-owned code."""
+        instance = object.__new__(cls)
+        if _ACTIVE_PACKET_CONSTRUCTOR.get() is cls:
+            _ACTIVE_PACKET_CONSTRUCTOR.set(None)
+            with _PACKET_SEALS_LOCK:
+                _CONSTRUCTING_PACKET_IDENTITIES[id(instance)] = instance
+        return instance
+
     def __repr__(self) -> str:
         """Return a representation that never emits worker/assignment correlation evidence."""
         return "AssignmentChangeReviewPacket(<redacted>)"
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
+        with _PACKET_SEALS_LOCK:
+            if _ISSUED_PACKET_IDENTITIES.get(id(self)) is self:
+                raise ValueError("assignment change review packet has already been issued")
+            if _CONSTRUCTING_PACKET_IDENTITIES.get(id(self)) is not self:
+                raise ValueError("assignment change review constructor provenance is unavailable")
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.assignment_change_review_reference,
@@ -312,9 +342,15 @@ class AssignmentChangeReviewPacket:
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed assignment-change instruction")
         _register_packet_seal(self, _seal_packet(_canonical_packet_json_unchecked(self)))
+        with _PACKET_SEALS_LOCK:
+            _ISSUED_PACKET_IDENTITIES[id(self)] = self
+            _CONSTRUCTING_PACKET_IDENTITIES.pop(id(self), None)
 
     def canonical_json(self) -> str:
         """Return issuance-verified deterministic JSON for immutable audit correlation."""
+        with _PACKET_SEALS_LOCK:
+            if _ISSUED_PACKET_IDENTITIES.get(id(self)) is not self:
+                raise ValueError("assignment change review issuance evidence is unavailable")
         payload_json = _canonical_packet_json_unchecked(self)
         authoritative_seal = _authoritative_packet_seal(self)
         if authoritative_seal is None:
