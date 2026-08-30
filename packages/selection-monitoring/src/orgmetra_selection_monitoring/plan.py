@@ -50,12 +50,13 @@ def _discard_plan_seal(plan_id: int) -> None:
 
 
 def _register_plan_seal(plan: object, seal: str) -> None:
-    """Bind one live monitoring-plan identity exactly once outside writable slots."""
+    """Atomically bind one live monitoring-plan identity to one issuance seal."""
     plan_id = id(plan)
     with _PLAN_SEALS_LOCK:
-        if plan_id in _PLAN_SEALS:
+        if _ISSUED_PLAN_IDENTITIES.get(plan_id) is plan:
             raise ValueError("selection monitoring plan issuance evidence already exists")
         _PLAN_SEALS[plan_id] = seal
+        _ISSUED_PLAN_IDENTITIES[plan_id] = plan
     finalize(plan, _discard_plan_seal, plan_id)
 
 
@@ -174,9 +175,6 @@ class SelectionOutcomeMonitoringPlan:
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
-        with _PLAN_SEALS_LOCK:
-            if _ISSUED_PLAN_IDENTITIES.get(id(self)) is self:
-                raise ValueError("selection monitoring plan issuance evidence already exists")
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.monitoring_plan_reference,
@@ -254,8 +252,6 @@ class SelectionOutcomeMonitoringPlan:
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed monitoring instruction")
         _register_plan_seal(self, _seal_plan(_canonical_plan_json_unchecked(self)))
-        with _PLAN_SEALS_LOCK:
-            _ISSUED_PLAN_IDENTITIES[id(self)] = self
 
     def __repr__(self) -> str:
         """Return a fully redacted representation safe for routine logs and assertions."""
