@@ -15,7 +15,7 @@ import re
 import secrets
 from threading import RLock
 from uuid import UUID
-from weakref import finalize
+from weakref import WeakValueDictionary, finalize
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -33,6 +33,8 @@ _NEXT_ACTION = (
 _MAX_EVIDENCE_VERSION = 2_147_483_647
 _PROCESS_PLAN_SEAL_KEY = secrets.token_bytes(32)
 _PLAN_SEALS: dict[int, str] = {}
+_CONSTRUCTING_PLAN_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
+_ISSUED_PLAN_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
 _PLAN_SEALS_LOCK = RLock()
 
 
@@ -155,8 +157,20 @@ class StructuredInterviewPlan:
     review_state: str = _REVIEW_STATE
     next_action: str = _NEXT_ACTION
 
+    def __new__(cls, *_args: object, **_kwargs: object) -> StructuredInterviewPlan:
+        """Mark only instances entering through the governed constructor as eligible."""
+        instance = object.__new__(cls)
+        with _PLAN_SEALS_LOCK:
+            _CONSTRUCTING_PLAN_IDENTITIES[id(instance)] = instance
+        return instance
+
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
+        with _PLAN_SEALS_LOCK:
+            if _ISSUED_PLAN_IDENTITIES.get(id(self)) is self:
+                raise ValueError("structured interview plan issuance evidence already exists")
+            if _CONSTRUCTING_PLAN_IDENTITIES.get(id(self)) is not self:
+                raise ValueError("structured interview plan constructor provenance is unavailable")
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(self.interview_plan_reference, "interview_plan", "interview_plan_reference")
         _validate_reference(self.requisition_reference, "requisition", "requisition_reference")
@@ -206,6 +220,9 @@ class StructuredInterviewPlan:
         if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed interview-plan instruction")
         _register_plan_seal(self, _seal_plan(self._canonical_json_unchecked()))
+        with _PLAN_SEALS_LOCK:
+            _ISSUED_PLAN_IDENTITIES[id(self)] = self
+            _CONSTRUCTING_PLAN_IDENTITIES.pop(id(self), None)
 
     def __repr__(self) -> str:
         """Return a fully redacted representation safe for routine logs and assertions."""
@@ -241,6 +258,9 @@ class StructuredInterviewPlan:
 
     def canonical_json(self) -> str:
         """Return creation-bound canonical JSON for immutable audit correlation."""
+        with _PLAN_SEALS_LOCK:
+            if _ISSUED_PLAN_IDENTITIES.get(id(self)) is not self:
+                raise ValueError("structured interview plan issuance evidence is unavailable")
         canonical = self._canonical_json_unchecked()
         authoritative_seal = _authoritative_plan_seal(self)
         if type(authoritative_seal) is not str:
