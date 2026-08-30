@@ -21,7 +21,7 @@ import re
 import secrets
 from threading import RLock
 from uuid import UUID
-from weakref import finalize
+from weakref import WeakValueDictionary, finalize
 
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(
@@ -40,11 +40,12 @@ _NEXT_ACTION = (
 )
 _PROCESS_PACKET_SEAL_KEY = secrets.token_bytes(32)
 _PACKET_SEALS: dict[int, str] = {}
+_ISSUED_PACKET_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
 _PACKET_SEALS_LOCK = RLock()
 
 
 def _discard_packet_seal(packet_id: int) -> None:
-    """Discard process-local issuance evidence after its review packet is collected."""
+    """Discard seal bytes without resetting the live packet's issuance lifecycle."""
     with _PACKET_SEALS_LOCK:
         _PACKET_SEALS.pop(packet_id, None)
 
@@ -53,9 +54,10 @@ def _register_packet_seal(packet: object, seal: str) -> None:
     """Bind one live review-packet identity exactly once outside writable slots."""
     packet_id = id(packet)
     with _PACKET_SEALS_LOCK:
-        if packet_id in _PACKET_SEALS:
+        if _ISSUED_PACKET_IDENTITIES.get(packet_id) is packet:
             raise ValueError("performance review issuance evidence already exists")
         _PACKET_SEALS[packet_id] = seal
+        _ISSUED_PACKET_IDENTITIES[packet_id] = packet
     finalize(packet, _discard_packet_seal, packet_id)
 
 
