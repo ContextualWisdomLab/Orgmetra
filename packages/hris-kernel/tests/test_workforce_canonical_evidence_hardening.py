@@ -165,6 +165,17 @@ def test_change_export_rechecks_date_order_after_endpoint_mutation() -> None:
         change.canonical_json()
 
 
+def test_change_export_rechecks_malformed_endpoint_date_before_comparison() -> None:
+    """Malformed endpoint time must fail with the snapshot domain contract, not raw TypeError."""
+    opening = _snapshot(date(2026, 1, 15))
+    closing = _snapshot(date(2026, 2, 15))
+    change = WorkforceCompositionChangeSnapshot(opening, closing)
+    object.__setattr__(opening, "effective_on", "2026-01-15")
+
+    with pytest.raises(IntervalError, match="temporal evidence"):
+        change.canonical_json()
+
+
 def test_change_export_rechecks_cutoff_after_endpoint_mutation() -> None:
     """Post-construction recorded-time mutation must not mix knowledge cutoffs."""
     opening = _snapshot(date(2026, 1, 15))
