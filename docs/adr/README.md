@@ -17,3 +17,4 @@
 | [0013](0013-governed-requisition-review-packet.md) | Governed requisition review packet | Accepted on active implementation branch |
 | [0014](0014-job-analysis-snapshot-persistence.md) | Persist governed job-analysis snapshots | Accepted on active implementation branch |
 | [0155](0155-employment-history-http-read.md) | Expose governed Employment history through a read-only HTTP boundary | Proposed on active stacked PR #155 |
+| [0156](0156-employment-history-postgres-read.md) | Read Employment history from canonical PostgreSQL truth | Proposed on active stacked PR #156 |
