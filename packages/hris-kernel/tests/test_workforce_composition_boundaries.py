@@ -226,7 +226,7 @@ def test_direct_snapshot_rejects_more_assigned_people_than_assignments() -> None
 
 def test_direct_snapshot_rejects_boolean_status_counts() -> None:
     """Boolean values must not serialize as employment counts."""
-    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+    with pytest.raises(SingleValuedFactError, match="status"):
         _direct_snapshot(
             known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
             employment_status_counts=(("active", True),),  # type: ignore[tuple-item]
@@ -235,7 +235,7 @@ def test_direct_snapshot_rejects_boolean_status_counts() -> None:
 
 def test_direct_snapshot_rejects_negative_status_counts() -> None:
     """Negative per-status counts cannot reconcile a workforce aggregate."""
-    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+    with pytest.raises(SingleValuedFactError, match="status"):
         _direct_snapshot(
             known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
             employment_status_counts=(("active", -1), ("leave", 2)),
