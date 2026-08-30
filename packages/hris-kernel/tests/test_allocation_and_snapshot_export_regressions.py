@@ -24,17 +24,29 @@ def _id(value: int) -> UUID:
     return UUID(int=value)
 
 
-def _assignment(allocation_ratio: Decimal) -> AssignmentFact:
-    """Build one visible assignment using a caller-provided allocation ratio."""
+def _assignment(allocation_ratio: object) -> AssignmentFact:
+    """Build one visible assignment using an untrusted caller allocation value."""
     return AssignmentFact(
         tenant_record_id=_id(1),
         assignment_record_id=_id(201),
         employment_record_id=_id(101),
         person_record_id=_id(11),
         position_record_id=_id(1201),
-        allocation_ratio=allocation_ratio,
+        allocation_ratio=allocation_ratio,  # type: ignore[arg-type]
         effective=DateInterval(date(2026, 1, 1)),
         recorded=RecordedInterval(datetime(2026, 1, 1, tzinfo=timezone.utc)),
+    )
+
+
+def _validate_portfolio(assignment: AssignmentFact) -> None:
+    """Run the tenant-scoped portfolio boundary for one fixture assignment."""
+    validate_assignment_portfolio(
+        [assignment],
+        tenant_record_id=_id(1),
+        person_record_id=_id(11),
+        employment_record_id=_id(101),
+        effective_on=date(2026, 1, 15),
+        known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
     )
 
 
@@ -60,17 +72,20 @@ def test_snapshot_export_rejects_post_construction_aggregate_mutation() -> None:
 
 def test_portfolio_rejects_allocation_scale_beyond_four_decimal_places() -> None:
     """Direct kernel facts must fail closed before exact aggregation can amplify scale."""
-    assignment = _assignment(Decimal("0.00001"))
-
     with pytest.raises(AssignmentPortfolioError, match="allocation_ratio"):
-        validate_assignment_portfolio(
-            [assignment],
-            tenant_record_id=_id(1),
-            person_record_id=_id(11),
-            employment_record_id=_id(101),
-            effective_on=date(2026, 1, 15),
-            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
-        )
+        _validate_portfolio(_assignment(Decimal("0.00001")))
+
+
+def test_portfolio_rejects_nonfinite_allocation_ratio() -> None:
+    """Non-finite Decimal values must become governed domain errors, not arithmetic faults."""
+    with pytest.raises(AssignmentPortfolioError, match="allocation_ratio"):
+        _validate_portfolio(_assignment(Decimal("NaN")))
+
+
+def test_portfolio_rejects_non_decimal_allocation_ratio() -> None:
+    """Only exact Decimal values may cross the HRIS allocation validation boundary."""
+    with pytest.raises(AssignmentPortfolioError, match="allocation_ratio"):
+        _validate_portfolio(_assignment("0.5000"))
 
 
 def test_position_capacity_rejects_allocation_scale_beyond_four_decimal_places() -> None:
