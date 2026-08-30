@@ -103,6 +103,7 @@ class WorkforceCompositionChangeSnapshot:
 
     def canonical_json(self) -> str:
         """Return deterministic aggregate-only comparison evidence for audit correlation."""
+        self.__post_init__()
         payload = {
             "closing_snapshot": json.loads(self.closing_snapshot.canonical_json()),
             "closing_snapshot_digest": self.closing_snapshot.content_digest(),
