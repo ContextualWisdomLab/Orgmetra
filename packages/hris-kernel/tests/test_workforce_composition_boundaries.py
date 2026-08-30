@@ -89,6 +89,25 @@ def test_direct_snapshot_rejects_duplicate_status_codes() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "employment_status_counts",
+    [
+        (("active", 1, 0),),
+        (None,),
+        ((1, 1),),
+    ],
+)
+def test_direct_snapshot_rejects_malformed_status_count_rows(
+    employment_status_counts: object,
+) -> None:
+    """Malformed status-count rows must become governed evidence errors."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_status_counts=employment_status_counts,  # type: ignore[arg-type]
+        )
+
+
 def test_direct_snapshot_rejects_negative_aggregate_counts() -> None:
     """Portable evidence cannot hash a negative workforce count."""
     with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
@@ -131,6 +150,25 @@ def test_direct_snapshot_rejects_non_decimal_staffed_fte() -> None:
         _direct_snapshot(
             known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
             staffed_fte=0,  # type: ignore[arg-type]
+        )
+
+
+def test_direct_snapshot_canonicalizes_zero_with_a_large_positive_exponent() -> None:
+    """Zero FTE must not expand a hostile Decimal exponent during canonicalization."""
+    evidence = _direct_snapshot(
+        known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+        staffed_fte=Decimal("0E+999999999"),
+    )
+
+    assert evidence.staffed_fte == Decimal("0.0000")
+
+
+def test_direct_snapshot_rejects_nonzero_large_positive_exponent_before_expansion() -> None:
+    """Out-of-range nonzero FTE must fail before fixed-scale padding allocates memory."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            staffed_fte=Decimal("1E+999999999"),
         )
 
 

@@ -299,3 +299,49 @@ def test_direct_change_snapshot_rejects_different_knowledge_cutoffs() -> None:
 
     with pytest.raises(IntervalError, match="knowledge cutoff"):
         WorkforceCompositionChangeSnapshot(opening, closing)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_error", "message"),
+    [
+        (
+            lambda change: object.__setattr__(change, "opening_snapshot", object()),
+            TypeError,
+            "opening_snapshot",
+        ),
+        (
+            lambda change: object.__setattr__(change.closing_snapshot, "tenant_record_id", _id(2)),
+            IdentityScopeError,
+            "same tenant",
+        ),
+        (
+            lambda change: object.__setattr__(change.opening_snapshot, "effective_on", date(2026, 2, 15)),
+            IntervalError,
+            "later",
+        ),
+        (
+            lambda change: object.__setattr__(
+                change.closing_snapshot,
+                "known_at",
+                datetime(2026, 2, 21, tzinfo=timezone.utc),
+            ),
+            IntervalError,
+            "knowledge cutoff",
+        ),
+    ],
+)
+def test_change_export_revalidates_mutated_endpoint_coordinates(
+    mutation: object,
+    expected_error: type[Exception],
+    message: str,
+) -> None:
+    """Canonical comparison export must recheck both endpoint identities and coordinates."""
+    change = WorkforceCompositionChangeSnapshot(
+        _aggregate_snapshot(date(2026, 1, 15), "0.5000"),
+        _aggregate_snapshot(date(2026, 2, 15), "1.0000"),
+    )
+
+    mutation(change)  # type: ignore[operator]
+
+    with pytest.raises(expected_error, match=message):
+        change.canonical_json()
