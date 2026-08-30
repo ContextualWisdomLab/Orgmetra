@@ -133,3 +133,14 @@ def test_timezone_callback_cannot_retain_assignment_change_constructor_privilege
         forged_packet.__post_init__()
     with pytest.raises(ValueError, match="issuance evidence is unavailable"):
         forged_packet.canonical_json()
+
+
+def test_existing_packet_seal_cannot_be_replaced_by_secondary_registration() -> None:
+    """A second seal registration must not overwrite an already issued packet."""
+    packet = _build_packet()
+    original = packet.canonical_json()
+
+    with pytest.raises(ValueError, match="already been issued"):
+        packet_module._register_packet_seal(packet, "0" * 64)
+
+    assert packet.canonical_json() == original
