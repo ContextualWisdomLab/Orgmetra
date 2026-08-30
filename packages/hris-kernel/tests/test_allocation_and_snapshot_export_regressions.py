@@ -38,6 +38,21 @@ def _assignment(allocation_ratio: object) -> AssignmentFact:
     )
 
 
+def _staffed_snapshot(staffed_fte: Decimal) -> WorkforceCompositionSnapshot:
+    """Build one directly constructed, otherwise valid staffed snapshot."""
+    return WorkforceCompositionSnapshot(
+        tenant_record_id=_id(1),
+        effective_on=date(2026, 1, 15),
+        known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+        person_headcount=1,
+        employment_count=1,
+        staffed_assignment_count=1,
+        staffed_fte=staffed_fte,
+        unassigned_person_count=0,
+        employment_status_counts=(("active", 1),),
+    )
+
+
 def _validate_portfolio(assignment: AssignmentFact) -> None:
     """Run the tenant-scoped portfolio boundary for one fixture assignment."""
     validate_assignment_portfolio(
@@ -68,6 +83,23 @@ def test_snapshot_export_rejects_post_construction_aggregate_mutation() -> None:
 
     with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
         snapshot.canonical_json()
+
+
+def test_direct_snapshot_rejects_fte_scale_beyond_four_decimal_places() -> None:
+    """Every accepted direct FTE must remain bounded for exact comparison arithmetic."""
+    with pytest.raises(SingleValuedFactError, match="staffed FTE"):
+        _staffed_snapshot(Decimal("1E-5000"))
+
+
+def test_direct_snapshot_canonicalizes_equivalent_fte_scales() -> None:
+    """Equivalent FTE values must emit one canonical four-decimal evidence representation."""
+    compact = _staffed_snapshot(Decimal("0.5"))
+    fixed_scale = _staffed_snapshot(Decimal("0.5000"))
+
+    assert compact.staffed_fte == Decimal("0.5000")
+    assert compact.staffed_fte.as_tuple().exponent == -4
+    assert compact.canonical_json() == fixed_scale.canonical_json()
+    assert compact.content_digest() == fixed_scale.content_digest()
 
 
 def test_portfolio_rejects_allocation_scale_beyond_four_decimal_places() -> None:
