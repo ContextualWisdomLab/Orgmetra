@@ -1,12 +1,37 @@
 """Regression tests for post-construction structured-interview plan integrity."""
 
 from copy import copy
-from dataclasses import fields
+from dataclasses import fields, replace
+from datetime import datetime, timedelta, tzinfo
 
 import pytest
 
 import orgmetra_interview_plan.plan as plan_module
 from test_activation import plan
+
+
+class ReentrantPlanAllocatorTimezone(tzinfo):
+    """Retain a plan allocated reentrantly from a caller-owned timezone callback."""
+
+    def __init__(self) -> None:
+        """Start without a retained forged plan."""
+        self.forged_plan: object | None = None
+
+    def utcoffset(self, _dt: datetime | None) -> timedelta:
+        """Allocate once while the legitimate constructor normalizes generated_at."""
+        if self.forged_plan is None:
+            self.forged_plan = plan_module.StructuredInterviewPlan.__new__(
+                plan_module.StructuredInterviewPlan
+            )
+        return timedelta(hours=9)
+
+    def dst(self, _dt: datetime | None) -> timedelta:
+        """Use a stable zero daylight-saving offset."""
+        return timedelta(0)
+
+    def tzname(self, _dt: datetime | None) -> str:
+        """Return a descriptive test-only timezone name."""
+        return "REENTRANT"
 
 
 def test_plan_canonical_evidence_fails_closed_after_low_level_mutation():
@@ -68,6 +93,25 @@ def test_direct_class_new_clone_cannot_acquire_plan_issuance_evidence():
     """Calling the class allocator directly must not grant constructor provenance."""
     issued_plan = plan()
     forged_plan = type(issued_plan).__new__(type(issued_plan))
+    for field in fields(issued_plan):
+        object.__setattr__(forged_plan, field.name, getattr(issued_plan, field.name))
+
+    with pytest.raises(ValueError, match="constructor provenance is unavailable"):
+        forged_plan.__post_init__()
+    with pytest.raises(ValueError, match="issuance evidence is unavailable"):
+        forged_plan.canonical_json()
+
+
+def test_timezone_callback_cannot_mint_plan_constructor_provenance():
+    """Caller timezone code must not retain constructor privilege for another plan."""
+    callback_timezone = ReentrantPlanAllocatorTimezone()
+    issued_plan = replace(
+        plan(),
+        generated_at=datetime(2026, 8, 30, 12, 0, tzinfo=callback_timezone),
+    )
+    forged_plan = callback_timezone.forged_plan
+    assert forged_plan is not None
+
     for field in fields(issued_plan):
         object.__setattr__(forged_plan, field.name, getattr(issued_plan, field.name))
 
