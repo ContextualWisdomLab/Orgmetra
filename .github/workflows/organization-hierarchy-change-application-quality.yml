@@ -8,6 +8,7 @@ on:
     paths:
       - "database/migrations/0027_organization_hierarchy_change_application.sql"
       - "database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql"
+      - "database/migrations/0029_organization_hierarchy_parent_continuity.sql"
       - "tests/test_organization_hierarchy_change_application_postgres.sh"
       - "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh"
       - "tests/test_organization_hierarchy_change_parent_gap_postgres.sh"
@@ -71,6 +72,7 @@ jobs:
           required = [
               "database/migrations/0027_organization_hierarchy_change_application.sql",
               "database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql",
+              "database/migrations/0029_organization_hierarchy_parent_continuity.sql",
               "tests/test_organization_hierarchy_change_application_postgres.sh",
               "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh",
               "tests/test_organization_hierarchy_change_parent_gap_postgres.sh",
@@ -100,10 +102,12 @@ jobs:
           PY
       - name: Run organization-hierarchy application regressions
         run: bash tests/test_organization_hierarchy_change_application_postgres.sh
-      - name: Run future-parent continuity and event-owner regressions
-        run: bash tests/test_organization_hierarchy_change_parent_gap_postgres.sh
       - name: Apply stale-transaction concurrency hardening
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql
+      - name: Apply parent-continuity and event-owner hardening
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0029_organization_hierarchy_parent_continuity.sql
+      - name: Run future-parent continuity and event-owner regressions
+        run: bash tests/test_organization_hierarchy_change_parent_gap_postgres.sh
       - name: Run stale-transaction concurrency regression
         run: bash tests/test_organization_hierarchy_change_application_concurrency_postgres.sh
       - name: Require clean checkout
