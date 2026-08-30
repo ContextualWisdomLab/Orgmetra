@@ -3,7 +3,7 @@
 ## Truth boundary
 
 - Protected `develop` truth remains `develop@9e3e4847510e1e612b48474ba42b177b8ed824df` for this stack's base history; this child is **active-PR evidence only** until its dependencies are integrated.
-- Parent UI contract: PR #130 `feat/hr-workspace-protected-read-state@b3b30058a79174000919d566fbbb1fdad80c62bf` owns shared protected-read accessibility semantics and Figma/Storybook correlation.
+- Parent UI contract: PR #130 `feat/hr-workspace-protected-read-state@c92749cf5889a39de1ba8036742f96fd3451f459` owns shared protected-read accessibility semantics and Figma/Storybook correlation.
 - Job grade governance owner: PR #101 owns `JobGradeDesignReviewPacket`; this UI does not import that unmerged package and does not claim its review is protected-branch runtime.
 - Durable Job grade persistence is separately owned by dependency-first PR #109. This UI neither writes those tables nor treats persistence evidence as integrated.
 
