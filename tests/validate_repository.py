@@ -25,6 +25,7 @@ REQUIRED = [
     "package.json",
     ".github/workflows/foundation-ci.yml",
     ".github/workflows/job-analysis-api-quality.yml",
+    ".github/workflows/organization-hierarchy-change-application-quality.yml",
     "docs/PRD.md",
     "docs/TRD.md",
     "docs/USER_STORIES.md",
@@ -74,6 +75,7 @@ REQUIRED = [
     "database/migrations/0013_job_analysis_snapshot.sql",
     "database/migrations/0027_organization_hierarchy_change_application.sql",
     "database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql",
+    "database/migrations/0029_organization_hierarchy_parent_continuity.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -82,6 +84,7 @@ REQUIRED = [
     "tests/dispatcher-inventory.test.mjs",
     "tests/foundation-contract.test.mjs",
     "tests/openapi-contract.test.mjs",
+    "tests/organization-hierarchy-change-inventory.test.mjs",
     "tests/test_bitemporal_postgres.sh",
     "tests/test_tenant_isolation_postgres.sh",
     "tests/test_evidence_sealing_postgres.sh",
@@ -97,6 +100,7 @@ REQUIRED = [
     "tests/test_job_analysis_snapshot_postgres.sh",
     "tests/test_organization_hierarchy_change_application_postgres.sh",
     "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh",
+    "tests/test_organization_hierarchy_change_parent_gap_postgres.sh",
     "tests/validate_repository.py",
 ]
 
