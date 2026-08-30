@@ -56,6 +56,7 @@ const FORBIDDEN_VALUE_KEYS = Object.freeze([
 ]);
 
 const WORKFLOW = readFileSync(new URL('../.github/workflows/hr-workspace-hiring-decision-record.yml', import.meta.url), 'utf8');
+const CSS = readFileSync(new URL('../apps/hr-workspace/hiring-decision-record-state.css', import.meta.url), 'utf8');
 
 test('hiring decision record exposes only bounded governed workflow states', () => {
   for (const state of STATES) {
@@ -100,6 +101,8 @@ test('hiring decision workflow is value-minimized and never creates shadow decis
 });
 
 test('hiring decision record renders Figma-correlated accessible DecisionRecord evidence', () => {
+  assert.match(CSS, /:hover:not\(:disabled\)/);
+  assert.match(CSS, /:focus-visible/);
   const loading = hiringDecisionRecordMarkup('loading');
   assert.match(loading, /data-figma-node-id="1:64"/);
   assert.match(loading, /data-figma-component="DecisionRecord"/);
