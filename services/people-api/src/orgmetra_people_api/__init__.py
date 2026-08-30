@@ -50,6 +50,7 @@ from orgmetra_people_api.people import (
     read_worker_people_record,
 )
 from orgmetra_people_api.postgres import PostgresPeopleReadPort
+from orgmetra_people_api.postgres_employment_history import PostgresEmploymentHistoryReadPort
 from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
 
@@ -86,6 +87,7 @@ __all__ = [
     "PostgresHireAcceptancePort",
     "PostgresPeopleMutationPort",
     "PostgresPeopleReadPort",
+    "PostgresEmploymentHistoryReadPort",
     "TokenAuthenticator",
     "WorkerPeopleRecord",
     "accept_confirmed_hire",
