@@ -12,6 +12,7 @@ on:
       - "tests/test_organization_hierarchy_change_application_postgres.sh"
       - "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh"
       - "tests/test_organization_hierarchy_change_parent_gap_postgres.sh"
+      - "tests/organization-hierarchy-change-inventory.test.mjs"
       - "docs/adr/0119-organization-hierarchy-change-application.md"
       - "docs/traceability/organization-hierarchy-change-application.md"
       - "docs/doctoring/organization-hierarchy-change-application-references.md"
@@ -21,7 +22,13 @@ on:
       - "docs/SECURITY.md"
       - "docs/TEST_STRATEGY.md"
       - "docs/OPERABILITY.md"
+      - "manifest.json"
+      - "scripts/foundation-contract-core.mjs"
+      - "tests/validate_repository.py"
       - ".github/workflows/organization-hierarchy-change-application-quality.yml"
+  push:
+    branches:
+      - feat/organization-hierarchy-change-application
   workflow_dispatch:
 
 permissions:
@@ -62,6 +69,13 @@ jobs:
         env:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Validate canonical application inventory
+        run: |
+          node --test tests/organization-hierarchy-change-inventory.test.mjs
+          python tests/validate_repository.py
+      - name: Print exact manifest repair data
+        if: failure()
+        run: python tests/validate_repository.py --print-manifest
       - name: Print deterministic application provenance
         run: |
           python - <<'PY'
@@ -76,6 +90,7 @@ jobs:
               "tests/test_organization_hierarchy_change_application_postgres.sh",
               "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh",
               "tests/test_organization_hierarchy_change_parent_gap_postgres.sh",
+              "tests/organization-hierarchy-change-inventory.test.mjs",
               ".github/workflows/organization-hierarchy-change-application-quality.yml",
           ]
           optional = [
