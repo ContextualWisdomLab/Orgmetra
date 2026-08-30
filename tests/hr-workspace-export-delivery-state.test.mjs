@@ -110,6 +110,7 @@ test('Storybook and styling cover the Figma-required high-risk and terminal stat
   for (const storyName of ['ReviewRequired', 'ConfirmedReady', 'Publishing', 'DeliveredReadOnly', 'DeliveryIndeterminate', 'PermissionDenied']) {
     assert.match(story, new RegExp(`export const ${storyName}`));
   }
+  assert.match(story, /import ['"]\.\/hr-export-delivery-state\.css['"]/);
   assert.match(story, /exportDeliveryStateMarkup/);
   assert.match(css, /data-interaction-state="high-risk-confirmation"/);
   assert.match(css, /var\(--orgmetra-surface-page\)/);

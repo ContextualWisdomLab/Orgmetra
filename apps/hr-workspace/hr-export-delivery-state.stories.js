@@ -1,3 +1,4 @@
+import './hr-export-delivery-state.css';
 import { exportDeliveryStateMarkup } from './hr-export-delivery-state.js';
 
 export default {
