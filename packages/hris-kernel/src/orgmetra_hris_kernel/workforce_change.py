@@ -38,11 +38,15 @@ class WorkforceCompositionChangeSnapshot:
         self._validate_comparable_endpoints()
 
     def _validate_comparable_endpoints(self) -> None:
-        """Recheck exact endpoint types and cross-endpoint coordinates without mutation."""
+        """Recheck exact endpoint evidence before comparing cross-endpoint coordinates."""
         if type(self.opening_snapshot) is not WorkforceCompositionSnapshot:
             raise TypeError("opening_snapshot must be an exact WorkforceCompositionSnapshot")
         if type(self.closing_snapshot) is not WorkforceCompositionSnapshot:
             raise TypeError("closing_snapshot must be an exact WorkforceCompositionSnapshot")
+
+        self.opening_snapshot._validate_canonical_invariants()
+        self.closing_snapshot._validate_canonical_invariants()
+
         if self.opening_snapshot.tenant_record_id != self.closing_snapshot.tenant_record_id:
             raise IdentityScopeError(
                 "Workforce change snapshots must belong to the same tenant.",
