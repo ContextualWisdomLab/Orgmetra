@@ -102,6 +102,15 @@ def test_direct_snapshot_canonicalizes_equivalent_fte_scales() -> None:
     assert compact.content_digest() == fixed_scale.content_digest()
 
 
+def test_snapshot_export_rejects_post_construction_fte_scale_mutation() -> None:
+    """Canonical export must reject equivalent values whose governed FTE scale was bypassed."""
+    snapshot = _staffed_snapshot(Decimal("0.5000"))
+    object.__setattr__(snapshot, "staffed_fte", Decimal("0.5"))
+
+    with pytest.raises(SingleValuedFactError, match="canonical four-decimal"):
+        snapshot.canonical_json()
+
+
 def test_portfolio_rejects_allocation_scale_beyond_four_decimal_places() -> None:
     """Direct kernel facts must fail closed before exact aggregation can amplify scale."""
     with pytest.raises(AssignmentPortfolioError, match="allocation_ratio"):
