@@ -115,7 +115,7 @@ def _canonical_json(payload: dict[str, object]) -> str:
 
 
 def _seal_issuance(packet: object, canonical: str) -> None:
-    """Bind one live packet identity to its creation-time canonical evidence digest."""
+    """Bind one live packet identity exactly once to its creation-time evidence digest."""
     digest = sha256(canonical.encode("utf-8")).hexdigest()
     packet_id = id(packet)
 
@@ -126,6 +126,8 @@ def _seal_issuance(packet: object, canonical: str) -> None:
 
     packet_reference = ref(packet, release_issuance)
     with _ISSUANCE_LOCK:
+        if packet_id in _ISSUANCE_DIGESTS:
+            raise ValueError("employment leave review evidence integrity check failed")
         _ISSUANCE_DIGESTS[packet_id] = (packet_reference, digest)
 
 
