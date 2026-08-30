@@ -3,7 +3,8 @@
 from pathlib import Path
 
 
-_WORKFLOW_PATH = Path(".github/workflows/employment-leave-review-quality.yml")
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+_WORKFLOW_PATH = _REPOSITORY_ROOT / ".github/workflows/employment-leave-review-quality.yml"
 _SHARED_TEST_CONFIGURATION = (
     ".gitignore",
     ".python-version",
