@@ -60,6 +60,7 @@ const FORBIDDEN_VALUE_KEYS = Object.freeze([
 ]);
 
 const WORKFLOW = readFileSync(new URL('../.github/workflows/hr-workspace-job-architecture.yml', import.meta.url), 'utf8');
+const CSS = readFileSync(new URL('../apps/hr-workspace/job-architecture-state.css', import.meta.url), 'utf8');
 
 test('Job Architecture exposes only bounded governed workspace states', () => {
   for (const state of STATES) {
@@ -110,6 +111,8 @@ test('Job Architecture is value-minimized and never creates shadow Job or employ
 });
 
 test('Job Architecture renders Figma-correlated accessible workspace evidence', () => {
+  assert.match(CSS, /:hover:not\(:disabled\)/);
+  assert.match(CSS, /:focus-visible/);
   const loading = jobArchitectureMarkup('loading');
   assert.match(loading, /data-figma-node-id="1:16"/);
   assert.match(loading, /data-storybook-inventory-node-id="1:64"/);

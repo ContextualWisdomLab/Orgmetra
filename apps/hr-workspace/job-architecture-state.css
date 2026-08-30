@@ -53,6 +53,10 @@
   cursor: pointer;
 }
 
+.job-architecture-action:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
 .job-architecture-action:disabled {
   cursor: not-allowed;
   opacity: 0.62;
