@@ -35,6 +35,10 @@ class WorkforceCompositionChangeSnapshot:
 
     def __post_init__(self) -> None:
         """Fail closed when endpoint evidence or coordinates are not comparable."""
+        self._validate_comparable_endpoints()
+
+    def _validate_comparable_endpoints(self) -> None:
+        """Recheck exact endpoint types and cross-endpoint coordinates without mutation."""
         if type(self.opening_snapshot) is not WorkforceCompositionSnapshot:
             raise TypeError("opening_snapshot must be an exact WorkforceCompositionSnapshot")
         if type(self.closing_snapshot) is not WorkforceCompositionSnapshot:
@@ -103,6 +107,7 @@ class WorkforceCompositionChangeSnapshot:
 
     def canonical_json(self) -> str:
         """Return deterministic aggregate-only comparison evidence for audit correlation."""
+        self._validate_comparable_endpoints()
         payload = {
             "closing_snapshot": json.loads(self.closing_snapshot.canonical_json()),
             "closing_snapshot_digest": self.closing_snapshot.content_digest(),
