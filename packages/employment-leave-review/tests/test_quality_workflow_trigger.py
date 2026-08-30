@@ -25,3 +25,13 @@ def test_quality_workflow_retriggers_on_shared_test_configuration() -> None:
             f"{path} can change package test or clean-checkout behavior and must retrigger "
             "Employment Leave Review Quality"
         )
+
+
+def test_quality_workflow_contract_is_independent_of_process_cwd(monkeypatch) -> None:
+    """Read the repository workflow even when pytest starts from the package directory."""
+    package_root = Path(__file__).resolve().parents[1]
+    monkeypatch.chdir(package_root)
+
+    workflow = _WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert "Employment Leave Review Quality" in workflow
