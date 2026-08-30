@@ -539,6 +539,24 @@ export function validateOpenApiContract(openapiText) {
     requireWithin(errors, 'readJobAnalysisSnapshot', jobAnalysisRead, '            - orgmetra.job_architecture.read', 'least-privilege read scope');
   }
 
+  const employmentHistoryRead = extractYamlBlock(
+    openapiText,
+    '  /tenants/{tenant_record_id}/people/{person_record_id}/employment-history:'
+  );
+  if (!employmentHistoryRead) {
+    errors.push('readEmploymentHistory: path block is missing');
+  } else {
+    requireWithin(errors, 'readEmploymentHistory', employmentHistoryRead, 'operationId: readEmploymentHistory', 'operationId');
+    requireWithin(errors, 'readEmploymentHistory', employmentHistoryRead, '            - orgmetra.people.employment_history.read', 'least-privilege read scope');
+    for (const parameterName of ['tenant_record_id', 'person_record_id', 'known_at', 'purpose', 'fields']) {
+      requireWithin(errors, 'readEmploymentHistory', employmentHistoryRead, `        - name: ${parameterName}`, `required ${parameterName} parameter`);
+    }
+    for (const responseCode of ["        '200':", "        '400':", "        '401':", "        '403':", "        '409':"]) {
+      requireWithin(errors, 'readEmploymentHistory', employmentHistoryRead, responseCode, `response ${responseCode.trim()}`);
+    }
+    requireWithin(errors, 'readEmploymentHistory', employmentHistoryRead, "$ref: '#/components/schemas/EmploymentHistoryResponse'", 'response schema');
+  }
+
   const jobCommand = extractYamlBlock(openapiText, '    CreateJobProfileCommand:');
   if (!jobCommand) {
     errors.push('CreateJobProfileCommand: schema block is missing');

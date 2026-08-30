@@ -1,0 +1,66 @@
+name: Employment History HTTP Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - feat/people-employment-history-read
+    paths:
+      - "services/people-api/**"
+      - "packages/hris-kernel/**"
+      - "packages/keyverse-adapter/**"
+      - "schemas/openapi.yaml"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/employment-history-http-quality.yml"
+      - "docs/API_CONTRACT.md"
+      - "docs/SECURITY.md"
+      - "docs/TEST_STRATEGY.md"
+      - "docs/TRACEABILITY.md"
+      - "docs/adr/0155-employment-history-http-read.md"
+      - "docs/doctoring/employment-history-http-read-references.md"
+      - "docs/traceability/employment-history-http-read.md"
+      - "services/people-api/README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: employment-history-http-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Employment-history HTTP read contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Compile People API boundary
+        run: python -m compileall -q services/people-api/src packages/hris-kernel/src packages/keyverse-adapter/src services/people-api/tests
+      - name: Test governed People contracts with exact statement and branch coverage
+        env:
+          PYTHONPATH: services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src
+          COVERAGE_FILE: /tmp/orgmetra-employment-history-http.coverage
+        run: python -m pytest -c services/people-api/pyproject.toml services/people-api/tests
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

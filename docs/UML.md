@@ -46,6 +46,32 @@ flowchart LR
 
 The cluster is physically shared in the initial modular deployment. Each bounded context has a separate schema and role; direct reads of another context's application tables are prohibited.
 
+## Employment-history read sequence
+
+```mermaid
+sequenceDiagram
+    actor HRUser as Authorized HR user
+    participant Gateway
+    participant PeopleHTTP as EmploymentHistoryAsgiApp
+    participant Auth as Keyverse authentication
+    participant Service as Employment-history service
+    participant Store as Injected read port
+
+    HRUser->>Gateway: GET Person Employment history(tenant, known_at, purpose, fields)
+    Gateway->>PeopleHTTP: Forward one versioned request
+    PeopleHTTP->>PeopleHTTP: Validate route/query before authentication
+    PeopleHTTP->>Auth: Authenticate one Bearer credential
+    Auth-->>PeopleHTTP: Principal and operation scope
+    PeopleHTTP->>Service: Authorize exact target and requested fields
+    Service->>Store: Read tenant/Person history at known_at
+    Store-->>Service: Bitemporal Employment versions
+    Service-->>PeopleHTTP: Authorized entries only
+    PeopleHTTP-->>HRUser: No-store JSON response or safe error
+```
+
+The route is read-only and does not query another service's application tables,
+mutate Employment truth, or make an employment decision.
+
 ## Selection decision sequence
 
 ```mermaid

@@ -344,6 +344,64 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/SnapshotNotFound'
+  /tenants/{tenant_record_id}/people/{person_record_id}/employment-history:
+    get:
+      operationId: readEmploymentHistory
+      summary: Read purpose-bound bitemporal Employment history for one Person
+      tags:
+        - people-core
+      security:
+        - keyverse_oidc:
+            - orgmetra.people.employment_history.read
+      parameters:
+        - name: tenant_record_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: person_record_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: known_at
+          in: query
+          required: true
+          description: System-time knowledge cutoff for the half-open recorded interval.
+          schema:
+            type: string
+            format: date-time
+        - name: purpose
+          in: query
+          required: true
+          description: Business purpose evaluated by the purpose-bound authorization policy.
+          schema:
+            type: string
+            pattern: '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$'
+        - name: fields
+          in: query
+          required: true
+          description: Comma-separated, explicitly requested Employment-history fields.
+          schema:
+            type: string
+            pattern: '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(,[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*$'
+      responses:
+        '200':
+          description: Authorized Employment-history entries ordered by effective date.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmploymentHistoryResponse'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/EmploymentHistoryIntegrityConflict'
 components:
   securitySchemes:
     keyverse_oidc:
@@ -669,6 +727,32 @@ components:
         assignment_record_id:
           type: string
           format: uuid
+    EmploymentHistoryResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - resource_reference
+        - entries
+      properties:
+        resource_reference:
+          type: string
+          pattern: '^person_employment_history:[0-9a-f]{32}$'
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmploymentHistoryEntry'
+    EmploymentHistoryEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - fields
+      properties:
+        fields:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: 'null'
     JobAnalysisEvidenceSource:
       type: object
       additionalProperties: false
@@ -1008,6 +1092,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     SnapshotNotFound:
       description: The authorized job-analysis snapshot target does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    EmploymentHistoryIntegrityConflict:
+      description: The Employment-history evidence failed its trusted bitemporal integrity checks.
       content:
         application/json:
           schema:
