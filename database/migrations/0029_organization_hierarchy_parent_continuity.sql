@@ -1,7 +1,169 @@
 -- Harden the reviewed Organization hierarchy application boundary so a
 -- successor never points at a proposed parent that disappears during the
--- successor's effective interval, and attribute emitted hierarchy events to
--- the organization_core owner rather than people_api.
+-- successor's effective interval, emitted hierarchy events remain bound to the
+-- organization_core event family, and immutable application evidence names the
+-- exact predecessor/successor bitemporal correction that was reviewed.
+
+CREATE OR REPLACE FUNCTION validate_organization_hierarchy_application_audit()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+DECLARE
+    audit_payload jsonb;
+    review_payload jsonb;
+    review_recorded_at timestamptz;
+    outbox_audit_id uuid;
+BEGIN
+    IF NEW.recorded_at IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
+        RAISE EXCEPTION 'organization hierarchy application recorded_at must equal transaction timestamp'
+            USING ERRCODE = '22023';
+    END IF;
+
+    IF NOT validate_organization_hierarchy_change_review_evidence(
+        NEW.canonical_review_json,
+        NEW.review_evidence_digest_sha256,
+        NEW.tenant_record_id,
+        NEW.organization_unit_id,
+        NEW.effective_on
+    ) THEN
+        RAISE EXCEPTION 'organization hierarchy review evidence is invalid or out of scope'
+            USING ERRCODE = '23514';
+    END IF;
+
+    review_payload := NEW.canonical_review_json::jsonb;
+    review_recorded_at := (review_payload ->> 'recorded_at')::timestamptz;
+    IF review_payload ->> 'organization_hierarchy_change_reference'
+           IS DISTINCT FROM 'organization_hierarchy_change:' || NEW.organization_hierarchy_change_reference::text
+       OR review_payload ->> 'current_parent_organization_unit_reference'
+           IS DISTINCT FROM (
+               CASE
+                WHEN NEW.current_parent_organization_unit_id IS NULL THEN NULL
+                ELSE 'organization_unit:' || NEW.current_parent_organization_unit_id::text
+               END
+           )
+       OR review_payload ->> 'proposed_parent_organization_unit_reference'
+           IS DISTINCT FROM (
+               CASE
+                WHEN NEW.proposed_parent_organization_unit_id IS NULL THEN NULL
+                ELSE 'organization_unit:' || NEW.proposed_parent_organization_unit_id::text
+               END
+           )
+       OR review_payload ->> 'organization_unit_snapshot_digest'
+           IS DISTINCT FROM NEW.organization_unit_snapshot_digest_sha256
+       OR review_payload ->> 'hierarchy_snapshot_digest'
+           IS DISTINCT FROM NEW.hierarchy_snapshot_digest_sha256
+       OR review_payload ->> 'requester_reference'
+           IS DISTINCT FROM NEW.requester_actor_reference
+       OR review_payload ->> 'reviewer_reference'
+           IS DISTINCT FROM NEW.reviewer_actor_reference
+       OR review_payload ->> 'reason_code' IS DISTINCT FROM NEW.reason_code
+       OR review_recorded_at IS DISTINCT FROM NEW.review_packet_recorded_at THEN
+        RAISE EXCEPTION 'organization hierarchy application columns do not match the reviewed evidence'
+            USING ERRCODE = '23514';
+    END IF;
+
+    SELECT canonical_event_json::jsonb
+    INTO audit_payload
+    FROM audit_event_record
+    WHERE tenant_record_id = NEW.tenant_record_id
+      AND audit_event_record_id = NEW.audit_event_record_id;
+
+    IF audit_payload IS NULL
+       OR audit_payload ->> 'source' IS DISTINCT FROM 'urn:orgmetra:organization_core'
+       OR audit_payload ->> 'type' IS DISTINCT FROM 'orgmetra.organization.hierarchy_changed'
+       OR audit_payload ->> 'subject'
+          IS DISTINCT FROM 'organization_unit:' || NEW.organization_unit_id::text
+       OR audit_payload ->> 'orgmetraactor' IS DISTINCT FROM NEW.applied_by_actor_reference
+       OR audit_payload ->> 'orgmetrapurpose'
+          IS DISTINCT FROM 'organization_hierarchy_change_apply'
+       OR audit_payload ->> 'orgmetrareason' IS DISTINCT FROM NEW.reason_code
+       OR audit_payload ->> 'orgmetraevidence'
+          IS DISTINCT FROM NEW.review_evidence_digest_sha256
+       OR audit_payload #>> '{data,result_code}'
+          IS DISTINCT FROM 'organization_hierarchy_changed'
+       OR audit_payload #>> '{data,high_impact}' IS DISTINCT FROM 'true'
+       OR audit_payload ->> 'orgmetraconfirmation'
+          IS DISTINCT FROM 'human_confirmation:' || NEW.organization_hierarchy_change_reference::text THEN
+        RAISE EXCEPTION 'organization hierarchy audit event does not match the applied review'
+            USING ERRCODE = '23514';
+    END IF;
+
+    SELECT audit_event_record_id
+    INTO outbox_audit_id
+    FROM outbox_delivery_record
+    WHERE tenant_record_id = NEW.tenant_record_id
+      AND outbox_delivery_record_id = NEW.outbox_delivery_record_id;
+    IF outbox_audit_id IS DISTINCT FROM NEW.audit_event_record_id THEN
+        RAISE EXCEPTION 'organization hierarchy outbox does not reference the application audit event'
+            USING ERRCODE = '23514';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION validate_organization_hierarchy_application_audit() IS
+    'Binds immutable hierarchy-application evidence to the exact reviewed fields, organization_core hierarchy-changed event family, human confirmation, actor/purpose/reason/evidence, and matching outbox record.';
+
+CREATE OR REPLACE FUNCTION validate_organization_hierarchy_application_successor()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+DECLARE
+    predecessor organization_unit_version%ROWTYPE;
+    successor organization_unit_version%ROWTYPE;
+BEGIN
+    SELECT version.*
+    INTO predecessor
+    FROM organization_unit_version AS version
+    WHERE version.tenant_record_id = NEW.tenant_record_id
+      AND version.organization_unit_id = NEW.organization_unit_id
+      AND version.organization_unit_version_id = NEW.predecessor_organization_unit_version_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'organization hierarchy predecessor version is not bound to its application'
+            USING ERRCODE = '23514';
+    END IF;
+
+    SELECT version.*
+    INTO successor
+    FROM organization_unit_version AS version
+    WHERE version.tenant_record_id = NEW.tenant_record_id
+      AND version.organization_unit_id = NEW.organization_unit_id
+      AND version.organization_unit_version_id = NEW.successor_organization_unit_version_id
+      AND version.organization_hierarchy_change_application_record_id =
+          NEW.organization_hierarchy_change_application_record_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'organization hierarchy successor version is not bound to its application'
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF predecessor.effective_from > NEW.effective_on
+       OR (predecessor.effective_to IS NOT NULL AND NEW.effective_on >= predecessor.effective_to)
+       OR predecessor.parent_organization_unit_id IS DISTINCT FROM NEW.current_parent_organization_unit_id
+       OR predecessor.recorded_to IS DISTINCT FROM NEW.recorded_at THEN
+        RAISE EXCEPTION 'organization hierarchy predecessor does not describe the reviewed correction coordinate'
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF successor.effective_from IS DISTINCT FROM NEW.effective_on
+       OR successor.effective_to IS DISTINCT FROM predecessor.effective_to
+       OR successor.parent_organization_unit_id IS DISTINCT FROM NEW.proposed_parent_organization_unit_id
+       OR successor.unit_name IS DISTINCT FROM predecessor.unit_name
+       OR successor.organization_type_code IS DISTINCT FROM predecessor.organization_type_code
+       OR successor.recorded_from IS DISTINCT FROM NEW.recorded_at
+       OR successor.recorded_to IS NOT NULL THEN
+        RAISE EXCEPTION 'organization hierarchy successor does not describe the reviewed correction result'
+            USING ERRCODE = '23514';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION validate_organization_hierarchy_application_successor() IS
+    'At deferred commit time, binds hierarchy evidence to the predecessor covering effective_on and to the exact current-recorded successor produced by the reviewed parent correction, including business interval and preserved unit attributes.';
 
 CREATE OR REPLACE FUNCTION apply_organization_hierarchy_change(
     p_tenant_record_id uuid,
