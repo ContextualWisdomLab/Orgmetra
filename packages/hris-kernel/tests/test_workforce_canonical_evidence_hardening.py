@@ -54,6 +54,22 @@ def test_malformed_status_rows_fail_with_domain_error() -> None:
         )
 
 
+def test_invalid_staffed_assignment_count_fails_with_domain_error() -> None:
+    """FTE canonicalization must reject non-integer assignment counts before arithmetic."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        WorkforceCompositionSnapshot(
+            tenant_record_id=UUID(int=1),
+            effective_on=date(2026, 1, 15),
+            known_at=datetime(2026, 2, 20, tzinfo=timezone.utc),
+            person_headcount=1,
+            employment_count=1,
+            staffed_assignment_count=True,  # type: ignore[arg-type]
+            staffed_fte=Decimal("0.0000"),
+            unassigned_person_count=1,
+            employment_status_counts=(("active", 1),),
+        )
+
+
 def test_equivalent_zero_evidence_has_one_canonical_representation() -> None:
     """Negative Decimal zero and zero-count status rows must not fork evidence digests."""
     positive_zero = _snapshot(date(2026, 1, 15), staffed_fte=Decimal("0.0000"))
@@ -91,11 +107,40 @@ def test_equivalent_zero_evidence_has_one_canonical_representation() -> None:
     assert zero_row.content_digest() == empty.content_digest()
 
 
+def test_export_rejects_post_construction_zero_status_row() -> None:
+    """Low-level mutation cannot reintroduce a noncanonical semantic-zero status row."""
+    snapshot = _snapshot(date(2026, 1, 15))
+    object.__setattr__(
+        snapshot,
+        "employment_status_counts",
+        (("active", 1), ("leave", 0)),
+    )
+
+    with pytest.raises(SingleValuedFactError, match="not canonical"):
+        snapshot.canonical_json()
+
+
 def test_large_zero_exponent_canonicalizes_without_representation_expansion() -> None:
     """A mathematically zero FTE never needs exponent-proportional digit padding."""
     snapshot = _snapshot(date(2026, 1, 15), staffed_fte=Decimal("0E+1000000"))
     assert snapshot.staffed_fte == Decimal("0.0000")
     assert format(snapshot.staffed_fte, "f") == "0.0000"
+
+
+def test_large_nonzero_exponent_is_rejected_before_representation_expansion() -> None:
+    """Oversized nonzero FTE is rejected against assignment capacity before digit padding."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        WorkforceCompositionSnapshot(
+            tenant_record_id=UUID(int=1),
+            effective_on=date(2026, 1, 15),
+            known_at=datetime(2026, 2, 20, tzinfo=timezone.utc),
+            person_headcount=1,
+            employment_count=1,
+            staffed_assignment_count=1,
+            staffed_fte=Decimal("1E+1000000"),
+            unassigned_person_count=0,
+            employment_status_counts=(("active", 1),),
+        )
 
 
 def test_change_export_rechecks_tenant_after_endpoint_mutation() -> None:
