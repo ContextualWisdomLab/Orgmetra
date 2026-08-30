@@ -23,6 +23,8 @@ Because the exact-one rule spans Employment versions, employer relationships, an
 
 The relationship is independent of Position and Assignment. It stores no Person PII, compensation, payroll, tax, benefits, statutory-account, candidate, performance, or model-output fields.
 
+The API compatibility boundary is explicit. Existing `/v1` Employment and confirmed-hire payloads remain available for legacy terminated writes, while an active or leave `/v1` payload without employer facts fails before persistence with migration guidance. Employer-required writes use `/v2`; this keeps the exact-one database invariant intact without silently inventing a legal employer or changing the meaning of an existing V1 request.
+
 History is correction-not-rewrite: business fields cannot be updated in place; the current recorded interval may only be closed and a replacement fact inserted. DELETE and TRUNCATE are rejected. Tenant-qualified foreign keys and forced RLS independently protect cross-tenant integrity and visibility.
 
 ## Consequences

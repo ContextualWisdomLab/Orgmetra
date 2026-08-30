@@ -188,7 +188,11 @@ def _is_aware_datetime(value: object) -> bool:
 def _validate_authorization(command: HireAcceptanceCommand, authorization: object) -> AuthorizationDecision:
     """Require an exact allow decision for this selection decision and employer target."""
     expected_reference = f"selection_decision:{command.selection_decision_id.hex}"
-    expected_target_scope = organization_unit_scope_code(command.employing_organization_unit_id)
+    expected_target_scope = (
+        organization_unit_scope_code(command.employing_organization_unit_id)
+        if command.employing_organization_unit_id is not None
+        else None
+    )
     if not isinstance(authorization, AuthorizationDecision):
         raise HireDecisionIntegrityError("hire mutation requires a typed authorization decision")
     if (
@@ -441,6 +445,8 @@ class PostgresHireAcceptancePort:
                     ),
                 )
                 if command.employment_status_code in {"active", "leave"}:
+                    assert command.employing_organization_unit_id is not None
+                    assert command.employment_employing_organization_record_id is not None
                     cursor.execute(
                         _INSERT_EMPLOYMENT_EMPLOYING_ORGANIZATION_SQL,
                         (

@@ -48,7 +48,7 @@ def employment_payload(evidence_references: list[object]) -> dict[str, object]:
 def command_for(evidence_references: list[object]):
     """Build one employment command from the public evidence-reference shape."""
     return _command_for_route(
-        "employment-records",
+        "employment-records-v2",
         TENANT,
         employment_payload(evidence_references),
         SequentialIdFactory(),

@@ -54,7 +54,7 @@ class PeopleMutationSchemaTypeTests(unittest.TestCase):
         """An integer YYYYMMDD must not cross the HTTP command boundary as a date string."""
         with self.assertRaisesRegex(ValueError, "effective_from"):
             _command_for_route(
-                "employment-records",
+                "employment-records-v2",
                 TENANT,
                 employment_payload(effective_from=20260818),
                 id_factory(),
@@ -66,7 +66,7 @@ class PeopleMutationSchemaTypeTests(unittest.TestCase):
         for value in ("20260818", "2026-W34-2"):
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, "effective_from"):
                 _command_for_route(
-                    "employment-records",
+                    "employment-records-v2",
                     TENANT,
                     employment_payload(effective_from=value),
                     id_factory(),
@@ -77,7 +77,7 @@ class PeopleMutationSchemaTypeTests(unittest.TestCase):
         """Decision rationale must stay within the published 4000-character bound."""
         with self.assertRaisesRegex(ValueError, "decision_reason"):
             _command_for_route(
-                "employment-records",
+                "employment-records-v2",
                 TENANT,
                 employment_payload(decision_reason="r" * 4001),
                 id_factory(),
@@ -90,7 +90,7 @@ class PeopleMutationSchemaTypeTests(unittest.TestCase):
         self.assertEqual(len(overlong_reference), 301)
         with self.assertRaisesRegex(ValueError, "confirmation_reference"):
             _command_for_route(
-                "employment-records",
+                "employment-records-v2",
                 TENANT,
                 employment_payload(confirmation_reference=overlong_reference),
                 id_factory(),

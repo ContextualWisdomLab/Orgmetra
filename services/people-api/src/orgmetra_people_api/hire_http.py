@@ -41,7 +41,8 @@ from orgmetra_people_api.http import (
 from orgmetra_people_api.mutations import validate_idempotency_key
 
 _LOGGER = logging.getLogger(__name__)
-_ROUTE_PREFIX = ("v1", "tenants")
+_ROUTE_VERSIONS = frozenset({"v1", "v2"})
+_ROUTE_PREFIX = "tenants"
 _ROUTE_LEAF = "candidate-worker-conversions"
 _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _RFC3339_FULL_DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z", flags=re.ASCII)
@@ -50,7 +51,23 @@ _MAX_BODY_BYTES = 65536
 _MAX_BODY_FRAMES = 1024
 _MAX_JSON_NESTING_DEPTH = 128
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
-_REQUIRED_BODY_KEYS = frozenset(
+_V1_REQUIRED_BODY_KEYS = frozenset(
+    {
+        "candidate_profile_id",
+        "selection_decision_id",
+        "person_record_id",
+        "person_name_record_id",
+        "employment_record_id",
+        "employment_record_version_id",
+        "candidate_worker_conversion_record_id",
+        "audit_event_record_id",
+        "outbox_delivery_record_id",
+        "effective_from",
+        "display_name",
+        "employment_status_code",
+    }
+)
+_V2_REQUIRED_BODY_KEYS = frozenset(
     {
         "employing_organization_unit_id",
         "candidate_profile_id",
@@ -130,7 +147,7 @@ class HireAcceptanceAsgiApp:
 
     Supported route::
 
-        POST /v1/tenants/{tenant_record_id}/candidate-worker-conversions
+        POST /v1 or /v2/tenants/{tenant_record_id}/candidate-worker-conversions
             ?purpose=candidate_hire
 
     Successful responses contain only opaque worker identities. Display names and
@@ -176,14 +193,16 @@ class HireAcceptanceAsgiApp:
                 status=404,
                 payload={
                     "error": "route_not_found",
-                    "message": "Use /v1/tenants/{tenant_record_id}/candidate-worker-conversions.",
+                    "message": "Use /v1 or /v2/tenants/{tenant_record_id}/candidate-worker-conversions.",
                 },
             )
             return
 
         try:
-            tenant_record_id, purpose_code = _parse_hire_route(path, scope.get("query_string", b""))
-        except (_InvalidHttpRequest, ValueError, TypeError):
+            tenant_record_id, purpose_code, api_version = _parse_hire_route(
+                path, scope.get("query_string", b"")
+            )
+        except (ValueError, TypeError):
             await _send_json(
                 send,
                 status=400,
@@ -247,7 +266,12 @@ class HireAcceptanceAsgiApp:
             idempotency_key = _parse_idempotency_key(scope)
             _require_json_content_type(scope)
             payload = await _read_json_object(receive)
-            command = _command_from_payload(tenant_record_id, payload, idempotency_key)
+            command = _command_from_payload(
+                tenant_record_id,
+                payload,
+                idempotency_key,
+                api_version=api_version,
+            )
         except _PayloadTooLarge:
             await _send_json(
                 send,
@@ -268,13 +292,13 @@ class HireAcceptanceAsgiApp:
                 },
             )
             return
-        except (_InvalidHttpRequest, ValueError, TypeError):
+        except (_InvalidHttpRequest, ValueError, TypeError) as error:
             await _send_json(
                 send,
                 status=400,
                 payload={
                     "error": "invalid_request",
-                    "message": "Correct the idempotency key and hire command fields, then retry.",
+                    "message": str(error),
                 },
             )
             return
@@ -354,10 +378,15 @@ class HireAcceptanceAsgiApp:
 def _looks_like_hire_route(path: str) -> bool:
     """Recognize only the versioned hire-acceptance route shape."""
     parts = path.strip("/").split("/")
-    return len(parts) == 4 and tuple(parts[:2]) == _ROUTE_PREFIX and parts[3] == _ROUTE_LEAF
+    return (
+        len(parts) == 4
+        and parts[0] in _ROUTE_VERSIONS
+        and parts[1] == _ROUTE_PREFIX
+        and parts[3] == _ROUTE_LEAF
+    )
 
 
-def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
+def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str, str]:
     """Validate tenant and purpose before authentication and body interpretation."""
     parts = path.strip("/").split("/")
     try:
@@ -389,7 +418,7 @@ def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
     purpose_code = query["purpose"]
     if _PURPOSE_PATTERN.fullmatch(purpose_code) is None:
         raise _InvalidHttpRequest("purpose must be a lower snake_case code")
-    return tenant_record_id, purpose_code
+    return tenant_record_id, purpose_code, parts[0]
 
 
 def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
@@ -503,19 +532,32 @@ def _command_from_payload(
     tenant_record_id: UUID,
     payload: Mapping[str, object],
     idempotency_key: str,
+    *,
+    api_version: str = "v2",
 ) -> HireAcceptanceCommand:
     """Map one exact JSON object and validated idempotency key onto the hire command."""
-    if frozenset(payload) != _REQUIRED_BODY_KEYS:
+    if api_version not in _ROUTE_VERSIONS:
+        raise _InvalidHttpRequest("unsupported hire API version")
+    expected_keys = _V2_REQUIRED_BODY_KEYS if api_version == "v2" else _V1_REQUIRED_BODY_KEYS
+    if frozenset(payload) != expected_keys:
         raise _InvalidHttpRequest("hire command fields are incomplete or unsupported")
     try:
         effective_from_raw = _require_string_field(payload, "effective_from")
         if _RFC3339_FULL_DATE.fullmatch(effective_from_raw) is None:
             raise _InvalidHttpRequest("effective_from must be an RFC 3339 full-date")
         effective_from = date.fromisoformat(effective_from_raw)
+        employment_status_code = _require_string_field(payload, "employment_status_code")
+        if api_version == "v1" and employment_status_code in {"active", "leave"}:
+            raise _InvalidHttpRequest(
+                "active or leave hire requires /v2/tenants/{tenant_record_id}/candidate-worker-conversions "
+                "with employing organization fields"
+            )
         return HireAcceptanceCommand(
             tenant_record_id=tenant_record_id,
-            employing_organization_unit_id=UUID(
-                _require_string_field(payload, "employing_organization_unit_id")
+            employing_organization_unit_id=(
+                UUID(_require_string_field(payload, "employing_organization_unit_id"))
+                if api_version == "v2"
+                else None
             ),
             candidate_profile_id=UUID(_require_string_field(payload, "candidate_profile_id")),
             selection_decision_id=UUID(_require_string_field(payload, "selection_decision_id")),
@@ -525,8 +567,10 @@ def _command_from_payload(
             employment_record_version_id=UUID(
                 _require_string_field(payload, "employment_record_version_id")
             ),
-            employment_employing_organization_record_id=UUID(
-                _require_string_field(payload, "employment_employing_organization_record_id")
+            employment_employing_organization_record_id=(
+                UUID(_require_string_field(payload, "employment_employing_organization_record_id"))
+                if api_version == "v2"
+                else None
             ),
             candidate_worker_conversion_record_id=UUID(
                 _require_string_field(payload, "candidate_worker_conversion_record_id")
@@ -538,7 +582,9 @@ def _command_from_payload(
             effective_from=effective_from,
             display_name=_require_string_field(payload, "display_name"),
             idempotency_key=idempotency_key,
-            employment_status_code=_require_string_field(payload, "employment_status_code"),
+            employment_status_code=employment_status_code,
         )
+    except _InvalidHttpRequest:
+        raise
     except (TypeError, ValueError) as error:
         raise _InvalidHttpRequest("hire command fields are invalid") from error

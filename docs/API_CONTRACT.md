@@ -2,7 +2,12 @@
 
 ## Versioning
 
-Orgmetra APIs use OpenAPI 3.2.0. Major versions are path-scoped under `/v1` until a breaking contract requires `/v2`.
+Orgmetra APIs use OpenAPI 3.2.0. Major versions are path-scoped. The existing
+`/v1` Employment and confirmed-hire routes retain their former wire shape so
+legacy terminated writes remain readable; an `/v1` active or leave write that
+lacks an employing organization is rejected with migration guidance. The
+employer-required contracts are available under `/v2` and use
+`CreateEmploymentRecordCommandV2` for Employment.
 
 ## Authentication
 
@@ -35,7 +40,7 @@ Every mutating request requires:
 - resource-scoped authorization; and
 - a command digest stored with the idempotency record.
 
-Employment, position, assignment, person, job-profile, and selection-decision commands carry tenant, actor, and purpose through the reusable `X-Tenant-Reference`, `X-Actor-Reference`, and `X-Purpose-Code` components. The confirmed-hire route instead binds tenant in `/v1/tenants/{tenant_record_id}/candidate-worker-conversions`, purpose in the required query parameter, and actor through the authenticated principal; those path/query/authentication bindings are authoritative for that route and are not duplicated as weaker caller-controlled headers.
+Employment, position, assignment, person, job-profile, and selection-decision commands carry tenant, actor, and purpose through the reusable `X-Tenant-Reference`, `X-Actor-Reference`, and `X-Purpose-Code` components. The confirmed-hire route instead binds tenant in `/v1` or `/v2` `/tenants/{tenant_record_id}/candidate-worker-conversions`, purpose in the required query parameter, and actor through the authenticated principal; those path/query/authentication bindings are authoritative for that route and are not duplicated as weaker caller-controlled headers.
 
 High-impact commands additionally require:
 
@@ -47,7 +52,7 @@ High-impact commands additionally require:
 
 For confirmed-hire materialization, those high-impact facts are resolved from the exact already-sealed `selection_decision` and its evidence set inside the tenant-bound transaction rather than accepted again as mutable request-body assertions.
 
-Employment creation requires `employing_organization_unit_id` and atomically records the bitemporal employing-organization relationship for active and leave Employment versions. Confirmed-hire materialization requires the employing organization and relationship record identities in its explicit command, and persists that relationship in the same transaction as the Person, Employment, conversion, and audit/outbox evidence.
+The `/v2` Employment and confirmed-hire commands require `employing_organization_unit_id` and atomically record the bitemporal employing-organization relationship for active and leave Employment versions. The `/v1` commands preserve the former terminated payload; they do not weaken the database invariant, so active and leave payloads without employer facts fail before persistence with a `/v2` migration action. Confirmed-hire materialization persists the employer relationship in the same transaction as the Person, Employment, conversion, and audit/outbox evidence.
 
 The server rejects a reused idempotency key when its method, resource, tenant, actor, purpose, or semantic command digest differs. People employment, position, assignment, and confirmed-hire writes persist that digest on `people_mutation_idempotency_record` in the same transaction as the authoritative HRIS fact and audit/outbox pair. A matching retry returns the first committed record identity without duplicating authoritative or audit/outbox facts. Generated record identifiers are excluded from the employment/position/assignment digest so a retried POST that allocates fresh UUIDs still replays; the confirmed-hire route requires the caller to repeat the exact confirmed identities and rejects a same-key command whose materialization identities differ.
 
@@ -58,6 +63,8 @@ POST /v1/person-records
 GET  /v1/person-records/{person_record_id}
 POST /v1/tenants/{tenant_record_id}/candidate-worker-conversions?purpose=candidate_hire
 POST /v1/employment-records
+POST /v2/tenants/{tenant_record_id}/candidate-worker-conversions?purpose=candidate_hire
+POST /v2/employment-records
 POST /v1/position-records
 POST /v1/assignment-records
 POST /v1/job-profiles

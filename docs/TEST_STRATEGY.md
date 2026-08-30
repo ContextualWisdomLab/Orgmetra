@@ -50,6 +50,7 @@ Required negative and provenance tests include:
 - mutation authentication and tenant binding occur before request-body reads or identifier allocation, so unauthenticated input cannot consume parser or persistence work;
 - a reused confirmation or idempotency key cannot bind to different command content;
 - an identical tenant/route/idempotency-key retry replays the first committed created-record identity rather than issuing a duplicate authoritative write;
+- legacy `/v1` terminated Employment and confirmed-hire payloads remain parseable, while employer-required active/leave commands use `/v2` and V1 missing-employer requests fail before persistence with migration guidance;
 - concurrent exact-key requests serialize at the persistence boundary and cannot commit two different identities;
 - previewed evidence versions must equal recorded evidence versions;
 - an open evidence set rejects a caller-supplied digest, preventing a client assertion from masquerading as database-observed membership;

@@ -213,7 +213,7 @@ class SupportReferenceCorrelationTests(unittest.IsolatedAsyncioTestCase):
                 scope={
                     "type": "http",
                     "method": "POST",
-                    "path": f"/v1/tenants/{TENANT}/candidate-worker-conversions",
+                    "path": f"/v2/tenants/{TENANT}/candidate-worker-conversions",
                     "query_string": b"purpose=candidate_hire",
                     "headers": [
                         (b"authorization", b"Bearer opaque-token"),
@@ -255,7 +255,7 @@ class SupportReferenceCorrelationTests(unittest.IsolatedAsyncioTestCase):
                 scope={
                     "type": "http",
                     "method": "POST",
-                    "path": "/v1/employment-records",
+                    "path": "/v2/employment-records",
                     "query_string": b"",
                     "headers": [
                         (b"authorization", b"Bearer opaque-token"),

@@ -556,6 +556,7 @@ def _validate_openapi_contract() -> None:
         "CreateJobProfileCommand",
         "RecordSelectionDecisionCommand",
         "CreateEmploymentRecordCommand",
+        "CreateEmploymentRecordCommandV2",
         "CreatePositionRecordCommand",
         "CreateAssignmentRecordCommand",
     ):
