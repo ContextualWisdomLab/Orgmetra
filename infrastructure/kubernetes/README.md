@@ -16,9 +16,9 @@ The probe paths also assume the selected image contains the governed People API 
 
 ## Pod hardening
 
-The `orgmetra-system` namespace declares `pod-security.kubernetes.io/enforce=restricted` and matching audit/warn labels. The People API pod is non-root, uses `RuntimeDefault` seccomp, disables service-account token automount, privilege escalation, privileged mode and host namespaces, drops every Linux capability, and uses a read-only root filesystem. Because the root filesystem is read-only, the pod declares a dedicated `tmp-scratch` `emptyDir` mounted at `/tmp`; do not remove it and do not replace it with a `hostPath`.
+The `orgmetra-system` namespace declares Restricted Pod Security Admission for `enforce`, `audit`, and `warn`, and pins all three policy modes to Kubernetes minor `v1.37`. The explicit version labels are deliberate: an omitted version uses the admission controller's `latest` policy, which can change the effective Restricted contract after a Kubernetes upgrade. The People API pod is non-root, uses `RuntimeDefault` seccomp, disables service-account token automount, privilege escalation, privileged mode and host namespaces, drops every Linux capability, and uses a read-only root filesystem. Because the root filesystem is read-only, the pod declares a dedicated `tmp-scratch` `emptyDir` mounted at `/tmp`; do not remove it and do not replace it with a `hostPath`.
 
-Cluster operators must verify that admission controls actually enforce the intended Restricted profile. If the environment injects sidecars or init containers, those injected containers must independently satisfy the same effective policy.
+Cluster operators must verify that admission controls actually enforce the intended Restricted profile. A target cluster whose supported policy minor differs from `v1.37` must not make the reference deployable by deleting or weakening the version labels. Re-baseline the policy deliberately against that cluster's authoritative Kubernetes documentation, update the pinned minor and regression evidence together, and prove the resulting objects with server-side dry-run before release. If the environment injects sidecars or init containers, those injected containers must independently satisfy the same effective policy.
 
 ## Liveness and readiness
 
