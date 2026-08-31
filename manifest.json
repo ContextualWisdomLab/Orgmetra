@@ -335,9 +335,9 @@
     },
     {
       "path": "docs/doctoring/kubernetes-reference-deployment-references.md",
-      "sha256": "5827c99bd7a8cc3306833ccdad330f75fce9e546d83096a77847e1183fd010d5",
-      "bytes": 2689,
-      "lines": 24
+      "sha256": "49567f7a50c6736d51143366c38104ce56ca360f9446947dbb44e6ecdd2fa78d",
+      "bytes": 3253,
+      "lines": 26
     },
     {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -353,21 +353,21 @@
     },
     {
       "path": "docs/traceability/kubernetes-reference-deployment.md",
-      "sha256": "2b0baaff96410785449b2c97b33eeeb0c5439115f4b8737f7175751b5bfd1735",
-      "bytes": 4093,
-      "lines": 34
+      "sha256": "417fdf56e4a3304d45d9c455faf083f9e1a03e8bf3c97b39e5fbaf83253755c8",
+      "bytes": 4961,
+      "lines": 37
     },
     {
       "path": "infrastructure/kubernetes/README.md",
-      "sha256": "3d586751ddb99770a9a5584f2d4a3f7e33f49bfb8cf1e7144793620b7344cd2e",
-      "bytes": 5299,
+      "sha256": "1561e352c5062da262ae52c443912c583b2bc7d2f113cbfb99187fbe2643f56b",
+      "bytes": 6097,
       "lines": 58
     },
     {
       "path": "infrastructure/kubernetes/people-api-reference.json",
-      "sha256": "2f115861ece27f351c59225ea7449c5bb6f9a04b24d76d531575758a29c36ed2",
-      "bytes": 9112,
-      "lines": 341
+      "sha256": "e11a6df307a1640867753fd323d2f10de147cd1990f7569822fd164157538098",
+      "bytes": 9302,
+      "lines": 344
     },
     {
       "path": "package.json",
@@ -401,7 +401,7 @@
     },
     {
       "path": "scripts/foundation-contract.mjs",
-      "sha256": "5242dcdbe0935775edf074462c82600e9bc4927d9fdc50c47727af915fd4b23a",
+      "sha256": "5242dcdbe0935775edf074462c82600e9bc4927d9fd4d559ca88b8716c8fed83e",
       "bytes": 218,
       "lines": 6
     },
@@ -419,9 +419,9 @@
     },
     {
       "path": "tests/kubernetes-reference.test.mjs",
-      "sha256": "72d03037a5ba178a6bc250f20fd3413810005209809aa16fa54e393062cf8a0b",
-      "bytes": 9473,
-      "lines": 263
+      "sha256": "83c2636d12c73f4b05e9fb0a9912a345d86db4a5a88eb1278b7032c14eb95163",
+      "bytes": 9938,
+      "lines": 275
     },
     {
       "path": "tests/openapi-contract.test.mjs",
