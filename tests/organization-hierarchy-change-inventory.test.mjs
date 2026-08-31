@@ -48,7 +48,7 @@ test('organization hierarchy integrity helpers deny PUBLIC execution', () => {
   }
 });
 
-test('hierarchy staleness indexes use non-blocking production builds', () => {
+test('hierarchy staleness indexes use idempotent non-blocking production builds', () => {
   const migration = readFileSync(
     new URL('../database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql', import.meta.url),
     'utf8'
@@ -63,8 +63,8 @@ test('hierarchy staleness indexes use non-blocking production builds', () => {
   for (const indexName of indexNames) {
     assert.match(
       migration,
-      new RegExp(`CREATE INDEX CONCURRENTLY ${indexName}\\n`),
-      `${indexName} must be built concurrently so deployment does not block Organization writes`
+      new RegExp(`CREATE INDEX CONCURRENTLY IF NOT EXISTS ${indexName}\\n`),
+      `${indexName} must be rebuilt concurrently and idempotently so retry does not block Organization writes`
     );
   }
 });
