@@ -4,6 +4,9 @@ set -euo pipefail
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
 
 TENANT_ID="31000000-0000-7000-8000-000000000001"
+RECOVERY_TENANT_ID="31000000-0000-7000-8000-000000000002"
+RECOVERY_X_ID="00000000-0000-7000-8000-000000000201"
+RECOVERY_Y_ID="00000000-0000-7000-8000-000000000202"
 X_ID="00000000-0000-7000-8000-000000000101"
 Y_ID="00000000-0000-7000-8000-000000000102"
 X_VERSION_ID="00000000-0000-7000-8000-000000000111"
@@ -66,6 +69,92 @@ if [[ "$(psql "${DATABASE_URL}" -Atqc "SELECT to_regprocedure('apply_organizatio
     exit 1
 fi
 
+# Reproduce PostgreSQL's documented failed-concurrent-build residue. A failed
+# unique concurrent build leaves an INVALID same-named index. Migration 0028
+# must be safely retryable from that partial state and must still install its
+# stale-transaction function and trigger after repairing all index contracts.
+with_tenant "${RECOVERY_TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
+INSERT INTO tenant_record (tenant_record_id, tenant_reference)
+VALUES ('${RECOVERY_TENANT_ID}', 'tenant_concurrent_index_recovery');
+INSERT INTO organization_unit (tenant_record_id, organization_unit_id)
+VALUES
+    ('${RECOVERY_TENANT_ID}', '${RECOVERY_X_ID}'),
+    ('${RECOVERY_TENANT_ID}', '${RECOVERY_Y_ID}');
+SQL
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
+    "DROP TRIGGER IF EXISTS organization_hierarchy_application_concurrency_guard ON organization_hierarchy_change_application_record;"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
+    "DROP FUNCTION IF EXISTS reject_stale_organization_hierarchy_transaction();"
+for index_name in \
+    organization_unit_tenant_recorded_from_idx \
+    organization_unit_tenant_recorded_to_idx \
+    organization_unit_version_tenant_recorded_from_idx \
+    organization_unit_version_tenant_recorded_to_idx; do
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "DROP INDEX CONCURRENTLY IF EXISTS ${index_name};"
+done
+
+set +e
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
+    "CREATE UNIQUE INDEX CONCURRENTLY organization_unit_tenant_recorded_from_idx ON organization_unit (tenant_record_id);" \
+    >/tmp/orgmetra-invalid-index-build.log 2>&1
+invalid_build_status=$?
+set -e
+if [[ ${invalid_build_status} -eq 0 ]]; then
+    echo "failed to create the expected invalid concurrent-index residue" >&2
+    exit 1
+fi
+invalid_index_count="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_class AS index_class
+JOIN pg_namespace AS namespace ON namespace.oid = index_class.relnamespace
+JOIN pg_index AS index_state ON index_state.indexrelid = index_class.oid
+WHERE namespace.nspname = 'public'
+  AND index_class.relname = 'organization_unit_tenant_recorded_from_idx'
+  AND NOT index_state.indisvalid;")"
+if [[ "${invalid_index_count}" != "1" ]]; then
+    echo "failed concurrent build did not leave one invalid index residue: ${invalid_index_count}" >&2
+    exit 1
+fi
+
+set +e
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -f database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql \
+    >/tmp/orgmetra-concurrent-index-recovery.log 2>&1
+recovery_status=$?
+set -e
+if [[ ${recovery_status} -ne 0 ]]; then
+    cat /tmp/orgmetra-concurrent-index-recovery.log >&2
+    echo "migration 0028 could not recover invalid concurrent-index residue" >&2
+    exit 1
+fi
+
+invalid_index_count="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_class AS index_class
+JOIN pg_namespace AS namespace ON namespace.oid = index_class.relnamespace
+JOIN pg_index AS index_state ON index_state.indexrelid = index_class.oid
+WHERE namespace.nspname = 'public'
+  AND index_class.relname IN (
+      'organization_unit_tenant_recorded_from_idx',
+      'organization_unit_tenant_recorded_to_idx',
+      'organization_unit_version_tenant_recorded_from_idx',
+      'organization_unit_version_tenant_recorded_to_idx'
+  )
+  AND NOT index_state.indisvalid;")"
+if [[ "${invalid_index_count}" != "0" ]]; then
+    echo "migration 0028 left invalid hierarchy indexes after recovery: ${invalid_index_count}" >&2
+    exit 1
+fi
+if [[ "$(psql "${DATABASE_URL}" -Atqc "SELECT to_regprocedure('reject_stale_organization_hierarchy_transaction()') IS NOT NULL;")" != "t" ]]; then
+    echo "migration 0028 recovery stopped before installing the stale-transaction function" >&2
+    exit 1
+fi
+if [[ "$(psql "${DATABASE_URL}" -Atqc "SELECT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'organization_hierarchy_application_concurrency_guard' AND NOT tgisinternal);")" != "t" ]]; then
+    echo "migration 0028 recovery stopped before installing the concurrency trigger" >&2
+    exit 1
+fi
+
 unhardened_functions="$(psql "${DATABASE_URL}" -Atqc "
 SELECT count(*)
 FROM pg_proc
@@ -124,7 +213,7 @@ x_review_digest="$(digest_review "${x_review}")"
 y_review_digest="$(digest_review "${y_review}")"
 
 old_transaction_output="$(mktemp)"
-trap 'rm -f "${old_transaction_output}"' EXIT
+trap 'rm -f "${old_transaction_output}" /tmp/orgmetra-invalid-index-build.log /tmp/orgmetra-concurrent-index-recovery.log' EXIT
 
 # Start the Y->X transaction first, but delay its mutation. X->Y then commits in
 # a later-started transaction. The older transaction must not use its earlier
