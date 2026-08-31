@@ -25,3 +25,22 @@ test('organization hierarchy application artifacts are canonical foundation inve
     assert.equal(pythonRequired.has(artifact), true, `${artifact} missing from Python REQUIRED`);
   }
 });
+
+test('organization hierarchy integrity helpers deny PUBLIC execution', () => {
+  const migration = readFileSync(
+    new URL('../database/migrations/0029_organization_hierarchy_parent_continuity.sql', import.meta.url),
+    'utf8'
+  );
+  const helperFunctions = [
+    'validate_organization_hierarchy_application_audit',
+    'validate_organization_hierarchy_application_successor'
+  ];
+
+  for (const functionName of helperFunctions) {
+    assert.match(
+      migration,
+      new RegExp(`REVOKE ALL ON FUNCTION ${functionName}\\(\\) FROM PUBLIC;`),
+      `${functionName} must not retain PostgreSQL's default PUBLIC EXECUTE privilege`
+    );
+  }
+});
