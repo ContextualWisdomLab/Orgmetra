@@ -155,6 +155,88 @@ if [[ "$(psql "${DATABASE_URL}" -Atqc "SELECT EXISTS (SELECT 1 FROM pg_trigger W
     exit 1
 fi
 
+# Retry must also reject misleading *valid* residue. A same-named but wrong
+# index and a disabled same-named trigger must not let migration 0028 report
+# success while its stale-transaction protection is structurally absent.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
+    "DROP INDEX CONCURRENTLY organization_unit_tenant_recorded_from_idx;"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
+    "CREATE INDEX CONCURRENTLY organization_unit_tenant_recorded_from_idx ON organization_unit (recorded_from, tenant_record_id);"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE OR REPLACE FUNCTION ignore_organization_hierarchy_staleness()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN NEW;
+END;
+$$;
+DROP TRIGGER organization_hierarchy_application_concurrency_guard
+    ON organization_hierarchy_change_application_record;
+CREATE TRIGGER organization_hierarchy_application_concurrency_guard
+BEFORE INSERT ON organization_hierarchy_change_application_record
+FOR EACH ROW
+EXECUTE FUNCTION ignore_organization_hierarchy_staleness();
+ALTER TABLE organization_hierarchy_change_application_record
+    DISABLE TRIGGER organization_hierarchy_application_concurrency_guard;
+SQL
+
+set +e
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -f database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql \
+    >/tmp/orgmetra-mismatched-guard-recovery.log 2>&1
+mismatched_recovery_status=$?
+set -e
+if [[ ${mismatched_recovery_status} -ne 0 ]]; then
+    cat /tmp/orgmetra-mismatched-guard-recovery.log >&2
+    echo "migration 0028 could not reconcile misleading valid residue" >&2
+    exit 1
+fi
+
+exact_index_count="$(psql "${DATABASE_URL}" -Atqc "
+WITH expected(index_name, table_name, second_column_name, expected_predicate) AS (
+    VALUES
+      ('organization_unit_tenant_recorded_from_idx', 'organization_unit', 'recorded_from', NULL::text),
+      ('organization_unit_tenant_recorded_to_idx', 'organization_unit', 'recorded_to', '(recorded_to IS NOT NULL)'),
+      ('organization_unit_version_tenant_recorded_from_idx', 'organization_unit_version', 'recorded_from', NULL::text),
+      ('organization_unit_version_tenant_recorded_to_idx', 'organization_unit_version', 'recorded_to', '(recorded_to IS NOT NULL)')
+)
+SELECT count(*)
+FROM expected
+JOIN pg_class AS index_class ON index_class.relname = expected.index_name
+JOIN pg_namespace AS namespace ON namespace.oid = index_class.relnamespace AND namespace.nspname = 'public'
+JOIN pg_index AS index_state ON index_state.indexrelid = index_class.oid
+JOIN pg_class AS table_class ON table_class.oid = index_state.indrelid AND table_class.relname = expected.table_name
+JOIN pg_am AS access_method ON access_method.oid = index_class.relam AND access_method.amname = 'btree'
+WHERE index_state.indisvalid
+  AND index_state.indisready
+  AND NOT index_state.indisunique
+  AND index_state.indnkeyatts = 2
+  AND pg_get_indexdef(index_class.oid, 1, true) = 'tenant_record_id'
+  AND pg_get_indexdef(index_class.oid, 2, true) = expected.second_column_name
+  AND pg_get_expr(index_state.indpred, index_state.indrelid) IS NOT DISTINCT FROM expected.expected_predicate;")"
+if [[ "${exact_index_count}" != "4" ]]; then
+    echo "migration 0028 accepted a mismatched governed index: ${exact_index_count}/4 exact" >&2
+    exit 1
+fi
+
+exact_trigger_count="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_trigger
+WHERE tgrelid = 'organization_hierarchy_change_application_record'::regclass
+  AND tgname = 'organization_hierarchy_application_concurrency_guard'
+  AND NOT tgisinternal
+  AND NOT tgisconstraint
+  AND tgenabled = 'O'
+  AND tgtype = 7
+  AND tgfoid = 'reject_stale_organization_hierarchy_transaction()'::regprocedure;")"
+if [[ "${exact_trigger_count}" != "1" ]]; then
+    echo "migration 0028 accepted a disabled or mismatched concurrency trigger: ${exact_trigger_count}" >&2
+    exit 1
+fi
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c \
+    "DROP FUNCTION ignore_organization_hierarchy_staleness();"
+
 unhardened_functions="$(psql "${DATABASE_URL}" -Atqc "
 SELECT count(*)
 FROM pg_proc
@@ -213,7 +295,7 @@ x_review_digest="$(digest_review "${x_review}")"
 y_review_digest="$(digest_review "${y_review}")"
 
 old_transaction_output="$(mktemp)"
-trap 'rm -f "${old_transaction_output}" /tmp/orgmetra-invalid-index-build.log /tmp/orgmetra-concurrent-index-recovery.log' EXIT
+trap 'rm -f "${old_transaction_output}" /tmp/orgmetra-invalid-index-build.log /tmp/orgmetra-concurrent-index-recovery.log /tmp/orgmetra-mismatched-guard-recovery.log' EXIT
 
 # Start the Y->X transaction first, but delay its mutation. X->Y then commits in
 # a later-started transaction. The older transaction must not use its earlier
