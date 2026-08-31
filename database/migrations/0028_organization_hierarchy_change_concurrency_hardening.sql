@@ -95,7 +95,10 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS organization_unit_version_tenant_recorde
 
 -- CREATE INDEX IF NOT EXISTS is intentionally not accepted as proof. Assert the
 -- full catalog contract after creation so a name collision cannot silently turn
--- a successful migration into an unindexed stale-transaction scan.
+-- a successful migration into an unindexed stale-transaction scan. Scope the
+-- index lookup to the governed public schema before matching names; unrelated
+-- schemas are independent PostgreSQL namespaces and must not create false
+-- contract failures merely because they use the same local index name.
 DO $$
 BEGIN
     IF EXISTS (
@@ -133,11 +136,11 @@ BEGIN
         )
         SELECT 1
         FROM expected_index AS expected
-        LEFT JOIN pg_class AS index_class
-          ON index_class.relname = expected.index_name
         LEFT JOIN pg_namespace AS namespace
-          ON namespace.oid = index_class.relnamespace
-         AND namespace.nspname = 'public'
+          ON namespace.nspname = 'public'
+        LEFT JOIN pg_class AS index_class
+          ON index_class.relnamespace = namespace.oid
+         AND index_class.relname = expected.index_name
         LEFT JOIN pg_index AS index_state
           ON index_state.indexrelid = index_class.oid
         LEFT JOIN pg_class AS table_class
@@ -145,6 +148,7 @@ BEGIN
         LEFT JOIN pg_am AS access_method
           ON access_method.oid = index_class.relam
         WHERE namespace.oid IS NULL
+           OR index_class.oid IS NULL
            OR index_state.indexrelid IS NULL
            OR table_class.relname IS DISTINCT FROM expected.table_name
            OR access_method.amname IS DISTINCT FROM 'btree'
