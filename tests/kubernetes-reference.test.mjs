@@ -133,6 +133,18 @@ test("namespace and workload align with restricted pod-security intent", () => {
   assert.equal("hostPort" in container.ports[0], false);
 });
 
+test("pod-security policy behavior is pinned to the authored Kubernetes minor", () => {
+  const document = referenceDocument();
+  const namespace = resource(document, "Namespace", "orgmetra-system");
+  for (const mode of ["enforce", "audit", "warn"]) {
+    assert.equal(
+      namespace.metadata.labels[`pod-security.kubernetes.io/${mode}-version`],
+      "v1.37",
+      `${mode} Pod Security policy must not drift with an implicit latest version`,
+    );
+  }
+});
+
 test("health probes preserve liveness/readiness separation", () => {
   const document = referenceDocument();
   const container = peopleContainer(document);
