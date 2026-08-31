@@ -7,14 +7,16 @@
 
 -- The stale guard is on the mutation path, so its tenant/time probes must not
 -- degrade into tenant-history scans as bitemporal Organization truth grows.
-CREATE INDEX organization_unit_tenant_recorded_from_idx
+-- Build the supporting indexes concurrently because this active-PR migration
+-- can be applied to populated Organization tables during a controlled rollout.
+CREATE INDEX CONCURRENTLY organization_unit_tenant_recorded_from_idx
     ON organization_unit (tenant_record_id, recorded_from);
-CREATE INDEX organization_unit_tenant_recorded_to_idx
+CREATE INDEX CONCURRENTLY organization_unit_tenant_recorded_to_idx
     ON organization_unit (tenant_record_id, recorded_to)
     WHERE recorded_to IS NOT NULL;
-CREATE INDEX organization_unit_version_tenant_recorded_from_idx
+CREATE INDEX CONCURRENTLY organization_unit_version_tenant_recorded_from_idx
     ON organization_unit_version (tenant_record_id, recorded_from);
-CREATE INDEX organization_unit_version_tenant_recorded_to_idx
+CREATE INDEX CONCURRENTLY organization_unit_version_tenant_recorded_to_idx
     ON organization_unit_version (tenant_record_id, recorded_to)
     WHERE recorded_to IS NOT NULL;
 
