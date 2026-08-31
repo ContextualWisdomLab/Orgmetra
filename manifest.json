@@ -18,7 +18,7 @@
     {"path":"database/migrations/0002_sealed_evidence_digest.sql","sha256":"93d659ca8e0e9293a83d5422d043be7b1022c5470a5b22670aa3416fa334a04c","bytes":6649,"lines":202},
     {"path":"database/migrations/0003_audit_outbox_persistence.sql","sha256":"2aa7bbb8220923ec584537c0cd46f0cba2b692d69d431f097b7df6db75235bfc","bytes":15417,"lines":423},
     {"path":"database/migrations/0004_outbox_delivery_claim.sql","sha256":"d4504acf7d58528a2a8f4f03d1584b868c8d3ba9046a007b9c2e7cfef993b2ef","bytes":9451,"lines":234},
-    {"path":"database/migrations/0005_outbox_delivery_finalization.sql","sha256":"b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5ef9e8a92abba5c3cf182","bytes":6125,"lines":170},
+    {"path":"database/migrations/0005_outbox_delivery_finalization.sql","sha256":"b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5b7a3a25fa60016b6a4961","bytes":6125,"lines":170},
     {"path":"database/migrations/0006_outbox_delivery_dead_letter.sql","sha256":"c1fb91cdf98169fd6684984e86cb0a14fa19c8f1226028d2346a2a069df2b3c7","bytes":24919,"lines":628},
     {"path":"database/migrations/0007_outbox_retry_exhaustion.sql","sha256":"812f50d70ca5929c7eba964d34a208aedee660d11cc7ffc09d67688c4737e0d5","bytes":19081,"lines":476},
     {"path":"database/migrations/0008_audit_outbox_review_hardening.sql","sha256":"c3713a12db9d00fdc10005df1f86c07965e9555eefad78ca67e994537a739d9b","bytes":17562,"lines":448},
