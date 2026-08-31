@@ -32,6 +32,9 @@ test('organization hierarchy integrity helpers deny PUBLIC execution', () => {
     'utf8'
   );
   const helperFunctions = [
+    'protect_organization_hierarchy_application_history',
+    'reject_organization_hierarchy_application_truncate',
+    'reject_stale_organization_hierarchy_transaction',
     'validate_organization_hierarchy_application_audit',
     'validate_organization_hierarchy_application_successor'
   ];
