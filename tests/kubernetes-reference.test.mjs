@@ -272,4 +272,26 @@ test("reference documentation keeps digest resolution and database egress fail-c
   assert.match(text, /NetworkPolicy-capable CNI/i);
   assert.match(text, /kubectl apply --dry-run=server/i);
   assert.match(text, /pod-security\.kubernetes\.io\/enforce=restricted/i);
+  assert.match(text, /fresh target cluster/i);
+  assert.match(text, /temporary validation namespace/i);
+  assert.match(text, /kubectl create namespace/i);
+  assert.match(text, /kubectl delete namespace/i);
+});
+
+test("canonical buyer-facing docs track the Kubernetes reference deployment boundary", () => {
+  for (const relativePath of [
+    "ARCHITECTURE.md",
+    "CHANGELOG.md",
+    "docs/OPERABILITY.md",
+    "docs/SECURITY.md",
+    "docs/TEST_STRATEGY.md",
+    "docs/TRACEABILITY.md",
+  ]) {
+    const text = fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+    assert.match(
+      text,
+      /infrastructure\/kubernetes\/people-api-reference\.json/i,
+      `${relativePath} must identify the governed Kubernetes reference artifact`,
+    );
+  }
 });
