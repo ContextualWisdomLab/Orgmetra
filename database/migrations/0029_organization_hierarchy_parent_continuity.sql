@@ -114,6 +114,7 @@ AS $$
 DECLARE
     predecessor organization_unit_version%ROWTYPE;
     successor organization_unit_version%ROWTYPE;
+    preserved_segment_count bigint;
 BEGIN
     SELECT version.*
     INTO predecessor
@@ -158,12 +159,34 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    IF predecessor.effective_from < NEW.effective_on THEN
+        SELECT count(*)
+        INTO preserved_segment_count
+        FROM organization_unit_version AS version
+        WHERE version.tenant_record_id = NEW.tenant_record_id
+          AND version.organization_unit_id = NEW.organization_unit_id
+          AND version.organization_unit_version_id <> NEW.successor_organization_unit_version_id
+          AND version.organization_hierarchy_change_application_record_id =
+              NEW.organization_hierarchy_change_application_record_id
+          AND version.effective_from IS NOT DISTINCT FROM predecessor.effective_from
+          AND version.effective_to IS NOT DISTINCT FROM NEW.effective_on
+          AND version.parent_organization_unit_id IS NOT DISTINCT FROM predecessor.parent_organization_unit_id
+          AND version.unit_name IS NOT DISTINCT FROM predecessor.unit_name
+          AND version.organization_type_code IS NOT DISTINCT FROM predecessor.organization_type_code
+          AND version.recorded_from IS NOT DISTINCT FROM NEW.recorded_at
+          AND version.recorded_to IS NULL;
+        IF preserved_segment_count <> 1 THEN
+            RAISE EXCEPTION 'organization hierarchy preserved predecessor segment is missing or ambiguous'
+                USING ERRCODE = '23514';
+        END IF;
+    END IF;
+
     RETURN NEW;
 END;
 $$;
 
 COMMENT ON FUNCTION validate_organization_hierarchy_application_successor() IS
-    'At deferred commit time, binds hierarchy evidence to the predecessor covering effective_on and to the exact current-recorded successor produced by the reviewed parent correction, including business interval and preserved unit attributes.';
+    'At deferred commit time, binds hierarchy evidence to the predecessor covering effective_on, the exact current-recorded successor, and the required preserved pre-effective segment produced by a future-effective reviewed parent correction.';
 
 REVOKE ALL ON FUNCTION protect_organization_hierarchy_application_history() FROM PUBLIC;
 REVOKE ALL ON FUNCTION reject_organization_hierarchy_application_truncate() FROM PUBLIC;
