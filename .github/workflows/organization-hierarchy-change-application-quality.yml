@@ -11,6 +11,7 @@ on:
       - "database/migrations/0029_organization_hierarchy_parent_continuity.sql"
       - "tests/test_organization_hierarchy_change_application_postgres.sh"
       - "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh"
+      - "tests/test_organization_hierarchy_change_cross_schema_index_retry_postgres.sh"
       - "tests/test_organization_hierarchy_change_parent_gap_postgres.sh"
       - "tests/organization-hierarchy-change-inventory.test.mjs"
       - "docs/adr/0119-organization-hierarchy-change-application.md"
@@ -89,6 +90,7 @@ jobs:
               "database/migrations/0029_organization_hierarchy_parent_continuity.sql",
               "tests/test_organization_hierarchy_change_application_postgres.sh",
               "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh",
+              "tests/test_organization_hierarchy_change_cross_schema_index_retry_postgres.sh",
               "tests/test_organization_hierarchy_change_parent_gap_postgres.sh",
               "tests/organization-hierarchy-change-inventory.test.mjs",
               ".github/workflows/organization-hierarchy-change-application-quality.yml",
@@ -119,6 +121,8 @@ jobs:
         run: bash tests/test_organization_hierarchy_change_application_postgres.sh
       - name: Apply stale-transaction concurrency hardening
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql
+      - name: Run cross-schema index retry regression
+        run: bash tests/test_organization_hierarchy_change_cross_schema_index_retry_postgres.sh
       - name: Apply parent-continuity and event-owner hardening
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0029_organization_hierarchy_parent_continuity.sql
       - name: Run future-parent continuity and event-owner regressions
