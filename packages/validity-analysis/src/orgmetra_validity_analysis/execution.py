@@ -284,8 +284,13 @@ class RustRecoveryEvidence:
         _validate_positive_integer(self.sample_size, "sample_size")
         _validate_positive_integer(self.item_count, "item_count")
         _validate_nonnegative_integer(self.seed, "seed")
-        if self.cluster_count is not None:
-            _validate_positive_integer(self.cluster_count, "cluster_count")
+        if self.design_code == "nested_multilevel":
+            if self.cluster_count is None or type(self.cluster_count) is not int or self.cluster_count < 2:
+                raise ValueError("nested_multilevel recovery evidence requires cluster_count >= 2")
+            if self.cluster_count > self.sample_size:
+                raise ValueError("nested_multilevel recovery evidence cluster_count cannot exceed sample_size")
+        elif self.cluster_count is not None:
+            raise ValueError("cross_sectional recovery evidence cannot carry cluster_count")
         if type(self.convergence_status) is not str or self.convergence_status not in {
             "converged",
             "max_iter_reached",
