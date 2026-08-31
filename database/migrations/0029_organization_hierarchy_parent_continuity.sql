@@ -179,6 +179,19 @@ BEGIN
             RAISE EXCEPTION 'organization hierarchy preserved predecessor segment is missing or ambiguous'
                 USING ERRCODE = '23514';
         END IF;
+    ELSIF EXISTS (
+        SELECT 1
+        FROM organization_unit_version AS version
+        WHERE version.tenant_record_id = NEW.tenant_record_id
+          AND version.organization_unit_id = NEW.organization_unit_id
+          AND version.organization_unit_version_id <> NEW.successor_organization_unit_version_id
+          AND version.organization_hierarchy_change_application_record_id =
+              NEW.organization_hierarchy_change_application_record_id
+          AND version.recorded_from IS NOT DISTINCT FROM NEW.recorded_at
+          AND version.recorded_to IS NULL
+    ) THEN
+        RAISE EXCEPTION 'organization hierarchy unexpected preserved segment exists when no split is required'
+            USING ERRCODE = '23514';
     END IF;
 
     RETURN NEW;
@@ -186,7 +199,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION validate_organization_hierarchy_application_successor() IS
-    'At deferred commit time, binds hierarchy evidence to the predecessor covering effective_on, the exact current-recorded successor, and the required preserved pre-effective segment produced by a future-effective reviewed parent correction.';
+    'At deferred commit time, binds hierarchy evidence to the predecessor covering effective_on, the exact current-recorded successor, exactly one required preserved pre-effective segment when the predecessor spans the boundary, and no extra application-attributed segment when no split is required.';
 
 REVOKE ALL ON FUNCTION protect_organization_hierarchy_application_history() FROM PUBLIC;
 REVOKE ALL ON FUNCTION reject_organization_hierarchy_application_truncate() FROM PUBLIC;
