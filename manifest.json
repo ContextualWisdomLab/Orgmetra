@@ -59,7 +59,7 @@
     {"path":"docs/adr/0012-governed-migration-handoff.md","sha256":"713855d670001d3964ecb36cc653830502fb1d82a58b9e39f564b6992dd2bd80","bytes":5965,"lines":59},
     {"path":"docs/adr/0013-governed-requisition-review-packet.md","sha256":"70bf2cbdf903a8793d6d8bc116a08331931090118341f42010236e09c6cc1802","bytes":4693,"lines":46},
     {"path":"docs/adr/0014-job-analysis-snapshot-persistence.md","sha256":"a7ab6fee50aaa63f7f407516a4cb39885faeb0fc6e5035ee8fc352ed73430105","bytes":5365,"lines":49},
-    {"path":"docs/adr/0119-organization-hierarchy-change-application.md","sha256":"35b5ffecb7e0de783d27337a2efcdb19d2ea6d11edb6aa2ce395d937a510c977","bytes":7046,"lines":43},
+    {"path":"docs/adr/0119-organization-hierarchy-change-application.md","sha256":"855de0a7e896c30bba839fb74515cdbfd52ae0013e0cd290fe7d7148d1bd199b","bytes":8782,"lines":47},
     {"path":"docs/adr/README.md","sha256":"761595c7f1597d05fa80831cd407375824689ee1e8f916a89c40554f5b045541","bytes":1964,"lines":19},
     {"path":"docs/doctoring/REFERENCES.md","sha256":"929f7ee36df16279f028f726fcf039982180deb377746fe3804f3c0d090778d5","bytes":6352,"lines":69},
     {"path":"docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md","sha256":"b64f21abb19373e780db8b9e64deb8ba9a6219ccf9625a651f25407b8691fcbd","bytes":8227,"lines":226},
