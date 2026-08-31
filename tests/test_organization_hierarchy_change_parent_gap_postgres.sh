@@ -172,6 +172,7 @@ fi
 # cannot be forged by a table-capable maintenance path.
 UNRELATED_PREDECESSOR_VERSION_ID="30000000-0000-7000-8000-000000000028"
 DIRECT_SUCCESSOR_VERSION_ID="30000000-0000-7000-8000-000000000029"
+DIRECT_PRESERVED_VERSION_ID="30000000-0000-7000-8000-000000000030"
 DIRECT_APPLICATION_ID="30000000-0000-7000-8000-000000000033"
 DIRECT_AUDIT_ID="30000000-0000-4000-8000-000000000045"
 DIRECT_OUTBOX_ID="30000000-0000-4000-8000-000000000046"
@@ -198,7 +199,8 @@ expect_direct_evidence_failure() {
     local successor_from="$7"
     local successor_to="$8"
     local successor_name="$9"
-    local output status close_sql successor_to_sql
+    local insert_preserved="${10:-no}"
+    local output status close_sql successor_to_sql preserved_sql
 
     close_sql=""
     if [[ "${close_current}" == "yes" ]]; then
@@ -207,6 +209,10 @@ expect_direct_evidence_failure() {
     successor_to_sql="NULL"
     if [[ -n "${successor_to}" ]]; then
         successor_to_sql="DATE '${successor_to}'"
+    fi
+    preserved_sql=""
+    if [[ "${insert_preserved}" == "yes" ]]; then
+        preserved_sql="INSERT INTO organization_unit_version (tenant_record_id, organization_unit_version_id, organization_unit_id, unit_name, organization_type_code, parent_organization_unit_id, effective_from, effective_to, recorded_from, organization_hierarchy_change_application_record_id) VALUES ('${TENANT_ID}'::uuid, '${DIRECT_PRESERVED_VERSION_ID}'::uuid, '${GAP_CHILD_ID}'::uuid, 'Gap child', 'department', NULL, DATE '2020-01-01', DATE '${EFFECTIVE_ON}', pg_catalog.transaction_timestamp(), '${DIRECT_APPLICATION_ID}'::uuid);"
     fi
 
     set +e
@@ -299,6 +305,7 @@ INSERT INTO organization_hierarchy_change_application_record (
 );
 
 ${close_sql}
+${preserved_sql}
 
 INSERT INTO organization_unit_version (
     tenant_record_id,
@@ -388,3 +395,15 @@ expect_direct_evidence_failure \
     "2026-09-15" \
     "" \
     "Gap child"
+
+expect_direct_evidence_failure \
+    "direct application evidence accepted a successor whose proposed parent disappears inside the effective interval" \
+    "proposed parent is not visible throughout successor effective interval" \
+    "${GAP_CHILD_VERSION_ID}" \
+    "urn:orgmetra:organization_core" \
+    "orgmetra.organization.hierarchy_changed" \
+    "yes" \
+    "2026-09-15" \
+    "" \
+    "Gap child" \
+    "yes"
