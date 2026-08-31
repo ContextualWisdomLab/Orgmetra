@@ -165,6 +165,9 @@ $$;
 COMMENT ON FUNCTION validate_organization_hierarchy_application_successor() IS
     'At deferred commit time, binds hierarchy evidence to the predecessor covering effective_on and to the exact current-recorded successor produced by the reviewed parent correction, including business interval and preserved unit attributes.';
 
+REVOKE ALL ON FUNCTION validate_organization_hierarchy_application_audit() FROM PUBLIC;
+REVOKE ALL ON FUNCTION validate_organization_hierarchy_application_successor() FROM PUBLIC;
+
 CREATE OR REPLACE FUNCTION apply_organization_hierarchy_change(
     p_tenant_record_id uuid,
     p_organization_unit_id uuid,
