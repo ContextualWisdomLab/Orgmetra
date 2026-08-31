@@ -357,6 +357,17 @@ expect_direct_evidence_failure \
     "Forged successor"
 
 expect_direct_evidence_failure \
+    "direct application evidence accepted a future-effective correction without preserved history" \
+    "preserved" \
+    "${GAP_CHILD_VERSION_ID}" \
+    "urn:orgmetra:organization_core" \
+    "orgmetra.organization.hierarchy_changed" \
+    "yes" \
+    "2026-09-15" \
+    "" \
+    "Gap child"
+
+expect_direct_evidence_failure \
     "direct application evidence accepted an audit event from the wrong bounded context" \
     "audit event" \
     "${GAP_CHILD_VERSION_ID}" \
