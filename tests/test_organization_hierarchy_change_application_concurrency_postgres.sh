@@ -80,6 +80,27 @@ if [[ "${unhardened_functions}" != "0" ]]; then
     exit 1
 fi
 
+stale_guard_index_count="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND (
+    (indexname = 'organization_unit_tenant_recorded_from_idx'
+      AND indexdef LIKE '%(tenant_record_id, recorded_from)%')
+    OR (indexname = 'organization_unit_tenant_recorded_to_idx'
+      AND indexdef LIKE '%(tenant_record_id, recorded_to)%'
+      AND indexdef LIKE '%WHERE (recorded_to IS NOT NULL)%')
+    OR (indexname = 'organization_unit_version_tenant_recorded_from_idx'
+      AND indexdef LIKE '%(tenant_record_id, recorded_from)%')
+    OR (indexname = 'organization_unit_version_tenant_recorded_to_idx'
+      AND indexdef LIKE '%(tenant_record_id, recorded_to)%'
+      AND indexdef LIKE '%WHERE (recorded_to IS NOT NULL)%')
+  );")"
+if [[ "${stale_guard_index_count}" != "4" ]]; then
+    echo "organization hierarchy stale-transaction probes are not fully indexed: ${stale_guard_index_count}/4" >&2
+    exit 1
+fi
+
 with_tenant "${TENANT_ID}" "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
 VALUES ('${TENANT_ID}', 'tenant_concurrency');
