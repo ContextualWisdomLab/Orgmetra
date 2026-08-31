@@ -13,6 +13,7 @@ on:
       - "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh"
       - "tests/test_organization_hierarchy_change_cross_schema_index_retry_postgres.sh"
       - "tests/test_organization_hierarchy_change_parent_gap_postgres.sh"
+      - "tests/test_organization_hierarchy_change_unexpected_preserved_segment_postgres.sh"
       - "tests/organization-hierarchy-change-inventory.test.mjs"
       - "docs/adr/0119-organization-hierarchy-change-application.md"
       - "docs/traceability/organization-hierarchy-change-application.md"
@@ -92,6 +93,7 @@ jobs:
               "tests/test_organization_hierarchy_change_application_concurrency_postgres.sh",
               "tests/test_organization_hierarchy_change_cross_schema_index_retry_postgres.sh",
               "tests/test_organization_hierarchy_change_parent_gap_postgres.sh",
+              "tests/test_organization_hierarchy_change_unexpected_preserved_segment_postgres.sh",
               "tests/organization-hierarchy-change-inventory.test.mjs",
               ".github/workflows/organization-hierarchy-change-application-quality.yml",
           ]
@@ -127,6 +129,8 @@ jobs:
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/migrations/0029_organization_hierarchy_parent_continuity.sql
       - name: Run future-parent continuity and event-owner regressions
         run: bash tests/test_organization_hierarchy_change_parent_gap_postgres.sh
+      - name: Run no-split preservation regression
+        run: bash tests/test_organization_hierarchy_change_unexpected_preserved_segment_postgres.sh
       - name: Run stale-transaction concurrency regression
         run: bash tests/test_organization_hierarchy_change_application_concurrency_postgres.sh
       - name: Require clean checkout
