@@ -47,3 +47,24 @@ test('organization hierarchy integrity helpers deny PUBLIC execution', () => {
     );
   }
 });
+
+test('hierarchy staleness indexes use non-blocking production builds', () => {
+  const migration = readFileSync(
+    new URL('../database/migrations/0028_organization_hierarchy_change_concurrency_hardening.sql', import.meta.url),
+    'utf8'
+  );
+  const indexNames = [
+    'organization_unit_tenant_recorded_from_idx',
+    'organization_unit_tenant_recorded_to_idx',
+    'organization_unit_version_tenant_recorded_from_idx',
+    'organization_unit_version_tenant_recorded_to_idx'
+  ];
+
+  for (const indexName of indexNames) {
+    assert.match(
+      migration,
+      new RegExp(`CREATE INDEX CONCURRENTLY ${indexName}\\n`),
+      `${indexName} must be built concurrently so deployment does not block Organization writes`
+    );
+  }
+});
