@@ -1,0 +1,101 @@
+name: Release Publication Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - feat/release-authorization-boundary
+    paths:
+      - "packages/release-publication/**"
+      - "packages/release-authorization/**"
+      - "packages/release-readiness-review/**"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/release-publication-quality.yml"
+      - "docs/adr/0127-governed-release-publication.md"
+      - "docs/doctoring/release-publication-references.md"
+      - "docs/traceability/release-publication.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-publication-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Release publication governance and exact 100% coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up exact Python runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Install reviewed package build backend
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r packages/release-publication/build-requirements.txt
+          python -m pip check
+      - name: Compile owned Python
+        run: python -m compileall -q packages/release-publication/tests
+      - name: Require beginner-readable docstrings
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          discovered = 0
+          for path in sorted(Path("packages/release-publication").rglob("*.py")):
+              discovered += 1
+              tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+              for node in ast.walk(tree):
+                  if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and ast.get_docstring(node) is None:
+                      raise SystemExit(f"missing docstring: {path}:{node.lineno} {node.name}")
+          if discovered == 0:
+              raise SystemExit("release-publication docstring gate discovered no Python files")
+          PY
+      - name: Test exact statement and branch coverage
+        env:
+          PYTHONPATH: packages/release-readiness-review/src:packages/release-authorization/src:packages/release-publication/src
+          COVERAGE_FILE: /tmp/orgmetra-release-publication.coverage
+        run: python -m pytest -c packages/release-publication/pyproject.toml packages/release-publication/tests
+      - name: Prove hash-bound isolated package install
+        run: |
+          rm -rf /tmp/orgmetra-release-ready-build /tmp/orgmetra-release-auth-build /tmp/orgmetra-release-publish-build /tmp/orgmetra-release-publish-wheels /tmp/orgmetra-release-publish-installed
+          cp -R packages/release-readiness-review /tmp/orgmetra-release-ready-build
+          cp -R packages/release-authorization /tmp/orgmetra-release-auth-build
+          cp -R packages/release-publication /tmp/orgmetra-release-publish-build
+          mkdir -p /tmp/orgmetra-release-publish-wheels
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-release-publish-wheels /tmp/orgmetra-release-ready-build
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-release-publish-wheels /tmp/orgmetra-release-auth-build
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-release-publish-wheels /tmp/orgmetra-release-publish-build
+          : > /tmp/orgmetra-release-publish-wheel.txt
+          while IFS= read -r wheel; do
+            wheel_sha="$(sha256sum "$wheel" | cut -d' ' -f1)"
+            printf 'file://%s --hash=sha256:%s\n' "$wheel" "$wheel_sha" >> /tmp/orgmetra-release-publish-wheel.txt
+          done < <(find /tmp/orgmetra-release-publish-wheels -maxdepth 1 -type f -name '*.whl' -print | sort)
+          test "$(wc -l < /tmp/orgmetra-release-publish-wheel.txt)" -eq 3
+          python -m pip install --require-hashes --no-deps --target /tmp/orgmetra-release-publish-installed -r /tmp/orgmetra-release-publish-wheel.txt
+          PYTHONPATH=/tmp/orgmetra-release-publish-installed python - <<'PY'
+          import orgmetra_release_publication as package
+          assert "ReleasePublicationReceipt" in package.__all__
+          assert "publish_authorized_release" in package.__all__
+          PY
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
