@@ -1,10 +1,21 @@
 # Orgmetra
 
-**Evidence-centered HRIS for the full employment lifecycle.**
+**Evidence-centered HRIS and HCM for the full employment lifecycle.**
 
-Orgmetra is the ContextualWisdomLab system of record for people, employment, organizations, jobs, positions, assignments, candidate-to-worker linkage, performance criteria, compensation, and evidence-backed talent decisions.
+Orgmetra connects job architecture, recruiting evidence, employment records, performance outcomes, and validation evidence without collapsing them into one opaque HR record. It is designed for teams that need HR decisions to remain explainable over time: what the job required, what evidence informed a decision, what happened afterward, and which system owns each fact.
 
-The product is intentionally federated: specialist CWL products remain independently deployable and integrate through versioned package, API, event, and adapter contracts. Orgmetra does not read another product's application tables directly.
+## Why Orgmetra
+
+Traditional HR systems often split job analysis, recruiting, assessment, employment records, performance management, compensation, and people analytics into disconnected workflows. Orgmetra's product boundary is built around preserving the evidence and time semantics that make those workflows auditable and scientifically useful.
+
+| Need | What Orgmetra provides |
+| --- | --- |
+| HR source of truth | Distinct Person, Employment, Organization, Job, Position, Assignment, candidate-worker, performance, and validation records |
+| Time-aware HR facts | Separate business-effective time and system-recorded time |
+| Evidence-backed decisions | Explicit evidence and actor context for governed selection and talent workflows |
+| Privacy without unusable masking | Purpose-bound authorization, least privilege, encryption, retention, and audit |
+| Scientific validation | Predictor, criterion, sample, and policy-version evidence without replacing psychometric/statistical kernels |
+| Ecosystem integration | Versioned API, event, package, and adapter boundaries instead of cross-service application-table access |
 
 ## Product loop
 
@@ -23,26 +34,59 @@ Job evidence
 
 ## Core bounded contexts
 
-- People and employment
-- Organization, job, position, and assignment
+- People and Employment
+- Organization, Job, Position, and Assignment
 - Talent acquisition and candidate-worker linkage
 - Performance and criterion observations
 - Workforce validation and decision evidence
 - Audit, provenance, and purpose-bound authorization
 - CWL integration hub
 
-## CWL ecosystem boundaries
+## Start with the repository baseline
 
-- Keyverse: identity, OIDC, SCIM, federation
-- Naruon: customer-owned mail/calendar/file control plane
-- Psychometrics Commons + fast-mlsirm: assessment lifecycle and psychometric computation
-- TEPP: temporal, event, multilevel and multiple-membership analysis
-- Semantic Data Portal: occupation/skill/ability ontology and semantic catalog
-- Contextual Orchestrator: bounded, evidence-grounded AI assistance
-- Clearfolio + NewsDOM: document viewing and PDF-to-DOM
-- MHTML ETL Gateway + mightyETL: governed migration and CDC
-- RankWeave + ThreadWeave + LineageWeave: retrieval, conversation structure and inferred evidence lineage
-- Inkspan + DiagramWeave: authoring and diagrams
+The root validation path is dependency-light and matches the current Foundation CI toolchain: Node.js 24 and Python 3.14.
+
+```bash
+npm ci
+npm run validate
+```
+
+`npm run validate` checks the repository manifest, foundation contract, OpenAPI structure, and dispatcher inventory. Product packages and PostgreSQL contracts have their own focused test paths; use the applicable package/workflow rather than treating the root validation command as proof of every subsystem.
+
+For the current executable verification contract, see [Foundation CI](.github/workflows/foundation-ci.yml) and [`docs/TEST_STRATEGY.md`](docs/TEST_STRATEGY.md).
+
+## Architecture and integration
+
+Orgmetra is intentionally federated. Specialist ContextualWisdomLab products stay independently deployable and integrate through explicit versioned boundaries.
+
+```text
+                        ┌──────────────────┐
+                        │     Orgmetra     │
+                        │ HRIS / HCM truth │
+                        └────────┬─────────┘
+                                 │
+                 versioned APIs / events / packages / adapters
+                                 │
+       ┌───────────────┬─────────┴──────────┬────────────────┐
+       ▼               ▼                    ▼                ▼
+   identity       psychometrics        orchestration     data / docs /
+    boundary          kernels             boundary        integration
+```
+
+Key product boundaries in the current architecture include:
+
+- **Keyverse** — identity, OIDC, SCIM, and federation.
+- **Naruon** — customer-owned mail, calendar, and file control plane.
+- **fast-mlsirm / psychometric components** — psychometric numerical computation.
+- **TEPP** — temporal, event, multilevel, and multiple-membership analysis.
+- **Semantic Data Portal** — occupation, skill, ability, and semantic catalog authority.
+- **Contextual Orchestrator** — bounded model routing and AI assistance.
+- **MHTML ETL Gateway / mightyETL** — governed migration and CDC boundaries.
+- **RankWeave / ThreadWeave / LineageWeave** — retrieval, conversation structure, and inferred evidence lineage.
+
+Orgmetra does not directly query another product's application tables, and an integration does not transfer the other product's authority into Orgmetra.
+
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the code-current architecture boundary.
 
 ## Non-negotiable contracts
 
@@ -50,32 +94,44 @@ Job evidence
 2. Effective time and system-recorded time are preserved independently.
 3. Database objects are normalized to 3NF and use descriptive two-or-more-word `snake_case` names.
 4. Public identifiers are opaque; credentials are never HR person identifiers.
-5. PII required for authorized HR work remains usable. Protection is achieved with purpose-bound authorization, least privilege, encryption, retention and audit rather than indiscriminate masking.
+5. PII required for authorized HR work remains usable. Protection is achieved with purpose-bound authorization, least privilege, encryption, retention, and audit rather than indiscriminate masking.
 6. LLM output is draft evidence, never an autonomous high-impact employment decision.
 7. Inferred lineage is not authoritative audit history.
 8. No cross-service application-table access.
 
+## Current product status
+
+Protected `develop` is the shipped repository authority. It contains the P0 HRIS foundation and governed evidence boundaries described by the current PRD, including distinct core HR records, bitemporal HR facts, candidate-worker linkage, performance/criterion models, validation-study registration, audit/provenance contracts, and integration-adapter contracts.
+
+Open pull requests may contain additional candidate behavior. Treat those changes as active-PR truth only until they integrate into protected `develop`; do not infer a shipped capability from an open branch or PR description.
+
+The repository does not claim certification, customer deployment, release maturity, benchmark leadership, or autonomous employment-decision authority unless separate current evidence explicitly supports such a claim.
+
 ## Documentation map
 
-- `docs/PRD.md`
-- `docs/TRD.md`
-- `ARCHITECTURE.md`
-- `docs/USER_STORIES.md`
-- `docs/STORYBOARD.md`
-- `docs/WIREFRAMES.md`
-- `docs/STORYBOOK.md`
-- `docs/UML.md`
-- `docs/ERD.md`
-- `docs/DATA_MODEL.md`
-- `docs/API_CONTRACT.md`
-- `docs/SECURITY.md`
-- `docs/THREAT_MODEL.md`
-- `docs/TEST_STRATEGY.md`
-- `docs/OPERABILITY.md`
-- `docs/TRACEABILITY.md`
-- `docs/adr/README.md`
-- `docs/doctoring/REFERENCES.md`
+| Topic | Source |
+| --- | --- |
+| Product requirements | [`docs/PRD.md`](docs/PRD.md) |
+| Technical requirements | [`docs/TRD.md`](docs/TRD.md) |
+| Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| User stories | [`docs/USER_STORIES.md`](docs/USER_STORIES.md) |
+| Storyboard | [`docs/STORYBOARD.md`](docs/STORYBOARD.md) |
+| Wireframes | [`docs/WIREFRAMES.md`](docs/WIREFRAMES.md) |
+| Storybook inventory | [`docs/STORYBOOK.md`](docs/STORYBOOK.md) |
+| UML / ERD / data model | [`docs/UML.md`](docs/UML.md), [`docs/ERD.md`](docs/ERD.md), [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) |
+| API contract | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) |
+| Security and threat model | [`docs/SECURITY.md`](docs/SECURITY.md), [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) |
+| Testing and operability | [`docs/TEST_STRATEGY.md`](docs/TEST_STRATEGY.md), [`docs/OPERABILITY.md`](docs/OPERABILITY.md) |
+| Traceability | [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) |
+| Architecture decisions | [`docs/adr/README.md`](docs/adr/README.md) |
+| Research / standards basis | [`docs/doctoring/REFERENCES.md`](docs/doctoring/REFERENCES.md) |
 
-## Status
+## Contributing and support
 
-Protected `develop` includes the employment-truth kernel, governed candidate-to-worker conversion, purpose-bound PII authorization, normalized worker-bound validity studies, criterion-observation scope, bitemporal workforce-composition evidence, the governed Naruon intent adapter, and requisition review packets. This active PR adds durable purpose-bound People mutation and confirmed-hire materialization paths for Employment, Position, and Assignment with atomic audit/outbox evidence and tenant-scoped idempotency; treat those write paths as active-PR truth until this exact head passes all fresh protected-base gates and merges.
+Start with [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md), the PRD, and the applicable ADR/traceability document before changing a product contract. Keep source, tests, documentation, and public claims aligned to the same repository revision.
+
+Security-sensitive reports should follow [`SECURITY.md`](SECURITY.md). Product and integration defects should be tracked in this repository only when Orgmetra owns the failing boundary; otherwise repair the dedicated owner instead of adding a local workaround.
+
+## License
+
+Orgmetra is licensed under the [Apache License 2.0](LICENSE). See [`NOTICE`](NOTICE) for repository attribution information.
