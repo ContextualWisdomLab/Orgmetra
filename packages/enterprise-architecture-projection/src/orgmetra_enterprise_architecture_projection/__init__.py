@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
 import re
+from typing import NamedTuple
 
 
 _ORGMETRA_REPOSITORY = "ContextualWisdomLab/Orgmetra"
@@ -93,9 +94,8 @@ class ContractAdmissionEvidence:
     verified_at: datetime
 
 
-@dataclass(frozen=True, slots=True)
-class ProjectionReadiness:
-    """Decision describing whether a candidate may be handed to the EA owner."""
+class ProjectionReadiness(NamedTuple):
+    """Immutable decision describing whether a candidate may be handed to the EA owner."""
 
     ready: bool
     truth_status: ProjectionTruthStatus
