@@ -178,6 +178,14 @@ def test_post_issuance_payload_mutation_fails_closed() -> None:
         packet.canonical_json()
 
 
+def test_post_issuance_digest_subclass_fails_before_canonical_export() -> None:
+    """Equality-compatible digest subtypes cannot escape as canonical evidence."""
+    packet = build_valid()
+    object.__setattr__(packet, "security_evidence_digest_sha256", ForgedText(DIGEST_A))
+    with pytest.raises(ValueError, match="security_evidence_digest_sha256.*exact string"):
+        packet.canonical_document()
+
+
 def test_post_issuance_identity_and_time_mutation_fail_closed() -> None:
     """Identity, time, and version integrity are revalidated before export."""
     packet = build_valid()
