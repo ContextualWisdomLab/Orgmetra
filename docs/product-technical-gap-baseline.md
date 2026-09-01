@@ -78,6 +78,7 @@ Fresh live reads on 2026-09-02 show the inherited ruleset still has:
 
 - `required_approving_review_count = 1`;
 - `require_last_push_approval = false`;
+- `require_code_owner_review = false`;
 - `required_reviewers = []`;
 - `dismiss_stale_reviews_on_push = true`;
 - required review-thread resolution enabled;
@@ -86,12 +87,13 @@ Fresh live reads on 2026-09-02 show the inherited ruleset still has:
 - deletion and non-fast-forward protection enabled; and
 - an `OrganizationAdmin` actor with routine `bypass_mode = always`.
 
-The central `.github` repository's own active ruleset **17921150 — `Lock default branch`** is a second live drift surface. Its approval count is already `0`, last-push approval is disabled, required reviewers are empty, review-thread resolution and deletion/non-fast-forward protection are enabled, but it still permits `rebase` and still exposes `OrganizationAdmin/always` bypass. Source-level audit policy and both live ruleset payloads must converge before governance repair is complete.
+The central `.github` repository's own active ruleset **17921150 — `Lock default branch`** is a second live drift surface. Its approval count is already `0`, last-push approval and CODEOWNER review are disabled, required reviewers are empty, review-thread resolution and deletion/non-fast-forward protection are enabled, but it still permits `rebase` and still exposes `OrganizationAdmin/always` bypass. Source-level audit policy and both live ruleset payloads must converge before governance repair is complete.
 
-This is not the current governance decision. `.github#772` establishes that the present one-human-maintainer fleet cannot satisfy a positive generic independent-human approval count. The compliant repair is **not** a bot approval, service-account approval, self-approval, credential widening, or routine administrator bypass. The current target is:
+This is not the current governance decision. `.github#772` establishes that the present one-human-maintainer fleet cannot satisfy a positive generic independent-human approval count, a last-push approval by another person, or mandatory CODEOWNER approval by the same sole author. The compliant repair is **not** a bot approval, service-account approval, self-approval, credential widening, or routine administrator bypass. The current target is:
 
 - `required_approving_review_count = 0` while no genuinely independent human reviewer exists;
 - `require_last_push_approval = false` because the rule otherwise requires a different person from the latest pusher;
+- `require_code_owner_review = false` while the sole code owner is also the author;
 - no synthetic `required_reviewers` merely to recreate the unavailable human gate;
 - review-thread resolution stays enabled;
 - exact-current-head OpenCode, Noema, Strix, Security/SAST, Dependency Review, coverage, provenance and repository-specific quality gates remain fail-closed;
@@ -99,7 +101,7 @@ This is not the current governance decision. `.github#772` establishes that the 
 - no routine `OrganizationAdmin/always` bypass; emergency repair belongs to a separately governed, time-bounded, auditable break-glass path; and
 - only merge and squash are accepted by the current audit; merge-method policy must not be weakened merely to solve the reviewer-capacity problem.
 
-Causal owner: `ContextualWisdomLab/.github`, primarily issues #772/#1351/#1340/#1200 and the existing ruleset-audit writer PR #1176. Orgmetra issue #89 mirrors this dependency. Orgmetra must not add a leaf workflow shim to simulate organization settings.
+Causal owner: `ContextualWisdomLab/.github`, primarily issues #772/#1351/#1340/#1200 and the existing ruleset-audit writer PR #1176. That writer now carries a test-first regression for the CODEOWNER deadlock and the corresponding organization/repository auditor repair. Orgmetra issue #89 mirrors this dependency. Orgmetra must not add a leaf workflow shim to simulate organization settings.
 
 **Canary:** Orgmetra PR #88 (`fix/job-analysis-http-request-budgets`) was freshly re-verified on exact head `0dc4f09cc3c87829ea1e3a0e3dc0188df07ad8cd`; the currently returned repository workflow runs are terminal-success, combined CodeRabbit/Devin statuses are successful, and its only inline review thread is resolved. It has no qualifying independent approval. It is intentionally retained as a governance canary: after the central policy repair, an unchanged sole-author GREEN PR must no longer be blocked *only* by a reviewer identity that does not exist. Do not merge it through administrator bypass to fake that proof.
 
@@ -121,7 +123,7 @@ Do **not** store PR #100's own current head inside this file: changing this file
 
 | Gap | Current evidence | Buyer consequence | Owner / next acceptance evidence | Priority |
 | --- | --- | --- | --- | --- |
-| **GOV-01 satisfiable protected-branch admission** | inherited ruleset still requires one unavailable generic approval and routine admin bypass; owner-repository ruleset still permits rebase and routine admin bypass | GREEN work cannot progress normally; bypass would undermine evidence | `.github#772/#1351`, PR #1176; live post-change ruleset reads + unchanged Orgmetra canary | **P0** |
+| **GOV-01 satisfiable protected-branch admission** | inherited ruleset still requires one unavailable generic approval and routine admin bypass; owner-repository ruleset still permits rebase and routine admin bypass; source audit now also rejects same-author CODEOWNER review deadlock | GREEN work cannot progress normally; bypass would undermine evidence | `.github#772/#1351`, PR #1176; live post-change ruleset reads + unchanged Orgmetra canary | **P0** |
 | **SEC-01 authoritative Dependency Review availability** | exact public comparisons repeatedly return 403; central gate correctly fails closed | merge queue can remain blocked without trustworthy dependency diff | `.github#810`; exact unchanged canary returns 200 and pinned action executes | **P0** |
 | **REL-01 integrated release evidence** | no published release; large active PR stack; no single integrated protected head yet proves the complete gate set | buyers cannot install/deploy a supported release | merge causal dependency roots in order; protected-head release checklist + signed/provenance evidence + CHANGELOG/version | **P0** |
 | **UX-01 role workspaces are design truth, not shipped UI** | P1 workspaces appear in PRD/wireframes/Storybook contract; protected branch shows foundation package and design tokens but no indexed React workspace implementation | buyers cannot complete the lifecycle through a coherent UI | executable Job Architecture → Candidate Evidence → Hiring Decision → Employee Profile → Validation vertical slice; Storybook, screenshots, WCAG 2.2 AA, interaction/i18n/edge-state tests | **P1** |
