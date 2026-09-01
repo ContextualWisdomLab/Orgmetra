@@ -18,4 +18,6 @@ Only after release identity and the release-bound conformance, complete-bundle, 
 
 Permitted projection concepts are deployable architecture concerns such as applications, interfaces, technology components and versions, providers, lifecycle, supported capabilities, initiatives, transformations, and dependencies. Projection evidence preserves Orgmetra source revision, effective time, recorded time, non-person ownership references, architecture-only dependency references, and the exact contract-admission evidence identities used for the handoff.
 
+Candidate construction is not the only integrity boundary. `evaluate_projection_readiness` revalidates the exact retained candidate immediately before issuing a readiness decision so a caller cannot use low-level frozen-dataclass mutation to replace a validated architecture owner with a Person reference, restore a mutable dependency collection, or otherwise bypass constructor checks after validation.
+
 The package intentionally exposes no free-form payload field. If a future use case needs additional fields, add them explicitly with RED tests proving that HR record data cannot cross the boundary.
