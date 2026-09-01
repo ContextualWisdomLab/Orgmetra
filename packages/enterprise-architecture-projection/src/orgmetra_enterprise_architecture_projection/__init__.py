@@ -303,6 +303,15 @@ def _validate_contract_admission(
         "migration_receipt_sha256",
         "migration receipt",
     )
+    if (
+        admission.compatibility_receipt_sha256 is not None
+        and admission.migration_receipt_sha256 is not None
+        and admission.compatibility_receipt_sha256
+        == admission.migration_receipt_sha256
+    ):
+        raise ValueError(
+            "compatibility and migration receipts must identify distinct lifecycle evidence"
+        )
 
 
 def _blocked_readiness(
