@@ -289,6 +289,8 @@ def _validate_contract_admission(
     if admission.admission_state != "verified":
         raise ValueError("admission_state must identify verified contract admission")
     _require_aware_time(admission.verified_at, "verified_at", "admission verification time")
+    if admission.verified_at < release.verified_at:
+        raise ValueError("admission verification cannot predate release verification")
     if admission.contract_commit_sha != release.commit_sha:
         raise ValueError("admission commit must match released commit")
     if admission.contract_asset_sha256 != release.asset_sha256:
