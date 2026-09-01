@@ -20,14 +20,9 @@ _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _RELEASE_TAG_RE = re.compile(r"^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$")
 _PROJECTION_KEY_RE = re.compile(r"^orgmetra\.[a-z0-9][a-z0-9._-]*$")
-_OWNER_PREFIXES = ("team:", "organization:", "application:")
-_DEPENDENCY_PREFIXES = (
-    "application:",
-    "service:",
-    "interface:",
-    "technology:",
-    "provider:",
-    "capability:",
+_OWNER_REFERENCE_RE = re.compile(r"^(?:team|organization|application):[a-z0-9][a-z0-9._/-]*$")
+_DEPENDENCY_REFERENCE_RE = re.compile(
+    r"^(?:application|service|interface|technology|provider|capability):[a-z0-9][a-z0-9._/-]*$"
 )
 
 
@@ -82,10 +77,13 @@ class ArchitectureProjectionCandidate:
             _require_aware_time(self.effective_to, "effective_to")
             if self.effective_to <= self.effective_from:
                 raise ValueError("effective_to must be after effective_from")
-        if not self.owner_reference.startswith(_OWNER_PREFIXES):
+        if _OWNER_REFERENCE_RE.fullmatch(self.owner_reference) is None:
             raise ValueError("owner_reference must be a non-person architecture owner reference")
         dependencies = tuple(self.dependency_references)
-        if any(not reference.startswith(_DEPENDENCY_PREFIXES) for reference in dependencies):
+        if any(
+            _DEPENDENCY_REFERENCE_RE.fullmatch(reference) is None
+            for reference in dependencies
+        ):
             raise ValueError(
                 "dependency_references must contain architecture-only dependency reference values"
             )
@@ -143,7 +141,8 @@ def evaluate_projection_readiness(
     contract_release: ContractReleaseEvidence | None,
 ) -> ProjectionReadiness:
     """Return fail-closed readiness without conferring Enterprise Architecture truth."""
-    del candidate
+    if type(candidate) is not ArchitectureProjectionCandidate:
+        raise TypeError("candidate must be an ArchitectureProjectionCandidate")
     if contract_release is None:
         return ProjectionReadiness(
             ready=False,
@@ -153,6 +152,8 @@ def evaluate_projection_readiness(
             contract_commit_sha=None,
             contract_asset_sha256=None,
         )
+    if type(contract_release) is not ContractReleaseEvidence:
+        raise TypeError("contract_release must be ContractReleaseEvidence or None")
     _validate_contract_release(contract_release)
     return ProjectionReadiness(
         ready=True,
