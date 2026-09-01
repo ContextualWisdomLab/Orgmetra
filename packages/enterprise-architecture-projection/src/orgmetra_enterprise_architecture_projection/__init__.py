@@ -12,6 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
+import hashlib
+import json
 import re
 from typing import NamedTuple
 
@@ -94,6 +96,20 @@ class ContractAdmissionEvidence:
     verified_at: datetime
 
 
+class _CandidateEvidenceSnapshot(NamedTuple):
+    """Immutable local snapshot of the exact candidate values evaluated for readiness."""
+
+    projection_key: str
+    projection_kind: ProjectionKind
+    source_revision: str
+    source_repository: str
+    effective_from: datetime
+    effective_to: datetime | None
+    recorded_at: datetime
+    owner_reference: str
+    dependency_references: tuple[str, ...]
+
+
 class ProjectionReadiness(NamedTuple):
     """Immutable decision describing whether a candidate may be handed to the EA owner."""
 
@@ -101,6 +117,7 @@ class ProjectionReadiness(NamedTuple):
     truth_status: ProjectionTruthStatus
     source_repository: str
     source_revision: str
+    candidate_sha256: str
     reason: str
     next_action: str
     contract_commit_sha: str | None
@@ -131,8 +148,10 @@ def _require_aware_time(
         raise TypeError(f"{field_name} must use exact built-in datetime and timezone")
 
 
-def _validate_projection_candidate(candidate: ArchitectureProjectionCandidate) -> None:
-    """Revalidate the exact retained candidate before any readiness decision is issued."""
+def _validate_projection_candidate(
+    candidate: ArchitectureProjectionCandidate | _CandidateEvidenceSnapshot,
+) -> None:
+    """Revalidate retained candidate values before any readiness decision is issued."""
     _require_exact_text(candidate.projection_key, "projection_key")
     if _PROJECTION_KEY_RE.fullmatch(candidate.projection_key) is None:
         raise ValueError("projection_key must be a deployable architecture key")
@@ -161,6 +180,43 @@ def _validate_projection_candidate(candidate: ArchitectureProjectionCandidate) -
             raise ValueError(
                 "dependency_references must contain architecture-only dependency reference values"
             )
+
+
+def _snapshot_projection_candidate(
+    candidate: ArchitectureProjectionCandidate,
+) -> _CandidateEvidenceSnapshot:
+    """Detach evaluated candidate values from the caller-owned object before handoff evidence."""
+    _validate_projection_candidate(candidate)
+    snapshot = _CandidateEvidenceSnapshot(
+        projection_key=candidate.projection_key,
+        projection_kind=candidate.projection_kind,
+        source_revision=candidate.source_revision,
+        source_repository=candidate.source_repository,
+        effective_from=candidate.effective_from,
+        effective_to=candidate.effective_to,
+        recorded_at=candidate.recorded_at,
+        owner_reference=candidate.owner_reference,
+        dependency_references=candidate.dependency_references,
+    )
+    _validate_projection_candidate(snapshot)
+    return snapshot
+
+
+def _candidate_sha256(candidate: _CandidateEvidenceSnapshot) -> str:
+    """Hash the exact allowed architecture evidence so readiness cannot move between candidates."""
+    payload = {
+        "dependency_references": list(candidate.dependency_references),
+        "effective_from": candidate.effective_from.isoformat(),
+        "effective_to": candidate.effective_to.isoformat() if candidate.effective_to is not None else None,
+        "owner_reference": candidate.owner_reference,
+        "projection_key": candidate.projection_key,
+        "projection_kind": candidate.projection_kind.value,
+        "recorded_at": candidate.recorded_at.isoformat(),
+        "source_repository": candidate.source_repository,
+        "source_revision": candidate.source_revision,
+    }
+    canonical = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _validate_contract_release(release: ContractReleaseEvidence) -> None:
@@ -230,13 +286,15 @@ def evaluate_projection_readiness(
     """Return fail-closed readiness without conferring Enterprise Architecture truth."""
     if type(candidate) is not ArchitectureProjectionCandidate:
         raise TypeError("candidate must be an ArchitectureProjectionCandidate")
-    _validate_projection_candidate(candidate)
+    candidate_snapshot = _snapshot_projection_candidate(candidate)
+    candidate_sha256 = _candidate_sha256(candidate_snapshot)
     if contract_release is None:
         return ProjectionReadiness(
             ready=False,
             truth_status=ProjectionTruthStatus.PROPOSED,
-            source_repository=candidate.source_repository,
-            source_revision=candidate.source_revision,
+            source_repository=candidate_snapshot.source_repository,
+            source_revision=candidate_snapshot.source_revision,
+            candidate_sha256=candidate_sha256,
             reason="context_graph_contract_release_not_admitted",
             next_action="install_approved_context_graph_contract_release",
             contract_commit_sha=None,
@@ -252,8 +310,9 @@ def evaluate_projection_readiness(
         return ProjectionReadiness(
             ready=False,
             truth_status=ProjectionTruthStatus.PROPOSED,
-            source_repository=candidate.source_repository,
-            source_revision=candidate.source_revision,
+            source_repository=candidate_snapshot.source_repository,
+            source_revision=candidate_snapshot.source_revision,
+            candidate_sha256=candidate_sha256,
             reason="context_graph_contract_admission_not_verified",
             next_action="verify_released_context_graph_contract_admission",
             contract_commit_sha=contract_release.commit_sha,
@@ -268,8 +327,9 @@ def evaluate_projection_readiness(
     return ProjectionReadiness(
         ready=True,
         truth_status=ProjectionTruthStatus.PROPOSED,
-        source_repository=candidate.source_repository,
-        source_revision=candidate.source_revision,
+        source_repository=candidate_snapshot.source_repository,
+        source_revision=candidate_snapshot.source_revision,
+        candidate_sha256=candidate_sha256,
         reason="projection_candidate_ready",
         next_action="submit_candidate_to_enterprise_architecture_owner",
         contract_commit_sha=contract_release.commit_sha,
