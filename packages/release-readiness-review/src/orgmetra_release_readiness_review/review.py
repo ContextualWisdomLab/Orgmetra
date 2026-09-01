@@ -13,6 +13,7 @@ from weakref import WeakKeyDictionary
 
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+_NULL_REVISION = "0" * 40
 _ACTOR_PATTERN = re.compile(
     r"^actor:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 )
@@ -42,6 +43,8 @@ def _validate_revision(value: object) -> str:
     text = _require_exact_text(value, "candidate_revision_sha")
     if not _REVISION_PATTERN.fullmatch(text):
         raise ValueError("candidate_revision_sha must be 40 lower-case hexadecimal characters")
+    if text == _NULL_REVISION:
+        raise ValueError("candidate_revision_sha must not use the null Git revision")
     return text
 
 

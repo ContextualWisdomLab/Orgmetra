@@ -66,6 +66,7 @@ def test_canonical_evidence_is_value_minimized_and_deterministic() -> None:
     [
         ("candidate_revision_sha", "A" * 40),
         ("candidate_revision_sha", "a" * 39),
+        ("candidate_revision_sha", "0" * 40),
         ("source_artifact_digest_sha256", "g" * 64),
         ("requester_actor_reference", "actor:not-a-uuid"),
         ("reviewer_actor_reference", "actor:123e4567-e89b-12d3-a456-426614174000"),
