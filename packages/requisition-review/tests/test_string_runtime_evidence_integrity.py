@@ -178,3 +178,26 @@ def test_rejects_postconstruction_governance_mutation_before_evidence(
 
     with pytest.raises(ValueError):
         packet.canonical_json()
+
+
+def test_canonical_evidence_emits_the_same_snapshot_that_was_validated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Prevent an interleaving mutation from changing fields after validation."""
+    packet = _packet()
+    packet_type = type(packet)
+    original_validate = packet_type._validate_human_review_fields
+
+    def validate_then_mutate(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        """Reproduce another thread changing live state after validation returns."""
+        original_validate(self, *args, **kwargs)
+        object.__setattr__(self, "review_state", "approved")
+
+    monkeypatch.setattr(
+        packet_type,
+        "_validate_human_review_fields",
+        validate_then_mutate,
+    )
+
+    payload = json.loads(packet.canonical_json())
+    assert payload["review_state"] == "requires_human_approval"
