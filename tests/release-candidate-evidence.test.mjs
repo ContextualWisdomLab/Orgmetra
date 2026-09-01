@@ -30,13 +30,20 @@ function pythonVersion() {
   return result.stdout.trim();
 }
 
-function buildEvidence(outputDirectory, sourceSha) {
+function buildEvidence(outputDirectory, sourceSha, env = process.env) {
   const result = spawnSync(
     'python',
     [builderPath, '--output-dir', outputDirectory, '--source-sha', sourceSha],
-    { cwd: repoRoot, encoding: 'utf8' },
+    { cwd: repoRoot, encoding: 'utf8', env },
   );
   assert.equal(result.status, 0, result.stderr || result.stdout);
+}
+
+function runBuilderProbe(program) {
+  return spawnSync('python', ['-c', program, builderPath], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
 }
 
 function sha256(path) {
@@ -94,7 +101,17 @@ test('release candidate evidence is deterministic and binds the exact source rev
     assert.equal(
       provenance.predicate.buildDefinition.internalParameters.pythonRuntime,
       exactPythonVersion,
-      'provenance must record the exact Python runtime that can affect archive bytes',
+      'provenance must record the exact Python runtime that can affect evidence bytes',
+    );
+    assert.equal(
+      provenance.predicate.buildDefinition.internalParameters.pythonImplementation,
+      'CPython',
+      'provenance must bind the Python implementation as well as its version',
+    );
+    assert.equal(
+      provenance.predicate.buildDefinition.internalParameters.compressionImplementation,
+      'orgmetra-stored-gzip-v1',
+      'provenance must name the repository-owned deterministic gzip encoding',
     );
     const workflow = readFileSync(workflowPath, 'utf8');
     assert.match(
@@ -110,11 +127,98 @@ test('release candidate evidence is deterministic and binds the exact source rev
     assert.equal(
       workflow.includes('runs-on: ubuntu-24.04'),
       true,
-      'release evidence must bind its supported GitHub-hosted runner image explicitly',
+      'release evidence keeps an explicit supported hosted OS while evidence bytes avoid host zlib',
     );
-    assert.equal(provenance.predicate.runDetails.builder.id.includes('release-candidate-evidence-quality.yml'), true);
+    assert.equal(
+      readFileSync(builderPath, 'utf8').includes('gzip.compress('),
+      false,
+      'release evidence must not delegate artifact bytes to host zlib through gzip.compress',
+    );
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      assert.equal(provenance.predicate.runDetails.builder.id.includes('release-candidate-evidence-quality.yml'), true);
+      assert.equal(provenance.predicate.buildDefinition.internalParameters.builderEnvironment, 'github-actions');
+    } else {
+      assert.equal(provenance.predicate.runDetails.builder.id.endsWith('#local-builder-v1'), true);
+      assert.equal(provenance.predicate.buildDefinition.internalParameters.builderEnvironment, 'local');
+    }
   } finally {
     rmSync(first, { recursive: true, force: true });
     rmSync(second, { recursive: true, force: true });
+  }
+});
+
+test('runtime validation rejects a non-CPython implementation even at the pinned version', () => {
+  const probe = runBuilderProbe(`
+import importlib.util
+import sys
+spec = importlib.util.spec_from_file_location("orgmetra_release_evidence", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module.platform.python_version = lambda: module._EXPECTED_PYTHON_RUNTIME
+module.platform.python_implementation = lambda: "PyPy"
+try:
+    module._validate_runtime()
+except module.ReleaseEvidenceError as error:
+    assert "PyPy" in str(error)
+else:
+    raise AssertionError("non-CPython runtime must fail closed")
+`);
+  assert.equal(probe.status, 0, probe.stderr || probe.stdout);
+});
+
+test('non-exact Python requirements receive distinct stable bom-ref identities', () => {
+  const probe = runBuilderProbe(`
+import importlib.util
+import sys
+spec = importlib.util.spec_from_file_location("orgmetra_release_evidence", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+first_requirement = "example>=1; python_version < '4'"
+second_requirement = "example<1; python_version < '4'"
+marker_variant = "example>=1; python_version < '3.14'"
+first = module._pypi_ref("example", None, first_requirement)
+assert first == module._pypi_ref("example", None, first_requirement)
+assert first != module._pypi_ref("example", None, second_requirement)
+assert first != module._pypi_ref("example", None, marker_variant)
+assert first.startswith("urn:orgmetra:pypi-requirement:example:")
+`);
+  assert.equal(probe.status, 0, probe.stderr || probe.stdout);
+});
+
+test('repository-owned gzip encoder is deterministic and standards-readable', () => {
+  const probe = runBuilderProbe(`
+import gzip
+import importlib.util
+import sys
+spec = importlib.util.spec_from_file_location("orgmetra_release_evidence", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+payload = (b"Orgmetra release evidence\\n" * 10000) + bytes(range(256))
+first = module._deterministic_gzip(payload)
+second = module._deterministic_gzip(payload)
+assert first == second
+assert gzip.decompress(first) == payload
+assert first[:3] == b"\\x1f\\x8b\\x08"
+assert first[9] == 255
+`);
+  assert.equal(probe.status, 0, probe.stderr || probe.stdout);
+});
+
+test('local execution never claims the GitHub Actions builder identity', () => {
+  const sourceSha = gitHead();
+  const output = mkdtempSync(join(tmpdir(), 'orgmetra-release-evidence-local-'));
+  const localEnv = { ...process.env };
+  delete localEnv.GITHUB_ACTIONS;
+  delete localEnv.GITHUB_WORKFLOW_REF;
+  delete localEnv.GITHUB_RUN_ID;
+
+  try {
+    buildEvidence(output, sourceSha, localEnv);
+    const provenance = readJson(join(output, 'orgmetra.provenance.json'));
+    assert.equal(provenance.predicate.runDetails.builder.id.endsWith('#local-builder-v1'), true);
+    assert.equal(provenance.predicate.runDetails.builder.id.includes('/actions/workflows/'), false);
+    assert.equal(provenance.predicate.buildDefinition.internalParameters.builderEnvironment, 'local');
+  } finally {
+    rmSync(output, { recursive: true, force: true });
   }
 });
