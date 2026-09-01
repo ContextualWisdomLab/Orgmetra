@@ -248,6 +248,23 @@ assert components["pytest-cov"]["bom-ref"] in parent["dependsOn"]
   assert.equal(probe.status, 0, probe.stderr || probe.stdout);
 });
 
+test('workflow retains inspectable candidate evidence outside the source checkout', () => {
+  const workflow = readFileSync(workflowPath, 'utf8');
+  assert.match(
+    workflow,
+    /python scripts\/build-release-candidate-evidence\.py --output-dir "\$\{\{ runner\.temp \}\}\/orgmetra-release-candidate" --source-sha "\$\{EXPECTED_SHA\}"/,
+    'workflow must build the exact candidate into runner temp for review',
+  );
+  assert.match(
+    workflow,
+    /uses: actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/,
+    'workflow must use the immutable upload-artifact v4.6.2 commit',
+  );
+  assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/orgmetra-release-candidate\//);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.match(workflow, /retention-days: 7/);
+});
+
 test('repository-owned gzip encoder is deterministic and standards-readable', () => {
   const probe = runBuilderProbe(`
 import gzip
