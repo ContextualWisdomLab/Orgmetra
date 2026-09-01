@@ -37,14 +37,39 @@ _SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _PYTHON_REQUIREMENT_PATTERN = re.compile(
     r"^\s*(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]+\])?\s*(?P<constraint>[^;]*)"
 )
-_PYTHON_CONCRETE_VERSION = (
-    r"(?:(?:[0-9]+)!)?[0-9]+(?:\.[0-9]+)*"
-    r"(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?"
-    r"(?:\+[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*)?"
-)
-_EXACT_VERSION_PATTERN = re.compile(
-    rf"^==\s*(?P<version>{_PYTHON_CONCRETE_VERSION})\s*$",
-    re.IGNORECASE,
+_PYTHON_VERSION_PATTERN = re.compile(
+    r"""
+    ^\s*v?
+    (?:
+        (?:(?P<epoch>[0-9]+)!)?
+        (?P<release>[0-9]+(?:\.[0-9]+)*)
+        (?P<pre>
+            [-_.]?
+            (?P<pre_l>a|b|c|rc|alpha|beta|pre|preview)
+            [-_.]?
+            (?P<pre_n>[0-9]+)?
+        )?
+        (?P<post>
+            (?:-(?P<post_n1>[0-9]+))
+            |
+            (?:
+                [-_.]?
+                (?P<post_l>post|rev|r)
+                [-_.]?
+                (?P<post_n2>[0-9]+)?
+            )
+        )?
+        (?P<dev>
+            [-_.]?
+            (?P<dev_l>dev)
+            [-_.]?
+            (?P<dev_n>[0-9]+)?
+        )?
+    )
+    (?:\+(?P<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?
+    \s*$
+    """,
+    re.VERBOSE | re.IGNORECASE,
 )
 _SEMVER_NUMBER = r"(?:0|[1-9][0-9]*)"
 _SEMVER_PRERELEASE_IDENTIFIER = (
@@ -240,16 +265,61 @@ def _npm_ref(name: str, version: str | None, requirement: str) -> str:
     return f"urn:orgmetra:npm-requirement:{encoded_name}:{requirement_digest}"
 
 
+def _normalize_python_version(candidate: str) -> str | None:
+    """Normalize one concrete PEP 440 version using the specification's accepted spellings."""
+    match = _PYTHON_VERSION_PATTERN.fullmatch(candidate)
+    if match is None:
+        return None
+
+    epoch_number = int(match.group("epoch") or "0")
+    normalized = f"{epoch_number}!" if epoch_number else ""
+    normalized += ".".join(str(int(part)) for part in match.group("release").split("."))
+
+    pre_label = match.group("pre_l")
+    if pre_label is not None:
+        pre_aliases = {
+            "a": "a",
+            "alpha": "a",
+            "b": "b",
+            "beta": "b",
+            "c": "rc",
+            "rc": "rc",
+            "pre": "rc",
+            "preview": "rc",
+        }
+        normalized += pre_aliases[pre_label.lower()]
+        normalized += str(int(match.group("pre_n") or "0"))
+
+    if match.group("post") is not None:
+        post_number = match.group("post_n1") or match.group("post_n2") or "0"
+        normalized += f".post{int(post_number)}"
+
+    if match.group("dev") is not None:
+        normalized += f".dev{int(match.group('dev_n') or '0')}"
+
+    local = match.group("local")
+    if local is not None:
+        local_parts = re.split(r"[-_.]", local.lower())
+        normalized_local = ".".join(
+            str(int(part)) if part.isdigit() else part for part in local_parts
+        )
+        normalized += f"+{normalized_local}"
+    return normalized
+
+
 def _python_requirement(requirement: str) -> tuple[str, str | None]:
-    """Extract the distribution name and an exact concrete pin when one is declared."""
+    """Extract the distribution name and normalized exact pin when unconditional and concrete."""
     match = _PYTHON_REQUIREMENT_PATTERN.match(requirement)
     if match is None:
         raise ReleaseEvidenceError(f"unsupported Python dependency declaration: {requirement!r}")
     name = match.group("name")
     constraint = match.group("constraint").strip()
-    version_match = _EXACT_VERSION_PATTERN.fullmatch(constraint)
-    version = version_match.group("version") if version_match else None
-    return name, version
+    if ";" in requirement or not constraint.startswith("==") or constraint.startswith("==="):
+        return name, None
+    candidate = constraint[2:].strip()
+    if not candidate or "*" in candidate:
+        return name, None
+    return name, _normalize_python_version(candidate)
 
 
 def _add_component(
