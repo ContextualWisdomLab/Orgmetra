@@ -216,7 +216,7 @@ class ReleaseReadinessReviewPacket:
         }
 
     def _verified_payload(self) -> dict[str, object]:
-        """Return one verified payload or fail closed after evidence mutation."""
+        """Return the exact validated payload snapshot or fail closed on mutation."""
         self._require_fixed_governance()
         _validate_revision(self.candidate_revision_sha)
         for field_name in _DIGEST_FIELDS:
@@ -226,7 +226,25 @@ class ReleaseReadinessReviewPacket:
         _validate_timestamp(self.reviewed_at, "reviewed_at")
         _validate_timestamp(self.recorded_at, "recorded_at")
         _validate_evidence_version(self.evidence_version)
+
         payload = self._payload()
+        _validate_revision(payload["candidate_revision_sha"])
+        for field_name in _DIGEST_FIELDS:
+            _validate_digest(payload[field_name], field_name)
+        _validate_actor_reference(payload["requester_actor_reference"], "requester_actor_reference")
+        _validate_actor_reference(payload["reviewer_actor_reference"], "reviewer_actor_reference")
+        _validate_evidence_version(payload["evidence_version"])
+        for field_name in (
+            "purpose_code",
+            "review_state",
+            "integration_state",
+            "release_authority",
+            "next_action",
+            "reviewed_at",
+            "recorded_at",
+        ):
+            _require_exact_text(payload[field_name], field_name)
+
         digest = sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
         with self._issuance_lock:
             issued_digest = self._issuance_digests.get(self)
