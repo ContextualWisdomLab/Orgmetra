@@ -108,6 +108,12 @@ class ProjectionReadiness:
     contract_provenance_attestation_sha256: str | None
 
 
+def _require_exact_text(value: object, field_name: str) -> None:
+    """Reject text subclasses whose comparison behavior can contradict stored evidence."""
+    if type(value) is not str:
+        raise TypeError(f"{field_name} must be exact built-in text")
+
+
 def _require_aware_time(value: datetime, field_name: str) -> None:
     """Reject naive timestamps because projection evidence is compared across systems."""
     if value.utcoffset() is None:
@@ -116,12 +122,15 @@ def _require_aware_time(value: datetime, field_name: str) -> None:
 
 def _validate_projection_candidate(candidate: ArchitectureProjectionCandidate) -> None:
     """Revalidate the exact retained candidate before any readiness decision is issued."""
+    _require_exact_text(candidate.projection_key, "projection_key")
     if _PROJECTION_KEY_RE.fullmatch(candidate.projection_key) is None:
         raise ValueError("projection_key must be a deployable architecture key")
     if not isinstance(candidate.projection_kind, ProjectionKind):
         raise ValueError("projection_kind must be a supported architecture kind")
+    _require_exact_text(candidate.source_repository, "source_repository")
     if candidate.source_repository != _ORGMETRA_REPOSITORY:
         raise ValueError("source_repository must be the Orgmetra source repository")
+    _require_exact_text(candidate.source_revision, "source_revision")
     if _SHA_RE.fullmatch(candidate.source_revision) is None:
         raise ValueError("source_revision must be a 40-character lowercase source revision")
     _require_aware_time(candidate.effective_from, "effective_from")
@@ -130,29 +139,34 @@ def _validate_projection_candidate(candidate: ArchitectureProjectionCandidate) -
         _require_aware_time(candidate.effective_to, "effective_to")
         if candidate.effective_to <= candidate.effective_from:
             raise ValueError("effective_to must be after effective_from")
+    _require_exact_text(candidate.owner_reference, "owner_reference")
     if _OWNER_REFERENCE_RE.fullmatch(candidate.owner_reference) is None:
         raise ValueError("owner_reference must be a non-person architecture owner reference")
     if type(candidate.dependency_references) is not tuple:
         raise ValueError("dependency_references must remain an immutable tuple")
-    if any(
-        _DEPENDENCY_REFERENCE_RE.fullmatch(reference) is None
-        for reference in candidate.dependency_references
-    ):
-        raise ValueError(
-            "dependency_references must contain architecture-only dependency reference values"
-        )
+    for reference in candidate.dependency_references:
+        _require_exact_text(reference, "dependency reference")
+        if _DEPENDENCY_REFERENCE_RE.fullmatch(reference) is None:
+            raise ValueError(
+                "dependency_references must contain architecture-only dependency reference values"
+            )
 
 
 def _validate_contract_release(release: ContractReleaseEvidence) -> None:
     """Require immutable-looking evidence for the exact foreign contract authority."""
+    _require_exact_text(release.repository, "repository")
     if release.repository != _CONTRACT_REPOSITORY:
         raise ValueError("unexpected contract repository")
+    _require_exact_text(release.release_tag, "release_tag")
     if _RELEASE_TAG_RE.fullmatch(release.release_tag) is None:
         raise ValueError("release_tag must be a stable release tag")
+    _require_exact_text(release.commit_sha, "commit_sha")
     if _SHA_RE.fullmatch(release.commit_sha) is None:
         raise ValueError("commit_sha must be a 40-character lowercase commit SHA")
+    _require_exact_text(release.asset_sha256, "asset_sha256")
     if _SHA256_RE.fullmatch(release.asset_sha256) is None:
         raise ValueError("asset_sha256 must be a 64-character lowercase SHA-256")
+    _require_exact_text(release.release_state, "release_state")
     if release.release_state != "published":
         raise ValueError("release_state must identify a published release")
     if release.verified_at.utcoffset() is None:
@@ -164,22 +178,31 @@ def _validate_contract_admission(
     release: ContractReleaseEvidence,
 ) -> None:
     """Bind semantic, bundle, and provenance evidence to the exact released bytes."""
+    _require_exact_text(admission.contract_commit_sha, "contract_commit_sha")
     if _SHA_RE.fullmatch(admission.contract_commit_sha) is None:
         raise ValueError("contract_commit_sha must be a 40-character lowercase contract commit SHA")
+    _require_exact_text(admission.contract_asset_sha256, "contract_asset_sha256")
     if _SHA256_RE.fullmatch(admission.contract_asset_sha256) is None:
         raise ValueError("contract_asset_sha256 must be a 64-character lowercase contract asset SHA-256")
+    _require_exact_text(admission.conformance_receipt_sha256, "conformance_receipt_sha256")
     if _SHA256_RE.fullmatch(admission.conformance_receipt_sha256) is None:
         raise ValueError(
             "conformance_receipt_sha256 must be a 64-character lowercase conformance receipt SHA-256"
         )
+    _require_exact_text(admission.bundle_manifest_sha256, "bundle_manifest_sha256")
     if _SHA256_RE.fullmatch(admission.bundle_manifest_sha256) is None:
         raise ValueError(
             "bundle_manifest_sha256 must be a 64-character lowercase bundle manifest SHA-256"
         )
+    _require_exact_text(
+        admission.provenance_attestation_sha256,
+        "provenance_attestation_sha256",
+    )
     if _SHA256_RE.fullmatch(admission.provenance_attestation_sha256) is None:
         raise ValueError(
             "provenance_attestation_sha256 must be a 64-character lowercase provenance attestation SHA-256"
         )
+    _require_exact_text(admission.admission_state, "admission_state")
     if admission.admission_state != "verified":
         raise ValueError("admission_state must identify verified contract admission")
     if admission.verified_at.utcoffset() is None:
