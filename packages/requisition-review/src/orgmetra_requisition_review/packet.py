@@ -129,9 +129,23 @@ class RequisitionReviewPacket:
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
+        self._validate_governance_fields()
+        object.__setattr__(self, "generated_at", _freeze_timestamp(self.generated_at))
+        self._validate_human_review_fields()
+
+    def _validate_governance_fields(self) -> None:
+        """Validate mutable-by-runtime fields before they can become audit evidence."""
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
-        _validate_reference(self.requisition_reference, "requisition", "requisition_reference")
-        _validate_reference(self.job_profile_reference, "job_profile", "job_profile_reference")
+        _validate_reference(
+            self.requisition_reference,
+            "requisition",
+            "requisition_reference",
+        )
+        _validate_reference(
+            self.job_profile_reference,
+            "job_profile",
+            "job_profile_reference",
+        )
         _validate_reference(
             self.job_requirements_reference,
             "job_requirements",
@@ -153,10 +167,17 @@ class RequisitionReviewPacket:
             "actor",
             "hiring_manager_actor_reference",
         )
-        _validate_reference(self.approver_actor_reference, "actor", "approver_actor_reference")
+        _validate_reference(
+            self.approver_actor_reference,
+            "actor",
+            "approver_actor_reference",
+        )
         if self.hiring_manager_actor_reference == self.approver_actor_reference:
             raise ValueError("hiring manager and approver must be different actor references")
-        if type(self.requested_opening_count) is not int or not 1 <= self.requested_opening_count <= 100:
+        if (
+            type(self.requested_opening_count) is not int
+            or not 1 <= self.requested_opening_count <= 100
+        ):
             raise ValueError("requested_opening_count must be an integer from 1 through 100")
         if self.position_record_reference is not None:
             _validate_reference(
@@ -172,7 +193,9 @@ class RequisitionReviewPacket:
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive requisition reason")
-        object.__setattr__(self, "generated_at", _freeze_timestamp(self.generated_at))
+
+    def _validate_human_review_fields(self) -> None:
+        """Keep retained evidence pending the same accountable human-review contract."""
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for requisition approval")
         if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
@@ -186,9 +209,12 @@ class RequisitionReviewPacket:
 
     def canonical_json(self) -> str:
         """Return deterministic canonical JSON for immutable audit correlation."""
+        self._validate_governance_fields()
+        generated_at = _canonical_timestamp(self.generated_at)
+        self._validate_human_review_fields()
         payload = {
             "approver_actor_reference": self.approver_actor_reference,
-            "generated_at": _canonical_timestamp(self.generated_at),
+            "generated_at": generated_at,
             "headcount_authorization_reference": self.headcount_authorization_reference,
             "hiring_manager_actor_reference": self.hiring_manager_actor_reference,
             "human_confirmation_required": self.human_confirmation_required,
