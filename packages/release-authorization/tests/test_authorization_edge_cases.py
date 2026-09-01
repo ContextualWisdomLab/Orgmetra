@@ -57,8 +57,11 @@ def _verification() -> ReleaseControlVerification:
         integrated_default_head_sha=_CANDIDATE,
         ruleset_evidence_digest_sha256="2" * 64,
         required_gate_evidence_digest_sha256="3" * 64,
-        qualifying_independent_approval_count=2,
-        last_push_approved=True,
+        qualifying_independent_approval_count=0,
+        last_push_approved=False,
+        required_approving_review_count=0,
+        require_last_push_approval=False,
+        synthetic_required_reviewers_absent=True,
         review_threads_resolved=True,
         all_required_gates_green=True,
         routine_admin_bypass_disabled=True,
@@ -180,8 +183,11 @@ def test_control_and_audit_runtime_constructors_reject_malformed_evidence() -> N
             integrated_default_head_sha=_CANDIDATE,
             ruleset_evidence_digest_sha256="2" * 64,
             required_gate_evidence_digest_sha256="3" * 64,
-            qualifying_independent_approval_count=2,
-            last_push_approved=True,
+            qualifying_independent_approval_count=0,
+            last_push_approved=False,
+            required_approving_review_count=0,
+            require_last_push_approval=False,
+            synthetic_required_reviewers_absent=True,
             review_threads_resolved=True,
             all_required_gates_green=True,
             routine_admin_bypass_disabled=True,
@@ -193,8 +199,11 @@ def test_control_and_audit_runtime_constructors_reject_malformed_evidence() -> N
             integrated_default_head_sha=_CANDIDATE,
             ruleset_evidence_digest_sha256="bad",
             required_gate_evidence_digest_sha256="3" * 64,
-            qualifying_independent_approval_count=2,
-            last_push_approved=True,
+            qualifying_independent_approval_count=0,
+            last_push_approved=False,
+            required_approving_review_count=0,
+            require_last_push_approval=False,
+            synthetic_required_reviewers_absent=True,
             review_threads_resolved=True,
             all_required_gates_green=True,
             routine_admin_bypass_disabled=True,
@@ -210,7 +219,14 @@ def test_control_and_audit_runtime_constructors_reject_malformed_evidence() -> N
 
 @pytest.mark.parametrize(
     "field_name",
-    ["last_push_approved", "review_threads_resolved", "all_required_gates_green", "routine_admin_bypass_disabled"],
+    [
+        "last_push_approved",
+        "require_last_push_approval",
+        "synthetic_required_reviewers_absent",
+        "review_threads_resolved",
+        "all_required_gates_green",
+        "routine_admin_bypass_disabled",
+    ],
 )
 def test_control_boolean_fields_require_exact_bool(field_name: str) -> None:
     """Reject integer-like or polymorphic control truth values."""
@@ -219,8 +235,11 @@ def test_control_boolean_fields_require_exact_bool(field_name: str) -> None:
         "integrated_default_head_sha": _CANDIDATE,
         "ruleset_evidence_digest_sha256": "2" * 64,
         "required_gate_evidence_digest_sha256": "3" * 64,
-        "qualifying_independent_approval_count": 2,
-        "last_push_approved": True,
+        "qualifying_independent_approval_count": 0,
+        "last_push_approved": False,
+        "required_approving_review_count": 0,
+        "require_last_push_approval": False,
+        "synthetic_required_reviewers_absent": True,
         "review_threads_resolved": True,
         "all_required_gates_green": True,
         "routine_admin_bypass_disabled": True,
@@ -234,14 +253,17 @@ def test_control_boolean_fields_require_exact_bool(field_name: str) -> None:
 def test_final_trust_types_reject_subclass_overrides() -> None:
     """Keep trust-bearing container semantics final."""
     with pytest.raises(TypeError, match="ReleaseControlVerification"):
+
         class ForgedControl(ReleaseControlVerification):
             """Attempt to override live-control semantics."""
 
     with pytest.raises(TypeError, match="ReleaseAuditReceipt"):
+
         class ForgedAudit(ReleaseAuditReceipt):
             """Attempt to override audit semantics."""
 
     with pytest.raises(TypeError, match="ReleaseAuthorizationReceipt"):
+
         class ForgedReceipt(ReleaseAuthorizationReceipt):
             """Attempt to override issued release authority."""
 
