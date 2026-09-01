@@ -19,9 +19,9 @@ _ORGMETRA_SHA = "9e3e4847510e1e612b48474ba42b177b8ed824df"
 _CONTRACT_SHA = "99d230991b9d48fbf87489e0b375b7bbf09d8559"
 
 
-def test_mutated_projection_candidate_is_revalidated_before_readiness() -> None:
-    """Reject an exact candidate whose frozen fields were rewritten after construction."""
-    candidate = ArchitectureProjectionCandidate(
+def _candidate() -> ArchitectureProjectionCandidate:
+    """Return one valid projection candidate for runtime-tampering tests."""
+    return ArchitectureProjectionCandidate(
         projection_key="orgmetra.people-api",
         projection_kind=ProjectionKind.APPLICATION,
         source_revision=_ORGMETRA_SHA,
@@ -32,9 +32,11 @@ def test_mutated_projection_candidate_is_revalidated_before_readiness() -> None:
         owner_reference="team:orgmetra",
         dependency_references=("service:keyverse",),
     )
-    object.__setattr__(candidate, "owner_reference", "person:employee-123")
 
-    release = ContractReleaseEvidence(
+
+def _release() -> ContractReleaseEvidence:
+    """Return valid release-shape evidence for candidate-integrity tests."""
+    return ContractReleaseEvidence(
         repository="ContextualWisdomLab/context-graph-contracts",
         release_tag="v1.0.0",
         commit_sha=_CONTRACT_SHA,
@@ -42,7 +44,11 @@ def test_mutated_projection_candidate_is_revalidated_before_readiness() -> None:
         release_state="published",
         verified_at=datetime(2026, 9, 1, 6, 1, tzinfo=UTC),
     )
-    admission = ContractAdmissionEvidence(
+
+
+def _admission() -> ContractAdmissionEvidence:
+    """Return valid admission-shape evidence for candidate-integrity tests."""
+    return ContractAdmissionEvidence(
         contract_commit_sha=_CONTRACT_SHA,
         contract_asset_sha256="a" * 64,
         conformance_receipt_sha256="b" * 64,
@@ -52,5 +58,20 @@ def test_mutated_projection_candidate_is_revalidated_before_readiness() -> None:
         verified_at=datetime(2026, 9, 1, 6, 2, tzinfo=UTC),
     )
 
+
+def test_mutated_projection_candidate_is_revalidated_before_readiness() -> None:
+    """Reject an exact candidate whose frozen fields were rewritten after construction."""
+    candidate = _candidate()
+    object.__setattr__(candidate, "owner_reference", "person:employee-123")
+
     with pytest.raises(ValueError, match="non-person architecture owner reference"):
-        evaluate_projection_readiness(candidate, release, admission)
+        evaluate_projection_readiness(candidate, _release(), _admission())
+
+
+def test_mutated_candidate_collection_cannot_reintroduce_mutable_evidence() -> None:
+    """Reject dependency evidence rewritten to a mutable collection after construction."""
+    candidate = _candidate()
+    object.__setattr__(candidate, "dependency_references", ["service:keyverse"])
+
+    with pytest.raises(ValueError, match="immutable tuple"):
+        evaluate_projection_readiness(candidate, _release(), _admission())
