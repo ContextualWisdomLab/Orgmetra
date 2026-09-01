@@ -101,6 +101,7 @@ def test_untrusted_contract_release_evidence_is_rejected(
     ("field", "value", "message"),
     [
         ("projection_key", "person:1234", "deployable architecture key"),
+        ("projection_kind", "person", "supported architecture kind"),
         ("source_repository", "ContextualWisdomLab/enterprise-architecture-core", "Orgmetra source repository"),
         ("source_revision", "not-a-sha", "40-character lowercase source revision"),
         ("effective_from", datetime(2026, 9, 1), "timezone-aware effective_from"),
@@ -128,6 +129,13 @@ def test_hr_record_or_invalid_temporal_data_cannot_cross_into_ea_projection(
     """Keep authoritative HR facts and malformed bitemporal evidence out of EA."""
     with pytest.raises(ValueError, match=message):
         _candidate(**{field: value})
+
+
+def test_open_ended_or_future_ended_effective_intervals_are_accepted() -> None:
+    """Accept an ordered effective interval while keeping recorded time separate."""
+    candidate = _candidate(effective_to=datetime(2026, 9, 2, tzinfo=UTC))
+
+    assert candidate.effective_to == datetime(2026, 9, 2, tzinfo=UTC)
 
 
 def test_candidate_collections_are_immutable_after_validation() -> None:
