@@ -71,9 +71,8 @@ class ArchitectureProjectionCandidate:
         _validate_projection_candidate(self)
 
 
-@dataclass(frozen=True, slots=True)
-class ContractReleaseEvidence:
-    """Trusted-control-plane observation of a published context-graph release."""
+class ContractReleaseEvidence(NamedTuple):
+    """Immutable trusted-control-plane observation of a published context-graph release."""
 
     repository: str
     release_tag: str
@@ -83,9 +82,8 @@ class ContractReleaseEvidence:
     verified_at: datetime
 
 
-@dataclass(frozen=True, slots=True)
-class ContractAdmissionEvidence:
-    """Trusted evidence that exact released contract bytes passed semantic admission."""
+class ContractAdmissionEvidence(NamedTuple):
+    """Immutable evidence that exact released contract bytes passed semantic admission."""
 
     contract_commit_sha: str
     contract_asset_sha256: str

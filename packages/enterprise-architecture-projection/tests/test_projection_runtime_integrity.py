@@ -128,8 +128,15 @@ def test_comparison_overriding_source_repository_cannot_claim_orgmetra_authority
 
 def test_comparison_overriding_admission_commit_cannot_bind_different_release() -> None:
     """Reject behavior-bearing digest text before exact release/admission equality checks."""
-    admission = _admission()
-    object.__setattr__(admission, "contract_commit_sha", _AlwaysEqualText("f" * 40))
+    admission = ContractAdmissionEvidence(
+        contract_commit_sha=_AlwaysEqualText("f" * 40),
+        contract_asset_sha256="a" * 64,
+        conformance_receipt_sha256="b" * 64,
+        bundle_manifest_sha256="c" * 64,
+        provenance_attestation_sha256="d" * 64,
+        admission_state="verified",
+        verified_at=datetime(2026, 9, 1, 6, 2, tzinfo=UTC),
+    )
 
     with pytest.raises(TypeError, match="contract_commit_sha must be exact built-in text"):
         evaluate_projection_readiness(_candidate(), _release(), admission)
@@ -155,11 +162,13 @@ def test_behavior_bearing_candidate_timezone_cannot_enter_projection_evidence() 
 
 def test_behavior_bearing_release_timezone_cannot_rewrite_verification_evidence() -> None:
     """Reject mutable timezone behavior before release verification evidence is trusted."""
-    release = _release()
-    object.__setattr__(
-        release,
-        "verified_at",
-        datetime(2026, 9, 1, 6, 1, tzinfo=_MutableTimezone()),
+    release = ContractReleaseEvidence(
+        repository="ContextualWisdomLab/context-graph-contracts",
+        release_tag="v1.0.0",
+        commit_sha=_CONTRACT_SHA,
+        asset_sha256="a" * 64,
+        release_state="published",
+        verified_at=datetime(2026, 9, 1, 6, 1, tzinfo=_MutableTimezone()),
     )
 
     with pytest.raises(TypeError, match="verified_at must use exact built-in datetime and timezone"):
