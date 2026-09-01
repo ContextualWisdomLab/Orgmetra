@@ -48,7 +48,7 @@ def _readiness_packet():
 
 
 class _Authority:
-    """Return fresh acquisition-grade control evidence for the exact candidate."""
+    """Return fresh solo-maintainer control evidence for the exact candidate."""
 
     def verify_release_controls(self, readiness_packet: object, tag_name: str) -> ReleaseControlVerification:
         """Return controls fresh at the beginning of authorization."""
@@ -59,8 +59,11 @@ class _Authority:
             integrated_default_head_sha=_CANDIDATE,
             ruleset_evidence_digest_sha256="2" * 64,
             required_gate_evidence_digest_sha256="3" * 64,
-            qualifying_independent_approval_count=2,
-            last_push_approved=True,
+            qualifying_independent_approval_count=0,
+            last_push_approved=False,
+            required_approving_review_count=0,
+            require_last_push_approval=False,
+            synthetic_required_reviewers_absent=True,
             review_threads_resolved=True,
             all_required_gates_green=True,
             routine_admin_bypass_disabled=True,
