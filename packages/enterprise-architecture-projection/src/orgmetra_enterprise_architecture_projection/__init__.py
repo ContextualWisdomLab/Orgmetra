@@ -99,6 +99,8 @@ class ProjectionReadiness:
 
     ready: bool
     truth_status: ProjectionTruthStatus
+    source_repository: str
+    source_revision: str
     reason: str
     next_action: str
     contract_commit_sha: str | None
@@ -233,6 +235,8 @@ def evaluate_projection_readiness(
         return ProjectionReadiness(
             ready=False,
             truth_status=ProjectionTruthStatus.PROPOSED,
+            source_repository=candidate.source_repository,
+            source_revision=candidate.source_revision,
             reason="context_graph_contract_release_not_admitted",
             next_action="install_approved_context_graph_contract_release",
             contract_commit_sha=None,
@@ -248,6 +252,8 @@ def evaluate_projection_readiness(
         return ProjectionReadiness(
             ready=False,
             truth_status=ProjectionTruthStatus.PROPOSED,
+            source_repository=candidate.source_repository,
+            source_revision=candidate.source_revision,
             reason="context_graph_contract_admission_not_verified",
             next_action="verify_released_context_graph_contract_admission",
             contract_commit_sha=contract_release.commit_sha,
@@ -262,6 +268,8 @@ def evaluate_projection_readiness(
     return ProjectionReadiness(
         ready=True,
         truth_status=ProjectionTruthStatus.PROPOSED,
+        source_repository=candidate.source_repository,
+        source_revision=candidate.source_revision,
         reason="projection_candidate_ready",
         next_action="submit_candidate_to_enterprise_architecture_owner",
         contract_commit_sha=contract_release.commit_sha,
