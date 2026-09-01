@@ -119,7 +119,7 @@ def test_timestamp_runtime_and_chronology_fail_closed() -> None:
 
     kwargs = valid_kwargs()
     kwargs["reviewed_at"] = datetime(2020, 1, 1)
-    with pytest.raises(ValueError, match="timezone.utc"):
+    with pytest.raises(ValueError, match=r"timezone\.utc"):
         build_release_readiness_review_packet(**kwargs)
 
     kwargs = valid_kwargs()
@@ -182,7 +182,7 @@ def test_post_issuance_digest_subclass_fails_before_canonical_export() -> None:
     """Equality-compatible digest subtypes cannot escape as canonical evidence."""
     packet = build_valid()
     object.__setattr__(packet, "security_evidence_digest_sha256", ForgedText(DIGEST_A))
-    with pytest.raises(ValueError, match="security_evidence_digest_sha256.*exact string"):
+    with pytest.raises(ValueError, match=r"security_evidence_digest_sha256.*exact string"):
         packet.canonical_document()
 
 

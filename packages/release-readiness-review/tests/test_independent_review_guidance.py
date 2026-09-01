@@ -33,6 +33,11 @@ def test_next_action_requires_fresh_independent_review_without_hardcoding_approv
 
     next_action = build_release_readiness_review_packet(**values).canonical_document()["next_action"]
     assert type(next_action) is str
-    assert "fresh qualifying independent review" in next_action
+    assert (
+        "require fresh qualifying independent review evidence without manufacturing approval"
+        in next_action
+    )
+    assert "not require fresh qualifying independent review" not in next_action.lower()
+    assert "do not require fresh qualifying independent review" not in next_action.lower()
     assert "two approvals" not in next_action
     assert "approval after the last push" not in next_action
