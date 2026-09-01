@@ -130,6 +130,16 @@ def test_one_lifecycle_receipt_cannot_stand_in_for_both_results() -> None:
         )
 
 
+def test_admission_verification_cannot_predate_release_verification() -> None:
+    """Reject lifecycle evidence that was allegedly verified before release identity."""
+    with pytest.raises(ValueError, match="cannot predate release verification"):
+        evaluate_projection_readiness(
+            _candidate(),
+            _release(),
+            _admission(verified_at=datetime(2026, 9, 1, 6, 0, tzinfo=UTC)),
+        )
+
+
 def test_ready_projection_retains_compatibility_and_migration_receipts() -> None:
     """Do not authorize handoff without exact compatibility and migration evidence."""
     decision = evaluate_projection_readiness(_candidate(), _release(), _admission())
