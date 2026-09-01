@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, tzinfo
 
 import pytest
 
@@ -29,6 +29,22 @@ class _AlwaysEqualText(str):
     def __ne__(self, other: object) -> bool:
         """Claim inequality with no comparison target."""
         return False
+
+
+class _MutableTimezone(tzinfo):
+    """Adversarial timezone whose offset can change after evidence construction."""
+
+    def __init__(self) -> None:
+        """Start by impersonating UTC."""
+        self.offset = timedelta(0)
+
+    def utcoffset(self, value: datetime | None) -> timedelta:
+        """Return caller-controlled offset state."""
+        return self.offset
+
+    def dst(self, value: datetime | None) -> timedelta:
+        """Return no daylight-saving adjustment."""
+        return timedelta(0)
 
 
 def _candidate() -> ArchitectureProjectionCandidate:
@@ -109,3 +125,34 @@ def test_comparison_overriding_admission_commit_cannot_bind_different_release() 
 
     with pytest.raises(TypeError, match="contract_commit_sha must be exact built-in text"):
         evaluate_projection_readiness(_candidate(), _release(), admission)
+
+
+def test_behavior_bearing_candidate_timezone_cannot_enter_projection_evidence() -> None:
+    """Reject mutable timezone behavior before it becomes retained bitemporal evidence."""
+    timezone = _MutableTimezone()
+
+    with pytest.raises(TypeError, match="effective_from must use exact built-in datetime and timezone"):
+        ArchitectureProjectionCandidate(
+            projection_key="orgmetra.people-api",
+            projection_kind=ProjectionKind.APPLICATION,
+            source_revision=_ORGMETRA_SHA,
+            source_repository="ContextualWisdomLab/Orgmetra",
+            effective_from=datetime(2026, 9, 1, tzinfo=timezone),
+            effective_to=None,
+            recorded_at=datetime(2026, 9, 1, 6, 0, tzinfo=UTC),
+            owner_reference="team:orgmetra",
+            dependency_references=("service:keyverse",),
+        )
+
+
+def test_behavior_bearing_release_timezone_cannot_rewrite_verification_evidence() -> None:
+    """Reject mutable timezone behavior before release verification evidence is trusted."""
+    release = _release()
+    object.__setattr__(
+        release,
+        "verified_at",
+        datetime(2026, 9, 1, 6, 1, tzinfo=_MutableTimezone()),
+    )
+
+    with pytest.raises(TypeError, match="verified_at must use exact built-in datetime and timezone"):
+        evaluate_projection_readiness(_candidate(), release, _admission())
