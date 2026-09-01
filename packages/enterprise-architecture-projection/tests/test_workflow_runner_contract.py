@@ -1,3 +1,5 @@
+"""Protect the EA projection workflow from floating hosted-runner aliases."""
+
 from pathlib import Path
 
 
