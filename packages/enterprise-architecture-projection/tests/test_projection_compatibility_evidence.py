@@ -94,6 +94,32 @@ def test_semantic_admission_without_lifecycle_receipts_remains_blocked() -> None
     assert decision.contract_migration_receipt_sha256 is None
 
 
+@pytest.mark.parametrize(
+    ("field", "retained_compatibility", "retained_migration"),
+    [
+        ("compatibility_receipt_sha256", None, _MIGRATION_SHA256),
+        ("migration_receipt_sha256", _COMPATIBILITY_SHA256, None),
+    ],
+)
+def test_each_missing_lifecycle_receipt_blocks_projection_independently(
+    field: str,
+    retained_compatibility: str | None,
+    retained_migration: str | None,
+) -> None:
+    """Require both lifecycle receipts instead of accepting whichever one exists."""
+    decision = evaluate_projection_readiness(
+        _candidate(),
+        _release(),
+        _admission(**{field: None}),
+    )
+
+    assert decision.ready is False
+    assert decision.reason == "context_graph_contract_lifecycle_evidence_not_verified"
+    assert decision.next_action == "verify_context_graph_contract_compatibility_and_migration"
+    assert decision.contract_compatibility_receipt_sha256 == retained_compatibility
+    assert decision.contract_migration_receipt_sha256 == retained_migration
+
+
 def test_ready_projection_retains_compatibility_and_migration_receipts() -> None:
     """Do not authorize handoff without exact compatibility and migration evidence."""
     decision = evaluate_projection_readiness(_candidate(), _release(), _admission())
