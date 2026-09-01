@@ -21,6 +21,8 @@ jobs:
     name: Reproducible source, SBOM and provenance evidence
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,8 +30,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Prove exact candidate checkout
-        env:
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -43,6 +43,15 @@ jobs:
           check-latest: false
       - name: Exercise reproducible release-candidate evidence contract
         run: node --test tests/release-candidate-evidence.test.mjs
+      - name: Build inspectable candidate evidence
+        run: python scripts/build-release-candidate-evidence.py --output-dir "${{ runner.temp }}/orgmetra-release-candidate" --source-sha "${EXPECTED_SHA}"
+      - name: Upload candidate evidence for review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: orgmetra-release-candidate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/orgmetra-release-candidate/
+          if-no-files-found: error
+          retention-days: 7
       - name: Validate repository contracts
         run: npm run validate
       - name: Prove clean checkout
