@@ -222,6 +222,31 @@ assert components["pre-npm"]["version"] == "1.2.3-beta.1+build.5"
   assert.equal(probe.status, 0, probe.stderr || probe.stdout);
 });
 
+test('PEP 440 exact aliases normalize to package identities while conditional pins remain declarations', () => {
+  const probe = runBuilderProbe(`
+import importlib.util
+import json
+import sys
+spec = importlib.util.spec_from_file_location("orgmetra_release_evidence", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+pyproject = b'''[project]\nname = "pep440-fixture"\nversion = "1.0.0"\ndependencies = [\n  "implicit-post==1.0-1",\n  "rev-post==1.0_rev_1",\n  "preview==1.0-preview1",\n  "leading-v==v1.2",\n  "local-build==1.0+ubuntu-1",\n  "wildcard==1.*",\n  "conditional==1.2.3; python_version < '4'",\n]\n'''
+sbom = json.loads(module._build_sbom("a" * 40, "b" * 64, {
+    "fixtures/python/pyproject.toml": pyproject,
+}))
+components = {component["name"]: component for component in sbom["components"]}
+assert components["implicit-post"]["version"] == "1.0.post1"
+assert components["rev-post"]["version"] == "1.0.post1"
+assert components["preview"]["version"] == "1.0rc1"
+assert components["leading-v"]["version"] == "1.2"
+assert components["local-build"]["version"] == "1.0+ubuntu.1"
+for name in ("wildcard", "conditional"):
+    assert "version" not in components[name]
+    assert "purl" not in components[name]
+`);
+  assert.equal(probe.status, 0, probe.stderr || probe.stdout);
+});
+
 test('PEP 621 optional dependency groups remain visible in the declaration SBOM', () => {
   const probe = runBuilderProbe(`
 import importlib.util
