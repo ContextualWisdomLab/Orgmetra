@@ -14,7 +14,7 @@
 | Readiness review remains non-authorizing | PR #118 package contract | Exact `ReleaseReadinessReviewPacket` runtime type plus verified parent canonical evidence |
 | Reviewed candidate equals freshly integrated default head | PR #126 authorization boundary | `ReleaseControlVerification` snapshot + mismatch regressions |
 | Fresh control evidence | PR #126 authorization boundary | Authorization instant and durable audit `recorded_at` must both be at or after verification and no more than 60 seconds later; stale-control and audit-latency regressions fail closed |
-| Independent review is acquisition-grade | PR #126 policy | At least two qualifying independent non-author approvals and last-push approval required even when the live ruleset is weaker |
+| Solo-maintainer approval policy is explicit and satisfiable | PR #126 policy | `required_approving_review_count == 0`, `require_last_push_approval is False`, and `synthetic_required_reviewers_absent is True`; observed approval count/last-push approval remain evidence but are not mandatory release gates |
 | Review conversations resolved | PR #126 policy | `review_threads_resolved is True` regression |
 | All applicable release gates terminal GREEN | PR #126 policy | `all_required_gates_green is True` regression; queued/pending/skipped/cancelled/absent evidence cannot authorize |
 | Routine administrator bypass disabled | PR #126 policy | `routine_admin_bypass_disabled is True` regression; current live `always` bypass therefore fails closed |
@@ -29,11 +29,11 @@ The 60-second window is a conservative Orgmetra operational bound, not a claim o
 
 ## Dependency and integration order
 
-1. PR #118 must become integrated default-branch truth with fresh exact-head evidence and qualifying approvals.
+1. PR #118 must become integrated default-branch truth with fresh exact-head deterministic evidence under the effective solo-maintainer governance contract.
 2. PR #126 must then retarget to fresh `develop`; no parent check, review, or mergeability evidence transfers.
 3. Every applicable Foundation/Recovery/SAST/Security/package/coverage/release-control workflow must materially execute and be terminal GREEN on the new exact child head.
 4. Only a later publication owner may consume the exact audited authorization receipt, and actual release/version/tag creation remains prohibited until the integrated protected head satisfies the complete release gate set together.
 
 ## Current external-control reality
 
-Fresh organization ruleset 18156473 remains active on `~DEFAULT_BRANCH`, but currently requires only one approval, does not require last-push approval, and allows OrganizationAdmin routine `always` bypass. Issue #89 owns that organization-settings gap. The release-authorization boundary intentionally fails closed unless the stronger commercial controls are actually proven; it does not create a local workflow shim that pretends the organization setting is fixed.
+Fresh organization ruleset 18156473 remains active on `~DEFAULT_BRANCH`, but currently requires one approval and allows OrganizationAdmin routine `always` bypass while last-push approval is disabled. Issue #89 owns that organization-settings gap. GitHub's current ruleset documentation permits zero required approvals and specifies that most-recent-push approval requires someone other than the latest pusher. The release-authorization boundary therefore fails closed unless the satisfiable target—zero required approvals, no last-push requirement, no synthetic required reviewer, resolved conversations, exact-head GREEN gates, and no routine administrator bypass—is actually proven. It does not create a local workflow shim that pretends the organization setting is fixed.
