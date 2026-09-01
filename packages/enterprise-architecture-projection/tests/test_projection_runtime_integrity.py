@@ -19,6 +19,18 @@ _ORGMETRA_SHA = "9e3e4847510e1e612b48474ba42b177b8ed824df"
 _CONTRACT_SHA = "99d230991b9d48fbf87489e0b375b7bbf09d8559"
 
 
+class _AlwaysEqualText(str):
+    """Adversarial text whose comparison behavior lies about its stored value."""
+
+    def __eq__(self, other: object) -> bool:
+        """Claim equality with every comparison target."""
+        return True
+
+    def __ne__(self, other: object) -> bool:
+        """Claim inequality with no comparison target."""
+        return False
+
+
 def _candidate() -> ArchitectureProjectionCandidate:
     """Return one valid projection candidate for runtime-tampering tests."""
     return ArchitectureProjectionCandidate(
@@ -75,3 +87,25 @@ def test_mutated_candidate_collection_cannot_reintroduce_mutable_evidence() -> N
 
     with pytest.raises(ValueError, match="immutable tuple"):
         evaluate_projection_readiness(candidate, _release(), _admission())
+
+
+def test_comparison_overriding_source_repository_cannot_claim_orgmetra_authority() -> None:
+    """Reject behavior-bearing text that can lie about the candidate source repository."""
+    candidate = _candidate()
+    object.__setattr__(
+        candidate,
+        "source_repository",
+        _AlwaysEqualText("ContextualWisdomLab/not-orgmetra"),
+    )
+
+    with pytest.raises(TypeError, match="source_repository must be exact built-in text"):
+        evaluate_projection_readiness(candidate, _release(), _admission())
+
+
+def test_comparison_overriding_admission_commit_cannot_bind_different_release() -> None:
+    """Reject behavior-bearing digest text before exact release/admission equality checks."""
+    admission = _admission()
+    object.__setattr__(admission, "contract_commit_sha", _AlwaysEqualText("f" * 40))
+
+    with pytest.raises(TypeError, match="contract_commit_sha must be exact built-in text"):
+        evaluate_projection_readiness(_candidate(), _release(), admission)
