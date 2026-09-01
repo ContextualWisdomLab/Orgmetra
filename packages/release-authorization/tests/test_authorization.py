@@ -63,8 +63,11 @@ def _verification(**overrides: object) -> ReleaseControlVerification:
         "integrated_default_head_sha": _CANDIDATE,
         "ruleset_evidence_digest_sha256": _RULESET_DIGEST,
         "required_gate_evidence_digest_sha256": _GATE_DIGEST,
-        "qualifying_independent_approval_count": 2,
-        "last_push_approved": True,
+        "qualifying_independent_approval_count": 0,
+        "last_push_approved": False,
+        "required_approving_review_count": 0,
+        "require_last_push_approval": False,
+        "synthetic_required_reviewers_absent": True,
         "review_threads_resolved": True,
         "all_required_gates_green": True,
         "routine_admin_bypass_disabled": True,
@@ -176,6 +179,7 @@ def test_authorization_rejects_noncanonical_release_tags(tag_name: str) -> None:
 
 def test_authorization_rejects_string_subclass_tag() -> None:
     """Reject caller-defined tag text before regex or authority operations."""
+
     class ForgedText(str):
         """Represent untrusted polymorphic text."""
 
@@ -209,8 +213,9 @@ def test_authorization_requires_separate_release_actor(release_actor: str) -> No
     [
         ({"integrated_default_head_sha": _OTHER_REVISION}, "integrated default-branch head"),
         ({"candidate_revision_sha": _OTHER_REVISION}, "candidate revision"),
-        ({"qualifying_independent_approval_count": 1}, "two qualifying"),
-        ({"last_push_approved": False}, "last push"),
+        ({"required_approving_review_count": 1}, "required approving review count"),
+        ({"require_last_push_approval": True}, "last-push approval requirement"),
+        ({"synthetic_required_reviewers_absent": False}, "synthetic required reviewers"),
         ({"review_threads_resolved": False}, "review threads"),
         ({"all_required_gates_green": False}, "required gate"),
         ({"routine_admin_bypass_disabled": False}, "administrator bypass"),
@@ -230,11 +235,21 @@ def test_authorization_rejects_weak_or_mismatched_live_controls(overrides: dict[
         )
 
 
-def test_authorization_revalidates_mutated_control_verification() -> None:
+@pytest.mark.parametrize(
+    ("field_name", "value", "message"),
+    [
+        ("required_approving_review_count", 1, "required approving review count"),
+        ("qualifying_independent_approval_count", True, "qualifying independent approval count"),
+        ("last_push_approved", 1, "last_push_approved"),
+    ],
+)
+def test_authorization_revalidates_mutated_control_verification(
+    field_name: str, value: object, message: str
+) -> None:
     """Reject a verification object weakened after its own construction."""
     verification = _verification()
-    object.__setattr__(verification, "qualifying_independent_approval_count", 1)
-    with pytest.raises(ReleaseAuthorizationError, match="two qualifying"):
+    object.__setattr__(verification, field_name, value)
+    with pytest.raises(ReleaseAuthorizationError, match=message):
         authorize_release_candidate(
             readiness_packet=_readiness_packet(),
             tag_name="v1.2.3",
@@ -297,6 +312,12 @@ def test_weak_control_runtime_types_fail_closed() -> None:
     """Require exact primitive evidence for live repository controls."""
     with pytest.raises(ValueError, match="approval count"):
         _verification(qualifying_independent_approval_count=True)
+    with pytest.raises(ValueError, match="approval count"):
+        _verification(qualifying_independent_approval_count=-1)
+    with pytest.raises(ValueError, match="required_approving_review_count"):
+        _verification(required_approving_review_count=True)
+    with pytest.raises(ValueError, match="required_approving_review_count"):
+        _verification(required_approving_review_count=-1)
     with pytest.raises(ValueError, match="last_push_approved"):
         _verification(last_push_approved=1)
     with pytest.raises(ValueError, match="verified_at"):
@@ -305,6 +326,7 @@ def test_weak_control_runtime_types_fail_closed() -> None:
 
 def test_release_actor_runtime_type_and_shape_fail_closed() -> None:
     """Reject non-opaque release actor evidence before authority resolution."""
+
     class ForgedText(str):
         """Represent caller-defined actor text."""
 
