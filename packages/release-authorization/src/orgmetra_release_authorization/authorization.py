@@ -24,7 +24,6 @@ _REASON_CODE = "approved_commercial_release"
 _RELEASE_AUTHORITY = "authorized_for_exact_release_operation"
 _PUBLICATION_STATE = "not_published"
 _EVIDENCE_VERSION = 1
-_MINIMUM_APPROVALS = 2
 _MAX_CONTROL_AGE = timedelta(seconds=60)
 _RECEIPT_CAPABILITY = object()
 
@@ -126,6 +125,9 @@ class ReleaseControlVerification:
     required_gate_evidence_digest_sha256: str
     qualifying_independent_approval_count: int
     last_push_approved: bool
+    required_approving_review_count: int
+    require_last_push_approval: bool
+    synthetic_required_reviewers_absent: bool
     review_threads_resolved: bool
     all_required_gates_green: bool
     routine_admin_bypass_disabled: bool
@@ -143,8 +145,12 @@ class ReleaseControlVerification:
         _validate_digest(self.required_gate_evidence_digest_sha256, "required_gate_evidence_digest_sha256")
         if type(self.qualifying_independent_approval_count) is not int or self.qualifying_independent_approval_count < 0:
             raise ValueError("approval count must be an exact non-negative integer")
+        if type(self.required_approving_review_count) is not int or self.required_approving_review_count < 0:
+            raise ValueError("required_approving_review_count must be an exact non-negative integer")
         for field_name in (
             "last_push_approved",
+            "require_last_push_approval",
+            "synthetic_required_reviewers_absent",
             "review_threads_resolved",
             "all_required_gates_green",
             "routine_admin_bypass_disabled",
@@ -161,10 +167,13 @@ class ReleaseControlVerification:
             "integrated_default_head_sha": self.integrated_default_head_sha,
             "last_push_approved": self.last_push_approved,
             "qualifying_independent_approval_count": self.qualifying_independent_approval_count,
+            "require_last_push_approval": self.require_last_push_approval,
+            "required_approving_review_count": self.required_approving_review_count,
             "required_gate_evidence_digest_sha256": self.required_gate_evidence_digest_sha256,
             "review_threads_resolved": self.review_threads_resolved,
             "routine_admin_bypass_disabled": self.routine_admin_bypass_disabled,
             "ruleset_evidence_digest_sha256": self.ruleset_evidence_digest_sha256,
+            "synthetic_required_reviewers_absent": self.synthetic_required_reviewers_absent,
             "verified_at": self.verified_at,
         }
 
@@ -305,7 +314,7 @@ class ReleaseAuthorizationReceipt:
 
 
 def _validate_control_snapshot(payload: dict[str, object], candidate_revision_sha: str) -> None:
-    """Apply Orgmetra's acquisition-grade release policy to one fresh snapshot."""
+    """Apply Orgmetra's solo-maintainer release policy to one fresh snapshot."""
     try:
         candidate = _validate_revision(payload["candidate_revision_sha"], "candidate_revision_sha")
         integrated = _validate_revision(payload["integrated_default_head_sha"], "integrated_default_head_sha")
@@ -314,15 +323,25 @@ def _validate_control_snapshot(payload: dict[str, object], candidate_revision_sh
         _validate_timestamp(payload["verified_at"], "verified_at")
     except (KeyError, ValueError) as exc:
         raise ReleaseAuthorizationError("ReleaseControlVerification contains invalid trust evidence") from exc
+
     approvals = payload.get("qualifying_independent_approval_count")
-    if type(approvals) is not int or approvals < _MINIMUM_APPROVALS:
-        raise ReleaseAuthorizationError("release authorization requires at least two qualifying independent approvals")
+    if type(approvals) is not int or approvals < 0:
+        raise ReleaseAuthorizationError("qualifying independent approval count must be an exact non-negative integer")
+    if type(payload.get("last_push_approved")) is not bool:
+        raise ReleaseAuthorizationError("last_push_approved must be an exact boolean")
+
+    required_approvals = payload.get("required_approving_review_count")
+    if type(required_approvals) is not int or required_approvals != 0:
+        raise ReleaseAuthorizationError("release authorization requires required approving review count to be exactly zero")
+    if payload.get("require_last_push_approval") is not False:
+        raise ReleaseAuthorizationError("release authorization requires the last-push approval requirement to be disabled")
+    if payload.get("synthetic_required_reviewers_absent") is not True:
+        raise ReleaseAuthorizationError("release authorization requires synthetic required reviewers to be absent")
+
     if candidate != candidate_revision_sha:
         raise ReleaseAuthorizationError("verified candidate revision does not match readiness evidence")
     if integrated != candidate_revision_sha:
         raise ReleaseAuthorizationError("candidate is not the freshly integrated default-branch head")
-    if payload.get("last_push_approved") is not True:
-        raise ReleaseAuthorizationError("release authorization requires approval after the last push")
     if payload.get("review_threads_resolved") is not True:
         raise ReleaseAuthorizationError("release authorization requires all review threads to be resolved")
     if payload.get("all_required_gates_green") is not True:
