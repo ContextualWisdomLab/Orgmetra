@@ -1,6 +1,6 @@
 # Product and technical gap baseline
 
-Verified: 2026-09-01 (Asia/Seoul).
+Verified: 2026-09-02 (Asia/Seoul).
 
 This document is the commercialization baseline for **Orgmetra**, not a frozen PR inventory and not merge authorization. It records product responsibility, shipped-vs-planned truth, causal control-plane blockers, and the next highest-leverage buyer gaps. Volatile PR heads, workflow run IDs, queue counts, review snapshots, mergeability, and base tips must be fetched live before every action rather than copied here until stale.
 
@@ -74,7 +74,7 @@ There are currently no published GitHub releases. Do not manufacture a release m
 
 The effective control plane for Orgmetra `develop` is inherited organization ruleset **18156473 — `CWL Central required workflows`**. Classic branch-protection fields alone are not authoritative while that ruleset is active.
 
-Fresh live reads on 2026-09-01 show the inherited ruleset still has:
+Fresh live reads on 2026-09-02 show the inherited ruleset still has:
 
 - `required_approving_review_count = 1`;
 - `require_last_push_approval = false`;
@@ -82,8 +82,11 @@ Fresh live reads on 2026-09-01 show the inherited ruleset still has:
 - `dismiss_stale_reviews_on_push = true`;
 - required review-thread resolution enabled;
 - central required workflows enabled;
+- only merge and squash allowed;
 - deletion and non-fast-forward protection enabled; and
 - an `OrganizationAdmin` actor with routine `bypass_mode = always`.
+
+The central `.github` repository's own active ruleset **17921150 — `Lock default branch`** is a second live drift surface. Its approval count is already `0`, last-push approval is disabled, required reviewers are empty, review-thread resolution and deletion/non-fast-forward protection are enabled, but it still permits `rebase` and still exposes `OrganizationAdmin/always` bypass. Source-level audit policy and both live ruleset payloads must converge before governance repair is complete.
 
 This is not the current governance decision. `.github#772` establishes that the present one-human-maintainer fleet cannot satisfy a positive generic independent-human approval count. The compliant repair is **not** a bot approval, service-account approval, self-approval, credential widening, or routine administrator bypass. The current target is:
 
@@ -94,19 +97,19 @@ This is not the current governance decision. `.github#772` establishes that the 
 - exact-current-head OpenCode, Noema, Strix, Security/SAST, Dependency Review, coverage, provenance and repository-specific quality gates remain fail-closed;
 - deletion and non-fast-forward protection remain enabled;
 - no routine `OrganizationAdmin/always` bypass; emergency repair belongs to a separately governed, time-bounded, auditable break-glass path; and
-- merge-method policy must not be weakened merely to solve the reviewer-capacity problem.
+- only merge and squash are accepted by the current audit; merge-method policy must not be weakened merely to solve the reviewer-capacity problem.
 
 Causal owner: `ContextualWisdomLab/.github`, primarily issues #772/#1351/#1340/#1200 and the existing ruleset-audit writer PR #1176. Orgmetra issue #89 mirrors this dependency. Orgmetra must not add a leaf workflow shim to simulate organization settings.
 
-**Canary:** Orgmetra PR #88 (`fix/job-analysis-http-request-budgets`) was freshly verified on exact head `0dc4f09cc3c87829ea1e3a0e3dc0188df07ad8cd` with all observed deterministic hosted gates terminal-success and its review thread resolved, but with zero qualifying approvals. It is intentionally retained as a governance canary: after the central policy repair, an unchanged sole-author GREEN PR must no longer be blocked *only* by a reviewer identity that does not exist. Do not merge it through administrator bypass to fake that proof.
+**Canary:** Orgmetra PR #88 (`fix/job-analysis-http-request-budgets`) was freshly re-verified on exact head `0dc4f09cc3c87829ea1e3a0e3dc0188df07ad8cd`; the currently returned repository workflow runs are terminal-success, combined CodeRabbit/Devin statuses are successful, and its only inline review thread is resolved. It has no qualifying independent approval. It is intentionally retained as a governance canary: after the central policy repair, an unchanged sole-author GREEN PR must no longer be blocked *only* by a reviewer identity that does not exist. Do not merge it through administrator bypass to fake that proof.
 
 ## 6. Required-workflow availability: P0 evidence blocker
 
 The central Dependency Review workflow now correctly fails closed: it proceeds to the pinned GitHub Dependency Review action only after an exact `BASE_SHA...HEAD_SHA` dependency comparison returns transport success and HTTP `200`.
 
-Repeated public, non-fork Orgmetra canaries currently receive HTTP `403` with successful transport from the GitHub dependency comparison endpoint. This is **missing authoritative dependency-diff evidence**, not a clean review. OSV, Trivy, Scorecard, SAST or other scanners remain useful independent controls but are not semantic substitutes for Dependency Review.
+Fresh current-head evidence again reproduced the incident on a public, non-fork Orgmetra PR: exact head checkout and SHA verification succeeded on an Ubuntu 24.04 hosted runner; the comparison transport succeeded (`curl_exit=0`) but GitHub returned HTTP `403`, so the Dependency Review action was correctly skipped and the job failed closed. Independent OSV, Trivy and Scorecard jobs on that same Security run succeeded. This remains **missing authoritative dependency-diff evidence**, not a clean review, and those independent scanners are not semantic substitutes for Dependency Review.
 
-Causal owner/incident: `.github#810`. The original fail-open source defect is already repaired; the remaining work is an authorized GitHub/account/repository availability or configuration repair followed by an unchanged exact-head canary where the comparison returns `200` and the pinned action actually executes. Do not weaken the gate or create an Orgmetra-specific skip.
+Causal owner/incident: `.github#810`. The original fail-open source defect is already repaired; the remaining work is an authorized GitHub/account/repository availability or configuration repair followed by an unchanged exact-head canary where the comparison returns `200` and the pinned action actually executes. Do not infer the root cause from the status code alone, weaken the gate, or create an Orgmetra-specific skip.
 
 ## 7. Current baseline-writer evidence
 
@@ -118,7 +121,7 @@ Do **not** store PR #100's own current head inside this file: changing this file
 
 | Gap | Current evidence | Buyer consequence | Owner / next acceptance evidence | Priority |
 | --- | --- | --- | --- | --- |
-| **GOV-01 satisfiable protected-branch admission** | live inherited ruleset still requires one unavailable generic approval and routine admin bypass | GREEN work cannot progress normally; bypass would undermine evidence | `.github#772/#1351`, PR #1176; live post-change ruleset read + unchanged Orgmetra canary | **P0** |
+| **GOV-01 satisfiable protected-branch admission** | inherited ruleset still requires one unavailable generic approval and routine admin bypass; owner-repository ruleset still permits rebase and routine admin bypass | GREEN work cannot progress normally; bypass would undermine evidence | `.github#772/#1351`, PR #1176; live post-change ruleset reads + unchanged Orgmetra canary | **P0** |
 | **SEC-01 authoritative Dependency Review availability** | exact public comparisons repeatedly return 403; central gate correctly fails closed | merge queue can remain blocked without trustworthy dependency diff | `.github#810`; exact unchanged canary returns 200 and pinned action executes | **P0** |
 | **REL-01 integrated release evidence** | no published release; large active PR stack; no single integrated protected head yet proves the complete gate set | buyers cannot install/deploy a supported release | merge causal dependency roots in order; protected-head release checklist + signed/provenance evidence + CHANGELOG/version | **P0** |
 | **UX-01 role workspaces are design truth, not shipped UI** | P1 workspaces appear in PRD/wireframes/Storybook contract; protected branch shows foundation package and design tokens but no indexed React workspace implementation | buyers cannot complete the lifecycle through a coherent UI | executable Job Architecture → Candidate Evidence → Hiring Decision → Employee Profile → Validation vertical slice; Storybook, screenshots, WCAG 2.2 AA, interaction/i18n/edge-state tests | **P1** |
