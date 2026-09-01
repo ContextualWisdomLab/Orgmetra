@@ -52,6 +52,7 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0012-governed-migration-handoff.md',
   'docs/adr/0013-governed-requisition-review-packet.md',
   'docs/adr/0014-job-analysis-snapshot-persistence.md',
+  'docs/adr/0131-employment-work-capacity-persistence.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
@@ -68,6 +69,9 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
   'database/migrations/0013_job_analysis_snapshot.sql',
+  'database/migrations/0031_employment_work_capacity_persistence.sql',
+  'database/migrations/0032_employment_work_capacity_forward_chain.sql',
+  'database/migrations/0033_employment_work_capacity_canonical_evidence.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -89,6 +93,9 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/test_job_analysis_snapshot_postgres.sh',
+  'tests/test_employment_work_capacity_canonical_evidence_postgres.sh',
+  'tests/test_employment_work_capacity_persistence_postgres.sh',
+  'tests/test_employment_work_capacity_retroactive_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
@@ -129,7 +136,8 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
   'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
   'outbox_event', 'outbox_delivery_record', 'outbox_delivery_escalation_record',
-  'people_mutation_idempotency_record', 'inbox_event', 'integration_delivery'
+  'people_mutation_idempotency_record', 'employment_work_capacity_record',
+  'employment_work_capacity_version', 'inbox_event', 'integration_delivery'
 ]);
 
 /** Migration-backed logical objects whose persisted table identity must not drift. */
@@ -139,7 +147,9 @@ export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
   'job_analysis_task_item',
   'job_analysis_ksao_item',
   'job_analysis_task_ksao_link',
-  'job_analysis_write_command'
+  'job_analysis_write_command',
+  'employment_work_capacity_record',
+  'employment_work_capacity_version'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
