@@ -1,10 +1,10 @@
 """Fail-closed admission boundary for Orgmetra Enterprise Architecture projections.
 
 This package validates Orgmetra-owned architecture projection candidates and the
-release, semantic-conformance, bundle-identity, and provenance evidence required
-before they can be handed to the Enterprise Architecture owner. It does not
-serialize the foreign context-graph contract, write Enterprise Architecture
-state, or transport authoritative HR records.
+release, semantic-conformance, bundle-identity, provenance, compatibility, and
+migration evidence required before they can be handed to the Enterprise
+Architecture owner. It does not serialize the foreign context-graph contract,
+write Enterprise Architecture state, or transport authoritative HR records.
 """
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ class ContractReleaseEvidence(NamedTuple):
 
 
 class ContractAdmissionEvidence(NamedTuple):
-    """Immutable evidence that exact released contract bytes passed semantic admission."""
+    """Immutable evidence that exact released bytes passed semantic and lifecycle admission."""
 
     contract_commit_sha: str
     contract_asset_sha256: str
@@ -92,6 +92,8 @@ class ContractAdmissionEvidence(NamedTuple):
     provenance_attestation_sha256: str
     admission_state: str
     verified_at: datetime
+    compatibility_receipt_sha256: str | None = None
+    migration_receipt_sha256: str | None = None
 
 
 class _CandidateEvidenceSnapshot(NamedTuple):
@@ -123,6 +125,8 @@ class ProjectionReadiness(NamedTuple):
     contract_conformance_receipt_sha256: str | None
     contract_bundle_manifest_sha256: str | None
     contract_provenance_attestation_sha256: str | None
+    contract_compatibility_receipt_sha256: str | None
+    contract_migration_receipt_sha256: str | None
 
 
 def _require_exact_text(value: object, field_name: str) -> None:
@@ -237,11 +241,26 @@ def _validate_contract_release(release: ContractReleaseEvidence) -> None:
     _require_aware_time(release.verified_at, "verified_at", "verification time")
 
 
+def _validate_optional_receipt(
+    value: str | None,
+    field_name: str,
+    receipt_name: str,
+) -> None:
+    """Validate an optional lifecycle receipt when a control plane supplies one."""
+    if value is None:
+        return
+    _require_exact_text(value, field_name)
+    if _SHA256_RE.fullmatch(value) is None:
+        raise ValueError(
+            f"{field_name} must be a 64-character lowercase {receipt_name} SHA-256"
+        )
+
+
 def _validate_contract_admission(
     admission: ContractAdmissionEvidence,
     release: ContractReleaseEvidence,
 ) -> None:
-    """Bind semantic, bundle, and provenance evidence to the exact released bytes."""
+    """Bind semantic, bundle, provenance, and lifecycle evidence to released bytes."""
     _require_exact_text(admission.contract_commit_sha, "contract_commit_sha")
     if _SHA_RE.fullmatch(admission.contract_commit_sha) is None:
         raise ValueError("contract_commit_sha must be a 40-character lowercase contract commit SHA")
@@ -274,6 +293,53 @@ def _validate_contract_admission(
         raise ValueError("admission commit must match released commit")
     if admission.contract_asset_sha256 != release.asset_sha256:
         raise ValueError("admission asset must match released asset")
+    _validate_optional_receipt(
+        admission.compatibility_receipt_sha256,
+        "compatibility_receipt_sha256",
+        "compatibility receipt",
+    )
+    _validate_optional_receipt(
+        admission.migration_receipt_sha256,
+        "migration_receipt_sha256",
+        "migration receipt",
+    )
+
+
+def _blocked_readiness(
+    candidate: _CandidateEvidenceSnapshot,
+    candidate_sha256: str,
+    reason: str,
+    next_action: str,
+    release: ContractReleaseEvidence | None = None,
+    admission: ContractAdmissionEvidence | None = None,
+) -> ProjectionReadiness:
+    """Build one immutable fail-closed decision without dropping verified evidence."""
+    return ProjectionReadiness(
+        ready=False,
+        truth_status=ProjectionTruthStatus.PROPOSED,
+        source_repository=candidate.source_repository,
+        source_revision=candidate.source_revision,
+        candidate_sha256=candidate_sha256,
+        reason=reason,
+        next_action=next_action,
+        contract_commit_sha=release.commit_sha if release is not None else None,
+        contract_asset_sha256=release.asset_sha256 if release is not None else None,
+        contract_conformance_receipt_sha256=(
+            admission.conformance_receipt_sha256 if admission is not None else None
+        ),
+        contract_bundle_manifest_sha256=(
+            admission.bundle_manifest_sha256 if admission is not None else None
+        ),
+        contract_provenance_attestation_sha256=(
+            admission.provenance_attestation_sha256 if admission is not None else None
+        ),
+        contract_compatibility_receipt_sha256=(
+            admission.compatibility_receipt_sha256 if admission is not None else None
+        ),
+        contract_migration_receipt_sha256=(
+            admission.migration_receipt_sha256 if admission is not None else None
+        ),
+    )
 
 
 def evaluate_projection_readiness(
@@ -287,41 +353,38 @@ def evaluate_projection_readiness(
     candidate_snapshot = _snapshot_projection_candidate(candidate)
     candidate_sha256 = _candidate_sha256(candidate_snapshot)
     if contract_release is None:
-        return ProjectionReadiness(
-            ready=False,
-            truth_status=ProjectionTruthStatus.PROPOSED,
-            source_repository=candidate_snapshot.source_repository,
-            source_revision=candidate_snapshot.source_revision,
-            candidate_sha256=candidate_sha256,
+        return _blocked_readiness(
+            candidate_snapshot,
+            candidate_sha256,
             reason="context_graph_contract_release_not_admitted",
             next_action="install_approved_context_graph_contract_release",
-            contract_commit_sha=None,
-            contract_asset_sha256=None,
-            contract_conformance_receipt_sha256=None,
-            contract_bundle_manifest_sha256=None,
-            contract_provenance_attestation_sha256=None,
         )
     if type(contract_release) is not ContractReleaseEvidence:
         raise TypeError("contract_release must be ContractReleaseEvidence or None")
     _validate_contract_release(contract_release)
     if contract_admission is None:
-        return ProjectionReadiness(
-            ready=False,
-            truth_status=ProjectionTruthStatus.PROPOSED,
-            source_repository=candidate_snapshot.source_repository,
-            source_revision=candidate_snapshot.source_revision,
-            candidate_sha256=candidate_sha256,
+        return _blocked_readiness(
+            candidate_snapshot,
+            candidate_sha256,
             reason="context_graph_contract_admission_not_verified",
             next_action="verify_released_context_graph_contract_admission",
-            contract_commit_sha=contract_release.commit_sha,
-            contract_asset_sha256=contract_release.asset_sha256,
-            contract_conformance_receipt_sha256=None,
-            contract_bundle_manifest_sha256=None,
-            contract_provenance_attestation_sha256=None,
+            release=contract_release,
         )
     if type(contract_admission) is not ContractAdmissionEvidence:
         raise TypeError("contract_admission must be ContractAdmissionEvidence or None")
     _validate_contract_admission(contract_admission, contract_release)
+    if (
+        contract_admission.compatibility_receipt_sha256 is None
+        or contract_admission.migration_receipt_sha256 is None
+    ):
+        return _blocked_readiness(
+            candidate_snapshot,
+            candidate_sha256,
+            reason="context_graph_contract_lifecycle_evidence_not_verified",
+            next_action="verify_context_graph_contract_compatibility_and_migration",
+            release=contract_release,
+            admission=contract_admission,
+        )
     return ProjectionReadiness(
         ready=True,
         truth_status=ProjectionTruthStatus.PROPOSED,
@@ -334,5 +397,11 @@ def evaluate_projection_readiness(
         contract_asset_sha256=contract_release.asset_sha256,
         contract_conformance_receipt_sha256=contract_admission.conformance_receipt_sha256,
         contract_bundle_manifest_sha256=contract_admission.bundle_manifest_sha256,
-        contract_provenance_attestation_sha256=contract_admission.provenance_attestation_sha256,
+        contract_provenance_attestation_sha256=(
+            contract_admission.provenance_attestation_sha256
+        ),
+        contract_compatibility_receipt_sha256=(
+            contract_admission.compatibility_receipt_sha256
+        ),
+        contract_migration_receipt_sha256=contract_admission.migration_receipt_sha256,
     )

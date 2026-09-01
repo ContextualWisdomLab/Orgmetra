@@ -23,6 +23,8 @@ ARTIFACT_SHA256 = "a" * 64
 CONFORMANCE_SHA256 = "b" * 64
 BUNDLE_SHA256 = "c" * 64
 PROVENANCE_SHA256 = "d" * 64
+COMPATIBILITY_SHA256 = "e" * 64
+MIGRATION_SHA256 = "f" * 64
 
 
 def _candidate(**overrides: object) -> ArchitectureProjectionCandidate:
@@ -57,7 +59,7 @@ def _release(**overrides: object) -> ContractReleaseEvidence:
 
 
 def _admission(**overrides: object) -> ContractAdmissionEvidence:
-    """Return trusted conformance and provenance evidence with optional overrides."""
+    """Return trusted conformance, provenance, and lifecycle evidence."""
     values: dict[str, object] = {
         "contract_commit_sha": CONTRACT_SHA,
         "contract_asset_sha256": ARTIFACT_SHA256,
@@ -66,6 +68,8 @@ def _admission(**overrides: object) -> ContractAdmissionEvidence:
         "provenance_attestation_sha256": PROVENANCE_SHA256,
         "admission_state": "verified",
         "verified_at": datetime(2026, 9, 1, 6, 2, tzinfo=UTC),
+        "compatibility_receipt_sha256": COMPATIBILITY_SHA256,
+        "migration_receipt_sha256": MIGRATION_SHA256,
     }
     values.update(overrides)
     return ContractAdmissionEvidence(**values)
@@ -84,6 +88,8 @@ def test_unreleased_contract_blocks_projection_with_next_action() -> None:
     assert decision.contract_conformance_receipt_sha256 is None
     assert decision.contract_bundle_manifest_sha256 is None
     assert decision.contract_provenance_attestation_sha256 is None
+    assert decision.contract_compatibility_receipt_sha256 is None
+    assert decision.contract_migration_receipt_sha256 is None
 
 
 def test_release_metadata_without_conformance_and_provenance_stays_blocked() -> None:
@@ -99,10 +105,12 @@ def test_release_metadata_without_conformance_and_provenance_stays_blocked() -> 
     assert decision.contract_conformance_receipt_sha256 is None
     assert decision.contract_bundle_manifest_sha256 is None
     assert decision.contract_provenance_attestation_sha256 is None
+    assert decision.contract_compatibility_receipt_sha256 is None
+    assert decision.contract_migration_receipt_sha256 is None
 
 
 def test_verified_contract_admission_allows_only_a_candidate_not_ea_truth() -> None:
-    """Admit only evidence bound to conformance, bundle identity, and provenance."""
+    """Admit only evidence bound to conformance, provenance, and lifecycle fitness."""
     decision = evaluate_projection_readiness(_candidate(), _release(), _admission())
 
     assert decision.ready is True
@@ -114,6 +122,8 @@ def test_verified_contract_admission_allows_only_a_candidate_not_ea_truth() -> N
     assert decision.contract_conformance_receipt_sha256 == CONFORMANCE_SHA256
     assert decision.contract_bundle_manifest_sha256 == BUNDLE_SHA256
     assert decision.contract_provenance_attestation_sha256 == PROVENANCE_SHA256
+    assert decision.contract_compatibility_receipt_sha256 == COMPATIBILITY_SHA256
+    assert decision.contract_migration_receipt_sha256 == MIGRATION_SHA256
 
 
 @pytest.mark.parametrize(

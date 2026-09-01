@@ -92,6 +92,8 @@ def _admission() -> ContractAdmissionEvidence:
         provenance_attestation_sha256="d" * 64,
         admission_state="verified",
         verified_at=datetime(2026, 9, 1, 6, 2, tzinfo=UTC),
+        compatibility_receipt_sha256="e" * 64,
+        migration_receipt_sha256="f" * 64,
     )
 
 
@@ -136,6 +138,8 @@ def test_comparison_overriding_admission_commit_cannot_bind_different_release() 
         provenance_attestation_sha256="d" * 64,
         admission_state="verified",
         verified_at=datetime(2026, 9, 1, 6, 2, tzinfo=UTC),
+        compatibility_receipt_sha256="e" * 64,
+        migration_receipt_sha256="f" * 64,
     )
 
     with pytest.raises(TypeError, match="contract_commit_sha must be exact built-in text"):
@@ -144,7 +148,7 @@ def test_comparison_overriding_admission_commit_cannot_bind_different_release() 
 
 def test_behavior_bearing_candidate_timezone_cannot_enter_projection_evidence() -> None:
     """Reject mutable timezone behavior before it becomes retained bitemporal evidence."""
-    timezone = _MutableTimezone()
+    mutable_timezone = _MutableTimezone()
 
     with pytest.raises(TypeError, match="effective_from must use exact built-in datetime and timezone"):
         ArchitectureProjectionCandidate(
@@ -152,7 +156,7 @@ def test_behavior_bearing_candidate_timezone_cannot_enter_projection_evidence() 
             projection_kind=ProjectionKind.APPLICATION,
             source_revision=_ORGMETRA_SHA,
             source_repository="ContextualWisdomLab/Orgmetra",
-            effective_from=datetime(2026, 9, 1, tzinfo=timezone),
+            effective_from=datetime(2026, 9, 1, tzinfo=mutable_timezone),
             effective_to=None,
             recorded_at=datetime(2026, 9, 1, 6, 0, tzinfo=UTC),
             owner_reference="team:orgmetra",

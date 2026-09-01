@@ -47,7 +47,7 @@ def _release() -> ContractReleaseEvidence:
 
 
 def _admission() -> ContractAdmissionEvidence:
-    """Build admission evidence bound to the exact released contract bytes."""
+    """Build admission evidence bound to exact released and lifecycle evidence."""
     return ContractAdmissionEvidence(
         contract_commit_sha=CONTRACT_SHA,
         contract_asset_sha256=ARTIFACT_SHA256,
@@ -56,6 +56,8 @@ def _admission() -> ContractAdmissionEvidence:
         provenance_attestation_sha256="d" * 64,
         admission_state="verified",
         verified_at=datetime(2026, 9, 1, 6, 2, tzinfo=UTC),
+        compatibility_receipt_sha256="e" * 64,
+        migration_receipt_sha256="f" * 64,
     )
 
 

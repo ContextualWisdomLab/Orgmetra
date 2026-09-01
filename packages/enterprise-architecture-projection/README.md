@@ -10,9 +10,11 @@ A candidate is blocked until a trusted control-plane lookup has observed an immu
 
 Release identity alone is deliberately insufficient. The exact released commit and artifact must also be bound to trusted evidence for executable semantic conformance, the complete published contract bundle, and artifact provenance. Until those admission and provenance receipts are independently verified, `evaluate_projection_readiness` remains fail-closed with the next action `verify_released_context_graph_contract_admission`.
 
-The package does not guess or reproduce an unreleased Context Assertion, CloudEvent, API schema, profile, admission receipt, or provenance format. The trusted control plane must obtain those semantics from the immutable released `context-graph-contracts` package and retain their exact evidence identities. When `context-graph-contracts` has no immutable release, the earlier gate remains `install_approved_context_graph_contract_release`.
+Semantic admission still does not prove that a released contract is safe for this consumer. Positive handoff also requires exact compatibility and migration receipts bound to the admitted release. Missing lifecycle receipts produce the separate fail-closed next action `verify_context_graph_contract_compatibility_and_migration`; one receipt cannot stand in for the other, and malformed receipt identity is rejected.
 
-Only after release identity and the release-bound conformance, complete-bundle, and provenance evidence are all admitted can Orgmetra produce a `proposed` candidate whose next action is `submit_candidate_to_enterprise_architecture_owner`. Acceptance, replacement, lifecycle decisions, and authoritative EA truth remain with the Enterprise Architecture owner.
+The package does not guess or reproduce an unreleased Context Assertion, CloudEvent, API schema, profile, admission receipt, provenance format, compatibility result, or migration result. The trusted control plane must obtain those semantics from the immutable released `context-graph-contracts` package and retain their exact evidence identities. When `context-graph-contracts` has no immutable release, the earlier gate remains `install_approved_context_graph_contract_release`.
+
+Only after release identity and the release-bound conformance, complete-bundle, provenance, compatibility, and migration evidence are all admitted can Orgmetra produce a `proposed` candidate whose next action is `submit_candidate_to_enterprise_architecture_owner`. Acceptance, replacement, lifecycle decisions, and authoritative EA truth remain with the Enterprise Architecture owner.
 
 ## Candidate scope
 
