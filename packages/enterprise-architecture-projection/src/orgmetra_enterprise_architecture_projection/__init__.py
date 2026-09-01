@@ -1,9 +1,10 @@
 """Fail-closed admission boundary for Orgmetra Enterprise Architecture projections.
 
 This package validates Orgmetra-owned architecture projection candidates and the
-release evidence required before they can be handed to the Enterprise
-Architecture owner. It does not serialize the foreign context-graph contract,
-write Enterprise Architecture state, or transport authoritative HR records.
+release, semantic-conformance, bundle-identity, and provenance evidence required
+before they can be handed to the Enterprise Architecture owner. It does not
+serialize the foreign context-graph contract, write Enterprise Architecture
+state, or transport authoritative HR records.
 """
 
 from __future__ import annotations
@@ -103,6 +104,19 @@ class ContractReleaseEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class ContractAdmissionEvidence:
+    """Trusted evidence that exact released contract bytes passed semantic admission."""
+
+    contract_commit_sha: str
+    contract_asset_sha256: str
+    conformance_receipt_sha256: str
+    bundle_manifest_sha256: str
+    provenance_attestation_sha256: str
+    admission_state: str
+    verified_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectionReadiness:
     """Decision describing whether a candidate may be handed to the EA owner."""
 
@@ -112,6 +126,9 @@ class ProjectionReadiness:
     next_action: str
     contract_commit_sha: str | None
     contract_asset_sha256: str | None
+    contract_conformance_receipt_sha256: str | None
+    contract_bundle_manifest_sha256: str | None
+    contract_provenance_attestation_sha256: str | None
 
 
 def _require_aware_time(value: datetime, field_name: str) -> None:
@@ -136,9 +153,41 @@ def _validate_contract_release(release: ContractReleaseEvidence) -> None:
         raise ValueError("verified_at must be a timezone-aware verification time")
 
 
+def _validate_contract_admission(
+    admission: ContractAdmissionEvidence,
+    release: ContractReleaseEvidence,
+) -> None:
+    """Bind semantic, bundle, and provenance evidence to the exact released bytes."""
+    if _SHA_RE.fullmatch(admission.contract_commit_sha) is None:
+        raise ValueError("contract_commit_sha must be a 40-character lowercase contract commit SHA")
+    if _SHA256_RE.fullmatch(admission.contract_asset_sha256) is None:
+        raise ValueError("contract_asset_sha256 must be a 64-character lowercase contract asset SHA-256")
+    if _SHA256_RE.fullmatch(admission.conformance_receipt_sha256) is None:
+        raise ValueError(
+            "conformance_receipt_sha256 must be a 64-character lowercase conformance receipt SHA-256"
+        )
+    if _SHA256_RE.fullmatch(admission.bundle_manifest_sha256) is None:
+        raise ValueError(
+            "bundle_manifest_sha256 must be a 64-character lowercase bundle manifest SHA-256"
+        )
+    if _SHA256_RE.fullmatch(admission.provenance_attestation_sha256) is None:
+        raise ValueError(
+            "provenance_attestation_sha256 must be a 64-character lowercase provenance attestation SHA-256"
+        )
+    if admission.admission_state != "verified":
+        raise ValueError("admission_state must identify verified contract admission")
+    if admission.verified_at.utcoffset() is None:
+        raise ValueError("verified_at must be a timezone-aware admission verification time")
+    if admission.contract_commit_sha != release.commit_sha:
+        raise ValueError("admission commit must match released commit")
+    if admission.contract_asset_sha256 != release.asset_sha256:
+        raise ValueError("admission asset must match released asset")
+
+
 def evaluate_projection_readiness(
     candidate: ArchitectureProjectionCandidate,
     contract_release: ContractReleaseEvidence | None,
+    contract_admission: ContractAdmissionEvidence | None = None,
 ) -> ProjectionReadiness:
     """Return fail-closed readiness without conferring Enterprise Architecture truth."""
     if type(candidate) is not ArchitectureProjectionCandidate:
@@ -151,10 +200,28 @@ def evaluate_projection_readiness(
             next_action="install_approved_context_graph_contract_release",
             contract_commit_sha=None,
             contract_asset_sha256=None,
+            contract_conformance_receipt_sha256=None,
+            contract_bundle_manifest_sha256=None,
+            contract_provenance_attestation_sha256=None,
         )
     if type(contract_release) is not ContractReleaseEvidence:
         raise TypeError("contract_release must be ContractReleaseEvidence or None")
     _validate_contract_release(contract_release)
+    if contract_admission is None:
+        return ProjectionReadiness(
+            ready=False,
+            truth_status=ProjectionTruthStatus.PROPOSED,
+            reason="context_graph_contract_admission_not_verified",
+            next_action="verify_released_context_graph_contract_admission",
+            contract_commit_sha=contract_release.commit_sha,
+            contract_asset_sha256=contract_release.asset_sha256,
+            contract_conformance_receipt_sha256=None,
+            contract_bundle_manifest_sha256=None,
+            contract_provenance_attestation_sha256=None,
+        )
+    if type(contract_admission) is not ContractAdmissionEvidence:
+        raise TypeError("contract_admission must be ContractAdmissionEvidence or None")
+    _validate_contract_admission(contract_admission, contract_release)
     return ProjectionReadiness(
         ready=True,
         truth_status=ProjectionTruthStatus.PROPOSED,
@@ -162,4 +229,7 @@ def evaluate_projection_readiness(
         next_action="submit_candidate_to_enterprise_architecture_owner",
         contract_commit_sha=contract_release.commit_sha,
         contract_asset_sha256=contract_release.asset_sha256,
+        contract_conformance_receipt_sha256=contract_admission.conformance_receipt_sha256,
+        contract_bundle_manifest_sha256=contract_admission.bundle_manifest_sha256,
+        contract_provenance_attestation_sha256=contract_admission.provenance_attestation_sha256,
     )
