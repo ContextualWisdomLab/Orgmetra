@@ -9,6 +9,7 @@ import pytest
 
 from orgmetra_enterprise_architecture_projection import (
     ArchitectureProjectionCandidate,
+    ContractAdmissionEvidence,
     ContractReleaseEvidence,
     ProjectionKind,
     ProjectionTruthStatus,
@@ -19,6 +20,9 @@ from orgmetra_enterprise_architecture_projection import (
 ORGMETRA_SHA = "9e3e4847510e1e612b48474ba42b177b8ed824df"
 CONTRACT_SHA = "99d230991b9d48fbf87489e0b375b7bbf09d8559"
 ARTIFACT_SHA256 = "a" * 64
+CONFORMANCE_SHA256 = "b" * 64
+BUNDLE_SHA256 = "c" * 64
+PROVENANCE_SHA256 = "d" * 64
 
 
 def _candidate(**overrides: object) -> ArchitectureProjectionCandidate:
@@ -52,6 +56,21 @@ def _release(**overrides: object) -> ContractReleaseEvidence:
     return ContractReleaseEvidence(**values)
 
 
+def _admission(**overrides: object) -> ContractAdmissionEvidence:
+    """Return trusted conformance and provenance evidence with optional overrides."""
+    values: dict[str, object] = {
+        "contract_commit_sha": CONTRACT_SHA,
+        "contract_asset_sha256": ARTIFACT_SHA256,
+        "conformance_receipt_sha256": CONFORMANCE_SHA256,
+        "bundle_manifest_sha256": BUNDLE_SHA256,
+        "provenance_attestation_sha256": PROVENANCE_SHA256,
+        "admission_state": "verified",
+        "verified_at": datetime(2026, 9, 1, 6, 2, tzinfo=UTC),
+    }
+    values.update(overrides)
+    return ContractAdmissionEvidence(**values)
+
+
 def test_unreleased_contract_blocks_projection_with_next_action() -> None:
     """Do not serialize or publish EA data before a reviewed immutable contract exists."""
     decision = evaluate_projection_readiness(_candidate(), None)
@@ -62,11 +81,29 @@ def test_unreleased_contract_blocks_projection_with_next_action() -> None:
     assert decision.next_action == "install_approved_context_graph_contract_release"
     assert decision.contract_commit_sha is None
     assert decision.contract_asset_sha256 is None
+    assert decision.contract_conformance_receipt_sha256 is None
+    assert decision.contract_bundle_manifest_sha256 is None
+    assert decision.contract_provenance_attestation_sha256 is None
 
 
-def test_published_contract_evidence_admits_only_a_candidate_not_ea_truth() -> None:
-    """Admit a candidate after release pinning without granting EA authoritative status."""
+def test_release_metadata_without_conformance_and_provenance_stays_blocked() -> None:
+    """Do not treat a tag and artifact digest as semantic admission or provenance."""
     decision = evaluate_projection_readiness(_candidate(), _release())
+
+    assert decision.ready is False
+    assert decision.truth_status is ProjectionTruthStatus.PROPOSED
+    assert decision.reason == "context_graph_contract_admission_not_verified"
+    assert decision.next_action == "verify_released_context_graph_contract_admission"
+    assert decision.contract_commit_sha == CONTRACT_SHA
+    assert decision.contract_asset_sha256 == ARTIFACT_SHA256
+    assert decision.contract_conformance_receipt_sha256 is None
+    assert decision.contract_bundle_manifest_sha256 is None
+    assert decision.contract_provenance_attestation_sha256 is None
+
+
+def test_verified_contract_admission_allows_only_a_candidate_not_ea_truth() -> None:
+    """Admit only evidence bound to conformance, bundle identity, and provenance."""
+    decision = evaluate_projection_readiness(_candidate(), _release(), _admission())
 
     assert decision.ready is True
     assert decision.truth_status is ProjectionTruthStatus.PROPOSED
@@ -74,6 +111,9 @@ def test_published_contract_evidence_admits_only_a_candidate_not_ea_truth() -> N
     assert decision.next_action == "submit_candidate_to_enterprise_architecture_owner"
     assert decision.contract_commit_sha == CONTRACT_SHA
     assert decision.contract_asset_sha256 == ARTIFACT_SHA256
+    assert decision.contract_conformance_receipt_sha256 == CONFORMANCE_SHA256
+    assert decision.contract_bundle_manifest_sha256 == BUNDLE_SHA256
+    assert decision.contract_provenance_attestation_sha256 == PROVENANCE_SHA256
 
 
 @pytest.mark.parametrize(
@@ -95,6 +135,49 @@ def test_untrusted_contract_release_evidence_is_rejected(
 
     with pytest.raises(ValueError, match=message):
         evaluate_projection_readiness(_candidate(), release)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("contract_commit_sha", "deadbeef", "40-character lowercase contract commit SHA"),
+        ("contract_asset_sha256", "abc", "64-character lowercase contract asset SHA-256"),
+        ("conformance_receipt_sha256", "abc", "64-character lowercase conformance receipt SHA-256"),
+        ("bundle_manifest_sha256", "abc", "64-character lowercase bundle manifest SHA-256"),
+        (
+            "provenance_attestation_sha256",
+            "abc",
+            "64-character lowercase provenance attestation SHA-256",
+        ),
+        ("admission_state", "pending", "verified contract admission"),
+        ("verified_at", datetime(2026, 9, 1), "timezone-aware admission verification time"),
+    ],
+)
+def test_malformed_contract_admission_evidence_is_rejected(
+    field: str, value: object, message: str
+) -> None:
+    """Reject incomplete or malformed semantic-admission and provenance evidence."""
+    admission = _admission(**{field: value})
+
+    with pytest.raises(ValueError, match=message):
+        evaluate_projection_readiness(_candidate(), _release(), admission)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("contract_commit_sha", "e" * 40, "admission commit must match released commit"),
+        ("contract_asset_sha256", "e" * 64, "admission asset must match released asset"),
+    ],
+)
+def test_contract_admission_must_bind_the_exact_release(
+    field: str, value: object, message: str
+) -> None:
+    """Reject valid-looking admission evidence for different released bytes."""
+    admission = _admission(**{field: value})
+
+    with pytest.raises(ValueError, match=message):
+        evaluate_projection_readiness(_candidate(), _release(), admission)
 
 
 @pytest.mark.parametrize(
@@ -169,9 +252,15 @@ def test_unvalidated_release_object_cannot_bypass_release_evidence_type() -> Non
         evaluate_projection_readiness(_candidate(), object())  # type: ignore[arg-type]
 
 
+def test_unvalidated_admission_object_cannot_bypass_admission_evidence_type() -> None:
+    """Reject duck-typed semantic admission evidence at the trust boundary."""
+    with pytest.raises(TypeError, match="ContractAdmissionEvidence"):
+        evaluate_projection_readiness(_candidate(), _release(), object())  # type: ignore[arg-type]
+
+
 def test_projection_decision_exposes_no_free_form_hr_payload() -> None:
     """Keep the adapter incapable of carrying person/employment/job decision payloads."""
-    decision = evaluate_projection_readiness(_candidate(), _release())
+    decision = evaluate_projection_readiness(_candidate(), _release(), _admission())
 
     assert not hasattr(decision, "payload")
     assert not hasattr(decision, "person")
