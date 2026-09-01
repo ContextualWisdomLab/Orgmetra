@@ -73,18 +73,20 @@ Orgmetra is intentionally federated. Specialist ContextualWisdomLab products sta
     boundary          kernels             boundary        integration
 ```
 
-Key product boundaries in the current architecture include:
+Integration maturity is evidence-bound. `implemented_on_protected_main` means the Orgmetra-side boundary is shipped on protected `develop`; `accepted_architecture` means the boundary and contract shape are accepted but are not a shipped end-to-end integration; `planned` means no shipped integration should be inferred.
 
-- **Keyverse** — identity, OIDC, SCIM, and federation.
-- **Naruon** — customer-owned mail, calendar, and file control plane.
-- **fast-mlsirm / psychometric components** — psychometric numerical computation.
-- **TEPP** — temporal, event, multilevel, and multiple-membership analysis.
-- **Semantic Data Portal** — occupation, skill, ability, and semantic catalog authority.
-- **Contextual Orchestrator** — bounded model routing and AI assistance.
-- **MHTML ETL Gateway / mightyETL** — governed migration and CDC boundaries.
-- **RankWeave / ThreadWeave / LineageWeave** — retrieval, conversation structure, and inferred evidence lineage.
+| External product boundary | Orgmetra use | Current maturity |
+| --- | --- | --- |
+| **Keyverse** | Identity, OIDC, SCIM, federation, and purpose-bound authorization | `implemented_on_protected_main` |
+| **Psychometrics Commons** | Immutable assessment response/result snapshots | `accepted_architecture` |
+| **fast-mlsirm** | Psychometric numerical kernels and governed validation-result contract | `accepted_architecture` |
+| **Naruon** | Customer-owned communication and calendar integration | `planned` |
+| **TEPP** | Temporal, event, multilevel, and multiple-membership evidence | `planned` |
+| **Semantic Data Portal / OriginWeave / LineageWeave** | Semantic, source, and lineage evidence adapters | `planned` |
+| **Contextual Orchestrator** | Draft-evidence model orchestration; never employment-decision authority | `planned` |
+| **MHTML ETL Gateway / mightyETL** | Governed migration and CDC | `planned` |
 
-Orgmetra does not directly query another product's application tables, and an integration does not transfer the other product's authority into Orgmetra.
+The detailed evidence, pinned revisions, and required integration proof are authoritative in [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md). Orgmetra does not directly query another product's application tables, and an integration does not transfer the other product's authority into Orgmetra.
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the code-current architecture boundary.
 
