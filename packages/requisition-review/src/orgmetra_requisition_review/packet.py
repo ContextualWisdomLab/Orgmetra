@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
+from typing import NamedTuple
 from uuid import UUID
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
@@ -28,6 +29,28 @@ _NEXT_ACTION = (
     "approved Job requirements and authorized headcount before recording accountable human "
     "requisition approval."
 )
+
+
+class _RequisitionReviewSnapshot(NamedTuple):
+    """Hold one immutable read of every field that can enter canonical evidence."""
+
+    tenant_record_id: str
+    requisition_reference: str
+    job_profile_reference: str
+    job_requirements_reference: str
+    job_requirements_digest: str
+    requirements_version_code: str
+    headcount_authorization_reference: str
+    hiring_manager_actor_reference: str
+    approver_actor_reference: str
+    requested_opening_count: int
+    purpose_code: str
+    reason_code: str
+    generated_at: datetime
+    position_record_reference: str | None
+    human_confirmation_required: bool
+    review_state: str
+    next_action: str
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
@@ -129,78 +152,101 @@ class RequisitionReviewPacket:
 
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
-        self._validate_governance_fields()
-        object.__setattr__(self, "generated_at", _freeze_timestamp(self.generated_at))
-        self._validate_human_review_fields()
+        snapshot = self._snapshot()
+        self._validate_governance_fields(snapshot)
+        object.__setattr__(self, "generated_at", _freeze_timestamp(snapshot.generated_at))
+        self._validate_human_review_fields(snapshot)
 
-    def _validate_governance_fields(self) -> None:
-        """Validate mutable-by-runtime fields before they can become audit evidence."""
-        _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
+    def _snapshot(self) -> _RequisitionReviewSnapshot:
+        """Read each evidence field once so validation and emission share one state."""
+        return _RequisitionReviewSnapshot(
+            tenant_record_id=self.tenant_record_id,
+            requisition_reference=self.requisition_reference,
+            job_profile_reference=self.job_profile_reference,
+            job_requirements_reference=self.job_requirements_reference,
+            job_requirements_digest=self.job_requirements_digest,
+            requirements_version_code=self.requirements_version_code,
+            headcount_authorization_reference=self.headcount_authorization_reference,
+            hiring_manager_actor_reference=self.hiring_manager_actor_reference,
+            approver_actor_reference=self.approver_actor_reference,
+            requested_opening_count=self.requested_opening_count,
+            purpose_code=self.purpose_code,
+            reason_code=self.reason_code,
+            generated_at=self.generated_at,
+            position_record_reference=self.position_record_reference,
+            human_confirmation_required=self.human_confirmation_required,
+            review_state=self.review_state,
+            next_action=self.next_action,
+        )
+
+    def _validate_governance_fields(self, snapshot: _RequisitionReviewSnapshot) -> None:
+        """Validate one captured governance state before it can become audit evidence."""
+        _validate_operational_uuid(snapshot.tenant_record_id, "tenant_record_id")
         _validate_reference(
-            self.requisition_reference,
+            snapshot.requisition_reference,
             "requisition",
             "requisition_reference",
         )
         _validate_reference(
-            self.job_profile_reference,
+            snapshot.job_profile_reference,
             "job_profile",
             "job_profile_reference",
         )
         _validate_reference(
-            self.job_requirements_reference,
+            snapshot.job_requirements_reference,
             "job_requirements",
             "job_requirements_reference",
         )
         if (
-            type(self.job_requirements_digest) is not str
-            or not _DIGEST_PATTERN.fullmatch(self.job_requirements_digest)
+            type(snapshot.job_requirements_digest) is not str
+            or not _DIGEST_PATTERN.fullmatch(snapshot.job_requirements_digest)
         ):
             raise ValueError("job_requirements_digest must be lowercase SHA-256 hex")
-        _validate_requirements_version_code(self.requirements_version_code)
+        _validate_requirements_version_code(snapshot.requirements_version_code)
         _validate_reference(
-            self.headcount_authorization_reference,
+            snapshot.headcount_authorization_reference,
             "headcount_authorization",
             "headcount_authorization_reference",
         )
         _validate_reference(
-            self.hiring_manager_actor_reference,
+            snapshot.hiring_manager_actor_reference,
             "actor",
             "hiring_manager_actor_reference",
         )
         _validate_reference(
-            self.approver_actor_reference,
+            snapshot.approver_actor_reference,
             "actor",
             "approver_actor_reference",
         )
-        if self.hiring_manager_actor_reference == self.approver_actor_reference:
+        if snapshot.hiring_manager_actor_reference == snapshot.approver_actor_reference:
             raise ValueError("hiring manager and approver must be different actor references")
         if (
-            type(self.requested_opening_count) is not int
-            or not 1 <= self.requested_opening_count <= 100
+            type(snapshot.requested_opening_count) is not int
+            or not 1 <= snapshot.requested_opening_count <= 100
         ):
             raise ValueError("requested_opening_count must be an integer from 1 through 100")
-        if self.position_record_reference is not None:
+        if snapshot.position_record_reference is not None:
             _validate_reference(
-                self.position_record_reference,
+                snapshot.position_record_reference,
                 "position_record",
                 "position_record_reference",
             )
-            if self.requested_opening_count != 1:
+            if snapshot.requested_opening_count != 1:
                 raise ValueError("an exact Position seat can authorize exactly one opening")
-        _validate_code(self.purpose_code, "purpose_code")
-        if self.purpose_code != _REVIEW_PURPOSE:
+        _validate_code(snapshot.purpose_code, "purpose_code")
+        if snapshot.purpose_code != _REVIEW_PURPOSE:
             raise ValueError("purpose_code must remain requisition_review")
-        _validate_code(self.reason_code, "reason_code")
-        if self.reason_code not in _ALLOWED_REASON_CODES:
+        _validate_code(snapshot.reason_code, "reason_code")
+        if snapshot.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive requisition reason")
 
-    def _validate_human_review_fields(self) -> None:
-        """Keep retained evidence pending the same accountable human-review contract."""
-        if self.human_confirmation_required is not True:
+    def _validate_human_review_fields(self, snapshot: _RequisitionReviewSnapshot) -> None:
+        """Keep one captured state pending the accountable human-review contract."""
+        if snapshot.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for requisition approval")
-        if type(self.review_state) is not str or self.review_state != _REVIEW_STATE:
+        if type(snapshot.review_state) is not str or snapshot.review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_approval")
-        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
+        if type(snapshot.next_action) is not str or snapshot.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed requisition-review instruction")
 
     def __repr__(self) -> str:
@@ -209,27 +255,28 @@ class RequisitionReviewPacket:
 
     def canonical_json(self) -> str:
         """Return deterministic canonical JSON for immutable audit correlation."""
-        self._validate_governance_fields()
-        generated_at = _canonical_timestamp(self.generated_at)
-        self._validate_human_review_fields()
+        snapshot = self._snapshot()
+        self._validate_governance_fields(snapshot)
+        generated_at = _canonical_timestamp(snapshot.generated_at)
+        self._validate_human_review_fields(snapshot)
         payload = {
-            "approver_actor_reference": self.approver_actor_reference,
+            "approver_actor_reference": snapshot.approver_actor_reference,
             "generated_at": generated_at,
-            "headcount_authorization_reference": self.headcount_authorization_reference,
-            "hiring_manager_actor_reference": self.hiring_manager_actor_reference,
-            "human_confirmation_required": self.human_confirmation_required,
-            "job_profile_reference": self.job_profile_reference,
-            "job_requirements_digest": self.job_requirements_digest,
-            "job_requirements_reference": self.job_requirements_reference,
-            "next_action": self.next_action,
-            "position_record_reference": self.position_record_reference,
-            "purpose_code": self.purpose_code,
-            "reason_code": self.reason_code,
-            "requested_opening_count": self.requested_opening_count,
-            "requirements_version_code": self.requirements_version_code,
-            "requisition_reference": self.requisition_reference,
-            "review_state": self.review_state,
-            "tenant_record_id": self.tenant_record_id,
+            "headcount_authorization_reference": snapshot.headcount_authorization_reference,
+            "hiring_manager_actor_reference": snapshot.hiring_manager_actor_reference,
+            "human_confirmation_required": snapshot.human_confirmation_required,
+            "job_profile_reference": snapshot.job_profile_reference,
+            "job_requirements_digest": snapshot.job_requirements_digest,
+            "job_requirements_reference": snapshot.job_requirements_reference,
+            "next_action": snapshot.next_action,
+            "position_record_reference": snapshot.position_record_reference,
+            "purpose_code": snapshot.purpose_code,
+            "reason_code": snapshot.reason_code,
+            "requested_opening_count": snapshot.requested_opening_count,
+            "requirements_version_code": snapshot.requirements_version_code,
+            "requisition_reference": snapshot.requisition_reference,
+            "review_state": snapshot.review_state,
+            "tenant_record_id": snapshot.tenant_record_id,
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
