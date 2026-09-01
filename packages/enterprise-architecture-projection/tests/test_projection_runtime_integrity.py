@@ -177,3 +177,13 @@ def test_behavior_bearing_datetime_subclass_cannot_rewrite_recorded_time() -> No
 
     with pytest.raises(TypeError, match="recorded_at must use exact built-in datetime and timezone"):
         evaluate_projection_readiness(candidate, _release(), _admission())
+
+
+def test_fail_closed_readiness_cannot_be_rewritten_after_evaluation() -> None:
+    """A caller must not be able to turn a blocked handoff into a ready decision in place."""
+    decision = evaluate_projection_readiness(_candidate(), None)
+
+    assert decision.ready is False
+    with pytest.raises(AttributeError):
+        object.__setattr__(decision, "ready", True)
+    assert decision.ready is False
