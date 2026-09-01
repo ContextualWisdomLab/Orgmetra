@@ -55,5 +55,5 @@ def test_export_validates_the_same_digest_snapshot_it_emits(monkeypatch: pytest.
         return original_payload(self)
 
     monkeypatch.setattr(ReleaseReadinessReviewPacket, "_payload", interleaving_payload)
-    with pytest.raises(ValueError, match="security_evidence_digest_sha256.*exact string"):
+    with pytest.raises(ValueError, match=r"security_evidence_digest_sha256.*exact string"):
         packet.canonical_document()
