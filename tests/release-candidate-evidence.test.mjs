@@ -185,6 +185,69 @@ assert first.startswith("urn:orgmetra:pypi-requirement:example:")
   assert.equal(probe.status, 0, probe.stderr || probe.stdout);
 });
 
+test('wildcard and partial dependency declarations are not promoted to exact package versions', () => {
+  const probe = runBuilderProbe(`
+import importlib.util
+import json
+import sys
+spec = importlib.util.spec_from_file_location("orgmetra_release_evidence", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+pyproject = b'''[project]\nname = "python-fixture"\nversion = "1.0.0"\ndependencies = [\n  "wildcard==1.*",\n  "exact==1.2.3",\n  "prerelease==2.0rc1+cpu.1",\n]\n'''
+package_json = json.dumps({
+    "name": "npm-fixture",
+    "version": "1.0.0",
+    "dependencies": {
+        "partial": "1.2",
+        "exact-npm": "1.2.3",
+        "pre-npm": "1.2.3-beta.1+build.5",
+    },
+}, separators=(",", ":")).encode()
+sbom = json.loads(module._build_sbom("a" * 40, "b" * 64, {
+    "fixtures/python/pyproject.toml": pyproject,
+    "fixtures/npm/package.json": package_json,
+}))
+components = {component["name"]: component for component in sbom["components"]}
+assert "version" not in components["wildcard"]
+assert "purl" not in components["wildcard"]
+assert components["exact"]["version"] == "1.2.3"
+assert components["exact"]["purl"].endswith("@1.2.3")
+assert components["prerelease"]["version"] == "2.0rc1+cpu.1"
+assert "version" not in components["partial"]
+assert "purl" not in components["partial"]
+assert components["exact-npm"]["version"] == "1.2.3"
+assert components["exact-npm"]["purl"].endswith("@1.2.3")
+assert components["pre-npm"]["version"] == "1.2.3-beta.1+build.5"
+`);
+  assert.equal(probe.status, 0, probe.stderr || probe.stdout);
+});
+
+test('PEP 621 optional dependency groups remain visible in the declaration SBOM', () => {
+  const probe = runBuilderProbe(`
+import importlib.util
+import json
+import sys
+spec = importlib.util.spec_from_file_location("orgmetra_release_evidence", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+pyproject = b'''[project]\nname = "optional-fixture"\nversion = "1.0.0"\ndependencies = ["runtime==2.3.4"]\n\n[project.optional-dependencies]\ntest = ["pytest==9.0.2", "pytest-cov>=7"]\n'''
+sbom = json.loads(module._build_sbom("a" * 40, "b" * 64, {
+    "fixtures/optional/pyproject.toml": pyproject,
+}))
+components = {component["name"]: component for component in sbom["components"]}
+assert components["runtime"]["scope"] == "required"
+assert components["pytest"]["scope"] == "optional"
+assert components["pytest-cov"]["scope"] == "optional"
+assert components["pytest"]["version"] == "9.0.2"
+assert "version" not in components["pytest-cov"]
+parent_ref = "pkg:pypi/optional-fixture@1.0.0"
+parent = next(row for row in sbom["dependencies"] if row["ref"] == parent_ref)
+assert components["pytest"]["bom-ref"] in parent["dependsOn"]
+assert components["pytest-cov"]["bom-ref"] in parent["dependsOn"]
+`);
+  assert.equal(probe.status, 0, probe.stderr || probe.stdout);
+});
+
 test('repository-owned gzip encoder is deterministic and standards-readable', () => {
   const probe = runBuilderProbe(`
 import gzip
