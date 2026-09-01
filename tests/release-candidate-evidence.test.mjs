@@ -96,10 +96,21 @@ test('release candidate evidence is deterministic and binds the exact source rev
       exactPythonVersion,
       'provenance must record the exact Python runtime that can affect archive bytes',
     );
+    const workflow = readFileSync(workflowPath, 'utf8');
     assert.match(
-      readFileSync(workflowPath, 'utf8'),
+      workflow,
       new RegExp(`python-version: ["']${exactPythonVersion.replaceAll('.', '\\.') }["']`),
       'workflow must pin the exact Python patch runtime recorded in provenance',
+    );
+    assert.equal(
+      workflow.includes('runs-on: ubuntu-latest'),
+      false,
+      'release evidence must not depend on the moving ubuntu-latest runner alias',
+    );
+    assert.equal(
+      workflow.includes('runs-on: ubuntu-24.04'),
+      true,
+      'release evidence must bind its supported GitHub-hosted runner image explicitly',
     );
     assert.equal(provenance.predicate.runDetails.builder.id.includes('release-candidate-evidence-quality.yml'), true);
   } finally {
