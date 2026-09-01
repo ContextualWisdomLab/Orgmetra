@@ -4,7 +4,7 @@
 
 Protected-main truth at the branch point provides deterministic repository-source integrity, exact-head CI, security scanning, and a real PostgreSQL restore rehearsal. It does not yet provide a release-candidate evidence bundle that binds one exact Git revision to a reproducible source artifact, a software bill of materials, and structured provenance. This active PR adds that bounded evidence surface. It does **not** create a Git tag, GitHub Release, deployable container, signed attestation, SLSA level claim, certification claim, or permission to release.
 
-The evidence builder reads immutable Git blobs from the exact checked-out commit rather than copying mutable working-tree bytes. It rejects a requested revision that differs from `HEAD`, rejects unsupported tree object modes, requires the exact CPython 3.14.7 runtime used by the checked-in workflow, normalizes archive ownership/mode/time metadata, and builds twice in isolated temporary directories during CI. The two source archives, SBOMs, and provenance statements must be byte-identical.
+The evidence builder reads immutable Git blobs from the exact checked-out commit rather than copying mutable working-tree bytes. It rejects a requested revision that differs from `HEAD`, rejects unsupported tree object modes, requires the exact **CPython 3.14.7** implementation/runtime used by the checked-in workflow, normalizes archive ownership/mode/time metadata, and builds twice in isolated temporary directories during CI. Source archive, SBOM, and provenance bytes must reproduce within the same declared builder mode.
 
 ## Build type v1
 
@@ -23,7 +23,19 @@ The builder emits exactly three candidate artifacts:
 2. `orgmetra.cdx.json` — deterministic CycloneDX 1.7 JSON inventory for the source application, checked-in Python/npm package metadata, and declared dependency relationships discoverable from those package manifests;
 3. `orgmetra.provenance.json` — an in-toto Statement v1 using the SLSA provenance v1 predicate type, whose subjects bind the source archive and SBOM SHA-256 digests and whose resolved source dependency binds the exact Git commit.
 
-The build has no network dependency after checkout. It uses only Git and CPython 3.14.7 standard-library modules to construct evidence, with Node.js 24 executing the verification contract. The quality workflow pins checkout/setup actions by immutable commit SHA, pins CPython to the exact 3.14.7 patch release, and proves that checkout `HEAD` equals the pull-request event SHA before executing the contract. The builder independently refuses to construct candidate evidence under another Python patch runtime so provenance cannot claim a runtime different from the implementation that affected archive bytes.
+### Deterministic archive encoding
+
+The source archive no longer delegates DEFLATE bytes to the host `zlib` implementation. `orgmetra-stored-gzip-v1` emits an RFC 1952 gzip member with normalized header metadata and RFC 1951 `BTYPE=00` stored blocks of at most 65,535 bytes, followed by the required CRC-32 and input-size trailer. This deliberately trades compression ratio for byte stability across hosted-image zlib refreshes. Standard gzip readers must decode the result back to the exact normalized GNU tar bytes.
+
+The quality workflow still names `ubuntu-24.04` rather than the moving `ubuntu-latest` alias and pins checkout/setup actions by immutable commit SHA, but reproducible archive bytes do not rely on the host zlib implementation. CPython is pinned to the exact 3.14.7 patch release and the builder separately requires the implementation name `CPython`; another implementation reporting the same version string fails closed.
+
+### Dependency identities
+
+Exact Python/npm versions may use package URLs because the manifest itself supplies a concrete version. Non-exact declarations are not promoted into fake versions. Their component identities include a stable SHA-256-derived suffix over the **full declared requirement string** so distinct ranges or environment markers cannot collapse onto one `bom-ref`. The original declaration remains present as `orgmetra:declared-requirement` evidence.
+
+### Builder identity
+
+SLSA `runDetails.builder.id` must describe the actual execution mode rather than claiming GitHub Actions for every invocation. When `GITHUB_ACTIONS=true`, the unsigned candidate provenance identifies the checked-in GitHub Actions workflow. A local invocation instead uses the source-bound `#local-builder-v1` documentation identity and records `builderEnvironment=local`; local evidence therefore cannot silently claim the GitHub Actions builder identity. This remains workload-generated, unsigned provenance and is not trusted-control-plane attestation.
 
 ## Assurance boundary
 
@@ -36,17 +48,20 @@ The SLSA-shaped provenance is intentionally **unsigned candidate provenance gene
 | Requirement | Evidence | Expected result | Maturity |
 |---|---|---|---|
 | Exact source binding | workflow checkout proof plus builder `HEAD == --source-sha` guard | another commit cannot be labeled as the requested source | implemented_on_active_pr |
-| Exact build-runtime binding | exact CPython 3.14.7 workflow pin, builder runtime guard, and provenance assertion | a different Python patch cannot emit evidence labeled as the canonical build runtime | implemented_on_active_pr |
-| Source archive reproducibility | two independent temporary-directory builds | source archive SHA-256 is byte-identical | implemented_on_active_pr |
+| Exact build-runtime binding | exact CPython 3.14.7 workflow pin, CPython implementation guard, and provenance assertions | another patch or Python implementation cannot emit evidence labeled as canonical | implemented_on_active_pr |
+| Host-zlib independence | `orgmetra-stored-gzip-v1` regression plus source assertion excluding `gzip.compress` | standard gzip round-trip succeeds without host-zlib-generated evidence bytes | implemented_on_active_pr |
+| Source archive reproducibility | two independent temporary-directory builds | source archive SHA-256 is byte-identical within one declared builder mode | implemented_on_active_pr |
 | SBOM reproducibility | two independent temporary-directory builds | `orgmetra.cdx.json` SHA-256 is byte-identical | implemented_on_active_pr |
+| Stable Python declaration identity | regression over distinct ranges and markers | non-exact requirements receive stable, distinct `bom-ref` values and dependency edges | implemented_on_active_pr |
 | Stable final SBOM profile | `tests/release-candidate-evidence.test.mjs` | CycloneDX 1.7 identifiers, unique component references, product component, and declared components are present | implemented_on_active_pr |
 | Provenance subject binding | same executable contract | source archive and SBOM subject digests match generated bytes | implemented_on_active_pr |
 | Source-material binding | same executable contract | resolved Git dependency records the exact commit | implemented_on_active_pr |
+| Honest builder identity | hosted/local execution regressions | local evidence cannot claim the GitHub Actions builder; builder mode is explicit | implemented_on_active_pr |
 | Repository integrity | `npm run validate` in the dedicated workflow | protected foundation contracts remain unchanged and GREEN | implemented_on_active_pr |
 | Read-only evidence generation | output goes to temporary directories plus final clean-checkout proof | tracked checkout remains unchanged | implemented_on_active_pr |
 
 ## Buyer and operator interpretation
 
-A GREEN exact-head run proves that this repository revision can deterministically produce the three candidate evidence artifacts under the defined build type and exact declared Python patch runtime. It is useful for acquisition diligence, artifact-review automation, incident reconstruction, and future protected release automation. It does not mean Orgmetra has shipped, that a binary/container is reproducible, that the SBOM has registry-resolved every transitive dependency, or that the provenance is cryptographically authenticated.
+A GREEN exact-head run proves that this repository revision can produce the three candidate evidence artifacts under the declared build type, exact CPython implementation/runtime, deterministic archive codec, and recorded builder mode. It is useful for acquisition diligence, artifact-review automation, incident reconstruction, and future protected release automation. It does not mean Orgmetra has shipped, that a binary/container is reproducible, that the SBOM has registry-resolved every transitive dependency, or that the provenance is cryptographically authenticated.
 
 Primary technical sources and APA 7 references are recorded in `docs/doctoring/release-candidate-evidence-references.md`.
