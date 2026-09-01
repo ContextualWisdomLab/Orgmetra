@@ -179,6 +179,24 @@ def test_behavior_bearing_datetime_subclass_cannot_rewrite_recorded_time() -> No
         evaluate_projection_readiness(candidate, _release(), _admission())
 
 
+def test_release_evidence_cannot_be_rewritten_after_construction() -> None:
+    """Release identity must remain immutable after it enters the admission boundary."""
+    release = _release()
+
+    with pytest.raises(AttributeError):
+        object.__setattr__(release, "commit_sha", "f" * 40)
+    assert release.commit_sha == _CONTRACT_SHA
+
+
+def test_admission_evidence_cannot_be_rewritten_after_construction() -> None:
+    """Conformance and provenance receipts must remain immutable after construction."""
+    admission = _admission()
+
+    with pytest.raises(AttributeError):
+        object.__setattr__(admission, "conformance_receipt_sha256", "e" * 64)
+    assert admission.conformance_receipt_sha256 == "b" * 64
+
+
 def test_fail_closed_readiness_cannot_be_rewritten_after_evaluation() -> None:
     """A caller must not be able to turn a blocked handoff into a ready decision in place."""
     decision = evaluate_projection_readiness(_candidate(), None)
