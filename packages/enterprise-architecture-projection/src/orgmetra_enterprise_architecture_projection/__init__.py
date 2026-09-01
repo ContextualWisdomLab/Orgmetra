@@ -10,7 +10,7 @@ state, or transport authoritative HR records.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import StrEnum
 import re
 
@@ -115,9 +115,13 @@ def _require_exact_text(value: object, field_name: str) -> None:
 
 
 def _require_aware_time(value: datetime, field_name: str) -> None:
-    """Reject naive timestamps because projection evidence is compared across systems."""
+    """Accept only immutable built-in temporal behavior at the cross-system trust boundary."""
+    if type(value) is not datetime:
+        raise TypeError(f"{field_name} must use exact built-in datetime and timezone")
     if value.utcoffset() is None:
         raise ValueError(f"{field_name} must be timezone-aware {field_name}")
+    if type(value.tzinfo) is not timezone:
+        raise TypeError(f"{field_name} must use exact built-in datetime and timezone")
 
 
 def _validate_projection_candidate(candidate: ArchitectureProjectionCandidate) -> None:
@@ -169,8 +173,7 @@ def _validate_contract_release(release: ContractReleaseEvidence) -> None:
     _require_exact_text(release.release_state, "release_state")
     if release.release_state != "published":
         raise ValueError("release_state must identify a published release")
-    if release.verified_at.utcoffset() is None:
-        raise ValueError("verified_at must be a timezone-aware verification time")
+    _require_aware_time(release.verified_at, "verified_at")
 
 
 def _validate_contract_admission(
@@ -205,8 +208,7 @@ def _validate_contract_admission(
     _require_exact_text(admission.admission_state, "admission_state")
     if admission.admission_state != "verified":
         raise ValueError("admission_state must identify verified contract admission")
-    if admission.verified_at.utcoffset() is None:
-        raise ValueError("verified_at must be a timezone-aware admission verification time")
+    _require_aware_time(admission.verified_at, "verified_at")
     if admission.contract_commit_sha != release.commit_sha:
         raise ValueError("admission commit must match released commit")
     if admission.contract_asset_sha256 != release.asset_sha256:
