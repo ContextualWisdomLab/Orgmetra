@@ -159,3 +159,22 @@ def test_rejects_requirements_version_code_text_subclass() -> None:
     """Ensure requirements version text cannot carry caller-defined runtime behavior."""
     with pytest.raises(ValueError):
         _packet(requirements_version_code=OpaqueTextSubclass("requirements_version_1"))
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("human_confirmation_required", False),
+        ("review_state", "approved"),
+        ("approver_actor_reference", f"actor:{MANAGER_UUID}"),
+    ],
+)
+def test_rejects_postconstruction_governance_mutation_before_evidence(
+    field: str, replacement: object
+) -> None:
+    """Ensure retained packet mutation cannot rewrite human-review audit evidence."""
+    packet = _packet()
+    object.__setattr__(packet, field, replacement)
+
+    with pytest.raises(ValueError):
+        packet.canonical_json()
