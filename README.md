@@ -103,9 +103,9 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the code-current architecture bound
 
 ## Current product status
 
-Protected `develop` is the shipped repository authority. It contains the P0 HRIS foundation and governed evidence boundaries described by the current PRD, including distinct core HR records, bitemporal HR facts, candidate-worker linkage, performance/criterion models, validation-study registration, audit/provenance contracts, and integration-adapter contracts.
+Protected `develop` is the shipped repository authority. Treat a capability as shipped only when its current traceability evidence is marked `implemented_on_protected_main`; PRD requirements, accepted architecture, and `implemented_on_active_pr` rows are not protected-branch capability evidence.
 
-Open pull requests may contain additional candidate behavior. Treat those changes as active-PR truth only until they integrate into protected `develop`; do not infer a shipped capability from an open branch or PR description.
+Open pull requests may contain additional candidate behavior. Treat those changes as active-PR truth only until they integrate into protected `develop`; use [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) as the maturity authority and do not infer a shipped capability from PRD scope or a PR description.
 
 The repository does not claim certification, customer deployment, release maturity, benchmark leadership, or autonomous employment-decision authority unless separate current evidence explicitly supports such a claim.
 
