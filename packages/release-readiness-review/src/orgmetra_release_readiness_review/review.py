@@ -25,9 +25,23 @@ _EVIDENCE_VERSION = 1
 _NEXT_ACTION = (
     "Freshly verify that candidate_revision_sha is the integrated default-branch head, "
     "re-resolve every referenced CI/security/coverage/recovery/accessibility/operability/"
-    "migration/package/SBOM/provenance artifact to that same revision, require the live "
-    "repository ruleset and qualifying independent approvals, then perform release "
-    "authorization separately. This packet never tags, publishes, signs, deploys, or releases."
+    "migration/package/SBOM/provenance artifact to that same revision, verify the effective "
+    "repository ruleset and its required review policy, then perform release authorization "
+    "separately. This packet never tags, publishes, signs, deploys, or releases."
+)
+_DIGEST_FIELDS = (
+    "source_artifact_digest_sha256",
+    "sbom_digest_sha256",
+    "provenance_digest_sha256",
+    "test_evidence_digest_sha256",
+    "coverage_evidence_digest_sha256",
+    "security_evidence_digest_sha256",
+    "sast_evidence_digest_sha256",
+    "recovery_evidence_digest_sha256",
+    "operability_evidence_digest_sha256",
+    "accessibility_evidence_digest_sha256",
+    "migration_rollback_evidence_digest_sha256",
+    "package_reproducibility_evidence_digest_sha256",
 )
 
 
@@ -136,20 +150,7 @@ class ReleaseReadinessReviewPacket:
     def __post_init__(self) -> None:
         """Validate all reviewed evidence and seal its exact creation snapshot."""
         _validate_revision(self.candidate_revision_sha)
-        for field_name in (
-            "source_artifact_digest_sha256",
-            "sbom_digest_sha256",
-            "provenance_digest_sha256",
-            "test_evidence_digest_sha256",
-            "coverage_evidence_digest_sha256",
-            "security_evidence_digest_sha256",
-            "sast_evidence_digest_sha256",
-            "recovery_evidence_digest_sha256",
-            "operability_evidence_digest_sha256",
-            "accessibility_evidence_digest_sha256",
-            "migration_rollback_evidence_digest_sha256",
-            "package_reproducibility_evidence_digest_sha256",
-        ):
+        for field_name in _DIGEST_FIELDS:
             _validate_digest(getattr(self, field_name), field_name)
         _validate_actor_reference(self.requester_actor_reference, "requester_actor_reference")
         _validate_actor_reference(self.reviewer_actor_reference, "reviewer_actor_reference")
@@ -218,6 +219,8 @@ class ReleaseReadinessReviewPacket:
         """Return one verified payload or fail closed after evidence mutation."""
         self._require_fixed_governance()
         _validate_revision(self.candidate_revision_sha)
+        for field_name in _DIGEST_FIELDS:
+            _validate_digest(getattr(self, field_name), field_name)
         _validate_actor_reference(self.requester_actor_reference, "requester_actor_reference")
         _validate_actor_reference(self.reviewer_actor_reference, "reviewer_actor_reference")
         _validate_timestamp(self.reviewed_at, "reviewed_at")
