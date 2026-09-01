@@ -102,7 +102,11 @@ def test_untrusted_contract_release_evidence_is_rejected(
     [
         ("projection_key", "person:1234", "deployable architecture key"),
         ("projection_kind", "person", "supported architecture kind"),
-        ("source_repository", "ContextualWisdomLab/enterprise-architecture-core", "Orgmetra source repository"),
+        (
+            "source_repository",
+            "ContextualWisdomLab/enterprise-architecture-core",
+            "Orgmetra source repository",
+        ),
         ("source_revision", "not-a-sha", "40-character lowercase source revision"),
         ("effective_from", datetime(2026, 9, 1), "timezone-aware effective_from"),
         (
@@ -116,9 +120,15 @@ def test_untrusted_contract_release_evidence_is_rejected(
             "effective_to must be after effective_from",
         ),
         ("owner_reference", "person:employee-123", "non-person architecture owner reference"),
+        ("owner_reference", "team:", "non-person architecture owner reference"),
         (
             "dependency_references",
             ("employment:abc",),
+            "architecture-only dependency reference",
+        ),
+        (
+            "dependency_references",
+            ("service:",),
             "architecture-only dependency reference",
         ),
     ],
@@ -145,6 +155,18 @@ def test_candidate_collections_are_immutable_after_validation() -> None:
     assert candidate.dependency_references == ("service:keyverse", "service:naruon")
     with pytest.raises(AttributeError):
         candidate.dependency_references.append("person:employee-1")  # type: ignore[attr-defined]
+
+
+def test_unvalidated_candidate_object_cannot_bypass_constructor_checks() -> None:
+    """Reject arbitrary objects even when contract-release evidence itself is valid."""
+    with pytest.raises(TypeError, match="ArchitectureProjectionCandidate"):
+        evaluate_projection_readiness(object(), _release())  # type: ignore[arg-type]
+
+
+def test_unvalidated_release_object_cannot_bypass_release_evidence_type() -> None:
+    """Reject duck-typed release objects before reading their caller-controlled fields."""
+    with pytest.raises(TypeError, match="ContractReleaseEvidence"):
+        evaluate_projection_readiness(_candidate(), object())  # type: ignore[arg-type]
 
 
 def test_projection_decision_exposes_no_free_form_hr_payload() -> None:
