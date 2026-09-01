@@ -11,14 +11,16 @@ must provide any trusted signing or platform attestation required for release.
 from __future__ import annotations
 
 import argparse
+import binascii
 from collections import defaultdict
-import gzip
 import hashlib
 import io
 import json
+import os
 from pathlib import Path, PurePosixPath
 import platform
 import re
+import struct
 import subprocess
 import tarfile
 import tomllib
@@ -29,6 +31,8 @@ from uuid import NAMESPACE_URL, uuid5
 _REPOSITORY_URL = "https://github.com/ContextualWisdomLab/Orgmetra"
 _REPOSITORY_GIT_URI = "git+https://github.com/ContextualWisdomLab/Orgmetra.git"
 _EXPECTED_PYTHON_RUNTIME = "3.14.7"
+_EXPECTED_PYTHON_IMPLEMENTATION = "CPython"
+_COMPRESSION_IMPLEMENTATION = "orgmetra-stored-gzip-v1"
 _SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _PYTHON_REQUIREMENT_PATTERN = re.compile(
     r"^\s*(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]+\])?\s*(?P<constraint>[^;]*)"
@@ -65,10 +69,15 @@ def _repository_root() -> Path:
 def _validate_runtime() -> None:
     """Require the exact CPython patch runtime that defines evidence bytes."""
     observed_runtime = platform.python_version()
-    if observed_runtime != _EXPECTED_PYTHON_RUNTIME:
+    observed_implementation = platform.python_implementation()
+    if (
+        observed_runtime != _EXPECTED_PYTHON_RUNTIME
+        or observed_implementation != _EXPECTED_PYTHON_IMPLEMENTATION
+    ):
         raise ReleaseEvidenceError(
             "release evidence runtime mismatch: "
-            f"expected={_EXPECTED_PYTHON_RUNTIME}, observed={observed_runtime}"
+            f"expected={_EXPECTED_PYTHON_IMPLEMENTATION} {_EXPECTED_PYTHON_RUNTIME}, "
+            f"observed={observed_implementation} {observed_runtime}"
         )
 
 
@@ -121,6 +130,29 @@ def _blob_bytes(object_id: str) -> bytes:
     return _run_git(["cat-file", "blob", object_id])
 
 
+def _deterministic_gzip(content: bytes) -> bytes:
+    """Encode RFC 1952 gzip bytes without delegating DEFLATE output to host zlib."""
+    if type(content) is not bytes:
+        raise ReleaseEvidenceError("deterministic gzip content must be exact bytes")
+
+    encoded = bytearray(b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff")
+    if not content:
+        encoded.extend(b"\x01\x00\x00\xff\xff")
+    else:
+        for offset in range(0, len(content), 65535):
+            block = content[offset : offset + 65535]
+            is_final = offset + len(block) == len(content)
+            encoded.append(0x01 if is_final else 0x00)
+            block_size = len(block)
+            encoded.extend(struct.pack("<H", block_size))
+            encoded.extend(struct.pack("<H", 0xFFFF - block_size))
+            encoded.extend(block)
+
+    crc32 = binascii.crc32(content) & 0xFFFFFFFF
+    encoded.extend(struct.pack("<II", crc32, len(content) & 0xFFFFFFFF))
+    return bytes(encoded)
+
+
 def _build_source_archive(
     source_sha: str,
     entries: Iterable[tuple[str, str, str, str]],
@@ -152,7 +184,7 @@ def _build_source_archive(
             info.mode = 0o755 if mode == "100755" else 0o644
             info.size = len(content)
             archive.addfile(info, io.BytesIO(content))
-    return gzip.compress(tar_buffer.getvalue(), compresslevel=9, mtime=0)
+    return _deterministic_gzip(tar_buffer.getvalue())
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -172,12 +204,15 @@ def _python_name(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def _pypi_ref(name: str, version: str | None) -> str:
-    """Return a deterministic Python package bom-ref, using purl when exact."""
+def _pypi_ref(name: str, version: str | None, requirement: str | None = None) -> str:
+    """Return a deterministic Python bom-ref, digesting non-exact declarations."""
     normalized_name = _python_name(name)
     if version:
         return f"pkg:pypi/{quote(normalized_name, safe='-._~')}@{quote(version, safe='-._~')}"
-    return f"urn:orgmetra:pypi-requirement:{normalized_name}"
+    if type(requirement) is not str or not requirement:
+        raise ReleaseEvidenceError("non-exact Python dependency must preserve its full requirement")
+    requirement_digest = hashlib.sha256(requirement.encode("utf-8")).hexdigest()[:16]
+    return f"urn:orgmetra:pypi-requirement:{normalized_name}:{requirement_digest}"
 
 
 def _npm_ref(name: str, version: str | None, requirement: str) -> str:
@@ -306,7 +341,7 @@ def _build_sbom(
     for parent_ref, requirements, scope in deferred_python_dependencies:
         for requirement in requirements:
             name, version = _python_requirement(requirement)
-            component_ref = _pypi_ref(name, version)
+            component_ref = _pypi_ref(name, version, requirement)
             component = {
                 "type": "library",
                 "bom-ref": component_ref,
@@ -378,6 +413,20 @@ def _build_sbom(
     return _canonical_json(document)
 
 
+def _builder_identity(source_sha: str) -> tuple[str, str]:
+    """Return the execution-mode builder URI without mislabeling local evidence."""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        return (
+            f"{_REPOSITORY_URL}/actions/workflows/release-candidate-evidence-quality.yml",
+            "github-actions",
+        )
+    return (
+        f"{_REPOSITORY_URL}/blob/{source_sha}/docs/traceability/"
+        "release-candidate-evidence.md#local-builder-v1",
+        "local",
+    )
+
+
 def _build_provenance(
     source_sha: str,
     archive_name: str,
@@ -389,6 +438,7 @@ def _build_provenance(
         f"{_REPOSITORY_URL}/blob/{source_sha}/docs/traceability/"
         "release-candidate-evidence.md#build-type-v1"
     )
+    builder_id, builder_environment = _builder_identity(source_sha)
     document: dict[str, Any] = {
         "_type": "https://in-toto.io/Statement/v1",
         "subject": [
@@ -406,7 +456,10 @@ def _build_provenance(
                 "internalParameters": {
                     "archiveFormat": "tar+gzip",
                     "archiveMtime": 0,
+                    "builderEnvironment": builder_environment,
+                    "compressionImplementation": _COMPRESSION_IMPLEMENTATION,
                     "cycloneDxSpecVersion": "1.7",
+                    "pythonImplementation": _EXPECTED_PYTHON_IMPLEMENTATION,
                     "pythonRuntime": _EXPECTED_PYTHON_RUNTIME,
                 },
                 "resolvedDependencies": [
@@ -416,14 +469,7 @@ def _build_provenance(
                     }
                 ],
             },
-            "runDetails": {
-                "builder": {
-                    "id": (
-                        f"{_REPOSITORY_URL}/actions/workflows/"
-                        "release-candidate-evidence-quality.yml"
-                    )
-                }
-            },
+            "runDetails": {"builder": {"id": builder_id}},
         },
     }
     return _canonical_json(document)
