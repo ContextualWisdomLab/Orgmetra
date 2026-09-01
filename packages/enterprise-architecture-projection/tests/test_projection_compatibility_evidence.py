@@ -49,6 +49,19 @@ def _release() -> ContractReleaseEvidence:
     )
 
 
+def _legacy_admission() -> ContractAdmissionEvidence:
+    """Return semantic admission that lacks lifecycle compatibility evidence."""
+    return ContractAdmissionEvidence(
+        contract_commit_sha=_CONTRACT_SHA,
+        contract_asset_sha256=_ARTIFACT_SHA256,
+        conformance_receipt_sha256="b" * 64,
+        bundle_manifest_sha256="c" * 64,
+        provenance_attestation_sha256="d" * 64,
+        admission_state="verified",
+        verified_at=datetime(2026, 9, 1, 6, 2, tzinfo=UTC),
+    )
+
+
 def _admission(**overrides: object) -> ContractAdmissionEvidence:
     """Return release-bound evidence including compatibility and migration receipts."""
     values: dict[str, object] = {
@@ -57,13 +70,28 @@ def _admission(**overrides: object) -> ContractAdmissionEvidence:
         "conformance_receipt_sha256": "b" * 64,
         "bundle_manifest_sha256": "c" * 64,
         "provenance_attestation_sha256": "d" * 64,
-        "compatibility_receipt_sha256": _COMPATIBILITY_SHA256,
-        "migration_receipt_sha256": _MIGRATION_SHA256,
         "admission_state": "verified",
         "verified_at": datetime(2026, 9, 1, 6, 2, tzinfo=UTC),
+        "compatibility_receipt_sha256": _COMPATIBILITY_SHA256,
+        "migration_receipt_sha256": _MIGRATION_SHA256,
     }
     values.update(overrides)
     return ContractAdmissionEvidence(**values)
+
+
+def test_semantic_admission_without_lifecycle_receipts_remains_blocked() -> None:
+    """Do not mistake conformance and provenance for consumer compatibility."""
+    decision = evaluate_projection_readiness(
+        _candidate(),
+        _release(),
+        _legacy_admission(),
+    )
+
+    assert decision.ready is False
+    assert decision.reason == "context_graph_contract_lifecycle_evidence_not_verified"
+    assert decision.next_action == "verify_context_graph_contract_compatibility_and_migration"
+    assert decision.contract_compatibility_receipt_sha256 is None
+    assert decision.contract_migration_receipt_sha256 is None
 
 
 def test_ready_projection_retains_compatibility_and_migration_receipts() -> None:
