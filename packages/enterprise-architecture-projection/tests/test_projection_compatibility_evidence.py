@@ -120,6 +120,16 @@ def test_each_missing_lifecycle_receipt_blocks_projection_independently(
     assert decision.contract_migration_receipt_sha256 == retained_migration
 
 
+def test_one_lifecycle_receipt_cannot_stand_in_for_both_results() -> None:
+    """Reject duplicated receipt identity across compatibility and migration evidence."""
+    with pytest.raises(ValueError, match="distinct lifecycle evidence"):
+        evaluate_projection_readiness(
+            _candidate(),
+            _release(),
+            _admission(migration_receipt_sha256=_COMPATIBILITY_SHA256),
+        )
+
+
 def test_ready_projection_retains_compatibility_and_migration_receipts() -> None:
     """Do not authorize handoff without exact compatibility and migration evidence."""
     decision = evaluate_projection_readiness(_candidate(), _release(), _admission())
