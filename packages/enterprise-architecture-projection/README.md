@@ -20,4 +20,6 @@ Permitted projection concepts are deployable architecture concerns such as appli
 
 Candidate construction is not the only integrity boundary. `evaluate_projection_readiness` revalidates the exact retained candidate immediately before issuing a readiness decision so a caller cannot use low-level frozen-dataclass mutation to replace a validated architecture owner with a Person reference, restore a mutable dependency collection, or otherwise bypass constructor checks after validation.
 
+Trust-bearing timestamps use exact built-in `datetime` values paired with Python's immutable built-in fixed-offset `timezone`. Behavior-bearing `datetime` subclasses and caller-defined mutable `tzinfo` providers are rejected both when candidate evidence is retained and when release/admission evidence is evaluated. This prevents a value that initially appears timezone-aware from changing offset or comparison behavior after validation and silently rewriting effective, recorded, or verification-time meaning.
+
 The package intentionally exposes no free-form payload field. If a future use case needs additional fields, add them explicitly with RED tests proving that HR record data cannot cross the boundary.
