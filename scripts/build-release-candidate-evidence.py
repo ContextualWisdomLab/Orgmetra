@@ -37,8 +37,24 @@ _SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _PYTHON_REQUIREMENT_PATTERN = re.compile(
     r"^\s*(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]+\])?\s*(?P<constraint>[^;]*)"
 )
-_EXACT_VERSION_PATTERN = re.compile(r"^==\s*(?P<version>[^\s,]+)\s*$")
-_NPM_EXACT_VERSION_PATTERN = re.compile(r"^(?:v)?(?P<version>[0-9]+(?:\.[0-9]+){1,3}(?:[-+][A-Za-z0-9.-]+)?)$")
+_PYTHON_CONCRETE_VERSION = (
+    r"(?:(?:[0-9]+)!)?[0-9]+(?:\.[0-9]+)*"
+    r"(?:(?:a|b|rc)[0-9]+)?(?:\.post[0-9]+)?(?:\.dev[0-9]+)?"
+    r"(?:\+[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*)?"
+)
+_EXACT_VERSION_PATTERN = re.compile(
+    rf"^==\s*(?P<version>{_PYTHON_CONCRETE_VERSION})\s*$",
+    re.IGNORECASE,
+)
+_SEMVER_NUMBER = r"(?:0|[1-9][0-9]*)"
+_SEMVER_PRERELEASE_IDENTIFIER = (
+    r"(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+)
+_NPM_EXACT_VERSION_PATTERN = re.compile(
+    rf"^(?P<version>{_SEMVER_NUMBER}\.{_SEMVER_NUMBER}\.{_SEMVER_NUMBER}"
+    rf"(?:-{_SEMVER_PRERELEASE_IDENTIFIER}(?:\.{_SEMVER_PRERELEASE_IDENTIFIER})*)?"
+    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)$"
+)
 _ALLOWED_GIT_MODES = frozenset({"100644", "100755", "120000"})
 
 
@@ -225,7 +241,7 @@ def _npm_ref(name: str, version: str | None, requirement: str) -> str:
 
 
 def _python_requirement(requirement: str) -> tuple[str, str | None]:
-    """Extract the distribution name and an exact pin when one is declared."""
+    """Extract the distribution name and an exact concrete pin when one is declared."""
     match = _PYTHON_REQUIREMENT_PATTERN.match(requirement)
     if match is None:
         raise ReleaseEvidenceError(f"unsupported Python dependency declaration: {requirement!r}")
@@ -293,6 +309,27 @@ def _build_sbom(
             if not isinstance(dependencies, list) or any(type(item) is not str for item in dependencies):
                 raise ReleaseEvidenceError(f"project dependencies must be a string array: {path}")
             deferred_python_dependencies.append((component_ref, dependencies, "required"))
+
+            optional_dependencies = project.get("optional-dependencies", {})
+            if not isinstance(optional_dependencies, dict):
+                raise ReleaseEvidenceError(
+                    f"project optional-dependencies must be a table of string arrays: {path}"
+                )
+            for group_name in sorted(optional_dependencies):
+                group_requirements = optional_dependencies[group_name]
+                if (
+                    type(group_name) is not str
+                    or not group_name
+                    or not isinstance(group_requirements, list)
+                    or any(type(item) is not str for item in group_requirements)
+                ):
+                    raise ReleaseEvidenceError(
+                        f"project optional-dependencies must be a table of string arrays: {path}"
+                    )
+                deferred_python_dependencies.append(
+                    (component_ref, group_requirements, "optional")
+                )
+
             build_system = document.get("build-system", {})
             build_requirements = build_system.get("requires", []) if isinstance(build_system, dict) else []
             if not isinstance(build_requirements, list) or any(
