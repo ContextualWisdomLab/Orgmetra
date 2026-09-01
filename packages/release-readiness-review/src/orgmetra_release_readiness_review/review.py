@@ -26,8 +26,9 @@ _NEXT_ACTION = (
     "Freshly verify that candidate_revision_sha is the integrated default-branch head, "
     "re-resolve every referenced CI/security/coverage/recovery/accessibility/operability/"
     "migration/package/SBOM/provenance artifact to that same revision, verify the effective "
-    "repository ruleset and its required review policy, then perform release authorization "
-    "separately. This packet never tags, publishes, signs, deploys, or releases."
+    "repository ruleset and its required review policy, require fresh qualifying independent review "
+    "evidence without manufacturing approval, then perform release authorization separately. "
+    "This packet never tags, publishes, signs, deploys, or releases."
 )
 _DIGEST_FIELDS = (
     "source_artifact_digest_sha256",
