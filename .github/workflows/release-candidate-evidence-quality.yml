@@ -42,7 +42,10 @@ jobs:
           node-version: "24"
           check-latest: false
       - name: Exercise reproducible release-candidate evidence contract
-        run: node --test tests/release-candidate-evidence.test.mjs
+        run: >-
+          node --test
+          tests/release-candidate-evidence.test.mjs
+          tests/release-candidate-evidence-component-merge.test.mjs
       - name: Build inspectable candidate evidence
         run: python scripts/build-release-candidate-evidence.py --output-dir "${{ runner.temp }}/orgmetra-release-candidate" --source-sha "${EXPECTED_SHA}"
       - name: Upload candidate evidence for review
