@@ -1,5 +1,7 @@
 # Orgmetra
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/Orgmetra)
+
 **Evidence-centered HRIS and HCM for the full employment lifecycle.**
 
 Orgmetra connects job architecture, recruiting evidence, employment records, performance outcomes, and validation evidence without collapsing them into one opaque HR record. It is designed for teams that need HR decisions to remain explainable over time: what the job required, what evidence informed a decision, what happened afterward, and which system owns each fact.
