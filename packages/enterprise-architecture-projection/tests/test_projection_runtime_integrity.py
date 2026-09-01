@@ -47,6 +47,14 @@ class _MutableTimezone(tzinfo):
         return timedelta(0)
 
 
+class _BehaviorBearingDateTime(datetime):
+    """Adversarial datetime that can override temporal comparison behavior."""
+
+    def utcoffset(self) -> timedelta:
+        """Claim a stable zero offset independent of retained timezone data."""
+        return timedelta(0)
+
+
 def _candidate() -> ArchitectureProjectionCandidate:
     """Return one valid projection candidate for runtime-tampering tests."""
     return ArchitectureProjectionCandidate(
@@ -156,3 +164,16 @@ def test_behavior_bearing_release_timezone_cannot_rewrite_verification_evidence(
 
     with pytest.raises(TypeError, match="verified_at must use exact built-in datetime and timezone"):
         evaluate_projection_readiness(_candidate(), release, _admission())
+
+
+def test_behavior_bearing_datetime_subclass_cannot_rewrite_recorded_time() -> None:
+    """Reject datetime subclasses before overridden temporal behavior enters readiness."""
+    candidate = _candidate()
+    object.__setattr__(
+        candidate,
+        "recorded_at",
+        _BehaviorBearingDateTime(2026, 9, 1, 6, 0, tzinfo=UTC),
+    )
+
+    with pytest.raises(TypeError, match="recorded_at must use exact built-in datetime and timezone"):
+        evaluate_projection_readiness(candidate, _release(), _admission())
