@@ -81,6 +81,7 @@ _NPM_EXACT_VERSION_PATTERN = re.compile(
     r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)$"
 )
 _ALLOWED_GIT_MODES = frozenset({"100644", "100755", "120000"})
+_DEPENDENCY_SCOPE_PRIORITY = {"excluded": 0, "optional": 1, "required": 2}
 
 
 class ReleaseEvidenceError(RuntimeError):
@@ -336,6 +337,57 @@ def _add_component(
     components[component_ref] = component
 
 
+def _merge_dependency_component(
+    components: dict[str, dict[str, Any]],
+    component: dict[str, Any],
+) -> None:
+    """Merge repeated declarations for one resolved dependency without losing evidence."""
+    component_ref = component.get("bom-ref")
+    if not isinstance(component_ref, str) or not component_ref:
+        raise ReleaseEvidenceError("CycloneDX component must have a non-empty bom-ref")
+    previous = components.get(component_ref)
+    if previous is None:
+        _add_component(components, component)
+        return
+
+    identity_fields = {key: value for key, value in previous.items() if key not in {"scope", "properties"}}
+    candidate_identity = {
+        key: value for key, value in component.items() if key not in {"scope", "properties"}
+    }
+    if identity_fields != candidate_identity:
+        raise ReleaseEvidenceError(f"conflicting CycloneDX component evidence for {component_ref}")
+
+    previous_scope = previous.get("scope")
+    candidate_scope = component.get("scope")
+    if previous_scope not in _DEPENDENCY_SCOPE_PRIORITY or candidate_scope not in _DEPENDENCY_SCOPE_PRIORITY:
+        raise ReleaseEvidenceError(f"dependency component has invalid CycloneDX scope for {component_ref}")
+
+    merged_properties: set[tuple[str, str]] = set()
+    for source in (previous, component):
+        properties = source.get("properties")
+        if not isinstance(properties, list):
+            raise ReleaseEvidenceError(f"dependency component properties must be a list for {component_ref}")
+        for property_row in properties:
+            if not isinstance(property_row, dict):
+                raise ReleaseEvidenceError(f"dependency component property must be an object for {component_ref}")
+            name = property_row.get("name")
+            value = property_row.get("value")
+            if type(name) is not str or not name or type(value) is not str:
+                raise ReleaseEvidenceError(f"dependency component property must be string evidence for {component_ref}")
+            merged_properties.add((name, value))
+
+    merged = dict(previous)
+    merged["scope"] = max(
+        (previous_scope, candidate_scope),
+        key=lambda scope: _DEPENDENCY_SCOPE_PRIORITY[scope],
+    )
+    merged["properties"] = [
+        {"name": name, "value": value}
+        for name, value in sorted(merged_properties)
+    ]
+    components[component_ref] = merged
+
+
 def _build_sbom(
     source_sha: str,
     archive_digest: str,
@@ -459,8 +511,7 @@ def _build_sbom(
             if version:
                 component["version"] = version
                 component["purl"] = component_ref
-            if component_ref not in components:
-                _add_component(components, component)
+            _merge_dependency_component(components, component)
             dependency_edges[parent_ref].add(component_ref)
 
     for parent_ref, dependencies, scope in deferred_npm_dependencies:
@@ -478,8 +529,7 @@ def _build_sbom(
             if version:
                 component["version"] = version
                 component["purl"] = component_ref
-            if component_ref not in components:
-                _add_component(components, component)
+            _merge_dependency_component(components, component)
             dependency_edges[parent_ref].add(component_ref)
 
     if not local_refs:
