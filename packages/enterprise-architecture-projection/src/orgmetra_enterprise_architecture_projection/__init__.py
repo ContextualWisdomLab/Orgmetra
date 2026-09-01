@@ -64,31 +64,8 @@ class ArchitectureProjectionCandidate:
 
     def __post_init__(self) -> None:
         """Normalize immutable collections and reject HR facts or malformed evidence."""
-        if _PROJECTION_KEY_RE.fullmatch(self.projection_key) is None:
-            raise ValueError("projection_key must be a deployable architecture key")
-        if not isinstance(self.projection_kind, ProjectionKind):
-            raise ValueError("projection_kind must be a supported architecture kind")
-        if self.source_repository != _ORGMETRA_REPOSITORY:
-            raise ValueError("source_repository must be the Orgmetra source repository")
-        if _SHA_RE.fullmatch(self.source_revision) is None:
-            raise ValueError("source_revision must be a 40-character lowercase source revision")
-        _require_aware_time(self.effective_from, "effective_from")
-        _require_aware_time(self.recorded_at, "recorded_at")
-        if self.effective_to is not None:
-            _require_aware_time(self.effective_to, "effective_to")
-            if self.effective_to <= self.effective_from:
-                raise ValueError("effective_to must be after effective_from")
-        if _OWNER_REFERENCE_RE.fullmatch(self.owner_reference) is None:
-            raise ValueError("owner_reference must be a non-person architecture owner reference")
-        dependencies = tuple(self.dependency_references)
-        if any(
-            _DEPENDENCY_REFERENCE_RE.fullmatch(reference) is None
-            for reference in dependencies
-        ):
-            raise ValueError(
-                "dependency_references must contain architecture-only dependency reference values"
-            )
-        object.__setattr__(self, "dependency_references", dependencies)
+        object.__setattr__(self, "dependency_references", tuple(self.dependency_references))
+        _validate_projection_candidate(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +112,35 @@ def _require_aware_time(value: datetime, field_name: str) -> None:
     """Reject naive timestamps because projection evidence is compared across systems."""
     if value.utcoffset() is None:
         raise ValueError(f"{field_name} must be timezone-aware {field_name}")
+
+
+def _validate_projection_candidate(candidate: ArchitectureProjectionCandidate) -> None:
+    """Revalidate the exact retained candidate before any readiness decision is issued."""
+    if _PROJECTION_KEY_RE.fullmatch(candidate.projection_key) is None:
+        raise ValueError("projection_key must be a deployable architecture key")
+    if not isinstance(candidate.projection_kind, ProjectionKind):
+        raise ValueError("projection_kind must be a supported architecture kind")
+    if candidate.source_repository != _ORGMETRA_REPOSITORY:
+        raise ValueError("source_repository must be the Orgmetra source repository")
+    if _SHA_RE.fullmatch(candidate.source_revision) is None:
+        raise ValueError("source_revision must be a 40-character lowercase source revision")
+    _require_aware_time(candidate.effective_from, "effective_from")
+    _require_aware_time(candidate.recorded_at, "recorded_at")
+    if candidate.effective_to is not None:
+        _require_aware_time(candidate.effective_to, "effective_to")
+        if candidate.effective_to <= candidate.effective_from:
+            raise ValueError("effective_to must be after effective_from")
+    if _OWNER_REFERENCE_RE.fullmatch(candidate.owner_reference) is None:
+        raise ValueError("owner_reference must be a non-person architecture owner reference")
+    if type(candidate.dependency_references) is not tuple:
+        raise ValueError("dependency_references must remain an immutable tuple")
+    if any(
+        _DEPENDENCY_REFERENCE_RE.fullmatch(reference) is None
+        for reference in candidate.dependency_references
+    ):
+        raise ValueError(
+            "dependency_references must contain architecture-only dependency reference values"
+        )
 
 
 def _validate_contract_release(release: ContractReleaseEvidence) -> None:
@@ -192,6 +198,7 @@ def evaluate_projection_readiness(
     """Return fail-closed readiness without conferring Enterprise Architecture truth."""
     if type(candidate) is not ArchitectureProjectionCandidate:
         raise TypeError("candidate must be an ArchitectureProjectionCandidate")
+    _validate_projection_candidate(candidate)
     if contract_release is None:
         return ProjectionReadiness(
             ready=False,
