@@ -22,7 +22,7 @@ concurrency:
 jobs:
   unit:
     name: EA projection admission and 100% coverage
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout exact candidate
