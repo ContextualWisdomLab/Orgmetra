@@ -174,10 +174,12 @@ Customer-facing language describes the user's next action and evidence state, no
 
 ## 12. Research and standards basis
 
-The following authoritative sources were re-checked for this baseline. They define design/audit constraints; they do not by themselves certify Orgmetra or establish legal compliance.
+The following authoritative sources were re-checked on 2026-09-02. They define design/audit constraints; they do not by themselves certify Orgmetra or establish legal compliance. WCAG 2.2 remains the current published accessibility basis as ISO/IEC 40500:2025 while ISO/IEC has a newer revision project in development; draft work is not treated as a published requirement. NIST SP 800-53 Rev. 5 also has a finalized Release 5.2.0 control-catalog update from 2025, so current control mapping must use that release rather than assuming the original 2020 catalog is unchanged.
 
 - International Organization for Standardization. (2023). *ISO 30405:2023 Human resource management—Guidelines on recruitment* (2nd ed.). https://www.iso.org/standard/79488.html
+- International Organization for Standardization, & International Electrotechnical Commission. (2025). *ISO/IEC 40500:2025 Information technology—W3C Web Content Accessibility Guidelines (WCAG) 2.2* (2nd ed.). https://www.iso.org/standard/91029.html
 - World Wide Web Consortium. (2023). *Web Content Accessibility Guidelines (WCAG) 2.2*. https://www.w3.org/TR/WCAG22/
+- National Institute of Standards and Technology. (2025, August 27). *NIST releases revision to SP 800-53 security and privacy controls (Release 5.2.0)*. https://csrc.nist.gov/news/2025/nist-releases-revision-to-sp-800-53-controls
 - Joint Task Force. (2020). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53 Rev. 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
 - Autio, C., Schwartz, R., Dunietz, J., Jain, S., Stanley, M., Tabassi, E., Hall, P., & Roberts, K. (2024). *Artificial Intelligence Risk Management Framework: Generative Artificial Intelligence Profile* (NIST AI 600-1). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.AI.600-1
 - American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association.
