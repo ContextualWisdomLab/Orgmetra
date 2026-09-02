@@ -12,6 +12,22 @@ from orgmetra_hris_kernel.facts import AssignmentFact
 from orgmetra_hris_kernel.intervals import RecordedInterval
 
 _EXPLICIT_ASSIGNMENT_CATEGORY_CODES = frozenset({"primary", "concurrent_secondary"})
+_MAX_UUID_INT = (1 << 128) - 1
+
+
+def _require_operational_uuid(value: object, field_name: str) -> UUID:
+    """Require exact runtime UUID identity and reject protocol sentinel values."""
+    if type(value) is not UUID:
+        raise CorrectionError(
+            f"{field_name} must be an exact UUID.",
+            next_action="Use the authoritative operational UUID assigned to this correction record.",
+        )
+    if value.int in (0, _MAX_UUID_INT):
+        raise CorrectionError(
+            f"{field_name} must be an operational UUID, not a reserved sentinel.",
+            next_action="Allocate a non-reserved operational UUID and retry the correction.",
+        )
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +39,21 @@ class AssignmentSupersessionFact:
     predecessor_assignment_record_id: UUID
     replacement_assignment_record_id: UUID
     recorded_at: datetime
+
+    def __post_init__(self) -> None:
+        """Reject malformed provenance identities before they become domain evidence."""
+        for field_name in (
+            "tenant_record_id",
+            "assignment_supersession_record_id",
+            "predecessor_assignment_record_id",
+            "replacement_assignment_record_id",
+        ):
+            _require_operational_uuid(getattr(self, field_name), field_name)
+        if self.predecessor_assignment_record_id == self.replacement_assignment_record_id:
+            raise CorrectionError(
+                "Supersession provenance requires distinct Assignment identities.",
+                next_action="Allocate a new replacement Assignment record ID and retry the correction.",
+            )
 
 
 def correct_assignment_category(
@@ -84,7 +115,20 @@ def correct_assignment_category(
             "Assignment category correction must select a different category.",
             next_action="Keep the existing Assignment when its category is already correct.",
         )
-    if replacement_assignment_record_id == predecessor.assignment_record_id:
+
+    predecessor_assignment_record_id = _require_operational_uuid(
+        predecessor.assignment_record_id,
+        "predecessor_assignment_record_id",
+    )
+    replacement_assignment_record_id = _require_operational_uuid(
+        replacement_assignment_record_id,
+        "replacement_assignment_record_id",
+    )
+    assignment_supersession_record_id = _require_operational_uuid(
+        assignment_supersession_record_id,
+        "assignment_supersession_record_id",
+    )
+    if replacement_assignment_record_id == predecessor_assignment_record_id:
         raise CorrectionError(
             "A category correction requires a new replacement Assignment identity.",
             next_action="Allocate a new Assignment record ID and retry the correction.",
@@ -100,7 +144,7 @@ def correct_assignment_category(
     supersession = AssignmentSupersessionFact(
         tenant_record_id=predecessor.tenant_record_id,
         assignment_supersession_record_id=assignment_supersession_record_id,
-        predecessor_assignment_record_id=predecessor.assignment_record_id,
+        predecessor_assignment_record_id=predecessor_assignment_record_id,
         replacement_assignment_record_id=replacement_assignment_record_id,
         recorded_at=recorded_at,
     )
