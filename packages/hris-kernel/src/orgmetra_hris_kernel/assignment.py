@@ -236,6 +236,12 @@ def validate_position_seat_capacity(
         if fact.tenant_record_id == tenant_record_id
         and fact.position_record_id == position_record_id
     ]
+    for fact in scoped:
+        if not _ratio_is_valid(fact.allocation_ratio):
+            raise PositionSeatError(
+                "allocation_ratio must be greater than 0 and at most 1.0000.",
+                next_action="Enter an allocation between 0.0001 and 1.0000, then save.",
+            )
     visible = resolve_bitemporal_facts(
         scoped,
         tenant_record_id=tenant_record_id,
