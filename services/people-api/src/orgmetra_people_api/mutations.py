@@ -284,7 +284,7 @@ class AssignmentMutationCommand:
         if self.allocation_ratio.as_tuple().exponent < -4:
             raise ValueError("allocation_ratio must have at most four decimal places.")
         if (
-            not isinstance(self.assignment_category_code, str)
+            type(self.assignment_category_code) is not str
             or self.assignment_category_code not in _NEW_ASSIGNMENT_CATEGORY_CODES
         ):
             raise ValueError(
