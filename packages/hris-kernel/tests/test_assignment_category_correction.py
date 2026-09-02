@@ -16,10 +16,22 @@ from .conftest import recorded, utc
 
 SUPERSESSION = UUID("10000000-0000-7000-8000-000000000390")
 REPLACEMENT = UUID("10000000-0000-7000-8000-000000000391")
+MAX_UUID = UUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
+NIL_UUID = UUID(int=0)
 
 
 class ForgedCategory(str):
     """Represent caller-controlled string behavior at the correction boundary."""
+
+
+class ForgedUUID(UUID):
+    """Represent caller-controlled UUID equality at the correction boundary."""
+
+    def __eq__(self, other: object) -> bool:
+        """Lie about identity equality while retaining different UUID bytes."""
+        return False
+
+    __hash__ = UUID.__hash__
 
 
 def test_category_correction_closes_and_links_an_immutable_replacement(
@@ -123,6 +135,75 @@ def test_category_correction_rejects_noop_and_identity_reuse(jordan_icu_assignme
             corrected_category_code="concurrent_secondary",
             recorded_at=utc(2024, 6, 1, 12),
         )
+
+
+def test_category_correction_rejects_forged_reused_assignment_identity(
+    jordan_icu_assignment,
+) -> None:
+    """A UUID subtype cannot lie about equality to reuse the predecessor identity."""
+    predecessor = replace(jordan_icu_assignment, assignment_category_code="primary")
+    forged_reuse = ForgedUUID(str(predecessor.assignment_record_id))
+
+    with pytest.raises(CorrectionError, match="replacement_assignment_record_id"):
+        correct_assignment_category(
+            predecessor,
+            replacement_assignment_record_id=forged_reuse,
+            assignment_supersession_record_id=SUPERSESSION,
+            corrected_category_code="concurrent_secondary",
+            recorded_at=utc(2024, 6, 1, 12),
+        )
+
+
+@pytest.mark.parametrize("invalid_id", [NIL_UUID, MAX_UUID, "not-a-uuid"])
+def test_category_correction_rejects_non_operational_new_identities(
+    jordan_icu_assignment,
+    invalid_id,
+) -> None:
+    """New correction identities must match the PostgreSQL operational UUID contract."""
+    predecessor = replace(jordan_icu_assignment, assignment_category_code="primary")
+
+    with pytest.raises(CorrectionError, match="replacement_assignment_record_id"):
+        correct_assignment_category(
+            predecessor,
+            replacement_assignment_record_id=invalid_id,
+            assignment_supersession_record_id=SUPERSESSION,
+            corrected_category_code="concurrent_secondary",
+            recorded_at=utc(2024, 6, 1, 12),
+        )
+    with pytest.raises(CorrectionError, match="assignment_supersession_record_id"):
+        correct_assignment_category(
+            predecessor,
+            replacement_assignment_record_id=REPLACEMENT,
+            assignment_supersession_record_id=invalid_id,
+            corrected_category_code="concurrent_secondary",
+            recorded_at=utc(2024, 6, 1, 12),
+        )
+
+
+def test_supersession_fact_rejects_direct_identity_drift(jordan_icu_assignment) -> None:
+    """The exported provenance fact cannot be directly constructed with invalid identity truth."""
+    predecessor = replace(jordan_icu_assignment, assignment_category_code="primary")
+    valid = AssignmentSupersessionFact(
+        tenant_record_id=predecessor.tenant_record_id,
+        assignment_supersession_record_id=SUPERSESSION,
+        predecessor_assignment_record_id=predecessor.assignment_record_id,
+        replacement_assignment_record_id=REPLACEMENT,
+        recorded_at=utc(2024, 6, 1, 12),
+    )
+
+    for field_name in (
+        "tenant_record_id",
+        "assignment_supersession_record_id",
+        "predecessor_assignment_record_id",
+        "replacement_assignment_record_id",
+    ):
+        with pytest.raises(CorrectionError, match=field_name):
+            replace(valid, **{field_name: ForgedUUID(str(REPLACEMENT))})
+        with pytest.raises(CorrectionError, match=field_name):
+            replace(valid, **{field_name: NIL_UUID})
+
+    with pytest.raises(CorrectionError, match="distinct Assignment identities"):
+        replace(valid, replacement_assignment_record_id=valid.predecessor_assignment_record_id)
 
 
 def test_category_correction_rejects_already_closed_predecessor(jordan_icu_assignment) -> None:
