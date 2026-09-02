@@ -1,7 +1,6 @@
 """Assignment category correction and supersession regressions."""
 
 from dataclasses import replace
-from datetime import date
 from uuid import UUID
 
 import pytest
@@ -59,21 +58,28 @@ def test_category_correction_closes_and_links_an_immutable_replacement(
     )
 
 
-def test_category_correction_can_explicitly_classify_historical_sentinel(
+@pytest.mark.parametrize(
+    "predecessor_category",
+    ["legacy_unspecified", "secondary", ForgedCategory("primary")],
+)
+def test_category_correction_rejects_non_explicit_predecessor_categories(
     jordan_icu_assignment,
+    predecessor_category,
 ) -> None:
-    """A human correction may replace historical unknown truth without heuristic inference."""
-    closed, replacement, supersession = correct_assignment_category(
+    """This correction contract starts only from exact committed explicit category truth."""
+    predecessor = replace(
         jordan_icu_assignment,
-        replacement_assignment_record_id=REPLACEMENT,
-        assignment_supersession_record_id=SUPERSESSION,
-        corrected_category_code="primary",
-        recorded_at=utc(2024, 6, 1, 12),
+        assignment_category_code=predecessor_category,
     )
 
-    assert closed.assignment_category_code == "legacy_unspecified"
-    assert replacement.assignment_category_code == "primary"
-    assert supersession.predecessor_assignment_record_id == jordan_icu_assignment.assignment_record_id
+    with pytest.raises(CorrectionError, match="explicit governed category"):
+        correct_assignment_category(
+            predecessor,
+            replacement_assignment_record_id=REPLACEMENT,
+            assignment_supersession_record_id=SUPERSESSION,
+            corrected_category_code="primary",
+            recorded_at=utc(2024, 6, 1, 12),
+        )
 
 
 @pytest.mark.parametrize(
