@@ -1,6 +1,7 @@
 """Assignment category correction and supersession regressions."""
 
 from dataclasses import replace
+from datetime import datetime
 from uuid import UUID
 
 import pytest
@@ -32,6 +33,10 @@ class ForgedUUID(UUID):
         return False
 
     __hash__ = UUID.__hash__
+
+
+class ForgedDateTime(datetime):
+    """Represent executable datetime behavior at the correction boundary."""
 
 
 def test_category_correction_closes_and_links_an_immutable_replacement(
@@ -204,6 +209,45 @@ def test_supersession_fact_rejects_direct_identity_drift(jordan_icu_assignment) 
 
     with pytest.raises(CorrectionError, match="distinct Assignment identities"):
         replace(valid, replacement_assignment_record_id=valid.predecessor_assignment_record_id)
+
+
+@pytest.mark.parametrize(
+    "invalid_recorded_at",
+    [
+        "2024-06-01T12:00:00Z",
+        datetime(2024, 6, 1, 12),
+        ForgedDateTime.fromtimestamp(1717243200, tz=utc(2024, 6, 1, 12).tzinfo),
+    ],
+)
+def test_category_correction_rejects_malformed_recorded_time(
+    jordan_icu_assignment,
+    invalid_recorded_at,
+) -> None:
+    """Correction provenance requires one exact offset-aware system timestamp."""
+    predecessor = replace(jordan_icu_assignment, assignment_category_code="primary")
+
+    with pytest.raises(CorrectionError, match="recorded_at"):
+        correct_assignment_category(
+            predecessor,
+            replacement_assignment_record_id=REPLACEMENT,
+            assignment_supersession_record_id=SUPERSESSION,
+            corrected_category_code="concurrent_secondary",
+            recorded_at=invalid_recorded_at,
+        )
+
+
+def test_supersession_fact_rejects_direct_recorded_time_drift(jordan_icu_assignment) -> None:
+    """Direct provenance construction cannot bypass recorded-time runtime integrity."""
+    predecessor = replace(jordan_icu_assignment, assignment_category_code="primary")
+
+    with pytest.raises(CorrectionError, match="recorded_at"):
+        AssignmentSupersessionFact(
+            tenant_record_id=predecessor.tenant_record_id,
+            assignment_supersession_record_id=SUPERSESSION,
+            predecessor_assignment_record_id=predecessor.assignment_record_id,
+            replacement_assignment_record_id=REPLACEMENT,
+            recorded_at=datetime(2024, 6, 1, 12),
+        )
 
 
 def test_category_correction_rejects_already_closed_predecessor(jordan_icu_assignment) -> None:
