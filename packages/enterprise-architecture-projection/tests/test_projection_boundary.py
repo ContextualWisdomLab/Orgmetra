@@ -277,3 +277,24 @@ def test_projection_decision_exposes_no_free_form_hr_payload() -> None:
     assert not hasattr(decision, "employment")
     assert not hasattr(decision, "job")
     assert MappingProxyType({}) == {}
+
+
+def test_projection_kind_covers_declared_ea_decision_plane_scope() -> None:
+    """Keep executable projection concepts aligned with the declared EA handoff contract."""
+    required_kinds = {
+        "application",
+        "service",
+        "api",
+        "worker",
+        "database",
+        "runtime",
+        "provider",
+        "technology_version",
+        "lifecycle",
+        "risk",
+        "ownership",
+        "remediation",
+        "transformation",
+    }
+
+    assert required_kinds <= {kind.value for kind in ProjectionKind}
