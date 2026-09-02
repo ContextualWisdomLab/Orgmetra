@@ -133,13 +133,14 @@ def position_body() -> bytes:
 
 
 def assignment_body() -> bytes:
-    """Return one canonical assignment command body."""
+    """Return one canonical assignment command body with explicit HR classification."""
     return json.dumps(
         {
             "employment_record_id": str(EMPLOYMENT),
             "person_record_id": str(PERSON),
             "position_record_id": str(POSITION),
             "allocation_ratio": "1.0000",
+            "assignment_category_code": "primary",
             "effective_from": "2026-08-18",
             "decision_reason": "Assign the hired worker to the open seat.",
             "confirmation_reference": "human_confirmation:review-88",
@@ -310,6 +311,7 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual((assignment_status, assignment_payload), (201, {"assignment_record_id": str(ASSIGNMENT)}))
         self.assertEqual(port.assignment_calls[0][0].allocation_ratio, Decimal("1.0000"))
+        self.assertEqual(port.assignment_calls[0][0].assignment_category_code, "primary")
         self.assertEqual(port.assignment_calls[0][0].idempotency_key, "idempotency-key-17xx")
 
     async def test_route_header_and_media_input_fail_before_authentication(self) -> None:
