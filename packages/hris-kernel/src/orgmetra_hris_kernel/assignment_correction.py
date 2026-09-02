@@ -30,6 +30,16 @@ def _require_operational_uuid(value: object, field_name: str) -> UUID:
     return value
 
 
+def _require_recorded_at(value: object) -> datetime:
+    """Require one exact offset-aware system timestamp for correction provenance."""
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+        raise CorrectionError(
+            "recorded_at must be an exact timezone-aware datetime.",
+            next_action="Use the database-owned correction timestamp with an explicit UTC offset.",
+        )
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class AssignmentSupersessionFact:
     """Link one superseded Assignment fact to its immutable replacement."""
@@ -41,7 +51,7 @@ class AssignmentSupersessionFact:
     recorded_at: datetime
 
     def __post_init__(self) -> None:
-        """Reject malformed provenance identities before they become domain evidence."""
+        """Reject malformed provenance identities and timestamps before persistence."""
         for field_name in (
             "tenant_record_id",
             "assignment_supersession_record_id",
@@ -49,6 +59,7 @@ class AssignmentSupersessionFact:
             "replacement_assignment_record_id",
         ):
             _require_operational_uuid(getattr(self, field_name), field_name)
+        _require_recorded_at(self.recorded_at)
         if self.predecessor_assignment_record_id == self.replacement_assignment_record_id:
             raise CorrectionError(
                 "Supersession provenance requires distinct Assignment identities.",
@@ -128,6 +139,7 @@ def correct_assignment_category(
         assignment_supersession_record_id,
         "assignment_supersession_record_id",
     )
+    recorded_at = _require_recorded_at(recorded_at)
     if replacement_assignment_record_id == predecessor_assignment_record_id:
         raise CorrectionError(
             "A category correction requires a new replacement Assignment identity.",
