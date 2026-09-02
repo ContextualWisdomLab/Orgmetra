@@ -12,9 +12,6 @@ from orgmetra_hris_kernel.facts import AssignmentFact
 from orgmetra_hris_kernel.intervals import RecordedInterval
 
 _EXPLICIT_ASSIGNMENT_CATEGORY_CODES = frozenset({"primary", "concurrent_secondary"})
-_PERSISTED_ASSIGNMENT_CATEGORY_CODES = frozenset(
-    {"legacy_unspecified", "primary", "concurrent_secondary"}
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,20 +33,20 @@ def correct_assignment_category(
     corrected_category_code: str,
     recorded_at: datetime,
 ) -> tuple[AssignmentFact, AssignmentFact, AssignmentSupersessionFact]:
-    """Close one Assignment fact and create a linked category-only replacement.
+    """Close one explicit Assignment fact and create a linked category replacement.
 
     The replacement preserves tenant, Employment, Person, Position, allocation,
     and effective-time truth. It receives a new Assignment identity and a new
-    open recorded interval beginning exactly when the predecessor closes.
-    Historical ``legacy_unspecified`` may be explicitly corrected by a human,
-    but it is never accepted as the new category.
+    open recorded interval beginning exactly when the predecessor closes. This
+    operation corrects a committed explicit category; classifying historical
+    ``legacy_unspecified`` rows remains outside this contract.
 
     Callers must re-run the Assignment portfolio and Position-capacity invariants
     against locked authoritative state before persisting the three returned facts
     in one transaction.
 
     Args:
-        predecessor: Recorded-open Assignment fact being corrected.
+        predecessor: Recorded-open, explicitly classified Assignment being corrected.
         replacement_assignment_record_id: New operational identity for the replacement.
         assignment_supersession_record_id: Identity of the normalized provenance edge.
         corrected_category_code: Exact explicit category chosen by the reviewer.
@@ -59,16 +56,20 @@ def correct_assignment_category(
         The closed predecessor, open replacement, and normalized supersession fact.
 
     Raises:
-        CorrectionError: The correction is malformed, a no-op, reuses the
-            predecessor identity, or cannot close the predecessor history.
+        CorrectionError: The predecessor is not explicitly classified, the
+            correction is malformed or a no-op, the identity is reused, or the
+            predecessor history cannot be closed.
     """
     if (
         type(predecessor.assignment_category_code) is not str
-        or predecessor.assignment_category_code not in _PERSISTED_ASSIGNMENT_CATEGORY_CODES
+        or predecessor.assignment_category_code not in _EXPLICIT_ASSIGNMENT_CATEGORY_CODES
     ):
         raise CorrectionError(
-            "Predecessor Assignment category is not governed persisted truth.",
-            next_action="Repair the malformed Assignment fact before recording a correction.",
+            "Predecessor Assignment must have an explicit governed category.",
+            next_action=(
+                "Use the separately governed historical-classification workflow for "
+                "legacy or malformed Assignment facts."
+            ),
         )
     if (
         type(corrected_category_code) is not str
