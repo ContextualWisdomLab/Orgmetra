@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   kernel:
-    name: Assignment correction application contract
+    name: Assignment correction application and 100% People coverage
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -53,12 +53,10 @@ jobs:
           python -m pip check
       - name: Prove HRIS correction domain contract
         run: python -m pytest packages/hris-kernel/tests/test_assignment_category_correction.py
-      - name: Prove purpose-bound People correction command, HTTP, and PostgreSQL adapter
-        run: >-
-          python -m pytest
-          services/people-api/tests/test_assignment_correction_mutations.py
-          services/people-api/tests/test_assignment_correction_http.py
-          services/people-api/tests/test_postgres_assignment_corrections.py
+      - name: Prove the full People API at exact statement and branch coverage
+        env:
+          COVERAGE_FILE: /tmp/orgmetra-assignment-correction.coverage
+        run: python -m pytest -c services/people-api/pyproject.toml services/people-api/tests
       - name: Require clean checkout
         run: |
           git diff --exit-code
