@@ -6,6 +6,7 @@ on:
       - develop
     paths:
       - .github/workflows/assignment-manifest-repair-data.yml
+      - tests/openapi-contract.test.mjs
 
 permissions:
   contents: write
