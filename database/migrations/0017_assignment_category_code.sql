@@ -18,6 +18,11 @@ ALTER TABLE public.assignment_record
     ADD CONSTRAINT assignment_record_category_code_check
     CHECK (assignment_category_code IN ('legacy_unspecified', 'primary', 'concurrent_secondary')) NOT VALID;
 
+-- Add the constraint without the strongest validation-time table lock, then
+-- prove every migrated historical row conforms before the migration completes.
+ALTER TABLE public.assignment_record
+    VALIDATE CONSTRAINT assignment_record_category_code_check;
+
 CREATE FUNCTION public.enforce_assignment_category_write()
 RETURNS trigger
 LANGUAGE plpgsql
