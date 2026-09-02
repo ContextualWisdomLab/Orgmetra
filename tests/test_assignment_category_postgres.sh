@@ -40,10 +40,16 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0017_assignment
 legacy_category="$(psql "${DATABASE_URL}" -Atqc "SELECT assignment_category_code FROM assignment_record WHERE assignment_record_id='00000000-0000-7000-8000-000000000151';")"
 test "${legacy_category}" = "legacy_unspecified"
 
+# The migration may use NOT VALID to avoid the strongest table lock while adding
+# the CHECK, but it must finish by validating every migrated historical row.
+# Leaving convalidated=false would publish a weaker catalog invariant even though
+# migration 0017 deterministically assigns every pre-contract row the sentinel.
+category_constraint_validated="$(psql "${DATABASE_URL}" -Atqc "SELECT convalidated FROM pg_constraint WHERE conrelid='public.assignment_record'::regclass AND conname='assignment_record_category_code_check';")"
+test "${category_constraint_validated}" = "t"
+
 # A pre-contract row is still legitimate system-time history. Closing its
 # recorded interval must not force Orgmetra to invent a primary/secondary
-# classification merely because PostgreSQL rechecks a NOT VALID constraint on
-# UPDATE.
+# classification merely because PostgreSQL rechecks the CHECK on UPDATE.
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "UPDATE assignment_record SET recorded_to=TIMESTAMPTZ '2026-09-01 00:02:00+00' WHERE assignment_record_id='00000000-0000-7000-8000-000000000151';"
 legacy_recorded_to="$(psql "${DATABASE_URL}" -Atqc "SELECT recorded_to FROM assignment_record WHERE assignment_record_id='00000000-0000-7000-8000-000000000151';")"
 test "${legacy_recorded_to}" = "2026-09-01 00:02:00+00"
