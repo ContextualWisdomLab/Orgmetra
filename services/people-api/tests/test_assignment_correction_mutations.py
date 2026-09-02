@@ -151,8 +151,10 @@ class AssignmentCorrectionMutationTests(unittest.TestCase):
             lambda: correction_command(corrected_category_code=ForgedString("primary")),
             lambda: correction_command(confirmation_reference="not-namespaced"),
             lambda: correction_command(confirmation_reference=ForgedString(CONFIRMATION)),
+            lambda: correction_command(confirmation_reference="human_confirmation:" + "a" * 300),
             lambda: correction_command(evidence_version_code="has space"),
             lambda: correction_command(evidence_version_code=ForgedString(EVIDENCE)),
+            lambda: correction_command(evidence_version_code="v" * 201),
             lambda: correction_command(idempotency_key="short"),
             lambda: correction_command(idempotency_key=ForgedString(IDEMPOTENCY)),
             lambda: AssignmentCorrectionMutationResult(
