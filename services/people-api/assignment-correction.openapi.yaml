@@ -103,9 +103,11 @@ components:
           enum: [primary, concurrent_secondary]
         confirmation_reference:
           type: string
+          maxLength: 300
           pattern: '^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$'
         evidence_version_code:
           type: string
+          maxLength: 200
           pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
     AssignmentCategoryCorrectionResult:
       type: object
