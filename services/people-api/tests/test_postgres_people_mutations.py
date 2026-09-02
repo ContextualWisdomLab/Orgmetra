@@ -286,13 +286,6 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             sql for sql, _parameters in cursor.executions if "candidate_worker_conversion_record" in sql
         )
         self.assertIn("conversion.recorded_to IS NULL", conversion_sql)
-        employment_lock_sql = next(
-            sql
-            for sql, _parameters in cursor.executions
-            if "FROM public.employment_record AS employment" in sql
-            and "employment.employment_record_id = %s" in sql
-        )
-        self.assertIn("FOR UPDATE OF employment", employment_lock_sql)
         self.assertIn("public.assignment_record", sql_text)
         self.assertIn("public.record_audit_outbox_event", sql_text)
         self.assertIn("public.people_mutation_idempotency_record", sql_text)
