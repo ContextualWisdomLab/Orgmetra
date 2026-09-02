@@ -146,9 +146,9 @@ class AssignmentCategoryContractTests(unittest.TestCase):
             assignment_command(category="concurrent_secondary").assignment_category_code,
             "concurrent_secondary",
         )
-        for invalid in ("legacy_unspecified", "secondary", "", "primary_assignment"):
+        for invalid in ("legacy_unspecified", "secondary", "", "primary_assignment", None):
             with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "assignment_category_code"):
-                assignment_command(category=invalid)
+                assignment_command(category=invalid)  # type: ignore[arg-type]
 
     def test_idempotency_digest_includes_assignment_category(self) -> None:
         primary = mutation_command_digest(command=assignment_command(category="primary"), authorization=authorization())
