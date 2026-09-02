@@ -5,6 +5,39 @@ set -euo pipefail
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation_schema.sql
 
+# A migration that fails after its first DDL statement must not leave a partial
+# assignment-category schema behind. A conflicting trigger-function name forces
+# a deterministic late failure after the column and CHECK would otherwise have
+# been committed by psql statement autocommit.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE FUNCTION public.enforce_assignment_category_write()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN NEW;
+END;
+$$;
+SQL
+
+set +e
+atomicity_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0017_assignment_category_code.sql 2>&1)"
+atomicity_status=$?
+set -e
+if [[ ${atomicity_status} -eq 0 || "${atomicity_output}" != *"enforce_assignment_category_write"* ]]; then
+  echo "assignment category migration did not hit the deterministic conflict: ${atomicity_output}" >&2
+  exit 1
+fi
+
+partial_column_count="$(psql "${DATABASE_URL}" -Atqc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='assignment_record' AND column_name='assignment_category_code';")"
+partial_constraint_count="$(psql "${DATABASE_URL}" -Atqc "SELECT count(*) FROM pg_constraint WHERE conrelid='public.assignment_record'::regclass AND conname IN ('assignment_record_category_code_check','assignment_record_primary_bitemporal_exclusion');")"
+if [[ "${partial_column_count}" != "0" || "${partial_constraint_count}" != "0" ]]; then
+  echo "failed assignment category migration left partial schema state" >&2
+  exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "DROP FUNCTION public.enforce_assignment_category_write();"
+
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
 VALUES ('10000000-0000-7000-8000-000000000001', 'tenant_alpha');
