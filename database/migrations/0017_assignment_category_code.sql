@@ -8,6 +8,10 @@
 -- write guard rejects introduction of the sentinel on a new row or by changing
 -- an already classified row back to legacy state.
 
+BEGIN;
+
+SET LOCAL search_path = public, pg_catalog;
+
 ALTER TABLE public.assignment_record
     ADD COLUMN assignment_category_code text NOT NULL DEFAULT 'legacy_unspecified';
 
@@ -69,3 +73,5 @@ ALTER TABLE public.assignment_record
         tstzrange(recorded_from, recorded_to, '[)') WITH &&
     )
     WHERE (assignment_category_code = 'primary');
+
+COMMIT;
