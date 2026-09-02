@@ -1,10 +1,13 @@
 """Fail-closed admission boundary for Orgmetra Enterprise Architecture projections.
 
 This package validates Orgmetra-owned architecture projection candidates and the
-release, semantic-conformance, bundle-identity, provenance, compatibility, and
-migration evidence required before they can be handed to the Enterprise
-Architecture owner. It does not serialize the foreign context-graph contract,
-write Enterprise Architecture state, or transport authoritative HR records.
+shape and internal consistency of external release, conformance, provenance,
+compatibility, and migration evidence. Caller-created evidence is never enough
+to authorize an Enterprise Architecture handoff: positive admission remains
+closed until Orgmetra has a repository-owned adapter for the immutable trust
+contract published by the Context Graph owner. The package does not serialize
+the foreign contract, write Enterprise Architecture state, or transport
+authoritative HR records.
 """
 
 from __future__ import annotations
@@ -80,7 +83,7 @@ class ArchitectureProjectionCandidate:
 
 
 class ContractReleaseEvidence(NamedTuple):
-    """Immutable trusted-control-plane observation of a published context-graph release."""
+    """Release-shape evidence that still requires repository-owned trust verification."""
 
     repository: str
     release_tag: str
@@ -91,7 +94,7 @@ class ContractReleaseEvidence(NamedTuple):
 
 
 class ContractAdmissionEvidence(NamedTuple):
-    """Immutable evidence that exact released bytes passed semantic and lifecycle admission."""
+    """Admission-shape evidence that still requires repository-owned trust verification."""
 
     contract_commit_sha: str
     contract_asset_sha256: str
@@ -343,7 +346,7 @@ def _blocked_readiness(
     release: ContractReleaseEvidence | None = None,
     admission: ContractAdmissionEvidence | None = None,
 ) -> ProjectionReadiness:
-    """Build one immutable fail-closed decision without dropping verified evidence."""
+    """Build one immutable fail-closed decision without dropping validated evidence."""
     return ProjectionReadiness(
         ready=False,
         truth_status=ProjectionTruthStatus.PROPOSED,
@@ -377,7 +380,7 @@ def evaluate_projection_readiness(
     contract_release: ContractReleaseEvidence | None,
     contract_admission: ContractAdmissionEvidence | None = None,
 ) -> ProjectionReadiness:
-    """Return fail-closed readiness without conferring Enterprise Architecture truth."""
+    """Validate caller evidence while keeping handoff closed until trusted owner integration."""
     if type(candidate) is not ArchitectureProjectionCandidate:
         raise TypeError("candidate must be an ArchitectureProjectionCandidate")
     candidate_snapshot = _snapshot_projection_candidate(candidate)
@@ -415,23 +418,11 @@ def evaluate_projection_readiness(
             release=contract_release,
             admission=contract_admission,
         )
-    return ProjectionReadiness(
-        ready=True,
-        truth_status=ProjectionTruthStatus.PROPOSED,
-        source_repository=candidate_snapshot.source_repository,
-        source_revision=candidate_snapshot.source_revision,
-        candidate_sha256=candidate_sha256,
-        reason="projection_candidate_ready",
-        next_action="submit_candidate_to_enterprise_architecture_owner",
-        contract_commit_sha=contract_release.commit_sha,
-        contract_asset_sha256=contract_release.asset_sha256,
-        contract_conformance_receipt_sha256=contract_admission.conformance_receipt_sha256,
-        contract_bundle_manifest_sha256=contract_admission.bundle_manifest_sha256,
-        contract_provenance_attestation_sha256=(
-            contract_admission.provenance_attestation_sha256
-        ),
-        contract_compatibility_receipt_sha256=(
-            contract_admission.compatibility_receipt_sha256
-        ),
-        contract_migration_receipt_sha256=contract_admission.migration_receipt_sha256,
+    return _blocked_readiness(
+        candidate_snapshot,
+        candidate_sha256,
+        reason="trusted_control_plane_evidence_not_available",
+        next_action="integrate_released_context_graph_trust_contract",
+        release=contract_release,
+        admission=contract_admission,
     )
