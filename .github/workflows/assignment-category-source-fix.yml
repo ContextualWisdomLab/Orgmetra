@@ -1,0 +1,238 @@
+name: Assignment Category Source Fix
+
+on:
+  push:
+    branches:
+      - feat/explicit-assignment-category
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact writer head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feat/explicit-assignment-category
+          fetch-depth: 0
+      - name: Apply deterministic source, persistence, API, docs, and provenance repair
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if text.count(old) != 1:
+                  raise SystemExit(f"{path}: expected exactly one replacement target, found {text.count(old)}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "services/people-api/src/orgmetra_people_api/mutation_http.py",
+              '        "allocation_ratio",\n        "effective_from",',
+              '        "allocation_ratio",\n        "assignment_category_code",\n        "effective_from",',
+          )
+          replace_once(
+              "services/people-api/src/orgmetra_people_api/mutation_http.py",
+              '        allocation_ratio=parse_allocation_ratio(payload["allocation_ratio"]),\n        effective_from=effective_from,',
+              '        allocation_ratio=parse_allocation_ratio(payload["allocation_ratio"]),\n        assignment_category_code=_require_string_field(payload, "assignment_category_code"),\n        effective_from=effective_from,',
+          )
+
+          replace_once(
+              "services/people-api/src/orgmetra_people_api/postgres_mutations.py",
+              '    assignment.allocation_ratio,\n    assignment.effective_from,',
+              '    assignment.allocation_ratio,\n    assignment.assignment_category_code,\n    assignment.effective_from,',
+          )
+          replace_once(
+              "services/people-api/src/orgmetra_people_api/postgres_mutations.py",
+              '    allocation_ratio,\n    effective_from,\n    recorded_from\n) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)',
+              '    allocation_ratio,\n    assignment_category_code,\n    effective_from,\n    recorded_from\n) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)',
+          )
+          replace_once(
+              "services/people-api/src/orgmetra_people_api/postgres_mutations.py",
+              '    if len(row) != 9:\n        raise PeopleMutationIntegrityError("assignment row has an invalid shape")',
+              '    if len(row) != 10:\n        raise PeopleMutationIntegrityError("assignment row has an invalid shape")',
+          )
+          replace_once(
+              "services/people-api/src/orgmetra_people_api/postgres_mutations.py",
+              '        allocation_ratio,\n        effective_from,',
+              '        allocation_ratio,\n        assignment_category_code,\n        effective_from,',
+          )
+          replace_once(
+              "services/people-api/src/orgmetra_people_api/postgres_mutations.py",
+              '        or not isinstance(allocation_ratio, Decimal)\n        or type(effective_from) is not date',
+              '        or not isinstance(allocation_ratio, Decimal)\n        or assignment_category_code not in {"primary", "concurrent_secondary", "legacy_unspecified"}\n        or type(effective_from) is not date',
+          )
+          replace_once(
+              "services/people-api/src/orgmetra_people_api/postgres_mutations.py",
+              '        allocation_ratio=allocation_ratio,\n        effective=DateInterval(effective_from, effective_to if isinstance(effective_to, date) else None),',
+              '        allocation_ratio=allocation_ratio,\n        assignment_category_code=assignment_category_code,\n        effective=DateInterval(effective_from, effective_to if isinstance(effective_to, date) else None),',
+          )
+          replace_once(
+              "services/people-api/src/orgmetra_people_api/postgres_mutations.py",
+              '                    allocation_ratio=command.allocation_ratio,\n                    effective=DateInterval(command.effective_from),',
+              '                    allocation_ratio=command.allocation_ratio,\n                    assignment_category_code=command.assignment_category_code,\n                    effective=DateInterval(command.effective_from),',
+          )
+          replace_once(
+              "services/people-api/src/orgmetra_people_api/postgres_mutations.py",
+              '                        command.allocation_ratio,\n                        command.effective_from,\n                        recorded_at,',
+              '                        command.allocation_ratio,\n                        command.assignment_category_code,\n                        command.effective_from,\n                        recorded_at,',
+          )
+
+          replace_once(
+              "services/people-api/tests/test_people_mutations.py",
+              '        "allocation_ratio": Decimal("1.0000"),\n        "effective_from": EFFECTIVE_FROM,',
+              '        "allocation_ratio": Decimal("1.0000"),\n        "assignment_category_code": "primary",\n        "effective_from": EFFECTIVE_FROM,',
+          )
+          replace_once(
+              "services/people-api/tests/test_mutation_http_route.py",
+              '            "allocation_ratio": "1.0000",\n            "effective_from": "2026-08-18",',
+              '            "allocation_ratio": "1.0000",\n            "assignment_category_code": "primary",\n            "effective_from": "2026-08-18",',
+          )
+
+          migration = Path("database/migrations/0017_assignment_category_code.sql")
+          if migration.exists():
+              raise SystemExit(f"migration already exists: {migration}")
+          migration.write_text("""-- Record assignment role classification as authoritative HRIS truth.\n-- Historical rows are preserved explicitly; no allocation/order heuristic is allowed.\n\nALTER TABLE public.assignment_record\n    ADD COLUMN assignment_category_code text;\n\nUPDATE public.assignment_record\nSET assignment_category_code = 'legacy_unspecified'\nWHERE assignment_category_code IS NULL;\n\nALTER TABLE public.assignment_record\n    ALTER COLUMN assignment_category_code SET NOT NULL;\n\nALTER TABLE public.assignment_record\n    ADD CONSTRAINT assignment_record_category_code_check\n    CHECK (assignment_category_code IN ('primary', 'concurrent_secondary', 'legacy_unspecified'));\n\nALTER TABLE public.assignment_record\n    ADD CONSTRAINT assignment_record_primary_bitemporal_exclusion\n    EXCLUDE USING gist (\n        tenant_record_id WITH =,\n        employment_record_id WITH =,\n        daterange(effective_from, effective_to, '[)') WITH &&,\n        tstzrange(recorded_from, recorded_to, '[)') WITH &&\n    )\n    WHERE (assignment_category_code = 'primary');\n""", encoding="utf-8")
+
+          postgres_test = Path("tests/test_assignment_category_postgres.sh")
+          if postgres_test.exists():
+              raise SystemExit(f"test already exists: {postgres_test}")
+          postgres_test.write_text(r'''#!/usr/bin/env bash
+          set -euo pipefail
+          : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
+          psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation_schema.sql
+
+          psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO tenant_record (tenant_record_id, tenant_reference)
+          VALUES ('10000000-0000-7000-8000-000000000001', 'tenant_alpha');
+          INSERT INTO person_record (tenant_record_id, person_record_id, recorded_from)
+          VALUES ('10000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000101', TIMESTAMPTZ '2026-09-01 00:00:00+00');
+          INSERT INTO employment_record (tenant_record_id, employment_record_id, person_record_id, recorded_from)
+          VALUES ('10000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000111', '00000000-0000-7000-8000-000000000101', TIMESTAMPTZ '2026-09-01 00:00:00+00');
+          INSERT INTO organization_unit (tenant_record_id, organization_unit_id, recorded_from)
+          VALUES ('10000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000121', TIMESTAMPTZ '2026-09-01 00:00:00+00');
+          INSERT INTO job_profile (tenant_record_id, job_profile_id, recorded_from)
+          VALUES ('10000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000131', TIMESTAMPTZ '2026-09-01 00:00:00+00');
+          INSERT INTO position_record (tenant_record_id, position_record_id, organization_unit_id, job_profile_id, recorded_from)
+          VALUES
+            ('10000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000141', '00000000-0000-7000-8000-000000000121', '00000000-0000-7000-8000-000000000131', TIMESTAMPTZ '2026-09-01 00:00:00+00'),
+            ('10000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000142', '00000000-0000-7000-8000-000000000121', '00000000-0000-7000-8000-000000000131', TIMESTAMPTZ '2026-09-01 00:00:00+00'),
+            ('10000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000143', '00000000-0000-7000-8000-000000000121', '00000000-0000-7000-8000-000000000131', TIMESTAMPTZ '2026-09-01 00:00:00+00');
+          INSERT INTO assignment_record (
+              tenant_record_id, assignment_record_id, employment_record_id, person_record_id,
+              position_record_id, allocation_ratio, effective_from, recorded_from
+          ) VALUES (
+              '10000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000151',
+              '00000000-0000-7000-8000-000000000111', '00000000-0000-7000-8000-000000000101',
+              '00000000-0000-7000-8000-000000000141', 0.5000, DATE '2026-09-01', TIMESTAMPTZ '2026-09-01 00:01:00+00'
+          );
+          SQL
+
+          psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0017_assignment_category_code.sql
+          legacy_category="$(psql "${DATABASE_URL}" -Atqc "SELECT assignment_category_code FROM assignment_record WHERE assignment_record_id='00000000-0000-7000-8000-000000000151';")"
+          test "${legacy_category}" = "legacy_unspecified"
+
+          psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO assignment_record (
+              tenant_record_id, assignment_record_id, employment_record_id, person_record_id,
+              position_record_id, allocation_ratio, assignment_category_code, effective_from, recorded_from
+          ) VALUES (
+              '10000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000152',
+              '00000000-0000-7000-8000-000000000111', '00000000-0000-7000-8000-000000000101',
+              '00000000-0000-7000-8000-000000000142', 0.2500, 'primary', DATE '2026-09-01', TIMESTAMPTZ '2026-09-01 00:02:00+00'
+          );
+          INSERT INTO assignment_record (
+              tenant_record_id, assignment_record_id, employment_record_id, person_record_id,
+              position_record_id, allocation_ratio, assignment_category_code, effective_from, recorded_from
+          ) VALUES (
+              '10000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000153',
+              '00000000-0000-7000-8000-000000000111', '00000000-0000-7000-8000-000000000101',
+              '00000000-0000-7000-8000-000000000143', 0.2500, 'concurrent_secondary', DATE '2026-09-01', TIMESTAMPTZ '2026-09-01 00:02:00+00'
+          );
+          SQL
+
+          set +e
+          missing_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "INSERT INTO assignment_record (tenant_record_id, assignment_record_id, employment_record_id, person_record_id, position_record_id, allocation_ratio, effective_from, recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','00000000-0000-7000-8000-000000000154','00000000-0000-7000-8000-000000000111','00000000-0000-7000-8000-000000000101','00000000-0000-7000-8000-000000000143',0.1000,DATE '2026-09-02',TIMESTAMPTZ '2026-09-02 00:00:00+00');" 2>&1)"
+          missing_status=$?
+          set -e
+          if [[ ${missing_status} -eq 0 || "${missing_output}" != *"not-null constraint"* ]]; then
+              echo "new assignment without category did not fail closed: ${missing_output}" >&2
+              exit 1
+          fi
+
+          set +e
+          duplicate_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "INSERT INTO assignment_record (tenant_record_id, assignment_record_id, employment_record_id, person_record_id, position_record_id, allocation_ratio, assignment_category_code, effective_from, recorded_from) VALUES ('10000000-0000-7000-8000-000000000001','00000000-0000-7000-8000-000000000155','00000000-0000-7000-8000-000000000111','00000000-0000-7000-8000-000000000101','00000000-0000-7000-8000-000000000143',0.1000,'primary',DATE '2026-09-01',TIMESTAMPTZ '2026-09-01 00:03:00+00');" 2>&1)"
+          duplicate_status=$?
+          set -e
+          if [[ ${duplicate_status} -eq 0 || "${duplicate_output}" != *"assignment_record_primary_bitemporal_exclusion"* ]]; then
+              echo "overlapping second primary did not fail closed: ${duplicate_output}" >&2
+              exit 1
+          fi
+
+          echo "assignment category PostgreSQL contract passed"
+          ''', encoding="utf-8")
+
+          replace_once(
+              ".github/workflows/foundation-ci.yml",
+              '          - test_job_analysis_snapshot_postgres.sh\n',
+              '          - test_job_analysis_snapshot_postgres.sh\n          - test_assignment_category_postgres.sh\n',
+          )
+          replace_once(
+              "tests/validate_repository.py",
+              '    "database/migrations/0013_job_analysis_snapshot.sql",\n',
+              '    "database/migrations/0013_job_analysis_snapshot.sql",\n    "database/migrations/0017_assignment_category_code.sql",\n',
+          )
+          replace_once(
+              "tests/validate_repository.py",
+              '    "tests/test_job_analysis_snapshot_postgres.sh",\n',
+              '    "tests/test_job_analysis_snapshot_postgres.sh",\n    "tests/test_assignment_category_postgres.sh",\n',
+          )
+          replace_once(
+              "tests/validate_repository.py",
+              '        "CREATE TRIGGER assignment_record_bitemporal_guard",\n',
+              '        "CREATE TRIGGER assignment_record_bitemporal_guard",\n        "assignment_category_code text",\n        "CONSTRAINT assignment_record_primary_bitemporal_exclusion",\n',
+          )
+          replace_once(
+              "tests/validate_repository.py",
+              '            "human confirmation reference",\n        )\n\n    decision_block = _yaml_block(openapi, "    RecordSelectionDecisionCommand:")',
+              '            "human confirmation reference",\n        )\n        if schema_name == "CreateAssignmentRecordCommand":\n            _require_in_block(block, schema_name, "        - assignment_category_code", "explicit assignment category")\n            _require_in_block(block, schema_name, "            - concurrent_secondary", "secondary assignment category")\n\n    decision_block = _yaml_block(openapi, "    RecordSelectionDecisionCommand:")',
+          )
+
+          replace_once(
+              "schemas/openapi.yaml",
+              '        - allocation_ratio\n        - effective_from',
+              '        - allocation_ratio\n        - assignment_category_code\n        - effective_from',
+          )
+          replace_once(
+              "schemas/openapi.yaml",
+              "        allocation_ratio:\n          type: string\n          pattern: '^(0\\.[0-9]{4}|1\\.0000)$'\n        effective_from:",
+              "        allocation_ratio:\n          type: string\n          pattern: '^(0\\.[0-9]{4}|1\\.0000)$'\n        assignment_category_code:\n          type: string\n          description: Authoritative HR classification recorded by the People workflow; never infer it from allocation ratio or row order.\n          enum:\n            - primary\n            - concurrent_secondary\n        effective_from:",
+          )
+
+          with Path("docs/DATA_MODEL.md").open("a", encoding="utf-8") as handle:
+              handle.write("\n\n### Assignment classification\n\n`assignment_record.assignment_category_code` records the reviewed HR relationship classification (`primary` or `concurrent_secondary`) independently of `allocation_ratio`. Migration `0017_assignment_category_code.sql` backfills pre-contract history as `legacy_unspecified`; neither services nor consumers may infer a historical category from FTE, row order, or position identity. At one effective/system-time coordinate, one Employment may expose at most one `primary` assignment, while additional assignments must be explicitly recorded as `concurrent_secondary`.\n")
+          with Path("docs/adr/0004-employment-position-version-and-assignment-binding.md").open("a", encoding="utf-8") as handle:
+              handle.write("\n\n## Explicit assignment classification amendment (2026-09-02)\n\nPrimary versus concurrent-secondary assignment status is authoritative People/Employment truth, not a derived property of allocation. New assignment writes therefore require `assignment_category_code` (`primary` or `concurrent_secondary`). Existing pre-contract rows are migrated to `legacy_unspecified` without heuristic relabeling. A bitemporal exclusion constraint prevents two simultaneously visible primary assignments for the same tenant-local Employment. Downstream ContextualWisdomLab consumers may read the published classification but must not reconstruct or overwrite it from allocation percentage, ordering, or graph topology.\n")
+          with Path("docs/TRACEABILITY.md").open("a", encoding="utf-8") as handle:
+              handle.write("\n\n## Assignment-category commercialization trace (2026-09-02)\n\n| Requirement | Owner | Persistence/API | Evidence | Status |\n|---|---|---|---|---|\n| Explicit primary versus concurrent-secondary assignment semantics without heuristics | People & Employment / Organization-Job-Position-Assignment context map | `assignment_record.assignment_category_code`; `POST /v1/assignment-records`; migration `0017_assignment_category_code.sql` | `test_assignment_category_contract.py`; `test_assignment_category_postgres.sh`; People API exact coverage | implemented_on_active_pr |\n")
+          with Path("CHANGELOG.md").open("a", encoding="utf-8") as handle:
+              handle.write("\n- Active PR #163 adds explicit `assignment_category_code` (`primary` / `concurrent_secondary`) to governed assignment writes and preserves historical rows as `legacy_unspecified` without FTE/order inference; release status remains pending protected-head evidence.\n")
+
+          Path(".github/workflows/assignment-category-source-fix.yml").unlink()
+          PY
+          python tests/validate_repository.py --print-manifest > manifest.json
+      - name: Commit repaired final tree without temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          test ! -e .github/workflows/assignment-category-source-fix.yml
+          git diff --cached --check
+          git commit -m "feat: integrate explicit assignment category"
+          git push origin HEAD:feat/explicit-assignment-category
