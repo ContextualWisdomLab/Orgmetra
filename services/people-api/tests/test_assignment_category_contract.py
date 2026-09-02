@@ -29,6 +29,16 @@ OUTBOX = UUID("0199a412-9200-7000-8000-000000000009")
 KNOWN_AT = datetime(2026, 9, 2, 5, 0, tzinfo=timezone.utc)
 
 
+class ForgedAssignmentCategory(str):
+    """Spoof governed membership while retaining different serialized text."""
+
+    def __hash__(self) -> int:
+        return hash("primary")
+
+    def __eq__(self, other: object) -> bool:
+        return other == "primary"
+
+
 def assignment_fact(*, assignment_id: UUID, position_id: UUID, category: str) -> AssignmentFact:
     """Build one visible assignment with an explicit classification code."""
     return AssignmentFact(
@@ -140,6 +150,26 @@ class AssignmentCategoryContractTests(unittest.TestCase):
 
         self.assertEqual(visible[0].assignment_category_code, "legacy_unspecified")
 
+    def test_portfolio_rejects_category_string_subclass_spoofing(self) -> None:
+        forged = ForgedAssignmentCategory("not_a_governed_category")
+        self.assertEqual(forged, "primary")
+
+        with self.assertRaisesRegex(AssignmentPortfolioError, "assignment_category_code"):
+            validate_assignment_portfolio(
+                [
+                    assignment_fact(
+                        assignment_id=ASSIGNMENT_A,
+                        position_id=PRIMARY_POSITION,
+                        category=forged,
+                    )
+                ],
+                tenant_record_id=TENANT,
+                person_record_id=PERSON,
+                employment_record_id=EMPLOYMENT,
+                effective_on=date(2026, 9, 2),
+                known_at=KNOWN_AT,
+            )
+
     def test_new_write_requires_primary_or_concurrent_secondary(self) -> None:
         self.assertEqual(assignment_command(category="primary").assignment_category_code, "primary")
         self.assertEqual(
@@ -149,6 +179,13 @@ class AssignmentCategoryContractTests(unittest.TestCase):
         for invalid in ("legacy_unspecified", "secondary", "", "primary_assignment", None):
             with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "assignment_category_code"):
                 assignment_command(category=invalid)  # type: ignore[arg-type]
+
+    def test_new_write_rejects_category_string_subclass_spoofing(self) -> None:
+        forged = ForgedAssignmentCategory("legacy_unspecified")
+        self.assertEqual(forged, "primary")
+
+        with self.assertRaisesRegex(ValueError, "assignment_category_code"):
+            assignment_command(category=forged)
 
     def test_idempotency_digest_includes_assignment_category(self) -> None:
         primary = mutation_command_digest(command=assignment_command(category="primary"), authorization=authorization())
