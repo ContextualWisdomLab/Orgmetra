@@ -184,6 +184,7 @@ SELECT
     assignment.person_record_id,
     assignment.position_record_id,
     assignment.allocation_ratio,
+    assignment.assignment_category_code,
     assignment.effective_from,
     assignment.effective_to,
     assignment.recorded_from,
@@ -204,9 +205,10 @@ INSERT INTO public.assignment_record (
     person_record_id,
     position_record_id,
     allocation_ratio,
+    assignment_category_code,
     effective_from,
     recorded_from
-) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
 """.strip()
 
 _LOOKUP_IDEMPOTENCY_SQL = """
@@ -441,8 +443,8 @@ def _position_version_from_row(tenant_record_id: UUID, row: tuple[object, ...]) 
 
 
 def _assignment_from_row(tenant_record_id: UUID, row: tuple[object, ...]) -> AssignmentFact:
-    """Reconstruct one assignment fact used by the assignment kernel."""
-    if len(row) != 9:
+    """Reconstruct one assignment fact used by the assignment kernel without heuristic classification."""
+    if len(row) != 10:
         raise PeopleMutationIntegrityError("assignment row has an invalid shape")
     (
         assignment_record_id,
@@ -450,6 +452,7 @@ def _assignment_from_row(tenant_record_id: UUID, row: tuple[object, ...]) -> Ass
         person_record_id,
         position_record_id,
         allocation_ratio,
+        assignment_category_code,
         effective_from,
         effective_to,
         recorded_from,
@@ -461,6 +464,7 @@ def _assignment_from_row(tenant_record_id: UUID, row: tuple[object, ...]) -> Ass
         or not _is_operational_uuid(person_record_id)
         or not _is_operational_uuid(position_record_id)
         or not isinstance(allocation_ratio, Decimal)
+        or not isinstance(assignment_category_code, str)
         or type(effective_from) is not date
         or (effective_to is not None and type(effective_to) is not date)
         or not _is_aware_datetime(recorded_from)
@@ -482,6 +486,7 @@ def _assignment_from_row(tenant_record_id: UUID, row: tuple[object, ...]) -> Ass
         allocation_ratio=allocation_ratio,
         effective=DateInterval(effective_from, effective_to if isinstance(effective_to, date) else None),
         recorded=RecordedInterval(recorded_from, recorded_to if isinstance(recorded_to, datetime) else None),
+        assignment_category_code=assignment_category_code,
     )
 
 
@@ -783,6 +788,7 @@ class PostgresPeopleMutationPort:
                     allocation_ratio=command.allocation_ratio,
                     effective=DateInterval(command.effective_from),
                     recorded=RecordedInterval(recorded_at),
+                    assignment_category_code=command.assignment_category_code,
                 )
                 try:
                     validate_assignment_write(
@@ -803,6 +809,7 @@ class PostgresPeopleMutationPort:
                         command.person_record_id,
                         command.position_record_id,
                         command.allocation_ratio,
+                        command.assignment_category_code,
                         command.effective_from,
                         recorded_at,
                     ),
