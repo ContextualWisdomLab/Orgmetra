@@ -11,8 +11,11 @@ from orgmetra_hris_kernel import (
     AssignmentFact,
     AssignmentPortfolioError,
     DateInterval,
+    EmploymentVersion,
+    PositionVersion,
     RecordedInterval,
     validate_assignment_portfolio,
+    validate_assignment_write,
 )
 from orgmetra_keyverse_adapter import AuthorizationDecision
 from orgmetra_people_api.mutations import AssignmentMutationCommand, mutation_command_digest
@@ -149,6 +152,46 @@ class AssignmentCategoryContractTests(unittest.TestCase):
         )
 
         self.assertEqual(visible[0].assignment_category_code, "legacy_unspecified")
+
+    def test_domain_write_rejects_legacy_unspecified_candidate(self) -> None:
+        """Historical sentinel must not cross the domain service as a new write."""
+        proposed = assignment_fact(
+            assignment_id=ASSIGNMENT_A,
+            position_id=PRIMARY_POSITION,
+            category="legacy_unspecified",
+        )
+        effective = DateInterval(date(2026, 9, 1))
+        recorded = RecordedInterval(KNOWN_AT)
+        employment_versions = [
+            EmploymentVersion(
+                tenant_record_id=TENANT,
+                employment_record_id=EMPLOYMENT,
+                employment_record_version_id=UUID("0199a412-9200-7000-8000-000000000010"),
+                person_record_id=PERSON,
+                employment_status_code="active",
+                effective=effective,
+                recorded=recorded,
+            )
+        ]
+        position_versions = [
+            PositionVersion(
+                tenant_record_id=TENANT,
+                position_record_id=PRIMARY_POSITION,
+                position_record_version_id=UUID("0199a412-9200-7000-8000-000000000011"),
+                position_status_code="active",
+                effective=effective,
+                recorded=recorded,
+            )
+        ]
+
+        with self.assertRaisesRegex(AssignmentPortfolioError, "primary or concurrent_secondary"):
+            validate_assignment_write(
+                proposed,
+                [proposed],
+                employment_versions,
+                position_versions,
+                known_at=KNOWN_AT,
+            )
 
     def test_portfolio_rejects_category_string_subclass_spoofing(self) -> None:
         forged = ForgedAssignmentCategory("not_a_governed_category")
