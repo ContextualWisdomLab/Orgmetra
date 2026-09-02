@@ -24,8 +24,8 @@ _ASSIGNMENT_CATEGORY_CODES = frozenset({"primary", "concurrent_secondary", "lega
 
 
 def _ratio_is_valid(allocation_ratio: Decimal) -> bool:
-    """Return whether one assignment row stays inside (0, 1.0000]."""
-    return allocation_ratio > _ZERO and allocation_ratio <= _ONE
+    """Return whether one exact Decimal assignment row stays inside (0, 1.0000]."""
+    return type(allocation_ratio) is Decimal and allocation_ratio > _ZERO and allocation_ratio <= _ONE
 
 
 def _union_covers(intervals: list[DateInterval], target: DateInterval) -> bool:
