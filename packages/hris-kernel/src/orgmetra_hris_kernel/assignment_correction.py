@@ -1,0 +1,106 @@
+"""Build immutable Assignment category corrections and supersession provenance."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+from datetime import datetime
+from uuid import UUID
+
+from orgmetra_hris_kernel.correction import close_recorded_interval
+from orgmetra_hris_kernel.errors import CorrectionError
+from orgmetra_hris_kernel.facts import AssignmentFact
+from orgmetra_hris_kernel.intervals import RecordedInterval
+
+_EXPLICIT_ASSIGNMENT_CATEGORY_CODES = frozenset({"primary", "concurrent_secondary"})
+_PERSISTED_ASSIGNMENT_CATEGORY_CODES = frozenset(
+    {"legacy_unspecified", "primary", "concurrent_secondary"}
+)
+
+
+@dataclass(frozen=True, slots=True)
+class AssignmentSupersessionFact:
+    """Link one superseded Assignment fact to its immutable replacement."""
+
+    tenant_record_id: UUID
+    assignment_supersession_record_id: UUID
+    predecessor_assignment_record_id: UUID
+    replacement_assignment_record_id: UUID
+    recorded_at: datetime
+
+
+def correct_assignment_category(
+    predecessor: AssignmentFact,
+    *,
+    replacement_assignment_record_id: UUID,
+    assignment_supersession_record_id: UUID,
+    corrected_category_code: str,
+    recorded_at: datetime,
+) -> tuple[AssignmentFact, AssignmentFact, AssignmentSupersessionFact]:
+    """Close one Assignment fact and create a linked category-only replacement.
+
+    The replacement preserves tenant, Employment, Person, Position, allocation,
+    and effective-time truth. It receives a new Assignment identity and a new
+    open recorded interval beginning exactly when the predecessor closes.
+    Historical ``legacy_unspecified`` may be explicitly corrected by a human,
+    but it is never accepted as the new category.
+
+    Callers must re-run the Assignment portfolio and Position-capacity invariants
+    against locked authoritative state before persisting the three returned facts
+    in one transaction.
+
+    Args:
+        predecessor: Recorded-open Assignment fact being corrected.
+        replacement_assignment_record_id: New operational identity for the replacement.
+        assignment_supersession_record_id: Identity of the normalized provenance edge.
+        corrected_category_code: Exact explicit category chosen by the reviewer.
+        recorded_at: System-recorded time shared by closure, replacement, and edge.
+
+    Returns:
+        The closed predecessor, open replacement, and normalized supersession fact.
+
+    Raises:
+        CorrectionError: The correction is malformed, a no-op, reuses the
+            predecessor identity, or cannot close the predecessor history.
+    """
+    if (
+        type(predecessor.assignment_category_code) is not str
+        or predecessor.assignment_category_code not in _PERSISTED_ASSIGNMENT_CATEGORY_CODES
+    ):
+        raise CorrectionError(
+            "Predecessor Assignment category is not governed persisted truth.",
+            next_action="Repair the malformed Assignment fact before recording a correction.",
+        )
+    if (
+        type(corrected_category_code) is not str
+        or corrected_category_code not in _EXPLICIT_ASSIGNMENT_CATEGORY_CODES
+    ):
+        raise CorrectionError(
+            "The corrected category must be primary or concurrent_secondary.",
+            next_action="Choose the reviewed explicit Assignment category, then save again.",
+        )
+    if corrected_category_code == predecessor.assignment_category_code:
+        raise CorrectionError(
+            "Assignment category correction must select a different category.",
+            next_action="Keep the existing Assignment when its category is already correct.",
+        )
+    if replacement_assignment_record_id == predecessor.assignment_record_id:
+        raise CorrectionError(
+            "A category correction requires a new replacement Assignment identity.",
+            next_action="Allocate a new Assignment record ID and retry the correction.",
+        )
+
+    closed = close_recorded_interval(predecessor, recorded_to=recorded_at)
+    replacement = replace(
+        predecessor,
+        assignment_record_id=replacement_assignment_record_id,
+        assignment_category_code=corrected_category_code,
+        recorded=RecordedInterval(start=recorded_at),
+    )
+    supersession = AssignmentSupersessionFact(
+        tenant_record_id=predecessor.tenant_record_id,
+        assignment_supersession_record_id=assignment_supersession_record_id,
+        predecessor_assignment_record_id=predecessor.assignment_record_id,
+        replacement_assignment_record_id=replacement_assignment_record_id,
+        recorded_at=recorded_at,
+    )
+    return closed, replacement, supersession
