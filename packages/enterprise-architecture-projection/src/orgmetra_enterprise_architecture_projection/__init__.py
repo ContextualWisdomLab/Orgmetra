@@ -314,6 +314,17 @@ def _validate_contract_admission(
         raise ValueError(
             "compatibility and migration receipts must identify distinct lifecycle evidence"
         )
+    receipt_digests = [
+        admission.conformance_receipt_sha256,
+        admission.bundle_manifest_sha256,
+        admission.provenance_attestation_sha256,
+    ]
+    if admission.compatibility_receipt_sha256 is not None:
+        receipt_digests.append(admission.compatibility_receipt_sha256)
+    if admission.migration_receipt_sha256 is not None:
+        receipt_digests.append(admission.migration_receipt_sha256)
+    if len(receipt_digests) != len(set(receipt_digests)):
+        raise ValueError("contract evidence receipt SHA-256 identities must be distinct")
 
 
 def _blocked_readiness(
