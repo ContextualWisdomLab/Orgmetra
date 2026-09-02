@@ -53,10 +53,11 @@ jobs:
           python -m pip check
       - name: Prove HRIS correction domain contract
         run: python -m pytest packages/hris-kernel/tests/test_assignment_category_correction.py
-      - name: Prove purpose-bound People correction command and PostgreSQL adapter
+      - name: Prove purpose-bound People correction command, HTTP, and PostgreSQL adapter
         run: >-
           python -m pytest
           services/people-api/tests/test_assignment_correction_mutations.py
+          services/people-api/tests/test_assignment_correction_http.py
           services/people-api/tests/test_postgres_assignment_corrections.py
       - name: Require clean checkout
         run: |
