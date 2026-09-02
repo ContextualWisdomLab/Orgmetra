@@ -329,8 +329,8 @@
     },
     {
       "path": "docs/adr/0015-explicit-assignment-category.md",
-      "sha256": "5666bc4613ee336d5305f9ff90f078b64d824f1d6ce3a68e13190ff29729f186",
-      "bytes": 7994,
+      "sha256": "a89cf0381d7896c5671a0bbe463184fa0cf686406dfe62dfb7faba58b29e0c58",
+      "bytes": 8360,
       "lines": 72
     },
     {
