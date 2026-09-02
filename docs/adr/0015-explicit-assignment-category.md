@@ -1,6 +1,6 @@
 # ADR 0015: Explicit assignment category is authoritative HRIS truth
 
-- Status: Accepted on active implementation branch
+- Status: Proposed
 - Date: 2026-09-02
 - Owners: `people_core` and the Organization–Job–Position–Assignment domain boundary
 
@@ -45,7 +45,7 @@ The aggregate/entity/value-object split is:
 
 ## Persistence and concurrency consequences
 
-The migration backfills pre-contract rows explicitly and then applies a `NOT VALID` forward-write CHECK so old sentinels remain readable while inserted or rewritten rows must use the two governed values. A partial GiST exclusion constraint over tenant, employment, effective interval, and recorded interval rejects two simultaneously visible primary rows without serializing unrelated employments. This preserves normalized assignment facts rather than adding a denormalized 'current primary' pointer and keeps the model in 3NF.
+Migration 0017 backfills pre-contract rows explicitly as `legacy_unspecified`. Its table CHECK accepts only the three known storage values so historical rows remain valid when their system-time interval is closed. A dedicated write guard rejects introducing `legacy_unspecified` on INSERT and rejects changing an already classified row back to that sentinel; closing the `recorded_to` interval of a pre-contract legacy row therefore preserves history without inventing a classification. Replacement/current rows still require `primary | concurrent_secondary` through the application/API contract and database write guard. A partial GiST exclusion constraint over tenant, employment, effective interval, and recorded interval rejects two simultaneously visible primary rows without serializing unrelated employments. This preserves normalized assignment facts rather than adding a denormalized 'current primary' pointer and keeps the model in 3NF.
 
 The exclusion key starts with tenant and employment scope, so conflict work is localized to the employment portfolio instead of creating an organization-wide hot partition. Read paths continue to reconstruct bitemporal facts; this ADR does not introduce a cross-service read/write shortcut or direct access to another bounded context's database.
 
@@ -57,7 +57,7 @@ Tests and documentation use synthetic organization/person identifiers. Productio
 
 ## Verification and traceability
 
-The implementation is test-first: domain/idempotency regression preceded production changes; a PostgreSQL regression then preceded the forward-only persistence repair; and an OpenAPI regression preceded publishing the required command field. Exact-head validation must cover People API statement/branch coverage, PostgreSQL compatibility/invariants, Foundation manifest/provenance, Recovery, Security/SAST, and required organization review workflows before ordinary protected-branch integration.
+The implementation is test-first: domain/idempotency regression preceded production changes; a PostgreSQL regression then preceded the forward-only persistence repair; and an OpenAPI regression preceded publishing the required command field. A later RED regression proved that system-time closure of pre-contract `legacy_unspecified` history must remain legal; the database repair separates the storage vocabulary from the forward-write guard rather than forcing a guessed category. Exact-head validation must cover People API statement/branch coverage, PostgreSQL compatibility/invariants, Foundation manifest/provenance, Recovery, Security/SAST, and required organization review workflows before ordinary protected-branch integration.
 
 ## Consequences
 
