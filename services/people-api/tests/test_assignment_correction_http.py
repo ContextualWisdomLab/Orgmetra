@@ -7,48 +7,62 @@ from pathlib import Path
 import unittest
 from uuid import UUID
 
+from orgmetra_hris_kernel import KernelError
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
-from orgmetra_people_api import AuthenticatedPrincipal
-from orgmetra_people_api.assignment_correction_http import AssignmentCorrectionAsgiApp
+from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed
+from orgmetra_people_api.assignment_correction_http import (
+    AssignmentCorrectionAsgiApp,
+    _correction_command,
+    _predecessor_from_path,
+    _require_body_string,
+)
 from orgmetra_people_api.assignment_correction_mutations import (
     AssignmentCorrectionMutationCommand,
     AssignmentCorrectionMutationResult,
 )
+from orgmetra_people_api.hire_http import _InvalidHttpRequest
+from orgmetra_people_api.mutations import PeopleMutationIntegrityError
 
 TENANT = UUID("0198a412-8100-7000-8000-000000000001")
+OTHER_TENANT = UUID("0198a412-8100-7000-8000-000000000002")
 PREDECESSOR = UUID("0198a412-8100-7000-8000-000000000070")
 REPLACEMENT = UUID("0198a412-8100-7000-8000-000000000071")
 SUPERSESSION = UUID("0198a412-8100-7000-8000-000000000072")
 AUDIT = UUID("0198a412-8100-7000-8000-000000000073")
 OUTBOX = UUID("0198a412-8100-7000-8000-000000000074")
+IDS = (REPLACEMENT, SUPERSESSION, AUDIT, OUTBOX)
 
 
 class SequentialIdFactory:
     """Return deterministic operational UUIDs for one correction request."""
 
-    def __init__(self) -> None:
-        self.values = iter((REPLACEMENT, SUPERSESSION, AUDIT, OUTBOX))
+    def __init__(self, values: tuple[UUID, ...] = IDS) -> None:
+        self.values = iter(values)
 
     def __call__(self) -> UUID:
         return next(self.values)
 
 
 class FakeAuthenticator:
-    """Return one preconfigured principal and record bearer-token use."""
+    """Return one configured principal or error while recording bearer-token use."""
 
-    def __init__(self, principal: AuthenticatedPrincipal) -> None:
+    def __init__(self, principal: object, *, error: Exception | None = None) -> None:
         self.principal = principal
+        self.error = error
         self.tokens: list[str] = []
 
-    async def authenticate(self, bearer_token: str) -> AuthenticatedPrincipal:
+    async def authenticate(self, bearer_token: str) -> object:
         self.tokens.append(bearer_token)
+        if self.error is not None:
+            raise self.error
         return self.principal
 
 
 class RecordingCorrectionPort:
-    """Capture the authorized correction without persisting test data."""
+    """Capture authorized corrections or raise a configured persistence error."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, error: Exception | None = None) -> None:
+        self.error = error
         self.calls: list[tuple[AssignmentCorrectionMutationCommand, object]] = []
 
     def correct_assignment_category(
@@ -58,6 +72,8 @@ class RecordingCorrectionPort:
         authorization: object,
     ) -> AssignmentCorrectionMutationResult:
         self.calls.append((command, authorization))
+        if self.error is not None:
+            raise self.error
         return AssignmentCorrectionMutationResult(
             replacement_assignment_record_id=command.replacement_assignment_record_id,
             assignment_supersession_record_id=command.assignment_supersession_record_id,
@@ -65,7 +81,7 @@ class RecordingCorrectionPort:
 
 
 class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
-    """Prove the buyer-facing correction route is narrow, purpose-bound, and replayable."""
+    """Prove the buyer-facing correction route is narrow, purpose-bound, and fail-closed."""
 
     def setUp(self) -> None:
         self.principal = AuthenticatedPrincipal(
@@ -73,31 +89,66 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
             actor_reference="keyverse_subject:operator-17",
             granted_scope_codes=frozenset({"orgmetra.people.write"}),
         )
-        self.policy = PurposeBoundAccessPolicy(
-            tenant_record_id=TENANT,
+        self.policy = self._policy()
+
+    def _policy(
+        self,
+        *,
+        tenant_record_id: UUID = TENANT,
+        purpose_code: str = "workforce_admin",
+    ) -> PurposeBoundAccessPolicy:
+        return PurposeBoundAccessPolicy(
+            tenant_record_id=tenant_record_id,
             policy_version_code="assignment-correction-v1",
             resource_kind="assignment_record",
-            purpose_code="workforce_admin",
+            purpose_code=purpose_code,
             operation_code="correct_record",
             required_scope_code="orgmetra.people.write",
             permitted_fields=frozenset({"assignment_category_code"}),
         )
 
-    def _headers(self) -> list[tuple[bytes, bytes]]:
-        return [
+    def _headers(
+        self,
+        *,
+        tenant: UUID = TENANT,
+        actor: str = "keyverse_subject:operator-17",
+        purpose: str = "workforce_admin",
+        content_type: bytes = b"application/json",
+        include_idempotency: bool = True,
+    ) -> list[tuple[bytes, bytes]]:
+        headers = [
             (b"authorization", b"Bearer opaque-token"),
-            (b"content-type", b"application/json"),
-            (b"idempotency-key", b"assignment-correction-17"),
-            (b"x-tenant-reference", str(TENANT).encode("ascii")),
-            (b"x-actor-reference", b"keyverse_subject:operator-17"),
-            (b"x-purpose-code", b"workforce_admin"),
+            (b"content-type", content_type),
+            (b"x-tenant-reference", str(tenant).encode("ascii")),
+            (b"x-actor-reference", actor.encode("ascii")),
+            (b"x-purpose-code", purpose.encode("ascii")),
         ]
+        if include_idempotency:
+            headers.append((b"idempotency-key", b"assignment-correction-17"))
+        return headers
+
+    def _app(
+        self,
+        *,
+        authenticator: object | None = None,
+        policy: object | None = None,
+        port: object | None = None,
+        id_factory: object | None = None,
+    ) -> AssignmentCorrectionAsgiApp:
+        return AssignmentCorrectionAsgiApp(
+            authenticator=authenticator if authenticator is not None else FakeAuthenticator(self.principal),
+            correction_policy=policy if policy is not None else self.policy,
+            mutation_port=port if port is not None else RecordingCorrectionPort(),
+            id_factory=id_factory if id_factory is not None else SequentialIdFactory(),
+        )
 
     async def _request(
         self,
         app: AssignmentCorrectionAsgiApp,
         *,
-        path: str | object | None = None,
+        method: str = "POST",
+        path: object | None = None,
+        headers: object | None = None,
         body: object | None = None,
     ) -> tuple[int, dict[bytes, bytes], dict[str, object]]:
         payload = {
@@ -120,10 +171,10 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         await app(
             {
                 "type": "http",
-                "method": "POST",
+                "method": method,
                 "path": path if path is not None else f"/v1/assignment-records/{PREDECESSOR}/category-corrections",
                 "query_string": b"",
-                "headers": self._headers(),
+                "headers": headers if headers is not None else self._headers(),
             },
             receive,
             send,
@@ -131,15 +182,74 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         start, response = messages
         return int(start["status"]), dict(start["headers"]), json.loads(bytes(response["body"]))
 
+    def test_path_parser_accepts_only_one_operational_route_shape(self) -> None:
+        self.assertIsNone(_predecessor_from_path(object()))
+        self.assertIsNone(_predecessor_from_path("/v1/assignment-records"))
+        self.assertIsNone(_predecessor_from_path(f"/v2/assignment-records/{PREDECESSOR}/category-corrections"))
+        self.assertIsNone(_predecessor_from_path(f"/v1/other-records/{PREDECESSOR}/category-corrections"))
+        self.assertIsNone(_predecessor_from_path(f"/v1/assignment-records/{PREDECESSOR}/other"))
+        self.assertIsNone(_predecessor_from_path("/v1/assignment-records/not-a-uuid/category-corrections"))
+        self.assertIsNone(_predecessor_from_path(f"/v1/assignment-records/{UUID(int=0)}/category-corrections"))
+        self.assertIsNone(_predecessor_from_path(f"/v1/assignment-records/{UUID(int=(1 << 128) - 1)}/category-corrections"))
+        self.assertEqual(
+            _predecessor_from_path(f"/v1/assignment-records/{PREDECESSOR}/category-corrections"),
+            PREDECESSOR,
+        )
+
+    def test_body_parser_and_command_factory_reject_ambiguous_values(self) -> None:
+        self.assertEqual(_require_body_string({"field": "value"}, "field"), "value")
+        with self.assertRaises(_InvalidHttpRequest):
+            _require_body_string({"field": 1}, "field")
+        with self.assertRaises(_InvalidHttpRequest):
+            _correction_command(
+                tenant_record_id=TENANT,
+                predecessor_assignment_record_id=PREDECESSOR,
+                payload={"corrected_category_code": "primary"},
+                idempotency_key="assignment-correction-17",
+                id_factory=SequentialIdFactory(),
+            )
+        command = _correction_command(
+            tenant_record_id=TENANT,
+            predecessor_assignment_record_id=PREDECESSOR,
+            payload={
+                "corrected_category_code": "primary",
+                "confirmation_reference": "human_confirmation:review-42",
+                "evidence_version_code": "assignment-correction-v1",
+            },
+            idempotency_key="assignment-correction-17",
+            id_factory=SequentialIdFactory(),
+        )
+        self.assertEqual(command.replacement_assignment_record_id, REPLACEMENT)
+
+    def test_constructor_requires_every_governed_dependency(self) -> None:
+        with self.assertRaisesRegex(TypeError, "authenticator"):
+            self._app(authenticator=object())
+        with self.assertRaisesRegex(TypeError, "correction_policy"):
+            self._app(policy=object())
+        with self.assertRaisesRegex(TypeError, "mutation_port"):
+            self._app(port=object())
+        with self.assertRaisesRegex(TypeError, "id_factory"):
+            AssignmentCorrectionAsgiApp(
+                authenticator=FakeAuthenticator(self.principal),
+                correction_policy=self.policy,
+                mutation_port=RecordingCorrectionPort(),
+                id_factory=None,  # type: ignore[arg-type]
+            )
+
+    async def test_non_http_scope_is_rejected_as_programming_error(self) -> None:
+        async def receive() -> dict[str, object]:
+            return {"type": "http.request", "body": b"{}", "more_body": False}
+
+        async def send(message: dict[str, object]) -> None:
+            del message
+
+        with self.assertRaisesRegex(ValueError, "only HTTP"):
+            await self._app()({"type": "websocket"}, receive, send)
+
     async def test_post_creates_linked_replacement_and_authorizes_only_category(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
         port = RecordingCorrectionPort()
-        app = AssignmentCorrectionAsgiApp(
-            authenticator=authenticator,
-            correction_policy=self.policy,
-            mutation_port=port,
-            id_factory=SequentialIdFactory(),
-        )
+        app = self._app(authenticator=authenticator, port=port)
 
         status, headers, payload = await self._request(app)
 
@@ -161,20 +271,103 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(authorization.operation_code, "correct_record")
         self.assertEqual(authorization.requested_fields, frozenset({"assignment_category_code"}))
 
-    async def test_unknown_or_malformed_route_does_not_reach_authentication(self) -> None:
+    async def test_method_route_media_and_header_failures_stop_before_authentication(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
-        app = AssignmentCorrectionAsgiApp(
-            authenticator=authenticator,
-            correction_policy=self.policy,
-            mutation_port=RecordingCorrectionPort(),
+        app = self._app(authenticator=authenticator)
+
+        status, headers, payload = await self._request(app, method="GET")
+        self.assertEqual((status, headers[b"allow"], payload["error_code"]), (405, b"POST", "method_not_allowed"))
+        status, _, payload = await self._request(app, path="/v1/assignment-records/not-a-uuid/category-corrections")
+        self.assertEqual((status, payload["error_code"]), (404, "route_not_found"))
+        status, _, payload = await self._request(app, headers=self._headers(content_type=b"text/plain"))
+        self.assertEqual((status, payload["error_code"]), (415, "unsupported_media_type"))
+        status, _, payload = await self._request(app, headers=self._headers(include_idempotency=False))
+        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
+        self.assertEqual(authenticator.tokens, [])
+
+    async def test_authentication_failures_and_malformed_principal_are_client_safe(self) -> None:
+        denied = self._app(
+            authenticator=FakeAuthenticator(self.principal, error=AuthenticationFailed("denied")),
+        )
+        status, headers, payload = await self._request(denied)
+        self.assertEqual((status, headers[b"www-authenticate"], payload["error_code"]), (401, b"Bearer", "authentication_required"))
+
+        backend_failure = self._app(authenticator=FakeAuthenticator(self.principal, error=RuntimeError("secret")))
+        status, _, payload = await self._request(backend_failure)
+        self.assertEqual((status, payload["error_code"]), (500, "internal_error"))
+        self.assertNotIn("secret", json.dumps(payload))
+
+        malformed = self._app(authenticator=FakeAuthenticator(object()))
+        status, _, payload = await self._request(malformed)
+        self.assertEqual((status, payload["error_code"]), (500, "internal_error"))
+
+    async def test_principal_tenant_and_actor_must_match_governed_headers(self) -> None:
+        status, _, payload = await self._request(
+            self._app(),
+            headers=self._headers(tenant=OTHER_TENANT),
+        )
+        self.assertEqual((status, payload["error_code"]), (403, "access_denied"))
+
+        other_actor = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse_subject:other-actor",
+            granted_scope_codes=frozenset({"orgmetra.people.write"}),
         )
         status, _, payload = await self._request(
-            app,
-            path="/v1/assignment-records/not-a-uuid/category-corrections",
+            self._app(authenticator=FakeAuthenticator(other_actor)),
         )
-        self.assertEqual(status, 404)
-        self.assertEqual(payload["error_code"], "route_not_found")
-        self.assertEqual(authenticator.tokens, [])
+        self.assertEqual((status, payload["error_code"]), (403, "access_denied"))
+
+    async def test_body_size_shape_value_and_identity_generation_fail_closed(self) -> None:
+        app = self._app()
+        status, _, payload = await self._request(app, body=b"{" + (b"x" * 65536) + b"}")
+        self.assertEqual((status, payload["error_code"]), (413, "payload_too_large"))
+
+        status, _, payload = await self._request(app, body=b"not-json")
+        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
+
+        extra = json.dumps(
+            {
+                "corrected_category_code": "primary",
+                "confirmation_reference": "human_confirmation:review-42",
+                "evidence_version_code": "assignment-correction-v1",
+                "unexpected": True,
+            }
+        ).encode("utf-8")
+        status, _, payload = await self._request(app, body=extra)
+        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
+
+        invalid_category = json.dumps(
+            {
+                "corrected_category_code": "secondary",
+                "confirmation_reference": "human_confirmation:review-42",
+                "evidence_version_code": "assignment-correction-v1",
+            }
+        ).encode("utf-8")
+        status, _, payload = await self._request(app, body=invalid_category)
+        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
+
+        exhausted = self._app(id_factory=SequentialIdFactory(()))
+        status, _, payload = await self._request(exhausted)
+        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
+
+    async def test_authorization_integrity_and_unexpected_persistence_fail_closed(self) -> None:
+        denied_policy = self._policy(purpose_code="different_admin")
+        status, _, payload = await self._request(self._app(policy=denied_policy))
+        self.assertEqual((status, payload["error_code"]), (403, "access_denied"))
+
+        integrity = self._app(port=RecordingCorrectionPort(error=PeopleMutationIntegrityError("conflict")))
+        status, _, payload = await self._request(integrity)
+        self.assertEqual((status, payload["error_code"]), (409, "mutation_integrity_conflict"))
+
+        kernel = self._app(port=RecordingCorrectionPort(error=KernelError("kernel conflict")))
+        status, _, payload = await self._request(kernel)
+        self.assertEqual((status, payload["error_code"]), (409, "mutation_integrity_conflict"))
+
+        backend = self._app(port=RecordingCorrectionPort(error=RuntimeError("database-secret")))
+        status, _, payload = await self._request(backend)
+        self.assertEqual((status, payload["error_code"]), (500, "internal_error"))
+        self.assertNotIn("database-secret", json.dumps(payload))
 
     def test_service_openapi_publishes_exact_correction_contract(self) -> None:
         schema = (Path(__file__).parents[1] / "assignment-correction.openapi.yaml").read_text(encoding="utf-8")
@@ -186,8 +379,8 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("enum: [primary, concurrent_secondary]", schema)
         self.assertIn("replacement_assignment_record_id", schema)
         self.assertIn("assignment_supersession_record_id", schema)
-        self.assertIn("'413':", schema)
-        self.assertIn("'415':", schema)
+        for response in ("'400':", "'401':", "'403':", "'404':", "'405':", "'409':", "'413':", "'415':", "'500':"):
+            self.assertIn(response, schema)
 
 
 if __name__ == "__main__":
