@@ -78,7 +78,7 @@ def validate_assignment_portfolio(
         and fact.employment_record_id == employment_record_id
     ]
     for fact in scoped:
-        if fact.assignment_category_code not in _ASSIGNMENT_CATEGORY_CODES:
+        if type(fact.assignment_category_code) is not str or fact.assignment_category_code not in _ASSIGNMENT_CATEGORY_CODES:
             raise AssignmentPortfolioError(
                 "assignment_category_code is not a governed assignment classification.",
                 next_action=(
