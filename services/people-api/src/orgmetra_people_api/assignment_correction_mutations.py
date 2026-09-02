@@ -19,6 +19,8 @@ _EXPLICIT_ASSIGNMENT_CATEGORY_CODES = frozenset({"primary", "concurrent_secondar
 _CORRECTION_FIELDS = frozenset({"assignment_category_code"})
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+_CONFIRMATION_REFERENCE_MAX = 300
+_EVIDENCE_VERSION_MAX = 200
 _IDEMPOTENCY_MIN = 16
 _IDEMPOTENCY_MAX = 200
 
@@ -31,16 +33,24 @@ def _require_operational_uuid(field_name: str, value: object) -> UUID:
 
 
 def _require_reference(field_name: str, value: object) -> str:
-    """Require one exact namespaced opaque reference."""
-    if type(value) is not str or _REFERENCE_PATTERN.fullmatch(value) is None:
-        raise ValueError(f"{field_name} must be a namespaced opaque reference.")
+    """Require one exact, bounded namespaced opaque reference."""
+    if (
+        type(value) is not str
+        or not 1 <= len(value) <= _CONFIRMATION_REFERENCE_MAX
+        or _REFERENCE_PATTERN.fullmatch(value) is None
+    ):
+        raise ValueError(f"{field_name} must be a namespaced opaque reference of at most 300 characters.")
     return value
 
 
 def _require_version(value: object) -> str:
-    """Require one exact whitespace-free evidence version token."""
-    if type(value) is not str or _VERSION_PATTERN.fullmatch(value) is None:
-        raise ValueError("evidence_version_code must be a whitespace-free version token.")
+    """Require one exact, bounded whitespace-free evidence version token."""
+    if (
+        type(value) is not str
+        or not 1 <= len(value) <= _EVIDENCE_VERSION_MAX
+        or _VERSION_PATTERN.fullmatch(value) is None
+    ):
+        raise ValueError("evidence_version_code must be a whitespace-free version token of at most 200 characters.")
     return value
 
 
