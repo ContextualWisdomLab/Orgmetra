@@ -15,7 +15,12 @@ from orgmetra_hris_kernel import (
     validate_assignment_portfolio,
 )
 from orgmetra_keyverse_adapter import AuthorizationDecision
-from orgmetra_people_api.mutations import AssignmentMutationCommand, mutation_command_digest
+from orgmetra_people_api.mutations import (
+    AssignmentMutationCommand,
+    PeopleMutationIntegrityError,
+    mutation_command_digest,
+)
+from orgmetra_people_api.postgres_mutations import _assignment_from_row
 
 TENANT = UUID("0199a412-9200-7000-8000-000000000001")
 PERSON = UUID("0199a412-9200-7000-8000-000000000002")
@@ -186,6 +191,24 @@ class AssignmentCategoryContractTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "assignment_category_code"):
             assignment_command(category=forged)
+
+    def test_persistence_reconstruction_rejects_category_string_subclass_spoofing(self) -> None:
+        forged = ForgedAssignmentCategory("not_a_governed_category")
+        row = (
+            ASSIGNMENT_A,
+            EMPLOYMENT,
+            PERSON,
+            PRIMARY_POSITION,
+            Decimal("1.0000"),
+            forged,
+            date(2026, 9, 1),
+            None,
+            KNOWN_AT,
+            None,
+        )
+
+        with self.assertRaisesRegex(PeopleMutationIntegrityError, "assignment row is invalid"):
+            _assignment_from_row(TENANT, row)
 
     def test_idempotency_digest_includes_assignment_category(self) -> None:
         primary = mutation_command_digest(command=assignment_command(category="primary"), authorization=authorization())
