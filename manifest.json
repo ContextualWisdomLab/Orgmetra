@@ -143,9 +143,9 @@
     },
     {
       "path": "database/migrations/0017_assignment_category_code.sql",
-      "sha256": "e2350fc263bf1afb72d03885db096a5d3c78bb07f8a2752668ea03354318d2e5",
-      "bytes": 3003,
-      "lines": 67
+      "sha256": "ba0e50e6833b5e8931f7f717203b7e0b26c54a59b3d830f95995ae586af7694b",
+      "bytes": 3164,
+      "lines": 66
     },
     {
       "path": "docs/API_CONTRACT.md",
