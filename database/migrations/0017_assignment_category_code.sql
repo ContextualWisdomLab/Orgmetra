@@ -56,12 +56,15 @@ $$;
 COMMENT ON FUNCTION public.enforce_assignment_category_write() IS
     'Rejects new or retroactively introduced legacy_unspecified assignment categories while preserving pre-contract system-time history.';
 
-CREATE TRIGGER assignment_record_category_write_guard
+-- PostgreSQL fires same-kind triggers in name order. This name intentionally
+-- sorts before assignment_record_bitemporal_guard so a classified-to-sentinel
+-- rewrite reports the category invariant before the generic history guard.
+CREATE TRIGGER assignment_record_authoritative_category_guard
 BEFORE INSERT OR UPDATE OF assignment_category_code ON public.assignment_record
 FOR EACH ROW
 EXECUTE FUNCTION public.enforce_assignment_category_write();
 
-COMMENT ON TRIGGER assignment_record_category_write_guard ON public.assignment_record IS
+COMMENT ON TRIGGER assignment_record_authoritative_category_guard ON public.assignment_record IS
     'Keeps legacy_unspecified as migration provenance instead of a writable assignment classification.';
 
 ALTER TABLE public.assignment_record
