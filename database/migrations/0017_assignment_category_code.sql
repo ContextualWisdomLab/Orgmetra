@@ -1,19 +1,18 @@
 -- Record assignment role classification as authoritative HRIS truth.
 -- Historical rows are preserved explicitly; no allocation/order heuristic is allowed.
+-- The constant default materializes the historical sentinel for pre-contract rows
+-- without issuing an UPDATE that would violate the existing bitemporal history
+-- guard. Dropping the default immediately keeps every post-contract write explicit.
 -- legacy_unspecified is migration provenance only. The table constraint preserves
 -- that historical sentinel so system-time closure remains possible, while the
 -- write guard rejects introduction of the sentinel on a new row or by changing
 -- an already classified row back to legacy state.
 
 ALTER TABLE public.assignment_record
-    ADD COLUMN assignment_category_code text;
-
-UPDATE public.assignment_record
-SET assignment_category_code = 'legacy_unspecified'
-WHERE assignment_category_code IS NULL;
+    ADD COLUMN assignment_category_code text NOT NULL DEFAULT 'legacy_unspecified';
 
 ALTER TABLE public.assignment_record
-    ALTER COLUMN assignment_category_code SET NOT NULL;
+    ALTER COLUMN assignment_category_code DROP DEFAULT;
 
 ALTER TABLE public.assignment_record
     ADD CONSTRAINT assignment_record_category_code_check
