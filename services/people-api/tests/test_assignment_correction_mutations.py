@@ -166,6 +166,18 @@ class AssignmentCorrectionMutationTests(unittest.TestCase):
             with self.subTest(builder=builder), self.assertRaises(ValueError):
                 builder()
 
+    def test_command_accepts_exact_high_impact_metadata_limits(self) -> None:
+        confirmation_reference = "human_confirmation:" + "a" * 281
+        evidence_version_code = "v" * 200
+
+        command = correction_command(
+            confirmation_reference=confirmation_reference,
+            evidence_version_code=evidence_version_code,
+        )
+
+        self.assertEqual(len(command.confirmation_reference), 300)
+        self.assertEqual(len(command.evidence_version_code), 200)
+
     def test_digest_binds_semantics_but_excludes_generated_correction_ids(self) -> None:
         port = RecordingCorrectionPort()
         correct_assignment_record_category(
