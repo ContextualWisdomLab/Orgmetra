@@ -8,8 +8,10 @@ on:
       - main
     paths:
       - "database/migrations/0017_assignment_category_code.sql"
+      - "docs/adr/0015-explicit-assignment-category.md"
       - "packages/hris-kernel/**"
       - "services/people-api/**"
+      - "tests/assignment-category-provenance.test.mjs"
       - "tests/test_assignment_category_postgres.sh"
       - ".github/workflows/assignment-category-quality.yml"
   workflow_dispatch:
@@ -52,6 +54,8 @@ jobs:
         env:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Prove assignment category provenance inventory
+        run: node --test tests/assignment-category-provenance.test.mjs
       - name: Prove migration compatibility and new-write invariants
         run: bash tests/test_assignment_category_postgres.sh
       - name: Require clean checkout
