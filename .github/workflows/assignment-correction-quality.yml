@@ -9,6 +9,7 @@ on:
       - main
     paths:
       - "database/migrations/0018_assignment_category_supersession.sql"
+      - "database/migrations/0019_assignment_correction_idempotency_route.sql"
       - "docs/traceability/assignment-category-correction-provenance.md"
       - "packages/hris-kernel/**"
       - "services/people-api/**"
