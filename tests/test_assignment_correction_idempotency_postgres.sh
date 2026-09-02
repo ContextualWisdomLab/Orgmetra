@@ -8,6 +8,7 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evi
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0012_people_mutation_idempotency.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0017_assignment_category_code.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0018_assignment_category_supersession.sql
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0019_assignment_correction_idempotency_route.sql
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO public.tenant_record (tenant_record_id, tenant_reference)
