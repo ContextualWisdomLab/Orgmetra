@@ -19,8 +19,10 @@ function schemaBlock(text, schemaName) {
   const marker = `    ${schemaName}:\n`;
   const start = text.indexOf(marker);
   assert.ok(start >= 0, `schema fixture missing: ${schemaName}`);
-  const next = text.indexOf('\n    ', start + marker.length);
-  return text.slice(start, next >= 0 ? next : text.length);
+  const remainder = text.slice(start + marker.length);
+  const nextSchema = remainder.search(/^ {4}\S.*:\s*$/m);
+  const end = nextSchema >= 0 ? start + marker.length + nextSchema : text.length;
+  return text.slice(start, end);
 }
 
 test('canonical OpenAPI passes structural operation validation', () => {
