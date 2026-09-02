@@ -40,6 +40,14 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0017_assignment
 legacy_category="$(psql "${DATABASE_URL}" -Atqc "SELECT assignment_category_code FROM assignment_record WHERE assignment_record_id='00000000-0000-7000-8000-000000000151';")"
 test "${legacy_category}" = "legacy_unspecified"
 
+# A pre-contract row is still legitimate system-time history. Closing its
+# recorded interval must not force Orgmetra to invent a primary/secondary
+# classification merely because PostgreSQL rechecks a NOT VALID constraint on
+# UPDATE. This is RED against the current migration.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "UPDATE assignment_record SET recorded_to=TIMESTAMPTZ '2026-09-01 00:02:00+00' WHERE assignment_record_id='00000000-0000-7000-8000-000000000151';"
+legacy_recorded_to="$(psql "${DATABASE_URL}" -Atqc "SELECT recorded_to FROM assignment_record WHERE assignment_record_id='00000000-0000-7000-8000-000000000151';")"
+test "${legacy_recorded_to}" = "2026-09-01 00:02:00+00"
+
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO assignment_record (
     tenant_record_id, assignment_record_id, employment_record_id, person_record_id,
