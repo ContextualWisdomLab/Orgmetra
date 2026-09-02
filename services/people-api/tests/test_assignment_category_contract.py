@@ -210,6 +210,23 @@ class AssignmentCategoryContractTests(unittest.TestCase):
         with self.assertRaisesRegex(PeopleMutationIntegrityError, "assignment row is invalid"):
             _assignment_from_row(TENANT, row)
 
+    def test_persistence_reconstruction_rejects_unknown_builtin_category(self) -> None:
+        row = (
+            ASSIGNMENT_A,
+            EMPLOYMENT,
+            PERSON,
+            PRIMARY_POSITION,
+            Decimal("1.0000"),
+            "secondary",
+            date(2026, 9, 1),
+            None,
+            KNOWN_AT,
+            None,
+        )
+
+        with self.assertRaisesRegex(PeopleMutationIntegrityError, "assignment row is invalid"):
+            _assignment_from_row(TENANT, row)
+
     def test_idempotency_digest_includes_assignment_category(self) -> None:
         primary = mutation_command_digest(command=assignment_command(category="primary"), authorization=authorization())
         secondary = mutation_command_digest(
