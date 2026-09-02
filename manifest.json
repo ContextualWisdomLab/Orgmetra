@@ -401,9 +401,9 @@
     },
     {
       "path": "tests/test_assignment_category_postgres.sh",
-      "sha256": "6d6abaaf056d90cacf50edb84ed3753f54bf39abd6b808267b54684faeaca62e",
-      "bytes": 6768,
-      "lines": 92
+      "sha256": "dbe84c56da410313820d81ee0567e2e272b9b6bb8b8cc06198e99bb1b059b56e",
+      "bytes": 8180,
+      "lines": 113
     },
     {
       "path": "tests/test_audit_outbox_hardening_postgres.sh",
@@ -419,7 +419,7 @@
     },
     {
       "path": "tests/test_bitemporal_postgres.sh",
-      "sha256": "7684b8c2ff52c044c081135515bd5aabbfd00e2daad0d471b0868701af2df6cc",
+      "sha256": "7684b8c2ff52c044c081135515bd5aabbfd00e2daad0d471b0868701af2df6cc7",
       "bytes": 8209,
       "lines": 230
     },
