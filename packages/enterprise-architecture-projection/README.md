@@ -18,7 +18,7 @@ Only after release identity and the release-bound conformance, complete-bundle, 
 
 ## Candidate scope
 
-Permitted projection concepts are deployable architecture concerns such as applications, interfaces, technology components and versions, providers, lifecycle, supported capabilities, initiatives, transformations, and dependencies. Projection evidence preserves Orgmetra source revision, effective time, recorded time, non-person ownership references, architecture-only dependency references, and the exact contract-admission evidence identities used for the handoff.
+Permitted projection concepts are deployable architecture concerns: applications, services, APIs, workers, databases, runtimes, interfaces, technology components and versions, providers, lifecycle, risk, ownership, remediation, supported capabilities, initiatives, transformations, and dependencies. Projection evidence preserves Orgmetra source revision, effective time, recorded time, non-person ownership references, architecture-only dependency references, and the exact contract-admission evidence identities used for the handoff.
 
 Every readiness result carries the exact validated Orgmetra source repository and source revision **and** a SHA-256 over the exact allowed candidate evidence snapshot used by the decision. That digest covers the projection identity and kind, source identity, effective and recorded times, architecture owner, and dependency references. A readiness decision for one candidate therefore cannot be treated as evidence for a different candidate merely because both came from the same Orgmetra commit. Fail-closed and ready outcomes use the same candidate-binding rule.
 
