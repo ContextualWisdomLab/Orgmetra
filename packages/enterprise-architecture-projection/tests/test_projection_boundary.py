@@ -59,7 +59,7 @@ def _release(**overrides: object) -> ContractReleaseEvidence:
 
 
 def _admission(**overrides: object) -> ContractAdmissionEvidence:
-    """Return trusted conformance, provenance, and lifecycle evidence."""
+    """Return trusted-looking conformance, provenance, and lifecycle evidence."""
     values: dict[str, object] = {
         "contract_commit_sha": CONTRACT_SHA,
         "contract_asset_sha256": ARTIFACT_SHA256,
@@ -109,14 +109,14 @@ def test_release_metadata_without_conformance_and_provenance_stays_blocked() -> 
     assert decision.contract_migration_receipt_sha256 is None
 
 
-def test_verified_contract_admission_allows_only_a_candidate_not_ea_truth() -> None:
-    """Admit only evidence bound to conformance, provenance, and lifecycle fitness."""
+def test_caller_constructed_complete_evidence_cannot_authorize_handoff() -> None:
+    """Keep shape-complete caller evidence blocked until a repository-owned trust adapter exists."""
     decision = evaluate_projection_readiness(_candidate(), _release(), _admission())
 
-    assert decision.ready is True
+    assert decision.ready is False
     assert decision.truth_status is ProjectionTruthStatus.PROPOSED
-    assert decision.reason == "projection_candidate_ready"
-    assert decision.next_action == "submit_candidate_to_enterprise_architecture_owner"
+    assert decision.reason == "trusted_control_plane_evidence_not_available"
+    assert decision.next_action == "integrate_released_context_graph_trust_contract"
     assert decision.contract_commit_sha == CONTRACT_SHA
     assert decision.contract_asset_sha256 == ARTIFACT_SHA256
     assert decision.contract_conformance_receipt_sha256 == CONFORMANCE_SHA256
