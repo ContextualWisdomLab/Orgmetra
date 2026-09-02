@@ -341,7 +341,7 @@ def _merge_dependency_component(
     components: dict[str, dict[str, Any]],
     component: dict[str, Any],
 ) -> None:
-    """Merge repeated declarations for one resolved dependency without losing evidence."""
+    """Merge repeated declarations or a local package identity without losing evidence."""
     component_ref = component.get("bom-ref")
     if not isinstance(component_ref, str) or not component_ref:
         raise ReleaseEvidenceError("CycloneDX component must have a non-empty bom-ref")
@@ -350,37 +350,68 @@ def _merge_dependency_component(
         _add_component(components, component)
         return
 
-    identity_fields = {key: value for key, value in previous.items() if key not in {"scope", "properties"}}
-    candidate_identity = {
-        key: value for key, value in component.items() if key not in {"scope", "properties"}
+    identity_fields = {
+        key: value
+        for key, value in previous.items()
+        if key not in {"scope", "properties"}
     }
+    candidate_identity = {
+        key: value
+        for key, value in component.items()
+        if key not in {"scope", "properties"}
+    }
+    if component_ref.startswith("pkg:pypi/"):
+        previous_name = identity_fields.get("name")
+        candidate_name = candidate_identity.get("name")
+        if type(previous_name) is not str or type(candidate_name) is not str:
+            raise ReleaseEvidenceError(
+                f"Python dependency component must have a string name for {component_ref}"
+            )
+        identity_fields["name"] = _python_name(previous_name)
+        candidate_identity["name"] = _python_name(candidate_name)
     if identity_fields != candidate_identity:
         raise ReleaseEvidenceError(f"conflicting CycloneDX component evidence for {component_ref}")
 
     previous_scope = previous.get("scope")
     candidate_scope = component.get("scope")
-    if previous_scope not in _DEPENDENCY_SCOPE_PRIORITY or candidate_scope not in _DEPENDENCY_SCOPE_PRIORITY:
-        raise ReleaseEvidenceError(f"dependency component has invalid CycloneDX scope for {component_ref}")
+    if candidate_scope not in _DEPENDENCY_SCOPE_PRIORITY:
+        raise ReleaseEvidenceError(
+            f"dependency component has invalid CycloneDX scope for {component_ref}"
+        )
+    if previous_scope is None:
+        merged_scope = candidate_scope
+    elif previous_scope not in _DEPENDENCY_SCOPE_PRIORITY:
+        raise ReleaseEvidenceError(
+            f"dependency component has invalid CycloneDX scope for {component_ref}"
+        )
+    else:
+        merged_scope = max(
+            (previous_scope, candidate_scope),
+            key=lambda scope: _DEPENDENCY_SCOPE_PRIORITY[scope],
+        )
 
     merged_properties: set[tuple[str, str]] = set()
     for source in (previous, component):
         properties = source.get("properties")
         if not isinstance(properties, list):
-            raise ReleaseEvidenceError(f"dependency component properties must be a list for {component_ref}")
+            raise ReleaseEvidenceError(
+                f"dependency component properties must be a list for {component_ref}"
+            )
         for property_row in properties:
             if not isinstance(property_row, dict):
-                raise ReleaseEvidenceError(f"dependency component property must be an object for {component_ref}")
+                raise ReleaseEvidenceError(
+                    f"dependency component property must be an object for {component_ref}"
+                )
             name = property_row.get("name")
             value = property_row.get("value")
             if type(name) is not str or not name or type(value) is not str:
-                raise ReleaseEvidenceError(f"dependency component property must be string evidence for {component_ref}")
+                raise ReleaseEvidenceError(
+                    f"dependency component property must be string evidence for {component_ref}"
+                )
             merged_properties.add((name, value))
 
     merged = dict(previous)
-    merged["scope"] = max(
-        (previous_scope, candidate_scope),
-        key=lambda scope: _DEPENDENCY_SCOPE_PRIORITY[scope],
-    )
+    merged["scope"] = merged_scope
     merged["properties"] = [
         {"name": name, "value": value}
         for name, value in sorted(merged_properties)
@@ -453,12 +484,18 @@ def _build_sbom(
                 )
 
             build_system = document.get("build-system", {})
-            build_requirements = build_system.get("requires", []) if isinstance(build_system, dict) else []
+            build_requirements = (
+                build_system.get("requires", [])
+                if isinstance(build_system, dict)
+                else []
+            )
             if not isinstance(build_requirements, list) or any(
                 type(item) is not str for item in build_requirements
             ):
                 raise ReleaseEvidenceError(f"build-system requires must be a string array: {path}")
-            deferred_python_dependencies.append((component_ref, build_requirements, "excluded"))
+            deferred_python_dependencies.append(
+                (component_ref, build_requirements, "excluded")
+            )
 
         if path.endswith("package.json"):
             try:
@@ -506,7 +543,9 @@ def _build_sbom(
                 "bom-ref": component_ref,
                 "name": name,
                 "scope": scope,
-                "properties": [{"name": "orgmetra:declared-requirement", "value": requirement}],
+                "properties": [
+                    {"name": "orgmetra:declared-requirement", "value": requirement}
+                ],
             }
             if version:
                 component["version"] = version
@@ -524,7 +563,9 @@ def _build_sbom(
                 "bom-ref": component_ref,
                 "name": name,
                 "scope": scope,
-                "properties": [{"name": "orgmetra:declared-requirement", "value": requirement}],
+                "properties": [
+                    {"name": "orgmetra:declared-requirement", "value": requirement}
+                ],
             }
             if version:
                 component["version"] = version
@@ -533,7 +574,9 @@ def _build_sbom(
             dependency_edges[parent_ref].add(component_ref)
 
     if not local_refs:
-        raise ReleaseEvidenceError("source tree must expose at least one package metadata component")
+        raise ReleaseEvidenceError(
+            "source tree must expose at least one package metadata component"
+        )
 
     root_ref = f"urn:orgmetra:source:{source_sha}"
     root_component = {
@@ -646,7 +689,10 @@ def build_release_candidate_evidence(output_directory: Path, source_sha: str) ->
     _validate_runtime()
     _validate_source_sha(source_sha)
     entries = _tree_entries(source_sha)
-    tree_content = {path: _blob_bytes(object_id) for path, _mode, _kind, object_id in entries}
+    tree_content = {
+        path: _blob_bytes(object_id)
+        for path, _mode, _kind, object_id in entries
+    }
     archive = _build_source_archive(source_sha, entries)
     archive_name = f"orgmetra-source-{source_sha}.tar.gz"
     archive_digest = _sha256_bytes(archive)
@@ -674,7 +720,10 @@ def main() -> int:
     """Run the release-candidate evidence builder and return a process status."""
     arguments = _parse_arguments()
     try:
-        build_release_candidate_evidence(arguments.output_dir.resolve(), arguments.source_sha)
+        build_release_candidate_evidence(
+            arguments.output_dir.resolve(),
+            arguments.source_sha,
+        )
     except (OSError, ReleaseEvidenceError) as error:
         print(f"release candidate evidence failed: {error}")
         return 1
