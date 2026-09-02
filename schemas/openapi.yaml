@@ -625,6 +625,7 @@ components:
         - person_record_id
         - position_record_id
         - allocation_ratio
+        - assignment_category_code
         - effective_from
         - decision_reason
         - confirmation_reference
@@ -642,6 +643,9 @@ components:
         allocation_ratio:
           type: string
           pattern: '^(0\.[0-9]{4}|1\.0000)$'
+        assignment_category_code:
+          type: string
+          pattern: '^(primary|concurrent_secondary)$'
         effective_from:
           type: string
           format: date
