@@ -123,10 +123,8 @@ components:
     ErrorResponse:
       type: object
       additionalProperties: false
-      required: [error, error_code, message, next_action, support_reference]
+      required: [error_code, message, next_action, support_reference]
       properties:
-        error:
-          type: string
         error_code:
           type: string
         message:
