@@ -63,7 +63,13 @@ class PositionVersion:
 
 @dataclass(frozen=True, slots=True)
 class AssignmentFact:
-    """One recorded assignment of a person, through one employment, to a position."""
+    """One recorded assignment of a person, through one employment, to a position.
+
+    ``assignment_category_code`` is authoritative HRIS truth. Historical rows
+    created before the explicit classification contract remain
+    ``legacy_unspecified``; callers must never infer a category from allocation
+    ratio, row order, or position identity.
+    """
 
     tenant_record_id: UUID
     assignment_record_id: UUID
@@ -73,3 +79,4 @@ class AssignmentFact:
     allocation_ratio: Decimal
     effective: DateInterval
     recorded: RecordedInterval
+    assignment_category_code: str = "legacy_unspecified"
