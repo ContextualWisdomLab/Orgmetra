@@ -257,9 +257,21 @@ def _pypi_ref(name: str, version: str | None, requirement: str | None = None) ->
     return f"urn:orgmetra:pypi-requirement:{normalized_name}:{requirement_digest}"
 
 
+def _npm_package_path(name: str) -> str:
+    """Encode an npm name using separate canonical namespace and package segments."""
+    if name.startswith("@"):
+        scope, separator, package_name = name.partition("/")
+        if not separator or len(scope) == 1 or not package_name or "/" in package_name:
+            raise ReleaseEvidenceError("scoped npm package name must use @scope/name")
+        return f"{quote(scope, safe='-._~')}/{quote(package_name, safe='-._~')}"
+    if "/" in name:
+        raise ReleaseEvidenceError("unscoped npm package name must not contain a slash")
+    return quote(name, safe="-._~")
+
+
 def _npm_ref(name: str, version: str | None, requirement: str) -> str:
     """Return a deterministic npm bom-ref without pretending a range is a version."""
-    encoded_name = quote(name, safe="-._~")
+    encoded_name = _npm_package_path(name)
     if version:
         return f"pkg:npm/{encoded_name}@{quote(version, safe='-._~')}"
     requirement_digest = hashlib.sha256(requirement.encode("utf-8")).hexdigest()[:16]
@@ -353,12 +365,12 @@ def _merge_dependency_component(
     identity_fields = {
         key: value
         for key, value in previous.items()
-        if key not in {"scope", "properties"}
+        if key not in {"scope", "properties", "type"}
     }
     candidate_identity = {
         key: value
         for key, value in component.items()
-        if key not in {"scope", "properties"}
+        if key not in {"scope", "properties", "type"}
     }
     if component_ref.startswith("pkg:pypi/"):
         previous_name = identity_fields.get("name")
@@ -508,7 +520,7 @@ def _build_sbom(
             version = document.get("version")
             if not isinstance(name, str) or not name or not isinstance(version, str) or not version:
                 continue
-            component_ref = f"pkg:npm/{quote(name, safe='-._~')}@{quote(version, safe='-._~')}"
+            component_ref = _npm_ref(name, version, version)
             _add_component(
                 components,
                 {
