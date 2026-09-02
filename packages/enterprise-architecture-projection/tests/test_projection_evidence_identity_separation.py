@@ -88,8 +88,10 @@ def test_semantically_distinct_receipts_cannot_reuse_one_artifact_identity(
         evaluate_projection_readiness(_candidate(), _release(), admission)
 
 
-def test_distinct_receipt_identities_remain_admissible() -> None:
-    """Preserve the positive path when every independent receipt has its own identity."""
+def test_distinct_receipt_identities_validate_without_authorizing_handoff() -> None:
+    """Keep well-formed independent receipts blocked until trusted control-plane integration."""
     decision = evaluate_projection_readiness(_candidate(), _release(), _admission())
 
-    assert decision.ready is True
+    assert decision.ready is False
+    assert decision.reason == "trusted_control_plane_evidence_not_available"
+    assert decision.next_action == "integrate_released_context_graph_trust_contract"
