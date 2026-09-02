@@ -4,6 +4,12 @@
   "generated_for_branch": "feat/audit-outbox-envelope",
   "files": [
     {
+      "path": ".github/workflows/assignment-category-quality.yml",
+      "sha256": "6c1a2b0be582f69669f2b7d061531fa15596737d39ee22e723b7a866abd0f8cb",
+      "bytes": 2207,
+      "lines": 64
+    },
+    {
       "path": ".github/workflows/foundation-ci.yml",
       "sha256": "12686a3bbd6445e6fdb202b4137dae118ddeeab1efb0c7f18ea6c8fa19d62537",
       "bytes": 4379,
@@ -89,7 +95,7 @@
     },
     {
       "path": "database/migrations/0005_outbox_delivery_finalization.sql",
-      "sha256": "b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5b7a3a25fa60016b6a4961",
+      "sha256": "b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5fb7a3a25fa60016b6a4961",
       "bytes": 6125,
       "lines": 170
     },
@@ -322,6 +328,12 @@
       "lines": 49
     },
     {
+      "path": "docs/adr/0015-explicit-assignment-category.md",
+      "sha256": "5666bc4613ee336d5305f9ff90f078b64d824f1d6ce3a68e13190ff29729f186",
+      "bytes": 7994,
+      "lines": 72
+    },
+    {
       "path": "docs/adr/README.md",
       "sha256": "070854c47de36ea53d62cc9ce3c102fc4fdbc809ffb0e33b0c157ddddeee41d6",
       "bytes": 1988,
@@ -371,15 +383,21 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "b80e050f716e2fd91e517f5aa97a3fc492a10782f7d830c5f2251e7222235228",
-      "bytes": 28279,
-      "lines": 691
+      "sha256": "0ce6276b23727c97e5faf3e2fd7784e64a3a058014536628d9336de77f46a21f",
+      "bytes": 28436,
+      "lines": 694
     },
     {
       "path": "scripts/foundation-contract.mjs",
       "sha256": "5242dcdbe0935775edf074462c82600e9bc4927d9fdc50c47727af915fd4b23a",
       "bytes": 218,
       "lines": 6
+    },
+    {
+      "path": "tests/assignment-category-provenance.test.mjs",
+      "sha256": "42ce6026533fc2e29339d0983f8a97334eaedcb02e252954edf826567b9ae766",
+      "bytes": 1013,
+      "lines": 21
     },
     {
       "path": "tests/dispatcher-inventory.test.mjs",
@@ -485,9 +503,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "c4cdff9c5425bf508cb994611c9dba9d439a8b2e94f1a614e3dafbb97777ea08",
-      "bytes": 27401,
-      "lines": 640
+      "sha256": "971c2820a6f4d845bae90044e47de369d0d270f8129dfe1ab5469d18da2a57d8",
+      "bytes": 27564,
+      "lines": 643
     }
   ]
 }
