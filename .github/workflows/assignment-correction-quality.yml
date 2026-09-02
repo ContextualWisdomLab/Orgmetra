@@ -11,6 +11,7 @@ on:
       - "database/migrations/0018_assignment_category_supersession.sql"
       - "docs/traceability/assignment-category-correction-provenance.md"
       - "packages/hris-kernel/**"
+      - "services/people-api/**"
       - "tests/test_assignment_category_correction_postgres.sh"
       - ".github/workflows/assignment-correction-quality.yml"
   workflow_dispatch:
@@ -24,11 +25,11 @@ concurrency:
 
 jobs:
   kernel:
-    name: Assignment correction kernel contract
+    name: Assignment correction application contract
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      PYTHONPATH: packages/hris-kernel/src
+      PYTHONPATH: packages/hris-kernel/src:packages/keyverse-adapter/src:services/people-api/src
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,8 +49,10 @@ jobs:
         run: |
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
-      - name: Prove HRIS correction contract
+      - name: Prove HRIS correction domain contract
         run: python -m pytest packages/hris-kernel/tests/test_assignment_category_correction.py
+      - name: Prove purpose-bound People correction command
+        run: python -m pytest services/people-api/tests/test_assignment_correction_mutations.py
       - name: Require clean checkout
         run: |
           git diff --exit-code
