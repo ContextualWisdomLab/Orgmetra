@@ -275,7 +275,7 @@ class AssignmentMutationCommand:
             _validate_operational_uuid(field_name, getattr(self, field_name))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.allocation_ratio, Decimal):
+        if type(self.allocation_ratio) is not Decimal:
             raise ValueError("allocation_ratio must be a Decimal.")
         if not self.allocation_ratio.is_finite():
             raise ValueError("allocation_ratio must be finite.")
