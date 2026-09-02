@@ -7,12 +7,43 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evidence_digest.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0017_assignment_category_code.sql
 
-# RED until the normalized correction-provenance relation exists.
+# A late migration failure must roll back the relation and all dependent DDL.
+# Colliding with the trigger function fails after CREATE TABLE has executed,
+# proving that BEGIN/COMMIT is the recovery boundary rather than psql autocommit.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE FUNCTION public.enforce_assignment_supersession_link()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN NEW;
+END;
+$$;
+SQL
+
+set +e
+atomicity_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0018_assignment_category_supersession.sql 2>&1)"
+atomicity_status=$?
+set -e
+if [[ ${atomicity_status} -eq 0 || "${atomicity_output}" != *"enforce_assignment_supersession_link"* ]]; then
+    echo "assignment supersession migration did not hit the deterministic late conflict: ${atomicity_output}" >&2
+    exit 1
+fi
+
+partial_table="$(psql "${DATABASE_URL}" -Atqc "SELECT pg_catalog.to_regclass('public.assignment_supersession_record') IS NOT NULL;")"
+if [[ "${partial_table}" != "f" ]]; then
+    echo "failed assignment supersession migration left partial schema state" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "DROP FUNCTION public.enforce_assignment_supersession_link();"
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0018_assignment_category_supersession.sql
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
-VALUES ('10000000-0000-7000-8000-000000000001', 'tenant_alpha');
+VALUES
+    ('10000000-0000-7000-8000-000000000001', 'tenant_alpha'),
+    ('20000000-0000-7000-8000-000000000001', 'tenant_beta');
 INSERT INTO person_record (tenant_record_id, person_record_id, recorded_from)
 VALUES ('10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000101', TIMESTAMPTZ '2026-09-03 00:00:00+00');
 INSERT INTO employment_record (tenant_record_id, employment_record_id, person_record_id, recorded_from)
@@ -76,6 +107,44 @@ test "${rls_state}" = "true:true"
 policy_count="$(psql "${DATABASE_URL}" -Atqc "SELECT count(*) FROM pg_policy WHERE polrelid='public.assignment_supersession_record'::regclass AND polname='assignment_supersession_scope_policy';")"
 test "${policy_count}" = "1"
 
+# RLS catalog flags are insufficient evidence. Prove visibility through an
+# ordinary NOBYPASSRLS role with absent, matching, and non-matching tenant context.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE ROLE orgmetra_assignment_correction_reader NOLOGIN NOBYPASSRLS;
+GRANT USAGE ON SCHEMA public TO orgmetra_assignment_correction_reader;
+GRANT SELECT ON public.assignment_supersession_record TO orgmetra_assignment_correction_reader;
+GRANT EXECUTE ON FUNCTION public.current_tenant_record_id() TO orgmetra_assignment_correction_reader;
+SET ROLE orgmetra_assignment_correction_reader;
+
+RESET orgmetra.tenant_record_id;
+DO $$
+BEGIN
+    IF (SELECT count(*) FROM public.assignment_supersession_record) <> 0 THEN
+        RAISE EXCEPTION 'missing tenant context exposed assignment supersession provenance';
+    END IF;
+END;
+$$;
+
+SET orgmetra.tenant_record_id = '10000000-0000-7000-8000-000000000001';
+DO $$
+BEGIN
+    IF (SELECT count(*) FROM public.assignment_supersession_record) <> 1 THEN
+        RAISE EXCEPTION 'tenant alpha could not read its assignment supersession provenance';
+    END IF;
+END;
+$$;
+
+SET orgmetra.tenant_record_id = '20000000-0000-7000-8000-000000000001';
+DO $$
+BEGIN
+    IF (SELECT count(*) FROM public.assignment_supersession_record) <> 0 THEN
+        RAISE EXCEPTION 'tenant beta observed tenant alpha assignment supersession provenance';
+    END IF;
+END;
+$$;
+RESET ROLE;
+SQL
+
 set +e
 update_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "UPDATE assignment_supersession_record SET recorded_at=TIMESTAMPTZ '2026-09-03 00:03:00+00' WHERE assignment_supersession_record_id='10000000-0000-7000-8000-000000000190';" 2>&1)"
 update_status=$?
@@ -134,6 +203,29 @@ business_status=$?
 set -e
 if [[ ${business_status} -eq 0 || "${business_output}" != *"business truth"* ]]; then
     echo "non-category replacement escaped supersession validation: ${business_output}" >&2
+    exit 1
+fi
+
+# Same-category replacement is also invalid even when every other fact matches.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO assignment_record (
+    tenant_record_id, assignment_record_id, employment_record_id, person_record_id,
+    position_record_id, allocation_ratio, assignment_category_code,
+    effective_from, effective_to, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001', '10000000-0000-7000-8000-000000000154',
+    '10000000-0000-7000-8000-000000000111', '10000000-0000-7000-8000-000000000101',
+    '10000000-0000-7000-8000-000000000141', 0.5000, 'primary',
+    DATE '2026-09-03', DATE '2026-10-01', TIMESTAMPTZ '2026-09-03 00:02:00+00'
+);
+SQL
+
+set +e
+category_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "INSERT INTO assignment_supersession_record (tenant_record_id, assignment_supersession_record_id, predecessor_assignment_record_id, replacement_assignment_record_id, recorded_at) VALUES ('10000000-0000-7000-8000-000000000001','10000000-0000-7000-8000-000000000194','10000000-0000-7000-8000-000000000151','10000000-0000-7000-8000-000000000154',TIMESTAMPTZ '2026-09-03 00:02:00+00');" 2>&1)"
+category_status=$?
+set -e
+if [[ ${category_status} -eq 0 || "${category_output}" != *"must change one explicit assignment category"* ]]; then
+    echo "same-category replacement escaped supersession validation: ${category_output}" >&2
     exit 1
 fi
 
