@@ -71,6 +71,7 @@ REQUIRED = [
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
+    "database/migrations/0017_assignment_category_code.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -92,6 +93,7 @@ REQUIRED = [
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
+    "tests/test_assignment_category_postgres.sh",
     "tests/validate_repository.py",
 ]
 
