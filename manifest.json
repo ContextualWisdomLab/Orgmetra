@@ -419,7 +419,7 @@
     },
     {
       "path": "tests/test_bitemporal_postgres.sh",
-      "sha256": "7684b8c2ff52c044c081135515bd5aabbfd00e2daad0d471b0868701af2df6cc7",
+      "sha256": "7684b8c2ff52c044c081135515bd5aabbfd00e2daad0d471b0868701af2df6cc",
       "bytes": 8209,
       "lines": 230
     },
