@@ -9,6 +9,7 @@ on:
       - main
     paths:
       - "database/migrations/0018_assignment_category_supersession.sql"
+      - "docs/traceability/assignment-category-correction-provenance.md"
       - "packages/hris-kernel/**"
       - "tests/test_assignment_category_correction_postgres.sh"
       - ".github/workflows/assignment-correction-quality.yml"
