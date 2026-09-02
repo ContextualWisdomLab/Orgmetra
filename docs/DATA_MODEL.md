@@ -14,7 +14,7 @@
 | `job_profile_version` | Bitemporal title, family, and version definition for a job profile. |
 | `position_record` | Durable seat identity that keeps stable organization and job references. |
 | `position_record_version` | Bitemporal position status and effective period. |
-| `assignment_record` | A person's allocation to a position through one employment. |
+| `assignment_record` | A person's allocation and explicit primary/concurrent-secondary category for a position through one employment. |
 | `candidate_profile` | Applicant/candidate record before hire. |
 | `candidate_worker_link` | Legacy append-only candidate-to-worker linkage retained for historical reads; new writes use `candidate_worker_conversion_record`. |
 | `candidate_worker_conversion_record` | Governed bitemporal candidate-to-worker conversion bound to the hire decision, person, employment, immutable audit event, and outbox evidence. |
@@ -54,6 +54,8 @@ Durable anchors such as `organization_unit`, `job_profile`, `employment_record`,
 
 Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
 
+`assignment_category_code` records a different invariant from allocation. Every new assignment write must state `primary` or `concurrent_secondary`; allocation percentage, row order, position identity, and graph topology are never used to infer the category. Rows created before migration 0017 are explicitly preserved as `legacy_unspecified`, but the forward-write CHECK rejects that sentinel on new or rewritten rows. A tenant/employment-scoped partial GiST exclusion over effective and recorded ranges allows multiple concurrent assignments while rejecting two simultaneously visible `primary` assignments. This keeps the category on the normalized assignment fact instead of denormalizing a mutable current-primary pointer, and localizes exclusion conflicts to one tenant-local employment portfolio.
+
 ## High-impact decision evidence
 
 Evidence membership is constructed in `selection_decision_evidence` while its `decision_evidence_set` is open. An open set has no caller-supplied content digest. Finalizing `selection_decision` requires at least one versioned evidence member, canonicalizes the members by `(evidence_reference, evidence_version_code)`, computes SHA-256 inside PostgreSQL, and atomically stores that digest while binding `sealed_selection_decision_id`. Database triggers reject later evidence inserts, second-decision reuse, arbitrary post-seal mutation, and a sealed-set pointer that does not resolve back to the decision that consumed that exact set. This makes the stored digest evidence about database-observed membership at finalization rather than an unverified client assertion.
@@ -62,7 +64,7 @@ New predictive-validity membership uses `validity_study_case_record` rather than
 
 ## People mutation idempotency
 
-`people_mutation_idempotency_record` is the durable retry boundary for governed candidate-worker conversion, Employment, Position, and Assignment mutations. Its unique business key is `(tenant_record_id, command_route, idempotency_key)`; the row stores the canonical semantic-command SHA-256 digest and the first committed created-record identity. Matching retries replay that identity, while a changed command under the same tenant/route/key fails closed instead of creating another HRIS fact.
+`people_mutation_idempotency_record` is the durable retry boundary for governed candidate-worker conversion, Employment, Position, and Assignment mutations. Its unique business key is `(tenant_record_id, command_route, idempotency_key)`; the row stores the canonical semantic-command SHA-256 digest and the first committed created-record identity. Matching retries replay that identity, while a changed command under the same tenant/route/key fails closed instead of creating another HRIS fact. Assignment category participates in that semantic digest, so changing `primary` to `concurrent_secondary` under the same Idempotency-Key is a conflict rather than an idempotent replay.
 
 The owning write port acquires an exact-key transaction-scoped advisory lock and writes the HRIS fact, immutable audit/outbox evidence, and idempotency row inside one PostgreSQL transaction. A rolled-back mutation therefore cannot leave a false replay marker. The relation is append-only, TRUNCATE-protected, tenant-RLS isolated, and uses opaque operational UUIDs. The idempotency key is transport correlation, not HR data or authorization evidence; actor, purpose, human-confirmation and resource authorization remain independently required.
 
