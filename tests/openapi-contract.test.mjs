@@ -15,8 +15,25 @@ function removeOccurrence(text, fragment, occurrence = 1) {
   return text.slice(0, searchIndex) + text.slice(searchIndex + fragment.length);
 }
 
+function schemaBlock(text, schemaName) {
+  const marker = `    ${schemaName}:\n`;
+  const start = text.indexOf(marker);
+  assert.ok(start >= 0, `schema fixture missing: ${schemaName}`);
+  const next = text.indexOf('\n    ', start + marker.length);
+  return text.slice(start, next >= 0 ? next : text.length);
+}
+
 test('canonical OpenAPI passes structural operation validation', () => {
   assert.deepEqual(validateOpenApiContract(canonical), []);
+});
+
+test('assignment command requires an explicit governed assignment category', () => {
+  const command = schemaBlock(canonical, 'CreateAssignmentRecordCommand');
+  assert.match(command, /\n        - assignment_category_code\n/);
+  assert.match(
+    command,
+    /\n        assignment_category_code:\n          type: string\n          pattern: '\^\(primary\|concurrent_secondary\)\$'\n/
+  );
 });
 
 for (const testCase of [
