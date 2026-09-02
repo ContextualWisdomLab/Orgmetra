@@ -61,17 +61,18 @@ def _admission() -> ContractAdmissionEvidence:
     )
 
 
-def test_ready_handoff_preserves_exact_orgmetra_source_identity() -> None:
-    """A ready handoff must remain attributable to the exact Orgmetra source revision."""
+def test_blocked_handoff_preserves_exact_orgmetra_source_identity() -> None:
+    """A blocked handoff must remain attributable to the exact Orgmetra source revision."""
     decision = evaluate_projection_readiness(_candidate(), _release(), _admission())
 
-    assert decision.ready is True
+    assert decision.ready is False
+    assert decision.reason == "trusted_control_plane_evidence_not_available"
     assert decision.source_repository == ORGMETRA_REPOSITORY
     assert decision.source_revision == ORGMETRA_SHA
 
 
-def test_readiness_is_bound_to_exact_candidate_evidence_not_only_source_revision() -> None:
-    """Two candidates from one source revision must never share transferable readiness evidence."""
+def test_blocked_decision_is_bound_to_exact_candidate_evidence_not_only_source_revision() -> None:
+    """Two candidates from one source revision must never share transferable decision evidence."""
     first = evaluate_projection_readiness(_candidate(), _release(), _admission())
     second = evaluate_projection_readiness(
         _candidate(
@@ -83,7 +84,8 @@ def test_readiness_is_bound_to_exact_candidate_evidence_not_only_source_revision
         _admission(),
     )
 
-    assert first.ready is True
-    assert second.ready is True
+    assert first.ready is False
+    assert second.ready is False
+    assert first.reason == second.reason == "trusted_control_plane_evidence_not_available"
     assert first.source_revision == second.source_revision == ORGMETRA_SHA
     assert first.candidate_sha256 != second.candidate_sha256
