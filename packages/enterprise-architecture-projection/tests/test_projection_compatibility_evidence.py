@@ -140,11 +140,13 @@ def test_admission_verification_cannot_predate_release_verification() -> None:
         )
 
 
-def test_ready_projection_retains_compatibility_and_migration_receipts() -> None:
-    """Do not authorize handoff without exact compatibility and migration evidence."""
+def test_shape_complete_projection_retains_receipts_but_stays_blocked() -> None:
+    """Retain lifecycle evidence without authorizing caller-created external evidence."""
     decision = evaluate_projection_readiness(_candidate(), _release(), _admission())
 
-    assert decision.ready is True
+    assert decision.ready is False
+    assert decision.reason == "trusted_control_plane_evidence_not_available"
+    assert decision.next_action == "integrate_released_context_graph_trust_contract"
     assert decision.contract_compatibility_receipt_sha256 == _COMPATIBILITY_SHA256
     assert decision.contract_migration_receipt_sha256 == _MIGRATION_SHA256
 
