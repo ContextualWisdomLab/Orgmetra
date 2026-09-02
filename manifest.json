@@ -143,9 +143,9 @@
     },
     {
       "path": "database/migrations/0017_assignment_category_code.sql",
-      "sha256": "ba0e50e6833b5e8931f7f717203b7e0b26c54a59b3d830f95995ae586af7694b",
-      "bytes": 3164,
-      "lines": 66
+      "sha256": "e8aa97c4d6490e5fe934b74eed74d5bcd5fcf21b674650fb388d63e9d650bd33",
+      "bytes": 3422,
+      "lines": 71
     },
     {
       "path": "docs/API_CONTRACT.md",
@@ -401,9 +401,9 @@
     },
     {
       "path": "tests/test_assignment_category_postgres.sh",
-      "sha256": "dbe84c56da410313820d81ee0567e2e272b9b6bb8b8cc06198e99bb1b059b56e",
-      "bytes": 8180,
-      "lines": 113
+      "sha256": "031a2b193598a11703ac5f88da0452e077d893f8bedbe3310100d2bf8da4ec0c",
+      "bytes": 8742,
+      "lines": 119
     },
     {
       "path": "tests/test_audit_outbox_hardening_postgres.sh",
