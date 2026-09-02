@@ -134,7 +134,7 @@ The repository does not claim certification, customer deployment, release maturi
 
 Start with [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md), the PRD, and the applicable ADR/traceability document before changing a product contract. Keep source, tests, documentation, and public claims aligned to the same repository revision.
 
-Security-sensitive reports should follow [`SECURITY.md`](SECURITY.md). Product and integration defects should be tracked in this repository only when Orgmetra owns the failing boundary; otherwise repair the dedicated owner instead of adding a local workaround.
+Security controls and trust boundaries are documented in [`docs/SECURITY.md`](docs/SECURITY.md). Product and integration defects should be tracked in this repository only when Orgmetra owns the failing boundary; otherwise repair the dedicated owner instead of adding a local workaround.
 
 ## License
 
