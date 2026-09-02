@@ -43,7 +43,7 @@ test "${legacy_category}" = "legacy_unspecified"
 # A pre-contract row is still legitimate system-time history. Closing its
 # recorded interval must not force Orgmetra to invent a primary/secondary
 # classification merely because PostgreSQL rechecks a NOT VALID constraint on
-# UPDATE. This is RED against the current migration.
+# UPDATE.
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "UPDATE assignment_record SET recorded_to=TIMESTAMPTZ '2026-09-01 00:02:00+00' WHERE assignment_record_id='00000000-0000-7000-8000-000000000151';"
 legacy_recorded_to="$(psql "${DATABASE_URL}" -Atqc "SELECT recorded_to FROM assignment_record WHERE assignment_record_id='00000000-0000-7000-8000-000000000151';")"
 test "${legacy_recorded_to}" = "2026-09-01 00:02:00+00"
@@ -85,6 +85,19 @@ legacy_write_status=$?
 set -e
 if [[ ${legacy_write_status} -eq 0 || "${legacy_write_output}" != *"assignment_record_category_code_check"* ]]; then
   echo "new legacy_unspecified assignment did not fail closed: ${legacy_write_output}" >&2
+  exit 1
+fi
+
+# A classified assignment cannot be rewritten back to the historical sentinel.
+# This separately exercises the UPDATE branch of the write guard while the
+# earlier recorded_to closure proves untouched legacy history remains mutable
+# only in system-time bookkeeping.
+set +e
+legacy_rewrite_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "UPDATE assignment_record SET assignment_category_code='legacy_unspecified' WHERE assignment_record_id='00000000-0000-7000-8000-000000000152';" 2>&1)"
+legacy_rewrite_status=$?
+set -e
+if [[ ${legacy_rewrite_status} -eq 0 || "${legacy_rewrite_output}" != *"assignment_record_category_code_check"* ]]; then
+  echo "classified assignment was allowed to become legacy_unspecified: ${legacy_rewrite_output}" >&2
   exit 1
 fi
 
