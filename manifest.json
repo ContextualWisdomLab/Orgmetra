@@ -17,7 +17,7 @@
     },
     {
       "path": ".gitignore",
-      "sha256": "145fda644f5209fa1fb3e3b40c9af9258bfac6d1a634bba2520fd08fe6d77a21",
+      "sha256": "145fda6445e6fdb2028ed8246e6d77a21",
       "bytes": 375,
       "lines": 37
     },
@@ -323,8 +323,8 @@
     },
     {
       "path": "docs/adr/README.md",
-      "sha256": "68438a8c68ac0f77942efcff7aed8f4354038476d05c6095859ca89a01fa7822",
-      "bytes": 1989,
+      "sha256": "070854c47de36ea53d62cc9ce3c102fc4fdbc809ffb0e33b0c157ddddeee41d6",
+      "bytes": 1988,
       "lines": 19
     },
     {
