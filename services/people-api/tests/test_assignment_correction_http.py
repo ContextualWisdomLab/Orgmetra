@@ -91,17 +91,12 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         )
         self.policy = self._policy()
 
-    def _policy(
-        self,
-        *,
-        tenant_record_id: UUID = TENANT,
-        purpose_code: str = "workforce_admin",
-    ) -> PurposeBoundAccessPolicy:
+    def _policy(self, *, purpose: str = "workforce_admin") -> PurposeBoundAccessPolicy:
         return PurposeBoundAccessPolicy(
-            tenant_record_id=tenant_record_id,
+            tenant_record_id=TENANT,
             policy_version_code="assignment-correction-v1",
             resource_kind="assignment_record",
-            purpose_code=purpose_code,
+            purpose_code=purpose,
             operation_code="correct_record",
             required_scope_code="orgmetra.people.write",
             permitted_fields=frozenset({"assignment_category_code"}),
@@ -112,18 +107,17 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         *,
         tenant: UUID = TENANT,
         actor: str = "keyverse_subject:operator-17",
-        purpose: str = "workforce_admin",
         content_type: bytes = b"application/json",
-        include_idempotency: bool = True,
+        idempotency: bool = True,
     ) -> list[tuple[bytes, bytes]]:
         headers = [
             (b"authorization", b"Bearer opaque-token"),
             (b"content-type", content_type),
             (b"x-tenant-reference", str(tenant).encode("ascii")),
             (b"x-actor-reference", actor.encode("ascii")),
-            (b"x-purpose-code", purpose.encode("ascii")),
+            (b"x-purpose-code", b"workforce_admin"),
         ]
-        if include_idempotency:
+        if idempotency:
             headers.append((b"idempotency-key", b"assignment-correction-17"))
         return headers
 
@@ -182,21 +176,22 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         start, response = messages
         return int(start["status"]), dict(start["headers"]), json.loads(bytes(response["body"]))
 
-    def test_path_parser_accepts_only_one_operational_route_shape(self) -> None:
-        self.assertIsNone(_predecessor_from_path(object()))
-        self.assertIsNone(_predecessor_from_path("/v1/assignment-records"))
-        self.assertIsNone(_predecessor_from_path(f"/v2/assignment-records/{PREDECESSOR}/category-corrections"))
-        self.assertIsNone(_predecessor_from_path(f"/v1/other-records/{PREDECESSOR}/category-corrections"))
-        self.assertIsNone(_predecessor_from_path(f"/v1/assignment-records/{PREDECESSOR}/other"))
-        self.assertIsNone(_predecessor_from_path("/v1/assignment-records/not-a-uuid/category-corrections"))
-        self.assertIsNone(_predecessor_from_path(f"/v1/assignment-records/{UUID(int=0)}/category-corrections"))
-        self.assertIsNone(_predecessor_from_path(f"/v1/assignment-records/{UUID(int=(1 << 128) - 1)}/category-corrections"))
+    def test_path_body_and_command_helpers_fail_closed(self) -> None:
+        for path in (
+            object(),
+            "/v1/assignment-records",
+            f"/v2/assignment-records/{PREDECESSOR}/category-corrections",
+            f"/v1/other-records/{PREDECESSOR}/category-corrections",
+            f"/v1/assignment-records/{PREDECESSOR}/other",
+            "/v1/assignment-records/not-a-uuid/category-corrections",
+            f"/v1/assignment-records/{UUID(int=0)}/category-corrections",
+            f"/v1/assignment-records/{UUID(int=(1 << 128) - 1)}/category-corrections",
+        ):
+            self.assertIsNone(_predecessor_from_path(path))
         self.assertEqual(
             _predecessor_from_path(f"/v1/assignment-records/{PREDECESSOR}/category-corrections"),
             PREDECESSOR,
         )
-
-    def test_body_parser_and_command_factory_reject_ambiguous_values(self) -> None:
         self.assertEqual(_require_body_string({"field": "value"}, "field"), "value")
         with self.assertRaises(_InvalidHttpRequest):
             _require_body_string({"field": 1}, "field")
@@ -249,10 +244,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
     async def test_post_creates_linked_replacement_and_authorizes_only_category(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
         port = RecordingCorrectionPort()
-        app = self._app(authenticator=authenticator, port=port)
-
-        status, headers, payload = await self._request(app)
-
+        status, headers, payload = await self._request(self._app(authenticator=authenticator, port=port))
         self.assertEqual(status, 201)
         self.assertEqual(
             payload,
@@ -271,101 +263,81 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(authorization.operation_code, "correct_record")
         self.assertEqual(authorization.requested_fields, frozenset({"assignment_category_code"}))
 
-    async def test_method_route_media_and_header_failures_stop_before_authentication(self) -> None:
+    async def test_request_edge_rejections_stop_before_authentication(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
         app = self._app(authenticator=authenticator)
-
         status, headers, payload = await self._request(app, method="GET")
         self.assertEqual((status, headers[b"allow"], payload["error_code"]), (405, b"POST", "method_not_allowed"))
         status, _, payload = await self._request(app, path="/v1/assignment-records/not-a-uuid/category-corrections")
         self.assertEqual((status, payload["error_code"]), (404, "route_not_found"))
         status, _, payload = await self._request(app, headers=self._headers(content_type=b"text/plain"))
         self.assertEqual((status, payload["error_code"]), (415, "unsupported_media_type"))
-        status, _, payload = await self._request(app, headers=self._headers(include_idempotency=False))
+        status, _, payload = await self._request(app, headers=self._headers(idempotency=False))
         self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
         self.assertEqual(authenticator.tokens, [])
 
-    async def test_authentication_failures_and_malformed_principal_are_client_safe(self) -> None:
-        denied = self._app(
-            authenticator=FakeAuthenticator(self.principal, error=AuthenticationFailed("denied")),
-        )
+    async def test_authentication_and_principal_binding_fail_closed(self) -> None:
+        denied = self._app(authenticator=FakeAuthenticator(self.principal, error=AuthenticationFailed("denied")))
         status, headers, payload = await self._request(denied)
         self.assertEqual((status, headers[b"www-authenticate"], payload["error_code"]), (401, b"Bearer", "authentication_required"))
-
-        backend_failure = self._app(authenticator=FakeAuthenticator(self.principal, error=RuntimeError("secret")))
-        status, _, payload = await self._request(backend_failure)
+        backend = self._app(authenticator=FakeAuthenticator(self.principal, error=RuntimeError("secret")))
+        status, _, payload = await self._request(backend)
         self.assertEqual((status, payload["error_code"]), (500, "internal_error"))
         self.assertNotIn("secret", json.dumps(payload))
-
-        malformed = self._app(authenticator=FakeAuthenticator(object()))
-        status, _, payload = await self._request(malformed)
+        status, _, payload = await self._request(self._app(authenticator=FakeAuthenticator(object())))
         self.assertEqual((status, payload["error_code"]), (500, "internal_error"))
-
-    async def test_principal_tenant_and_actor_must_match_governed_headers(self) -> None:
-        status, _, payload = await self._request(
-            self._app(),
-            headers=self._headers(tenant=OTHER_TENANT),
-        )
+        status, _, payload = await self._request(self._app(), headers=self._headers(tenant=OTHER_TENANT))
         self.assertEqual((status, payload["error_code"]), (403, "access_denied"))
-
         other_actor = AuthenticatedPrincipal(
             tenant_record_id=TENANT,
             actor_reference="keyverse_subject:other-actor",
             granted_scope_codes=frozenset({"orgmetra.people.write"}),
         )
-        status, _, payload = await self._request(
-            self._app(authenticator=FakeAuthenticator(other_actor)),
-        )
+        status, _, payload = await self._request(self._app(authenticator=FakeAuthenticator(other_actor)))
         self.assertEqual((status, payload["error_code"]), (403, "access_denied"))
 
-    async def test_body_size_shape_value_and_identity_generation_fail_closed(self) -> None:
+    async def test_body_and_identity_failures_return_bounded_client_errors(self) -> None:
         app = self._app()
         status, _, payload = await self._request(app, body=b"{" + (b"x" * 65536) + b"}")
         self.assertEqual((status, payload["error_code"]), (413, "payload_too_large"))
-
         status, _, payload = await self._request(app, body=b"not-json")
         self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
-
-        extra = json.dumps(
-            {
-                "corrected_category_code": "primary",
-                "confirmation_reference": "human_confirmation:review-42",
-                "evidence_version_code": "assignment-correction-v1",
-                "unexpected": True,
-            }
-        ).encode("utf-8")
-        status, _, payload = await self._request(app, body=extra)
+        extra = {
+            "corrected_category_code": "primary",
+            "confirmation_reference": "human_confirmation:review-42",
+            "evidence_version_code": "assignment-correction-v1",
+            "unexpected": True,
+        }
+        status, _, payload = await self._request(app, body=json.dumps(extra).encode())
+        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
+        invalid = {
+            "corrected_category_code": "secondary",
+            "confirmation_reference": "human_confirmation:review-42",
+            "evidence_version_code": "assignment-correction-v1",
+        }
+        status, _, payload = await self._request(app, body=json.dumps(invalid).encode())
+        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
+        status, _, payload = await self._request(self._app(id_factory=SequentialIdFactory(())))
         self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
 
-        invalid_category = json.dumps(
-            {
-                "corrected_category_code": "secondary",
-                "confirmation_reference": "human_confirmation:review-42",
-                "evidence_version_code": "assignment-correction-v1",
-            }
-        ).encode("utf-8")
-        status, _, payload = await self._request(app, body=invalid_category)
-        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
-
-        exhausted = self._app(id_factory=SequentialIdFactory(()))
-        status, _, payload = await self._request(exhausted)
-        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
-
-    async def test_authorization_integrity_and_unexpected_persistence_fail_closed(self) -> None:
-        denied_policy = self._policy(purpose_code="different_admin")
-        status, _, payload = await self._request(self._app(policy=denied_policy))
+    async def test_authorization_integrity_and_backend_failures_are_sanitized(self) -> None:
+        status, _, payload = await self._request(self._app(policy=self._policy(purpose="different_admin")))
         self.assertEqual((status, payload["error_code"]), (403, "access_denied"))
-
-        integrity = self._app(port=RecordingCorrectionPort(error=PeopleMutationIntegrityError("conflict")))
-        status, _, payload = await self._request(integrity)
+        status, _, payload = await self._request(
+            self._app(port=RecordingCorrectionPort(error=PeopleMutationIntegrityError("conflict")))
+        )
         self.assertEqual((status, payload["error_code"]), (409, "mutation_integrity_conflict"))
-
-        kernel = self._app(port=RecordingCorrectionPort(error=KernelError("kernel conflict")))
-        status, _, payload = await self._request(kernel)
+        status, _, payload = await self._request(
+            self._app(
+                port=RecordingCorrectionPort(
+                    error=KernelError("kernel conflict", next_action="refresh the Assignment")
+                )
+            )
+        )
         self.assertEqual((status, payload["error_code"]), (409, "mutation_integrity_conflict"))
-
-        backend = self._app(port=RecordingCorrectionPort(error=RuntimeError("database-secret")))
-        status, _, payload = await self._request(backend)
+        status, _, payload = await self._request(
+            self._app(port=RecordingCorrectionPort(error=RuntimeError("database-secret")))
+        )
         self.assertEqual((status, payload["error_code"]), (500, "internal_error"))
         self.assertNotIn("database-secret", json.dumps(payload))
 
