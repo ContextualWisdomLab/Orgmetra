@@ -10,7 +10,7 @@ An `assignment_record` already states that one person, through one employment, o
 
 The ecosystem contract in `ContextualWisdomLab/context-graph-contracts#23` needs a non-heuristic source for primary-versus-secondary organization membership. Orgmetra owns that source because it owns employment and assignment facts; consumers may translate the published value through an anti-corruption layer but must not author or infer it.
 
-Bitemporal interpretation matters because the same assignment can be corrected later and because two assignments may overlap in effective time while being known at different system times. Allen (1983) and Jensen and Snodgrass (1999) provide the temporal-data basis for treating interval overlap and recorded-time knowledge as first-class semantics rather than collapsing them into a current-row flag. ISO 30400:2022 is used only as HR vocabulary context, not as evidence that ISO prescribes these exact category codes.
+Bitemporal interpretation matters because historical Assignment facts can be closed and replacement facts can become known later while effective time and recorded time remain distinct. This increment does not claim a complete Assignment category-correction or supersession workflow: `assignment_record` is currently the immutable fact identity, and Orgmetra #164 owns the separate linked-replacement provenance/API gap. Allen (1983) and Jensen and Snodgrass (1999) provide the temporal-data basis for treating interval overlap and recorded-time knowledge as first-class semantics rather than collapsing them into a current-row flag. ISO 30400:2022 is used only as HR vocabulary context, not as evidence that ISO prescribes these exact category codes.
 
 ## Decision
 
@@ -45,7 +45,7 @@ The aggregate/entity/value-object split is:
 
 ## Persistence and concurrency consequences
 
-Migration 0017 backfills pre-contract rows explicitly as `legacy_unspecified`. Its table CHECK accepts only the three known storage values so historical rows remain valid when their system-time interval is closed. A dedicated write guard rejects introducing `legacy_unspecified` on INSERT and rejects changing an already classified row back to that sentinel; closing the `recorded_to` interval of a pre-contract legacy row therefore preserves history without inventing a classification. Replacement/current rows still require `primary | concurrent_secondary` through the application/API contract and database write guard. A partial GiST exclusion constraint over tenant, employment, effective interval, and recorded interval rejects two simultaneously visible primary rows without serializing unrelated employments. This preserves normalized assignment facts rather than adding a denormalized 'current primary' pointer and keeps the model in 3NF.
+Migration 0017 backfills pre-contract rows explicitly as `legacy_unspecified`. Its table CHECK accepts only the three known storage values so historical rows remain valid when their system-time interval is closed. A dedicated write guard rejects introducing `legacy_unspecified` on INSERT and rejects changing an already classified row back to that sentinel; closing the `recorded_to` interval of a pre-contract legacy row therefore preserves history without inventing a classification. Post-contract writes still require `primary | concurrent_secondary` through the application/API contract and database write guard. A partial GiST exclusion constraint over tenant, employment, effective interval, and recorded interval rejects two simultaneously visible primary rows without serializing unrelated employments. This preserves normalized assignment facts rather than adding a denormalized 'current primary' pointer and keeps the model in 3NF.
 
 The exclusion key starts with tenant and employment scope, so conflict work is localized to the employment portfolio instead of creating an organization-wide hot partition. Read paths continue to reconstruct bitemporal facts; this ADR does not introduce a cross-service read/write shortcut or direct access to another bounded context's database.
 
@@ -61,7 +61,7 @@ The implementation is test-first: domain/idempotency regression preceded product
 
 ## Consequences
 
-Consumers can distinguish primary from secondary membership without guessing. Historical uncertainty remains explicit rather than silently rewritten. A category correction must follow normal bitemporal correction semantics instead of in-place mutation. The added exclusion constraint introduces conflict detection only where two primary intervals overlap for the same tenant-local employment.
+Consumers can distinguish primary from secondary membership without guessing. Historical uncertainty remains explicit rather than silently rewritten. In-place category mutation is forbidden. A complete category correction requires a governed close-and-linked-replacement workflow with explicit supersession provenance; Orgmetra #164 owns that successor buyer gap. Until that contract integrates, this increment exposes category creation/read semantics only and must not be represented as supporting Assignment category correction.
 
 ## References
 
