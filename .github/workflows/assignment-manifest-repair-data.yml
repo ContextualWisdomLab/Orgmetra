@@ -1,0 +1,49 @@
+name: Assignment Manifest Repair Data
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - .github/workflows/assignment-manifest-repair-data.yml
+      - database/migrations/0017_assignment_category_code.sql
+      - docs/API_CONTRACT.md
+      - docs/DATA_MODEL.md
+      - docs/ERD.md
+      - docs/TRACEABILITY.md
+      - docs/adr/README.md
+      - schemas/openapi.yaml
+      - scripts/foundation-contract-core.mjs
+      - tests/openapi-contract.test.mjs
+      - tests/test_assignment_category_postgres.sh
+      - tests/validate_repository.py
+      - manifest.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assignment-manifest-repair-data-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  print-manifest:
+    name: Print exact manifest repair data
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Print deterministic manifest
+        run: python tests/validate_repository.py --print-manifest
+      - name: Prove diagnostic is read-only
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
