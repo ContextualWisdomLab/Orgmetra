@@ -157,7 +157,6 @@ JOIN public.employment_record_version AS version
  AND version.employment_record_id = employment.employment_record_id
 WHERE employment.tenant_record_id = %s
   AND employment.employment_record_id = %s
-FOR UPDATE OF employment
 """.strip()
 
 _NAMED_POSITION_VERSIONS_SQL = """
