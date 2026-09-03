@@ -447,6 +447,8 @@ def persist_job_analysis_snapshot(
         outbox_delivery_record_id=uuid4(),
         write_command_id=uuid4(),
     )
+    if type(persisted) is not JobAnalysisSnapshot:
+        raise JobAnalysisIntegrityError("persisted snapshot has an invalid runtime type")
     if persisted.to_snapshot() != snapshot.to_snapshot():
         raise JobAnalysisIntegrityError("persisted snapshot escaped posted payload")
     return PersistedJobAnalysisView(
@@ -485,6 +487,8 @@ def read_job_analysis_snapshot(
     )
     if snapshot is None:
         raise JobAnalysisSnapshotNotFound("job-analysis snapshot is unavailable")
+    if type(snapshot) is not JobAnalysisSnapshot:
+        raise JobAnalysisIntegrityError("resolved snapshot has an invalid runtime type")
     if (
         snapshot.tenant_record_id != tenant_record_id
         or snapshot.analysis_record_id != analysis_record_id
