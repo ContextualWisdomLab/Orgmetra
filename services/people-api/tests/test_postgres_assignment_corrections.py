@@ -117,7 +117,11 @@ class PostgresAssignmentCorrectionMutationTests(unittest.TestCase):
         self.assertEqual(result.replacement_assignment_record_id, REPLACEMENT)
         self.assertEqual(result.assignment_supersession_record_id, SUPERSESSION)
         sql = [statement for statement, _parameters in cursor.executions]
-        predecessor_lock = next(i for i, statement in enumerate(sql) if "FOR UPDATE OF assignment" in statement)
+        predecessor_read = next(
+            i
+            for i, statement in enumerate(sql)
+            if "assignment.assignment_record_id = %s" in statement and "LIMIT 2" in statement
+        )
         employment_lock = next(i for i, statement in enumerate(sql) if "FOR UPDATE OF employment" in statement)
         position_lock = next(i for i, statement in enumerate(sql) if "FOR UPDATE OF position" in statement)
         portfolio_lock = next(
@@ -143,7 +147,9 @@ class PostgresAssignmentCorrectionMutationTests(unittest.TestCase):
             for i, statement in enumerate(sql)
             if statement.startswith("INSERT INTO public.people_mutation_idempotency_record")
         )
-        self.assertLess(predecessor_lock, employment_lock)
+        self.assertNotIn("FOR UPDATE", sql[predecessor_read])
+        self.assertIn("ORDER BY assignment.assignment_record_id", sql[portfolio_lock])
+        self.assertLess(predecessor_read, employment_lock)
         self.assertLess(employment_lock, position_lock)
         self.assertLess(position_lock, portfolio_lock)
         self.assertLess(portfolio_lock, clock_read)
@@ -152,6 +158,7 @@ class PostgresAssignmentCorrectionMutationTests(unittest.TestCase):
         self.assertLess(replacement_write, supersession_write)
         self.assertLess(supersession_write, audit_write)
         self.assertLess(audit_write, replay_write)
+        self.assertEqual(cursor.fetchall_rows, [])
         close_parameters = cursor.executions[close_write][1]
         assert close_parameters is not None
         self.assertEqual(close_parameters, (CORRECTED_AT, TENANT, PREDECESSOR))
