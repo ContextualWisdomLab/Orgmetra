@@ -55,6 +55,8 @@ REQUIRED = [
     "docs/adr/0012-governed-migration-handoff.md",
     "docs/adr/0013-governed-requisition-review-packet.md",
     "docs/adr/0014-job-analysis-snapshot-persistence.md",
+    "docs/adr/0090-hardware-acceleration-container-boundary.md",
+    "docs/doctoring/2026-08-26-hardware-acceleration-container-routing.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -139,7 +141,7 @@ def _expected_manifest_document() -> dict[str, Any]:
     return {
         "package": "orgmetra-foundation-pack",
         "version": "0.1.0",
-        "generated_for_branch": "feat/audit-outbox-envelope",
+        "generated_for_branch": "docs/adr-acceleration-boundary",
         "files": files,
     }
 
@@ -153,10 +155,10 @@ def _manifest_entries() -> dict[str, dict[str, Any]]:
 
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         _fail("manifest.json must contain a files array")
-    if manifest.get("generated_for_branch") != "feat/audit-outbox-envelope":
+    if manifest.get("generated_for_branch") != "docs/adr-acceleration-boundary":
         _fail(
             "manifest generated_for_branch must identify the active generation branch "
-            "feat/audit-outbox-envelope"
+            "docs/adr-acceleration-boundary"
         )
 
     entries: dict[str, dict[str, Any]] = {}
