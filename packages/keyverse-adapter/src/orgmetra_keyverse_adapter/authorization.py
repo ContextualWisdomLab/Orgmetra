@@ -167,6 +167,7 @@ _DECISION_SNAPSHOT_REGISTRY: dict[
 ] = {}
 _POLICY_CONSTRUCTION_IDS: set[int] = set()
 _REQUEST_CONSTRUCTION_IDS: set[int] = set()
+_DECISION_ISSUANCE_IDS: set[int] = set()
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True, init=False)
@@ -473,7 +474,9 @@ class AuthorizationDecision:
     Validated values live in a module-owned snapshot rather than writable instance
     slots. In particular the tenant UUID is stored as its integer value and rebuilt
     on access, so a later low-level mutation of the caller's UUID cannot rewrite
-    already-issued authorization evidence.
+    already-issued authorization evidence. The public constructor is intentionally
+    non-authoritative: only the module-owned purpose-bound evaluator may mint an
+    issued decision.
     """
 
     __slots__ = ("__weakref__",)
@@ -507,10 +510,12 @@ class AuthorizationDecision:
         reason_code: str,
         next_action: str,
     ) -> None:
-        """Validate once and register a detached immutable evidence snapshot."""
+        """Register a detached snapshot only during module-owned policy evaluation."""
         key = id(self)
         if key in _DECISION_SNAPSHOT_REGISTRY:
             raise TypeError("AuthorizationDecision is already initialized")
+        if key not in _DECISION_ISSUANCE_IDS:
+            raise TypeError("AuthorizationDecision must be issued by purpose-bound evaluation")
         snapshot = _validated_decision_snapshot(
             allowed=allowed,
             tenant_record_id=tenant_record_id,
@@ -542,7 +547,7 @@ class AuthorizationDecision:
         """Return the issued snapshot or fail closed for low-level forged instances."""
         entry = _DECISION_SNAPSHOT_REGISTRY.get(id(self))
         if entry is None or entry[0]() is not self:
-            raise ValueError("AuthorizationDecision was not issued by the validated constructor")
+            raise ValueError("AuthorizationDecision was not issued by purpose-bound evaluation")
         return entry[1]
 
     @property
@@ -655,20 +660,28 @@ def _decision(
     """Build one immutable decision from validated creation-time authority snapshots."""
     authorized_fields = request.requested_fields if allowed else frozenset()
     next_action = _ALLOW_NEXT_ACTION if allowed else _DENIAL_NEXT_ACTION[reason_code]
-    return AuthorizationDecision(
-        allowed=allowed,
-        tenant_record_id=UUID(int=request.tenant_record_id_int),
-        actor_reference=request.actor_reference,
-        resource_reference=request.resource_reference,
-        policy_version_code=policy.policy_version_code,
-        purpose_code=request.purpose_code,
-        operation_code=request.operation_code,
-        resource_kind=request.resource_kind,
-        requested_fields=request.requested_fields,
-        authorized_fields=authorized_fields,
-        reason_code=reason_code,
-        next_action=next_action,
-    )
+    decision = object.__new__(AuthorizationDecision)
+    key = id(decision)
+    _DECISION_ISSUANCE_IDS.add(key)
+    try:
+        AuthorizationDecision.__init__(
+            decision,
+            allowed=allowed,
+            tenant_record_id=UUID(int=request.tenant_record_id_int),
+            actor_reference=request.actor_reference,
+            resource_reference=request.resource_reference,
+            policy_version_code=policy.policy_version_code,
+            purpose_code=request.purpose_code,
+            operation_code=request.operation_code,
+            resource_kind=request.resource_kind,
+            requested_fields=request.requested_fields,
+            authorized_fields=authorized_fields,
+            reason_code=reason_code,
+            next_action=next_action,
+        )
+    finally:
+        _DECISION_ISSUANCE_IDS.discard(key)
+    return decision
 
 
 def evaluate_purpose_bound_access(
@@ -682,7 +695,9 @@ def evaluate_purpose_bound_access(
     before comparing any authorization attribute. A frozen dataclass is not
     treated as a security boundary because ``object.__setattr__`` can still write
     its slots; any post-construction rewrite fails closed and the evaluator then
-    uses only the detached snapshots.
+    uses only the detached snapshots. Decision issuance is likewise bound to this
+    evaluator so a caller cannot mint an allow result by constructing the evidence
+    class directly.
     """
     if type(request) is not PurposeBoundAccessRequest:
         raise TypeError("request must be a PurposeBoundAccessRequest")
