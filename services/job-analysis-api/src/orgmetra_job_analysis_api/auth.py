@@ -8,6 +8,7 @@ cannot smuggle an HR purpose grant.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -92,6 +93,17 @@ class AuthenticatedPrincipal(tuple[int, str, frozenset[str]]):
         if any(type(scope) is not str or _SCOPE_PATTERN.fullmatch(scope) is None for scope in granted_scope_codes):
             raise ValueError("granted_scope_codes must contain explicit Orgmetra scopes.")
         return tuple.__new__(cls, (tenant_record_id_int, actor_reference, granted_scope_codes))
+
+    def __getitem__(
+        self,
+        key: int | slice,
+    ) -> int | str | frozenset[str] | tuple[int, str, frozenset[str]]:
+        """Expose sequence items only after all stored authentication evidence is valid."""
+        return _validated_principal_storage(self)[key]
+
+    def __iter__(self) -> Iterator[int | str | frozenset[str]]:
+        """Iterate only after all stored authentication evidence is revalidated."""
+        return iter(_validated_principal_storage(self))
 
     @property
     def tenant_record_id(self) -> UUID:
