@@ -202,6 +202,10 @@ class AuthorizationDecision:
     reason_code: str
     next_action: str
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Seal the evidence type so subclasses cannot override validation hooks."""
+        raise TypeError("AuthorizationDecision must not be subclassed")
+
     def __post_init__(self) -> None:
         """Reject malformed, contradictory, or executable downstream authorization evidence."""
         if type(self.allowed) is not bool:
