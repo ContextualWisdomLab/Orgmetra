@@ -111,6 +111,39 @@ def test_deny_decision_cannot_carry_authorized_fields() -> None:
         )
 
 
+def test_allow_decision_rejects_denial_reason() -> None:
+    """An allow verdict cannot carry a denial reason into downstream audit evidence."""
+    with pytest.raises(ValueError, match="allow decision must use access_permitted reason"):
+        _decision(reason_code="field_not_allowed")
+
+
+def test_deny_decision_rejects_success_reason() -> None:
+    """A deny verdict cannot masquerade as successful authorization in audit evidence."""
+    with pytest.raises(ValueError, match="deny decision must use a governed denial reason"):
+        _decision(
+            allowed=False,
+            authorized_fields=frozenset(),
+            reason_code="access_permitted",
+        )
+
+
+def test_allow_decision_requires_canonical_next_action() -> None:
+    """Successful evidence keeps the one governed continuation instruction."""
+    with pytest.raises(ValueError, match="next_action must match the governed authorization reason"):
+        _decision(next_action="Retry later.")
+
+
+def test_deny_decision_requires_reason_bound_next_action() -> None:
+    """Denial evidence cannot pair a valid reason with unrelated recovery guidance."""
+    with pytest.raises(ValueError, match="next_action must match the governed authorization reason"):
+        _decision(
+            allowed=False,
+            authorized_fields=frozenset(),
+            reason_code="field_not_allowed",
+            next_action="Resolve the policy for the requested resource kind before retrying.",
+        )
+
+
 def test_decision_rejects_resource_reference_namespace_mismatch() -> None:
     """Downstream evidence must correlate its opaque target to the declared resource kind."""
     with pytest.raises(ValueError, match="resource_reference namespace must match resource_kind"):
