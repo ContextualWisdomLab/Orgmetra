@@ -98,13 +98,37 @@ def test_snapshot_excludes_future_business_and_late_recorded_facts() -> None:
     ]
     assignments = [
         AssignmentFact(
-            _id(1), _id(201), _id(101), _id(11), _id(1201), Decimal("0.7500"), january, known_from_start, "legacy_unspecified"
+            _id(1),
+            _id(201),
+            _id(101),
+            _id(11),
+            _id(1201),
+            Decimal("0.7500"),
+            january,
+            known_from_start,
+            "legacy_unspecified",
         ),
         AssignmentFact(
-            _id(1), _id(202), _id(102), _id(12), _id(1202), Decimal("1.0000"), february, known_from_start, "legacy_unspecified"
+            _id(1),
+            _id(202),
+            _id(102),
+            _id(12),
+            _id(1202),
+            Decimal("1.0000"),
+            february,
+            known_from_start,
+            "legacy_unspecified",
         ),
         AssignmentFact(
-            _id(1), _id(203), _id(101), _id(11), _id(1203), Decimal("0.1000"), january, known_late, "legacy_unspecified"
+            _id(1),
+            _id(203),
+            _id(101),
+            _id(11),
+            _id(1203),
+            Decimal("0.1000"),
+            january,
+            known_late,
+            "legacy_unspecified",
         ),
     ]
 
