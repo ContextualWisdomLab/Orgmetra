@@ -187,6 +187,6 @@ def correct_assignment_record_category(
         command=command,
         authorization=authorization,
     )
-    if not isinstance(result, AssignmentCorrectionMutationResult):
-        raise TypeError("mutation_port must return AssignmentCorrectionMutationResult")
+    if type(result) is not AssignmentCorrectionMutationResult:
+        raise TypeError("mutation_port must return an exact AssignmentCorrectionMutationResult")
     return result
