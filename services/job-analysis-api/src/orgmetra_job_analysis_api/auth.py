@@ -8,6 +8,7 @@ cannot smuggle an HR purpose grant.
 from __future__ import annotations
 
 import re
+import sys
 from collections.abc import Iterator
 from typing import Protocol, runtime_checkable
 from uuid import UUID
@@ -94,6 +95,11 @@ class AuthenticatedPrincipal(tuple[int, str, frozenset[str]]):
             raise ValueError("granted_scope_codes must contain explicit Orgmetra scopes.")
         return tuple.__new__(cls, (tenant_record_id_int, actor_reference, granted_scope_codes))
 
+    def __len__(self) -> int:
+        """Report sequence length only after stored authentication evidence is valid."""
+        _validated_principal_storage(self)
+        return 3
+
     def __getitem__(
         self,
         key: int | slice,
@@ -104,6 +110,50 @@ class AuthenticatedPrincipal(tuple[int, str, frozenset[str]]):
     def __iter__(self) -> Iterator[int | str | frozenset[str]]:
         """Iterate only after all stored authentication evidence is revalidated."""
         return iter(_validated_principal_storage(self))
+
+    def __contains__(self, value: object) -> bool:
+        """Search only revalidated authentication evidence."""
+        return value in _validated_principal_storage(self)
+
+    def count(self, value: object) -> int:
+        """Count matches only in revalidated authentication evidence."""
+        return _validated_principal_storage(self).count(value)
+
+    def index(self, value: object, start: int = 0, stop: int = sys.maxsize) -> int:
+        """Locate a value only in revalidated authentication evidence."""
+        return _validated_principal_storage(self).index(value, start, stop)
+
+    def __add__(self, other: tuple[object, ...]) -> tuple[object, ...]:
+        """Concatenate only after this principal's stored evidence is revalidated."""
+        return _validated_principal_storage(self) + other
+
+    def __radd__(self, other: tuple[object, ...]) -> tuple[object, ...]:
+        """Right-concatenate only after this principal's stored evidence is revalidated."""
+        return other + _validated_principal_storage(self)
+
+    def __mul__(self, count: int) -> tuple[object, ...]:
+        """Repeat only revalidated authentication evidence."""
+        return _validated_principal_storage(self) * count
+
+    def __rmul__(self, count: int) -> tuple[object, ...]:
+        """Right-repeat only revalidated authentication evidence."""
+        return count * _validated_principal_storage(self)
+
+    def __lt__(self, other: tuple[object, ...]) -> bool:
+        """Order only after this principal's stored evidence is revalidated."""
+        return _validated_principal_storage(self) < other
+
+    def __le__(self, other: tuple[object, ...]) -> bool:
+        """Order only after this principal's stored evidence is revalidated."""
+        return _validated_principal_storage(self) <= other
+
+    def __gt__(self, other: tuple[object, ...]) -> bool:
+        """Order only after this principal's stored evidence is revalidated."""
+        return _validated_principal_storage(self) > other
+
+    def __ge__(self, other: tuple[object, ...]) -> bool:
+        """Order only after this principal's stored evidence is revalidated."""
+        return _validated_principal_storage(self) >= other
 
     @property
     def tenant_record_id(self) -> UUID:
