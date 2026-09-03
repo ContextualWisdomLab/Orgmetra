@@ -43,6 +43,12 @@ from orgmetra_people_api.people import (
 from orgmetra_people_api.postgres import PostgresPeopleReadPort
 from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
+from orgmetra_people_api.vacancy_fill import (
+    VacancyFillAuthority,
+    VacancyFillIntegrityError,
+    VacancyFillVerification,
+    fill_position_vacancy,
+)
 
 __all__ = [
     "AuthenticatedPrincipal",
@@ -72,6 +78,9 @@ __all__ = [
     "EmploymentMutationCommand",
     "EmploymentMutationResult",
     "TokenAuthenticator",
+    "VacancyFillAuthority",
+    "VacancyFillIntegrityError",
+    "VacancyFillVerification",
     "WorkerPeopleRecord",
     "accept_confirmed_hire",
     "authorize_resource_fields",
@@ -79,5 +88,6 @@ __all__ = [
     "create_employment_record",
     "create_position_record",
     "extract_bearer_token",
+    "fill_position_vacancy",
     "read_worker_people_record",
 ]
