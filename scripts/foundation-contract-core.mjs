@@ -52,6 +52,8 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0012-governed-migration-handoff.md',
   'docs/adr/0013-governed-requisition-review-packet.md',
   'docs/adr/0014-job-analysis-snapshot-persistence.md',
+  'docs/adr/0017-governed-offer-approval.md',
+  'docs/adr/0025-governed-candidate-evidence-intake.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
@@ -143,7 +145,8 @@ export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
-const ADR_STATUS_PATTERN = /^\|\s*\[\d{4}\]\(([^)]+)\)\s*\|.*\|\s*(Proposed|Accepted|Superseded|Rejected)\s*\|$/;
+const ADR_INDEX_ROW_PATTERN = /^\|\s*\[\d{4}\]\(([^)]+)\)\s*\|.*\|\s*([^|]+?)\s*\|$/;
+const ADR_STATUS_VALUES = Object.freeze(new Set(['Proposed', 'Accepted', 'Superseded', 'Rejected']));
 const LOCAL_LINK_PATTERN = /\[[^\]]+\]\((?!https?:\/\/|mailto:|#)([^)]+)\)/g;
 const CREATE_TABLE_PATTERN = /\bCREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)/gi;
 const DOLLAR_QUOTE_START_PATTERN = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/;
@@ -388,15 +391,20 @@ export function validateAdrIndex(rootPath) {
   const errors = [];
   const indexText = readFileSync(indexPath, 'utf8');
   for (const line of indexText.split(/\r?\n/)) {
-    const match = line.match(ADR_STATUS_PATTERN);
-    if (!match) continue;
-    const adrPath = resolve(dirname(indexPath), match[1]);
-    if (!existsSync(adrPath)) {
-      errors.push(`${relative(rootPath, indexPath)}: indexed ADR is missing: ${match[1]}`);
+    const rowMatch = line.match(ADR_INDEX_ROW_PATTERN);
+    if (!rowMatch) continue;
+    const status = rowMatch[2].trim();
+    if (!ADR_STATUS_VALUES.has(status)) {
+      errors.push(`${relative(rootPath, indexPath)}: non-canonical ADR status: ${status}`);
       continue;
     }
-    if (!readFileSync(adrPath, 'utf8').includes(`Status: ${match[2]}`)) {
-      errors.push(`${relative(rootPath, adrPath)}: status does not match ADR index (${match[2]})`);
+    const adrPath = resolve(dirname(indexPath), rowMatch[1]);
+    if (!existsSync(adrPath)) {
+      errors.push(`${relative(rootPath, indexPath)}: indexed ADR is missing: ${rowMatch[1]}`);
+      continue;
+    }
+    if (!readFileSync(adrPath, 'utf8').includes(`Status: ${status}`)) {
+      errors.push(`${relative(rootPath, adrPath)}: status does not match ADR index (${status})`);
     }
   }
   return errors;

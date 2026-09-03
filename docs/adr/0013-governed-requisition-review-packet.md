@@ -1,6 +1,6 @@
 # ADR 0013: Governed requisition review packet
 
-- Status: Accepted on active implementation branch
+- Status: Accepted
 - Date: 2026-08-18
 - Owners: Talent Acquisition / Job Architecture / People Governance
 
@@ -39,7 +39,7 @@ The packet cannot claim approval, open a requisition, create a candidate, or per
 - Routine `repr()` output does not disclose trust-bearing references or digests.
 - Requisition approval requires authoritative resolved-actor separation; two different opaque references alone cannot satisfy the hiring-manager/approver separation requirement.
 - Downstream persistence must still enforce purpose-bound authorization, idempotency, human approval, and immutable audit/outbox evidence at the authoritative mutation boundary.
-- This ADR describes active-PR truth only until the corresponding exact head integrates into protected `develop`.
+- This ADR describes the requisition-review evidence contract integrated on protected `develop`; opening or mutating a requisition remains a separate authoritative mutation boundary.
 
 ## References
 

@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted on active PR #33 only. This document is not protected-`develop` product truth until the owning PR integrates.
+Status: Accepted
+
+This ADR describes the workforce-composition evidence boundary integrated on protected `develop`.
 
 ## Context
 

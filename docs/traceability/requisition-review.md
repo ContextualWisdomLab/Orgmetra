@@ -2,7 +2,7 @@
 
 ## Maturity
 
-**Active PR only.** Protected `develop` does not contain this capability until the candidate branch is integrated with fresh protected-head evidence.
+**Protected `develop` capability.** The governed requisition review packet is present on protected `develop`; it remains evidence for accountable human review, not an autonomous employment decision.
 
 ## Requirement-to-evidence map
 

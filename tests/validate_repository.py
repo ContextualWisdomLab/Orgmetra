@@ -55,6 +55,8 @@ REQUIRED = [
     "docs/adr/0012-governed-migration-handoff.md",
     "docs/adr/0013-governed-requisition-review-packet.md",
     "docs/adr/0014-job-analysis-snapshot-persistence.md",
+    "docs/adr/0017-governed-offer-approval.md",
+    "docs/adr/0025-governed-candidate-evidence-intake.md",
     "docs/doctoring/REFERENCES.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
@@ -121,7 +123,7 @@ def _line_count(data: bytes) -> int:
 
 
 def _expected_manifest_document() -> dict[str, Any]:
-    """Build deterministic provenance for the exact active branch artifact set."""
+    """Build deterministic integrity metadata for the canonical target branch artifact set."""
     files = []
     for relative_path in sorted(set(REQUIRED) - {"manifest.json"}):
         path = ROOT / relative_path
@@ -139,7 +141,7 @@ def _expected_manifest_document() -> dict[str, Any]:
     return {
         "package": "orgmetra-foundation-pack",
         "version": "0.1.0",
-        "generated_for_branch": "feat/audit-outbox-envelope",
+        "canonical_target_branch": "develop",
         "files": files,
     }
 
@@ -153,11 +155,10 @@ def _manifest_entries() -> dict[str, dict[str, Any]]:
 
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         _fail("manifest.json must contain a files array")
-    if manifest.get("generated_for_branch") != "feat/audit-outbox-envelope":
-        _fail(
-            "manifest generated_for_branch must identify the active generation branch "
-            "feat/audit-outbox-envelope"
-        )
+    if manifest.get("canonical_target_branch") != "develop":
+        _fail("manifest canonical_target_branch must identify protected target branch develop")
+    if "generated_for_branch" in manifest:
+        _fail("manifest must not claim generation-branch provenance from static target metadata")
 
     entries: dict[str, dict[str, Any]] = {}
     for raw_entry in manifest["files"]:
