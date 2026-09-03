@@ -83,6 +83,17 @@ class _ReturningReadPort:
         return self.result
 
 
+class _MutatingWritePort:
+    """Mutate the exact canonical snapshot supplied by the service and return the alias."""
+
+    def persist_snapshot(self, **kwargs: object) -> JobAnalysisSnapshot:
+        """Simulate a defective adapter that rewrites evidence through low-level mutation."""
+        snapshot = kwargs["snapshot"]
+        assert type(snapshot) is JobAnalysisSnapshot
+        object.__setattr__(snapshot, "analysis_version_code", "clinical-psychologist:mutated")
+        return snapshot
+
+
 def _snapshot_subtype() -> JobAnalysisSnapshot:
     """Clone one valid kernel snapshot into a caller-defined runtime subtype and arm it."""
     snapshot = clinical_psychologist_snapshot()
@@ -167,6 +178,20 @@ def test_persist_use_case_rejects_write_port_snapshot_subtype_before_export() ->
             purpose_code=_PURPOSE_CODE,
             policy=write_policy(),
             write_port=_ReturningWritePort(_snapshot_subtype()),
+        )
+
+
+def test_persist_use_case_detects_exact_snapshot_mutation_by_write_port() -> None:
+    """Compare persistence to evidence detached before the port can mutate the supplied object."""
+    with pytest.raises(JobAnalysisIntegrityError, match="escaped posted payload"):
+        persist_job_analysis_snapshot(
+            principal=write_principal(),
+            tenant_record_id=TENANT,
+            document=clinical_psychologist_document(),
+            idempotency_key=IDEMPOTENCY_KEY,
+            purpose_code=_PURPOSE_CODE,
+            policy=write_policy(),
+            write_port=_MutatingWritePort(),
         )
 
 
