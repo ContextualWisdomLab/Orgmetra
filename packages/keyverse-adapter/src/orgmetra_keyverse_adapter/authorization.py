@@ -154,161 +154,6 @@ class _RequestSnapshot(NamedTuple):
     granted_scope_codes: frozenset[str]
 
 
-_POLICY_SNAPSHOT_REGISTRY: dict[
-    int,
-    tuple[weakref.ReferenceType[object], _PolicySnapshot],
-] = {}
-_REQUEST_SNAPSHOT_REGISTRY: dict[
-    int,
-    tuple[weakref.ReferenceType[object], _RequestSnapshot],
-] = {}
-_POLICY_CONSTRUCTION_IDS: set[int] = set()
-_REQUEST_CONSTRUCTION_IDS: set[int] = set()
-
-
-@dataclass(frozen=True, slots=True, weakref_slot=True, init=False)
-class PurposeBoundAccessPolicy:
-    """One tenant-local field policy for one purpose, resource, and operation.
-
-    A policy intentionally has no wildcard form. Separate purposes, operations,
-    or resources require separate reviewed policy records so a broad token cannot
-    silently widen access to necessary HR PII.
-    """
-
-    tenant_record_id: UUID
-    policy_version_code: str
-    resource_kind: str
-    purpose_code: str
-    operation_code: str
-    required_scope_code: str
-    permitted_fields: frozenset[str]
-
-    def __init__(
-        self,
-        *,
-        tenant_record_id: UUID,
-        policy_version_code: str,
-        resource_kind: str,
-        purpose_code: str,
-        operation_code: str,
-        required_scope_code: str,
-        permitted_fields: frozenset[str],
-    ) -> None:
-        """Write fields and issue authority only inside this constructor call."""
-        key = id(self)
-        if key in _POLICY_SNAPSHOT_REGISTRY:
-            raise TypeError("PurposeBoundAccessPolicy is already initialized")
-        if key in _POLICY_CONSTRUCTION_IDS:
-            raise TypeError("PurposeBoundAccessPolicy construction is already in progress")
-        _POLICY_CONSTRUCTION_IDS.add(key)
-        try:
-            object.__setattr__(self, "tenant_record_id", tenant_record_id)
-            object.__setattr__(self, "policy_version_code", policy_version_code)
-            object.__setattr__(self, "resource_kind", resource_kind)
-            object.__setattr__(self, "purpose_code", purpose_code)
-            object.__setattr__(self, "operation_code", operation_code)
-            object.__setattr__(self, "required_scope_code", required_scope_code)
-            object.__setattr__(self, "permitted_fields", permitted_fields)
-            self.__post_init__()
-        finally:
-            _POLICY_CONSTRUCTION_IDS.discard(key)
-
-    def __post_init__(self) -> None:
-        """Issue a validated snapshot only while the governed constructor is active."""
-        key = id(self)
-        if key not in _POLICY_CONSTRUCTION_IDS:
-            raise TypeError("PurposeBoundAccessPolicy must be initialized through its constructor")
-        snapshot = _validated_policy_snapshot(self)
-        if key in _POLICY_SNAPSHOT_REGISTRY:
-            raise TypeError("PurposeBoundAccessPolicy is already initialized")
-        reference = weakref.ref(
-            self,
-            lambda _reference, evidence_key=key: _POLICY_SNAPSHOT_REGISTRY.pop(
-                evidence_key,
-                None,
-            ),
-        )
-        _POLICY_SNAPSHOT_REGISTRY[key] = (reference, snapshot)
-
-
-@dataclass(frozen=True, slots=True, weakref_slot=True, init=False)
-class PurposeBoundAccessRequest:
-    """PII access attributes resolved before any protected field is returned.
-
-    ``actor_tenant_record_id`` comes from the authenticated identity binding,
-    ``tenant_record_id`` is the active Orgmetra request context, and
-    ``resource_tenant_record_id`` comes from the target record identity. The
-    opaque ``resource_reference`` identifies that exact target for audit
-    correlation without copying its PII. All tenant identifiers must match the
-    policy tenant. Only field names are carried here; field values remain behind
-    the authoritative data boundary until access is allowed.
-    """
-
-    tenant_record_id: UUID
-    actor_tenant_record_id: UUID
-    resource_tenant_record_id: UUID
-    actor_reference: str
-    resource_reference: str
-    purpose_code: str
-    operation_code: str
-    resource_kind: str
-    requested_fields: frozenset[str]
-    granted_scope_codes: frozenset[str]
-
-    def __init__(
-        self,
-        *,
-        tenant_record_id: UUID,
-        actor_tenant_record_id: UUID,
-        resource_tenant_record_id: UUID,
-        actor_reference: str,
-        resource_reference: str,
-        purpose_code: str,
-        operation_code: str,
-        resource_kind: str,
-        requested_fields: frozenset[str],
-        granted_scope_codes: frozenset[str],
-    ) -> None:
-        """Write fields and issue authority only inside this constructor call."""
-        key = id(self)
-        if key in _REQUEST_SNAPSHOT_REGISTRY:
-            raise TypeError("PurposeBoundAccessRequest is already initialized")
-        if key in _REQUEST_CONSTRUCTION_IDS:
-            raise TypeError("PurposeBoundAccessRequest construction is already in progress")
-        _REQUEST_CONSTRUCTION_IDS.add(key)
-        try:
-            object.__setattr__(self, "tenant_record_id", tenant_record_id)
-            object.__setattr__(self, "actor_tenant_record_id", actor_tenant_record_id)
-            object.__setattr__(self, "resource_tenant_record_id", resource_tenant_record_id)
-            object.__setattr__(self, "actor_reference", actor_reference)
-            object.__setattr__(self, "resource_reference", resource_reference)
-            object.__setattr__(self, "purpose_code", purpose_code)
-            object.__setattr__(self, "operation_code", operation_code)
-            object.__setattr__(self, "resource_kind", resource_kind)
-            object.__setattr__(self, "requested_fields", requested_fields)
-            object.__setattr__(self, "granted_scope_codes", granted_scope_codes)
-            self.__post_init__()
-        finally:
-            _REQUEST_CONSTRUCTION_IDS.discard(key)
-
-    def __post_init__(self) -> None:
-        """Issue a validated snapshot only while the governed constructor is active."""
-        key = id(self)
-        if key not in _REQUEST_CONSTRUCTION_IDS:
-            raise TypeError("PurposeBoundAccessRequest must be initialized through its constructor")
-        snapshot = _validated_request_snapshot(self)
-        if key in _REQUEST_SNAPSHOT_REGISTRY:
-            raise TypeError("PurposeBoundAccessRequest is already initialized")
-        reference = weakref.ref(
-            self,
-            lambda _reference, evidence_key=key: _REQUEST_SNAPSHOT_REGISTRY.pop(
-                evidence_key,
-                None,
-            ),
-        )
-        _REQUEST_SNAPSHOT_REGISTRY[key] = (reference, snapshot)
-
-
 def _validated_policy_snapshot(policy: PurposeBoundAccessPolicy) -> _PolicySnapshot:
     """Read, validate, and detach one complete policy snapshot."""
     tenant_record_id = policy.tenant_record_id
@@ -384,131 +229,158 @@ def _validated_request_snapshot(request: PurposeBoundAccessRequest) -> _RequestS
     )
 
 
-def _issued_policy_snapshot(policy: PurposeBoundAccessPolicy) -> _PolicySnapshot:
-    """Return creation-time policy authority only when live fields still match it."""
-    entry = _POLICY_SNAPSHOT_REGISTRY.get(id(policy))
-    if entry is None or entry[0]() is not policy:
-        raise ValueError("PurposeBoundAccessPolicy was not issued by the validated constructor")
-    current = _validated_policy_snapshot(policy)
-    if current != entry[1]:
-        raise ValueError("PurposeBoundAccessPolicy changed after validation")
-    return entry[1]
-
-
-def _issued_request_snapshot(request: PurposeBoundAccessRequest) -> _RequestSnapshot:
-    """Return creation-time request authority only when live fields still match it."""
-    entry = _REQUEST_SNAPSHOT_REGISTRY.get(id(request))
-    if entry is None or entry[0]() is not request:
-        raise ValueError("PurposeBoundAccessRequest was not issued by the validated constructor")
-    current = _validated_request_snapshot(request)
-    if current != entry[1]:
-        raise ValueError("PurposeBoundAccessRequest changed after validation")
-    return entry[1]
-
-
-def _privatize_input_issuance_runtime() -> tuple[
+def _build_input_issuance_runtime() -> tuple[
+    type[PurposeBoundAccessPolicy],
+    type[PurposeBoundAccessRequest],
     Callable[[PurposeBoundAccessPolicy], _PolicySnapshot],
     Callable[[PurposeBoundAccessRequest], _RequestSnapshot],
 ]:
-    """Move policy/request issuance mutation state behind constructor-bound closures."""
-    policy_registry = _POLICY_SNAPSHOT_REGISTRY
-    request_registry = _REQUEST_SNAPSHOT_REGISTRY
-    policy_construction_ids = _POLICY_CONSTRUCTION_IDS
-    request_construction_ids = _REQUEST_CONSTRUCTION_IDS
+    """Create policy/request classes whose issuance mutation state is closure-private."""
+    policy_registry: dict[
+        int,
+        tuple[weakref.ReferenceType[object], _PolicySnapshot],
+    ] = {}
+    request_registry: dict[
+        int,
+        tuple[weakref.ReferenceType[object], _RequestSnapshot],
+    ] = {}
+    policy_construction_ids: set[int] = set()
+    request_construction_ids: set[int] = set()
 
-    def policy_init(
-        self: PurposeBoundAccessPolicy,
-        *,
-        tenant_record_id: UUID,
-        policy_version_code: str,
-        resource_kind: str,
-        purpose_code: str,
-        operation_code: str,
-        required_scope_code: str,
-        permitted_fields: frozenset[str],
-    ) -> None:
-        """Write fields and issue authority only inside this constructor call."""
-        key = id(self)
-        if key in policy_registry:
-            raise TypeError("PurposeBoundAccessPolicy is already initialized")
-        if key in policy_construction_ids:
-            raise TypeError("PurposeBoundAccessPolicy construction is already in progress")
-        policy_construction_ids.add(key)
-        try:
-            object.__setattr__(self, "tenant_record_id", tenant_record_id)
-            object.__setattr__(self, "policy_version_code", policy_version_code)
-            object.__setattr__(self, "resource_kind", resource_kind)
-            object.__setattr__(self, "purpose_code", purpose_code)
-            object.__setattr__(self, "operation_code", operation_code)
-            object.__setattr__(self, "required_scope_code", required_scope_code)
-            object.__setattr__(self, "permitted_fields", permitted_fields)
-            self.__post_init__()
-        finally:
-            policy_construction_ids.discard(key)
+    @dataclass(frozen=True, slots=True, weakref_slot=True, init=False)
+    class PurposeBoundAccessPolicy:
+        """One tenant-local field policy for one purpose, resource, and operation.
 
-    def policy_post_init(self: PurposeBoundAccessPolicy) -> None:
-        """Issue a policy snapshot only while its private constructor state is active."""
-        key = id(self)
-        if key not in policy_construction_ids:
-            raise TypeError("PurposeBoundAccessPolicy must be initialized through its constructor")
-        snapshot = _validated_policy_snapshot(self)
-        if key in policy_registry:
-            raise TypeError("PurposeBoundAccessPolicy is already initialized")
-        reference = weakref.ref(
+        A policy intentionally has no wildcard form. Separate purposes, operations,
+        or resources require separate reviewed policy records so a broad token cannot
+        silently widen access to necessary HR PII.
+        """
+
+        tenant_record_id: UUID
+        policy_version_code: str
+        resource_kind: str
+        purpose_code: str
+        operation_code: str
+        required_scope_code: str
+        permitted_fields: frozenset[str]
+
+        def __init__(
             self,
-            lambda _reference, evidence_key=key: policy_registry.pop(evidence_key, None),
-        )
-        policy_registry[key] = (reference, snapshot)
+            *,
+            tenant_record_id: UUID,
+            policy_version_code: str,
+            resource_kind: str,
+            purpose_code: str,
+            operation_code: str,
+            required_scope_code: str,
+            permitted_fields: frozenset[str],
+        ) -> None:
+            """Write fields and issue authority only inside this constructor call."""
+            key = id(self)
+            if key in policy_registry:
+                raise TypeError("PurposeBoundAccessPolicy is already initialized")
+            if key in policy_construction_ids:
+                raise TypeError("PurposeBoundAccessPolicy construction is already in progress")
+            policy_construction_ids.add(key)
+            try:
+                object.__setattr__(self, "tenant_record_id", tenant_record_id)
+                object.__setattr__(self, "policy_version_code", policy_version_code)
+                object.__setattr__(self, "resource_kind", resource_kind)
+                object.__setattr__(self, "purpose_code", purpose_code)
+                object.__setattr__(self, "operation_code", operation_code)
+                object.__setattr__(self, "required_scope_code", required_scope_code)
+                object.__setattr__(self, "permitted_fields", permitted_fields)
+                self.__post_init__()
+            finally:
+                policy_construction_ids.discard(key)
 
-    def request_init(
-        self: PurposeBoundAccessRequest,
-        *,
-        tenant_record_id: UUID,
-        actor_tenant_record_id: UUID,
-        resource_tenant_record_id: UUID,
-        actor_reference: str,
-        resource_reference: str,
-        purpose_code: str,
-        operation_code: str,
-        resource_kind: str,
-        requested_fields: frozenset[str],
-        granted_scope_codes: frozenset[str],
-    ) -> None:
-        """Write fields and issue authority only inside this constructor call."""
-        key = id(self)
-        if key in request_registry:
-            raise TypeError("PurposeBoundAccessRequest is already initialized")
-        if key in request_construction_ids:
-            raise TypeError("PurposeBoundAccessRequest construction is already in progress")
-        request_construction_ids.add(key)
-        try:
-            object.__setattr__(self, "tenant_record_id", tenant_record_id)
-            object.__setattr__(self, "actor_tenant_record_id", actor_tenant_record_id)
-            object.__setattr__(self, "resource_tenant_record_id", resource_tenant_record_id)
-            object.__setattr__(self, "actor_reference", actor_reference)
-            object.__setattr__(self, "resource_reference", resource_reference)
-            object.__setattr__(self, "purpose_code", purpose_code)
-            object.__setattr__(self, "operation_code", operation_code)
-            object.__setattr__(self, "resource_kind", resource_kind)
-            object.__setattr__(self, "requested_fields", requested_fields)
-            object.__setattr__(self, "granted_scope_codes", granted_scope_codes)
-            self.__post_init__()
-        finally:
-            request_construction_ids.discard(key)
+        def __post_init__(self) -> None:
+            """Issue a validated snapshot only while the governed constructor is active."""
+            key = id(self)
+            if key not in policy_construction_ids:
+                raise TypeError("PurposeBoundAccessPolicy must be initialized through its constructor")
+            snapshot = _validated_policy_snapshot(self)
+            if key in policy_registry:
+                raise TypeError("PurposeBoundAccessPolicy is already initialized")
+            reference = weakref.ref(
+                self,
+                lambda _reference, evidence_key=key: policy_registry.pop(evidence_key, None),
+            )
+            policy_registry[key] = (reference, snapshot)
 
-    def request_post_init(self: PurposeBoundAccessRequest) -> None:
-        """Issue a request snapshot only while its private constructor state is active."""
-        key = id(self)
-        if key not in request_construction_ids:
-            raise TypeError("PurposeBoundAccessRequest must be initialized through its constructor")
-        snapshot = _validated_request_snapshot(self)
-        if key in request_registry:
-            raise TypeError("PurposeBoundAccessRequest is already initialized")
-        reference = weakref.ref(
+    @dataclass(frozen=True, slots=True, weakref_slot=True, init=False)
+    class PurposeBoundAccessRequest:
+        """PII access attributes resolved before any protected field is returned.
+
+        ``actor_tenant_record_id`` comes from the authenticated identity binding,
+        ``tenant_record_id`` is the active Orgmetra request context, and
+        ``resource_tenant_record_id`` comes from the target record identity. The
+        opaque ``resource_reference`` identifies that exact target for audit
+        correlation without copying its PII. All tenant identifiers must match the
+        policy tenant. Only field names are carried here; field values remain behind
+        the authoritative data boundary until access is allowed.
+        """
+
+        tenant_record_id: UUID
+        actor_tenant_record_id: UUID
+        resource_tenant_record_id: UUID
+        actor_reference: str
+        resource_reference: str
+        purpose_code: str
+        operation_code: str
+        resource_kind: str
+        requested_fields: frozenset[str]
+        granted_scope_codes: frozenset[str]
+
+        def __init__(
             self,
-            lambda _reference, evidence_key=key: request_registry.pop(evidence_key, None),
-        )
-        request_registry[key] = (reference, snapshot)
+            *,
+            tenant_record_id: UUID,
+            actor_tenant_record_id: UUID,
+            resource_tenant_record_id: UUID,
+            actor_reference: str,
+            resource_reference: str,
+            purpose_code: str,
+            operation_code: str,
+            resource_kind: str,
+            requested_fields: frozenset[str],
+            granted_scope_codes: frozenset[str],
+        ) -> None:
+            """Write fields and issue authority only inside this constructor call."""
+            key = id(self)
+            if key in request_registry:
+                raise TypeError("PurposeBoundAccessRequest is already initialized")
+            if key in request_construction_ids:
+                raise TypeError("PurposeBoundAccessRequest construction is already in progress")
+            request_construction_ids.add(key)
+            try:
+                object.__setattr__(self, "tenant_record_id", tenant_record_id)
+                object.__setattr__(self, "actor_tenant_record_id", actor_tenant_record_id)
+                object.__setattr__(self, "resource_tenant_record_id", resource_tenant_record_id)
+                object.__setattr__(self, "actor_reference", actor_reference)
+                object.__setattr__(self, "resource_reference", resource_reference)
+                object.__setattr__(self, "purpose_code", purpose_code)
+                object.__setattr__(self, "operation_code", operation_code)
+                object.__setattr__(self, "resource_kind", resource_kind)
+                object.__setattr__(self, "requested_fields", requested_fields)
+                object.__setattr__(self, "granted_scope_codes", granted_scope_codes)
+                self.__post_init__()
+            finally:
+                request_construction_ids.discard(key)
+
+        def __post_init__(self) -> None:
+            """Issue a validated snapshot only while the governed constructor is active."""
+            key = id(self)
+            if key not in request_construction_ids:
+                raise TypeError("PurposeBoundAccessRequest must be initialized through its constructor")
+            snapshot = _validated_request_snapshot(self)
+            if key in request_registry:
+                raise TypeError("PurposeBoundAccessRequest is already initialized")
+            reference = weakref.ref(
+                self,
+                lambda _reference, evidence_key=key: request_registry.pop(evidence_key, None),
+            )
+            request_registry[key] = (reference, snapshot)
 
     def issued_policy_snapshot(policy: PurposeBoundAccessPolicy) -> _PolicySnapshot:
         """Return creation-time policy authority only when live fields still match it."""
@@ -530,28 +402,23 @@ def _privatize_input_issuance_runtime() -> tuple[
             raise ValueError("PurposeBoundAccessRequest changed after validation")
         return entry[1]
 
-    policy_init.__name__ = "__init__"
-    policy_init.__qualname__ = "PurposeBoundAccessPolicy.__init__"
-    policy_post_init.__name__ = "__post_init__"
-    policy_post_init.__qualname__ = "PurposeBoundAccessPolicy.__post_init__"
-    request_init.__name__ = "__init__"
-    request_init.__qualname__ = "PurposeBoundAccessRequest.__init__"
-    request_post_init.__name__ = "__post_init__"
-    request_post_init.__qualname__ = "PurposeBoundAccessRequest.__post_init__"
-
-    PurposeBoundAccessPolicy.__init__ = policy_init  # type: ignore[method-assign]
-    PurposeBoundAccessPolicy.__post_init__ = policy_post_init  # type: ignore[method-assign]
-    PurposeBoundAccessRequest.__init__ = request_init  # type: ignore[method-assign]
-    PurposeBoundAccessRequest.__post_init__ = request_post_init  # type: ignore[method-assign]
-    return issued_policy_snapshot, issued_request_snapshot
+    PurposeBoundAccessPolicy.__qualname__ = "PurposeBoundAccessPolicy"
+    PurposeBoundAccessRequest.__qualname__ = "PurposeBoundAccessRequest"
+    return (
+        PurposeBoundAccessPolicy,
+        PurposeBoundAccessRequest,
+        issued_policy_snapshot,
+        issued_request_snapshot,
+    )
 
 
-_issued_policy_snapshot, _issued_request_snapshot = _privatize_input_issuance_runtime()
-del _POLICY_SNAPSHOT_REGISTRY
-del _REQUEST_SNAPSHOT_REGISTRY
-del _POLICY_CONSTRUCTION_IDS
-del _REQUEST_CONSTRUCTION_IDS
-del _privatize_input_issuance_runtime
+(
+    PurposeBoundAccessPolicy,
+    PurposeBoundAccessRequest,
+    _issued_policy_snapshot,
+    _issued_request_snapshot,
+) = _build_input_issuance_runtime()
+del _build_input_issuance_runtime
 
 
 def _validated_decision_snapshot(
