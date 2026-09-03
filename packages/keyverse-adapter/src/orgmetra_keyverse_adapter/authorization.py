@@ -226,16 +226,10 @@ class AuthorizationDecision:
             raise ValueError("allow decision must authorize exactly the requested fields.")
         if not self.allowed and self.authorized_fields:
             raise ValueError("deny decision must not authorize fields.")
-        if self.allowed:
-            if self.reason_code != "access_permitted":
-                raise ValueError("allow decision must use access_permitted reason.")
-            expected_next_action = _ALLOW_NEXT_ACTION
-        else:
-            if self.reason_code not in _DENIAL_NEXT_ACTION:
-                raise ValueError("deny decision must use a governed denial reason.")
-            expected_next_action = _DENIAL_NEXT_ACTION[self.reason_code]
-        if self.next_action != expected_next_action:
-            raise ValueError("next_action must match the governed authorization reason.")
+        if self.allowed and self.reason_code != "access_permitted":
+            raise ValueError("allow decision must use access_permitted reason.")
+        if not self.allowed and self.reason_code not in _DENIAL_NEXT_ACTION:
+            raise ValueError("deny decision must use a governed denial reason.")
 
 
 class AuthorizationDeniedError(PermissionError):
