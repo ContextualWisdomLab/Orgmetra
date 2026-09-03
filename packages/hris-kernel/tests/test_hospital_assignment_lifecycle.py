@@ -63,6 +63,7 @@ def test_june_correction_changes_may_history_only_after_it_is_recorded(
         allocation_ratio=Decimal("1.0000"),
         effective=effective(date(2024, 4, 1)),
         recorded=recorded(utc(2024, 6, 15, 10)),
+        assignment_category_code="legacy_unspecified",
     )
     original_through_march = replace(
         jordan_icu_assignment,
