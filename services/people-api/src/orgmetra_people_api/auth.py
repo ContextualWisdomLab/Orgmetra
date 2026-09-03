@@ -21,7 +21,7 @@ class AuthenticationFailed(RuntimeError):
     """Indicate that bearer authentication evidence is absent or malformed."""
 
 
-class AuthenticatedPrincipal(tuple[UUID, str, frozenset[str]]):
+class AuthenticatedPrincipal(tuple[int, str, frozenset[str]]):
     """Structurally immutable identity evidence returned by token authentication.
 
     ``tenant_record_id`` binds the authenticated actor to one Orgmetra tenant.
@@ -29,9 +29,9 @@ class AuthenticatedPrincipal(tuple[UUID, str, frozenset[str]]):
     identifier. ``granted_scope_codes`` carries explicit operation capabilities;
     it never carries an HR purpose decision.
 
-    Tuple-backed storage deliberately leaves no writable instance slots. This
-    prevents low-level field replacement after authentication while preserving
-    value semantics for trusted service code.
+    Tuple-backed storage deliberately leaves no writable instance slots. The
+    tenant UUID is stored as its validated integer and reconstructed on access,
+    so neither the caller's UUID nor a returned UUID aliases stored authority.
     """
 
     __slots__ = ()
@@ -57,12 +57,12 @@ class AuthenticatedPrincipal(tuple[UUID, str, frozenset[str]]):
             raise ValueError("granted_scope_codes must be a non-empty frozenset.")
         if any(type(scope) is not str or _SCOPE_PATTERN.fullmatch(scope) is None for scope in granted_scope_codes):
             raise ValueError("granted_scope_codes must contain explicit Orgmetra scopes.")
-        return tuple.__new__(cls, (UUID(int=tenant_record_id_int), actor_reference, granted_scope_codes))
+        return tuple.__new__(cls, (tenant_record_id_int, actor_reference, granted_scope_codes))
 
     @property
     def tenant_record_id(self) -> UUID:
-        """Return the detached authenticated tenant identifier."""
-        return self[0]
+        """Return a detached authenticated tenant identifier value."""
+        return UUID(int=self[0])
 
     @property
     def actor_reference(self) -> str:
