@@ -239,8 +239,8 @@ class PostgresJobAnalysisPort:
         """
         if not isinstance(snapshot, JobAnalysisSnapshot):
             raise TypeError("snapshot must be a JobAnalysisSnapshot")
-        if not isinstance(audit_event, AuditOutboxEvent):
-            raise TypeError("audit_event must be an AuditOutboxEvent")
+        if type(audit_event) is not AuditOutboxEvent:
+            raise TypeError("audit_event must be an exact AuditOutboxEvent")
         if not isinstance(idempotency_key, str):
             raise ValueError("idempotency_key must reach the write port as a string.")
         validate_operational_uuid("write_command_id", write_command_id)
