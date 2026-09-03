@@ -73,9 +73,10 @@ Job evidence
 - `docs/TEST_STRATEGY.md`
 - `docs/OPERABILITY.md`
 - `docs/TRACEABILITY.md`
+- `docs/product-technical-gap-baseline.md`
 - `docs/adr/README.md`
 - `docs/doctoring/REFERENCES.md`
 
 ## Status
 
-Protected `develop` includes the employment-truth kernel, governed candidate-to-worker conversion, purpose-bound PII authorization, normalized worker-bound validity studies, criterion-observation scope, bitemporal workforce-composition evidence, the governed Naruon intent adapter, and requisition review packets. This active PR adds durable purpose-bound People mutation and confirmed-hire materialization paths for Employment, Position, and Assignment with atomic audit/outbox evidence and tenant-scoped idempotency; treat those write paths as active-PR truth until this exact head passes all fresh protected-base gates and merges.
+Protected `develop` at `9e3e4847510e1e612b48474ba42b177b8ed824df` includes the employment-truth kernel, governed candidate-to-worker conversion, purpose-bound PII authorization, normalized worker-bound validity studies, criterion-observation scope, the governed Naruon intent adapter, requisition review packets, the governed People mutation/confirmed-hire implementation with tenant-scoped idempotency and atomic audit/outbox evidence, and canonical persisted Job Analysis through migration `0013` and the protected Job Analysis API. Workforce-composition evidence remains active PR #54 rather than protected truth. The next protected product gaps are a connected and released browser workspace, statistical validity estimation, and a versioned release; see `docs/product-technical-gap-baseline.md` for exact evidence boundaries and current PR state.

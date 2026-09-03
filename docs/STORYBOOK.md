@@ -5,6 +5,7 @@ Design tokens live in `packages/design-tokens/` and map to the Figma file at htt
 ## Component inventory
 
 - `HrActionButton` (tokenized approve/review/correct/request-evidence/compare/export/escalate)
+- `KeyboardBypass` (focused skip-to-main state tied to Figma HR Home node `1:10`)
 - `Button`
 - `LinkButton`
 - `TextField`
@@ -44,7 +45,41 @@ Each interactive component requires at least these stories where applicable:
 
 ## Accessibility contract
 
+- The first keyboard focus on a role workspace exposes a visible skip-to-main control before repeated workspace navigation; activation moves focus to the `main` landmark.
+- The bypass label follows the active English/Korean locale and its focus treatment consumes the shared Orgmetra focus-ring token.
 - All charts require exact-value tables.
 - Every evidence citation opens a keyboard-accessible drawer.
 - High-impact actions require preview, reason, actor, purpose, and confirmation.
 - Missing evidence is shown as `unknown`, not `failed`.
+
+## Local executable slice
+
+`apps/hr-workspace/` is the first dependency-free executable slice of the
+Employee Profile and HR Home experience. It consumes the shared CSS tokens,
+keeps the Figma node IDs in the markup, and exercises keyboard bypass,
+evidence review, purpose-bound permission denial, high-impact confirmation,
+exact allocation values, and English/Korean labels. The Job Analysis and
+Employee Profile People views are API-bound read surfaces: a host may inject
+an API base URL and short-lived authorization provider through
+`globalThis.__ORGMETRA_JOB_ANALYSIS__` and `globalThis.__ORGMETRA_PEOPLE__`.
+The fixture has no such provider and therefore makes no connected-data claim
+or local-data fallback.
+
+## Local Storybook runtime
+
+The repository uses Storybook `10.5.10` with
+`@storybook/web-components-vite` and native HTML/CSS stories in
+`apps/hr-workspace/workspace.stories.js`. The stories cover tokenized action
+states, the focused keyboard-bypass state, read-only and validation-error
+fields, purpose-bound denial, the keyboard-accessible evidence drawer,
+high-impact confirmation, and exact assignment values. Shared design tokens
+and workspace CSS are imported by `.storybook/preview.js`.
+
+Run `npm run storybook` for the local development UI or
+`npm run build-storybook` for the static build. This is local component and
+state evidence. Run `npm run test:e2e` for the Chromium browser contract, which
+proves the initial keyboard bypass, human-review, permission, locale,
+host-injected read, authorization, and no-fallback error states against a local
+static runtime. This still does not prove a protected deployment: the Job
+Analysis and People read surfaces require a real protected API runtime before
+they can be called released.

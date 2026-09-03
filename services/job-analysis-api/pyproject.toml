@@ -7,13 +7,20 @@ name = "orgmetra-job-analysis-api"
 version = "0.1.0"
 description = "Governed persistence boundary for Orgmetra job-analysis snapshots."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "ContextualWisdomLab" }]
 dependencies = [
   "orgmetra-hris-kernel==0.4.0",
   "orgmetra-keyverse-adapter==0.1.0",
 ]
+
+[project.optional-dependencies]
+test = ["pytest>=8.3", "pytest-cov>=5.0"]
+
+[tool.uv.sources]
+orgmetra-hris-kernel = { path = "../../packages/hris-kernel" }
+orgmetra-keyverse-adapter = { path = "../../packages/keyverse-adapter" }
 
 [tool.setuptools]
 package-dir = {"" = "src"}

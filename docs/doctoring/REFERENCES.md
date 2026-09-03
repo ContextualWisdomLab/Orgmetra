@@ -12,17 +12,17 @@ Cloud Native Computing Foundation. (2022). *CloudEvents specification v1.0.2*. h
 
 Diez-Roux, A. V. (1998). Bringing context back into epidemiology: Variables and fallacies in multilevel analysis. *American Journal of Public Health, 88*(2), 216–222. https://doi.org/10.2105/AJPH.88.2.216
 
-Equal Employment Opportunity Commission. (1978). *Uniform guidelines on employee selection procedures*. 29 C.F.R. Part 1607. https://www.govinfo.gov/content/pkg/CFR-2025-title29-vol4/pdf/CFR-2025-title29-vol4-part1607.pdf
+Equal Employment Opportunity Commission. (1978). *Uniform guidelines on employee selection procedures*. 29 C.F.R. Part 1607.
 
 Hu, V. C., Ferraiolo, D. F., & Kuhn, D. R. (2019). *Attribute considerations for access control systems* (NIST Special Publication 800-205). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-205
 
 Hu, V. C., Ferraiolo, D. F., Kuhn, D. R., Schnitzer, A., Sandlin, K., Miller, R., & Scarfone, K. A. (2019). *Guide to attribute based access control (ABAC) definition and considerations* (NIST Special Publication 800-162). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-162
 
-International Organization for Standardization. (2022). *ISO 30400:2022 Human resource management — Vocabulary*. ISO. https://www.iso.org/standard/78044.html
+International Organization for Standardization. (2022). *ISO 30400:2022 Human resource management — Vocabulary*. ISO.
 
-International Organization for Standardization. (2023). *ISO 30405:2023 Human resource management — Guidelines on recruitment*. ISO. https://www.iso.org/standard/79488.html
+International Organization for Standardization. (2023). *ISO 30405:2023 Human resource management — Guidelines on recruitment*. ISO.
 
-International Organization for Standardization. (2025). *ISO 30414:2025 Human resource management — Requirements and recommendations for human capital reporting and disclosure*. ISO. https://www.iso.org/standard/30414
+International Organization for Standardization. (2025). *ISO 30414:2025 Human resource management — Requirements and recommendations for human capital reporting and disclosure*. ISO.
 
 Internet Engineering Task Force. (2024). *Universally Unique IDentifiers (UUIDs)* (RFC 9562). https://www.rfc-editor.org/rfc/rfc9562.html
 
@@ -56,9 +56,9 @@ PostgreSQL Global Development Group. (n.d.). *SELECT (PostgreSQL 16 documentatio
 
 Robinson, W. S. (1950). Ecological correlations and the behavior of individuals. *American Sociological Review, 15*(3), 351–357. https://doi.org/10.2307/2087176
 
-Snodgrass, R. T. (1999). *Developing time-oriented database applications in SQL*. Morgan Kaufmann. https://lccn.loc.gov/99014298
+Snodgrass, R. T. (1999). *Developing time-oriented database applications in SQL*. Morgan Kaufmann.
 
-Society for Industrial and Organizational Psychology. (2018). *Principles for the validation and use of personnel selection procedures* (5th ed.). SIOP. https://doi.org/10.1017/iop.2018.195
+Society for Industrial and Organizational Psychology. (2018). *Principles for the validation and use of personnel selection procedures* (5th ed.). SIOP.
 
 U.S. Department of Labor, Office of Administrative Law Judges. (1991). *Dictionary of Occupational Titles (4th ed., rev. 1991), Appendix B: Explanation of Data, People, and Things*. https://www.dol.gov/agencies/oalj/PUBLIC/DOT/REFERENCES/DOTAPPB
 
@@ -67,3 +67,19 @@ U.S. Office of Personnel Management. (n.d.). *Job analysis*. Retrieved August 17
 World Wide Web Consortium. (2013). *PROV-O: The PROV ontology*. https://www.w3.org/TR/prov-o/
 
 World Wide Web Consortium. (2023, October 5). *Web Content Accessibility Guidelines (WCAG) 2.2*. https://www.w3.org/TR/WCAG22/
+
+## Product and technical gap baseline sources
+
+American Institute of Certified Public Accountants. (2023). *2017 trust services criteria (with revised points of focus—2022).* https://www.aicpa-cima.com/resources/download/2017-trust-services-criteria-with-revised-points-of-focus-2022
+
+Fugu Team, Sakana AI. (2026). *Sakana Fugu technical report* (arXiv:2606.21228). arXiv. https://arxiv.org/abs/2606.21228
+
+International Organization for Standardization. (2023). *ISO 30405:2023: Human resource management—Guidelines on recruitment* (2nd ed.). https://www.iso.org/standard/79488.html
+
+National Institute of Standards and Technology. (2023). *Artificial intelligence risk management framework (AI RMF 1.0)* (NIST AI 100-1). U.S. Department of Commerce. https://doi.org/10.6028/NIST.AI.100-1
+
+Nielsen, S., Cetin, E., Schwendeman, P., Sun, Q., Xu, J., & Tang, Y. (2025). *Learning to orchestrate agents in natural language with the Conductor* (arXiv:2512.04388). arXiv. https://arxiv.org/abs/2512.04388
+
+Sakana AI. (2026). *TRINITY: An evolved LLM coordinator* (arXiv:2512.04695). arXiv. https://arxiv.org/abs/2512.04695
+
+World Wide Web Consortium. (2024, December 12). *Web Content Accessibility Guidelines (WCAG) 2.2*. https://www.w3.org/TR/2024/REC-WCAG22-20241212/

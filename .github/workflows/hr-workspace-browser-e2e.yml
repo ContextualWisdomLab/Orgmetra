@@ -1,0 +1,57 @@
+name: HR Workspace Browser E2E
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "apps/hr-workspace/**"
+      - "packages/design-tokens/**"
+      - "tests/e2e/**"
+      - "playwright.config.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/hr-workspace-browser-e2e.yml"
+      - "tests/validate_repository.py"
+      - "scripts/foundation-contract-core.mjs"
+      - "manifest.json"
+      - "docs/STORYBOOK.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hr-workspace-browser-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    name: HR workspace Chromium E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Node.js LTS
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          check-latest: false
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Install Chromium and Linux dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Run HR workspace browser E2E
+        run: npm run test:e2e
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

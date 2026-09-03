@@ -1,6 +1,7 @@
 # ADR-0006: Governed audit/outbox envelope and durable persistence
 
-- **Status:** Accepted for the stacked implementation branch; not protected-main truth until merged.
+- Status: Accepted
+- Provenance: integrated on `develop`; enforceable branch protection is tracked by Orgmetra issue #89.
 - **Decision date:** 2026-08-17
 - **Scope:** Orgmetra-owned audit envelope, immutable audit persistence, guarded outbox delivery state, tenant-safe atomic dispatcher claiming, expired-lease takeover, owner-bound completion/retry, database-budget-governed terminal dead-letter escalation, review hardening, and privileged recovery of an expired exhausted lease when its recorded final worker identity is permanently unavailable. Exponential retry policy, retention/export workflows, and external delivery receipts remain subsequent work.
 
@@ -59,7 +60,7 @@ The branch contains test-first application and PostgreSQL regressions for determ
 
 Review hardening added a focused PostgreSQL RED contract before migration 0008. That contract requires statement-level audit/outbox TRUNCATE denial, trusted search paths on every audited dispatcher/recovery boundary, deterministic/session-independent immutable envelope validation, the due-work partial index, and operator terminalization of only an expired exhausted lease with immutable operator-attributed escalation evidence. The operator regression executes recovery through the externally assignable NOLOGIN capability role, proves both service-owned recovery roles are non-superuser and NOBYPASSRLS, proves neither participates in a pre-existing membership edge, proves the temporary schema CREATE grant is absent after migration, and proves the operator role cannot read/update outbox state or insert escalation evidence directly. A dedicated preflight regression creates a colliding reserved role name and requires migration 0008 to fail before creating its due-work index or recovery function, then removes the collision and runs the normal migration. Additional review regressions make every captured dispatcher/dead-letter `psql` assertion fail on SQL errors, execute audit persistence sessions with explicit tenant context, assert the exact duplicate-delivery primary-key failure for transaction rollback, prove non-UTC application timestamps normalize to UTC, discover all executable migration/PostgreSQL-contract artifacts for provenance, and validate the database contract across all migrations rather than a hardcoded prefix.
 
-Exact-current-head hosted evidence is required after every branch mutation. Queued, cancelled, stale, predecessor, or model-only results are non-passing and do not change this ADR’s protected-main status.
+Exact-current-head hosted evidence is required after every branch mutation. Queued, cancelled, stale, predecessor, or model-only results are non-passing and do not confer merge authorization while the repository protection defect tracked by issue #89 remains unresolved.
 
 ## References
 

@@ -11,6 +11,8 @@ The Figma baseline contains six role-based wireframes:
 
 Figma file: https://www.figma.com/design/xu1ZK1zmtFcDep95R8oE9O
 
+The Figma baseline was re-verified against the live `Orgmetra Baseline` page for this interaction slice. Figma nodes `1:10` (HR Home) and `1:28` (Employee Profile) remain the visual geometry baseline. The keyboard bypass control below is intentionally a focus-only interaction affordance rather than a persistent geometric change to those frames; its visible focus state is captured in Storybook and its behavior is enforced by browser tests.
+
 ## HR Home
 
 Primary action cards:
@@ -19,6 +21,12 @@ Primary action cards:
 - Approve job profile
 - Resolve effective-date conflict
 - Open validation study
+
+Keyboard interaction contract:
+
+- The first keyboard-focusable control is **Skip to main content** / **본문으로 건너뛰기**.
+- It becomes visibly rendered when focused and moves focus to the `main` landmark, bypassing repeated workspace navigation.
+- The control follows the active English/Korean workspace locale and uses the shared focus-ring token.
 
 ## Job Architecture
 
@@ -52,6 +60,8 @@ Panels:
 - Seat-capacity warning when visible allocations would exceed 1.0000
 - Manager and organization timeline
 - Performance criteria and observations
+
+The same page-level keyboard bypass contract applies before the Employee Profile navigation path, so repeated sidebar navigation is not a prerequisite to reaching the profile content.
 
 ## Validate
 
