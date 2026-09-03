@@ -119,12 +119,23 @@ def test_allow_decision_rejects_denial_reason() -> None:
 
 def test_deny_decision_rejects_success_reason() -> None:
     """A deny verdict cannot masquerade as successful authorization in audit evidence."""
-    with pytest.raises(ValueError, match="deny decision must use a governed denial reason"):
+    with pytest.raises(ValueError, match="deny decision must not use access_permitted reason"):
         _decision(
             allowed=False,
             authorized_fields=frozenset(),
             reason_code="access_permitted",
         )
+
+
+def test_decision_accepts_explicit_denial_reason_outside_evaluator_vocabulary() -> None:
+    """The public evidence type preserves bounded downstream denial codes without widening allow semantics."""
+    decision = _decision(
+        allowed=False,
+        authorized_fields=frozenset(),
+        reason_code="access_denied",
+        next_action="stop",
+    )
+    assert decision.reason_code == "access_denied"
 
 
 def test_decision_preserves_bounded_actionable_text_as_non_authoritative_guidance() -> None:
