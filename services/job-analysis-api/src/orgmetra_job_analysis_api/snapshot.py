@@ -130,10 +130,13 @@ def _reject_unknown_fields(
 
 
 def validate_operational_uuid(field_name: str, value: object) -> UUID:
-    """Require a UUID that is not one of Orgmetra's reserved protocol sentinels."""
-    if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
+    """Return a detached exact UUID after validating operational identity evidence."""
+    if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
-    return value
+    value_int = value.int
+    if type(value_int) is not int or not 0 < value_int < _MAX_UUID_INT:
+        raise ValueError(f"{field_name} must be an operational UUID.")
+    return UUID(int=value_int)
 
 
 def _validate_idempotency_key(value: object) -> str:
