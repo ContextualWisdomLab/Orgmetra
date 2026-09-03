@@ -100,6 +100,24 @@ class AssignmentCorrectionOpenApiStructureTests(unittest.TestCase):
         self.assertIn("operationId: correctAssignmentRecordCategory", moved)
         self.assertNotIn("operationId: correctAssignmentRecordCategory", self._post_operation(moved))
 
+    def test_same_scope_on_different_security_scheme_cannot_satisfy_post_authority(self) -> None:
+        """Reject a substituted OIDC scheme even when the People write scope survives."""
+        substituted = self.schema.replace(
+            "        - keyverse_oidc:\n            - orgmetra.people.write",
+            "        - external_oidc:\n            - orgmetra.people.write",
+            1,
+        )
+        self.assertNotEqual(substituted, self.schema)
+        self.assertIn("orgmetra.people.write", self._post_operation(substituted))
+
+        original_schema = self.schema
+        self.schema = substituted
+        try:
+            with self.assertRaises(AssertionError):
+                self.test_service_openapi_binds_the_exact_correction_contract_to_post()
+        finally:
+            self.schema = original_schema
+
 
 if __name__ == "__main__":
     unittest.main()
