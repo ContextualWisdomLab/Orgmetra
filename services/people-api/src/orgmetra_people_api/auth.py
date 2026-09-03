@@ -49,6 +49,11 @@ class AuthenticatedPrincipal:
         if any(type(scope) is not str or _SCOPE_PATTERN.fullmatch(scope) is None for scope in self.granted_scope_codes):
             raise ValueError("granted_scope_codes must contain explicit Orgmetra scopes.")
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Prevent executable principal subclasses from overriding authenticated evidence."""
+        del kwargs
+        raise TypeError("AuthenticatedPrincipal must not be subclassed")
+
 
 @runtime_checkable
 class TokenAuthenticator(Protocol):
