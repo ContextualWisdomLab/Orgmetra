@@ -51,6 +51,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Pinned the PostgreSQL 16.14 CI service image to the reviewed Docker Official Image index digest and added a regression that rejects a mutable `postgres:16` service tag.
 - Split employment and position identity from versioned status so corrections no longer mint a new employment or position identifier.
 - Made assignment coverage status-aware: `active` and `leave` remain staffable while `terminated` and other non-eligible employment statuses fail closed.
+- Made position coverage fail closed only when simultaneously visible versions have different statuses; repeated same-status evidence does not become a false contradiction.
 - Made organization hierarchy reconstruction fail closed on a cycle at the requested tenant, effective day, and knowledge cutoff while ignoring future-recorded and foreign-tenant facts.
 - Build the outbox due-work index concurrently during migration 0008, requiring that index step to run outside an explicit transaction block so established queues do not block writers while the index is built; pre-index hardening and post-index privileged role setup use separate explicit transactions.
 

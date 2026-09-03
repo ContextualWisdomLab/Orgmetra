@@ -155,14 +155,16 @@ def validate_assignment_position_coverage(
     *,
     known_at: datetime,
 ) -> None:
-    """Require every assignment day to land on a staffable position in its tenant.
+    """Require every assignment day to land on one unambiguous staffable position.
 
     ``active`` and ``open`` seats remain staffable. ``closed``, ``frozen``, and
     ``abolished`` seats cannot receive new or continuing allocations. A matching
     position identifier in another tenant never supplies local staffing coverage.
+    Simultaneously recorded-visible position versions may not overlap the
+    assignment interval because a position is a single-valued seat-state fact.
 
     Raises:
-        PositionCoverageError: Choose an open seat or shorten the assignment.
+        PositionCoverageError: Choose an open seat or correct contradictory position history.
     """
     named = [
         version
@@ -170,11 +172,25 @@ def validate_assignment_position_coverage(
         if version.tenant_record_id == assignment.tenant_record_id
         and version.position_record_id == assignment.position_record_id
     ]
-    visible = [
+    assignment_visible = [
         version
         for version in named
         if version.recorded.contains(known_at)
-        and version.position_status_code in _STAFFABLE_POSITION_STATUSES
+        and version.effective.overlaps(assignment.effective)
+    ]
+    for index, left in enumerate(assignment_visible):
+        for right in assignment_visible[index + 1 :]:
+            if left.effective.overlaps(right.effective):
+                raise PositionCoverageError(
+                    "Assignment intersects contradictory position versions in this tenant.",
+                    next_action=(
+                        "Close the superseded recorded position version, then save the assignment again."
+                    ),
+                )
+    visible = [
+        version
+        for version in assignment_visible
+        if version.position_status_code in _STAFFABLE_POSITION_STATUSES
     ]
     if not visible or not _union_covers(
         [version.effective for version in visible],
