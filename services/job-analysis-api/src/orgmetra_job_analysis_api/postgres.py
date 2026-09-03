@@ -237,8 +237,8 @@ class PostgresJobAnalysisPort:
         ``record_audit_outbox_event`` runs only for a new write, inside the same
         transaction.
         """
-        if not isinstance(snapshot, JobAnalysisSnapshot):
-            raise TypeError("snapshot must be a JobAnalysisSnapshot")
+        if type(snapshot) is not JobAnalysisSnapshot:
+            raise TypeError("snapshot must be an exact JobAnalysisSnapshot")
         if type(audit_event) is not AuditOutboxEvent:
             raise TypeError("audit_event must be an exact AuditOutboxEvent")
         if not isinstance(idempotency_key, str):
