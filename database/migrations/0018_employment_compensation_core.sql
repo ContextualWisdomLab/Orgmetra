@@ -1,0 +1,273 @@
+-- Normalize base compensation to Employment so concurrent employments retain
+-- independent compensation truth. The legacy person-scoped relation remains
+-- readable for historical compatibility but no longer accepts new writes.
+
+SET search_path = public, pg_catalog;
+
+CREATE TABLE employment_base_compensation_record (
+    tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
+    employment_base_compensation_record_id uuid PRIMARY KEY,
+    employment_record_id uuid NOT NULL,
+    recorded_from timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
+    recorded_to timestamptz,
+    CONSTRAINT employment_base_compensation_record_id_operational_check
+        CHECK (public.is_operational_uuid(employment_base_compensation_record_id)),
+    CONSTRAINT employment_base_compensation_employment_tenant_fk
+        FOREIGN KEY (tenant_record_id, employment_record_id)
+        REFERENCES employment_record(tenant_record_id, employment_record_id),
+    CONSTRAINT employment_base_compensation_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
+    CONSTRAINT employment_base_compensation_tenant_identity_unique
+        UNIQUE (tenant_record_id, employment_base_compensation_record_id),
+    CONSTRAINT employment_base_compensation_employment_unique
+        UNIQUE (tenant_record_id, employment_record_id)
+);
+
+CREATE TABLE employment_base_compensation_version (
+    tenant_record_id uuid NOT NULL REFERENCES tenant_record(tenant_record_id),
+    employment_base_compensation_version_id uuid PRIMARY KEY,
+    employment_base_compensation_record_id uuid NOT NULL,
+    base_compensation_amount numeric(19,4) NOT NULL,
+    currency_code text NOT NULL,
+    pay_rate_period_code text NOT NULL,
+    effective_from date NOT NULL,
+    effective_to date,
+    recorded_from timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
+    recorded_to timestamptz,
+    CONSTRAINT employment_base_compensation_version_id_operational_check
+        CHECK (public.is_operational_uuid(employment_base_compensation_version_id)),
+    CONSTRAINT employment_base_compensation_version_tenant_fk
+        FOREIGN KEY (tenant_record_id, employment_base_compensation_record_id)
+        REFERENCES employment_base_compensation_record(
+            tenant_record_id,
+            employment_base_compensation_record_id
+        ),
+    CONSTRAINT employment_base_compensation_amount_check
+        CHECK (
+            base_compensation_amount <> 'NaN'::numeric
+            AND base_compensation_amount >= 0
+        ),
+    CONSTRAINT employment_base_compensation_currency_check
+        CHECK (currency_code ~ '^[A-Z]{3}$'),
+    CONSTRAINT employment_base_compensation_rate_period_check
+        CHECK (
+            pay_rate_period_code IN (
+                'hour',
+                'day',
+                'week',
+                'biweekly',
+                'semimonthly',
+                'month',
+                'year'
+            )
+        ),
+    CONSTRAINT employment_base_compensation_effective_period_check
+        CHECK (effective_to IS NULL OR effective_to > effective_from),
+    CONSTRAINT employment_base_compensation_version_recorded_period_check
+        CHECK (recorded_to IS NULL OR recorded_to > recorded_from),
+    CONSTRAINT employment_base_compensation_version_tenant_identity_unique
+        UNIQUE (tenant_record_id, employment_base_compensation_version_id),
+    CONSTRAINT employment_base_compensation_bitemporal_exclusion
+        EXCLUDE USING gist (
+            tenant_record_id WITH =,
+            employment_base_compensation_record_id WITH =,
+            daterange(effective_from, effective_to, '[)') WITH &&,
+            tstzrange(recorded_from, recorded_to, '[)') WITH &&
+        )
+);
+
+CREATE FUNCTION public.enforce_employment_base_compensation_recorded_from()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+BEGIN
+    IF NEW.recorded_to IS NOT NULL THEN
+        RAISE EXCEPTION 'base-compensation recorded_to must be NULL on insert'
+            USING ERRCODE = '22023';
+    END IF;
+    IF NEW.recorded_from IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
+        RAISE EXCEPTION 'base-compensation recorded_from must equal the current transaction timestamp'
+            USING ERRCODE = '22023';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.enforce_employment_base_compensation_recorded_from() IS
+    'Guards new base-compensation anchors and versions: rejects caller-preclosed evidence and requires recorded_from to equal the current PostgreSQL transaction timestamp.';
+
+CREATE TRIGGER employment_base_compensation_record_system_time_guard
+BEFORE INSERT ON employment_base_compensation_record
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_employment_base_compensation_recorded_from();
+
+CREATE TRIGGER employment_base_compensation_version_system_time_guard
+BEFORE INSERT ON employment_base_compensation_version
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_employment_base_compensation_recorded_from();
+
+CREATE FUNCTION public.enforce_employment_base_compensation_version_anchor_open()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+BEGIN
+    PERFORM 1
+    FROM public.employment_base_compensation_record AS anchor
+    WHERE anchor.tenant_record_id = NEW.tenant_record_id
+      AND anchor.employment_base_compensation_record_id = NEW.employment_base_compensation_record_id
+      AND anchor.recorded_to IS NULL
+    FOR SHARE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'base-compensation version requires an open compensation anchor'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.enforce_employment_base_compensation_version_anchor_open() IS
+    'Guards new compensation versions: locks and requires the same-tenant compensation anchor to remain open, preventing new recorded truth beneath a closed anchor.';
+
+CREATE TRIGGER employment_base_compensation_version_anchor_open_guard
+BEFORE INSERT ON employment_base_compensation_version
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_employment_base_compensation_version_anchor_open();
+
+CREATE FUNCTION public.enforce_employment_base_compensation_recorded_to()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+BEGIN
+    IF NEW.recorded_to IS DISTINCT FROM OLD.recorded_to
+       AND NEW.recorded_to IS DISTINCT FROM pg_catalog.transaction_timestamp() THEN
+        RAISE EXCEPTION 'base-compensation recorded_to must equal the current transaction timestamp'
+            USING ERRCODE = '22023';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.enforce_employment_base_compensation_recorded_to() IS
+    'Guards base-compensation history closure: a changed recorded_to is accepted only when it equals the current PostgreSQL transaction timestamp.';
+
+CREATE TRIGGER employment_base_compensation_record_system_time_close_guard
+BEFORE UPDATE ON employment_base_compensation_record
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_employment_base_compensation_recorded_to();
+
+CREATE TRIGGER employment_base_compensation_version_system_time_close_guard
+BEFORE UPDATE ON employment_base_compensation_version
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_employment_base_compensation_recorded_to();
+
+CREATE FUNCTION public.enforce_employment_base_compensation_anchor_version_alignment()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+BEGIN
+    IF NEW.recorded_to IS NULL OR NEW.recorded_to IS NOT DISTINCT FROM OLD.recorded_to THEN
+        RETURN NULL;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM public.employment_base_compensation_version AS version
+        WHERE version.tenant_record_id = NEW.tenant_record_id
+          AND version.employment_base_compensation_record_id = NEW.employment_base_compensation_record_id
+          AND (version.recorded_to IS NULL OR version.recorded_to > NEW.recorded_to)
+    ) THEN
+        RAISE EXCEPTION 'cannot close base-compensation anchor while a recorded version remains open'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+COMMENT ON FUNCTION public.enforce_employment_base_compensation_anchor_version_alignment() IS
+    'Deferred integrity guard for anchor closure: every child version must already have a recorded_to no later than the anchor close instant before the transaction may commit.';
+
+CREATE CONSTRAINT TRIGGER employment_base_compensation_anchor_version_alignment_guard
+AFTER UPDATE ON employment_base_compensation_record
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_employment_base_compensation_anchor_version_alignment();
+
+CREATE TRIGGER employment_base_compensation_record_bitemporal_guard
+BEFORE UPDATE OR DELETE ON employment_base_compensation_record
+FOR EACH ROW
+EXECUTE FUNCTION public.protect_bitemporal_history();
+
+CREATE TRIGGER employment_base_compensation_version_bitemporal_guard
+BEFORE UPDATE OR DELETE ON employment_base_compensation_version
+FOR EACH ROW
+EXECUTE FUNCTION public.protect_bitemporal_history();
+
+CREATE FUNCTION public.reject_employment_base_compensation_truncate()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+BEGIN
+    RAISE EXCEPTION 'employment base-compensation history cannot be truncated'
+        USING ERRCODE = '55000';
+END;
+$$;
+
+COMMENT ON FUNCTION public.reject_employment_base_compensation_truncate() IS
+    'Rejects table-wide TRUNCATE of Employment-scoped base-compensation anchors or versions so governed history cannot bypass row-level correction guards.';
+
+CREATE TRIGGER employment_base_compensation_record_truncate_guard
+BEFORE TRUNCATE ON employment_base_compensation_record
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.reject_employment_base_compensation_truncate();
+
+CREATE TRIGGER employment_base_compensation_version_truncate_guard
+BEFORE TRUNCATE ON employment_base_compensation_version
+FOR EACH STATEMENT
+EXECUTE FUNCTION public.reject_employment_base_compensation_truncate();
+
+REVOKE TRUNCATE ON employment_base_compensation_record FROM PUBLIC;
+REVOKE TRUNCATE ON employment_base_compensation_version FROM PUBLIC;
+
+CREATE FUNCTION public.reject_legacy_compensation_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public, pg_temp
+AS $$
+BEGIN
+    RAISE EXCEPTION 'legacy compensation_record is read-only for new writes; use employment_base_compensation_record and employment_base_compensation_version'
+        USING ERRCODE = '55000';
+END;
+$$;
+
+COMMENT ON FUNCTION public.reject_legacy_compensation_insert() IS
+    'Rejects every new Person-scoped legacy compensation_record insert so new base-compensation truth must use the Employment-scoped relations.';
+
+CREATE TRIGGER compensation_record_legacy_insert_guard
+BEFORE INSERT ON compensation_record
+FOR EACH ROW
+EXECUTE FUNCTION public.reject_legacy_compensation_insert();
+
+ALTER TABLE employment_base_compensation_record ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employment_base_compensation_record FORCE ROW LEVEL SECURITY;
+CREATE POLICY employment_base_compensation_record_scope_policy
+ON employment_base_compensation_record
+USING (tenant_record_id = current_tenant_record_id())
+WITH CHECK (tenant_record_id = current_tenant_record_id());
+
+ALTER TABLE employment_base_compensation_version ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employment_base_compensation_version FORCE ROW LEVEL SECURITY;
+CREATE POLICY employment_base_compensation_version_scope_policy
+ON employment_base_compensation_version
+USING (tenant_record_id = current_tenant_record_id())
+WITH CHECK (tenant_record_id = current_tenant_record_id());
+
+COMMENT ON TABLE employment_base_compensation_record IS
+    'Durable tenant-scoped base-compensation anchor owned by one Employment; recorded_from is fixed to PostgreSQL transaction time, INSERT requires an open recorded interval, and closure is accepted only at the PostgreSQL transaction timestamp after every child version is closed.';
+COMMENT ON TABLE employment_base_compensation_version IS
+    'Single-valued bitemporal base-compensation amount, currency transport code, and pay-rate period for one open Employment compensation anchor; Nil/Max identities and NaN amounts are rejected, INSERT requires an open recorded interval and open parent anchor, and closure is accepted only at the PostgreSQL transaction timestamp.';

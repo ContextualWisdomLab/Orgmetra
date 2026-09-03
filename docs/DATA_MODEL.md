@@ -8,6 +8,8 @@
 | `person_record` | Durable person entity inside Orgmetra, not an authentication subject. |
 | `employment_record` | Durable employment identity for a person. |
 | `employment_record_version` | Bitemporal employment status, exclusive-or-concurrent code, and effective period. |
+| `employment_base_compensation_record` | Durable tenant-qualified base-compensation anchor owned by exactly one Employment. |
+| `employment_base_compensation_version` | Bitemporal base amount, currency, pay-rate period, and system-recorded history for one employment compensation anchor. |
 | `organization_unit` | Durable organizational identity referenced by positions and hierarchy facts. |
 | `organization_unit_version` | Bitemporal organizational name, type, and parent relationship for an organization unit. |
 | `job_profile` | Durable job identity referenced by positions, criteria, and decisions. |
@@ -53,6 +55,12 @@ Intervals are half-open and non-empty: an end value, when present, must be stric
 Durable anchors such as `organization_unit`, `job_profile`, `employment_record`, and `position_record` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version`, `job_profile_version`, `employment_record_version`, and `position_record_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
 
 Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
+
+## Employment-scoped base compensation
+
+`employment_base_compensation_record` is the durable compensation anchor for exactly one tenant-qualified `employment_record`. `employment_base_compensation_version` stores the effective-dated base amount, three-letter uppercase currency code, controlled pay-rate-period code, and independent system-recorded interval. Its two-dimensional exclusion prevents contradictory simultaneously visible base-compensation truth for the same employment anchor. Both `recorded_from` and a governed `recorded_to` closure are bound to PostgreSQL transaction time so callers cannot backdate when Orgmetra learned or stopped believing a compensation fact.
+
+The legacy Person-scoped `compensation_record` remains readable historical compatibility data but rejects new writes. Protected truth does not contain sufficient provenance to infer both the owning Employment and pay-rate period for every historical legacy row, so migration 0018 deliberately does not fabricate an automatic conversion. Compensation authorization, human-reviewed compensation-change evidence, export controls, and immutable audit/outbox remain separate governance boundaries.
 
 ## High-impact decision evidence
 

@@ -1,0 +1,171 @@
+name: Employment Compensation Core Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "database/migrations/0018_employment_compensation_core.sql"
+      - "tests/test_employment_compensation_core_postgres.sh"
+      - "tests/test_employment_compensation_review_regressions_postgres.sh"
+      - "docs/adr/0099-employment-scoped-base-compensation.md"
+      - "docs/adr/README.md"
+      - "docs/traceability/employment-compensation-core.md"
+      - "docs/doctoring/employment-compensation-core-references.md"
+      - "docs/DATA_MODEL.md"
+      - "docs/ERD.md"
+      - "docs/TRACEABILITY.md"
+      - "CHANGELOG.md"
+      - "manifest.json"
+      - ".github/workflows/employment-compensation-core-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: employment-compensation-core-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres_contract:
+    name: Employment-scoped base-compensation contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: orgmetra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d orgmetra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Print deterministic employment-compensation provenance
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          paths = [
+              "tests/test_employment_compensation_core_postgres.sh",
+              "tests/test_employment_compensation_review_regressions_postgres.sh",
+              ".github/workflows/employment-compensation-core-quality.yml",
+              "tests/validate_repository.py",
+              "scripts/foundation-contract-core.mjs",
+              "docs/adr/0099-employment-scoped-base-compensation.md",
+          ]
+          optional = [
+              "database/migrations/0018_employment_compensation_core.sql",
+              "docs/adr/README.md",
+              "docs/traceability/employment-compensation-core.md",
+              "docs/doctoring/employment-compensation-core-references.md",
+              "docs/DATA_MODEL.md",
+              "docs/ERD.md",
+              "docs/TRACEABILITY.md",
+              "CHANGELOG.md",
+          ]
+          rows = []
+          for path_text in paths + [path for path in optional if Path(path).is_file()]:
+              data = Path(path_text).read_bytes()
+              rows.append(
+                  {
+                      "path": path_text,
+                      "sha256": hashlib.sha256(data).hexdigest(),
+                      "bytes": len(data),
+                      "lines": len(data.decode("utf-8").splitlines()),
+                  }
+              )
+          print(json.dumps(rows, separators=(",", ":")))
+          PY
+      - name: Require canonical employment-compensation documentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          required_tables = (
+              "employment_base_compensation_record",
+              "employment_base_compensation_version",
+          )
+          canonical_docs = (
+              "docs/DATA_MODEL.md",
+              "docs/ERD.md",
+              "docs/TRACEABILITY.md",
+              "CHANGELOG.md",
+          )
+          for path_text in canonical_docs:
+              text = Path(path_text).read_text(encoding="utf-8")
+              missing = [table for table in required_tables if table not in text]
+              if missing:
+                  raise SystemExit(
+                      f"{path_text}: missing employment-compensation schema truth: "
+                      + ", ".join(missing)
+                  )
+
+          migration_text = Path(
+              "database/migrations/0018_employment_compensation_core.sql"
+          ).read_text(encoding="utf-8")
+          required_function_docs = (
+              "enforce_employment_base_compensation_recorded_from",
+              "enforce_employment_base_compensation_version_anchor_open",
+              "enforce_employment_base_compensation_recorded_to",
+              "enforce_employment_base_compensation_anchor_version_alignment",
+              "reject_employment_base_compensation_truncate",
+              "reject_legacy_compensation_insert",
+          )
+          undocumented = [
+              function_name
+              for function_name in required_function_docs
+              if f"COMMENT ON FUNCTION public.{function_name}() IS" not in migration_text
+          ]
+          if undocumented:
+              raise SystemExit(
+                  "database/migrations/0018_employment_compensation_core.sql: "
+                  "missing beginner-readable COMMENT ON FUNCTION for: "
+                  + ", ".join(undocumented)
+              )
+
+          adr_path = Path("docs/adr/0099-employment-scoped-base-compensation.md")
+          if not adr_path.is_file():
+              raise SystemExit("ADR 0099 document is required by the compensation contract")
+
+          adr_index = Path("docs/adr/README.md").read_text(encoding="utf-8")
+          required_adr_entry = (
+              "| [0099](0099-employment-scoped-base-compensation.md) | "
+              "Employment-scoped bitemporal base compensation | Active PR |"
+          )
+          if required_adr_entry not in adr_index:
+              raise SystemExit(
+                  "docs/adr/README.md: ADR 0099 is missing from the canonical ADR index"
+              )
+          PY
+      - name: Run employment compensation regression
+        run: bash tests/test_employment_compensation_core_postgres.sh
+      - name: Run review-driven integrity regressions in an isolated database
+        run: |
+          PGPASSWORD=orgmetra psql -h localhost -U orgmetra -d postgres -v ON_ERROR_STOP=1 \
+            -c 'CREATE DATABASE orgmetra_compensation_review'
+          DATABASE_URL=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra_compensation_review \
+            bash tests/test_employment_compensation_review_regressions_postgres.sh
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
