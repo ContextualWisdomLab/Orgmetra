@@ -6,7 +6,11 @@ from uuid import UUID
 
 import pytest
 
-from orgmetra_hris_kernel import AssignmentSupersessionFact, CorrectionError, correct_assignment_category
+from orgmetra_hris_kernel import (
+    AssignmentSupersessionFact,
+    CorrectionError,
+    correct_assignment_category,
+)
 
 SUPERSESSION = UUID("10000000-0000-7000-8000-000000000390")
 REPLACEMENT = UUID("10000000-0000-7000-8000-000000000391")
@@ -64,7 +68,7 @@ def _caller_recorded_at(zone: tzinfo) -> datetime:
 def test_category_correction_detaches_caller_timezone_before_returning_provenance(
     jordan_icu_assignment,
 ) -> None:
-    """Accepted recorded time must retain the instant without executable caller timezone state."""
+    """Accepted recorded time keeps the instant without executable caller timezone state."""
     predecessor = replace(jordan_icu_assignment, assignment_category_code="primary")
     caller_time = _caller_recorded_at(FixedCallerTimezone())
 
@@ -76,7 +80,11 @@ def test_category_correction_detaches_caller_timezone_before_returning_provenanc
         recorded_at=caller_time,
     )
 
-    for stored in (closed.recorded.end, replacement.recorded.start, supersession.recorded_at):
+    for stored in (
+        closed.recorded.end,
+        replacement.recorded.start,
+        supersession.recorded_at,
+    ):
         assert type(stored) is datetime
         assert type(stored.tzinfo) is timezone
         assert stored.utcoffset() == timedelta(hours=9)
@@ -85,7 +93,7 @@ def test_category_correction_detaches_caller_timezone_before_returning_provenanc
 def test_direct_supersession_construction_detaches_caller_timezone(
     jordan_icu_assignment,
 ) -> None:
-    """Direct provenance construction must apply the same fixed-offset detachment boundary."""
+    """Direct provenance construction applies the same fixed-offset detachment boundary."""
     predecessor = replace(jordan_icu_assignment, assignment_category_code="primary")
 
     supersession = AssignmentSupersessionFact(
@@ -109,7 +117,7 @@ def test_category_correction_rejects_untrusted_timezone_offset_evidence(
     jordan_icu_assignment,
     caller_timezone,
 ) -> None:
-    """Provider failure, missing offsets, and offset subtypes must share the domain error contract."""
+    """Reject provider failures, missing offsets, and executable offset subtypes."""
     predecessor = replace(jordan_icu_assignment, assignment_category_code="primary")
 
     with pytest.raises(CorrectionError, match="recorded_at"):
