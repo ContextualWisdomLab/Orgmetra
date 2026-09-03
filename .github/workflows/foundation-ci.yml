@@ -7,11 +7,17 @@ on:
       - bootstrap
       - main
       - feat/foundation-product-baseline
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
   push:
     branches:
       - bootstrap
       - main
       - feat/audit-outbox-envelope
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
   workflow_dispatch:
 
 permissions:
