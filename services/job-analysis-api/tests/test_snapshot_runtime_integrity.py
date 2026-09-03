@@ -10,8 +10,23 @@ import pytest
 
 from orgmetra_hris_kernel import AuditOutboxEvent, JobAnalysisSnapshot
 from orgmetra_job_analysis_api.postgres import PostgresJobAnalysisPort
-from orgmetra_job_analysis_api.snapshot import command_digest
-from fixtures import ANALYSIS, IDEMPOTENCY_KEY, TENANT, clinical_psychologist_snapshot
+from orgmetra_job_analysis_api.snapshot import (
+    JobAnalysisIntegrityError,
+    command_digest,
+    persist_job_analysis_snapshot,
+    read_job_analysis_snapshot,
+)
+from fixtures import (
+    ANALYSIS,
+    IDEMPOTENCY_KEY,
+    TENANT,
+    clinical_psychologist_document,
+    clinical_psychologist_snapshot,
+    read_policy,
+    read_principal,
+    write_policy,
+    write_principal,
+)
 
 _ACTOR_REFERENCE = "keyverse:actor-ja-1"
 _PURPOSE_CODE = "job_analysis_write"
@@ -40,6 +55,32 @@ class _SnapshotSubtype(JobAnalysisSnapshot):
     def content_digest(self) -> str:
         """Reject digest serialization if persistence validation is reordered."""
         raise AssertionError("snapshot subtype content_digest consumed before exact-type rejection")
+
+    def to_snapshot(self) -> dict[str, object]:
+        """Reject document export if a service consumes subtype behavior before validation."""
+        raise AssertionError("snapshot subtype to_snapshot consumed before exact-type rejection")
+
+
+class _ReturningWritePort:
+    """Return a configured persistence result without consuming it."""
+
+    def __init__(self, result: JobAnalysisSnapshot) -> None:
+        self.result = result
+
+    def persist_snapshot(self, **_: object) -> JobAnalysisSnapshot:
+        """Return the adversarial value exactly as a compromised adapter could."""
+        return self.result
+
+
+class _ReturningReadPort:
+    """Return a configured read result without consuming it."""
+
+    def __init__(self, result: JobAnalysisSnapshot) -> None:
+        self.result = result
+
+    def read_snapshot(self, **_: object) -> JobAnalysisSnapshot:
+        """Return the adversarial value exactly as a compromised adapter could."""
+        return self.result
 
 
 def _snapshot_subtype() -> JobAnalysisSnapshot:
@@ -109,4 +150,37 @@ def test_postgres_rejects_snapshot_subtype_before_fields_or_database() -> None:
             audit_event=_audit_event(base_snapshot),
             outbox_delivery_record_id=UUID("0198a412-6000-7000-8000-000000000412"),
             write_command_id=UUID("0198a412-6000-7000-8000-000000000413"),
+        )
+
+
+def test_persist_use_case_rejects_write_port_snapshot_subtype_before_export() -> None:
+    """The service must reject an executable persistence result before document export."""
+    with pytest.raises(
+        JobAnalysisIntegrityError,
+        match="persisted snapshot has an invalid runtime type",
+    ):
+        persist_job_analysis_snapshot(
+            principal=write_principal(),
+            tenant_record_id=TENANT,
+            document=clinical_psychologist_document(),
+            idempotency_key=IDEMPOTENCY_KEY,
+            purpose_code=_PURPOSE_CODE,
+            policy=write_policy(),
+            write_port=_ReturningWritePort(_snapshot_subtype()),
+        )
+
+
+def test_read_use_case_rejects_read_port_snapshot_subtype_before_fields_or_export() -> None:
+    """The service must reject an executable repository result before authority-field access."""
+    with pytest.raises(
+        JobAnalysisIntegrityError,
+        match="resolved snapshot has an invalid runtime type",
+    ):
+        read_job_analysis_snapshot(
+            principal=read_principal(),
+            tenant_record_id=TENANT,
+            analysis_record_id=ANALYSIS,
+            purpose_code="job_analysis_read",
+            policy=read_policy(),
+            read_port=_ReturningReadPort(_snapshot_subtype()),
         )
