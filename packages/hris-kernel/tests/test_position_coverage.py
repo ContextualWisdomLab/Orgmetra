@@ -166,6 +166,21 @@ def test_float_allocation_does_not_consume_icu_seat_capacity(
     )
 
 
+def test_nonfinite_allocation_does_not_reach_seat_total_comparison(
+    jordan_icu_assignment,
+) -> None:
+    """Seat capacity rejects non-finite stored ratios before summing them."""
+    invalid = replace(jordan_icu_assignment, allocation_ratio=Decimal("NaN"))
+    with pytest.raises(PositionSeatError, match="finite Decimals"):
+        validate_position_seat_capacity(
+            [invalid],
+            tenant_record_id=TENANT,
+            position_record_id=ICU_POSITION,
+            effective_on=date(2024, 5, 1),
+            known_at=utc(2024, 5, 1),
+        )
+
+
 def test_riley_may_take_the_remaining_icu_allocation(
     jordan_icu_assignment,
 ) -> None:

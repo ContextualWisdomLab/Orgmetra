@@ -12,6 +12,7 @@ Use this package to:
 6. Build a CloudEvents 1.0-compatible audit/outbox envelope that carries tenant, actor, purpose, reason, evidence version, result, and accountable human-confirmation references without copying mutable HR payload fields into a shadow system of record.
 7. Build a deterministic `JobAnalysisSnapshot` that links observable Tasks to explicit KSAO requirements, retains source/version/digest provenance, and optionally carries historical Functional Job Analysis Data/People/Things codes without confusing Job with Position or Assignment.
 8. Build a deterministic `WorkforceCompositionSnapshot` for one tenant, effective day, and recorded-time cutoff with distinct-person headcount, reportable employment count, staffed assignment count/FTE, unassigned-person count, and status counts without serializing row-level person, employment, position, or assignment identifiers.
+9. Build a deterministic `PositionVacancySnapshot` for one tenant, effective day, and recorded-time cutoff with vacant, partially staffed, fully staffed, and aggregate staffed-FTE evidence without serializing worker identifiers.
 
 Every historical reconstruction and portfolio/capacity decision requires an explicit `tenant_record_id`. A colliding durable identifier from another tenant is ignored rather than treated as local employment truth.
 

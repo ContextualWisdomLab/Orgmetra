@@ -133,6 +133,24 @@ def test_portfolio_rejects_non_positive_or_oversized_ratio(jordan_icu_assignment
         )
 
 
+@pytest.mark.parametrize("invalid_ratio", [Decimal("NaN"), 0.5])
+def test_portfolio_rejects_nonfinite_or_non_decimal_ratio(
+    jordan_icu_assignment,
+    invalid_ratio: object,
+) -> None:
+    """Stored ratios must remain finite Decimal values before comparison."""
+    invalid = replace(jordan_icu_assignment, allocation_ratio=invalid_ratio)
+    with pytest.raises(AssignmentPortfolioError, match="allocation_ratio"):
+        validate_assignment_portfolio(
+            [invalid],
+            tenant_record_id=TENANT,
+            person_record_id=JORDAN,
+            employment_record_id=JORDAN_EMPLOYMENT,
+            effective_on=date(2024, 5, 1),
+            known_at=utc(2024, 5, 1),
+        )
+
+
 def test_assignment_requires_covering_active_employment(
     jordan_icu_assignment,
     jordan_active_employment,
