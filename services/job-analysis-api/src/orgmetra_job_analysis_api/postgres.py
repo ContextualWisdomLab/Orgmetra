@@ -33,6 +33,7 @@ from orgmetra_job_analysis_api.snapshot import (
     JobAnalysisIntegrityError,
     JobAnalysisScopeMissing,
     _validate_idempotency_key,
+    command_digest,
     snapshot_from_document,
     validate_operational_uuid,
 )
@@ -395,6 +396,15 @@ class PostgresJobAnalysisPort:
             criterion_blueprint_id = validate_operational_uuid(
                 "criterion_blueprint_id",
                 criterion_blueprint_id,
+            )
+        expected_request_digest = command_digest(
+            snapshot=snapshot,
+            position_record_id=position_record_id,
+            criterion_blueprint_id=criterion_blueprint_id,
+        )
+        if request_digest != expected_request_digest:
+            raise JobAnalysisIntegrityError(
+                "request_digest does not match detached snapshot command"
             )
         expected_resource_reference = f"job_analysis_snapshot:{snapshot.analysis_record_id.hex}"
         if (
