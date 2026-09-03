@@ -49,14 +49,7 @@ def _require_recorded_at(value: object) -> datetime:
             "recorded_at must expose a stable UTC offset.",
             next_action="Use the database-owned correction timestamp with an explicit UTC offset.",
         )
-    try:
-        fixed_timezone = timezone(offset)
-    except (OverflowError, ValueError) as exc:
-        raise CorrectionError(
-            "recorded_at must expose a valid UTC offset.",
-            next_action="Use the database-owned correction timestamp with an explicit UTC offset.",
-        ) from exc
-    return value.replace(tzinfo=fixed_timezone)
+    return value.replace(tzinfo=timezone(offset))
 
 
 @dataclass(frozen=True, slots=True)
