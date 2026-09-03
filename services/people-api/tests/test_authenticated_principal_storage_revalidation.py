@@ -1,0 +1,87 @@
+"""Regression contracts for tuple-level principal storage revalidation."""
+
+from __future__ import annotations
+
+import unittest
+from uuid import UUID
+
+from orgmetra_people_api import AuthenticatedPrincipal
+
+TENANT = UUID("0198a412-6200-7000-8000-000000000001")
+SCOPE = "orgmetra.people.read"
+
+
+class _TextSubtype(str):
+    """Caller-controlled text runtime behavior that cannot become identity evidence."""
+
+
+class AuthenticatedPrincipalStorageRevalidationTests(unittest.TestCase):
+    """Require every public principal view to revalidate tuple-backed evidence."""
+
+    def test_tuple_constructor_bypass_cannot_publish_unvalidated_actor_evidence(self) -> None:
+        """A direct base-tuple constructor must not bypass actor runtime validation."""
+        forged = tuple.__new__(
+            AuthenticatedPrincipal,
+            (TENANT.int, _TextSubtype("keyverse:actor-1"), frozenset({SCOPE})),
+        )
+
+        with self.assertRaisesRegex(ValueError, "stored authentication evidence"):
+            _ = forged.actor_reference
+
+    def test_tuple_constructor_bypass_cannot_publish_unvalidated_scope_evidence(self) -> None:
+        """A direct base-tuple constructor must not bypass scope runtime validation."""
+        forged = tuple.__new__(
+            AuthenticatedPrincipal,
+            (TENANT.int, "keyverse:actor-1", frozenset({_TextSubtype(SCOPE)})),
+        )
+
+        with self.assertRaisesRegex(ValueError, "stored authentication evidence"):
+            _ = forged.granted_scope_codes
+
+    def test_tuple_constructor_bypass_cannot_publish_malformed_storage_shape(self) -> None:
+        """Malformed tuple arity must fail through the stable principal integrity contract."""
+        forged = tuple.__new__(AuthenticatedPrincipal, (TENANT.int, "keyverse:actor-1"))
+
+        with self.assertRaisesRegex(ValueError, "stored authentication evidence"):
+            _ = forged.tenant_record_id
+
+    def test_malformed_storage_cannot_participate_in_value_semantics(self) -> None:
+        """Hash, comparison, and repr must not legitimize malformed authentication evidence."""
+        forged = tuple.__new__(
+            AuthenticatedPrincipal,
+            (TENANT.int, object(), frozenset({SCOPE})),
+        )
+        canonical = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({SCOPE}),
+        )
+
+        with self.assertRaisesRegex(ValueError, "stored authentication evidence"):
+            hash(forged)
+        with self.assertRaisesRegex(ValueError, "stored authentication evidence"):
+            _ = forged == canonical
+        with self.assertRaisesRegex(ValueError, "stored authentication evidence"):
+            repr(forged)
+
+    def test_valid_tuple_storage_remains_value_compatible_without_claiming_provenance(self) -> None:
+        """Valid structural evidence stays readable without treating construction history as authority."""
+        structurally_valid = tuple.__new__(
+            AuthenticatedPrincipal,
+            (TENANT.int, "keyverse:actor-1", frozenset({SCOPE})),
+        )
+        canonical = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({SCOPE}),
+        )
+
+        self.assertEqual(structurally_valid.tenant_record_id, TENANT)
+        self.assertEqual(structurally_valid.actor_reference, "keyverse:actor-1")
+        self.assertEqual(structurally_valid.granted_scope_codes, frozenset({SCOPE}))
+        self.assertEqual(structurally_valid, canonical)
+        self.assertEqual(hash(structurally_valid), hash(canonical))
+
+
+if __name__ == "__main__":
+    unittest.main()
