@@ -393,10 +393,16 @@ def _validated_decision_snapshot(
         raise ValueError("allow decision must authorize exactly the requested fields.")
     if not allowed and authorized_fields:
         raise ValueError("deny decision must not authorize fields.")
-    if allowed and reason_code != "access_permitted":
-        raise ValueError("allow decision must use access_permitted reason.")
-    if not allowed and reason_code == "access_permitted":
-        raise ValueError("deny decision must not use access_permitted reason.")
+    if allowed:
+        if reason_code != "access_permitted":
+            raise ValueError("allow decision must use access_permitted reason.")
+        if next_action != _ALLOW_NEXT_ACTION:
+            raise ValueError("allow decision must use the canonical next action.")
+    else:
+        if reason_code not in _DENIAL_NEXT_ACTION:
+            raise ValueError("deny decision must use a known denial reason.")
+        if next_action != _DENIAL_NEXT_ACTION[reason_code]:
+            raise ValueError("deny decision must use the canonical next action.")
     return _DecisionSnapshot(
         allowed,
         tenant_int,
