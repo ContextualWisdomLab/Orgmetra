@@ -37,9 +37,11 @@ class SequentialIdFactory:
     """Return deterministic operational UUIDs for one correction request."""
 
     def __init__(self, values: tuple[UUID, ...] = IDS) -> None:
+        """Initialize the request-local UUID sequence."""
         self.values = iter(values)
 
     def __call__(self) -> UUID:
+        """Return the next deterministic operational UUID."""
         return next(self.values)
 
 
@@ -47,11 +49,13 @@ class FakeAuthenticator:
     """Return one configured principal or error while recording bearer-token use."""
 
     def __init__(self, principal: object, *, error: Exception | None = None) -> None:
+        """Configure the authentication result and optional backend failure."""
         self.principal = principal
         self.error = error
         self.tokens: list[str] = []
 
     async def authenticate(self, bearer_token: str) -> object:
+        """Record the bearer token and return the configured authentication result."""
         self.tokens.append(bearer_token)
         if self.error is not None:
             raise self.error
@@ -62,6 +66,7 @@ class RecordingCorrectionPort:
     """Capture authorized corrections or raise a configured persistence error."""
 
     def __init__(self, *, error: Exception | None = None) -> None:
+        """Initialize an empty correction ledger and optional persistence failure."""
         self.error = error
         self.calls: list[tuple[AssignmentCorrectionMutationCommand, object]] = []
 
@@ -71,6 +76,7 @@ class RecordingCorrectionPort:
         command: AssignmentCorrectionMutationCommand,
         authorization: object,
     ) -> AssignmentCorrectionMutationResult:
+        """Record one correction call and return its governed identities."""
         self.calls.append((command, authorization))
         if self.error is not None:
             raise self.error
@@ -84,6 +90,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
     """Prove the buyer-facing correction route is narrow, purpose-bound, and fail-closed."""
 
     def setUp(self) -> None:
+        """Build one authorized tenant principal and correction policy per test."""
         self.principal = AuthenticatedPrincipal(
             tenant_record_id=TENANT,
             actor_reference="keyverse_subject:operator-17",
@@ -92,6 +99,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         self.policy = self._policy()
 
     def _policy(self, *, purpose: str = "workforce_admin") -> PurposeBoundAccessPolicy:
+        """Return the exact field-scoped correction policy for the requested purpose."""
         return PurposeBoundAccessPolicy(
             tenant_record_id=TENANT,
             policy_version_code="assignment-correction-v1",
@@ -110,6 +118,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         content_type: bytes = b"application/json",
         idempotency: bool = True,
     ) -> list[tuple[bytes, bytes]]:
+        """Build one governed correction request header set."""
         headers = [
             (b"authorization", b"Bearer opaque-token"),
             (b"content-type", content_type),
@@ -129,6 +138,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         port: object | None = None,
         id_factory: object | None = None,
     ) -> AssignmentCorrectionAsgiApp:
+        """Build the correction ASGI app with optional boundary doubles."""
         return AssignmentCorrectionAsgiApp(
             authenticator=authenticator if authenticator is not None else FakeAuthenticator(self.principal),
             correction_policy=policy if policy is not None else self.policy,
@@ -145,6 +155,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         headers: object | None = None,
         body: object | None = None,
     ) -> tuple[int, dict[bytes, bytes], dict[str, object]]:
+        """Execute one in-memory ASGI correction request and decode its response."""
         payload = {
             "corrected_category_code": "concurrent_secondary",
             "confirmation_reference": "human_confirmation:review-42",
@@ -153,6 +164,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         messages: list[dict[str, object]] = []
 
         async def receive() -> dict[str, object]:
+            """Return one bounded ASGI request body frame."""
             return {
                 "type": "http.request",
                 "body": body if body is not None else json.dumps(payload).encode("utf-8"),
@@ -160,6 +172,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
             }
 
         async def send(message: dict[str, object]) -> None:
+            """Capture one ASGI response frame for assertions."""
             messages.append(message)
 
         await app(
@@ -177,6 +190,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         return int(start["status"]), dict(start["headers"]), json.loads(bytes(response["body"]))
 
     def test_path_body_and_command_helpers_fail_closed(self) -> None:
+        """Reject malformed routes and command bodies before governed service execution."""
         for path in (
             object(),
             "/v1/assignment-records",
@@ -217,6 +231,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(command.replacement_assignment_record_id, REPLACEMENT)
 
     def test_constructor_requires_every_governed_dependency(self) -> None:
+        """Reject missing or untyped authentication, policy, persistence, and ID dependencies."""
         with self.assertRaisesRegex(TypeError, "authenticator"):
             self._app(authenticator=object())
         with self.assertRaisesRegex(TypeError, "correction_policy"):
@@ -232,16 +247,20 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_non_http_scope_is_rejected_as_programming_error(self) -> None:
+        """Reject non-HTTP ASGI scopes instead of interpreting them as correction traffic."""
         async def receive() -> dict[str, object]:
+            """Return an unused request frame for the non-HTTP scope regression."""
             return {"type": "http.request", "body": b"{}", "more_body": False}
 
         async def send(message: dict[str, object]) -> None:
+            """Discard the response because non-HTTP scope handling must raise first."""
             del message
 
         with self.assertRaisesRegex(ValueError, "only HTTP"):
             await self._app()({"type": "websocket"}, receive, send)
 
     async def test_post_creates_linked_replacement_and_authorizes_only_category(self) -> None:
+        """Return linked correction identities after category-only authorization succeeds."""
         authenticator = FakeAuthenticator(self.principal)
         port = RecordingCorrectionPort()
         status, headers, payload = await self._request(self._app(authenticator=authenticator, port=port))
@@ -264,6 +283,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(authorization.requested_fields, frozenset({"assignment_category_code"}))
 
     async def test_request_edge_rejections_stop_before_authentication(self) -> None:
+        """Reject method, route, media-type, and header errors without invoking identity."""
         authenticator = FakeAuthenticator(self.principal)
         app = self._app(authenticator=authenticator)
         status, headers, payload = await self._request(app, method="GET")
@@ -277,6 +297,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(authenticator.tokens, [])
 
     async def test_authentication_and_principal_binding_fail_closed(self) -> None:
+        """Sanitize identity failures and bind actor and tenant to the authenticated principal."""
         denied = self._app(authenticator=FakeAuthenticator(self.principal, error=AuthenticationFailed("denied")))
         status, headers, payload = await self._request(denied)
         self.assertEqual((status, headers[b"www-authenticate"], payload["error_code"]), (401, b"Bearer", "authentication_required"))
@@ -297,6 +318,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((status, payload["error_code"]), (403, "access_denied"))
 
     async def test_body_and_identity_failures_return_bounded_client_errors(self) -> None:
+        """Map oversized, malformed, unsupported, and exhausted-ID requests to bounded 4xx errors."""
         app = self._app()
         status, _, payload = await self._request(app, body=b"{" + (b"x" * 65536) + b"}")
         self.assertEqual((status, payload["error_code"]), (413, "payload_too_large"))
@@ -321,6 +343,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
 
     async def test_authorization_integrity_and_backend_failures_are_sanitized(self) -> None:
+        """Map policy, kernel, integrity, and backend failures without leaking internal details."""
         status, _, payload = await self._request(self._app(policy=self._policy(purpose="different_admin")))
         self.assertEqual((status, payload["error_code"]), (403, "access_denied"))
         status, _, payload = await self._request(
@@ -342,6 +365,7 @@ class AssignmentCorrectionHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("database-secret", json.dumps(payload))
 
     def test_service_openapi_publishes_exact_correction_contract(self) -> None:
+        """Publish the correction route, scopes, headers, vocabulary, result, and error statuses."""
         schema = (Path(__file__).parents[1] / "assignment-correction.openapi.yaml").read_text(encoding="utf-8")
         self.assertIn("/assignment-records/{assignment_record_id}/category-corrections:", schema)
         self.assertIn("operationId: correctAssignmentRecordCategory", schema)
