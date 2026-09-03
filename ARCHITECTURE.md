@@ -105,3 +105,7 @@ The foundation starts as a monorepo with separately deployable services. Each se
 ## Security posture
 
 Access is tenant-, actor-, purpose-, resource-, and lifetime-scoped. High-impact decisions require preview, explicit human confirmation, versioned evidence, immutable decision records, and attributable audit events. LLM outputs are draft evidence only.
+
+## Kubernetes reference deployment boundary
+
+The active deployment lane carries the provider-neutral People API reference at `infrastructure/kubernetes/people-api-reference.json`. It is an architecture example for extracting the People API behind the same published API/data-ownership boundary; it does not authorize a release and does not make Kubernetes part of protected-branch runtime truth until this lane is integrated. The manifest keeps the image non-runnable until an immutable digest from an integrated protected revision is supplied, preserves Restricted Pod Security Admission and default-deny network isolation, and requires environment-specific node-CIDR, DNS, PostgreSQL, admission and CNI validation. No Kubernetes object may introduce direct cross-service application-table access or weaken Orgmetra's service-owned schema boundary.

@@ -1,0 +1,46 @@
+name: Kubernetes Reference Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kubernetes-reference-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kubernetes-reference:
+    name: Hardened reference deployment contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
+      - name: Set up Node.js LTS
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          check-latest: false
+      - name: Exercise hardened Kubernetes reference contract
+        run: node --test tests/kubernetes-reference.test.mjs
+      - name: Validate repository contracts
+        run: npm run validate
+      - name: Prove clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

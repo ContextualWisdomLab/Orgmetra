@@ -1,0 +1,297 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const REFERENCE_PATH = path.join(
+  ROOT,
+  "infrastructure",
+  "kubernetes",
+  "people-api-reference.json",
+);
+const README_PATH = path.join(ROOT, "infrastructure", "kubernetes", "README.md");
+const IMAGE_SENTINEL =
+  "ghcr.io/contextualwisdomlab/orgmetra-people-api@sha256:__REPLACE_WITH_VERIFIED_64_HEX_DIGEST__";
+
+function referenceDocument() {
+  return JSON.parse(fs.readFileSync(REFERENCE_PATH, "utf8"));
+}
+
+function resource(document, kind, name) {
+  const match = document.items.find(
+    (item) => item.kind === kind && item.metadata?.name === name,
+  );
+  assert.ok(match, `missing ${kind}/${name}`);
+  return match;
+}
+
+function peopleContainer(document) {
+  const deployment = resource(document, "Deployment", "orgmetra-people-api");
+  assert.equal(deployment.spec.template.spec.containers.length, 1);
+  return deployment.spec.template.spec.containers[0];
+}
+
+// RFC 5737 TEST-NET-1 placeholder: operators MUST replace it with the exact
+// node CIDR their kubelet probes originate from before server-side apply.
+const PROBE_CIDR_PLACEHOLDER = "192.0.2.0/24";
+
+test("kubelet probe ingress is explicitly permitted", () => {
+  const document = referenceDocument();
+  const policy = resource(document, "NetworkPolicy", "orgmetra-people-api-access");
+  const probeRules = (policy.spec.ingress ?? []).filter((rule) =>
+    (rule.from ?? []).some((source) => "ipBlock" in source),
+  );
+  assert.equal(probeRules.length, 1);
+  assert.deepEqual(probeRules[0].from, [{ ipBlock: { cidr: PROBE_CIDR_PLACEHOLDER } }]);
+  assert.deepEqual(probeRules[0].ports, [{ protocol: "TCP", port: 8080 }]);
+});
+
+test("read-only root filesystem has a dedicated writable tmp scratch volume", () => {
+  const document = referenceDocument();
+  const deployment = resource(document, "Deployment", "orgmetra-people-api");
+  const podSpec = deployment.spec.template.spec;
+  const scratchVolumes = podSpec.volumes.filter(
+    (volume) => volume.name === "tmp-scratch",
+  );
+  assert.equal(scratchVolumes.length, 1);
+  assert.deepEqual(scratchVolumes[0].emptyDir, {});
+  for (const volume of podSpec.volumes) {
+    assert.equal("hostPath" in volume, false, "hostPath volumes are forbidden");
+  }
+  const container = peopleContainer(document);
+  const mounts = container.volumeMounts.filter(
+    (mount) => mount.mountPath === "/tmp",
+  );
+  assert.equal(mounts.length, 1);
+  assert.deepEqual(mounts[0], { name: "tmp-scratch", mountPath: "/tmp" });
+});
+
+test("reference contains the bounded deployment resource set", () => {
+  const document = referenceDocument();
+  assert.equal(document.apiVersion, "v1");
+  assert.equal(document.kind, "List");
+  assert.equal(document.items.length, 7);
+
+  resource(document, "Namespace", "orgmetra-system");
+  resource(document, "ServiceAccount", "orgmetra-people-api");
+  resource(document, "Deployment", "orgmetra-people-api");
+  resource(document, "Service", "orgmetra-people-api");
+  resource(document, "PodDisruptionBudget", "orgmetra-people-api");
+  resource(document, "NetworkPolicy", "orgmetra-default-deny");
+  resource(document, "NetworkPolicy", "orgmetra-people-api-access");
+});
+
+test("namespace and workload align with restricted pod-security intent", () => {
+  const document = referenceDocument();
+  const namespace = resource(document, "Namespace", "orgmetra-system");
+  assert.equal(
+    namespace.metadata.labels["pod-security.kubernetes.io/enforce"],
+    "restricted",
+  );
+  assert.equal(
+    namespace.metadata.labels["pod-security.kubernetes.io/audit"],
+    "restricted",
+  );
+  assert.equal(
+    namespace.metadata.labels["pod-security.kubernetes.io/warn"],
+    "restricted",
+  );
+
+  const serviceAccount = resource(
+    document,
+    "ServiceAccount",
+    "orgmetra-people-api",
+  );
+  assert.equal(serviceAccount.automountServiceAccountToken, false);
+
+  const deployment = resource(document, "Deployment", "orgmetra-people-api");
+  const podSpec = deployment.spec.template.spec;
+  assert.equal(podSpec.automountServiceAccountToken, false);
+  assert.equal(podSpec.serviceAccountName, "orgmetra-people-api");
+  assert.equal(podSpec.hostNetwork, false);
+  assert.equal(podSpec.hostPID, false);
+  assert.equal(podSpec.hostIPC, false);
+  assert.equal(podSpec.enableServiceLinks, false);
+  assert.equal(podSpec.securityContext.runAsNonRoot, true);
+  assert.deepEqual(podSpec.securityContext.seccompProfile, {
+    type: "RuntimeDefault",
+  });
+
+  for (const volume of podSpec.volumes ?? []) {
+    assert.equal("hostPath" in volume, false, "hostPath volumes are forbidden");
+  }
+
+  const container = peopleContainer(document);
+  assert.equal(container.image, IMAGE_SENTINEL);
+  assert.equal(container.imagePullPolicy, "IfNotPresent");
+  assert.equal(container.securityContext.privileged, false);
+  assert.equal(container.securityContext.allowPrivilegeEscalation, false);
+  assert.equal(container.securityContext.readOnlyRootFilesystem, true);
+  assert.deepEqual(container.securityContext.capabilities, { drop: ["ALL"] });
+  assert.equal("hostPort" in container.ports[0], false);
+});
+
+test("pod-security policy behavior is pinned to the authored Kubernetes minor", () => {
+  const document = referenceDocument();
+  const namespace = resource(document, "Namespace", "orgmetra-system");
+  for (const mode of ["enforce", "audit", "warn"]) {
+    assert.equal(
+      namespace.metadata.labels[`pod-security.kubernetes.io/${mode}-version`],
+      "v1.37",
+      `${mode} Pod Security policy must not drift with an implicit latest version`,
+    );
+  }
+});
+
+test("health probes preserve liveness/readiness separation", () => {
+  const document = referenceDocument();
+  const container = peopleContainer(document);
+
+  assert.deepEqual(container.startupProbe.httpGet, {
+    path: "/health",
+    port: "http",
+    scheme: "HTTP",
+  });
+  assert.equal(container.startupProbe.periodSeconds, 5);
+  assert.equal(container.startupProbe.failureThreshold, 24);
+
+  assert.deepEqual(container.livenessProbe.httpGet, {
+    path: "/health",
+    port: "http",
+    scheme: "HTTP",
+  });
+  assert.equal(container.livenessProbe.periodSeconds, 10);
+  assert.equal(container.livenessProbe.failureThreshold, 3);
+
+  assert.deepEqual(container.readinessProbe.httpGet, {
+    path: "/ready",
+    port: "http",
+    scheme: "HTTP",
+  });
+  assert.equal(container.readinessProbe.periodSeconds, 5);
+  assert.equal(container.readinessProbe.failureThreshold, 2);
+});
+
+test("deployment bounds resources and voluntary disruption", () => {
+  const document = referenceDocument();
+  const deployment = resource(document, "Deployment", "orgmetra-people-api");
+  const container = peopleContainer(document);
+
+  assert.equal(deployment.spec.replicas, 2);
+  assert.equal(deployment.spec.minReadySeconds, 10);
+  assert.equal(deployment.spec.progressDeadlineSeconds, 300);
+  assert.equal(deployment.spec.revisionHistoryLimit, 5);
+  assert.deepEqual(deployment.spec.strategy, {
+    type: "RollingUpdate",
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 },
+  });
+  assert.deepEqual(container.resources, {
+    requests: { cpu: "100m", memory: "128Mi", "ephemeral-storage": "64Mi" },
+    limits: { cpu: "1", memory: "512Mi", "ephemeral-storage": "256Mi" },
+  });
+
+  const pdb = resource(document, "PodDisruptionBudget", "orgmetra-people-api");
+  assert.equal(pdb.apiVersion, "policy/v1");
+  assert.equal(pdb.spec.maxUnavailable, 1);
+  assert.deepEqual(pdb.spec.selector, {
+    matchLabels: { "app.kubernetes.io/name": "orgmetra-people-api" },
+  });
+});
+
+test("network policy is default-deny with explicit People API flows", () => {
+  const document = referenceDocument();
+  const deny = resource(document, "NetworkPolicy", "orgmetra-default-deny");
+  assert.deepEqual(deny.spec.podSelector, {});
+  assert.deepEqual(deny.spec.policyTypes, ["Ingress", "Egress"]);
+  assert.deepEqual(deny.spec.ingress, []);
+  assert.deepEqual(deny.spec.egress, []);
+
+  const access = resource(
+    document,
+    "NetworkPolicy",
+    "orgmetra-people-api-access",
+  );
+  assert.deepEqual(access.spec.policyTypes, ["Ingress", "Egress"]);
+  assert.deepEqual(access.spec.podSelector, {
+    matchLabels: { "app.kubernetes.io/name": "orgmetra-people-api" },
+  });
+
+  assert.deepEqual(access.spec.ingress, [
+    {
+      from: [
+        {
+          podSelector: {
+            matchLabels: { "orgmetra.cwl/people-api-client": "true" },
+          },
+        },
+      ],
+      ports: [{ protocol: "TCP", port: 8080 }],
+    },
+    {
+      from: [{ ipBlock: { cidr: PROBE_CIDR_PLACEHOLDER } }],
+      ports: [{ protocol: "TCP", port: 8080 }],
+    },
+  ]);
+
+  assert.deepEqual(access.spec.egress, [
+    {
+      to: [
+        {
+          podSelector: {
+            matchLabels: { "app.kubernetes.io/name": "orgmetra-postgres" },
+          },
+        },
+      ],
+      ports: [{ protocol: "TCP", port: 5432 }],
+    },
+    {
+      to: [
+        {
+          namespaceSelector: {
+            matchLabels: { "kubernetes.io/metadata.name": "kube-system" },
+          },
+          podSelector: { matchLabels: { "k8s-app": "kube-dns" } },
+        },
+      ],
+      ports: [
+        { protocol: "UDP", port: 53 },
+        { protocol: "TCP", port: 53 },
+      ],
+    },
+  ]);
+});
+
+test("reference documentation keeps digest resolution and database egress fail-closed", () => {
+  const text = fs.readFileSync(README_PATH, "utf8");
+  assert.match(text, /verified 64-character lowercase SHA-256 image digest/i);
+  assert.match(text, /does not authorize a release/i);
+  assert.match(text, /managed PostgreSQL/i);
+  assert.match(text, /replace the database egress rule/i);
+  assert.match(text, /NetworkPolicy-capable CNI/i);
+  assert.match(text, /kubectl apply --dry-run=server/i);
+  assert.match(text, /pod-security\.kubernetes\.io\/enforce=restricted/i);
+  assert.match(text, /fresh target cluster/i);
+  assert.match(text, /temporary validation namespace/i);
+  assert.match(text, /kubectl create namespace/i);
+  assert.match(text, /kubectl delete namespace/i);
+});
+
+test("canonical buyer-facing docs track the Kubernetes reference deployment boundary", () => {
+  for (const relativePath of [
+    "ARCHITECTURE.md",
+    "CHANGELOG.md",
+    "docs/OPERABILITY.md",
+    "docs/SECURITY.md",
+    "docs/TEST_STRATEGY.md",
+    "docs/TRACEABILITY.md",
+  ]) {
+    const text = fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+    assert.match(
+      text,
+      /infrastructure\/kubernetes\/people-api-reference\.json/i,
+      `${relativePath} must identify the governed Kubernetes reference artifact`,
+    );
+  }
+});
