@@ -69,6 +69,15 @@ def test_decision_detaches_caller_owned_exact_uuid() -> None:
     assert decision.tenant_record_id == TENANT
 
 
+@pytest.mark.parametrize("forged_int", [-1, 1 << 128, "invalid"])
+def test_decision_rejects_low_level_corrupted_exact_uuid(forged_int: object) -> None:
+    """An exact UUID object with corrupted internal integer state is not valid tenant evidence."""
+    tenant = UUID(str(TENANT))
+    object.__setattr__(tenant, "int", forged_int)
+    with pytest.raises(ValueError, match="tenant_record_id must contain a valid UUID integer"):
+        _decision(tenant_record_id=tenant)
+
+
 def test_decision_rejects_non_boolean_allowed_flag() -> None:
     """Do not let truthy integers masquerade as an authorization verdict."""
     with pytest.raises(ValueError, match="allowed must be a boolean"):
