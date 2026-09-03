@@ -478,6 +478,15 @@ class PostgresJobAnalysisPort:
                     )
                     if replayed is None:
                         raise JobAnalysisIntegrityError("idempotent command lost its snapshot")
+                    replayed_digest = command_digest(
+                        snapshot=replayed,
+                        position_record_id=position_record_id,
+                        criterion_blueprint_id=criterion_blueprint_id,
+                    )
+                    if replayed_digest != request_digest:
+                        raise JobAnalysisIntegrityError(
+                            "idempotent replay snapshot does not match recorded command digest"
+                        )
                     return replayed
 
                 try:
