@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pickle
 import unittest
 from uuid import UUID
 
@@ -95,6 +96,32 @@ class AuthenticatedPrincipalRuntimeTypeTests(unittest.TestCase):
         self.assertEqual(principal.tenant_record_id, TENANT)
         self.assertEqual(principal.actor_reference, "keyverse:actor-ja-1")
         self.assertEqual(principal.granted_scope_codes, frozenset({SCOPE}))
+
+    def test_structural_storage_preserves_value_object_semantics(self) -> None:
+        """Structural immutability must not collapse the principal into a raw tuple value."""
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-ja-1",
+            granted_scope_codes=frozenset({SCOPE}),
+        )
+        equivalent = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-ja-1",
+            granted_scope_codes=frozenset({SCOPE}),
+        )
+        raw_tuple = (TENANT, "keyverse:actor-ja-1", frozenset({SCOPE}))
+
+        self.assertEqual(principal, equivalent)
+        self.assertEqual(hash(principal), hash(equivalent))
+        self.assertNotEqual(principal, raw_tuple)
+        self.assertNotEqual(raw_tuple, principal)
+        self.assertEqual(pickle.loads(pickle.dumps(principal)), principal)
+        self.assertEqual(
+            repr(principal),
+            "AuthenticatedPrincipal("
+            f"tenant_record_id={TENANT!r}, actor_reference='keyverse:actor-ja-1', "
+            f"granted_scope_codes={frozenset({SCOPE})!r})",
+        )
 
     def test_rejects_corrupted_exact_uuid_state(self) -> None:
         """An exact UUID with an invalid internal integer cannot become identity evidence."""
