@@ -96,7 +96,7 @@ class ValidatedCalendarIntent:
 
 def _require_uuid(value: object, label: str) -> str:
     """Return one canonical UUID string or reject malformed/non-canonical input."""
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ContractViolation(f"{label} must be a canonical UUID")
     try:
         parsed = UUID(value)
@@ -110,21 +110,21 @@ def _require_uuid(value: object, label: str) -> str:
 
 def _require_token(value: object, label: str) -> str:
     """Return a bounded printable token suitable for contract metadata."""
-    if not isinstance(value, str) or not _TOKEN_PATTERN.fullmatch(value):
+    if type(value) is not str or not _TOKEN_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} must be a bounded opaque token")
     return value
 
 
 def _require_code(value: object, label: str) -> str:
     """Return a bounded lowercase machine code used for purpose/reason metadata."""
-    if not isinstance(value, str) or not _CODE_PATTERN.fullmatch(value):
+    if type(value) is not str or not _CODE_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} must be a bounded lowercase code")
     return value
 
 
 def _require_resource_reference(value: object) -> str:
     """Validate an Orgmetra opaque record reference without dereferencing PII."""
-    if not isinstance(value, str) or value.count(":") != 1:
+    if type(value) is not str or value.count(":") != 1:
         raise ContractViolation("resource_reference must be a namespaced UUID reference")
     namespace, identifier = value.split(":", 1)
     if namespace not in _RESOURCE_NAMESPACES:
@@ -134,15 +134,18 @@ def _require_resource_reference(value: object) -> str:
 
 def _validate_context(context: CalendarIntentContext) -> tuple[str, str | None]:
     """Validate all local authorization/audit evidence before building an intent."""
+    if type(context) is not CalendarIntentContext:
+        raise ContractViolation("calendar intent context must be the governed context type")
     _require_uuid(context.tenant_record_id, "tenant_record_id")
     _require_resource_reference(context.resource_reference)
     _require_token(context.actor_reference, "actor_reference")
     _require_code(context.purpose_code, "purpose_code")
     _require_code(context.reason_code, "reason_code")
     _require_token(context.evidence_version, "evidence_version")
+    action_kind = _require_code(context.action_kind, "action kind")
     if context.human_confirmed is not True:
         raise ContractViolation("calendar intent requires explicit human confirmation")
-    summary = _ACTION_SUMMARIES.get(context.action_kind)
+    summary = _ACTION_SUMMARIES.get(action_kind)
     if summary is None:
         raise ContractViolation("calendar intent action kind is not supported")
     target_source_id = (
@@ -200,6 +203,15 @@ def _require_response_token(response: Mapping[str, object], key: str) -> str:
     return _require_token(response.get(key), key)
 
 
+def _require_exact_response_value(
+    response: Mapping[str, object], key: str, expected: object, message: str
+) -> None:
+    """Require one response literal to use the exact reviewed type and value."""
+    actual = response.get(key)
+    if type(actual) is not type(expected) or actual != expected:
+        raise ContractViolation(message)
+
+
 def validate_calendar_intent_response(
     plan: CalendarIntentPlan, response: Mapping[str, object]
 ) -> ValidatedCalendarIntent:
@@ -215,20 +227,36 @@ def validate_calendar_intent_response(
         raise ContractViolation(
             "calendar intent target source differs from the requested target source"
         )
-    if response.get("protocol") != "caldav":
-        raise ContractViolation("calendar intent protocol must remain caldav")
-    if response.get("writeback_mode") != "customer_owned":
-        raise ContractViolation("calendar intent writeback mode must remain customer_owned")
-    if response.get("requires_if_match") is not False or response.get("if_match") is not None:
-        raise ContractViolation("create intent must not require or carry If-Match")
-    if response.get("audit_event") != "calendar.writeback_intent.created":
-        raise ContractViolation(
-            "calendar intent audit event is not the reviewed intent-only event"
-        )
-    if response.get("provider_write_executed") is not False:
-        raise ContractViolation("calendar intent unexpectedly reports provider execution")
-    if response.get("status") != "intent_ready":
-        raise ContractViolation("calendar intent status is not intent_ready")
+    _require_exact_response_value(
+        response, "protocol", "caldav", "calendar intent protocol must remain caldav"
+    )
+    _require_exact_response_value(
+        response,
+        "writeback_mode",
+        "customer_owned",
+        "calendar intent writeback mode must remain customer_owned",
+    )
+    _require_exact_response_value(
+        response, "requires_if_match", False, "create intent must not require or carry If-Match"
+    )
+    _require_exact_response_value(
+        response, "if_match", None, "create intent must not require or carry If-Match"
+    )
+    _require_exact_response_value(
+        response,
+        "audit_event",
+        "calendar.writeback_intent.created",
+        "calendar intent audit event is not the reviewed intent-only event",
+    )
+    _require_exact_response_value(
+        response,
+        "provider_write_executed",
+        False,
+        "calendar intent unexpectedly reports provider execution",
+    )
+    _require_exact_response_value(
+        response, "status", "intent_ready", "calendar intent status is not intent_ready"
+    )
 
     execution_fields = (
         "runner_request_id",
@@ -247,8 +275,12 @@ def validate_calendar_intent_response(
     source_provider = _require_token(
         provenance.get("source_provider"), "source_provider"
     )
-    if provenance.get("source_protocol") != "caldav":
-        raise ContractViolation("calendar intent provenance protocol must remain caldav")
+    _require_exact_response_value(
+        provenance,
+        "source_protocol",
+        "caldav",
+        "calendar intent provenance protocol must remain caldav",
+    )
     # Validate Naruon's authoritative subject without collapsing it into Keyverse identity.
     del created_by
 
