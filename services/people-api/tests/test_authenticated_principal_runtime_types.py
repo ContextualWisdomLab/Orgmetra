@@ -75,6 +75,27 @@ class AuthenticatedPrincipalRuntimeTypeTests(unittest.TestCase):
         self.assertEqual(principal.tenant_record_id, TENANT)
         self.assertIsNot(principal.tenant_record_id, tenant_record_id)
 
+    def test_principal_evidence_cannot_be_rewritten_after_authentication(self) -> None:
+        """Low-level writes must not replace authenticated evidence on a live principal."""
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({SCOPE}),
+        )
+        cases = (
+            ("tenant_record_id", OTHER_TENANT),
+            ("actor_reference", "keyverse:actor-2"),
+            ("granted_scope_codes", frozenset({"orgmetra.people.write"})),
+        )
+
+        for field_name, replacement in cases:
+            with self.subTest(field_name=field_name), self.assertRaises((AttributeError, TypeError)):
+                object.__setattr__(principal, field_name, replacement)
+
+        self.assertEqual(principal.tenant_record_id, TENANT)
+        self.assertEqual(principal.actor_reference, "keyverse:actor-1")
+        self.assertEqual(principal.granted_scope_codes, frozenset({SCOPE}))
+
     def test_rejects_corrupted_exact_uuid_state(self) -> None:
         """An exact UUID with an invalid internal integer cannot become identity evidence."""
         tenant_record_id = UUID(TENANT.hex)
