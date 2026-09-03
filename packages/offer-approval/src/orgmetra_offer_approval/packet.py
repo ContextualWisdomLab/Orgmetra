@@ -8,12 +8,15 @@ assessment scores, and free-form model output remain outside this envelope.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
+from hmac import compare_digest, new as hmac_new
 import json
 import re
+from secrets import token_bytes
 from uuid import UUID
+from weakref import WeakValueDictionary
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -33,10 +36,15 @@ _NEXT_ACTION = (
     "provenance before recording accountable human approval through the authoritative offer "
     "workflow and before communicating or executing the offer."
 )
+_RUNTIME_EVIDENCE_KEY = token_bytes(32)
+_CONSTRUCTING_PACKET_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
+_ISSUED_PACKET_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
-    """Require canonical non-sentinel UUID text owned by the authoritative HRIS."""
+    """Require exact built-in canonical non-sentinel authoritative HRIS UUID text."""
+    if type(value) is not str:
+        raise ValueError(f"{field_name} must be canonical UUID text")
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as exc:
@@ -46,16 +54,16 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
 
 
 def _validate_code(value: str, field_name: str) -> None:
-    """Require a bounded descriptive lower snake_case governance code."""
-    if not isinstance(value, str) or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
+    """Require exact built-in bounded descriptive lower snake_case governance text."""
+    if type(value) is not str or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be bounded two-or-more-word lower snake_case")
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
-    """Require an expected namespace plus a canonical opaque UUIDv4 suffix."""
+    """Require an exact built-in expected namespace plus canonical opaque UUIDv4 suffix."""
     error_message = f"{field_name} must be an opaque {prefix}: reference"
     if (
-        not isinstance(value, str)
+        type(value) is not str
         or len(value) > 160
         or not _REFERENCE_PATTERN.fullmatch(value)
         or not value.startswith(f"{prefix}:")
@@ -76,11 +84,27 @@ def _validate_digest(value: str, field_name: str) -> None:
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
+def _freeze_timestamp(value: datetime) -> datetime:
+    """Detach caller-controlled timezone behavior and store one immutable UTC instant."""
+    if type(value) is not datetime or value.tzinfo is None:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
+    if type(offset) is not timedelta:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    try:
+        return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime") from exc
+
+
 def _canonical_timestamp(value: datetime) -> str:
-    """Render an aware instant as precision-preserving UTC RFC 3339 text."""
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("generated_at must be timezone-aware")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    """Render only a previously detached built-in UTC instant as RFC 3339 text."""
+    if type(value) is not datetime or value.tzinfo is not timezone.utc:
+        raise ValueError("generated_at must be an exact timezone-aware datetime")
+    return value.isoformat().replace("+00:00", "Z")
 
 
 def _validate_evidence_version(value: int) -> None:
@@ -89,7 +113,22 @@ def _validate_evidence_version(value: int) -> None:
         raise ValueError("evidence_version must be an integer from 1 through 2147483647")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
+def _validate_fixed_text(value: str, expected: str, field_name: str) -> None:
+    """Require exact built-in text for immutable fixed governance evidence."""
+    if type(value) is not str or value != expected:
+        raise ValueError(f"{field_name} must remain {expected}")
+
+
+def _seal_canonical_json(canonical_json: str) -> bytes:
+    """Bind one issued packet to its exact in-process canonical audit bytes."""
+    return hmac_new(
+        _RUNTIME_EVIDENCE_KEY,
+        canonical_json.encode("utf-8"),
+        sha256,
+    ).digest()
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True, repr=False)
 class OfferApprovalPacket:
     """Immutable value-free offer review packet awaiting accountable approval."""
 
@@ -118,13 +157,37 @@ class OfferApprovalPacket:
     review_state: str = _REVIEW_STATE
     delivery_state: str = _DELIVERY_STATE
     next_action: str = _NEXT_ACTION
+    _issuance_seal: bytes = field(init=False, repr=False, compare=False)
+
+    def __new__(cls, *_args: object, **_kwargs: object) -> OfferApprovalPacket:
+        """Mark only instances created through the governed class constructor as eligible."""
+        instance = object.__new__(cls)
+        _CONSTRUCTING_PACKET_IDENTITIES[id(instance)] = instance
+        return instance
 
     def __repr__(self) -> str:
         """Return a representation that never emits candidate or compensation evidence."""
         return "OfferApprovalPacket(<redacted>)"
 
+    def __copy__(self) -> OfferApprovalPacket:
+        """Return this immutable issued packet without minting a new evidence identity."""
+        return self
+
+    def __deepcopy__(self, memo: dict[int, object]) -> OfferApprovalPacket:
+        """Return this immutable issued packet without minting a new evidence identity."""
+        memo[id(self)] = self
+        return self
+
+    def __reduce_ex__(self, protocol: int) -> object:
+        """Reject pickle because process-local issuance identity cannot cross serialization."""
+        raise TypeError("offer approval evidence cannot be pickled")
+
     def __post_init__(self) -> None:
         """Fail closed when direct construction drifts from the governed contract."""
+        if _ISSUED_PACKET_IDENTITIES.get(id(self)) is self:
+            raise ValueError("offer approval evidence cannot be reissued")
+        if _CONSTRUCTING_PACKET_IDENTITIES.get(id(self)) is not self:
+            raise ValueError("offer approval evidence must use governed construction")
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.offer_approval_reference,
@@ -163,12 +226,11 @@ class OfferApprovalPacket:
         if self.requester_reference == self.approver_reference:
             raise ValueError("approver_reference must identify a different accountable actor")
         _validate_code(self.purpose_code, "purpose_code")
-        if self.purpose_code != _PURPOSE_CODE:
-            raise ValueError("purpose_code must remain offer_approval_review")
+        _validate_fixed_text(self.purpose_code, _PURPOSE_CODE, "purpose_code")
         _validate_code(self.reason_code, "reason_code")
         if self.reason_code not in _ALLOWED_REASON_CODES:
             raise ValueError("reason_code must use a reviewed non-sensitive offer reason")
-        _canonical_timestamp(self.generated_at)
+        object.__setattr__(self, "generated_at", _freeze_timestamp(self.generated_at))
         _validate_evidence_version(self.evidence_version)
         if self.contains_candidate_pii is not False:
             raise ValueError("offer approval packet must not contain candidate PII")
@@ -176,17 +238,21 @@ class OfferApprovalPacket:
             raise ValueError("offer approval packet must not contain compensation values")
         if self.human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory before offer approval")
-        if self.decision_authority != _DECISION_AUTHORITY:
-            raise ValueError("decision_authority must remain human_approval_only")
-        if self.review_state != _REVIEW_STATE:
-            raise ValueError("review_state must remain requires_human_approval")
-        if self.delivery_state != _DELIVERY_STATE:
-            raise ValueError("delivery_state must remain not_authorized_to_send")
-        if self.next_action != _NEXT_ACTION:
+        _validate_fixed_text(self.decision_authority, _DECISION_AUTHORITY, "decision_authority")
+        _validate_fixed_text(self.review_state, _REVIEW_STATE, "review_state")
+        _validate_fixed_text(self.delivery_state, _DELIVERY_STATE, "delivery_state")
+        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed offer-approval instruction")
+        object.__setattr__(
+            self,
+            "_issuance_seal",
+            _seal_canonical_json(self._canonical_json_unchecked()),
+        )
+        _ISSUED_PACKET_IDENTITIES[id(self)] = self
+        _CONSTRUCTING_PACKET_IDENTITIES.pop(id(self), None)
 
-    def canonical_json(self) -> str:
-        """Return deterministic canonical JSON for immutable audit correlation."""
+    def _canonical_json_unchecked(self) -> str:
+        """Render current fields only after construction-time contract validation."""
         payload = {
             "approver_reference": self.approver_reference,
             "candidate_profile_reference": self.candidate_profile_reference,
@@ -215,6 +281,19 @@ class OfferApprovalPacket:
             "tenant_record_id": self.tenant_record_id,
         }
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    def canonical_json(self) -> str:
+        """Return deterministic canonical JSON only while issued evidence remains intact."""
+        if _ISSUED_PACKET_IDENTITIES.get(id(self)) is not self:
+            raise ValueError("offer approval evidence was not issued by governed construction")
+        current = self._canonical_json_unchecked()
+        issuance_seal = getattr(self, "_issuance_seal", None)
+        if type(issuance_seal) is not bytes or not compare_digest(
+            issuance_seal,
+            _seal_canonical_json(current),
+        ):
+            raise ValueError("offer approval evidence changed after issuance")
+        return current
 
     def sha256_digest(self) -> str:
         """Return SHA-256 over the exact canonical UTF-8 offer-approval packet."""
