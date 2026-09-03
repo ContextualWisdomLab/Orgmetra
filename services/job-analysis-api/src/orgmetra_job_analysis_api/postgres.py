@@ -192,13 +192,23 @@ def _source_params(source: EvidenceSource) -> tuple[object, ...]:
     )
 
 
-def _validate_durable_command_scalars(*, idempotency_key: object, request_digest: object) -> None:
+def _validate_durable_command_scalars(
+    *,
+    idempotency_key: object,
+    request_digest: object,
+    actor_reference: object,
+    purpose_code: object,
+) -> None:
     """Reject malformed durable command text before acquiring PostgreSQL resources."""
     if type(idempotency_key) is not str:
         raise ValueError("idempotency_key must be exact built-in text.")
     _validate_idempotency_key(idempotency_key)
     if type(request_digest) is not str or _REQUEST_DIGEST_PATTERN.fullmatch(request_digest) is None:
         raise ValueError("request_digest must be an exact lowercase SHA-256 digest.")
+    if type(actor_reference) is not str:
+        raise ValueError("actor_reference must be exact built-in text.")
+    if type(purpose_code) is not str:
+        raise ValueError("purpose_code must be exact built-in text.")
 
 
 def _is_unique_violation(error: Exception) -> bool:
@@ -256,6 +266,8 @@ class PostgresJobAnalysisPort:
         _validate_durable_command_scalars(
             idempotency_key=idempotency_key,
             request_digest=request_digest,
+            actor_reference=actor_reference,
+            purpose_code=purpose_code,
         )
         write_command_id = validate_operational_uuid("write_command_id", write_command_id)
         outbox_delivery_record_id = validate_operational_uuid(
