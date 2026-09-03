@@ -30,12 +30,14 @@ class SupportReferenceResponsePrivacyTests(unittest.IsolatedAsyncioTestCase):
             mutation_port=_SUPPORT.FailingHirePort(),
         )
         payload = {
+            "employing_organization_unit_id": str(_SUPPORT.ORGANIZATION),
             "candidate_profile_id": str(_SUPPORT.CANDIDATE),
             "selection_decision_id": str(_SUPPORT.DECISION),
             "person_record_id": str(_SUPPORT.PERSON),
             "person_name_record_id": "0198a412-9900-7000-8000-000000000021",
             "employment_record_id": str(_SUPPORT.EMPLOYMENT),
             "employment_record_version_id": "0198a412-9900-7000-8000-000000000031",
+            "employment_employing_organization_record_id": "0198a412-9900-7000-8000-000000000032",
             "candidate_worker_conversion_record_id": "0198a412-9900-7000-8000-000000000040",
             "audit_event_record_id": str(_SUPPORT.AUDIT_EVENT),
             "outbox_delivery_record_id": "0198a412-9900-7000-8000-000000000051",
@@ -74,6 +76,7 @@ class SupportReferenceResponsePrivacyTests(unittest.IsolatedAsyncioTestCase):
             id_factory=_SUPPORT.SequentialIdFactory(),
         )
         payload = {
+            "employing_organization_unit_id": str(_SUPPORT.ORGANIZATION),
             "person_record_id": str(_SUPPORT.PERSON),
             "employment_status_code": "active",
             "employment_concurrency_code": "exclusive",

@@ -20,6 +20,8 @@ def _valid_payload() -> dict[str, object]:
         "person_name_record_id": "0198a412-7200-7000-8000-000000000021",
         "employment_record_id": "0198a412-7200-7000-8000-000000000030",
         "employment_record_version_id": "0198a412-7200-7000-8000-000000000031",
+        "employing_organization_unit_id": "0198a412-7200-7000-8000-000000000070",
+        "employment_employing_organization_record_id": "0198a412-7200-7000-8000-000000000071",
         "candidate_worker_conversion_record_id": "0198a412-7200-7000-8000-000000000040",
         "audit_event_record_id": "0198a412-7200-7000-8000-000000000050",
         "outbox_delivery_record_id": "0198a412-7200-7000-8000-000000000051",

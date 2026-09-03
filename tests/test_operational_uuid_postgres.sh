@@ -5,6 +5,7 @@ set -euo pipefail
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation_schema.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0002_sealed_evidence_digest.sql
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0040_employment_employing_organization.sql
 
 uncovered_uuid_columns="$(psql "${DATABASE_URL}" -Atqc "
 SELECT count(*)

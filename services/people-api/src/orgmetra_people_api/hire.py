@@ -17,7 +17,7 @@ from uuid import UUID
 from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessPolicy
 
 from orgmetra_people_api.auth import AuthenticatedPrincipal
-from orgmetra_people_api.authorization import authorize_resource_fields
+from orgmetra_people_api.authorization import authorize_resource_fields, organization_unit_scope_code
 from orgmetra_people_api.mutations import validate_idempotency_key
 
 _MAX_UUID_INT = (1 << 128) - 1
@@ -52,12 +52,14 @@ class HireAcceptanceCommand:
     """
 
     tenant_record_id: UUID
+    employing_organization_unit_id: UUID
     candidate_profile_id: UUID
     selection_decision_id: UUID
     person_record_id: UUID
     person_name_record_id: UUID
     employment_record_id: UUID
     employment_record_version_id: UUID
+    employment_employing_organization_record_id: UUID
     candidate_worker_conversion_record_id: UUID
     audit_event_record_id: UUID
     outbox_delivery_record_id: UUID
@@ -70,12 +72,14 @@ class HireAcceptanceCommand:
         """Fail closed before authorization or persistence on malformed input."""
         for field_name in (
             "tenant_record_id",
+            "employing_organization_unit_id",
             "candidate_profile_id",
             "selection_decision_id",
             "person_record_id",
             "person_name_record_id",
             "employment_record_id",
             "employment_record_version_id",
+            "employment_employing_organization_record_id",
             "candidate_worker_conversion_record_id",
             "audit_event_record_id",
             "outbox_delivery_record_id",
@@ -162,6 +166,7 @@ def accept_confirmed_hire(
         resource_kind="selection_decision",
         requested_fields=_HIRE_MUTATION_FIELDS,
         policy=policy,
+        required_target_scope_code=organization_unit_scope_code(command.employing_organization_unit_id),
     )
     result = mutation_port.accept_hire(command=command, authorization=authorization)
     if not isinstance(result, HireAcceptanceResult):

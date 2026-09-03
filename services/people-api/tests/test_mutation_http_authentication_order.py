@@ -8,6 +8,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.mutation_http import PeopleMutationAsgiApp
 from orgmetra_people_api.mutations import (
     AssignmentMutationCommand,
@@ -20,11 +21,13 @@ from orgmetra_people_api.mutations import (
 
 TENANT = UUID("0198a412-8100-7000-8000-000000000001")
 PERSON = UUID("0198a412-8100-7000-8000-000000000020")
+ORGANIZATION = UUID("0198a412-8100-7000-8000-000000000022")
 MUTATION_IDS = [
     UUID("0198a412-8100-7000-8000-000000000030"),
     UUID("0198a412-8100-7000-8000-000000000031"),
     UUID("0198a412-8100-7000-8000-000000000032"),
     UUID("0198a412-8100-7000-8000-000000000033"),
+    UUID("0198a412-8100-7000-8000-000000000034"),
 ]
 
 
@@ -119,7 +122,7 @@ def _principal() -> AuthenticatedPrincipal:
     return AuthenticatedPrincipal(
         tenant_record_id=TENANT,
         actor_reference="keyverse_subject:operator-17",
-        granted_scope_codes=frozenset({"orgmetra.people.write"}),
+        granted_scope_codes=frozenset({"orgmetra.people.write", organization_unit_scope_code(ORGANIZATION)}),
     )
 
 
@@ -203,6 +206,7 @@ class PeopleMutationAuthenticationOrderTests(unittest.IsolatedAsyncioTestCase):
         )
         body = json.dumps(
             {
+                "employing_organization_unit_id": "0198a412-8100-7000-8000-000000000022",
                 "person_record_id": str(PERSON),
                 "employment_status_code": "active",
                 "employment_concurrency_code": "exclusive",
@@ -236,7 +240,7 @@ class PeopleMutationAuthenticationOrderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(record.tenant_record_id, str(TENANT))
         self.assertEqual(
             record.correlation_reference,
-            f"audit_event_record:{MUTATION_IDS[2].hex}",
+            f"audit_event_record:{MUTATION_IDS[3].hex}",
         )
         self.assertEqual(record.exception_type, "RuntimeError")
         rendered = " ".join(captured.output)

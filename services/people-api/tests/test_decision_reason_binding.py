@@ -13,11 +13,13 @@ from orgmetra_people_api.mutations import EmploymentMutationCommand, mutation_co
 
 TENANT = UUID("0198a412-8a00-7000-8000-000000000001")
 PERSON = UUID("0198a412-8a00-7000-8000-000000000002")
+ORGANIZATION = UUID("0198a412-8a00-7000-8000-000000000003")
 GENERATED_IDS = (
     UUID("0198a412-8a00-7000-8000-000000000010"),
     UUID("0198a412-8a00-7000-8000-000000000011"),
     UUID("0198a412-8a00-7000-8000-000000000012"),
     UUID("0198a412-8a00-7000-8000-000000000013"),
+    UUID("0198a412-8a00-7000-8000-000000000014"),
 )
 _GOVERNANCE_BINDING_PATTERN = re.compile(r"^governance_evidence_v1:[0-9a-f]{64}$")
 
@@ -34,6 +36,7 @@ def _id_factory(values: Iterator[UUID]):
 def _payload(*, decision_reason: str, evidence_references: list[dict[str, str]] | None = None) -> dict[str, object]:
     """Return one high-impact employment command payload."""
     return {
+        "employing_organization_unit_id": str(ORGANIZATION),
         "person_record_id": str(PERSON),
         "employment_status_code": "active",
         "employment_concurrency_code": "exclusive",

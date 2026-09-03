@@ -10,6 +10,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
     HireAcceptanceResult,
@@ -29,6 +30,8 @@ PERSON = UUID("0198a412-7100-7000-8000-000000000020")
 PERSON_NAME = UUID("0198a412-7100-7000-8000-000000000021")
 EMPLOYMENT = UUID("0198a412-7100-7000-8000-000000000030")
 EMPLOYMENT_VERSION = UUID("0198a412-7100-7000-8000-000000000031")
+ORGANIZATION = UUID("0198a412-7100-7000-8000-000000000070")
+EMPLOYMENT_EMPLOYER = UUID("0198a412-7100-7000-8000-000000000071")
 CONVERSION = UUID("0198a412-7100-7000-8000-000000000040")
 AUDIT_EVENT = UUID("0198a412-7100-7000-8000-000000000050")
 OUTBOX_DELIVERY = UUID("0198a412-7100-7000-8000-000000000051")
@@ -62,12 +65,14 @@ def command(**overrides: object) -> HireAcceptanceCommand:
     """Build one deterministic hire command."""
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
+        "employing_organization_unit_id": ORGANIZATION,
         "candidate_profile_id": CANDIDATE,
         "selection_decision_id": DECISION,
         "person_record_id": PERSON,
         "person_name_record_id": PERSON_NAME,
         "employment_record_id": EMPLOYMENT,
         "employment_record_version_id": EMPLOYMENT_VERSION,
+        "employment_employing_organization_record_id": EMPLOYMENT_EMPLOYER,
         "candidate_worker_conversion_record_id": CONVERSION,
         "audit_event_record_id": AUDIT_EVENT,
         "outbox_delivery_record_id": OUTBOX_DELIVERY,
@@ -132,7 +137,9 @@ def allowed_authorization() -> AuthorizationDecision:
 PRINCIPAL = AuthenticatedPrincipal(
     tenant_record_id=TENANT,
     actor_reference=ACTOR,
-    granted_scope_codes=frozenset({"orgmetra.people.materialize_worker"}),
+    granted_scope_codes=frozenset(
+        {"orgmetra.people.materialize_worker", organization_unit_scope_code(ORGANIZATION)}
+    ),
 )
 
 
@@ -250,12 +257,20 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
             "public.person_name_record",
             "public.employment_record",
             "public.employment_record_version",
+            "public.employment_employing_organization_record",
         )
-        for execution, table_name in zip(cursor.executions[5:9], expected_tables, strict=True):
+        for execution, table_name in zip(cursor.executions[5:10], expected_tables, strict=True):
             self.assertIn(table_name, execution[0])
         self.assertEqual(cursor.executions[6][1][3], "Ada Lovelace")
 
-        audit_sql, audit_parameters = cursor.executions[9]
+        relation_sql, relation_parameters = cursor.executions[9]
+        self.assertEqual(
+            relation_parameters,
+            (TENANT, EMPLOYMENT_EMPLOYER, EMPLOYMENT, ORGANIZATION, DECIDED_AT.date(), TRANSACTION_AT),
+        )
+        self.assertIn("employing_organization_unit_id", relation_sql)
+
+        audit_sql, audit_parameters = cursor.executions[10]
         self.assertEqual(audit_sql, "SELECT public.record_audit_outbox_event(%s, %s, %s, %s, %s, %s)")
         self.assertIsNotNone(audit_parameters)
         assert audit_parameters is not None
@@ -277,13 +292,13 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
         self.assertEqual(envelope["time"], "2026-08-18T00:01:00Z")
         self.assertNotIn("Ada Lovelace", envelope_text)
 
-        conversion_sql, conversion_parameters = cursor.executions[10]
+        conversion_sql, conversion_parameters = cursor.executions[11]
         self.assertIn("public.candidate_worker_conversion_record", conversion_sql)
         self.assertEqual(
             conversion_parameters,
             (TENANT, CONVERSION, CANDIDATE, PERSON, EMPLOYMENT, DECISION, AUDIT_EVENT, DECIDED_AT.date(), TRANSACTION_AT),
         )
-        idempotency_sql, idempotency_parameters = cursor.executions[11]
+        idempotency_sql, idempotency_parameters = cursor.executions[12]
         self.assertIn("public.people_mutation_idempotency_record", idempotency_sql)
         self.assertIsNotNone(idempotency_parameters)
         assert idempotency_parameters is not None
@@ -291,6 +306,23 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
         self.assertEqual(idempotency_parameters[2:4], ("candidate-worker-conversions", IDEMPOTENCY_KEY))
         self.assertRegex(str(idempotency_parameters[4]), r"^[0-9a-f]{64}$")
         self.assertEqual(idempotency_parameters[5], CONVERSION)
+
+    def test_terminated_hire_does_not_write_employing_organization(self) -> None:
+        port, connection, cursor = self._port([decision_row()])
+
+        result = accept_confirmed_hire(
+            principal=PRINCIPAL,
+            command=command(employment_status_code="terminated"),
+            purpose_code=PURPOSE,
+            policy=policy(),
+            mutation_port=port,
+        )
+
+        self.assertEqual(result.employment_record_id, EMPLOYMENT)
+        self.assertFalse(
+            any("public.employment_employing_organization_record" in sql for sql, _ in cursor.executions)
+        )
+        self.assertIsNone(connection.exit_exception)
 
     def test_exact_committed_hire_replay_returns_without_duplicate_business_writes(self) -> None:
         request = command()

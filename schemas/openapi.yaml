@@ -525,6 +525,7 @@ components:
       type: object
       additionalProperties: false
       required:
+        - employing_organization_unit_id
         - person_record_id
         - employment_status_code
         - employment_concurrency_code
@@ -533,6 +534,9 @@ components:
         - confirmation_reference
         - evidence_references
       properties:
+        employing_organization_unit_id:
+          type: string
+          format: uuid
         person_record_id:
           type: string
           format: uuid

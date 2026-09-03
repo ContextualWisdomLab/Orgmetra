@@ -142,9 +142,11 @@ class PurposeBoundAccessRequest:
     ``tenant_record_id`` is the active Orgmetra request context, and
     ``resource_tenant_record_id`` comes from the target record identity. The
     opaque ``resource_reference`` identifies that exact target for audit
-    correlation without copying its PII. All tenant identifiers must match the
-    policy tenant. Only field names are carried here; field values remain behind
-    the authoritative data boundary until access is allowed.
+    correlation without copying its PII. An optional target scope narrows the
+    operation to one exact organization or other governed target. All tenant
+    identifiers must match the policy tenant. Only field names are carried here;
+    field values remain behind the authoritative data boundary until access is
+    allowed.
     """
 
     tenant_record_id: UUID
@@ -157,6 +159,7 @@ class PurposeBoundAccessRequest:
     resource_kind: str
     requested_fields: frozenset[str]
     granted_scope_codes: frozenset[str]
+    required_target_scope_code: str | None = None
 
     def __post_init__(self) -> None:
         """Reject untrusted identity, target, tenant, purpose, field, or scope attributes."""
@@ -174,6 +177,8 @@ class PurposeBoundAccessRequest:
         _validate_code("operation_code", self.operation_code)
         _validate_field_set("requested_fields", self.requested_fields)
         _validate_scope_set(self.granted_scope_codes)
+        if self.required_target_scope_code is not None:
+            _validate_scope("required_target_scope_code", self.required_target_scope_code)
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,6 +197,12 @@ class AuthorizationDecision:
     authorized_fields: frozenset[str]
     reason_code: str
     next_action: str
+    required_target_scope_code: str | None = None
+
+    def __post_init__(self) -> None:
+        """Reject malformed governed-target evidence on manually constructed decisions."""
+        if self.required_target_scope_code is not None:
+            _validate_scope("required_target_scope_code", self.required_target_scope_code)
 
 
 class AuthorizationDeniedError(PermissionError):
@@ -211,13 +222,18 @@ def _decision(
     policy: PurposeBoundAccessPolicy,
     allowed: bool,
     reason_code: str,
+    next_action_override: str | None = None,
 ) -> AuthorizationDecision:
     """Build one immutable allow/deny record without copying protected values."""
     authorized_fields = request.requested_fields if allowed else frozenset()
     next_action = (
         "Continue with only the authorized fields."
         if allowed
-        else _DENIAL_NEXT_ACTION[reason_code]
+        else (
+            next_action_override
+            if next_action_override is not None
+            else _DENIAL_NEXT_ACTION[reason_code]
+        )
     )
     return AuthorizationDecision(
         allowed=allowed,
@@ -232,6 +248,7 @@ def _decision(
         authorized_fields=authorized_fields,
         reason_code=reason_code,
         next_action=next_action,
+        required_target_scope_code=request.required_target_scope_code,
     )
 
 
@@ -285,6 +302,20 @@ def evaluate_purpose_bound_access(
             policy=policy,
             allowed=False,
             reason_code="required_scope_missing",
+        )
+    if (
+        request.required_target_scope_code is not None
+        and request.required_target_scope_code not in request.granted_scope_codes
+    ):
+        return _decision(
+            request=request,
+            policy=policy,
+            allowed=False,
+            reason_code="required_scope_missing",
+            next_action_override=(
+                "Obtain the exact Keyverse scope for the governed target before retrying; "
+                "the operation scope alone cannot authorize that target."
+            ),
         )
     if not request.requested_fields.issubset(policy.permitted_fields):
         return _decision(

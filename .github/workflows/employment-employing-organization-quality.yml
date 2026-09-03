@@ -1,0 +1,69 @@
+name: Employment Employing Organization Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "database/migrations/0001_foundation_schema.sql"
+      - "database/migrations/0002_sealed_evidence_digest.sql"
+      - "database/migrations/0040_employment_employing_organization.sql"
+      - "tests/test_employment_employing_organization_postgres.sh"
+      - "scripts/foundation-contract-core.mjs"
+      - "tests/validate_repository.py"
+      - ".github/workflows/employment-employing-organization-quality.yml"
+      - "docs/adr/0141-employment-employing-organization.md"
+      - "docs/doctoring/employment-employing-organization.md"
+      - "docs/DATA_MODEL.md"
+      - "docs/ERD.md"
+      - "docs/TRACEABILITY.md"
+      - "CHANGELOG.md"
+      - "manifest.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: employment-employing-organization-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres:
+    name: Employer scope bitemporal and tenant boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: orgmetra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d orgmetra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Print exact foundation manifest candidate
+        run: python tests/validate_repository.py --print-manifest
+      - name: Prove Employment employing-organization contract
+        run: bash tests/test_employment_employing_organization_postgres.sh
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

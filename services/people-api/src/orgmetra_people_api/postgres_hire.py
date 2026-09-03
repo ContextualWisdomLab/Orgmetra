@@ -22,6 +22,7 @@ from uuid import UUID
 from orgmetra_hris_kernel.audit import AuditOutboxEvent
 from orgmetra_keyverse_adapter import AuthorizationDecision
 
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
     HireAcceptanceResult,
@@ -134,6 +135,17 @@ INSERT INTO public.employment_record_version (
 ) VALUES (%s, %s, %s, %s, %s, %s)
 """.strip()
 
+_INSERT_EMPLOYMENT_EMPLOYING_ORGANIZATION_SQL = """
+INSERT INTO public.employment_employing_organization_record (
+    tenant_record_id,
+    employment_employing_organization_record_id,
+    employment_record_id,
+    employing_organization_unit_id,
+    effective_from,
+    recorded_from
+) VALUES (%s, %s, %s, %s, %s, %s)
+""".strip()
+
 _RECORD_AUDIT_OUTBOX_SQL = "SELECT public.record_audit_outbox_event(%s, %s, %s, %s, %s, %s)"
 
 _INSERT_CONVERSION_SQL = """
@@ -174,8 +186,9 @@ def _is_aware_datetime(value: object) -> bool:
 
 
 def _validate_authorization(command: HireAcceptanceCommand, authorization: object) -> AuthorizationDecision:
-    """Require an exact allow decision for this immutable selection decision."""
+    """Require an exact allow decision for this selection decision and employer target."""
     expected_reference = f"selection_decision:{command.selection_decision_id.hex}"
+    expected_target_scope = organization_unit_scope_code(command.employing_organization_unit_id)
     if not isinstance(authorization, AuthorizationDecision):
         raise HireDecisionIntegrityError("hire mutation requires a typed authorization decision")
     if (
@@ -186,6 +199,7 @@ def _validate_authorization(command: HireAcceptanceCommand, authorization: objec
         or authorization.operation_code != "materialize_worker"
         or authorization.requested_fields != _HIRE_MUTATION_FIELDS
         or authorization.authorized_fields != _HIRE_MUTATION_FIELDS
+        or authorization.required_target_scope_code != expected_target_scope
     ):
         raise HireDecisionIntegrityError("hire mutation authorization does not match the exact decision")
     return authorization
@@ -204,7 +218,11 @@ def _hire_command_digest(command: HireAcceptanceCommand, authorization: Authoriz
             "candidate_worker_conversion_record_id": str(command.candidate_worker_conversion_record_id),
             "display_name": command.display_name,
             "effective_from": command.effective_from.isoformat(),
+            "employing_organization_unit_id": str(command.employing_organization_unit_id),
             "employment_record_id": str(command.employment_record_id),
+            "employment_employing_organization_record_id": str(
+                command.employment_employing_organization_record_id
+            ),
             "employment_record_version_id": str(command.employment_record_version_id),
             "employment_status_code": command.employment_status_code,
             "outbox_delivery_record_id": str(command.outbox_delivery_record_id),
@@ -422,6 +440,18 @@ class PostgresHireAcceptancePort:
                         transaction_recorded_at,
                     ),
                 )
+                if command.employment_status_code in {"active", "leave"}:
+                    cursor.execute(
+                        _INSERT_EMPLOYMENT_EMPLOYING_ORGANIZATION_SQL,
+                        (
+                            command.tenant_record_id,
+                            command.employment_employing_organization_record_id,
+                            command.employment_record_id,
+                            command.employing_organization_unit_id,
+                            command.effective_from,
+                            transaction_recorded_at,
+                        ),
+                    )
                 cursor.execute(
                     _RECORD_AUDIT_OUTBOX_SQL,
                     (

@@ -55,7 +55,9 @@ REQUIRED = [
     "docs/adr/0012-governed-migration-handoff.md",
     "docs/adr/0013-governed-requisition-review-packet.md",
     "docs/adr/0014-job-analysis-snapshot-persistence.md",
+    "docs/adr/0141-employment-employing-organization.md",
     "docs/doctoring/REFERENCES.md",
+    "docs/doctoring/employment-employing-organization.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
     "database/migrations/0001_foundation_schema.sql",
@@ -71,6 +73,7 @@ REQUIRED = [
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
+    "database/migrations/0040_employment_employing_organization.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -92,6 +95,7 @@ REQUIRED = [
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
+    "tests/test_employment_employing_organization_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -364,6 +368,19 @@ def _validate_database_contract() -> None:
         "CREATE TRIGGER job_analysis_snapshot_append_only_guard",
         "ALTER TABLE job_analysis_snapshot FORCE ROW LEVEL SECURITY",
         "CREATE POLICY job_analysis_snapshot_scope_policy",
+        "CREATE TABLE employment_employing_organization_record",
+        "employment_employing_organization_employment_tenant_fk",
+        "employment_employing_organization_unit_tenant_fk",
+        "CONSTRAINT employment_employing_organization_bitemporal_exclusion",
+        "CREATE FUNCTION validate_employment_employing_organization_scope",
+        "CREATE CONSTRAINT TRIGGER employment_employing_organization_exact_one_employment_guard",
+        "CREATE CONSTRAINT TRIGGER employment_employing_organization_exact_one_relationship_guard",
+        "CREATE CONSTRAINT TRIGGER employment_employing_organization_exact_one_organization_guard",
+        "CREATE TRIGGER employment_employing_organization_bitemporal_guard",
+        "CREATE TRIGGER employment_employing_organization_truncate_guard",
+        "ALTER TABLE employment_employing_organization_record FORCE ROW LEVEL SECURITY",
+        "CREATE POLICY employment_employing_organization_scope_policy",
+        "CREATE INDEX employment_employing_organization_unit_lookup_index",
     ]
     for fragment in required_fragments:
         if fragment not in sql:

@@ -8,6 +8,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
     HireAcceptancePort,
@@ -22,6 +23,9 @@ PERSON = UUID("0198a412-7000-7000-8000-000000000020")
 PERSON_NAME = UUID("0198a412-7000-7000-8000-000000000021")
 EMPLOYMENT = UUID("0198a412-7000-7000-8000-000000000030")
 EMPLOYMENT_VERSION = UUID("0198a412-7000-7000-8000-000000000031")
+ORGANIZATION = UUID("0198a412-7000-7000-8000-000000000070")
+OTHER_ORGANIZATION = UUID("0198a412-7000-7000-8000-000000000072")
+EMPLOYMENT_EMPLOYER = UUID("0198a412-7000-7000-8000-000000000071")
 CONVERSION = UUID("0198a412-7000-7000-8000-000000000040")
 AUDIT_EVENT = UUID("0198a412-7000-7000-8000-000000000050")
 OUTBOX_DELIVERY = UUID("0198a412-7000-7000-8000-000000000051")
@@ -33,12 +37,14 @@ def command(**overrides: object) -> HireAcceptanceCommand:
     """Build one deterministic accepted-hire command for tests."""
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
+        "employing_organization_unit_id": ORGANIZATION,
         "candidate_profile_id": CANDIDATE,
         "selection_decision_id": DECISION,
         "person_record_id": PERSON,
         "person_name_record_id": PERSON_NAME,
         "employment_record_id": EMPLOYMENT,
         "employment_record_version_id": EMPLOYMENT_VERSION,
+        "employment_employing_organization_record_id": EMPLOYMENT_EMPLOYER,
         "candidate_worker_conversion_record_id": CONVERSION,
         "audit_event_record_id": AUDIT_EVENT,
         "outbox_delivery_record_id": OUTBOX_DELIVERY,
@@ -67,7 +73,9 @@ def policy(*, purpose_code: str = "candidate_hire") -> PurposeBoundAccessPolicy:
 PRINCIPAL = AuthenticatedPrincipal(
     tenant_record_id=TENANT,
     actor_reference="keyverse_subject:operator-17",
-    granted_scope_codes=frozenset({"orgmetra.people.materialize_worker"}),
+    granted_scope_codes=frozenset(
+        {"orgmetra.people.materialize_worker", organization_unit_scope_code(ORGANIZATION)}
+    ),
 )
 
 
@@ -134,6 +142,27 @@ class HireAcceptanceTests(unittest.TestCase):
 
         self.assertEqual(port.calls, [])
 
+    def test_missing_organization_scope_prevents_hire_materialization(self) -> None:
+        """Reject an unauthorized same-tenant employing organization before persistence."""
+        port = RecordingHirePort()
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse_subject:operator-17",
+            granted_scope_codes=frozenset(
+                {"orgmetra.people.materialize_worker", organization_unit_scope_code(ORGANIZATION)}
+            ),
+        )
+        with self.assertRaises(AuthorizationDeniedError) as caught:
+            accept_confirmed_hire(
+                principal=principal,
+                command=command(employing_organization_unit_id=OTHER_ORGANIZATION),
+                purpose_code="candidate_hire",
+                policy=policy(),
+                mutation_port=port,
+            )
+        self.assertEqual(caught.exception.reason_code, "required_scope_missing")
+        self.assertEqual(port.calls, [])
+
     def test_command_rejects_reserved_or_malformed_identifiers(self) -> None:
         invalid_values = (
             {"tenant_record_id": UUID(int=0)},
@@ -178,7 +207,9 @@ class HireAcceptanceTests(unittest.TestCase):
         other_tenant_principal = AuthenticatedPrincipal(
             tenant_record_id=UUID("0198a412-7000-7000-8000-000000000099"),
             actor_reference="keyverse_subject:operator-99",
-            granted_scope_codes=frozenset({"orgmetra.people.materialize_worker"}),
+            granted_scope_codes=frozenset(
+                {"orgmetra.people.materialize_worker", organization_unit_scope_code(ORGANIZATION)}
+            ),
         )
 
         with self.assertRaises(AuthorizationDeniedError):

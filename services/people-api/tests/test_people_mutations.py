@@ -9,6 +9,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import AuthorizationDecision, AuthorizationDeniedError, PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.mutations import (
     AssignmentMutationCommand,
     AssignmentMutationResult,
@@ -33,6 +34,7 @@ EMPLOYMENT_VERSION = UUID("0198a412-8000-7000-8000-000000000031")
 POSITION = UUID("0198a412-8000-7000-8000-000000000040")
 POSITION_VERSION = UUID("0198a412-8000-7000-8000-000000000041")
 ORGANIZATION = UUID("0198a412-8000-7000-8000-000000000050")
+OTHER_ORGANIZATION = UUID("0198a412-8000-7000-8000-000000000051")
 JOB = UUID("0198a412-8000-7000-8000-000000000060")
 ASSIGNMENT = UUID("0198a412-8000-7000-8000-000000000070")
 AUDIT_EVENT = UUID("0198a412-8000-7000-8000-000000000080")
@@ -47,9 +49,11 @@ def employment_command(**overrides: object) -> EmploymentMutationCommand:
     """Build one deterministic employment command."""
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
+        "employing_organization_unit_id": ORGANIZATION,
         "person_record_id": PERSON,
         "employment_record_id": EMPLOYMENT,
         "employment_record_version_id": EMPLOYMENT_VERSION,
+        "employment_employing_organization_record_id": UUID("0198a412-8000-7000-8000-000000000051"),
         "audit_event_record_id": AUDIT_EVENT,
         "outbox_delivery_record_id": OUTBOX,
         "employment_status_code": "active",
@@ -145,7 +149,13 @@ def assignment_policy() -> PurposeBoundAccessPolicy:
 PRINCIPAL = AuthenticatedPrincipal(
     tenant_record_id=TENANT,
     actor_reference="keyverse_subject:operator-17",
-    granted_scope_codes=frozenset({"orgmetra.people.write", "orgmetra.job_architecture.write"}),
+    granted_scope_codes=frozenset(
+        {
+            "orgmetra.people.write",
+            "orgmetra.job_architecture.write",
+            organization_unit_scope_code(ORGANIZATION),
+        }
+    ),
 )
 
 
@@ -231,6 +241,27 @@ class PeopleMutationTests(unittest.TestCase):
                 mutation_port=port,
             )
         self.assertEqual(port.employment_calls, [])
+
+    def test_missing_organization_scope_prevents_employment_mutation(self) -> None:
+        """Reject an unauthorized same-tenant employing organization before persistence."""
+        port = RecordingMutationPort()
+        with self.assertRaises(AuthorizationDeniedError) as caught:
+            create_employment_record(
+                principal=PRINCIPAL,
+                command=employment_command(employing_organization_unit_id=OTHER_ORGANIZATION),
+                purpose_code="workforce_admin",
+                policy=employment_policy(),
+                mutation_port=port,
+            )
+        self.assertEqual(caught.exception.reason_code, "required_scope_missing")
+        self.assertEqual(port.employment_calls, [])
+
+    def test_organization_scope_code_rejects_reserved_or_malformed_ids(self) -> None:
+        """Reject invalid organization identities before constructing a target scope."""
+        with self.assertRaises(ValueError):
+            organization_unit_scope_code(UUID(int=0))
+        with self.assertRaises(ValueError):
+            organization_unit_scope_code("not-a-uuid")  # type: ignore[arg-type]
 
     def test_commands_reject_reserved_or_malformed_values(self) -> None:
         cases = (

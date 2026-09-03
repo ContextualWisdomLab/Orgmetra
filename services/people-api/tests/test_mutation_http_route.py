@@ -10,6 +10,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.mutation_http import PeopleMutationAsgiApp
 from orgmetra_people_api.mutations import (
     AssignmentMutationCommand,
@@ -32,6 +33,7 @@ ASSIGNMENT = UUID("0198a412-8100-7000-8000-000000000070")
 IDS = [
     EMPLOYMENT,
     UUID("0198a412-8100-7000-8000-000000000031"),
+    UUID("0198a412-8100-7000-8000-000000000086"),
     UUID("0198a412-8100-7000-8000-000000000080"),
     UUID("0198a412-8100-7000-8000-000000000081"),
     POSITION,
@@ -103,6 +105,7 @@ class RecordingMutationPort:
 def employment_body(**overrides: object) -> bytes:
     """Return one canonical employment command body."""
     payload: dict[str, object] = {
+        "employing_organization_unit_id": str(ORGANIZATION),
         "person_record_id": str(PERSON),
         "employment_status_code": "active",
         "employment_concurrency_code": "exclusive",
@@ -157,7 +160,13 @@ class PeopleMutationHttpTests(unittest.IsolatedAsyncioTestCase):
         self.principal = AuthenticatedPrincipal(
             tenant_record_id=TENANT,
             actor_reference="keyverse_subject:operator-17",
-            granted_scope_codes=frozenset({"orgmetra.people.write", "orgmetra.job_architecture.write"}),
+            granted_scope_codes=frozenset(
+                {
+                    "orgmetra.people.write",
+                    "orgmetra.job_architecture.write",
+                    organization_unit_scope_code(ORGANIZATION),
+                }
+            ),
         )
         self.employment_policy = PurposeBoundAccessPolicy(
             tenant_record_id=TENANT,

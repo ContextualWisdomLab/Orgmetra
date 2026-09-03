@@ -10,11 +10,13 @@ from orgmetra_people_api.mutation_http import _command_for_route
 
 TENANT = UUID("0198a412-8100-7000-8000-000000000001")
 PERSON = UUID("0198a412-8100-7000-8000-000000000020")
+ORGANIZATION = UUID("0198a412-8100-7000-8000-000000000022")
 _GENERATED_IDS = tuple(
     UUID(value)
     for value in (
         "0198a412-8100-7000-8000-000000000030",
         "0198a412-8100-7000-8000-000000000031",
+        "0198a412-8100-7000-8000-000000000032",
         "0198a412-8100-7000-8000-000000000080",
         "0198a412-8100-7000-8000-000000000081",
     )
@@ -30,6 +32,7 @@ def id_factory() -> Callable[[], UUID]:
 def employment_payload(**overrides: object) -> dict[str, object]:
     """Return one canonical employment request payload with optional field overrides."""
     payload: dict[str, object] = {
+        "employing_organization_unit_id": str(ORGANIZATION),
         "person_record_id": str(PERSON),
         "employment_status_code": "active",
         "employment_concurrency_code": "exclusive",

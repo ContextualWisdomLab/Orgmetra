@@ -11,6 +11,7 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import AuthorizationDecision
 from orgmetra_people_api.auth import AuthenticatedPrincipal
+from orgmetra_people_api.authorization import organization_unit_scope_code
 from orgmetra_people_api.mutations import (
     PeopleMutationIntegrityError,
     PeopleMutationNotFound,
@@ -184,7 +185,13 @@ def covering_position_row() -> tuple[object, ...]:
 PRINCIPAL = AuthenticatedPrincipal(
     tenant_record_id=TENANT,
     actor_reference=ACTOR,
-    granted_scope_codes=frozenset({"orgmetra.people.write", "orgmetra.job_architecture.write"}),
+    granted_scope_codes=frozenset(
+        {
+            "orgmetra.people.write",
+            "orgmetra.job_architecture.write",
+            organization_unit_scope_code(ORGANIZATION),
+        }
+    ),
 )
 
 
@@ -209,9 +216,10 @@ class PostgresPeopleMutationTests(unittest.TestCase):
 
     def test_employment_requires_conversion_and_records_audit_atomically(self) -> None:
         port, cursor = self._port([[(CONVERSION, RECORDED_AT)]], [[]])
+        request = employment_command()
         result = create_employment_record(
             principal=PRINCIPAL,
-            command=employment_command(),
+            command=request,
             purpose_code="workforce_admin",
             policy=employment_policy(),
             mutation_port=port,
@@ -225,6 +233,16 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self.assertIn("conversion.recorded_to IS NULL", conversion_sql)
         self.assertIn("public.employment_record", sql_text)
         self.assertIn("employment_concurrency_code", sql_text)
+        relation_sql, relation_parameters = next(
+            execution
+            for execution in cursor.executions
+            if "public.employment_employing_organization_record" in execution[0]
+        )
+        self.assertEqual(
+            relation_parameters,
+            (TENANT, request.employment_employing_organization_record_id, EMPLOYMENT, ORGANIZATION, request.effective_from, RECORDED_AT),
+        )
+        self.assertIn("employing_organization_unit_id", relation_sql)
         self.assertIn("public.record_audit_outbox_event", sql_text)
         self.assertIn("public.people_mutation_idempotency_record", sql_text)
         self.assertNotIn("candidate_worker_link", sql_text)
@@ -237,6 +255,23 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self.assertEqual(envelope["type"], "orgmetra.people.employment_created")
         self.assertEqual(envelope["orgmetraconfirmation"], "human_confirmation:review-88")
         self.assertEqual(audit_parameters[4], sha256(audit_parameters[3].encode("utf-8")).hexdigest())
+
+    def test_terminated_employment_does_not_write_employing_organization(self) -> None:
+        port, cursor = self._port([[(CONVERSION, RECORDED_AT)]], [[]])
+        request = employment_command(employment_status_code="terminated")
+
+        result = create_employment_record(
+            principal=PRINCIPAL,
+            command=request,
+            purpose_code="workforce_admin",
+            policy=employment_policy(),
+            mutation_port=port,
+        )
+
+        self.assertEqual(result.employment_record_id, EMPLOYMENT)
+        self.assertFalse(
+            any("public.employment_employing_organization_record" in sql for sql, _ in cursor.executions)
+        )
 
     def test_position_requires_parents_and_records_audit(self) -> None:
         port, cursor = self._port([[(ORGANIZATION, JOB, RECORDED_AT)]])

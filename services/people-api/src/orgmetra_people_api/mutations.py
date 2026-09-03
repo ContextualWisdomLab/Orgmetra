@@ -22,7 +22,7 @@ from uuid import UUID, uuid5
 from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessPolicy
 
 from orgmetra_people_api.auth import AuthenticatedPrincipal
-from orgmetra_people_api.authorization import authorize_resource_fields
+from orgmetra_people_api.authorization import authorize_resource_fields, organization_unit_scope_code
 
 _MAX_UUID_INT = (1 << 128) - 1
 _IDEMPOTENCY_MIN = 16
@@ -123,6 +123,7 @@ def mutation_command_digest(
             "confirmation_reference": command.confirmation_reference,
             "effective_from": command.effective_from.isoformat(),
             "employment_concurrency_code": command.employment_concurrency_code,
+            "employing_organization_unit_id": str(command.employing_organization_unit_id),
             "employment_status_code": command.employment_status_code,
             "evidence_version_code": command.evidence_version_code,
             "person_record_id": str(command.person_record_id),
@@ -166,9 +167,11 @@ class EmploymentMutationCommand:
     """Opaque identities and high-impact evidence needed to create one employment."""
 
     tenant_record_id: UUID
+    employing_organization_unit_id: UUID
     person_record_id: UUID
     employment_record_id: UUID
     employment_record_version_id: UUID
+    employment_employing_organization_record_id: UUID
     audit_event_record_id: UUID
     outbox_delivery_record_id: UUID
     employment_status_code: str
@@ -182,9 +185,11 @@ class EmploymentMutationCommand:
         """Fail closed before authorization or persistence on malformed input."""
         for field_name in (
             "tenant_record_id",
+            "employing_organization_unit_id",
             "person_record_id",
             "employment_record_id",
             "employment_record_version_id",
+            "employment_employing_organization_record_id",
             "audit_event_record_id",
             "outbox_delivery_record_id",
         ):
@@ -376,6 +381,7 @@ def create_employment_record(
         resource_kind="employment_record",
         requested_fields=_EMPLOYMENT_FIELDS,
         policy=policy,
+        required_target_scope_code=organization_unit_scope_code(command.employing_organization_unit_id),
     )
     result = port.create_employment(command=command, authorization=authorization)
     if not isinstance(result, EmploymentMutationResult):
