@@ -38,14 +38,14 @@ def test_requester_and_approver_require_authoritative_actor_separation() -> None
         _build(approver_reference="actor:99999999-9999-4999-8999-999999999999")
 
     normalized_next_action = _build().next_action.lower()
-    assert "requester_reference and approver_reference" in normalized_next_action
+    assert "requester and approver actor references" in normalized_next_action
     assert "resolved actor identities are distinct" in normalized_next_action
 
 
 def test_approval_requires_every_reference_to_resolve_in_the_exact_tenant() -> None:
     """Prevent cross-tenant offer evidence mixing behind syntactically valid UUID references."""
     action = _build().next_action
-    tenant_clause = "Within tenant_record_id, re-resolve every packet reference"
+    tenant_clause = "Within your tenant, re-resolve every packet reference"
     actor_clause = "verify their resolved actor identities are distinct"
     scope_clause = "verify authoritative Job/Position scope"
     approval_clause = "accountable human approval"

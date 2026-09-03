@@ -34,7 +34,7 @@ def _packet():
 def test_sealing_requires_every_reference_to_resolve_in_exact_tenant() -> None:
     """Prevent cross-tenant evidence mixing behind syntactically valid opaque references."""
     action = _packet().next_action
-    tenant_clause = "Re-resolve every packet reference within tenant_record_id"
+    tenant_clause = "Re-resolve every packet reference within your tenant"
     correlation_clause = "verify candidate, requisition, and Job correlation"
     provenance_clause = "verify job relevance, source provenance"
     sealing_clause = "authoritative evidence sealing"
