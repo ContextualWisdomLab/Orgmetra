@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gc
+import weakref
 from uuid import UUID
 
 import pytest
@@ -76,6 +78,54 @@ def test_decision_rejects_low_level_corrupted_exact_uuid(forged_int: object) -> 
     object.__setattr__(tenant, "int", forged_int)
     with pytest.raises(ValueError, match="tenant_record_id must contain a valid UUID integer"):
         _decision(tenant_record_id=tenant)
+
+
+def test_decision_rejects_unissued_low_level_instance() -> None:
+    """Bypassing the public constructor must not yield readable authorization evidence."""
+    forged = object.__new__(AuthorizationDecision)
+    with pytest.raises(ValueError, match="was not issued by the validated constructor"):
+        _ = forged.allowed
+
+
+def test_decision_cannot_be_reinitialized_with_new_evidence() -> None:
+    """The public initializer cannot replace a snapshot after the decision has been issued."""
+    decision = _decision()
+    with pytest.raises(TypeError, match="already initialized"):
+        AuthorizationDecision.__init__(
+            decision,
+            allowed=False,
+            tenant_record_id=TENANT,
+            actor_reference="keyverse_subject:operator-17",
+            resource_reference="assignment_record:0198a412800070008000000000000070",
+            policy_version_code="assignment-correction-v1",
+            purpose_code="workforce_admin",
+            operation_code="correct_record",
+            resource_kind="assignment_record",
+            requested_fields=frozenset({"assignment_category_code"}),
+            authorized_fields=frozenset(),
+            reason_code="field_not_allowed",
+            next_action="Request only fields allowed for this purpose.",
+        )
+
+
+def test_decision_preserves_value_semantics_and_deterministic_repr() -> None:
+    """Structural hardening must preserve equality, hashing, and diagnostic representation."""
+    left = _decision()
+    right = _decision()
+    assert left == right
+    assert not (left == object())
+    assert hash(left) == hash(right)
+    assert repr(left).startswith("AuthorizationDecision(allowed=True")
+    assert "assignment_category_code" in repr(left)
+
+
+def test_decision_registry_does_not_retain_dead_evidence() -> None:
+    """Lifecycle bookkeeping must not keep authorization evidence alive after callers release it."""
+    decision = _decision()
+    reference = weakref.ref(decision)
+    del decision
+    gc.collect()
+    assert reference() is None
 
 
 def test_decision_rejects_non_boolean_allowed_flag() -> None:
