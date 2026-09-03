@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import unittest
+from uuid import UUID
 
 from orgmetra_job_analysis_api.postgres import PostgresJobAnalysisPort, _IDEMPOTENCY_LOOKUP_SQL
-from orgmetra_job_analysis_api.snapshot import JobAnalysisIdempotencyConflict, command_digest
+from orgmetra_job_analysis_api.snapshot import (
+    JobAnalysisIdempotencyConflict,
+    JobAnalysisIntegrityError,
+    command_digest,
+)
 
 from fixtures import ANALYSIS, IDEMPOTENCY_KEY, clinical_psychologist_snapshot
 from test_postgres import (
@@ -20,13 +25,14 @@ from test_postgres import (
 
 
 class PostgresIdempotencyAuthorityTests(unittest.TestCase):
-    """Prove a durable idempotency key cannot cross actor or purpose authority."""
+    """Prove a durable idempotency key cannot cross command or authority identity."""
 
     def _persist_replay(
         self,
         *,
         stored_actor_reference: str,
         stored_purpose_code: str,
+        stored_analysis_record_id: UUID = ANALYSIS,
         actor_reference: str = "keyverse:actor-ja-1",
         purpose_code: str = "job_analysis_write",
         include_snapshot: bool = False,
@@ -41,7 +47,7 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
             None,
             (
                 digest,
-                ANALYSIS,
+                stored_analysis_record_id,
                 stored_actor_reference,
                 stored_purpose_code,
             ),
@@ -59,12 +65,8 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
             position_record_id=None,
             criterion_blueprint_id=None,
             audit_event=_audit_event(),
-            outbox_delivery_record_id=__import__("uuid").UUID(
-                "0198a412-6000-7000-8000-000000000302"
-            ),
-            write_command_id=__import__("uuid").UUID(
-                "0198a412-6000-7000-8000-000000000303"
-            ),
+            outbox_delivery_record_id=UUID("0198a412-6000-7000-8000-000000000302"),
+            write_command_id=UUID("0198a412-6000-7000-8000-000000000303"),
         )
 
     def test_lookup_reads_the_immutable_actor_and_purpose_binding(self) -> None:
@@ -83,8 +85,18 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
         with self.assertRaisesRegex(JobAnalysisIdempotencyConflict, "purpose"):
             self._persist_replay(stored_actor_reference="keyverse:actor-ja-1", stored_purpose_code="job_analysis_read")
 
-    def test_exact_actor_and_purpose_replay_returns_the_stored_snapshot(self) -> None:
-        """Preserve the successful retry contract for the exact original authority."""
+    def test_same_digest_cannot_replay_a_different_snapshot_identity(self) -> None:
+        """A durable digest cannot authorize replay of another persisted snapshot identity."""
+        foreign_analysis_record_id = UUID("0198a412-6000-7000-8000-000000000399")
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "analysis_record_id"):
+            self._persist_replay(
+                stored_actor_reference="keyverse:actor-ja-1",
+                stored_purpose_code="job_analysis_write",
+                stored_analysis_record_id=foreign_analysis_record_id,
+            )
+
+    def test_exact_actor_purpose_and_snapshot_replay_returns_the_stored_snapshot(self) -> None:
+        """Preserve the successful retry contract for the exact original command authority."""
         replayed = self._persist_replay(
             stored_actor_reference="keyverse:actor-ja-1",
             stored_purpose_code="job_analysis_write",
