@@ -1,5 +1,12 @@
 """Request-edge, governed read, confirmed-hire, and People mutation contracts."""
 
+from orgmetra_people_api.assignment_correction_http import AssignmentCorrectionAsgiApp
+from orgmetra_people_api.assignment_correction_mutations import (
+    AssignmentCorrectionMutationCommand,
+    AssignmentCorrectionMutationPort,
+    AssignmentCorrectionMutationResult,
+    correct_assignment_record_category,
+)
 from orgmetra_people_api.auth import (
     AuthenticatedPrincipal,
     AuthenticationFailed,
@@ -41,10 +48,15 @@ from orgmetra_people_api.people import (
     read_worker_people_record,
 )
 from orgmetra_people_api.postgres import PostgresPeopleReadPort
+from orgmetra_people_api.postgres_assignment_corrections import PostgresAssignmentCorrectionMutationPort
 from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
 
 __all__ = [
+    "AssignmentCorrectionAsgiApp",
+    "AssignmentCorrectionMutationCommand",
+    "AssignmentCorrectionMutationPort",
+    "AssignmentCorrectionMutationResult",
     "AuthenticatedPrincipal",
     "AuthenticationFailed",
     "AuthorizedWorkerPeopleView",
@@ -64,6 +76,7 @@ __all__ = [
     "PeopleRecordNotFound",
     "PositionMutationCommand",
     "PositionMutationResult",
+    "PostgresAssignmentCorrectionMutationPort",
     "PostgresHireAcceptancePort",
     "PostgresPeopleMutationPort",
     "PostgresPeopleReadPort",
@@ -75,6 +88,7 @@ __all__ = [
     "WorkerPeopleRecord",
     "accept_confirmed_hire",
     "authorize_resource_fields",
+    "correct_assignment_record_category",
     "create_assignment_record",
     "create_employment_record",
     "create_position_record",

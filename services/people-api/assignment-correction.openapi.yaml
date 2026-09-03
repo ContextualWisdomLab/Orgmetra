@@ -1,0 +1,183 @@
+openapi: 3.2.0
+info:
+  title: Orgmetra People API - Assignment category correction
+  version: 0.1.0
+  summary: Purpose-bound correction of committed Assignment category facts
+servers:
+  - url: https://api.orgmetra.example/v1
+paths:
+  /assignment-records/{assignment_record_id}/category-corrections:
+    post:
+      operationId: correctAssignmentRecordCategory
+      summary: Replace one committed Assignment with a linked category correction
+      security:
+        - keyverse_oidc:
+            - orgmetra.people.write
+      parameters:
+        - name: assignment_record_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 16
+            maxLength: 200
+        - name: X-Tenant-Reference
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Actor-Reference
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - name: X-Purpose-Code
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z][a-z0-9_]{2,63}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentCategoryCorrectionCommand'
+      responses:
+        '201':
+          description: Correction committed as a linked replacement fact.
+          headers:
+            Location:
+              description: Canonical URI for the replacement Assignment record.
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentCategoryCorrectionResult'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/RouteNotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '409':
+          $ref: '#/components/responses/IntegrityConflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    keyverse_oidc:
+      type: openIdConnect
+      description: Keyverse access token carrying the least-privilege People write scope.
+      openIdConnectUrl: https://identity.orgmetra.example/.well-known/openid-configuration
+  schemas:
+    AssignmentCategoryCorrectionCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - corrected_category_code
+        - confirmation_reference
+        - evidence_version_code
+      properties:
+        corrected_category_code:
+          type: string
+          enum: [primary, concurrent_secondary]
+        confirmation_reference:
+          type: string
+          maxLength: 300
+          pattern: '^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$'
+        evidence_version_code:
+          type: string
+          maxLength: 200
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+    AssignmentCategoryCorrectionResult:
+      type: object
+      additionalProperties: false
+      required:
+        - replacement_assignment_record_id
+        - assignment_supersession_record_id
+      properties:
+        replacement_assignment_record_id:
+          type: string
+          format: uuid
+        assignment_supersession_record_id:
+          type: string
+          format: uuid
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error_code, message, next_action, support_reference]
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string
+        next_action:
+          type: string
+        support_reference:
+          type: string
+  responses:
+    InvalidRequest:
+      description: The governed command or required headers are invalid.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    Unauthenticated:
+      description: Bearer authentication is missing or invalid.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    Forbidden:
+      description: Tenant, actor, purpose, scope, or field authorization is denied.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    RouteNotFound:
+      description: The request does not address the owned correction route.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    MethodNotAllowed:
+      description: The correction route accepts POST only.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    IntegrityConflict:
+      description: Current Assignment truth or idempotency evidence conflicts with the requested correction.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    PayloadTooLarge:
+      description: The JSON command exceeds the bounded request size.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    UnsupportedMediaType:
+      description: The request is not application/json.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+    InternalError:
+      description: An internal dependency failed without exposing secrets or backend details.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
