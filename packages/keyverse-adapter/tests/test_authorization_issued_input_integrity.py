@@ -120,11 +120,11 @@ def test_rejected_policy_reinitialization_preserves_issued_value() -> None:
 
 
 def test_invalid_policy_reinitialization_preserves_issued_value() -> None:
-    """Validation failure during a second constructor call must also be side-effect free."""
+    """The issuance guard precedes validation and leaves an issued policy unchanged."""
     policy = _policy()
     before = repr(policy)
 
-    with pytest.raises(ValueError, match="policy_version_code"):
+    with pytest.raises(TypeError, match="PurposeBoundAccessPolicy is already initialized"):
         PurposeBoundAccessPolicy.__init__(
             policy,
             tenant_record_id=TENANT,
@@ -191,11 +191,11 @@ def test_rejected_request_reinitialization_preserves_issued_value() -> None:
 
 
 def test_invalid_request_reinitialization_preserves_issued_value() -> None:
-    """Invalid second-constructor input cannot partially rewrite the issued request."""
+    """The issuance guard precedes validation and leaves an issued request unchanged."""
     request = _request()
     before = repr(request)
 
-    with pytest.raises(ValueError, match="resource_reference"):
+    with pytest.raises(TypeError, match="PurposeBoundAccessRequest is already initialized"):
         PurposeBoundAccessRequest.__init__(
             request,
             tenant_record_id=TENANT,
