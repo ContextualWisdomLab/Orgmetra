@@ -17,6 +17,40 @@ _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$"
 _SCOPE_PATTERN = re.compile(r"^orgmetra(?:\.[a-z][a-z0-9_]*){2,}$")
 
 
+def _validated_principal_storage(
+    value: tuple[int, str, frozenset[str]],
+) -> tuple[int, str, frozenset[str]]:
+    """Return exact tuple-backed identity evidence or reject malformed storage.
+
+    ``tuple.__new__`` can instantiate a tuple subclass without invoking that
+    subclass's public constructor. Public principal behavior therefore cannot
+    assume that tuple storage was validated merely because the runtime class is
+    exact. Revalidating the raw built-in tuple slots keeps request-edge consumers
+    fail-closed without treating Python construction history as policy authority.
+    """
+    if tuple.__len__(value) != 3:
+        raise ValueError("stored authentication evidence is malformed.")
+    tenant_record_id_int = tuple.__getitem__(value, 0)
+    actor_reference = tuple.__getitem__(value, 1)
+    granted_scope_codes = tuple.__getitem__(value, 2)
+    if (
+        type(tenant_record_id_int) is not int
+        or not 0 <= tenant_record_id_int <= _MAX_UUID_INT
+        or tenant_record_id_int in (0, _MAX_UUID_INT)
+    ):
+        raise ValueError("stored authentication evidence is malformed.")
+    if type(actor_reference) is not str or _REFERENCE_PATTERN.fullmatch(actor_reference) is None:
+        raise ValueError("stored authentication evidence is malformed.")
+    if type(granted_scope_codes) is not frozenset or not granted_scope_codes:
+        raise ValueError("stored authentication evidence is malformed.")
+    if any(
+        type(scope) is not str or _SCOPE_PATTERN.fullmatch(scope) is None
+        for scope in granted_scope_codes
+    ):
+        raise ValueError("stored authentication evidence is malformed.")
+    return tenant_record_id_int, actor_reference, granted_scope_codes
+
+
 class AuthenticationFailed(RuntimeError):
     """Indicate that bearer authentication evidence is absent or malformed."""
 
@@ -32,6 +66,8 @@ class AuthenticatedPrincipal(tuple[int, str, frozenset[str]]):
     Tuple-backed storage deliberately leaves no writable instance slots. The
     tenant UUID is stored as its validated integer and reconstructed on access,
     so neither the caller's UUID nor a returned UUID aliases stored authority.
+    Public access also revalidates all raw tuple slots because callers inside the
+    service TCB can invoke ``tuple.__new__`` without this class's constructor.
     """
 
     __slots__ = ()
@@ -62,44 +98,51 @@ class AuthenticatedPrincipal(tuple[int, str, frozenset[str]]):
     @property
     def tenant_record_id(self) -> UUID:
         """Return a detached authenticated tenant identifier value."""
-        return UUID(int=self[0])
+        tenant_record_id_int, _, _ = _validated_principal_storage(self)
+        return UUID(int=tenant_record_id_int)
 
     @property
     def actor_reference(self) -> str:
         """Return the opaque authenticated actor correlation reference."""
-        return self[1]
+        _, actor_reference, _ = _validated_principal_storage(self)
+        return actor_reference
 
     @property
     def granted_scope_codes(self) -> frozenset[str]:
         """Return the exact operation scopes issued at authentication."""
-        return self[2]
+        _, _, granted_scope_codes = _validated_principal_storage(self)
+        return granted_scope_codes
 
     def __repr__(self) -> str:
         """Render the same field-oriented diagnostic shape as the prior value object."""
+        tenant_record_id_int, actor_reference, granted_scope_codes = _validated_principal_storage(self)
         return (
             "AuthenticatedPrincipal("
-            f"tenant_record_id={self.tenant_record_id!r}, "
-            f"actor_reference={self.actor_reference!r}, "
-            f"granted_scope_codes={self.granted_scope_codes!r})"
+            f"tenant_record_id={UUID(int=tenant_record_id_int)!r}, "
+            f"actor_reference={actor_reference!r}, "
+            f"granted_scope_codes={granted_scope_codes!r})"
         )
 
     def __eq__(self, other: object) -> bool:
         """Compare only another exact authenticated-principal value."""
         if type(other) is not AuthenticatedPrincipal:
             return False
-        return tuple.__eq__(self, other)
+        return _validated_principal_storage(self) == _validated_principal_storage(other)
 
     def __ne__(self, other: object) -> bool:
         """Keep inequality consistent with strict principal-only equality."""
         if type(other) is not AuthenticatedPrincipal:
             return True
-        return tuple.__ne__(self, other)
+        return _validated_principal_storage(self) != _validated_principal_storage(other)
 
-    __hash__ = tuple.__hash__
+    def __hash__(self) -> int:
+        """Hash only revalidated immutable authentication evidence."""
+        return hash(_validated_principal_storage(self))
 
     def __getnewargs__(self) -> tuple[UUID, str, frozenset[str]]:
         """Preserve validated constructor arguments for standard value reconstruction."""
-        return (self.tenant_record_id, self.actor_reference, self.granted_scope_codes)
+        tenant_record_id_int, actor_reference, granted_scope_codes = _validated_principal_storage(self)
+        return (UUID(int=tenant_record_id_int), actor_reference, granted_scope_codes)
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         """Prevent executable principal subclasses from overriding authenticated evidence."""
