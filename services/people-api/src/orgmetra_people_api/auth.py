@@ -89,6 +89,12 @@ class AuthenticatedPrincipal(tuple[UUID, str, frozenset[str]]):
             return False
         return tuple.__eq__(self, other)
 
+    def __ne__(self, other: object) -> bool:
+        """Keep inequality consistent with strict principal-only equality."""
+        if type(other) is not AuthenticatedPrincipal:
+            return True
+        return tuple.__ne__(self, other)
+
     __hash__ = tuple.__hash__
 
     def __getnewargs__(self) -> tuple[UUID, str, frozenset[str]]:
