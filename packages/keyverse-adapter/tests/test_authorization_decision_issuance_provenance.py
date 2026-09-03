@@ -1,11 +1,8 @@
-"""Issuance-provenance regressions for purpose-bound authorization decisions."""
+"""Trust-boundary regressions for purpose-bound authorization decisions."""
 
 from __future__ import annotations
 
-import weakref
 from uuid import UUID
-
-import pytest
 
 import orgmetra_keyverse_adapter.authorization as authorization_module
 from orgmetra_keyverse_adapter import (
@@ -20,97 +17,49 @@ RESOURCE_REFERENCE = "assignment_record:0198a412800070008000000000000070"
 REQUESTED_FIELDS = frozenset({"assignment_category_code"})
 
 
-def test_direct_decision_constructor_cannot_mint_allow_authority() -> None:
-    """A caller must not mint an allow decision without governed policy evaluation."""
-    with pytest.raises(TypeError, match="purpose-bound evaluation"):
-        AuthorizationDecision(
-            allowed=True,
-            tenant_record_id=TENANT,
-            actor_reference="keyverse_subject:operator-17",
-            resource_reference=RESOURCE_REFERENCE,
-            policy_version_code="assignment-correction-v1",
-            purpose_code="workforce_admin",
-            operation_code="correct_record",
-            resource_kind="assignment_record",
-            requested_fields=REQUESTED_FIELDS,
-            authorized_fields=REQUESTED_FIELDS,
-            reason_code="access_permitted",
-            next_action="Continue with only the authorized fields.",
-        )
+def _decision_values() -> dict[str, object]:
+    """Return one semantically coherent PII-minimized allow decision payload."""
+    return {
+        "allowed": True,
+        "tenant_record_id": TENANT,
+        "actor_reference": "keyverse_subject:operator-17",
+        "resource_reference": RESOURCE_REFERENCE,
+        "policy_version_code": "assignment-correction-v1",
+        "purpose_code": "workforce_admin",
+        "operation_code": "correct_record",
+        "resource_kind": "assignment_record",
+        "requested_fields": REQUESTED_FIELDS,
+        "authorized_fields": REQUESTED_FIELDS,
+        "reason_code": "access_permitted",
+        "next_action": "Continue with only the authorized fields.",
+    }
 
 
-def test_module_decision_helper_cannot_mint_from_fabricated_snapshots() -> None:
-    """Module-callable helpers must not turn fabricated snapshots into authority."""
-    request_snapshot = authorization_module._RequestSnapshot(
-        TENANT.int,
-        TENANT.int,
-        TENANT.int,
-        "keyverse_subject:operator-17",
-        RESOURCE_REFERENCE,
-        "workforce_admin",
-        "correct_record",
-        "assignment_record",
-        REQUESTED_FIELDS,
-        frozenset({"orgmetra.people.write"}),
-    )
-    policy_snapshot = authorization_module._PolicySnapshot(
-        TENANT.int,
-        "assignment-correction-v1",
-        "assignment_record",
-        "workforce_admin",
-        "correct_record",
-        "orgmetra.people.write",
-        REQUESTED_FIELDS,
-    )
+def test_direct_decision_construction_validates_data_but_does_not_claim_provenance() -> None:
+    """A Python decision object is validated evidence data, not an unforgeable capability."""
+    decision = AuthorizationDecision(**_decision_values())  # type: ignore[arg-type]
 
-    with pytest.raises(TypeError, match="internal to evaluate_purpose_bound_access"):
-        authorization_module._decision(
-            request=request_snapshot,
-            policy=policy_snapshot,
-            allowed=True,
-            reason_code="access_permitted",
-        )
-    assert not hasattr(authorization_module, "_DECISION_ISSUANCE_IDS")
+    assert decision.allowed is True
+    assert decision.tenant_record_id == TENANT
+    assert decision.authorized_fields == REQUESTED_FIELDS
 
 
-def test_module_registry_insertion_cannot_mint_forged_decision() -> None:
-    """Consumer-visible module state must not provide a writable authority registry."""
-    forged = object.__new__(AuthorizationDecision)
-    snapshot = authorization_module._validated_decision_snapshot(
-        allowed=True,
-        tenant_record_id=TENANT,
-        actor_reference="keyverse_subject:operator-17",
-        resource_reference=RESOURCE_REFERENCE,
-        policy_version_code="assignment-correction-v1",
-        purpose_code="workforce_admin",
-        operation_code="correct_record",
-        resource_kind="assignment_record",
-        requested_fields=REQUESTED_FIELDS,
-        authorized_fields=REQUESTED_FIELDS,
-        reason_code="access_permitted",
-        next_action="Continue with only the authorized fields.",
-    )
-    registry = getattr(authorization_module, "_DECISION_SNAPSHOT_REGISTRY", None)
-    inserted = False
-    try:
-        if registry is not None:
-            try:
-                registry[id(forged)] = (weakref.ref(forged), snapshot)
-            except TypeError:
-                pass
-            else:
-                inserted = True
-        with pytest.raises(ValueError, match="was not issued by purpose-bound evaluation"):
-            _ = forged.allowed
-    finally:
-        if inserted:
-            registry.pop(id(forged), None)
-
-    assert registry is None
+def test_authorization_module_exposes_no_mutable_issuance_registry() -> None:
+    """No Python mapping or id-set may be represented as authorization issuance authority."""
+    for attribute_name in (
+        "_DECISION_SNAPSHOT_REGISTRY",
+        "_DECISION_ISSUANCE_IDS",
+        "_POLICY_SNAPSHOT_REGISTRY",
+        "_REQUEST_SNAPSHOT_REGISTRY",
+        "_POLICY_CONSTRUCTION_IDS",
+        "_REQUEST_CONSTRUCTION_IDS",
+    ):
+        assert not hasattr(authorization_module, attribute_name)
+    assert evaluate_purpose_bound_access.__closure__ is None
 
 
-def test_governed_evaluator_remains_the_decision_issuance_path() -> None:
-    """Matching issued request and policy evidence still produce one allow decision."""
+def test_governed_evaluator_builds_decision_from_current_trusted_policy_and_request() -> None:
+    """The normal service path still evaluates every narrowing attribute before allow."""
     policy = PurposeBoundAccessPolicy(
         tenant_record_id=TENANT,
         policy_version_code="assignment-correction-v1",
