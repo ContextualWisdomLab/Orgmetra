@@ -25,15 +25,27 @@ from test_postgres import (
 )
 
 
+class _AlwaysEqualText(str):
+    """Model a non-canonical DB-returned text value that lies during comparison."""
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+
 class PostgresIdempotencyAuthorityTests(unittest.TestCase):
     """Prove a durable idempotency key cannot cross command or authority identity."""
 
     def _persist_replay(
         self,
         *,
-        stored_actor_reference: str,
-        stored_purpose_code: str,
+        stored_actor_reference: object,
+        stored_purpose_code: object,
         stored_analysis_record_id: object = ANALYSIS,
+        stored_request_digest: object | None = None,
+        include_stored_authority: bool = True,
         actor_reference: str = "keyverse:actor-ja-1",
         purpose_code: str = "job_analysis_write",
         include_snapshot: bool = False,
@@ -45,15 +57,18 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
             position_record_id=None,
             criterion_blueprint_id=None,
         )
-        script: list[object] = [
-            None,
-            (
-                digest,
+        durable_digest = digest if stored_request_digest is None else stored_request_digest
+        durable_row: tuple[object, ...]
+        if include_stored_authority:
+            durable_row = (
+                durable_digest,
                 stored_analysis_record_id,
                 stored_actor_reference,
                 stored_purpose_code,
-            ),
-        ]
+            )
+        else:
+            durable_row = (durable_digest, stored_analysis_record_id)
+        script: list[object] = [None, durable_row]
         if include_snapshot:
             script.extend(
                 [
@@ -83,6 +98,44 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
         normalized = " ".join(_IDEMPOTENCY_LOOKUP_SQL.lower().split())
         self.assertIn("actor_reference", normalized)
         self.assertIn("purpose_code", normalized)
+
+    def test_authorityless_durable_row_fails_closed(self) -> None:
+        """Reject a replay row that does not have the four columns selected by the SQL contract."""
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "durable command row"):
+            self._persist_replay(
+                stored_actor_reference="keyverse:actor-ja-1",
+                stored_purpose_code="job_analysis_write",
+                include_stored_authority=False,
+                include_snapshot=True,
+            )
+
+    def test_noncanonical_stored_digest_cannot_bypass_digest_binding(self) -> None:
+        """Revalidate database-returned digest text before using equality for authority."""
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "durable command"):
+            self._persist_replay(
+                stored_actor_reference="keyverse:actor-ja-1",
+                stored_purpose_code="job_analysis_write",
+                stored_request_digest=_AlwaysEqualText("f" * 64),
+                include_snapshot=True,
+            )
+
+    def test_noncanonical_stored_actor_cannot_bypass_actor_binding(self) -> None:
+        """Reject a driver-returned actor text subtype before comparing authority identity."""
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "durable command"):
+            self._persist_replay(
+                stored_actor_reference=_AlwaysEqualText("keyverse:actor-ja-other"),
+                stored_purpose_code="job_analysis_write",
+                include_snapshot=True,
+            )
+
+    def test_noncanonical_stored_purpose_cannot_bypass_purpose_binding(self) -> None:
+        """Reject a driver-returned purpose text subtype before comparing purpose authority."""
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "durable command"):
+            self._persist_replay(
+                stored_actor_reference="keyverse:actor-ja-1",
+                stored_purpose_code=_AlwaysEqualText("job_analysis_read"),
+                include_snapshot=True,
+            )
 
     def test_same_key_and_digest_cannot_replay_under_a_different_actor(self) -> None:
         """Prevent one authorized principal from inheriting another actor's command."""
