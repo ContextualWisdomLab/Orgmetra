@@ -257,12 +257,18 @@ class PostgresJobAnalysisPort:
             idempotency_key=idempotency_key,
             request_digest=request_digest,
         )
-        validate_operational_uuid("write_command_id", write_command_id)
-        validate_operational_uuid("outbox_delivery_record_id", outbox_delivery_record_id)
+        write_command_id = validate_operational_uuid("write_command_id", write_command_id)
+        outbox_delivery_record_id = validate_operational_uuid(
+            "outbox_delivery_record_id",
+            outbox_delivery_record_id,
+        )
         if position_record_id is not None:
-            validate_operational_uuid("position_record_id", position_record_id)
+            position_record_id = validate_operational_uuid("position_record_id", position_record_id)
         if criterion_blueprint_id is not None:
-            validate_operational_uuid("criterion_blueprint_id", criterion_blueprint_id)
+            criterion_blueprint_id = validate_operational_uuid(
+                "criterion_blueprint_id",
+                criterion_blueprint_id,
+            )
         expected_resource_reference = f"job_analysis_snapshot:{snapshot.analysis_record_id.hex}"
         if (
             audit_event.tenant_record_id != snapshot.tenant_record_id
@@ -446,8 +452,8 @@ class PostgresJobAnalysisPort:
         analysis_record_id: UUID,
     ) -> JobAnalysisSnapshot | None:
         """Read one snapshot under forced tenant RLS and reconstruct the kernel document."""
-        validate_operational_uuid("tenant_record_id", tenant_record_id)
-        validate_operational_uuid("analysis_record_id", analysis_record_id)
+        tenant_record_id = validate_operational_uuid("tenant_record_id", tenant_record_id)
+        analysis_record_id = validate_operational_uuid("analysis_record_id", analysis_record_id)
         with self.connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
