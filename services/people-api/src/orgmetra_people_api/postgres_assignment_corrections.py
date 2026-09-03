@@ -187,8 +187,8 @@ def _require_correction_authorization(
     command: AssignmentCorrectionMutationCommand,
 ) -> AuthorizationDecision:
     """Require the exact allow decision for the predecessor category correction."""
-    if not isinstance(authorization, AuthorizationDecision):
-        raise PeopleMutationIntegrityError("assignment correction requires a typed authorization decision")
+    if type(authorization) is not AuthorizationDecision:
+        raise PeopleMutationIntegrityError("assignment correction requires an exact authorization decision")
     if (
         not authorization.allowed
         or authorization.tenant_record_id != command.tenant_record_id
@@ -344,8 +344,8 @@ class PostgresAssignmentCorrectionMutationPort:
         authorization: AuthorizationDecision,
     ) -> AssignmentCorrectionMutationResult:
         """Lock, revalidate, replace, link, audit, and bind replay evidence atomically."""
-        if not isinstance(command, AssignmentCorrectionMutationCommand):
-            raise TypeError("command must be an AssignmentCorrectionMutationCommand")
+        if type(command) is not AssignmentCorrectionMutationCommand:
+            raise TypeError("command must be an exact AssignmentCorrectionMutationCommand")
         decision = _require_correction_authorization(
             authorization=authorization,
             command=command,
