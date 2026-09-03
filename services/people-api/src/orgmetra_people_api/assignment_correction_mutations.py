@@ -126,10 +126,10 @@ def assignment_correction_command_digest(
     authorization: AuthorizationDecision,
 ) -> str:
     """Hash correction semantics while excluding retry-generated record identities."""
-    if not isinstance(command, AssignmentCorrectionMutationCommand):
-        raise TypeError("command must be an AssignmentCorrectionMutationCommand")
-    if not isinstance(authorization, AuthorizationDecision):
-        raise TypeError("authorization must be an AuthorizationDecision")
+    if type(command) is not AssignmentCorrectionMutationCommand:
+        raise TypeError("command must be an exact AssignmentCorrectionMutationCommand")
+    if type(authorization) is not AuthorizationDecision:
+        raise TypeError("authorization must be an exact AuthorizationDecision")
     payload = {
         "actor_reference": authorization.actor_reference,
         "command_route": "assignment-category-corrections",
