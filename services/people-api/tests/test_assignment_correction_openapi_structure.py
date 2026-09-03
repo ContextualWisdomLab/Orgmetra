@@ -64,7 +64,10 @@ class AssignmentCorrectionOpenApiStructureTests(unittest.TestCase):
         created = _mapping_block(responses, key="'201'", indent=8)
 
         self.assertIn("      operationId: correctAssignmentRecordCategory", post)
-        self.assertIn("            - orgmetra.people.write", security)
+        self.assertIn(
+            "        - keyverse_oidc:\n            - orgmetra.people.write",
+            security,
+        )
         for header in _REQUIRED_HEADERS:
             self.assertIn(
                 f"        - name: {header}\n          in: header\n          required: true",
