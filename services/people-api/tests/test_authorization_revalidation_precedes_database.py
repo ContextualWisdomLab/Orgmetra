@@ -89,17 +89,17 @@ class AuthorizationRevalidationBeforeDatabaseTests(unittest.TestCase):
 
         self.assertEqual(factory.call_count, 0)
 
-    def test_generic_digest_maps_corrupt_decision_to_people_integrity_error(self) -> None:
-        """Idempotency hashing must use the People integrity error vocabulary."""
-        with self.assertRaises(PeopleMutationIntegrityError):
+    def test_generic_digest_revalidates_before_reading_corrupt_evidence(self) -> None:
+        """Idempotency hashing must reject contradictory decision data before hashing it."""
+        with self.assertRaises(ValueError):
             mutation_command_digest(
                 command=employment_command(),
                 authorization=_contradict(employment_authorization()),  # type: ignore[arg-type]
             )
 
-    def test_hire_digest_maps_corrupt_decision_to_hire_integrity_error(self) -> None:
-        """Hire replay hashing must use the hire integrity error vocabulary."""
-        with self.assertRaises(HireDecisionIntegrityError):
+    def test_hire_digest_revalidates_before_reading_corrupt_evidence(self) -> None:
+        """Hire replay hashing must reject contradictory decision data before hashing it."""
+        with self.assertRaises(ValueError):
             _hire_command_digest(
                 hire_command(),
                 _contradict(allowed_authorization()),  # type: ignore[arg-type]
