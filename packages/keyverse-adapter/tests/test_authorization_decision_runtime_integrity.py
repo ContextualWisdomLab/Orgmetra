@@ -61,6 +61,14 @@ def test_decision_resists_object_setattr_after_valid_construction() -> None:
     assert decision.reason_code == "access_permitted"
 
 
+def test_decision_detaches_caller_owned_exact_uuid() -> None:
+    """Later low-level mutation of an accepted UUID object must not rewrite issued evidence."""
+    tenant = UUID(str(TENANT))
+    decision = _decision(tenant_record_id=tenant)
+    object.__setattr__(tenant, "int", 0)
+    assert decision.tenant_record_id == TENANT
+
+
 def test_decision_rejects_non_boolean_allowed_flag() -> None:
     """Do not let truthy integers masquerade as an authorization verdict."""
     with pytest.raises(ValueError, match="allowed must be a boolean"):
