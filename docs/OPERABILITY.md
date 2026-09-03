@@ -6,6 +6,14 @@
 - High-impact command audit append success: 99.99% within accepted maintenance windows.
 - Integration adapter error visibility: every failed outbound command produces an operator-safe event.
 
+### People API liveness and readiness
+
+- `GET /health` is process-liveness evidence only. It must not call PostgreSQL, Keyverse, Naruon, or another external dependency; a healthy process returns `200` with the bounded body `{"status":"ok"}`. Orchestrators may use this route for restart decisions without turning a transient database outage into a restart loop.
+- `GET /ready` is traffic-eligibility evidence for the People API's owned PostgreSQL dependency. The current adapter opens a read-only transaction, issues only `SET TRANSACTION READ ONLY` and `SELECT 1`, and does not query HR application tables or require tenant context. A successful check returns `200` with `{"status":"ready"}`.
+- A readiness dependency failure returns bounded HTTP `503` evidence with `error=not_ready` and a retry-oriented next action. The response must not disclose database exception text, credentials, connection strings, SQL details, tenant identifiers, or HR values.
+- Readiness deliberately does not probe read-only dedicated-writer dependencies such as Keyverse or Naruon. Their outages retain their separately governed fail-closed/degraded-mode semantics and must not be converted into an Orgmetra process-liveness failure.
+- These routes are an executable operability contract, not a deployment or certification claim. Production orchestration still requires reviewed startup/liveness/readiness timing, network policy, resource limits, telemetry, SLO alerting, and recovery evidence on the released artifact.
+
 ## Degraded modes
 
 ### Keyverse unavailable

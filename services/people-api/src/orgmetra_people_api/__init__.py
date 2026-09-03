@@ -1,4 +1,4 @@
-"""Request-edge, governed read, confirmed-hire, and People mutation contracts."""
+"""Request-edge, governed read, confirmed-hire, mutation, and operability contracts."""
 
 from orgmetra_people_api.auth import (
     AuthenticatedPrincipal,
@@ -32,6 +32,11 @@ from orgmetra_people_api.mutations import (
     create_employment_record,
     create_position_record,
 )
+from orgmetra_people_api.operability import (
+    PeopleOperabilityAsgiApp,
+    PostgresReadinessProbe,
+    ReadinessProbe,
+)
 from orgmetra_people_api.people import (
     AuthorizedWorkerPeopleView,
     PeopleReadPort,
@@ -59,6 +64,7 @@ __all__ = [
     "PeopleMutationIntegrityError",
     "PeopleMutationNotFound",
     "PeopleMutationPort",
+    "PeopleOperabilityAsgiApp",
     "PeopleReadPort",
     "PeopleRecordIntegrityError",
     "PeopleRecordNotFound",
@@ -67,6 +73,8 @@ __all__ = [
     "PostgresHireAcceptancePort",
     "PostgresPeopleMutationPort",
     "PostgresPeopleReadPort",
+    "PostgresReadinessProbe",
+    "ReadinessProbe",
     "AssignmentMutationCommand",
     "AssignmentMutationResult",
     "EmploymentMutationCommand",
