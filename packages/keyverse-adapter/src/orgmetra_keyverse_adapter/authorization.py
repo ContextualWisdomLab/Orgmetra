@@ -228,8 +228,8 @@ class AuthorizationDecision:
             raise ValueError("deny decision must not authorize fields.")
         if self.allowed and self.reason_code != "access_permitted":
             raise ValueError("allow decision must use access_permitted reason.")
-        if not self.allowed and self.reason_code not in _DENIAL_NEXT_ACTION:
-            raise ValueError("deny decision must use a governed denial reason.")
+        if not self.allowed and self.reason_code == "access_permitted":
+            raise ValueError("deny decision must not use access_permitted reason.")
 
 
 class AuthorizationDeniedError(PermissionError):
