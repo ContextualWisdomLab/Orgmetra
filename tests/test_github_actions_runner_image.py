@@ -90,6 +90,24 @@ class GitHubActionsRunnerImageContractTest(unittest.TestCase):
             sum(value == _EXPECTED_RUNNER for _, value in declarations),
         )
 
+    def test_runner_parser_only_strips_yaml_comment_tokens(self) -> None:
+        """Do not mistake a hash inside a plain or quoted scalar for a YAML comment."""
+        sample = "\n".join(
+            (
+                "runs-on: ubuntu-24.04 # supported image",
+                "runs-on: ubuntu-24.04#not-a-comment",
+                "runs-on: 'ubuntu-24.04#not-a-comment'",
+            )
+        )
+        self.assertEqual(
+            [
+                "ubuntu-24.04",
+                "ubuntu-24.04#not-a-comment",
+                "ubuntu-24.04#not-a-comment",
+            ],
+            [value for _, value in _runner_declarations(sample)],
+        )
+
 
 if __name__ == "__main__":  # pragma: no cover - normal execution is via unittest discovery.
     unittest.main()
