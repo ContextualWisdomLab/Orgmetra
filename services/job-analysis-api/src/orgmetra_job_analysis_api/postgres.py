@@ -13,6 +13,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
+import json
 import re
 from typing import Any, Callable
 from uuid import UUID
@@ -229,6 +230,17 @@ def _snapshot_durable_audit_authority(
         authority_text.append(value)
     resource_reference, actor_reference, purpose_code = authority_text
     canonical_json = audit_event.canonical_json()
+    canonical_event = json.loads(canonical_json)
+    if (
+        canonical_event.get("id") != str(event_id)
+        or canonical_event.get("orgmetratenant") != str(tenant_record_id)
+        or canonical_event.get("subject") != resource_reference
+        or canonical_event.get("orgmetraactor") != actor_reference
+        or canonical_event.get("orgmetrapurpose") != purpose_code
+    ):
+        raise JobAnalysisIntegrityError(
+            "canonical audit evidence does not match validated authority"
+        )
     content_digest = sha256(canonical_json.encode("utf-8")).hexdigest()
     return (
         event_id,
