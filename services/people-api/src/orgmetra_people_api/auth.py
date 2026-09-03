@@ -86,7 +86,7 @@ class AuthenticatedPrincipal(tuple[UUID, str, frozenset[str]]):
     def __eq__(self, other: object) -> bool:
         """Compare only another exact authenticated-principal value."""
         if type(other) is not AuthenticatedPrincipal:
-            return NotImplemented
+            return False
         return tuple.__eq__(self, other)
 
     __hash__ = tuple.__hash__
