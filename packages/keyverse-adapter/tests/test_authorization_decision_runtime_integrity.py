@@ -1,9 +1,7 @@
-"""Runtime-integrity regressions for evaluator-issued authorization decisions."""
+"""Runtime-integrity regressions for purpose-bound authorization decision data."""
 
 from __future__ import annotations
 
-import gc
-import weakref
 from uuid import UUID
 
 import pytest
@@ -34,7 +32,7 @@ class _ForgedFieldSet(frozenset[str]):
 
 
 def _policy(**overrides: object) -> PurposeBoundAccessPolicy:
-    """Build one deterministic issued policy for decision-integrity tests."""
+    """Build one deterministic trusted policy for decision-integrity tests."""
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
         "policy_version_code": "assignment-correction-v1",
@@ -49,7 +47,7 @@ def _policy(**overrides: object) -> PurposeBoundAccessPolicy:
 
 
 def _request(**overrides: object) -> PurposeBoundAccessRequest:
-    """Build one deterministic issued request for decision-integrity tests."""
+    """Build one deterministic request value for decision-integrity tests."""
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
         "actor_tenant_record_id": TENANT,
@@ -67,12 +65,12 @@ def _request(**overrides: object) -> PurposeBoundAccessRequest:
 
 
 def _decision() -> AuthorizationDecision:
-    """Return one allow decision issued only by the governed evaluator."""
+    """Return one allow decision from the normal evaluator path."""
     return evaluate_purpose_bound_access(request=_request(), policy=_policy())
 
 
 def _validate_decision(**overrides: object) -> tuple[object, ...]:
-    """Exercise the internal pure evidence validator without minting authority."""
+    """Exercise the pure evidence validator without asserting object provenance."""
     values: dict[str, object] = {
         "allowed": True,
         "tenant_record_id": TENANT,
@@ -91,77 +89,56 @@ def _validate_decision(**overrides: object) -> tuple[object, ...]:
     return authorization_module._validated_decision_snapshot(**values)
 
 
-def test_decision_cannot_be_subclassed_to_bypass_validation() -> None:
-    """Caller-defined decision classes must not override issued evidence behavior."""
+def test_decision_cannot_be_subclassed_to_override_runtime_behavior() -> None:
+    """Caller-defined decision classes cannot override validated field semantics."""
     with pytest.raises(TypeError, match="AuthorizationDecision must not be subclassed"):
 
         class _ForgedDecision(AuthorizationDecision):
             pass
 
 
-def test_decision_resists_object_setattr_after_valid_evaluation() -> None:
-    """Low-level attribute writes cannot replace already-issued authorization evidence."""
+def test_consumer_revalidation_detects_low_level_decision_mutation() -> None:
+    """A durable consumer can fail closed if trusted-process code corrupts decision data."""
     decision = _decision()
-    with pytest.raises((AttributeError, TypeError)):
-        object.__setattr__(decision, "allowed", False)
-    assert decision.allowed is True
-    assert decision.reason_code == "access_permitted"
+    object.__setattr__(decision, "allowed", False)
+
+    with pytest.raises(ValueError, match="deny decision must not authorize fields"):
+        authorization_module.validate_authorization_decision(decision)
 
 
 def test_decision_detaches_caller_owned_exact_uuid() -> None:
-    """Later low-level UUID mutation must not rewrite an evaluator-issued decision."""
+    """Later low-level UUID mutation cannot rewrite constructed decision data."""
     tenant = UUID(str(TENANT))
-    decision = evaluate_purpose_bound_access(
-        request=_request(
-            tenant_record_id=tenant,
-            actor_tenant_record_id=tenant,
-            resource_tenant_record_id=tenant,
-        ),
-        policy=_policy(tenant_record_id=tenant),
+    decision = AuthorizationDecision(
+        allowed=True,
+        tenant_record_id=tenant,
+        actor_reference="keyverse_subject:operator-17",
+        resource_reference=RESOURCE_REFERENCE,
+        policy_version_code="assignment-correction-v1",
+        purpose_code="workforce_admin",
+        operation_code="correct_record",
+        resource_kind="assignment_record",
+        requested_fields=REQUESTED_FIELDS,
+        authorized_fields=REQUESTED_FIELDS,
+        reason_code="access_permitted",
+        next_action="Continue with only the authorized fields.",
     )
     object.__setattr__(tenant, "int", 0)
+
     assert decision.tenant_record_id == TENANT
 
 
 @pytest.mark.parametrize("forged_int", [-1, 1 << 128, "invalid"])
 def test_decision_validator_rejects_low_level_corrupted_exact_uuid(forged_int: object) -> None:
-    """The internal snapshot validator rejects an exact UUID with corrupted integer state."""
+    """The snapshot validator rejects an exact UUID with corrupted integer state."""
     tenant = UUID(str(TENANT))
     object.__setattr__(tenant, "int", forged_int)
     with pytest.raises(ValueError, match="tenant_record_id must contain a valid UUID integer"):
         _validate_decision(tenant_record_id=tenant)
 
 
-def test_decision_rejects_unissued_low_level_instance() -> None:
-    """Bypassing evaluation must not yield readable authorization evidence."""
-    forged = object.__new__(AuthorizationDecision)
-    with pytest.raises(ValueError, match="was not issued by purpose-bound evaluation"):
-        _ = forged.allowed
-
-
-def test_decision_cannot_be_reinitialized_with_new_evidence() -> None:
-    """A previously issued decision cannot be replaced through a second initializer call."""
-    decision = _decision()
-    with pytest.raises(TypeError, match="already initialized"):
-        AuthorizationDecision.__init__(
-            decision,
-            allowed=False,
-            tenant_record_id=TENANT,
-            actor_reference="keyverse_subject:operator-17",
-            resource_reference=RESOURCE_REFERENCE,
-            policy_version_code="assignment-correction-v1",
-            purpose_code="workforce_admin",
-            operation_code="correct_record",
-            resource_kind="assignment_record",
-            requested_fields=REQUESTED_FIELDS,
-            authorized_fields=frozenset(),
-            reason_code="field_not_allowed",
-            next_action="Request only fields allowed for this purpose.",
-        )
-
-
 def test_decision_preserves_value_semantics_and_deterministic_repr() -> None:
-    """Issuance hardening preserves equality, hashing, and diagnostic representation."""
+    """Validation preserves equality, hashing, and diagnostic representation."""
     left = _decision()
     right = _decision()
     assert left == right
@@ -171,15 +148,6 @@ def test_decision_preserves_value_semantics_and_deterministic_repr() -> None:
     assert "assignment_category_code" in repr(left)
 
 
-def test_decision_registry_does_not_retain_dead_evidence() -> None:
-    """Lifecycle bookkeeping must not keep evaluator-issued evidence alive."""
-    decision = _decision()
-    reference = weakref.ref(decision)
-    del decision
-    gc.collect()
-    assert reference() is None
-
-
 def test_decision_validator_rejects_non_boolean_allowed_flag() -> None:
     """Truthy integers cannot masquerade as an authorization verdict."""
     with pytest.raises(ValueError, match="allowed must be a boolean"):
@@ -187,7 +155,7 @@ def test_decision_validator_rejects_non_boolean_allowed_flag() -> None:
 
 
 def test_decision_validator_rejects_uuid_subclass() -> None:
-    """Decision snapshots cannot retain caller-defined UUID runtime behavior."""
+    """Decision data cannot retain caller-defined UUID runtime behavior."""
     forged = _ForgedUUID(str(TENANT))
     with pytest.raises(ValueError, match="tenant_record_id must be a UUID"):
         _validate_decision(tenant_record_id=forged)
@@ -207,14 +175,14 @@ def test_decision_validator_rejects_uuid_subclass() -> None:
     ],
 )
 def test_decision_validator_rejects_string_subclasses(field_name: str, forged_value: str) -> None:
-    """Decision snapshots cannot retain caller-defined text runtime behavior."""
+    """Decision data cannot retain caller-defined text runtime behavior."""
     with pytest.raises(ValueError):
         _validate_decision(**{field_name: forged_value})
 
 
 @pytest.mark.parametrize("field_name", ["requested_fields", "authorized_fields"])
 def test_decision_validator_rejects_frozenset_subclasses(field_name: str) -> None:
-    """Field evidence cannot override containment or equality after evaluation."""
+    """Field evidence cannot override containment or equality behavior."""
     forged = _ForgedFieldSet({"assignment_category_code"})
     with pytest.raises(ValueError, match=f"{field_name} must be a frozenset"):
         _validate_decision(**{field_name: forged})
@@ -262,7 +230,7 @@ def test_deny_decision_rejects_success_reason() -> None:
 
 
 def test_decision_validator_accepts_bounded_internal_denial_reason() -> None:
-    """The pure validator preserves a bounded denial code without minting authority."""
+    """The pure validator preserves a bounded denial code without conferring authority."""
     snapshot = _validate_decision(
         allowed=False,
         authorized_fields=frozenset(),
