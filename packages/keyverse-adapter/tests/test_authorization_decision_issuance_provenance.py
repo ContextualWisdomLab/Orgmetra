@@ -91,13 +91,19 @@ def test_module_registry_insertion_cannot_mint_forged_decision() -> None:
         next_action="Continue with only the authorized fields.",
     )
     registry = getattr(authorization_module, "_DECISION_SNAPSHOT_REGISTRY", None)
+    inserted = False
     try:
         if registry is not None:
-            registry[id(forged)] = (weakref.ref(forged), snapshot)
+            try:
+                registry[id(forged)] = (weakref.ref(forged), snapshot)
+            except TypeError:
+                pass
+            else:
+                inserted = True
         with pytest.raises(ValueError, match="was not issued by purpose-bound evaluation"):
             _ = forged.allowed
     finally:
-        if registry is not None:
+        if inserted:
             registry.pop(id(forged), None)
 
 
