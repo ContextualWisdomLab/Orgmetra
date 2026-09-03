@@ -47,7 +47,7 @@ class _AuditEventSubtype(AuditOutboxEvent):
 
 
 class _ForgedAuthorityText(str):
-    """Retain hostile audit text while reporting equality with reviewed authority."""
+    """Retain hostile audit text while reporting equality with reviewed evidence."""
 
     def __new__(cls, value: str, equal_to: str) -> _ForgedAuthorityText:
         """Build valid-looking text whose equality does not describe its stored bytes."""
@@ -56,7 +56,7 @@ class _ForgedAuthorityText(str):
         return instance
 
     def __eq__(self, other: object) -> bool:
-        """Spoof equality only for the reviewed authority value."""
+        """Spoof equality only for the reviewed evidence value."""
         return other == self._equal_to
 
     def __ne__(self, other: object) -> bool:
@@ -66,12 +66,18 @@ class _ForgedAuthorityText(str):
     __hash__ = str.__hash__
 
 
-class _AuthorityMutatingTimezone(tzinfo):
-    """Mutate an exact audit envelope from the canonicalization callback surface."""
+class _AuditFieldMutatingTimezone(tzinfo):
+    """Mutate one exact audit-envelope field from the canonicalization callback surface."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        field_name: str = "actor_reference",
+        field_value: object = "keyverse:actor-ja-canonicalization-drift",
+    ) -> None:
         """Start inert so AuditOutboxEvent construction itself remains valid."""
         self._audit_event: AuditOutboxEvent | None = None
+        self._field_name = field_name
+        self._field_value = field_value
         self._armed = False
 
     def arm(self, audit_event: AuditOutboxEvent) -> None:
@@ -80,13 +86,13 @@ class _AuthorityMutatingTimezone(tzinfo):
         self._armed = True
 
     def utcoffset(self, value: datetime | None) -> timedelta:
-        """Drift authority when canonicalization asks the timezone for its UTC offset."""
+        """Drift one field when canonicalization asks the timezone for its UTC offset."""
         del value
         if self._armed and self._audit_event is not None:
             object.__setattr__(
                 self._audit_event,
-                "actor_reference",
-                "keyverse:actor-ja-canonicalization-drift",
+                self._field_name,
+                self._field_value,
             )
         return timedelta(0)
 
@@ -110,7 +116,7 @@ def _audit_event(
     event_class: type[_AuditEventT] = AuditOutboxEvent,
     **overrides: object,
 ) -> _AuditEventT:
-    """Build one shaped audit envelope whose authority fields may be adversarially drifted."""
+    """Build one shaped audit envelope whose evidence may be adversarially drifted."""
     snapshot = clinical_psychologist_snapshot()
     values: dict[str, object] = {
         "event_id": UUID("0198a412-6000-7000-8000-000000000401"),
@@ -201,9 +207,63 @@ def test_exact_audit_event_rejects_forged_authority_text_before_database(
         _persist_with_audit(audit_event)
 
 
+@pytest.mark.parametrize(
+    "audit_event",
+    [
+        _audit_event(source_service="people_api"),
+        _audit_event(event_type="orgmetra.job_architecture.snapshot_superseded"),
+        _audit_event(reason_code="snapshot_corrected"),
+        _audit_event(evidence_version_code="unexpected:v1"),
+        _audit_event(result_code="updated"),
+        _audit_event(confirmation_reference="review:job-analysis-1"),
+        _audit_event(high_impact=True, confirmation_reference="review:job-analysis-1"),
+    ],
+)
+def test_job_analysis_audit_semantic_drift_fails_before_database(
+    audit_event: AuditOutboxEvent,
+) -> None:
+    """Durable audit semantics must identify this exact successful snapshot-recording write."""
+    with pytest.raises(
+        JobAnalysisIntegrityError,
+        match="audit event does not match the job-analysis snapshot semantics",
+    ):
+        _persist_with_audit(audit_event)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "forged_value", "reviewed_value"),
+    [
+        ("source_service", "people_api", "job_analysis_api"),
+        (
+            "event_type",
+            "orgmetra.job_architecture.snapshot_superseded",
+            "orgmetra.job_architecture.snapshot_recorded",
+        ),
+        ("reason_code", "snapshot_corrected", "snapshot_persisted"),
+        ("evidence_version_code", "unexpected:v1", clinical_psychologist_snapshot().analysis_version_code),
+        ("result_code", "updated", "recorded"),
+    ],
+)
+def test_exact_audit_event_rejects_forged_semantic_text_before_database(
+    field_name: str,
+    forged_value: str,
+    reviewed_value: str,
+) -> None:
+    """Runtime text equality must not substitute for durable audit semantic bytes."""
+    audit_event = _audit_event(
+        **{field_name: _ForgedAuthorityText(forged_value, reviewed_value)}
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=rf"audit_event\.{field_name} must be exact built-in text",
+    ):
+        _persist_with_audit(audit_event)
+
+
 def test_canonicalization_callback_cannot_drift_validated_audit_authority() -> None:
     """Canonical bytes must be rechecked after any executable timezone callback."""
-    callback_timezone = _AuthorityMutatingTimezone()
+    callback_timezone = _AuditFieldMutatingTimezone()
     audit_event = _audit_event(
         occurred_at=datetime(2026, 8, 18, 5, 1, tzinfo=callback_timezone)
     )
@@ -212,6 +272,21 @@ def test_canonicalization_callback_cannot_drift_validated_audit_authority() -> N
     with pytest.raises(
         JobAnalysisIntegrityError,
         match="canonical audit evidence does not match validated authority",
+    ):
+        _persist_with_audit(audit_event)
+
+
+def test_canonicalization_callback_cannot_drift_validated_audit_semantics() -> None:
+    """Frozen canonical bytes must still represent the pre-canonical semantic snapshot."""
+    callback_timezone = _AuditFieldMutatingTimezone("result_code", "updated")
+    audit_event = _audit_event(
+        occurred_at=datetime(2026, 8, 18, 5, 1, tzinfo=callback_timezone)
+    )
+    callback_timezone.arm(audit_event)
+
+    with pytest.raises(
+        JobAnalysisIntegrityError,
+        match="canonical audit evidence does not match validated semantics",
     ):
         _persist_with_audit(audit_event)
 
