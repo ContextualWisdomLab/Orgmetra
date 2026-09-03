@@ -249,6 +249,16 @@ class PostgresJobAnalysisPort:
             validate_operational_uuid("position_record_id", position_record_id)
         if criterion_blueprint_id is not None:
             validate_operational_uuid("criterion_blueprint_id", criterion_blueprint_id)
+        expected_resource_reference = f"job_analysis_snapshot:{snapshot.analysis_record_id.hex}"
+        if (
+            audit_event.tenant_record_id != snapshot.tenant_record_id
+            or audit_event.resource_reference != expected_resource_reference
+            or audit_event.actor_reference != actor_reference
+            or audit_event.purpose_code != purpose_code
+        ):
+            raise JobAnalysisIntegrityError(
+                "audit event does not match the job-analysis write authority"
+            )
 
         with self.connection_factory() as connection:
             with connection.cursor() as cursor:
