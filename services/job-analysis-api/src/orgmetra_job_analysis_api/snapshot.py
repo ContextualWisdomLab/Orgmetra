@@ -431,6 +431,7 @@ def persist_job_analysis_snapshot(
         occurred_at=datetime.now(timezone.utc),
         high_impact=False,
     )
+    authorized_snapshot = snapshot.to_snapshot()
     persisted = write_port.persist_snapshot(
         snapshot=snapshot,
         idempotency_key=key,
@@ -449,11 +450,11 @@ def persist_job_analysis_snapshot(
     )
     if type(persisted) is not JobAnalysisSnapshot:
         raise JobAnalysisIntegrityError("persisted snapshot has an invalid runtime type")
-    if persisted.to_snapshot() != snapshot.to_snapshot():
+    if persisted.to_snapshot() != authorized_snapshot:
         raise JobAnalysisIntegrityError("persisted snapshot escaped posted payload")
     return PersistedJobAnalysisView(
         resource_reference=decision.resource_reference,
-        snapshot=persisted.to_snapshot(),
+        snapshot=authorized_snapshot,
     )
 
 
