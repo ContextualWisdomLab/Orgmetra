@@ -1,10 +1,9 @@
 """Keyverse identity binding and purpose-bound authorization for Orgmetra.
 
 Orgmetra never stores passwords, passkeys, or raw credentials on a person
-record. Use ``bind_identity_subject`` after Keyverse authenticates the actor,
-then evaluate the authenticated subject, tenant, purpose, operation, scope, and
-requested field set against an Orgmetra-owned purpose-bound policy before
-returning protected HR data.
+record. Keyverse authenticates identity and scopes; Orgmetra's trusted service
+composition supplies HR policy. The exported value objects validate data but do
+not pretend to be unforgeable capabilities against arbitrary same-process code.
 """
 
 from orgmetra_keyverse_adapter.authorization import (
@@ -14,6 +13,7 @@ from orgmetra_keyverse_adapter.authorization import (
     PurposeBoundAccessRequest,
     evaluate_purpose_bound_access,
     require_purpose_bound_access,
+    validate_authorization_decision,
 )
 from orgmetra_keyverse_adapter.binding import (
     CredentialRejectedError,
@@ -31,4 +31,5 @@ __all__ = [
     "bind_identity_subject",
     "evaluate_purpose_bound_access",
     "require_purpose_bound_access",
+    "validate_authorization_decision",
 ]
