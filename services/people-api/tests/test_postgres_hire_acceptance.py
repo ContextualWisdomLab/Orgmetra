@@ -21,6 +21,7 @@ from orgmetra_people_api.postgres_hire import (
     PostgresHireAcceptancePort,
     _hire_command_digest,
 )
+from authorization_test_support import issued_authorization
 
 TENANT = UUID("0198a412-7100-7000-8000-000000000001")
 CANDIDATE = UUID("0198a412-7100-7000-8000-000000000010")
@@ -112,9 +113,8 @@ def policy() -> PurposeBoundAccessPolicy:
 
 
 def allowed_authorization() -> AuthorizationDecision:
-    """Return the exact allow decision produced for the deterministic test command."""
-    return AuthorizationDecision(
-        allowed=True,
+    """Return the exact allow decision issued for the deterministic test command."""
+    return issued_authorization(
         tenant_record_id=TENANT,
         actor_reference=ACTOR,
         resource_reference=f"selection_decision:{DECISION.hex}",
@@ -123,9 +123,7 @@ def allowed_authorization() -> AuthorizationDecision:
         operation_code="materialize_worker",
         resource_kind="selection_decision",
         requested_fields=frozenset({"candidate_worker_conversion"}),
-        authorized_fields=frozenset({"candidate_worker_conversion"}),
-        reason_code="access_permitted",
-        next_action="continue",
+        required_scope_code="orgmetra.people.materialize_worker",
     )
 
 
@@ -425,8 +423,7 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
             return FakeConnection(FakeCursor([[], [decision_row()]]))
 
         port = PostgresHireAcceptancePort(factory)
-        forged = AuthorizationDecision(
-            allowed=False,
+        denied = issued_authorization(
             tenant_record_id=TENANT,
             actor_reference=ACTOR,
             resource_reference=f"selection_decision:{DECISION.hex}",
@@ -435,28 +432,23 @@ class PostgresHireAcceptanceTests(unittest.TestCase):
             operation_code="materialize_worker",
             resource_kind="selection_decision",
             requested_fields=frozenset({"candidate_worker_conversion"}),
-            authorized_fields=frozenset(),
-            reason_code="access_denied",
-            next_action="stop",
+            required_scope_code="orgmetra.people.materialize_worker",
+            granted_scope_codes=frozenset({"orgmetra.people.read"}),
         )
-        invalid_authorizations: tuple[object, ...] = (
-            object(),
-            forged,
-            AuthorizationDecision(
-                allowed=True,
-                tenant_record_id=TENANT,
-                actor_reference=ACTOR,
-                resource_reference="selection_decision:wrong-target",
-                policy_version_code="people-hire-v1",
-                purpose_code=PURPOSE,
-                operation_code="materialize_worker",
-                resource_kind="selection_decision",
-                requested_fields=frozenset({"candidate_worker_conversion"}),
-                authorized_fields=frozenset({"candidate_worker_conversion"}),
-                reason_code="access_permitted",
-                next_action="continue",
-            ),
+        wrong_target = issued_authorization(
+            tenant_record_id=TENANT,
+            actor_reference=ACTOR,
+            resource_reference="selection_decision:wrong-target",
+            policy_version_code="people-hire-v1",
+            purpose_code=PURPOSE,
+            operation_code="materialize_worker",
+            resource_kind="selection_decision",
+            requested_fields=frozenset({"candidate_worker_conversion"}),
+            required_scope_code="orgmetra.people.materialize_worker",
         )
+        self.assertFalse(denied.allowed)
+        self.assertTrue(wrong_target.allowed)
+        invalid_authorizations: tuple[object, ...] = (object(), denied, wrong_target)
         for authorization in invalid_authorizations:
             with self.subTest(authorization=authorization), self.assertRaisesRegex(
                 HireDecisionIntegrityError,
