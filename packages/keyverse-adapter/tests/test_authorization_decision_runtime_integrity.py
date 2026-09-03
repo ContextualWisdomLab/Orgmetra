@@ -209,7 +209,9 @@ def test_deny_decision_cannot_carry_authorized_fields() -> None:
             allowed=False,
             authorized_fields=REQUESTED_FIELDS,
             reason_code="field_not_allowed",
-            next_action="Request only fields allowed for this purpose.",
+            next_action=(
+                "Request only fields allowed for this purpose or obtain a separately reviewed field policy."
+            ),
         )
 
 
@@ -221,7 +223,7 @@ def test_allow_decision_rejects_denial_reason() -> None:
 
 def test_deny_decision_rejects_success_reason() -> None:
     """A deny verdict cannot masquerade as successful authorization evidence."""
-    with pytest.raises(ValueError, match="deny decision must not use access_permitted reason"):
+    with pytest.raises(ValueError, match="deny decision must use a known denial reason"):
         _validate_decision(
             allowed=False,
             authorized_fields=frozenset(),
@@ -229,21 +231,25 @@ def test_deny_decision_rejects_success_reason() -> None:
         )
 
 
-def test_decision_validator_accepts_bounded_internal_denial_reason() -> None:
-    """The pure validator preserves a bounded denial code without conferring authority."""
+def test_decision_validator_accepts_governed_denial_reason_and_action() -> None:
+    """A denial snapshot preserves the evaluator's exact reason-to-recovery contract."""
+    next_action = (
+        "Use an approved purpose for this policy or obtain a separately governed policy decision."
+    )
     snapshot = _validate_decision(
         allowed=False,
         authorized_fields=frozenset(),
-        reason_code="access_denied",
-        next_action="stop",
+        reason_code="purpose_not_allowed",
+        next_action=next_action,
     )
-    assert snapshot[10] == "access_denied"
+    assert snapshot[10] == "purpose_not_allowed"
+    assert snapshot[11] == next_action
 
 
-def test_decision_validator_preserves_bounded_actionable_text() -> None:
-    """Recovery guidance validation remains independent of the governed verdict."""
-    snapshot = _validate_decision(next_action="Continue after logging the reviewed evidence.")
-    assert snapshot[11] == "Continue after logging the reviewed evidence."
+def test_decision_validator_rejects_noncanonical_allow_action() -> None:
+    """Allow evidence cannot replace the evaluator's governed recovery instruction."""
+    with pytest.raises(ValueError, match="allow decision must use the canonical next action"):
+        _validate_decision(next_action="Continue after logging the reviewed evidence.")
 
 
 def test_decision_validator_rejects_resource_reference_namespace_mismatch() -> None:
