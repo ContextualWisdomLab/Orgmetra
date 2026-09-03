@@ -225,12 +225,7 @@ def _detach_durable_snapshot(snapshot: JobAnalysisSnapshot) -> JobAnalysisSnapsh
         snapshot.tenant_record_id,
     )
     canonical_json = snapshot.canonical_json()
-    try:
-        document = json.loads(canonical_json)
-    except (TypeError, ValueError) as error:
-        raise JobAnalysisIntegrityError("snapshot canonical evidence is not valid JSON") from error
-    if not isinstance(document, dict):
-        raise JobAnalysisIntegrityError("snapshot canonical evidence must be an object")
+    document = json.loads(canonical_json)
     detached = snapshot_from_document(document, tenant_record_id=tenant_record_id)
     if detached.canonical_json() != canonical_json:
         raise JobAnalysisIntegrityError("detached snapshot does not match canonical evidence")
