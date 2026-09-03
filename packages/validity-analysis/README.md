@@ -1,0 +1,37 @@
+# Orgmetra validity-analysis handoff
+
+This package creates an immutable **selection-validity analysis handoff** and validates the matching numerical result envelope. It is the boundary between Orgmetra's authoritative validation-study evidence and numerical work owned by `ContextualWisdomLab/fast-mlsirm`.
+
+## What it does
+
+`build_validation_analysis_handoff(...)` binds one tenant, validation study, Job, predictor snapshot, criterion snapshot, population snapshot, decision policy, analysis plan, requester, reviewer, and the reviewed fast-mlsirm revision `04d0bc21a2a20693bcf16108cd76d394fe844d23`.
+
+The resulting canonical JSON is digest-addressable, contains no raw person-level predictor or criterion values, and remains `not_executed`. Its timestamp is detached to one UTC instant at construction so later timezone-provider changes cannot rewrite the digest. Required result evidence is explicit: effect estimate, uncertainty interval, sample size, missingness summary, and convergence diagnostics.
+
+`ValidationAnalysisResult` accepts only a result linked to the handoff digest and the same reviewed fast-mlsirm revision. It records the Rust CPU/GPU backend, precision, aggregate missingness counts, finite effect and interval values, and explicit convergence or nonconvergence diagnostics. Timestamps and finite numeric values are snapshotted before canonicalization, and the result envelope accepts only the exact governed `MissingnessSummary` and `ConvergenceDiagnostics` runtime types, preventing mutable runtime values or subclass method overrides from adding unreviewed or person-level fields to canonical audit evidence. Missingness counts must be internally possible: complete observations cannot overlap either predictor-missing or criterion-missing observations beyond the declared sample total. It never promotes a result to an employment decision; human review remains mandatory.
+
+## What it does not do
+
+- It does **not** run statistics.
+- It does **not** run or reproduce the fast-mlsirm numerical kernel.
+- It does **not** query fast-mlsirm or any other CWL application's database.
+- It does **not** claim that a selection procedure is valid.
+- It does **not** interpret adverse impact.
+- It does **not** authorize hiring, promotion, termination, compensation, or another employment decision.
+
+The fast-mlsirm repository remains a dedicated-writer dependency. This package records only the immutable revision reviewed for the handoff.
+
+## Host obligations
+
+Before an approved offline validation worker executes the handoff, the Orgmetra host must re-resolve every reference inside `tenant_record_id` and prove that the predictor, criterion, population, and policy evidence belong to the exact validation study and Job. The requester and reviewer must resolve to distinct authoritative actors. A numerical result is scientific evidence for accountable human interpretation, never an autonomous employment decision.
+
+## Verification
+
+Run:
+
+```bash
+PYTHONPATH=packages/validity-analysis/src \
+python -m pytest -c packages/validity-analysis/pyproject.toml packages/validity-analysis/tests
+```
+
+The package gate requires exact 100% owned production statement and branch coverage.
