@@ -44,6 +44,35 @@ def _request(*, field: str = "work_email") -> PurposeBoundAccessRequest:
     )
 
 
+def _policy_without_constructor() -> PurposeBoundAccessPolicy:
+    """Forge valid-looking policy fields without invoking the public constructor."""
+    policy = object.__new__(PurposeBoundAccessPolicy)
+    object.__setattr__(policy, "tenant_record_id", TENANT)
+    object.__setattr__(policy, "policy_version_code", "people_pii_v1")
+    object.__setattr__(policy, "resource_kind", "person_record")
+    object.__setattr__(policy, "purpose_code", "hr_operations")
+    object.__setattr__(policy, "operation_code", "read_person_pii")
+    object.__setattr__(policy, "required_scope_code", "orgmetra.people.read")
+    object.__setattr__(policy, "permitted_fields", frozenset({"work_email"}))
+    return policy
+
+
+def _request_without_constructor() -> PurposeBoundAccessRequest:
+    """Forge valid-looking request fields without invoking the public constructor."""
+    request = object.__new__(PurposeBoundAccessRequest)
+    object.__setattr__(request, "tenant_record_id", TENANT)
+    object.__setattr__(request, "actor_tenant_record_id", TENANT)
+    object.__setattr__(request, "resource_tenant_record_id", TENANT)
+    object.__setattr__(request, "actor_reference", "keyverse_subject:sub_jordan_hale")
+    object.__setattr__(request, "resource_reference", "person_record:per_01J5EXACTTARGET")
+    object.__setattr__(request, "purpose_code", "hr_operations")
+    object.__setattr__(request, "operation_code", "read_person_pii")
+    object.__setattr__(request, "resource_kind", "person_record")
+    object.__setattr__(request, "requested_fields", frozenset({"work_email"}))
+    object.__setattr__(request, "granted_scope_codes", frozenset({"orgmetra.people.read"}))
+    return request
+
+
 def test_evaluator_rejects_post_construction_policy_widening() -> None:
     """Low-level mutation cannot widen a policy after its governed construction."""
     policy = _policy()
@@ -75,6 +104,28 @@ def test_evaluator_rejects_post_construction_request_field_rewrite() -> None:
     object.__setattr__(request, "requested_fields", frozenset({"compensation_amount"}))
 
     with pytest.raises(ValueError, match="PurposeBoundAccessRequest changed after validation"):
+        evaluate_purpose_bound_access(request=request, policy=_policy())
+
+
+def test_direct_policy_post_init_cannot_issue_constructor_bypassing_object() -> None:
+    """Public lifecycle hooks cannot mint policy authority for a forged exact object."""
+    policy = _policy_without_constructor()
+
+    with pytest.raises(TypeError, match="must be initialized through its constructor"):
+        PurposeBoundAccessPolicy.__post_init__(policy)
+
+    with pytest.raises(ValueError, match="was not issued by the validated constructor"):
+        evaluate_purpose_bound_access(request=_request(), policy=policy)
+
+
+def test_direct_request_post_init_cannot_issue_constructor_bypassing_object() -> None:
+    """Public lifecycle hooks cannot mint request authority for a forged exact object."""
+    request = _request_without_constructor()
+
+    with pytest.raises(TypeError, match="must be initialized through its constructor"):
+        PurposeBoundAccessRequest.__post_init__(request)
+
+    with pytest.raises(ValueError, match="was not issued by the validated constructor"):
         evaluate_purpose_bound_access(request=request, policy=_policy())
 
 
