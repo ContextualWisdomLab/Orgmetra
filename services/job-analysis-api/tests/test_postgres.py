@@ -296,7 +296,7 @@ class PostgresJobAnalysisPortTests(unittest.TestCase):
         digest = command_digest(snapshot=snapshot, position_record_id=None, criterion_blueprint_id=None)
         script = [
             None,
-            (digest, ANALYSIS),
+            (digest, ANALYSIS, "keyverse:actor-ja-1", "job_analysis_write"),
             [_header_row()],
             _task_rows(),
             _ksao_rows(),
@@ -310,10 +310,14 @@ class PostgresJobAnalysisPortTests(unittest.TestCase):
     def test_idempotency_conflict_and_lost_snapshot_fail_closed(self) -> None:
         snapshot = clinical_psychologist_snapshot()
         digest = command_digest(snapshot=snapshot, position_record_id=None, criterion_blueprint_id=None)
-        port, _ = self._port([None, ("other" * 16, ANALYSIS)])
+        port, _ = self._port(
+            [None, ("f" * 64, ANALYSIS, "keyverse:actor-ja-1", "job_analysis_write")]
+        )
         with self.assertRaises(JobAnalysisIdempotencyConflict):
             self._persist(port, request_digest=digest)
-        port, _ = self._port([None, (digest, ANALYSIS), []])
+        port, _ = self._port(
+            [None, (digest, ANALYSIS, "keyverse:actor-ja-1", "job_analysis_write"), []]
+        )
         with self.assertRaisesRegex(JobAnalysisIntegrityError, "lost its snapshot"):
             self._persist(port, request_digest=digest)
 
