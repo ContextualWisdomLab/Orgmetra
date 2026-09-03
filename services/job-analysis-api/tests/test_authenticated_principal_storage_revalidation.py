@@ -64,6 +64,25 @@ class AuthenticatedPrincipalStorageRevalidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "stored authentication evidence"):
             repr(forged)
 
+    def test_malformed_storage_cannot_escape_through_sequence_protocol(self) -> None:
+        """Ordinary tuple-like access must not expose raw unvalidated identity evidence."""
+        forged = tuple.__new__(
+            AuthenticatedPrincipal,
+            (TENANT.int, _TextSubtype("keyverse:actor-ja-1"), frozenset({SCOPE})),
+        )
+
+        for access in (
+            lambda: forged[1],
+            lambda: forged[:],
+            lambda: list(forged),
+            lambda: tuple(forged),
+        ):
+            with self.subTest(access=access), self.assertRaisesRegex(
+                ValueError,
+                "stored authentication evidence",
+            ):
+                access()
+
     def test_valid_tuple_storage_remains_value_compatible_without_claiming_provenance(self) -> None:
         """Valid structural evidence stays readable without treating construction history as authority."""
         structurally_valid = tuple.__new__(
