@@ -25,6 +25,9 @@ from test_postgres import (
 )
 
 
+_UNSET = object()
+
+
 class _AlwaysEqualText(str):
     """Model a non-canonical DB-returned text value that lies during comparison."""
 
@@ -44,7 +47,7 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
         stored_actor_reference: object,
         stored_purpose_code: object,
         stored_analysis_record_id: object = ANALYSIS,
-        stored_request_digest: object | None = None,
+        stored_request_digest: object = _UNSET,
         include_stored_authority: bool = True,
         actor_reference: str = "keyverse:actor-ja-1",
         purpose_code: str = "job_analysis_write",
@@ -57,7 +60,7 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
             position_record_id=None,
             criterion_blueprint_id=None,
         )
-        durable_digest = digest if stored_request_digest is None else stored_request_digest
+        durable_digest = digest if stored_request_digest is _UNSET else stored_request_digest
         durable_row: tuple[object, ...]
         if include_stored_authority:
             durable_row = (
@@ -107,6 +110,15 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
                 stored_purpose_code="job_analysis_write",
                 include_stored_authority=False,
                 include_snapshot=True,
+            )
+
+    def test_partial_null_durable_row_fails_closed(self) -> None:
+        """Only the all-NULL LEFT JOIN projection can mean that no durable command exists."""
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "partial-null"):
+            self._persist_replay(
+                stored_actor_reference="keyverse:actor-ja-1",
+                stored_purpose_code="job_analysis_write",
+                stored_request_digest=None,
             )
 
     def test_noncanonical_stored_digest_cannot_bypass_digest_binding(self) -> None:
