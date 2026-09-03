@@ -37,10 +37,13 @@ class AuthenticatedPrincipal:
     granted_scope_codes: frozenset[str]
 
     def __post_init__(self) -> None:
-        """Reject sentinel identities, runtime subtypes, wildcards, and bad references."""
+        """Validate and detach exact identity/scope evidence before service use."""
         if type(self.tenant_record_id) is not UUID:
             raise ValueError("tenant_record_id must be a UUID.")
-        if self.tenant_record_id.int in (0, _MAX_UUID_INT):
+        tenant_record_id_int = self.tenant_record_id.int
+        if type(tenant_record_id_int) is not int or not 0 <= tenant_record_id_int <= _MAX_UUID_INT:
+            raise ValueError("tenant_record_id must contain a valid UUID integer.")
+        if tenant_record_id_int in (0, _MAX_UUID_INT):
             raise ValueError("tenant_record_id must not use a reserved UUID sentinel.")
         if type(self.actor_reference) is not str or _REFERENCE_PATTERN.fullmatch(self.actor_reference) is None:
             raise ValueError("actor_reference must be a namespaced opaque reference.")
@@ -48,6 +51,7 @@ class AuthenticatedPrincipal:
             raise ValueError("granted_scope_codes must be a non-empty frozenset.")
         if any(type(scope) is not str or _SCOPE_PATTERN.fullmatch(scope) is None for scope in self.granted_scope_codes):
             raise ValueError("granted_scope_codes must contain explicit Orgmetra scopes.")
+        object.__setattr__(self, "tenant_record_id", UUID(int=tenant_record_id_int))
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         """Prevent executable principal subclasses from overriding authenticated evidence."""
