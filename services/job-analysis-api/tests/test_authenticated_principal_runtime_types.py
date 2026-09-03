@@ -24,7 +24,7 @@ class _ScopeSetSubtype(frozenset[str]):
 
 
 class AuthenticatedPrincipalRuntimeTypeTests(unittest.TestCase):
-    """Require exact built-in trust-bearing values at principal construction."""
+    """Require exact canonical authentication evidence at principal construction."""
 
     def test_rejects_trust_bearing_runtime_subtypes(self) -> None:
         cases = (
@@ -52,6 +52,13 @@ class AuthenticatedPrincipalRuntimeTypeTests(unittest.TestCase):
         for values in cases:
             with self.subTest(values=values), self.assertRaises(ValueError):
                 AuthenticatedPrincipal(**values)
+
+    def test_principal_runtime_class_cannot_be_subclassed(self) -> None:
+        """Executable principal subclasses cannot override authenticated evidence access."""
+        with self.assertRaisesRegex(TypeError, "AuthenticatedPrincipal must not be subclassed"):
+
+            class _PrincipalSubtype(AuthenticatedPrincipal):
+                pass
 
 
 if __name__ == "__main__":
