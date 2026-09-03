@@ -20,7 +20,30 @@ _AuditEventT = TypeVar("_AuditEventT", bound=AuditOutboxEvent)
 
 
 class _AuditEventSubtype(AuditOutboxEvent):
-    """Represent caller-defined executable behavior at the durable audit boundary."""
+    """Trip if persistence consumes caller-defined audit behavior before type rejection."""
+
+    _TRIPWIRE_FIELDS = frozenset(
+        {"tenant_record_id", "resource_reference", "actor_reference", "purpose_code"}
+    )
+
+    def __getattribute__(self, name: str) -> object:
+        """Reject authority-field reads once the adversarial fixture is armed."""
+        if name in _AuditEventSubtype._TRIPWIRE_FIELDS:
+            try:
+                armed = object.__getattribute__(self, "_tripwire_armed")
+            except AttributeError:
+                armed = False
+            if armed:
+                raise AssertionError(f"audit subtype authority field consumed before exact-type rejection: {name}")
+        return super().__getattribute__(name)
+
+    def canonical_json(self) -> str:
+        """Reject canonical serialization if exact-type validation is reordered."""
+        raise AssertionError("audit subtype canonical_json consumed before exact-type rejection")
+
+    def content_digest(self) -> str:
+        """Reject digest serialization if exact-type validation is reordered."""
+        raise AssertionError("audit subtype content_digest consumed before exact-type rejection")
 
 
 def _never_connect() -> object:
@@ -49,7 +72,10 @@ def _audit_event(
         "high_impact": False,
     }
     values.update(overrides)
-    return event_class(**values)  # type: ignore[arg-type]
+    event = event_class(**values)  # type: ignore[arg-type]
+    if type(event) is _AuditEventSubtype:
+        object.__setattr__(event, "_tripwire_armed", True)
+    return event
 
 
 def _persist_with_audit(audit_event: AuditOutboxEvent) -> None:
@@ -91,7 +117,7 @@ def test_job_analysis_audit_authority_drift_fails_before_database(
         _persist_with_audit(audit_event)
 
 
-def test_job_analysis_audit_subtype_fails_before_database() -> None:
-    """Caller-defined audit behavior must not cross the durable provenance boundary."""
+def test_job_analysis_audit_subtype_fails_before_any_audit_or_database_access() -> None:
+    """Exact-type rejection must precede subtype-controlled fields, serialization, and DB I/O."""
     with pytest.raises(TypeError, match="audit_event must be an exact AuditOutboxEvent"):
         _persist_with_audit(_audit_event(_AuditEventSubtype))
