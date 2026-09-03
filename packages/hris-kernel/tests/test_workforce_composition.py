@@ -65,7 +65,7 @@ def _assignment(
     tenant_id: int = 1,
     recorded: RecordedInterval | None = None,
 ) -> AssignmentFact:
-    """Build one visible position assignment."""
+    """Build one visible historical-fixture position assignment."""
     return AssignmentFact(
         tenant_record_id=_id(tenant_id),
         assignment_record_id=_id(assignment_id),
@@ -75,6 +75,7 @@ def _assignment(
         allocation_ratio=Decimal(ratio),
         effective=DateInterval(date(2026, 1, 1)),
         recorded=recorded or _recorded(),
+        assignment_category_code="legacy_unspecified",
     )
 
 

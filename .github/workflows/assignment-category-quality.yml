@@ -9,10 +9,18 @@ on:
     paths:
       - "database/migrations/0017_assignment_category_code.sql"
       - "docs/adr/0015-explicit-assignment-category.md"
+      - "docs/API_CONTRACT.md"
+      - "docs/DATA_MODEL.md"
+      - "docs/ERD.md"
+      - "docs/TRACEABILITY.md"
+      - "manifest.json"
       - "packages/hris-kernel/**"
+      - "schemas/openapi.yaml"
       - "services/people-api/**"
       - "tests/assignment-category-provenance.test.mjs"
+      - "tests/openapi-contract.test.mjs"
       - "tests/test_assignment_category_postgres.sh"
+      - "tests/validate_repository.py"
       - ".github/workflows/assignment-category-quality.yml"
   workflow_dispatch:
 
