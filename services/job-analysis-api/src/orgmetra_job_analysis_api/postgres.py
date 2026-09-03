@@ -448,6 +448,19 @@ class PostgresJobAnalysisPort:
                         raise JobAnalysisIdempotencyConflict(
                             "idempotency key is bound to a different snapshot digest"
                         )
+                    try:
+                        stored_analysis_id = validate_operational_uuid(
+                            "stored analysis_record_id",
+                            stored_analysis_id,
+                        )
+                    except ValueError as error:
+                        raise JobAnalysisIntegrityError(
+                            "idempotent command has invalid analysis_record_id"
+                        ) from error
+                    if stored_analysis_id != snapshot.analysis_record_id:
+                        raise JobAnalysisIntegrityError(
+                            "idempotent command analysis_record_id does not match detached snapshot"
+                        )
                     if stored_authority:
                         stored_actor_reference, stored_purpose_code = stored_authority
                         if stored_actor_reference != actor_reference:
