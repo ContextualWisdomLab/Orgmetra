@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from typing import TypeVar
 from uuid import UUID
 
@@ -64,6 +64,41 @@ class _ForgedAuthorityText(str):
         return not self.__eq__(other)
 
     __hash__ = str.__hash__
+
+
+class _AuthorityMutatingTimezone(tzinfo):
+    """Mutate an exact audit envelope from the canonicalization callback surface."""
+
+    def __init__(self) -> None:
+        """Start inert so AuditOutboxEvent construction itself remains valid."""
+        self._audit_event: AuditOutboxEvent | None = None
+        self._armed = False
+
+    def arm(self, audit_event: AuditOutboxEvent) -> None:
+        """Enable the mutation only after the exact event constructor has returned."""
+        self._audit_event = audit_event
+        self._armed = True
+
+    def utcoffset(self, value: datetime | None) -> timedelta:
+        """Drift authority when canonicalization asks the timezone for its UTC offset."""
+        del value
+        if self._armed and self._audit_event is not None:
+            object.__setattr__(
+                self._audit_event,
+                "actor_reference",
+                "keyverse:actor-ja-canonicalization-drift",
+            )
+        return timedelta(0)
+
+    def dst(self, value: datetime | None) -> timedelta:
+        """Expose a stable zero daylight-saving offset."""
+        del value
+        return timedelta(0)
+
+    def tzname(self, value: datetime | None) -> str:
+        """Return a deterministic test-only timezone name."""
+        del value
+        return "UTC_TEST"
 
 
 def _never_connect() -> object:
@@ -162,6 +197,21 @@ def test_exact_audit_event_rejects_forged_authority_text_before_database(
     with pytest.raises(
         ValueError,
         match=rf"audit_event\.{field_name} must be exact built-in text",
+    ):
+        _persist_with_audit(audit_event)
+
+
+def test_canonicalization_callback_cannot_drift_validated_audit_authority() -> None:
+    """Canonical bytes must be rechecked after any executable timezone callback."""
+    callback_timezone = _AuthorityMutatingTimezone()
+    audit_event = _audit_event(
+        occurred_at=datetime(2026, 8, 18, 5, 1, tzinfo=callback_timezone)
+    )
+    callback_timezone.arm(audit_event)
+
+    with pytest.raises(
+        JobAnalysisIntegrityError,
+        match="canonical audit evidence does not match validated authority",
     ):
         _persist_with_audit(audit_event)
 
