@@ -10,9 +10,9 @@ for the operation-specific token scope.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 import re
-from types import MappingProxyType
 from typing import NamedTuple
 import weakref
 from uuid import UUID
@@ -633,16 +633,14 @@ def _decision(
 
 
 def _build_decision_runtime() -> tuple[
-    object,
-    object,
-    object,
+    Callable[[AuthorizationDecision], tuple[object, ...]],
+    Callable[..., AuthorizationDecision],
 ]:
-    """Create read-only registry visibility plus evaluator-private mutation authority."""
+    """Create evaluator-private decision storage and expose only read/evaluate closures."""
     registry: dict[
         int,
         tuple[weakref.ReferenceType[object], tuple[object, ...]],
     ] = {}
-    registry_view = MappingProxyType(registry)
 
     def decision_snapshot_for(decision: AuthorizationDecision) -> tuple[object, ...]:
         """Return only state registered by this evaluator runtime."""
@@ -710,12 +708,10 @@ def _build_decision_runtime() -> tuple[
             return issue_decision(allowed=False, reason_code="field_not_allowed")
         return issue_decision(allowed=True, reason_code="access_permitted")
 
-    return registry_view, decision_snapshot_for, evaluate
+    return decision_snapshot_for, evaluate
 
 
-_DECISION_SNAPSHOT_REGISTRY, _decision_snapshot_for, evaluate_purpose_bound_access = (
-    _build_decision_runtime()
-)
+_decision_snapshot_for, evaluate_purpose_bound_access = _build_decision_runtime()
 
 
 def require_purpose_bound_access(
