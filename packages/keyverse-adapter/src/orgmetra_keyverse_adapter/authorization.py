@@ -167,7 +167,6 @@ _DECISION_SNAPSHOT_REGISTRY: dict[
 ] = {}
 _POLICY_CONSTRUCTION_IDS: set[int] = set()
 _REQUEST_CONSTRUCTION_IDS: set[int] = set()
-_DECISION_ISSUANCE_IDS: set[int] = set()
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True, init=False)
@@ -510,34 +509,10 @@ class AuthorizationDecision:
         reason_code: str,
         next_action: str,
     ) -> None:
-        """Register a detached snapshot only during module-owned policy evaluation."""
-        key = id(self)
-        if key in _DECISION_SNAPSHOT_REGISTRY:
+        """Reject direct construction; only the evaluator may register evidence."""
+        if id(self) in _DECISION_SNAPSHOT_REGISTRY:
             raise TypeError("AuthorizationDecision is already initialized")
-        if key not in _DECISION_ISSUANCE_IDS:
-            raise TypeError("AuthorizationDecision must be issued by purpose-bound evaluation")
-        snapshot = _validated_decision_snapshot(
-            allowed=allowed,
-            tenant_record_id=tenant_record_id,
-            actor_reference=actor_reference,
-            resource_reference=resource_reference,
-            policy_version_code=policy_version_code,
-            purpose_code=purpose_code,
-            operation_code=operation_code,
-            resource_kind=resource_kind,
-            requested_fields=requested_fields,
-            authorized_fields=authorized_fields,
-            reason_code=reason_code,
-            next_action=next_action,
-        )
-        reference = weakref.ref(
-            self,
-            lambda _reference, evidence_key=key: _DECISION_SNAPSHOT_REGISTRY.pop(
-                evidence_key,
-                None,
-            ),
-        )
-        _DECISION_SNAPSHOT_REGISTRY[key] = (reference, snapshot)
+        raise TypeError("AuthorizationDecision must be issued by purpose-bound evaluation")
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         """Seal the evidence type so subclasses cannot override validation hooks."""
@@ -657,31 +632,8 @@ def _decision(
     allowed: bool,
     reason_code: str,
 ) -> AuthorizationDecision:
-    """Build one immutable decision from validated creation-time authority snapshots."""
-    authorized_fields = request.requested_fields if allowed else frozenset()
-    next_action = _ALLOW_NEXT_ACTION if allowed else _DENIAL_NEXT_ACTION[reason_code]
-    decision = object.__new__(AuthorizationDecision)
-    key = id(decision)
-    _DECISION_ISSUANCE_IDS.add(key)
-    try:
-        AuthorizationDecision.__init__(
-            decision,
-            allowed=allowed,
-            tenant_record_id=UUID(int=request.tenant_record_id_int),
-            actor_reference=request.actor_reference,
-            resource_reference=request.resource_reference,
-            policy_version_code=policy.policy_version_code,
-            purpose_code=request.purpose_code,
-            operation_code=request.operation_code,
-            resource_kind=request.resource_kind,
-            requested_fields=request.requested_fields,
-            authorized_fields=authorized_fields,
-            reason_code=reason_code,
-            next_action=next_action,
-        )
-    finally:
-        _DECISION_ISSUANCE_IDS.discard(key)
-    return decision
+    """Reject direct use of the former module-level authority-minting helper."""
+    raise TypeError("decision issuance is internal to evaluate_purpose_bound_access")
 
 
 def evaluate_purpose_bound_access(
@@ -695,9 +647,8 @@ def evaluate_purpose_bound_access(
     before comparing any authorization attribute. A frozen dataclass is not
     treated as a security boundary because ``object.__setattr__`` can still write
     its slots; any post-construction rewrite fails closed and the evaluator then
-    uses only the detached snapshots. Decision issuance is likewise bound to this
-    evaluator so a caller cannot mint an allow result by constructing the evidence
-    class directly.
+    uses only the detached snapshots. Decision issuance is local to this evaluator,
+    so caller-constructible snapshot values cannot reach the issuance registry.
     """
     if type(request) is not PurposeBoundAccessRequest:
         raise TypeError("request must be a PurposeBoundAccessRequest")
@@ -706,58 +657,54 @@ def evaluate_purpose_bound_access(
 
     request_snapshot = _issued_request_snapshot(request)
     policy_snapshot = _issued_policy_snapshot(policy)
+
+    def issue_decision(*, allowed: bool, reason_code: str) -> AuthorizationDecision:
+        """Register one decision from the already-issued policy/request snapshots."""
+        authorized_fields = request_snapshot.requested_fields if allowed else frozenset()
+        next_action = _ALLOW_NEXT_ACTION if allowed else _DENIAL_NEXT_ACTION[reason_code]
+        snapshot = _validated_decision_snapshot(
+            allowed=allowed,
+            tenant_record_id=UUID(int=request_snapshot.tenant_record_id_int),
+            actor_reference=request_snapshot.actor_reference,
+            resource_reference=request_snapshot.resource_reference,
+            policy_version_code=policy_snapshot.policy_version_code,
+            purpose_code=request_snapshot.purpose_code,
+            operation_code=request_snapshot.operation_code,
+            resource_kind=request_snapshot.resource_kind,
+            requested_fields=request_snapshot.requested_fields,
+            authorized_fields=authorized_fields,
+            reason_code=reason_code,
+            next_action=next_action,
+        )
+        decision = object.__new__(AuthorizationDecision)
+        key = id(decision)
+        reference = weakref.ref(
+            decision,
+            lambda _reference, evidence_key=key: _DECISION_SNAPSHOT_REGISTRY.pop(
+                evidence_key,
+                None,
+            ),
+        )
+        _DECISION_SNAPSHOT_REGISTRY[key] = (reference, snapshot)
+        return decision
+
     if (
         request_snapshot.tenant_record_id_int != policy_snapshot.tenant_record_id_int
         or request_snapshot.actor_tenant_record_id_int != policy_snapshot.tenant_record_id_int
         or request_snapshot.resource_tenant_record_id_int != policy_snapshot.tenant_record_id_int
     ):
-        return _decision(
-            request=request_snapshot,
-            policy=policy_snapshot,
-            allowed=False,
-            reason_code="tenant_scope_mismatch",
-        )
+        return issue_decision(allowed=False, reason_code="tenant_scope_mismatch")
     if request_snapshot.resource_kind != policy_snapshot.resource_kind:
-        return _decision(
-            request=request_snapshot,
-            policy=policy_snapshot,
-            allowed=False,
-            reason_code="resource_not_allowed",
-        )
+        return issue_decision(allowed=False, reason_code="resource_not_allowed")
     if request_snapshot.purpose_code != policy_snapshot.purpose_code:
-        return _decision(
-            request=request_snapshot,
-            policy=policy_snapshot,
-            allowed=False,
-            reason_code="purpose_not_allowed",
-        )
+        return issue_decision(allowed=False, reason_code="purpose_not_allowed")
     if request_snapshot.operation_code != policy_snapshot.operation_code:
-        return _decision(
-            request=request_snapshot,
-            policy=policy_snapshot,
-            allowed=False,
-            reason_code="operation_not_allowed",
-        )
+        return issue_decision(allowed=False, reason_code="operation_not_allowed")
     if policy_snapshot.required_scope_code not in request_snapshot.granted_scope_codes:
-        return _decision(
-            request=request_snapshot,
-            policy=policy_snapshot,
-            allowed=False,
-            reason_code="required_scope_missing",
-        )
+        return issue_decision(allowed=False, reason_code="required_scope_missing")
     if not request_snapshot.requested_fields.issubset(policy_snapshot.permitted_fields):
-        return _decision(
-            request=request_snapshot,
-            policy=policy_snapshot,
-            allowed=False,
-            reason_code="field_not_allowed",
-        )
-    return _decision(
-        request=request_snapshot,
-        policy=policy_snapshot,
-        allowed=True,
-        reason_code="access_permitted",
-    )
+        return issue_decision(allowed=False, reason_code="field_not_allowed")
+    return issue_decision(allowed=True, reason_code="access_permitted")
 
 
 def require_purpose_bound_access(
