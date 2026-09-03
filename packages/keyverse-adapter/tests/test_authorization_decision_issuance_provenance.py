@@ -106,6 +106,8 @@ def test_module_registry_insertion_cannot_mint_forged_decision() -> None:
         if inserted:
             registry.pop(id(forged), None)
 
+    assert registry is None
+
 
 def test_governed_evaluator_remains_the_decision_issuance_path() -> None:
     """Matching issued request and policy evidence still produce one allow decision."""
