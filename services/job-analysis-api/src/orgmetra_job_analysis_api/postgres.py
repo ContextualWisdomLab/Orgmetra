@@ -12,6 +12,7 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from hashlib import sha256
 import re
 from typing import Any, Callable
 from uuid import UUID
@@ -211,6 +212,35 @@ def _validate_durable_command_scalars(
         raise ValueError("purpose_code must be exact built-in text.")
 
 
+def _snapshot_durable_audit_authority(
+    audit_event: AuditOutboxEvent,
+) -> tuple[UUID, UUID, str, str, str, str, str]:
+    """Freeze exact audit authority and canonical bytes before executable DB acquisition."""
+    event_id = validate_operational_uuid("audit_event.event_id", audit_event.event_id)
+    tenant_record_id = validate_operational_uuid(
+        "audit_event.tenant_record_id",
+        audit_event.tenant_record_id,
+    )
+    authority_text: list[str] = []
+    for field_name in ("resource_reference", "actor_reference", "purpose_code"):
+        value = getattr(audit_event, field_name)
+        if type(value) is not str:
+            raise ValueError(f"audit_event.{field_name} must be exact built-in text.")
+        authority_text.append(value)
+    resource_reference, actor_reference, purpose_code = authority_text
+    canonical_json = audit_event.canonical_json()
+    content_digest = sha256(canonical_json.encode("utf-8")).hexdigest()
+    return (
+        event_id,
+        tenant_record_id,
+        resource_reference,
+        actor_reference,
+        purpose_code,
+        canonical_json,
+        content_digest,
+    )
+
+
 def _is_unique_violation(error: Exception) -> bool:
     """Return whether a PostgreSQL DB-API error reports SQLSTATE 23505."""
     return getattr(error, "sqlstate", getattr(error, "pgcode", None)) == "23505"
@@ -269,6 +299,15 @@ class PostgresJobAnalysisPort:
             actor_reference=actor_reference,
             purpose_code=purpose_code,
         )
+        (
+            audit_event_id,
+            audit_tenant_record_id,
+            audit_resource_reference,
+            audit_actor_reference,
+            audit_purpose_code,
+            audit_canonical_json,
+            audit_content_digest,
+        ) = _snapshot_durable_audit_authority(audit_event)
         write_command_id = validate_operational_uuid("write_command_id", write_command_id)
         outbox_delivery_record_id = validate_operational_uuid(
             "outbox_delivery_record_id",
@@ -283,10 +322,10 @@ class PostgresJobAnalysisPort:
             )
         expected_resource_reference = f"job_analysis_snapshot:{snapshot.analysis_record_id.hex}"
         if (
-            audit_event.tenant_record_id != snapshot.tenant_record_id
-            or audit_event.resource_reference != expected_resource_reference
-            or audit_event.actor_reference != actor_reference
-            or audit_event.purpose_code != purpose_code
+            audit_tenant_record_id != snapshot.tenant_record_id
+            or audit_resource_reference != expected_resource_reference
+            or audit_actor_reference != actor_reference
+            or audit_purpose_code != purpose_code
         ):
             raise JobAnalysisIntegrityError(
                 "audit event does not match the job-analysis write authority"
@@ -448,10 +487,10 @@ class PostgresJobAnalysisPort:
                     _AUDIT_OUTBOX_SQL,
                     (
                         snapshot.tenant_record_id,
-                        audit_event.event_id,
+                        audit_event_id,
                         outbox_delivery_record_id,
-                        audit_event.canonical_json(),
-                        audit_event.content_digest(),
+                        audit_canonical_json,
+                        audit_content_digest,
                         "integration_hub",
                     ),
                 )
