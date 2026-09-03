@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import unittest
 from uuid import UUID
 
@@ -36,6 +37,7 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
         actor_reference: str = "keyverse:actor-ja-1",
         purpose_code: str = "job_analysis_write",
         include_snapshot: bool = False,
+        stored_snapshot_header: tuple[object, ...] | None = None,
     ) -> object:
         snapshot = clinical_psychologist_snapshot()
         digest = command_digest(
@@ -53,7 +55,14 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
             ),
         ]
         if include_snapshot:
-            script.extend([[_header_row()], _task_rows(), _ksao_rows(), _link_rows()])
+            script.extend(
+                [
+                    [stored_snapshot_header if stored_snapshot_header is not None else _header_row()],
+                    _task_rows(),
+                    _ksao_rows(),
+                    _link_rows(),
+                ]
+            )
         cursor = FakeCursor(script)
         port = PostgresJobAnalysisPort(lambda: FakeConnection(cursor))
         return port.persist_snapshot(
@@ -102,6 +111,24 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
                 stored_actor_reference="keyverse:actor-ja-1",
                 stored_purpose_code="job_analysis_write",
                 stored_analysis_record_id="0198a412-6000-7000-8000-000000000399",
+            )
+
+    def test_same_command_row_cannot_replay_different_snapshot_content(self) -> None:
+        """Bind returned durable snapshot semantics back to the idempotency command digest."""
+        requested_snapshot = clinical_psychologist_snapshot()
+        altered_snapshot = replace(
+            requested_snapshot,
+            analysis_version_code="clinical-psychologist:v2",
+        )
+        altered_header = list(_header_row(digest=altered_snapshot.content_digest()))
+        altered_header[3] = altered_snapshot.analysis_version_code
+
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "recorded command digest"):
+            self._persist_replay(
+                stored_actor_reference="keyverse:actor-ja-1",
+                stored_purpose_code="job_analysis_write",
+                include_snapshot=True,
+                stored_snapshot_header=tuple(altered_header),
             )
 
     def test_exact_actor_purpose_and_snapshot_replay_returns_the_stored_snapshot(self) -> None:
