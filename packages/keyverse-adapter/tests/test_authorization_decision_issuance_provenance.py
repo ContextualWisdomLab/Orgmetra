@@ -69,6 +69,7 @@ def test_module_decision_helper_cannot_mint_from_fabricated_snapshots() -> None:
             allowed=True,
             reason_code="access_permitted",
         )
+    assert not hasattr(authorization_module, "_DECISION_ISSUANCE_IDS")
 
 
 def test_governed_evaluator_remains_the_decision_issuance_path() -> None:
