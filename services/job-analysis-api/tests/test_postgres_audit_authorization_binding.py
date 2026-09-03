@@ -46,6 +46,26 @@ class _AuditEventSubtype(AuditOutboxEvent):
         raise AssertionError("audit subtype content_digest consumed before exact-type rejection")
 
 
+class _ForgedAuthorityText(str):
+    """Retain hostile audit text while reporting equality with reviewed authority."""
+
+    def __new__(cls, value: str, equal_to: str) -> _ForgedAuthorityText:
+        """Build valid-looking text whose equality does not describe its stored bytes."""
+        instance = super().__new__(cls, value)
+        instance._equal_to = equal_to
+        return instance
+
+    def __eq__(self, other: object) -> bool:
+        """Spoof equality only for the reviewed authority value."""
+        return other == self._equal_to
+
+    def __ne__(self, other: object) -> bool:
+        """Keep inequality logically inverse to the forged equality result."""
+        return not self.__eq__(other)
+
+    __hash__ = str.__hash__
+
+
 def _never_connect() -> object:
     """Prove invalid durable evidence is rejected before database acquisition."""
     raise AssertionError("database acquired before job-analysis audit binding validation")
@@ -114,6 +134,35 @@ def test_job_analysis_audit_authority_drift_fails_before_database(
 ) -> None:
     """Command authority and durable audit provenance must describe the same write."""
     with pytest.raises(JobAnalysisIntegrityError, match="audit event does not match the job-analysis write authority"):
+        _persist_with_audit(audit_event)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "forged_value", "reviewed_value"),
+    [
+        (
+            "resource_reference",
+            "job_analysis_snapshot:0198a412600070008000000000000999",
+            _RESOURCE_REFERENCE,
+        ),
+        ("actor_reference", "keyverse:actor-ja-other", _ACTOR_REFERENCE),
+        ("purpose_code", "job_analysis_read", _PURPOSE_CODE),
+    ],
+)
+def test_exact_audit_event_rejects_forged_authority_text_before_database(
+    field_name: str,
+    forged_value: str,
+    reviewed_value: str,
+) -> None:
+    """Exact envelope type must not let subtype-controlled equality authorize durable audit bytes."""
+    audit_event = _audit_event(
+        **{field_name: _ForgedAuthorityText(forged_value, reviewed_value)}
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=rf"audit_event\.{field_name} must be exact built-in text",
+    ):
         _persist_with_audit(audit_event)
 
 
