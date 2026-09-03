@@ -39,6 +39,10 @@ from orgmetra_job_analysis_api.snapshot import (
 PostgresConnectionFactory = Callable[[], AbstractContextManager[Any]]
 
 _REQUEST_DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_EXPECTED_AUDIT_SOURCE_SERVICE = "job_analysis_api"
+_EXPECTED_AUDIT_EVENT_TYPE = "orgmetra.job_architecture.snapshot_recorded"
+_EXPECTED_AUDIT_REASON_CODE = "snapshot_persisted"
+_EXPECTED_AUDIT_RESULT_CODE = "recorded"
 _TENANT_CONTEXT_SQL = "SELECT pg_catalog.set_config('orgmetra.tenant_record_id', %s, true)"
 _READ_ONLY_SQL = "SET TRANSACTION READ ONLY"
 _IDEMPOTENCY_LOOKUP_SQL = """
@@ -213,43 +217,95 @@ def _validate_durable_command_scalars(
         raise ValueError("purpose_code must be exact built-in text.")
 
 
+@dataclass(frozen=True, slots=True)
+class _DurableAuditEvidence:
+    """Detached Job Analysis audit evidence frozen before PostgreSQL acquisition."""
+
+    event_id: UUID
+    tenant_record_id: UUID
+    source_service: str
+    event_type: str
+    resource_reference: str
+    actor_reference: str
+    purpose_code: str
+    reason_code: str
+    evidence_version_code: str
+    result_code: str
+    high_impact: bool
+    confirmation_reference: str | None
+    canonical_json: str
+    content_digest: str
+
+
 def _snapshot_durable_audit_authority(
     audit_event: AuditOutboxEvent,
-) -> tuple[UUID, UUID, str, str, str, str, str]:
-    """Freeze exact audit authority and canonical bytes before executable DB acquisition."""
+) -> _DurableAuditEvidence:
+    """Freeze exact audit authority, semantics, and canonical bytes before DB acquisition."""
     event_id = validate_operational_uuid("audit_event.event_id", audit_event.event_id)
     tenant_record_id = validate_operational_uuid(
         "audit_event.tenant_record_id",
         audit_event.tenant_record_id,
     )
-    authority_text: list[str] = []
-    for field_name in ("resource_reference", "actor_reference", "purpose_code"):
+    audit_text: dict[str, str] = {}
+    for field_name in (
+        "source_service",
+        "event_type",
+        "resource_reference",
+        "actor_reference",
+        "purpose_code",
+        "reason_code",
+        "evidence_version_code",
+        "result_code",
+    ):
         value = getattr(audit_event, field_name)
         if type(value) is not str:
             raise ValueError(f"audit_event.{field_name} must be exact built-in text.")
-        authority_text.append(value)
-    resource_reference, actor_reference, purpose_code = authority_text
+        audit_text[field_name] = value
+    high_impact = audit_event.high_impact
+    confirmation_reference = audit_event.confirmation_reference
     canonical_json = audit_event.canonical_json()
     canonical_event = json.loads(canonical_json)
     if (
         canonical_event.get("id") != str(event_id)
         or canonical_event.get("orgmetratenant") != str(tenant_record_id)
-        or canonical_event.get("subject") != resource_reference
-        or canonical_event.get("orgmetraactor") != actor_reference
-        or canonical_event.get("orgmetrapurpose") != purpose_code
+        or canonical_event.get("subject") != audit_text["resource_reference"]
+        or canonical_event.get("orgmetraactor") != audit_text["actor_reference"]
+        or canonical_event.get("orgmetrapurpose") != audit_text["purpose_code"]
     ):
         raise JobAnalysisIntegrityError(
             "canonical audit evidence does not match validated authority"
         )
+    if (
+        canonical_event.get("source") != f"urn:orgmetra:{audit_text['source_service']}"
+        or canonical_event.get("type") != audit_text["event_type"]
+        or canonical_event.get("orgmetrareason") != audit_text["reason_code"]
+        or canonical_event.get("orgmetraevidence") != audit_text["evidence_version_code"]
+        or canonical_event.get("data")
+        != {
+            "result_code": audit_text["result_code"],
+            "high_impact": high_impact,
+        }
+        or canonical_event.get("orgmetraconfirmation") != confirmation_reference
+    ):
+        raise JobAnalysisIntegrityError(
+            "canonical audit evidence does not match validated semantics"
+        )
     content_digest = sha256(canonical_json.encode("utf-8")).hexdigest()
-    return (
-        event_id,
-        tenant_record_id,
-        resource_reference,
-        actor_reference,
-        purpose_code,
-        canonical_json,
-        content_digest,
+    return _DurableAuditEvidence(
+        event_id=event_id,
+        tenant_record_id=tenant_record_id,
+        source_service=audit_text["source_service"],
+        event_type=audit_text["event_type"],
+        resource_reference=audit_text["resource_reference"],
+        actor_reference=audit_text["actor_reference"],
+        purpose_code=audit_text["purpose_code"],
+        reason_code=audit_text["reason_code"],
+        evidence_version_code=audit_text["evidence_version_code"],
+        result_code=audit_text["result_code"],
+        high_impact=high_impact,
+        confirmation_reference=confirmation_reference,
+        canonical_json=canonical_json,
+        content_digest=content_digest,
     )
 
 
@@ -311,15 +367,7 @@ class PostgresJobAnalysisPort:
             actor_reference=actor_reference,
             purpose_code=purpose_code,
         )
-        (
-            audit_event_id,
-            audit_tenant_record_id,
-            audit_resource_reference,
-            audit_actor_reference,
-            audit_purpose_code,
-            audit_canonical_json,
-            audit_content_digest,
-        ) = _snapshot_durable_audit_authority(audit_event)
+        audit_evidence = _snapshot_durable_audit_authority(audit_event)
         write_command_id = validate_operational_uuid("write_command_id", write_command_id)
         outbox_delivery_record_id = validate_operational_uuid(
             "outbox_delivery_record_id",
@@ -334,13 +382,25 @@ class PostgresJobAnalysisPort:
             )
         expected_resource_reference = f"job_analysis_snapshot:{snapshot.analysis_record_id.hex}"
         if (
-            audit_tenant_record_id != snapshot.tenant_record_id
-            or audit_resource_reference != expected_resource_reference
-            or audit_actor_reference != actor_reference
-            or audit_purpose_code != purpose_code
+            audit_evidence.tenant_record_id != snapshot.tenant_record_id
+            or audit_evidence.resource_reference != expected_resource_reference
+            or audit_evidence.actor_reference != actor_reference
+            or audit_evidence.purpose_code != purpose_code
         ):
             raise JobAnalysisIntegrityError(
                 "audit event does not match the job-analysis write authority"
+            )
+        if (
+            audit_evidence.source_service != _EXPECTED_AUDIT_SOURCE_SERVICE
+            or audit_evidence.event_type != _EXPECTED_AUDIT_EVENT_TYPE
+            or audit_evidence.reason_code != _EXPECTED_AUDIT_REASON_CODE
+            or audit_evidence.evidence_version_code != snapshot.analysis_version_code
+            or audit_evidence.result_code != _EXPECTED_AUDIT_RESULT_CODE
+            or audit_evidence.high_impact is not False
+            or audit_evidence.confirmation_reference is not None
+        ):
+            raise JobAnalysisIntegrityError(
+                "audit event does not match the job-analysis snapshot semantics"
             )
 
         with self.connection_factory() as connection:
@@ -499,10 +559,10 @@ class PostgresJobAnalysisPort:
                     _AUDIT_OUTBOX_SQL,
                     (
                         snapshot.tenant_record_id,
-                        audit_event_id,
+                        audit_evidence.event_id,
                         outbox_delivery_record_id,
-                        audit_canonical_json,
-                        audit_content_digest,
+                        audit_evidence.canonical_json,
+                        audit_evidence.content_digest,
                         "integration_hub",
                     ),
                 )
