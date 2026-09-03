@@ -21,6 +21,7 @@ _SCOPE_PATTERN = re.compile(r"^orgmetra(?:\.[a-z][a-z0-9_]*){2,}$")
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 
+_ALLOW_NEXT_ACTION = "Continue with only the authorized fields."
 _DENIAL_NEXT_ACTION = {
     "tenant_scope_mismatch": (
         "Re-resolve the actor, request context, resource, and policy in one tenant before retrying."
@@ -202,7 +203,7 @@ class AuthorizationDecision:
     next_action: str
 
     def __post_init__(self) -> None:
-        """Reject malformed or executable evidence before it reaches a persistence boundary."""
+        """Reject malformed, contradictory, or executable downstream authorization evidence."""
         if type(self.allowed) is not bool:
             raise ValueError("allowed must be a boolean.")
         _validate_uuid("tenant_record_id", self.tenant_record_id)
@@ -225,6 +226,16 @@ class AuthorizationDecision:
             raise ValueError("allow decision must authorize exactly the requested fields.")
         if not self.allowed and self.authorized_fields:
             raise ValueError("deny decision must not authorize fields.")
+        if self.allowed:
+            if self.reason_code != "access_permitted":
+                raise ValueError("allow decision must use access_permitted reason.")
+            expected_next_action = _ALLOW_NEXT_ACTION
+        else:
+            if self.reason_code not in _DENIAL_NEXT_ACTION:
+                raise ValueError("deny decision must use a governed denial reason.")
+            expected_next_action = _DENIAL_NEXT_ACTION[self.reason_code]
+        if self.next_action != expected_next_action:
+            raise ValueError("next_action must match the governed authorization reason.")
 
 
 class AuthorizationDeniedError(PermissionError):
@@ -247,11 +258,7 @@ def _decision(
 ) -> AuthorizationDecision:
     """Build one immutable allow/deny record without copying protected values."""
     authorized_fields = request.requested_fields if allowed else frozenset()
-    next_action = (
-        "Continue with only the authorized fields."
-        if allowed
-        else _DENIAL_NEXT_ACTION[reason_code]
-    )
+    next_action = _ALLOW_NEXT_ACTION if allowed else _DENIAL_NEXT_ACTION[reason_code]
     return AuthorizationDecision(
         allowed=allowed,
         tenant_record_id=request.tenant_record_id,
