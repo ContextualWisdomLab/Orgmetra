@@ -12,6 +12,7 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import re
 from typing import Any, Callable
 from uuid import UUID
 
@@ -29,11 +30,13 @@ from orgmetra_job_analysis_api.snapshot import (
     JobAnalysisIdempotencyConflict,
     JobAnalysisIntegrityError,
     JobAnalysisScopeMissing,
+    _validate_idempotency_key,
     validate_operational_uuid,
 )
 
 PostgresConnectionFactory = Callable[[], AbstractContextManager[Any]]
 
+_REQUEST_DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _TENANT_CONTEXT_SQL = "SELECT pg_catalog.set_config('orgmetra.tenant_record_id', %s, true)"
 _READ_ONLY_SQL = "SET TRANSACTION READ ONLY"
 _IDEMPOTENCY_LOOKUP_SQL = """
@@ -189,6 +192,15 @@ def _source_params(source: EvidenceSource) -> tuple[object, ...]:
     )
 
 
+def _validate_durable_command_scalars(*, idempotency_key: object, request_digest: object) -> None:
+    """Reject malformed durable command text before acquiring PostgreSQL resources."""
+    if type(idempotency_key) is not str:
+        raise ValueError("idempotency_key must be exact built-in text.")
+    _validate_idempotency_key(idempotency_key)
+    if type(request_digest) is not str or _REQUEST_DIGEST_PATTERN.fullmatch(request_digest) is None:
+        raise ValueError("request_digest must be an exact lowercase SHA-256 digest.")
+
+
 def _is_unique_violation(error: Exception) -> bool:
     """Return whether a PostgreSQL DB-API error reports SQLSTATE 23505."""
     return getattr(error, "sqlstate", getattr(error, "pgcode", None)) == "23505"
@@ -241,8 +253,10 @@ class PostgresJobAnalysisPort:
             raise TypeError("snapshot must be an exact JobAnalysisSnapshot")
         if type(audit_event) is not AuditOutboxEvent:
             raise TypeError("audit_event must be an exact AuditOutboxEvent")
-        if not isinstance(idempotency_key, str):
-            raise ValueError("idempotency_key must reach the write port as a string.")
+        _validate_durable_command_scalars(
+            idempotency_key=idempotency_key,
+            request_digest=request_digest,
+        )
         validate_operational_uuid("write_command_id", write_command_id)
         validate_operational_uuid("outbox_delivery_record_id", outbox_delivery_record_id)
         if position_record_id is not None:
