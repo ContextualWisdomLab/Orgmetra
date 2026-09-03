@@ -36,6 +36,26 @@ class ExplodingCallerTimezone(FixedCallerTimezone):
         raise RuntimeError("caller-controlled timezone failure")
 
 
+class OffsetlessCallerTimezone(FixedCallerTimezone):
+    """Return no usable offset despite carrying a non-null tzinfo object."""
+
+    def utcoffset(self, dt: datetime | None) -> None:
+        """Expose the offsetless custom-timezone case explicitly."""
+        return None
+
+
+class ForgedTimedelta(timedelta):
+    """Represent caller-defined executable offset evidence."""
+
+
+class ForgedOffsetCallerTimezone(FixedCallerTimezone):
+    """Return a timedelta subtype rather than an exact trusted offset value."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        """Preserve valid numeric offset semantics while changing runtime identity."""
+        return ForgedTimedelta(hours=9)
+
+
 def _caller_recorded_at(zone: tzinfo) -> datetime:
     """Build an exact datetime whose timezone implementation remains caller-owned."""
     return datetime(2024, 6, 1, 12, 0, tzinfo=zone)
@@ -81,10 +101,15 @@ def test_direct_supersession_construction_detaches_caller_timezone(
     assert supersession.recorded_at.utcoffset() == timedelta(hours=9)
 
 
-def test_category_correction_normalizes_timezone_provider_failure(
+@pytest.mark.parametrize(
+    "caller_timezone",
+    [ExplodingCallerTimezone(), OffsetlessCallerTimezone(), ForgedOffsetCallerTimezone()],
+)
+def test_category_correction_rejects_untrusted_timezone_offset_evidence(
     jordan_icu_assignment,
+    caller_timezone,
 ) -> None:
-    """Caller timezone exceptions must not escape the governed correction error contract."""
+    """Provider failure, missing offsets, and offset subtypes must share the domain error contract."""
     predecessor = replace(jordan_icu_assignment, assignment_category_code="primary")
 
     with pytest.raises(CorrectionError, match="recorded_at"):
@@ -93,5 +118,5 @@ def test_category_correction_normalizes_timezone_provider_failure(
             replacement_assignment_record_id=REPLACEMENT,
             assignment_supersession_record_id=SUPERSESSION,
             corrected_category_code="concurrent_secondary",
-            recorded_at=_caller_recorded_at(ExplodingCallerTimezone()),
+            recorded_at=_caller_recorded_at(caller_timezone),
         )
