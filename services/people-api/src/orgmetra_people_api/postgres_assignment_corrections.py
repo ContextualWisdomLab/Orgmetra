@@ -362,7 +362,6 @@ class PostgresAssignmentCorrectionMutationPort:
                     _position_version_from_row(command.tenant_record_id, row)
                     for row in cursor.fetchall()
                 ]
-                recorded_at = _post_lock_recorded_at(cursor)
 
                 cursor.execute(
                     _LOCK_ASSIGNMENT_PORTFOLIO_SQL,
@@ -376,6 +375,7 @@ class PostgresAssignmentCorrectionMutationPort:
                     _assignment_from_locked_row(command.tenant_record_id, row)
                     for row in cursor.fetchall()
                 ]
+                recorded_at = _post_lock_recorded_at(cursor)
                 try:
                     closed, replacement, supersession = build_assignment_category_correction(
                         predecessor,
