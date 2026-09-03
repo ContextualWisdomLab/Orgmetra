@@ -41,7 +41,9 @@ High-impact commands additionally require:
 
 For confirmed-hire materialization, those high-impact facts are resolved from the exact already-sealed `selection_decision` and its evidence set inside the tenant-bound transaction rather than accepted again as mutable request-body assertions.
 
-The server rejects a reused idempotency key when its method, resource, tenant, actor, purpose, or semantic command digest differs. People employment, position, assignment, and confirmed-hire writes persist that digest on `people_mutation_idempotency_record` in the same transaction as the authoritative HRIS fact and audit/outbox pair. A matching retry returns the first committed record identity without duplicating authoritative or audit/outbox facts. Generated record identifiers are excluded from the employment/position/assignment digest so a retried POST that allocates fresh UUIDs still replays; the confirmed-hire route requires the caller to repeat the exact confirmed identities and rejects a same-key command whose materialization identities differ.
+Assignment creation additionally requires `assignment_category_code` with exactly `primary` or `concurrent_secondary`. The API never accepts `legacy_unspecified` for a new command and never derives category from allocation percentage, row order, position identity, or graph topology. At one tenant/employment/effective/system-time coordinate, creating a second visible `primary` fails closed; additional concurrent work must be recorded explicitly as `concurrent_secondary` while still satisfying employment, position, and allocation-portfolio invariants.
+
+The server rejects a reused idempotency key when its method, resource, tenant, actor, purpose, or semantic command digest differs. People employment, position, assignment, and confirmed-hire writes persist that digest on `people_mutation_idempotency_record` in the same transaction as the authoritative HRIS fact and audit/outbox pair. Assignment category is part of the assignment semantic digest, so changing `primary` to `concurrent_secondary` under the same key is an idempotency conflict. A matching retry returns the first committed record identity without duplicating authoritative or audit/outbox facts. Generated record identifiers are excluded from the employment/position/assignment digest so a retried POST that allocates fresh UUIDs still replays; the confirmed-hire route requires the caller to repeat the exact confirmed identities and rejects a same-key command whose materialization identities differ.
 
 ## Example endpoints
 
@@ -60,7 +62,7 @@ POST /v1/criterion-observations
 POST /v1/validity-studies
 ```
 
-The foundation OpenAPI contract covers the shared command vocabulary and baseline person, employment, position, assignment, job-profile, and selection-decision operations. Runtime services must publish any additional path-specific contract before release and may not weaken the shared `Idempotency-Key`, least-privilege scope, authorization, evidence, or error semantics. Employment and assignment writes fail closed when exclusive jobs overlap, a seat is not staffable, or visible seat allocations exceed 1.0000.
+The foundation OpenAPI contract covers the shared command vocabulary and baseline person, employment, position, assignment, job-profile, and selection-decision operations. Runtime services must publish any additional path-specific contract before release and may not weaken the shared `Idempotency-Key`, least-privilege scope, authorization, evidence, or error semantics. Employment and assignment writes fail closed when exclusive jobs overlap, a seat is not staffable, visible seat allocations exceed 1.0000, assignment category is not explicit, or two primary assignment intervals overlap for the same tenant-local employment.
 
 ## Error shape
 

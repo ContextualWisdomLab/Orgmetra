@@ -1,0 +1,72 @@
+name: Assignment Category Quality
+
+on:
+  pull_request:
+    branches:
+      - bootstrap
+      - develop
+      - main
+    paths:
+      - "database/migrations/0017_assignment_category_code.sql"
+      - "docs/adr/0015-explicit-assignment-category.md"
+      - "docs/API_CONTRACT.md"
+      - "docs/DATA_MODEL.md"
+      - "docs/ERD.md"
+      - "docs/TRACEABILITY.md"
+      - "manifest.json"
+      - "packages/hris-kernel/**"
+      - "schemas/openapi.yaml"
+      - "services/people-api/**"
+      - "tests/assignment-category-provenance.test.mjs"
+      - "tests/openapi-contract.test.mjs"
+      - "tests/test_assignment_category_postgres.sh"
+      - "tests/validate_repository.py"
+      - ".github/workflows/assignment-category-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assignment-category-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres:
+    name: Explicit assignment category persistence contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: orgmetra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d orgmetra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Prove assignment category provenance inventory
+        run: node --test tests/assignment-category-provenance.test.mjs
+      - name: Prove migration compatibility and new-write invariants
+        run: bash tests/test_assignment_category_postgres.sh
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

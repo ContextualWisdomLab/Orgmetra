@@ -20,11 +20,12 @@ _ONE = Decimal("1.0000")
 _ZERO = Decimal("0")
 _ASSIGNMENT_ELIGIBLE_EMPLOYMENT_STATUSES = frozenset({"active", "leave"})
 _STAFFABLE_POSITION_STATUSES = frozenset({"active", "open"})
+_ASSIGNMENT_CATEGORY_CODES = frozenset({"primary", "concurrent_secondary", "legacy_unspecified"})
 
 
 def _ratio_is_valid(allocation_ratio: Decimal) -> bool:
-    """Return whether one assignment row stays inside (0, 1.0000]."""
-    return allocation_ratio > _ZERO and allocation_ratio <= _ONE
+    """Return whether one exact Decimal assignment row stays inside (0, 1.0000]."""
+    return type(allocation_ratio) is Decimal and allocation_ratio > _ZERO and allocation_ratio <= _ONE
 
 
 def _union_covers(intervals: list[DateInterval], target: DateInterval) -> bool:
@@ -48,8 +49,12 @@ def validate_assignment_portfolio(
     employment_record_id: UUID,
     effective_on: date,
     known_at: datetime,
-) -> None:
-    """Reject invalid ratios or a visible allocation total above 1.0000.
+) -> list[AssignmentFact]:
+    """Reject invalid ratios, categories, duplicate primaries, or allocation above 1.0000.
+
+    ``legacy_unspecified`` is accepted only as historical truth. This validator
+    never reclassifies it from allocation ratio, insertion order, or any other
+    heuristic.
 
     Args:
         assignments: Candidate assignment facts, including other tenants and people.
@@ -59,8 +64,11 @@ def validate_assignment_portfolio(
         effective_on: The day whose split is being reviewed.
         known_at: The knowledge cutoff used for the review.
 
+    Returns:
+        The visible assignment facts at the requested bitemporal coordinate.
+
     Raises:
-        AssignmentPortfolioError: Reduce one allocation, then save again.
+        AssignmentPortfolioError: Correct the category or allocation, then save again.
     """
     scoped = [
         fact
@@ -70,6 +78,14 @@ def validate_assignment_portfolio(
         and fact.employment_record_id == employment_record_id
     ]
     for fact in scoped:
+        if type(fact.assignment_category_code) is not str or fact.assignment_category_code not in _ASSIGNMENT_CATEGORY_CODES:
+            raise AssignmentPortfolioError(
+                "assignment_category_code is not a governed assignment classification.",
+                next_action=(
+                    "Use primary or concurrent_secondary for new writes; preserve "
+                    "legacy_unspecified only for historical rows."
+                ),
+            )
         if not _ratio_is_valid(fact.allocation_ratio):
             raise AssignmentPortfolioError(
                 "allocation_ratio must be greater than 0 and at most 1.0000.",
@@ -83,12 +99,20 @@ def validate_assignment_portfolio(
         effective_on=effective_on,
         known_at=known_at,
     )
+    if sum(fact.assignment_category_code == "primary" for fact in visible) > 1:
+        raise AssignmentPortfolioError(
+            "One employment cannot have two visible primary assignments.",
+            next_action=(
+                "Keep one primary assignment and record additional assignments as concurrent_secondary."
+            ),
+        )
     total = sum((fact.allocation_ratio for fact in visible), start=_ZERO)
     if total > _ONE:
         raise AssignmentPortfolioError(
             "Visible allocations for one employment exceed 1.0000.",
             next_action="Reduce one assignment so the employment total is at most 1.0000.",
         )
+    return visible
 
 
 def validate_assignment_employment_coverage(
@@ -212,6 +236,12 @@ def validate_position_seat_capacity(
         if fact.tenant_record_id == tenant_record_id
         and fact.position_record_id == position_record_id
     ]
+    for fact in scoped:
+        if not _ratio_is_valid(fact.allocation_ratio):
+            raise PositionSeatError(
+                "allocation_ratio must be greater than 0 and at most 1.0000.",
+                next_action="Enter an allocation between 0.0001 and 1.0000, then save.",
+            )
     visible = resolve_bitemporal_facts(
         scoped,
         tenant_record_id=tenant_record_id,

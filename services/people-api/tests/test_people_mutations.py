@@ -94,6 +94,7 @@ def assignment_command(**overrides: object) -> AssignmentMutationCommand:
         "audit_event_record_id": AUDIT_EVENT,
         "outbox_delivery_record_id": OUTBOX,
         "allocation_ratio": Decimal("1.0000"),
+        "assignment_category_code": "primary",
         "effective_from": EFFECTIVE_FROM,
         "confirmation_reference": CONFIRMATION,
         "evidence_version_code": EVIDENCE,

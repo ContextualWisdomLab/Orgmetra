@@ -30,8 +30,28 @@ def test_snapshot_rejects_position_seat_overallocation() -> None:
         EmploymentVersion(_id(1), _id(102), _id(1002), _id(12), "active", effective, known),
     ]
     assignments = [
-        AssignmentFact(_id(1), _id(201), _id(101), _id(11), _id(9001), Decimal("0.6000"), effective, known),
-        AssignmentFact(_id(1), _id(202), _id(102), _id(12), _id(9001), Decimal("0.6000"), effective, known),
+        AssignmentFact(
+            _id(1),
+            _id(201),
+            _id(101),
+            _id(11),
+            _id(9001),
+            Decimal("0.6000"),
+            effective,
+            known,
+            "legacy_unspecified",
+        ),
+        AssignmentFact(
+            _id(1),
+            _id(202),
+            _id(102),
+            _id(12),
+            _id(9001),
+            Decimal("0.6000"),
+            effective,
+            known,
+            "legacy_unspecified",
+        ),
     ]
 
     with pytest.raises(PositionSeatError, match="exceed"):

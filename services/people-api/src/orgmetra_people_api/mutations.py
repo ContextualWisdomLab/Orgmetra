@@ -33,6 +33,7 @@ _VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 _EMPLOYMENT_STATUSES = frozenset({"active", "leave", "terminated"})
 _CONCURRENCY_CODES = frozenset({"exclusive", "concurrent"})
 _POSITION_STATUSES = frozenset({"active", "open", "closed", "frozen", "abolished"})
+_NEW_ASSIGNMENT_CATEGORY_CODES = frozenset({"primary", "concurrent_secondary"})
 _EMPLOYMENT_FIELDS = frozenset({"employment_record"})
 _POSITION_FIELDS = frozenset({"position_record"})
 _ASSIGNMENT_FIELDS = frozenset({"assignment_record"})
@@ -141,6 +142,7 @@ def mutation_command_digest(
         route = "assignment-records"
         semantic_command = {
             "allocation_ratio": _canonical_allocation_ratio(command.allocation_ratio),
+            "assignment_category_code": command.assignment_category_code,
             "confirmation_reference": command.confirmation_reference,
             "effective_from": command.effective_from.isoformat(),
             "employment_record_id": str(command.employment_record_id),
@@ -257,6 +259,7 @@ class AssignmentMutationCommand:
     confirmation_reference: str
     evidence_version_code: str
     idempotency_key: str
+    assignment_category_code: str
 
     def __post_init__(self) -> None:
         """Fail closed before authorization or persistence on malformed input."""
@@ -272,7 +275,7 @@ class AssignmentMutationCommand:
             _validate_operational_uuid(field_name, getattr(self, field_name))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.allocation_ratio, Decimal):
+        if type(self.allocation_ratio) is not Decimal:
             raise ValueError("allocation_ratio must be a Decimal.")
         if not self.allocation_ratio.is_finite():
             raise ValueError("allocation_ratio must be finite.")
@@ -280,6 +283,13 @@ class AssignmentMutationCommand:
             raise ValueError("allocation_ratio must be greater than 0 and at most 1.0000.")
         if self.allocation_ratio.as_tuple().exponent < -4:
             raise ValueError("allocation_ratio must have at most four decimal places.")
+        if (
+            type(self.assignment_category_code) is not str
+            or self.assignment_category_code not in _NEW_ASSIGNMENT_CATEGORY_CODES
+        ):
+            raise ValueError(
+                "assignment_category_code must be primary or concurrent_secondary for new writes."
+            )
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
         validate_idempotency_key(self.idempotency_key)

@@ -63,6 +63,7 @@ def jordan_icu_assignment() -> AssignmentFact:
         allocation_ratio=Decimal("0.8000"),
         effective=effective(date(2024, 3, 1)),
         recorded=recorded(utc(2024, 3, 1, 16)),
+        assignment_category_code="legacy_unspecified",
     )
 
 
@@ -78,4 +79,5 @@ def jordan_float_assignment() -> AssignmentFact:
         allocation_ratio=Decimal("0.2000"),
         effective=effective(date(2024, 3, 1)),
         recorded=recorded(utc(2024, 3, 1, 16)),
+        assignment_category_code="legacy_unspecified",
     )

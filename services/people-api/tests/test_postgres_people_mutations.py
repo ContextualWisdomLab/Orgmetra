@@ -262,6 +262,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             PERSON,
             POSITION,
             Decimal("0.2500"),
+            "legacy_unspecified",
             date(2026, 8, 1),
             date(2026, 8, 10),
             RECORDED_AT,

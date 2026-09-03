@@ -80,6 +80,7 @@ def test_portfolio_ignores_another_person_and_another_employment(
         allocation_ratio=Decimal("1.0000"),
         effective=effective(date(2024, 3, 1)),
         recorded=recorded(utc(2024, 3, 1, 16)),
+        assignment_category_code="legacy_unspecified",
     )
     validate_assignment_portfolio(
         [jordan_icu_assignment, riley],

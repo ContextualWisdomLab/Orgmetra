@@ -20,6 +20,7 @@ export const REQUIRED_FILES = Object.freeze([
   'NOTICE',
   'manifest.json',
   'package.json',
+  '.github/workflows/assignment-category-quality.yml',
   '.github/workflows/foundation-ci.yml',
   '.github/workflows/job-analysis-api-quality.yml',
   'docs/PRD.md',
@@ -52,6 +53,7 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0012-governed-migration-handoff.md',
   'docs/adr/0013-governed-requisition-review-packet.md',
   'docs/adr/0014-job-analysis-snapshot-persistence.md',
+  'docs/adr/0015-explicit-assignment-category.md',
   'docs/doctoring/REFERENCES.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
@@ -68,11 +70,13 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
   'database/migrations/0013_job_analysis_snapshot.sql',
+  'database/migrations/0017_assignment_category_code.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
   'scripts/foundation-contract-core.mjs',
   'scripts/foundation-contract.mjs',
+  'tests/assignment-category-provenance.test.mjs',
   'tests/dispatcher-inventory.test.mjs',
   'tests/foundation-contract.test.mjs',
   'tests/openapi-contract.test.mjs',
@@ -89,6 +93,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/test_job_analysis_snapshot_postgres.sh',
+  'tests/test_assignment_category_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
