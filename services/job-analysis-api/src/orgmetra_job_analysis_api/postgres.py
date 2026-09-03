@@ -33,6 +33,7 @@ from orgmetra_job_analysis_api.snapshot import (
     JobAnalysisIntegrityError,
     JobAnalysisScopeMissing,
     _validate_idempotency_key,
+    snapshot_from_document,
     validate_operational_uuid,
 )
 
@@ -217,6 +218,25 @@ def _validate_durable_command_scalars(
         raise ValueError("purpose_code must be exact built-in text.")
 
 
+def _detach_durable_snapshot(snapshot: JobAnalysisSnapshot) -> JobAnalysisSnapshot:
+    """Rebuild exact snapshot evidence before any executable database boundary runs."""
+    tenant_record_id = validate_operational_uuid(
+        "snapshot.tenant_record_id",
+        snapshot.tenant_record_id,
+    )
+    canonical_json = snapshot.canonical_json()
+    try:
+        document = json.loads(canonical_json)
+    except (TypeError, ValueError) as error:
+        raise JobAnalysisIntegrityError("snapshot canonical evidence is not valid JSON") from error
+    if not isinstance(document, dict):
+        raise JobAnalysisIntegrityError("snapshot canonical evidence must be an object")
+    detached = snapshot_from_document(document, tenant_record_id=tenant_record_id)
+    if detached.canonical_json() != canonical_json:
+        raise JobAnalysisIntegrityError("detached snapshot does not match canonical evidence")
+    return detached
+
+
 @dataclass(frozen=True, slots=True)
 class _DurableAuditEvidence:
     """Detached Job Analysis audit evidence frozen before PostgreSQL acquisition."""
@@ -367,6 +387,7 @@ class PostgresJobAnalysisPort:
             actor_reference=actor_reference,
             purpose_code=purpose_code,
         )
+        snapshot = _detach_durable_snapshot(snapshot)
         audit_evidence = _snapshot_durable_audit_authority(audit_event)
         write_command_id = validate_operational_uuid("write_command_id", write_command_id)
         outbox_delivery_record_id = validate_operational_uuid(
