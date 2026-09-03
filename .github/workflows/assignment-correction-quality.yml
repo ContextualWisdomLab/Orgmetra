@@ -52,7 +52,10 @@ jobs:
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
       - name: Prove HRIS correction domain contract
-        run: python -m pytest packages/hris-kernel/tests/test_assignment_category_correction.py
+        run: >-
+          python -m pytest
+          packages/hris-kernel/tests/test_assignment_category_correction.py
+          packages/hris-kernel/tests/test_assignment_category_correction_recorded_time_integrity.py
       - name: Prove the full People API at exact statement and branch coverage
         env:
           COVERAGE_FILE: /tmp/orgmetra-assignment-correction.coverage
