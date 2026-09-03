@@ -43,7 +43,7 @@ PostgresConnectionFactory = Callable[[], AbstractContextManager[Any]]
 _CORRECTION_ROUTE = "assignment-category-corrections"
 _CORRECTION_FIELDS = frozenset({"assignment_category_code"})
 
-_LOCK_PREDECESSOR_SQL = """
+_READ_PREDECESSOR_SQL = """
 SELECT
     assignment.assignment_record_id,
     assignment.employment_record_id,
@@ -60,7 +60,6 @@ WHERE assignment.tenant_record_id = %s
   AND assignment.assignment_record_id = %s
   AND assignment.recorded_to IS NULL
 LIMIT 2
-FOR UPDATE OF assignment
 """.strip()
 
 _LOCK_EMPLOYMENT_VERSIONS_SQL = """
@@ -119,6 +118,7 @@ WHERE assignment.tenant_record_id = %s
         assignment.employment_record_id = %s
      OR assignment.position_record_id = %s
   )
+ORDER BY assignment.assignment_record_id
 FOR UPDATE OF assignment
 """.strip()
 
@@ -220,6 +220,31 @@ def _require_one_predecessor(
     predecessor = _assignment_from_locked_row(tenant_record_id, rows[0])
     if predecessor.recorded.end is not None:
         raise PeopleMutationIntegrityError("assignment correction predecessor is already closed")
+    return predecessor
+
+
+def _require_locked_predecessor(
+    *,
+    candidate: AssignmentFact,
+    portfolio: list[AssignmentFact],
+) -> AssignmentFact:
+    """Re-resolve the predecessor from the deterministically locked Assignment portfolio."""
+    matches = [
+        assignment
+        for assignment in portfolio
+        if assignment.assignment_record_id == candidate.assignment_record_id
+    ]
+    if len(matches) != 1:
+        raise PeopleMutationIntegrityError("assignment correction predecessor is missing or ambiguous")
+    predecessor = matches[0]
+    if predecessor.recorded.end is not None:
+        raise PeopleMutationIntegrityError("assignment correction predecessor is already closed")
+    if (
+        predecessor.employment_record_id != candidate.employment_record_id
+        or predecessor.person_record_id != candidate.person_record_id
+        or predecessor.position_record_id != candidate.position_record_id
+    ):
+        raise PeopleMutationIntegrityError("assignment correction predecessor identity changed during locking")
     return predecessor
 
 
@@ -338,17 +363,17 @@ class PostgresAssignmentCorrectionMutationPort:
                     return replayed
 
                 cursor.execute(
-                    _LOCK_PREDECESSOR_SQL,
+                    _READ_PREDECESSOR_SQL,
                     (command.tenant_record_id, command.predecessor_assignment_record_id),
                 )
-                predecessor = _require_one_predecessor(
+                candidate = _require_one_predecessor(
                     command.tenant_record_id,
                     cursor.fetchmany(2),
                 )
 
                 cursor.execute(
                     _LOCK_EMPLOYMENT_VERSIONS_SQL,
-                    (command.tenant_record_id, predecessor.employment_record_id),
+                    (command.tenant_record_id, candidate.employment_record_id),
                 )
                 employment_versions = [
                     _employment_version_from_row(command.tenant_record_id, row)
@@ -356,7 +381,7 @@ class PostgresAssignmentCorrectionMutationPort:
                 ]
                 cursor.execute(
                     _LOCK_POSITION_VERSIONS_SQL,
-                    (command.tenant_record_id, predecessor.position_record_id),
+                    (command.tenant_record_id, candidate.position_record_id),
                 )
                 position_versions = [
                     _position_version_from_row(command.tenant_record_id, row)
@@ -367,14 +392,18 @@ class PostgresAssignmentCorrectionMutationPort:
                     _LOCK_ASSIGNMENT_PORTFOLIO_SQL,
                     (
                         command.tenant_record_id,
-                        predecessor.employment_record_id,
-                        predecessor.position_record_id,
+                        candidate.employment_record_id,
+                        candidate.position_record_id,
                     ),
                 )
                 portfolio = [
                     _assignment_from_locked_row(command.tenant_record_id, row)
                     for row in cursor.fetchall()
                 ]
+                predecessor = _require_locked_predecessor(
+                    candidate=candidate,
+                    portfolio=portfolio,
+                )
                 recorded_at = _post_lock_recorded_at(cursor)
                 try:
                     closed, replacement, supersession = build_assignment_category_correction(
