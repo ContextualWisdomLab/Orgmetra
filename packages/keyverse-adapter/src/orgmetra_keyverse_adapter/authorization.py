@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+from typing import NamedTuple
 import weakref
 from uuid import UUID
 
@@ -49,6 +50,15 @@ def _validate_uuid(field_name: str, value: object) -> None:
         raise ValueError(f"{field_name} must be a UUID.")
     if value.int in (0, _MAX_UUID_INT):
         raise ValueError(f"{field_name} must not use a reserved UUID sentinel.")
+
+
+def _validated_uuid_int(field_name: str, value: object) -> int:
+    """Validate and detach an exact UUID into one immutable integer snapshot."""
+    _validate_uuid(field_name, value)
+    value_int = value.int
+    if type(value_int) is not int or not 0 <= value_int <= _MAX_UUID_INT:
+        raise ValueError(f"{field_name} must contain a valid UUID integer.")
+    return value_int
 
 
 def _validate_code(field_name: str, value: object) -> None:
@@ -116,7 +126,48 @@ def _validate_scope_set(values: object) -> None:
         raise ValueError("granted_scope_codes must contain only explicit Orgmetra scopes.")
 
 
-@dataclass(frozen=True, slots=True)
+class _PolicySnapshot(NamedTuple):
+    """Detached creation-time authority for one purpose-bound policy."""
+
+    tenant_record_id_int: int
+    policy_version_code: str
+    resource_kind: str
+    purpose_code: str
+    operation_code: str
+    required_scope_code: str
+    permitted_fields: frozenset[str]
+
+
+class _RequestSnapshot(NamedTuple):
+    """Detached creation-time authority for one purpose-bound access request."""
+
+    tenant_record_id_int: int
+    actor_tenant_record_id_int: int
+    resource_tenant_record_id_int: int
+    actor_reference: str
+    resource_reference: str
+    purpose_code: str
+    operation_code: str
+    resource_kind: str
+    requested_fields: frozenset[str]
+    granted_scope_codes: frozenset[str]
+
+
+_POLICY_SNAPSHOT_REGISTRY: dict[
+    int,
+    tuple[weakref.ReferenceType[object], _PolicySnapshot],
+] = {}
+_REQUEST_SNAPSHOT_REGISTRY: dict[
+    int,
+    tuple[weakref.ReferenceType[object], _RequestSnapshot],
+] = {}
+_DECISION_SNAPSHOT_REGISTRY: dict[
+    int,
+    tuple[weakref.ReferenceType[object], tuple[object, ...]],
+] = {}
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class PurposeBoundAccessPolicy:
     """One tenant-local field policy for one purpose, resource, and operation.
 
@@ -134,17 +185,22 @@ class PurposeBoundAccessPolicy:
     permitted_fields: frozenset[str]
 
     def __post_init__(self) -> None:
-        """Reject ambiguous or mutable policy attributes before evaluation."""
-        _validate_uuid("tenant_record_id", self.tenant_record_id)
-        _validate_version(self.policy_version_code)
-        _validate_resource_kind(self.resource_kind)
-        _validate_code("purpose_code", self.purpose_code)
-        _validate_code("operation_code", self.operation_code)
-        _validate_scope("required_scope_code", self.required_scope_code)
-        _validate_field_set("permitted_fields", self.permitted_fields)
+        """Validate and register the creation-time authority snapshot exactly once."""
+        snapshot = _validated_policy_snapshot(self)
+        key = id(self)
+        if key in _POLICY_SNAPSHOT_REGISTRY:
+            raise TypeError("PurposeBoundAccessPolicy is already initialized")
+        reference = weakref.ref(
+            self,
+            lambda _reference, evidence_key=key: _POLICY_SNAPSHOT_REGISTRY.pop(
+                evidence_key,
+                None,
+            ),
+        )
+        _POLICY_SNAPSHOT_REGISTRY[key] = (reference, snapshot)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class PurposeBoundAccessRequest:
     """PII access attributes resolved before any protected field is returned.
 
@@ -169,27 +225,116 @@ class PurposeBoundAccessRequest:
     granted_scope_codes: frozenset[str]
 
     def __post_init__(self) -> None:
-        """Reject untrusted identity, target, tenant, purpose, field, or scope attributes."""
-        _validate_uuid("tenant_record_id", self.tenant_record_id)
-        _validate_uuid("actor_tenant_record_id", self.actor_tenant_record_id)
-        _validate_uuid("resource_tenant_record_id", self.resource_tenant_record_id)
-        _validate_reference("actor_reference", self.actor_reference)
-        _validate_resource_kind(self.resource_kind)
-        _validate_reference(
-            "resource_reference",
-            self.resource_reference,
-            expected_namespace=self.resource_kind,
+        """Validate and register the creation-time request snapshot exactly once."""
+        snapshot = _validated_request_snapshot(self)
+        key = id(self)
+        if key in _REQUEST_SNAPSHOT_REGISTRY:
+            raise TypeError("PurposeBoundAccessRequest is already initialized")
+        reference = weakref.ref(
+            self,
+            lambda _reference, evidence_key=key: _REQUEST_SNAPSHOT_REGISTRY.pop(
+                evidence_key,
+                None,
+            ),
         )
-        _validate_code("purpose_code", self.purpose_code)
-        _validate_code("operation_code", self.operation_code)
-        _validate_field_set("requested_fields", self.requested_fields)
-        _validate_scope_set(self.granted_scope_codes)
+        _REQUEST_SNAPSHOT_REGISTRY[key] = (reference, snapshot)
 
 
-_DECISION_SNAPSHOT_REGISTRY: dict[
-    int,
-    tuple[weakref.ReferenceType[object], tuple[object, ...]],
-] = {}
+def _validated_policy_snapshot(policy: PurposeBoundAccessPolicy) -> _PolicySnapshot:
+    """Read, validate, and detach one complete policy snapshot."""
+    tenant_record_id = policy.tenant_record_id
+    policy_version_code = policy.policy_version_code
+    resource_kind = policy.resource_kind
+    purpose_code = policy.purpose_code
+    operation_code = policy.operation_code
+    required_scope_code = policy.required_scope_code
+    permitted_fields = policy.permitted_fields
+
+    tenant_record_id_int = _validated_uuid_int("tenant_record_id", tenant_record_id)
+    _validate_version(policy_version_code)
+    _validate_resource_kind(resource_kind)
+    _validate_code("purpose_code", purpose_code)
+    _validate_code("operation_code", operation_code)
+    _validate_scope("required_scope_code", required_scope_code)
+    _validate_field_set("permitted_fields", permitted_fields)
+    return _PolicySnapshot(
+        tenant_record_id_int,
+        policy_version_code,
+        resource_kind,
+        purpose_code,
+        operation_code,
+        required_scope_code,
+        permitted_fields,
+    )
+
+
+def _validated_request_snapshot(request: PurposeBoundAccessRequest) -> _RequestSnapshot:
+    """Read, validate, and detach one complete access-request snapshot."""
+    tenant_record_id = request.tenant_record_id
+    actor_tenant_record_id = request.actor_tenant_record_id
+    resource_tenant_record_id = request.resource_tenant_record_id
+    actor_reference = request.actor_reference
+    resource_reference = request.resource_reference
+    purpose_code = request.purpose_code
+    operation_code = request.operation_code
+    resource_kind = request.resource_kind
+    requested_fields = request.requested_fields
+    granted_scope_codes = request.granted_scope_codes
+
+    tenant_record_id_int = _validated_uuid_int("tenant_record_id", tenant_record_id)
+    actor_tenant_record_id_int = _validated_uuid_int(
+        "actor_tenant_record_id",
+        actor_tenant_record_id,
+    )
+    resource_tenant_record_id_int = _validated_uuid_int(
+        "resource_tenant_record_id",
+        resource_tenant_record_id,
+    )
+    _validate_reference("actor_reference", actor_reference)
+    _validate_resource_kind(resource_kind)
+    _validate_reference(
+        "resource_reference",
+        resource_reference,
+        expected_namespace=resource_kind,
+    )
+    _validate_code("purpose_code", purpose_code)
+    _validate_code("operation_code", operation_code)
+    _validate_field_set("requested_fields", requested_fields)
+    _validate_scope_set(granted_scope_codes)
+    return _RequestSnapshot(
+        tenant_record_id_int,
+        actor_tenant_record_id_int,
+        resource_tenant_record_id_int,
+        actor_reference,
+        resource_reference,
+        purpose_code,
+        operation_code,
+        resource_kind,
+        requested_fields,
+        granted_scope_codes,
+    )
+
+
+def _issued_policy_snapshot(policy: PurposeBoundAccessPolicy) -> _PolicySnapshot:
+    """Return creation-time policy authority only when live fields still match it."""
+    entry = _POLICY_SNAPSHOT_REGISTRY.get(id(policy))
+    if entry is None or entry[0]() is not policy:
+        raise ValueError("PurposeBoundAccessPolicy was not issued by the validated constructor")
+    current = _validated_policy_snapshot(policy)
+    if current != entry[1]:
+        raise ValueError("PurposeBoundAccessPolicy changed after validation")
+    return entry[1]
+
+
+def _issued_request_snapshot(request: PurposeBoundAccessRequest) -> _RequestSnapshot:
+    """Return creation-time request authority only when live fields still match it."""
+    entry = _REQUEST_SNAPSHOT_REGISTRY.get(id(request))
+    if entry is None or entry[0]() is not request:
+        raise ValueError("PurposeBoundAccessRequest was not issued by the validated constructor")
+    current = _validated_request_snapshot(request)
+    if current != entry[1]:
+        raise ValueError("PurposeBoundAccessRequest changed after validation")
+    return entry[1]
 
 
 def _validated_decision_snapshot(
@@ -210,10 +355,7 @@ def _validated_decision_snapshot(
     """Validate decision evidence and detach caller-owned mutable runtime objects."""
     if type(allowed) is not bool:
         raise ValueError("allowed must be a boolean.")
-    _validate_uuid("tenant_record_id", tenant_record_id)
-    tenant_int = tenant_record_id.int
-    if type(tenant_int) is not int or not 0 <= tenant_int <= _MAX_UUID_INT:
-        raise ValueError("tenant_record_id must contain a valid UUID integer.")
+    tenant_int = _validated_uuid_int("tenant_record_id", tenant_record_id)
     _validate_reference("actor_reference", actor_reference)
     _validate_resource_kind(resource_kind)
     _validate_reference(
@@ -433,17 +575,17 @@ class AuthorizationDeniedError(PermissionError):
 
 def _decision(
     *,
-    request: PurposeBoundAccessRequest,
-    policy: PurposeBoundAccessPolicy,
+    request: _RequestSnapshot,
+    policy: _PolicySnapshot,
     allowed: bool,
     reason_code: str,
 ) -> AuthorizationDecision:
-    """Build one immutable allow/deny record without copying protected values."""
+    """Build one immutable decision from validated creation-time authority snapshots."""
     authorized_fields = request.requested_fields if allowed else frozenset()
     next_action = _ALLOW_NEXT_ACTION if allowed else _DENIAL_NEXT_ACTION[reason_code]
     return AuthorizationDecision(
         allowed=allowed,
-        tenant_record_id=request.tenant_record_id,
+        tenant_record_id=UUID(int=request.tenant_record_id_int),
         actor_reference=request.actor_reference,
         resource_reference=request.resource_reference,
         policy_version_code=policy.policy_version_code,
@@ -464,64 +606,68 @@ def evaluate_purpose_bound_access(
 ) -> AuthorizationDecision:
     """Evaluate tenant, resource, purpose, operation, scope, and field attributes.
 
-    The order deliberately checks tenant isolation before policy detail and then
-    requires every narrowing attribute. Possessing a broad identity or a valid
-    purpose header is insufficient when the operation scope or requested field
-    set is not explicitly authorized.
+    The evaluator binds both inputs to their validated creation-time snapshots
+    before comparing any authorization attribute. A frozen dataclass is not
+    treated as a security boundary because ``object.__setattr__`` can still write
+    its slots; any post-construction rewrite fails closed and the evaluator then
+    uses only the detached snapshots.
     """
     if type(request) is not PurposeBoundAccessRequest:
         raise TypeError("request must be a PurposeBoundAccessRequest")
     if type(policy) is not PurposeBoundAccessPolicy:
         raise TypeError("policy must be a PurposeBoundAccessPolicy")
+
+    request_snapshot = _issued_request_snapshot(request)
+    policy_snapshot = _issued_policy_snapshot(policy)
     if (
-        request.tenant_record_id != policy.tenant_record_id
-        or request.actor_tenant_record_id != policy.tenant_record_id
-        or request.resource_tenant_record_id != policy.tenant_record_id
+        request_snapshot.tenant_record_id_int != policy_snapshot.tenant_record_id_int
+        or request_snapshot.actor_tenant_record_id_int != policy_snapshot.tenant_record_id_int
+        or request_snapshot.resource_tenant_record_id_int != policy_snapshot.tenant_record_id_int
     ):
         return _decision(
-            request=request,
-            policy=policy,
+            request=request_snapshot,
+            policy=policy_snapshot,
             allowed=False,
             reason_code="tenant_scope_mismatch",
         )
-    if request.resource_kind != policy.resource_kind:
+    if request_snapshot.resource_kind != policy_snapshot.resource_kind:
         return _decision(
-            request=request,
-            policy=policy,
+            request=request_snapshot,
+            policy=policy_snapshot,
             allowed=False,
             reason_code="resource_not_allowed",
         )
-    if request.purpose_code != policy.purpose_code:
+    if request_snapshot.purpose_code != policy_snapshot.purpose_code:
         return _decision(
-            request=request,
-            policy=policy,
+            request=request_snapshot,
+            policy=policy_snapshot,
             allowed=False,
             reason_code="purpose_not_allowed",
         )
-    if request.operation_code != policy.operation_code:
+    if request_snapshot.operation_code != policy_snapshot.operation_code:
         return _decision(
-            request=request,
-            policy=policy,
+            request=request_snapshot,
+            policy=policy_snapshot,
             allowed=False,
             reason_code="operation_not_allowed",
         )
-    if policy.required_scope_code not in request.granted_scope_codes:
+    if policy_snapshot.required_scope_code not in request_snapshot.granted_scope_codes:
         return _decision(
-            request=request,
-            policy=policy,
+            request=request_snapshot,
+            policy=policy_snapshot,
             allowed=False,
             reason_code="required_scope_missing",
         )
-    if not request.requested_fields.issubset(policy.permitted_fields):
+    if not request_snapshot.requested_fields.issubset(policy_snapshot.permitted_fields):
         return _decision(
-            request=request,
-            policy=policy,
+            request=request_snapshot,
+            policy=policy_snapshot,
             allowed=False,
             reason_code="field_not_allowed",
         )
     return _decision(
-        request=request,
-        policy=policy,
+        request=request_snapshot,
+        policy=policy_snapshot,
         allowed=True,
         reason_code="access_permitted",
     )
