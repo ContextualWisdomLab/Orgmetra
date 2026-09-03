@@ -1,6 +1,6 @@
 # Product and technical gap baseline
 
-Verified: 2026-09-02 (Asia/Seoul).
+Verified: 2026-09-03 (Asia/Seoul) for Orgmetra protected/product refs. External owner-repository evidence retains its separately dated doctoring until re-fetched in that owner lane.
 
 This document is the commercialization baseline for **Orgmetra**, not a frozen PR inventory and not merge authorization. It records product responsibility, shipped-vs-planned truth, causal control-plane blockers, and the next highest-leverage buyer gaps. Volatile PR heads, workflow run IDs, queue counts, review snapshots, mergeability, and base tips must be fetched live before every action rather than copied here until stale.
 
@@ -56,7 +56,7 @@ The initial deployment may share one PostgreSQL cluster, but each bounded contex
 
 ## 4. Current protected-branch product truth
 
-Protected `develop` was freshly observed at `9e3e4847510e1e612b48474ba42b177b8ed824df`. This SHA is a dated evidence anchor only; every execution loop must re-fetch the branch before acting.
+Protected `develop` was freshly observed at `5c5cd3258c34fd2cbbdacd7420afd05f2617aa29`. This SHA is a dated evidence anchor only; every execution loop must re-fetch the branch before acting. The protected change since the prior baseline anchor is CI admission only: Foundation CI and Recovery Rehearsal Quality now skip docs-only changes. It does not promote any pending HR domain feature to Shipped truth.
 
 Shipped foundation evidence includes:
 
@@ -68,6 +68,8 @@ Shipped foundation evidence includes:
 
 Protected `develop` does **not** yet encode the HR decision that distinguishes a primary assignment from a concurrent secondary/TFT assignment. Allocation percentage, row order, position identity and graph topology are not classification authority. Orgmetra issue #162 and Draft PR #163 are the active `people_core` owner lane: new writes require explicit `primary | concurrent_secondary`; pre-contract history remains `legacy_unspecified` without inference; one tenant-local Employment may have at most one simultaneously visible primary assignment for one effective/system-time coordinate; category participates in semantic idempotency; and API/application/PostgreSQL boundaries must enforce the same vocabulary. Because #163 is still an Active PR with non-terminal exact-head evidence, none of that behavior is Shipped truth yet.
 
+Assignment category correction is a distinct dependent buyer gap rather than an implied capability of #163. Issue #164 and Draft PR #165 own immutable close → replacement → normalized predecessor/replacement supersession for already-committed explicit categories. The active child preserves tenant/Employment/Person/Position/allocation/effective truth, requires Keyverse purpose-bound authorization and human-confirmation/evidence metadata, records audit/outbox plus durable replay evidence in the same PostgreSQL transaction, and rejects caller-defined command/authorization-decision runtime subtypes before semantic replay or database I/O. It remains downstream of #163 and has non-terminal exact-head hosted evidence, so correction provenance is **Active PR**, not Shipped truth.
+
 The root package remains `orgmetra-foundation-pack` version `0.1.0`, private, with a validation-oriented script rather than a deployable buyer application. Current default-branch code search finds `orgmetra-gateway`, employee workspace and HR workspace as architecture/design references, while no React implementation is indexed. The P1 PRD promise—Job Architecture, Candidate Evidence, Hiring Decision, bitemporal Employee Profile and Validation workspaces—therefore has **no protected-branch buyer UI implementation evidence yet**. Treat this as a major commercialization gap, not as a documentation completion.
 
 There are currently no published GitHub releases. Do not manufacture a release merely to clear that count; release only when an integrated protected head has complete exact-head governance, security, operability and buyer-workflow evidence.
@@ -76,7 +78,7 @@ There are currently no published GitHub releases. Do not manufacture a release m
 
 The effective control plane for Orgmetra `develop` is inherited organization ruleset **18156473 — `CWL Central required workflows`**. Classic branch-protection fields alone are not authoritative while that ruleset is active.
 
-Fresh live reads on 2026-09-02 show the inherited ruleset still has:
+Fresh Orgmetra live reads on 2026-09-03 show the inherited ruleset still has:
 
 - `required_approving_review_count = 1`;
 - `require_last_push_approval = false`;
@@ -119,7 +121,7 @@ Orgmetra must not infer a clean dependency review from independent OSV, Trivy or
 
 ## 7. Current baseline-writer evidence
 
-PR #100 owns this baseline. A predecessor exact head failed Foundation/Recovery-family repository-contract checks after `.codegraph/` was added to `.gitignore` without resealing `manifest.json`. The owner branch was repaired by resealing only the `.gitignore` manifest entry to the exact current digest/size/line count.
+PR #100 owns this baseline. A predecessor exact head failed Foundation/Recovery-family repository-contract checks after `.codegraph/` was added to `.gitignore` without resealing `manifest.json`. The owner branch was repaired by resealing only the `.gitignore` manifest entry to the exact current digest/size/line count. The owner branch has now also adopted protected #166's two CI admission changes as a two-parent non-force merge before this baseline update, so it is not knowingly carrying the stale pre-#166 protected tree.
 
 Do **not** store PR #100's own current head inside this file: changing this file creates a new head and would make the value self-invalidating. Its PR body and GitHub API are the source for exact-current-head verification. All reviews/checks must be re-fetched after every push.
 
@@ -131,6 +133,7 @@ Do **not** store PR #100's own current head inside this file: changing this file
 | **SEC-01 authoritative Dependency Review availability** | decisive A/B showed anonymous 404 vs minimally scoped job-token 200; canonical Draft #1725 keeps authenticated non-200 fail-closed, explicit caller permissions and immutable identity validation, but is not yet protected/released | merge queue can remain blocked without trustworthy dependency diff | `.github#810/#1725`; terminal unchanged-head evidence → ordinary protected integration → immutable consumer pin → unchanged public non-fork authenticated comparison 200 + pinned action execution | **P0** |
 | **REL-01 integrated release evidence** | no published release; large active PR stack; no single integrated protected head yet proves the complete gate set | buyers cannot install/deploy a supported release | merge causal dependency roots in order; protected-head release checklist + signed/provenance evidence + CHANGELOG/version | **P0** |
 | **ASG-01 explicit assignment authority** | protected `develop` stores assignment allocation but not the explicit HR decision distinguishing primary from concurrent secondary/TFT; issue #162 and Draft PR #163 are the active test-first owner lane and remain non-shipped while current exact-head evidence is non-terminal | employee profile, reporting and downstream authorization/graph consumers would otherwise have to guess authoritative membership from allocation/order/topology | Orgmetra #162/#163; integrate explicit category across domain/API/PostgreSQL/OpenAPI with bitemporal uniqueness, legacy provenance, semantic idempotency and no heuristic reclassification, then prove exact-head PostgreSQL/People/Foundation/Recovery/Security/SAST/review evidence | **P1 buyer truth** |
+| **ASG-02 auditable assignment category correction** | issue #164 / dependent Draft #165 implement immutable predecessor closure, replacement Assignment, normalized supersession, purpose-bound HTTP/OpenAPI, audit/outbox and durable replay; current exact head remains downstream of #163 with queued hosted evidence | HR operations cannot safely correct a misclassified primary/secondary Assignment without either rewriting history or creating provenance ambiguity | integrate #163 first → non-force restack/retarget #165 → exact-head PostgreSQL/full-People/idempotency/security/review GREEN → atomic canonical documentation/inventory handoff → ordinary protected integration | **P1 buyer truth** |
 | **UX-01 role workspaces are design truth, not shipped UI** | P1 workspaces appear in PRD/wireframes/Storybook contract; protected branch shows foundation package and design tokens but no indexed React workspace implementation | buyers cannot complete the lifecycle through a coherent UI | executable Job Architecture → Candidate Evidence → Hiring Decision → Employee Profile → Validation vertical slice; Storybook, screenshots, WCAG 2.2 AA, interaction/i18n/edge-state tests | **P1** |
 | **API-01 deployable gateway/service composition** | architecture defines `orgmetra-gateway` and bounded services; protected code evidence is still foundation/package-oriented | integrations lack one deployable, supported application boundary | async-capable gateway, generated OpenAPI validation, auth/purpose/idempotency, service-owned DB access, contract/load tests | **P1** |
 | **VAL-01 end-to-end validation workflow** | normalized validity/evidence architecture exists; specialist numerical ownership is correctly external | people analytics buyer cannot yet run a governed predictor→criterion→fairness workflow from UI/API | `workforce_validation` vertical slice integrating exact immutable snapshots through approved fast-mlsirm/TEPP/Psychometrics Commons boundaries; reproducibility/error evidence | **P1** |
