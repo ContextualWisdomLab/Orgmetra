@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from orgmetra_hris_kernel.correction import close_recorded_interval
@@ -31,13 +31,32 @@ def _require_operational_uuid(value: object, field_name: str) -> UUID:
 
 
 def _require_recorded_at(value: object) -> datetime:
-    """Require one exact offset-aware system timestamp for correction provenance."""
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+    """Detach one exact system timestamp from caller-controlled timezone behavior."""
+    if type(value) is not datetime or value.tzinfo is None:
         raise CorrectionError(
             "recorded_at must be an exact timezone-aware datetime.",
             next_action="Use the database-owned correction timestamp with an explicit UTC offset.",
         )
-    return value
+    try:
+        offset = value.utcoffset()
+    except Exception as exc:
+        raise CorrectionError(
+            "recorded_at must expose a stable UTC offset.",
+            next_action="Use the database-owned correction timestamp with an explicit UTC offset.",
+        ) from exc
+    if type(offset) is not timedelta:
+        raise CorrectionError(
+            "recorded_at must expose a stable UTC offset.",
+            next_action="Use the database-owned correction timestamp with an explicit UTC offset.",
+        )
+    try:
+        fixed_timezone = timezone(offset)
+    except (OverflowError, ValueError) as exc:
+        raise CorrectionError(
+            "recorded_at must expose a valid UTC offset.",
+            next_action="Use the database-owned correction timestamp with an explicit UTC offset.",
+        ) from exc
+    return value.replace(tzinfo=fixed_timezone)
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +70,7 @@ class AssignmentSupersessionFact:
     recorded_at: datetime
 
     def __post_init__(self) -> None:
-        """Reject malformed provenance identities and timestamps before persistence."""
+        """Reject malformed provenance identities and detach its recorded timestamp."""
         for field_name in (
             "tenant_record_id",
             "assignment_supersession_record_id",
@@ -59,7 +78,7 @@ class AssignmentSupersessionFact:
             "replacement_assignment_record_id",
         ):
             _require_operational_uuid(getattr(self, field_name), field_name)
-        _require_recorded_at(self.recorded_at)
+        object.__setattr__(self, "recorded_at", _require_recorded_at(self.recorded_at))
         if self.predecessor_assignment_record_id == self.replacement_assignment_record_id:
             raise CorrectionError(
                 "Supersession provenance requires distinct Assignment identities.",
