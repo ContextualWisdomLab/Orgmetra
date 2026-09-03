@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import weakref
 from uuid import UUID
 
 import pytest
@@ -70,6 +71,34 @@ def test_module_decision_helper_cannot_mint_from_fabricated_snapshots() -> None:
             reason_code="access_permitted",
         )
     assert not hasattr(authorization_module, "_DECISION_ISSUANCE_IDS")
+
+
+def test_module_registry_insertion_cannot_mint_forged_decision() -> None:
+    """Consumer-visible module state must not provide a writable authority registry."""
+    forged = object.__new__(AuthorizationDecision)
+    snapshot = authorization_module._validated_decision_snapshot(
+        allowed=True,
+        tenant_record_id=TENANT,
+        actor_reference="keyverse_subject:operator-17",
+        resource_reference=RESOURCE_REFERENCE,
+        policy_version_code="assignment-correction-v1",
+        purpose_code="workforce_admin",
+        operation_code="correct_record",
+        resource_kind="assignment_record",
+        requested_fields=REQUESTED_FIELDS,
+        authorized_fields=REQUESTED_FIELDS,
+        reason_code="access_permitted",
+        next_action="Continue with only the authorized fields.",
+    )
+    registry = getattr(authorization_module, "_DECISION_SNAPSHOT_REGISTRY", None)
+    try:
+        if registry is not None:
+            registry[id(forged)] = (weakref.ref(forged), snapshot)
+        with pytest.raises(ValueError, match="was not issued by purpose-bound evaluation"):
+            _ = forged.allowed
+    finally:
+        if registry is not None:
+            registry.pop(id(forged), None)
 
 
 def test_governed_evaluator_remains_the_decision_issuance_path() -> None:
