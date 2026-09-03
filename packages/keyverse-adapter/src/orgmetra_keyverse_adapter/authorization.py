@@ -96,6 +96,14 @@ def _validate_field_set(field_name: str, values: object) -> None:
         raise ValueError(f"{field_name} must contain only explicit lower snake_case field names.")
 
 
+def _validate_authorized_field_set(values: object) -> None:
+    """Require an exact immutable authorized-field set while allowing an empty deny result."""
+    if type(values) is not frozenset:
+        raise ValueError("authorized_fields must be a frozenset.")
+    if any(type(value) is not str or _CODE_PATTERN.fullmatch(value) is None for value in values):
+        raise ValueError("authorized_fields must contain only explicit lower snake_case field names.")
+
+
 def _validate_scope_set(values: object) -> None:
     """Require an exact immutable set of exact built-in authenticated token scopes."""
     if type(values) is not frozenset:
@@ -178,7 +186,7 @@ class PurposeBoundAccessRequest:
 
 @dataclass(frozen=True, slots=True)
 class AuthorizationDecision:
-    """PII-minimized authorization evidence safe to bind into an audit event."""
+    """PII-minimized, runtime-validated authorization evidence for downstream use."""
 
     allowed: bool
     tenant_record_id: UUID
@@ -192,6 +200,31 @@ class AuthorizationDecision:
     authorized_fields: frozenset[str]
     reason_code: str
     next_action: str
+
+    def __post_init__(self) -> None:
+        """Reject malformed or executable evidence before it reaches a persistence boundary."""
+        if type(self.allowed) is not bool:
+            raise ValueError("allowed must be a boolean.")
+        _validate_uuid("tenant_record_id", self.tenant_record_id)
+        _validate_reference("actor_reference", self.actor_reference)
+        _validate_resource_kind(self.resource_kind)
+        _validate_reference(
+            "resource_reference",
+            self.resource_reference,
+            expected_namespace=self.resource_kind,
+        )
+        _validate_version(self.policy_version_code)
+        _validate_code("purpose_code", self.purpose_code)
+        _validate_code("operation_code", self.operation_code)
+        _validate_field_set("requested_fields", self.requested_fields)
+        _validate_authorized_field_set(self.authorized_fields)
+        _validate_code("reason_code", self.reason_code)
+        if type(self.next_action) is not str or not self.next_action.strip() or len(self.next_action) > 500:
+            raise ValueError("next_action must be a non-blank string of at most 500 characters.")
+        if self.allowed and self.authorized_fields != self.requested_fields:
+            raise ValueError("allow decision must authorize exactly the requested fields.")
+        if not self.allowed and self.authorized_fields:
+            raise ValueError("deny decision must not authorize fields.")
 
 
 class AuthorizationDeniedError(PermissionError):
