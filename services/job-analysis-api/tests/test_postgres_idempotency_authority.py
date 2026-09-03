@@ -32,7 +32,7 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
         *,
         stored_actor_reference: str,
         stored_purpose_code: str,
-        stored_analysis_record_id: UUID = ANALYSIS,
+        stored_analysis_record_id: object = ANALYSIS,
         actor_reference: str = "keyverse:actor-ja-1",
         purpose_code: str = "job_analysis_write",
         include_snapshot: bool = False,
@@ -93,6 +93,15 @@ class PostgresIdempotencyAuthorityTests(unittest.TestCase):
                 stored_actor_reference="keyverse:actor-ja-1",
                 stored_purpose_code="job_analysis_write",
                 stored_analysis_record_id=foreign_analysis_record_id,
+            )
+
+    def test_malformed_stored_snapshot_identity_fails_closed(self) -> None:
+        """Corrupt durable replay identity is an integrity failure, not a load target."""
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "invalid analysis_record_id"):
+            self._persist_replay(
+                stored_actor_reference="keyverse:actor-ja-1",
+                stored_purpose_code="job_analysis_write",
+                stored_analysis_record_id="0198a412-6000-7000-8000-000000000399",
             )
 
     def test_exact_actor_purpose_and_snapshot_replay_returns_the_stored_snapshot(self) -> None:
