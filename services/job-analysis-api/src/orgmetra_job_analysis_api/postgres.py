@@ -442,27 +442,47 @@ class PostgresJobAnalysisPort:
                     ),
                 )
                 existing = cursor.fetchone()
-                if existing is not None and existing[0] is not None:
-                    stored_digest, stored_analysis_id, *stored_authority = existing
-                    if stored_digest != request_digest:
-                        raise JobAnalysisIdempotencyConflict(
-                            "idempotency key is bound to a different snapshot digest"
-                        )
+                if existing is not None:
                     try:
-                        stored_analysis_id = validate_operational_uuid(
-                            "stored analysis_record_id",
+                        (
+                            stored_digest,
                             stored_analysis_id,
-                        )
-                    except ValueError as error:
+                            stored_actor_reference,
+                            stored_purpose_code,
+                        ) = existing
+                    except (TypeError, ValueError) as error:
                         raise JobAnalysisIntegrityError(
-                            "idempotent command has invalid analysis_record_id"
+                            "idempotent durable command row has invalid shape"
                         ) from error
-                    if stored_analysis_id != snapshot.analysis_record_id:
-                        raise JobAnalysisIntegrityError(
-                            "idempotent command analysis_record_id does not match detached snapshot"
-                        )
-                    if stored_authority:
-                        stored_actor_reference, stored_purpose_code = stored_authority
+                    if stored_digest is not None:
+                        try:
+                            _validate_durable_command_scalars(
+                                idempotency_key=idempotency_key,
+                                request_digest=stored_digest,
+                                actor_reference=stored_actor_reference,
+                                purpose_code=stored_purpose_code,
+                            )
+                        except ValueError as error:
+                            raise JobAnalysisIntegrityError(
+                                "idempotent durable command has invalid scalar evidence"
+                            ) from error
+                        if stored_digest != request_digest:
+                            raise JobAnalysisIdempotencyConflict(
+                                "idempotency key is bound to a different snapshot digest"
+                            )
+                        try:
+                            stored_analysis_id = validate_operational_uuid(
+                                "stored analysis_record_id",
+                                stored_analysis_id,
+                            )
+                        except ValueError as error:
+                            raise JobAnalysisIntegrityError(
+                                "idempotent command has invalid analysis_record_id"
+                            ) from error
+                        if stored_analysis_id != snapshot.analysis_record_id:
+                            raise JobAnalysisIntegrityError(
+                                "idempotent command analysis_record_id does not match detached snapshot"
+                            )
                         if stored_actor_reference != actor_reference:
                             raise JobAnalysisIdempotencyConflict(
                                 "idempotency key is bound to a different actor"
@@ -471,23 +491,23 @@ class PostgresJobAnalysisPort:
                             raise JobAnalysisIdempotencyConflict(
                                 "idempotency key is bound to a different purpose"
                             )
-                    replayed = self._load_snapshot(
-                        cursor,
-                        tenant_record_id=snapshot.tenant_record_id,
-                        analysis_record_id=stored_analysis_id,
-                    )
-                    if replayed is None:
-                        raise JobAnalysisIntegrityError("idempotent command lost its snapshot")
-                    replayed_digest = command_digest(
-                        snapshot=replayed,
-                        position_record_id=position_record_id,
-                        criterion_blueprint_id=criterion_blueprint_id,
-                    )
-                    if replayed_digest != request_digest:
-                        raise JobAnalysisIntegrityError(
-                            "idempotent replay snapshot does not match recorded command digest"
+                        replayed = self._load_snapshot(
+                            cursor,
+                            tenant_record_id=snapshot.tenant_record_id,
+                            analysis_record_id=stored_analysis_id,
                         )
-                    return replayed
+                        if replayed is None:
+                            raise JobAnalysisIntegrityError("idempotent command lost its snapshot")
+                        replayed_digest = command_digest(
+                            snapshot=replayed,
+                            position_record_id=position_record_id,
+                            criterion_blueprint_id=criterion_blueprint_id,
+                        )
+                        if replayed_digest != request_digest:
+                            raise JobAnalysisIntegrityError(
+                                "idempotent replay snapshot does not match recorded command digest"
+                            )
+                        return replayed
 
                 try:
                     cursor.execute(
