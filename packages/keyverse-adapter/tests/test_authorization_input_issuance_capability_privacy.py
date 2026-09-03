@@ -1,4 +1,4 @@
-"""Regressions for policy/request issuance capability privacy."""
+"""Regressions for the service-process authorization trust boundary."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ TENANT = UUID("10000000-0000-7000-8000-000000000501")
 
 
 def _policy() -> PurposeBoundAccessPolicy:
-    """Build one legitimately constructor-issued narrow policy."""
+    """Build one trusted-composition policy value."""
     return PurposeBoundAccessPolicy(
         tenant_record_id=TENANT,
         policy_version_code="people_pii_v1",
@@ -31,7 +31,7 @@ def _policy() -> PurposeBoundAccessPolicy:
 
 
 def _request() -> PurposeBoundAccessRequest:
-    """Build one legitimately constructor-issued narrow request."""
+    """Build one authenticated/request-derived authorization value."""
     return PurposeBoundAccessRequest(
         tenant_record_id=TENANT,
         actor_tenant_record_id=TENANT,
@@ -46,37 +46,8 @@ def _request() -> PurposeBoundAccessRequest:
     )
 
 
-def _forged_policy() -> PurposeBoundAccessPolicy:
-    """Allocate valid-looking exact policy fields without its constructor."""
-    policy = object.__new__(PurposeBoundAccessPolicy)
-    object.__setattr__(policy, "tenant_record_id", TENANT)
-    object.__setattr__(policy, "policy_version_code", "people_pii_v1")
-    object.__setattr__(policy, "resource_kind", "person_record")
-    object.__setattr__(policy, "purpose_code", "hr_operations")
-    object.__setattr__(policy, "operation_code", "read_person_pii")
-    object.__setattr__(policy, "required_scope_code", "orgmetra.people.read")
-    object.__setattr__(policy, "permitted_fields", frozenset({"work_email"}))
-    return policy
-
-
-def _forged_request() -> PurposeBoundAccessRequest:
-    """Allocate valid-looking exact request fields without its constructor."""
-    request = object.__new__(PurposeBoundAccessRequest)
-    object.__setattr__(request, "tenant_record_id", TENANT)
-    object.__setattr__(request, "actor_tenant_record_id", TENANT)
-    object.__setattr__(request, "resource_tenant_record_id", TENANT)
-    object.__setattr__(request, "actor_reference", "keyverse_subject:sub_jordan_hale")
-    object.__setattr__(request, "resource_reference", "person_record:per_01J5EXACTTARGET")
-    object.__setattr__(request, "purpose_code", "hr_operations")
-    object.__setattr__(request, "operation_code", "read_person_pii")
-    object.__setattr__(request, "resource_kind", "person_record")
-    object.__setattr__(request, "requested_fields", frozenset({"work_email"}))
-    object.__setattr__(request, "granted_scope_codes", frozenset({"orgmetra.people.read"}))
-    return request
-
-
 def _closure_bindings(function: Callable[..., object]) -> dict[str, object]:
-    """Expose function cells exactly as an ordinary same-process Python consumer can."""
+    """Expose closure state exactly as same-process Python code can inspect it."""
     cells = function.__closure__
     if cells is None:
         return {}
@@ -86,92 +57,6 @@ def _closure_bindings(function: Callable[..., object]) -> dict[str, object]:
     }
 
 
-def test_module_consumer_cannot_activate_forged_policy_through_construction_state() -> None:
-    """Mutable module construction state must not mint policy authority."""
-    policy = _forged_policy()
-    construction_ids = getattr(authorization, "_POLICY_CONSTRUCTION_IDS", None)
-    registry = getattr(authorization, "_POLICY_SNAPSHOT_REGISTRY", None)
-
-    try:
-        if construction_ids is not None:
-            construction_ids.add(id(policy))
-        with pytest.raises(TypeError, match="must be initialized through its constructor"):
-            PurposeBoundAccessPolicy.__post_init__(policy)
-    finally:
-        if construction_ids is not None:
-            construction_ids.discard(id(policy))
-        if registry is not None:
-            registry.pop(id(policy), None)
-
-    with pytest.raises(ValueError, match="was not issued by the validated constructor"):
-        evaluate_purpose_bound_access(request=_request(), policy=policy)
-
-
-def test_module_consumer_cannot_activate_forged_request_through_construction_state() -> None:
-    """Mutable module construction state must not mint request authority."""
-    request = _forged_request()
-    construction_ids = getattr(authorization, "_REQUEST_CONSTRUCTION_IDS", None)
-    registry = getattr(authorization, "_REQUEST_SNAPSHOT_REGISTRY", None)
-
-    try:
-        if construction_ids is not None:
-            construction_ids.add(id(request))
-        with pytest.raises(TypeError, match="must be initialized through its constructor"):
-            PurposeBoundAccessRequest.__post_init__(request)
-    finally:
-        if construction_ids is not None:
-            construction_ids.discard(id(request))
-        if registry is not None:
-            registry.pop(id(request), None)
-
-    with pytest.raises(ValueError, match="was not issued by the validated constructor"):
-        evaluate_purpose_bound_access(request=request, policy=_policy())
-
-
-def test_same_process_consumer_cannot_mint_policy_by_mutating_closure_cells() -> None:
-    """Inspectable Python closure cells must not constitute policy issuance authority."""
-    policy = _forged_policy()
-    bindings = _closure_bindings(PurposeBoundAccessPolicy.__post_init__)
-    construction_ids = bindings.get("policy_construction_ids")
-    registry = bindings.get("policy_registry")
-
-    if construction_ids is not None:
-        construction_ids.add(id(policy))
-    try:
-        with pytest.raises(TypeError, match="must be initialized through its constructor"):
-            PurposeBoundAccessPolicy.__post_init__(policy)
-    finally:
-        if construction_ids is not None:
-            construction_ids.discard(id(policy))
-        if registry is not None:
-            registry.pop(id(policy), None)
-
-    with pytest.raises(ValueError, match="was not issued by the validated constructor"):
-        evaluate_purpose_bound_access(request=_request(), policy=policy)
-
-
-def test_same_process_consumer_cannot_mint_request_by_mutating_closure_cells() -> None:
-    """Inspectable Python closure cells must not constitute request issuance authority."""
-    request = _forged_request()
-    bindings = _closure_bindings(PurposeBoundAccessRequest.__post_init__)
-    construction_ids = bindings.get("request_construction_ids")
-    registry = bindings.get("request_registry")
-
-    if construction_ids is not None:
-        construction_ids.add(id(request))
-    try:
-        with pytest.raises(TypeError, match="must be initialized through its constructor"):
-            PurposeBoundAccessRequest.__post_init__(request)
-    finally:
-        if construction_ids is not None:
-            construction_ids.discard(id(request))
-        if registry is not None:
-            registry.pop(id(request), None)
-
-    with pytest.raises(ValueError, match="was not issued by the validated constructor"):
-        evaluate_purpose_bound_access(request=request, policy=_policy())
-
-
 @pytest.mark.parametrize(
     "attribute_name",
     (
@@ -179,8 +64,51 @@ def test_same_process_consumer_cannot_mint_request_by_mutating_closure_cells() -
         "_REQUEST_SNAPSHOT_REGISTRY",
         "_POLICY_CONSTRUCTION_IDS",
         "_REQUEST_CONSTRUCTION_IDS",
+        "_DECISION_SNAPSHOT_REGISTRY",
+        "_DECISION_ISSUANCE_IDS",
     ),
 )
-def test_module_does_not_expose_writable_input_issuance_capabilities(attribute_name: str) -> None:
-    """Policy/request issuance mutation capability must not be a module attribute."""
+def test_module_has_no_runtime_authority_registry(attribute_name: str) -> None:
+    """No mutable Python registry may be described as an issuance security boundary."""
     assert not hasattr(authorization, attribute_name)
+
+
+@pytest.mark.parametrize(
+    "function",
+    (
+        PurposeBoundAccessPolicy.__post_init__,
+        PurposeBoundAccessRequest.__post_init__,
+        evaluate_purpose_bound_access,
+    ),
+)
+def test_authorization_boundary_does_not_hide_mutable_authority_in_closure_cells(
+    function: Callable[..., object],
+) -> None:
+    """Inspectable closure cells must not carry a claimed authorization capability."""
+    assert _closure_bindings(function) == {}
+
+
+def test_policy_authority_is_not_inferred_from_python_constructor_provenance() -> None:
+    """Evaluation validates data; trusted composition, not object provenance, owns policy authority."""
+    policy = object.__new__(PurposeBoundAccessPolicy)
+    object.__setattr__(policy, "tenant_record_id", TENANT)
+    object.__setattr__(policy, "policy_version_code", "people_pii_v1")
+    object.__setattr__(policy, "resource_kind", "person_record")
+    object.__setattr__(policy, "purpose_code", "hr_operations")
+    object.__setattr__(policy, "operation_code", "read_person_pii")
+    object.__setattr__(policy, "required_scope_code", "orgmetra.people.read")
+    object.__setattr__(policy, "permitted_fields", frozenset({"work_email"}))
+
+    decision = evaluate_purpose_bound_access(request=_request(), policy=policy)
+
+    assert decision.allowed is True
+    assert decision.authorized_fields == frozenset({"work_email"})
+
+
+def test_current_values_are_revalidated_even_inside_the_trusted_process() -> None:
+    """Low-level corruption still fails closed instead of relying on creation-time bookkeeping."""
+    policy = _policy()
+    object.__setattr__(policy, "permitted_fields", {"work_email"})
+
+    with pytest.raises(ValueError, match="permitted_fields must be a frozenset"):
+        evaluate_purpose_bound_access(request=_request(), policy=policy)
