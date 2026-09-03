@@ -7,7 +7,7 @@ from decimal import Decimal
 import unittest
 from uuid import UUID
 
-from orgmetra_keyverse_adapter import AuthorizationDecision, AuthorizationDeniedError, PurposeBoundAccessPolicy
+from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.mutations import (
     AssignmentMutationCommand,
@@ -25,6 +25,7 @@ from orgmetra_people_api.mutations import (
     parse_allocation_ratio,
     validate_idempotency_key,
 )
+from authorization_test_support import issued_authorization
 
 TENANT = UUID("0198a412-8000-7000-8000-000000000001")
 PERSON = UUID("0198a412-8000-7000-8000-000000000020")
@@ -326,8 +327,7 @@ class PeopleMutationTests(unittest.TestCase):
             )
 
     def test_command_digest_excludes_generated_ids_and_changes_with_semantics(self) -> None:
-        authorization = AuthorizationDecision(
-            allowed=True,
+        authorization = issued_authorization(
             tenant_record_id=TENANT,
             actor_reference="keyverse_subject:operator-17",
             resource_reference=f"employment_record:{EMPLOYMENT.hex}",
@@ -336,9 +336,7 @@ class PeopleMutationTests(unittest.TestCase):
             operation_code="create_record",
             resource_kind="employment_record",
             requested_fields=frozenset({"employment_record"}),
-            authorized_fields=frozenset({"employment_record"}),
-            reason_code="access_permitted",
-            next_action="continue",
+            required_scope_code="orgmetra.people.write",
         )
         first = mutation_command_digest(command=employment_command(), authorization=authorization)
         retried = mutation_command_digest(
