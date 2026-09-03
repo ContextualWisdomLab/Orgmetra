@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/assignment-category-quality.yml",
-      "sha256": "6c1a2b0be582f69669f2b7d061531fa15596737d39ee22e723b7a866abd0f8cb",
-      "bytes": 2207,
-      "lines": 64
+      "sha256": "1a283c456f7c2c698d34436593b2bcecdf90d83283a91754985ab789b28e9551",
+      "bytes": 2456,
+      "lines": 72
     },
     {
       "path": ".github/workflows/foundation-ci.yml",
