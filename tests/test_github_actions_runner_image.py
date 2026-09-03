@@ -14,13 +14,39 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
-_RUNS_ON_PATTERN = re.compile(r"^\s*runs-on\s*:\s*(.*?)\s*(?:#.*)?$")
+_RUNS_ON_PATTERN = re.compile(r"^\s*runs-on\s*:\s*(.*?)\s*$")
 _EXPECTED_RUNNER = "ubuntu-24.04"
 
 
 def _workflow_paths() -> list[Path]:
     """Return every repository-owned YAML workflow regardless of extension."""
     return sorted({*WORKFLOWS.glob("*.yml"), *WORKFLOWS.glob("*.yaml")})
+
+
+def _strip_yaml_comment(value: str) -> str:
+    """Strip only YAML comments, preserving hash characters inside scalar text."""
+    quote: str | None = None
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if quote == "'":
+            if char == "'":
+                if index + 1 < len(value) and value[index + 1] == "'":
+                    index += 2
+                    continue
+                quote = None
+        elif quote == '"':
+            if char == "\\" and index + 1 < len(value):
+                index += 2
+                continue
+            if char == '"':
+                quote = None
+        elif char in {"'", '"'}:
+            quote = char
+        elif char == "#" and (index == 0 or value[index - 1].isspace()):
+            return value[:index].rstrip()
+        index += 1
+    return value.strip()
 
 
 def _runner_declarations(workflow: str) -> list[tuple[int, str]]:
@@ -30,7 +56,7 @@ def _runner_declarations(workflow: str) -> list[tuple[int, str]]:
         match = _RUNS_ON_PATTERN.match(line)
         if match is None:
             continue
-        value = match.group(1).strip()
+        value = _strip_yaml_comment(match.group(1))
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
             value = value[1:-1]
         declarations.append((line_number, value))
