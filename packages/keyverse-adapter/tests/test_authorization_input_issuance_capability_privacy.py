@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from uuid import UUID
 
 import pytest
@@ -74,6 +75,17 @@ def _forged_request() -> PurposeBoundAccessRequest:
     return request
 
 
+def _closure_bindings(function: Callable[..., object]) -> dict[str, object]:
+    """Expose function cells exactly as an ordinary same-process Python consumer can."""
+    cells = function.__closure__
+    if cells is None:
+        return {}
+    return {
+        name: cell.cell_contents
+        for name, cell in zip(function.__code__.co_freevars, cells, strict=True)
+    }
+
+
 def test_module_consumer_cannot_activate_forged_policy_through_construction_state() -> None:
     """Mutable module construction state must not mint policy authority."""
     policy = _forged_policy()
@@ -116,6 +128,50 @@ def test_module_consumer_cannot_activate_forged_request_through_construction_sta
         evaluate_purpose_bound_access(request=request, policy=_policy())
 
 
+def test_same_process_consumer_cannot_mint_policy_by_mutating_closure_cells() -> None:
+    """Inspectable Python closure cells must not constitute policy issuance authority."""
+    policy = _forged_policy()
+    bindings = _closure_bindings(PurposeBoundAccessPolicy.__post_init__)
+    construction_ids = bindings.get("policy_construction_ids")
+    registry = bindings.get("policy_registry")
+
+    if construction_ids is not None:
+        construction_ids.add(id(policy))
+    try:
+        with pytest.raises(TypeError, match="must be initialized through its constructor"):
+            PurposeBoundAccessPolicy.__post_init__(policy)
+    finally:
+        if construction_ids is not None:
+            construction_ids.discard(id(policy))
+        if registry is not None:
+            registry.pop(id(policy), None)
+
+    with pytest.raises(ValueError, match="was not issued by the validated constructor"):
+        evaluate_purpose_bound_access(request=_request(), policy=policy)
+
+
+def test_same_process_consumer_cannot_mint_request_by_mutating_closure_cells() -> None:
+    """Inspectable Python closure cells must not constitute request issuance authority."""
+    request = _forged_request()
+    bindings = _closure_bindings(PurposeBoundAccessRequest.__post_init__)
+    construction_ids = bindings.get("request_construction_ids")
+    registry = bindings.get("request_registry")
+
+    if construction_ids is not None:
+        construction_ids.add(id(request))
+    try:
+        with pytest.raises(TypeError, match="must be initialized through its constructor"):
+            PurposeBoundAccessRequest.__post_init__(request)
+    finally:
+        if construction_ids is not None:
+            construction_ids.discard(id(request))
+        if registry is not None:
+            registry.pop(id(request), None)
+
+    with pytest.raises(ValueError, match="was not issued by the validated constructor"):
+        evaluate_purpose_bound_access(request=request, policy=_policy())
+
+
 @pytest.mark.parametrize(
     "attribute_name",
     (
@@ -126,5 +182,5 @@ def test_module_consumer_cannot_activate_forged_request_through_construction_sta
     ),
 )
 def test_module_does_not_expose_writable_input_issuance_capabilities(attribute_name: str) -> None:
-    """Policy/request issuance mutation capability must remain closure-private."""
+    """Policy/request issuance mutation capability must not be a module attribute."""
     assert not hasattr(authorization, attribute_name)
