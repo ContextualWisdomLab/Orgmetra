@@ -76,6 +76,20 @@ class AuthenticatedPrincipalRuntimeTypeTests(unittest.TestCase):
         self.assertEqual(principal.tenant_record_id, TENANT)
         self.assertIsNot(principal.tenant_record_id, tenant_record_id)
 
+    def test_returned_tenant_uuid_cannot_retarget_principal(self) -> None:
+        """Mutating a returned UUID value cannot rewrite stored tenant evidence."""
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({SCOPE}),
+        )
+        returned_tenant_record_id = principal.tenant_record_id
+
+        object.__setattr__(returned_tenant_record_id, "int", OTHER_TENANT.int)
+
+        self.assertEqual(principal.tenant_record_id, TENANT)
+        self.assertIsNot(principal.tenant_record_id, returned_tenant_record_id)
+
     def test_principal_evidence_cannot_be_rewritten_after_authentication(self) -> None:
         """Low-level writes must not replace authenticated evidence on a live principal."""
         principal = AuthenticatedPrincipal(
