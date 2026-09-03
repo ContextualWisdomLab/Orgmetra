@@ -67,7 +67,7 @@ class _ConstraintCursor:
             self._last = None
             return
         if "FROM public.job_analysis_write_command" in sql:
-            self._last = (None, None)
+            self._last = (None, None, None, None)
         elif "FROM public.job_profile" in sql:
             self._last = (JOB,)
         else:
