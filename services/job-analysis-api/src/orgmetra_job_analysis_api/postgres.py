@@ -454,7 +454,19 @@ class PostgresJobAnalysisPort:
                         raise JobAnalysisIntegrityError(
                             "idempotent durable command row has invalid shape"
                         ) from error
-                    if stored_digest is not None:
+                    if stored_digest is None:
+                        if any(
+                            value is not None
+                            for value in (
+                                stored_analysis_id,
+                                stored_actor_reference,
+                                stored_purpose_code,
+                            )
+                        ):
+                            raise JobAnalysisIntegrityError(
+                                "idempotent durable command row is partial-null"
+                            )
+                    else:
                         try:
                             _validate_durable_command_scalars(
                                 idempotency_key=idempotency_key,
