@@ -39,17 +39,22 @@ def _direct_snapshot(
     *,
     known_at: datetime,
     employment_status_counts: tuple[tuple[str, int], ...] = (("active", 1),),
+    person_headcount: int = 1,
+    employment_count: int = 1,
+    staffed_assignment_count: int = 0,
+    staffed_fte: Decimal = Decimal("0.0000"),
+    unassigned_person_count: int = 1,
 ) -> WorkforceCompositionSnapshot:
     """Build a direct public snapshot fixture without using the aggregate builder."""
     return WorkforceCompositionSnapshot(
         tenant_record_id=_id(1),
         effective_on=date(2026, 1, 15),
         known_at=known_at,
-        person_headcount=1,
-        employment_count=1,
-        staffed_assignment_count=0,
-        staffed_fte=Decimal("0.0000"),
-        unassigned_person_count=1,
+        person_headcount=person_headcount,
+        employment_count=employment_count,
+        staffed_assignment_count=staffed_assignment_count,
+        staffed_fte=staffed_fte,
+        unassigned_person_count=unassigned_person_count,
         employment_status_counts=employment_status_counts,
     )
 
@@ -81,6 +86,177 @@ def test_direct_snapshot_rejects_duplicate_status_codes() -> None:
         _direct_snapshot(
             known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
             employment_status_counts=(("active", 1), ("active", 1)),
+        )
+
+
+def test_direct_snapshot_rejects_negative_aggregate_counts() -> None:
+    """Portable evidence cannot hash a negative workforce count."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            person_headcount=-1,
+        )
+
+
+def test_direct_snapshot_rejects_boolean_aggregate_counts() -> None:
+    """Boolean values must not masquerade as integer workforce counts."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_count=True,
+        )
+
+
+def test_direct_snapshot_rejects_unassigned_count_above_headcount() -> None:
+    """Unassigned people cannot exceed the distinct people represented."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            unassigned_person_count=2,
+        )
+
+
+def test_direct_snapshot_rejects_nonfinite_staffed_fte() -> None:
+    """NaN or infinite FTE values cannot enter deterministic audit evidence."""
+    with pytest.raises(SingleValuedFactError, match="staffed FTE"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            staffed_fte=Decimal("NaN"),
+        )
+
+
+def test_direct_snapshot_rejects_non_decimal_staffed_fte() -> None:
+    """FTE evidence must remain Decimal so finite and canonical formatting are guaranteed."""
+    with pytest.raises(SingleValuedFactError, match="staffed FTE"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            staffed_fte=0,  # type: ignore[arg-type]
+        )
+
+
+def test_direct_snapshot_rejects_fte_without_staffed_assignments() -> None:
+    """Zero staffed assignments cannot carry positive FTE evidence."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            staffed_fte=Decimal("0.0001"),
+        )
+
+
+def test_direct_snapshot_rejects_zero_fte_with_staffed_assignments() -> None:
+    """A staffed assignment must contribute a positive allocation."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            staffed_assignment_count=1,
+            staffed_fte=Decimal("0.0000"),
+            unassigned_person_count=0,
+        )
+
+
+def test_direct_snapshot_rejects_staffing_without_employment_totals() -> None:
+    """Staffing cannot exist when no reportable employment is represented."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_status_counts=(),
+            employment_count=0,
+            staffed_assignment_count=1,
+            staffed_fte=Decimal("0.5000"),
+            unassigned_person_count=0,
+        )
+
+
+def test_direct_snapshot_rejects_staffing_without_people() -> None:
+    """Staffing cannot exist when no reportable person is represented."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            person_headcount=0,
+            staffed_assignment_count=1,
+            staffed_fte=Decimal("0.5000"),
+            unassigned_person_count=0,
+        )
+
+
+def test_direct_snapshot_rejects_fte_above_staffed_assignment_count() -> None:
+    """Each staffed assignment contributes at most one full-time allocation."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            staffed_assignment_count=1,
+            staffed_fte=Decimal("1.0001"),
+            unassigned_person_count=0,
+        )
+
+
+def test_direct_snapshot_rejects_assigned_person_without_staffing() -> None:
+    """A person counted as assigned requires at least one staffed assignment."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            unassigned_person_count=0,
+        )
+
+
+def test_direct_snapshot_rejects_staffing_when_every_person_is_unassigned() -> None:
+    """Staffed assignments cannot coexist with an entirely unassigned workforce."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            staffed_assignment_count=1,
+            staffed_fte=Decimal("0.5000"),
+            unassigned_person_count=1,
+        )
+
+
+def test_direct_snapshot_rejects_more_assigned_people_than_assignments() -> None:
+    """Distinct assigned people cannot exceed the number of staffed assignments."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            person_headcount=2,
+            employment_count=2,
+            employment_status_counts=(("active", 2),),
+            staffed_assignment_count=1,
+            staffed_fte=Decimal("0.5000"),
+            unassigned_person_count=0,
+        )
+
+
+def test_direct_snapshot_rejects_boolean_status_counts() -> None:
+    """Boolean values must not serialize as employment counts."""
+    with pytest.raises(SingleValuedFactError, match="status"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_status_counts=(("active", True),),  # type: ignore[tuple-item]
+        )
+
+
+def test_direct_snapshot_rejects_negative_status_counts() -> None:
+    """Negative per-status counts cannot reconcile a workforce aggregate."""
+    with pytest.raises(SingleValuedFactError, match="status"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_status_counts=(("active", -1), ("leave", 2)),
+        )
+
+
+def test_direct_snapshot_rejects_status_total_mismatch() -> None:
+    """Per-status employment counts must reconcile to total employment count."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_status_counts=(("active", 2),),
+        )
+
+
+def test_direct_snapshot_rejects_nonreportable_status_code() -> None:
+    """Direct evidence cannot introduce a status outside the reportable workforce vocabulary."""
+    with pytest.raises(SingleValuedFactError, match="internally inconsistent"):
+        _direct_snapshot(
+            known_at=datetime(2026, 1, 20, tzinfo=timezone.utc),
+            employment_status_counts=(("terminated", 1),),
         )
 
 

@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from uuid import UUID
 
 import pytest
@@ -56,7 +56,7 @@ def test_portfolio_rejects_allocation_above_one_for_one_employment(
         assignment_record_id=UUID("10000000-0000-7000-8000-000000000303"),
         allocation_ratio=Decimal("0.3000"),
     )
-    with pytest.raises(AssignmentPortfolioError, match="1.0000"):
+    with pytest.raises(AssignmentPortfolioError, match=r"1\.0000"):
         validate_assignment_portfolio(
             [jordan_icu_assignment, jordan_float_assignment, extra],
             tenant_record_id=TENANT,
@@ -65,6 +65,26 @@ def test_portfolio_rejects_allocation_above_one_for_one_employment(
             effective_on=date(2024, 5, 1),
             known_at=utc(2024, 5, 1),
         )
+
+
+def test_portfolio_rejects_exact_overallocation_under_low_decimal_precision(
+    jordan_icu_assignment,
+    jordan_float_assignment,
+) -> None:
+    """Allocation limits must use exact totals even when Decimal precision is low."""
+    first = replace(jordan_icu_assignment, allocation_ratio=Decimal("0.5040"))
+    second = replace(jordan_float_assignment, allocation_ratio=Decimal("0.5040"))
+    with localcontext() as context:
+        context.prec = 2
+        with pytest.raises(AssignmentPortfolioError, match=r"1\.0000"):
+            validate_assignment_portfolio(
+                [first, second],
+                tenant_record_id=TENANT,
+                person_record_id=JORDAN,
+                employment_record_id=JORDAN_EMPLOYMENT,
+                effective_on=date(2024, 5, 1),
+                known_at=utc(2024, 5, 1),
+            )
 
 
 def test_portfolio_ignores_another_person_and_another_employment(

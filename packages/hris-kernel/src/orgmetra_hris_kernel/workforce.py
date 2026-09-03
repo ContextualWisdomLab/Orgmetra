@@ -9,24 +9,139 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import hashlib
 import json
 from uuid import UUID
 
 from orgmetra_hris_kernel.assignment import (
+    _exact_decimal_total,
     validate_assignment_employment_coverage,
     validate_assignment_portfolio,
     validate_position_seat_capacity,
 )
 from orgmetra_hris_kernel.employment import validate_person_employment_exclusivity
-from orgmetra_hris_kernel.errors import IntervalError, SingleValuedFactError
+from orgmetra_hris_kernel.errors import IdentityScopeError, IntervalError, SingleValuedFactError
 from orgmetra_hris_kernel.facts import AssignmentFact, EmploymentVersion
 from orgmetra_hris_kernel.resolution import resolve_single_valued_fact
 
 _WORKFORCE_INCLUDED_STATUSES = frozenset({"active", "leave"})
 _ZERO_FTE = Decimal("0.0000")
+_CANONICAL_FTE_EXPONENT = -4
+
+
+def _validate_snapshot_tenant_id(tenant_record_id: UUID) -> None:
+    """Require one exact, non-sentinel tenant UUID before emitting evidence."""
+    if type(tenant_record_id) is not UUID or tenant_record_id.int in {0, (1 << 128) - 1}:
+        raise IdentityScopeError(
+            "Workforce snapshot tenant_record_id must be a canonical operational UUID.",
+            next_action="Resolve the authoritative non-sentinel tenant UUID, then rebuild the snapshot.",
+        )
+
+
+def _validate_snapshot_temporal_coordinate(effective_on: date, known_at: datetime) -> datetime:
+    """Validate and detach exact business and recorded-time values before evidence use."""
+    if type(effective_on) is not date:
+        raise IntervalError(
+            "Workforce snapshot effective date must be a calendar date.",
+            next_action="Provide an exact business date, then rebuild the snapshot.",
+        )
+    if type(known_at) is not datetime or known_at.tzinfo is None:
+        raise IntervalError(
+            "Workforce snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+        )
+    try:
+        offset = known_at.utcoffset()
+    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+        raise IntervalError(
+            "Workforce snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+        ) from exc
+    if type(offset) is not timedelta:
+        raise IntervalError(
+            "Workforce snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+        )
+    try:
+        return (known_at.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
+    except OverflowError as exc:
+        raise IntervalError(
+            "Workforce snapshot knowledge cutoff must be timezone-aware.",
+            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+        ) from exc
+
+
+def _status_values(value: object) -> tuple[object, ...]:
+    """Detach one caller-owned status container or fail with the public domain error."""
+    try:
+        return tuple(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as exc:
+        raise SingleValuedFactError(
+            "Workforce snapshot employment status evidence must contain status/count pairs.",
+            next_action="Rebuild the snapshot with two-value status/count pairs.",
+        ) from exc
+
+
+def _freeze_employment_status_counts(value: object) -> tuple[tuple[str, int], ...]:
+    """Detach status rows, reject malformed values, and omit semantic zero rows."""
+    frozen: list[tuple[str, int]] = []
+    for raw_row in _status_values(value):
+        row = _status_values(raw_row)
+        if len(row) != 2:
+            raise SingleValuedFactError(
+                "Workforce snapshot employment status evidence must contain status/count pairs.",
+                next_action="Rebuild the snapshot with exactly two values in every status/count pair.",
+            )
+        status, count = row
+        if type(status) is not str or type(count) is not int or count < 0:
+            raise SingleValuedFactError(
+                "Workforce snapshot employment status evidence must contain valid status/count pairs.",
+                next_action="Rebuild the snapshot with string status codes and non-negative integer counts.",
+            )
+        if count == 0:
+            continue
+        frozen.append((status, count))
+    return tuple(frozen)
+
+
+def _canonicalize_staffed_fte(staffed_fte: Decimal, staffed_assignment_count: int) -> Decimal:
+    """Return bounded four-decimal FTE evidence without exponent-proportional work."""
+    if type(staffed_assignment_count) is not int or staffed_assignment_count < 0:
+        raise SingleValuedFactError(
+            "Workforce snapshot aggregate values are internally inconsistent.",
+            next_action="Rebuild the snapshot with a non-negative integer staffed-assignment count.",
+        )
+    if type(staffed_fte) is not Decimal or not staffed_fte.is_finite() or staffed_fte < _ZERO_FTE:
+        raise SingleValuedFactError(
+            "Workforce snapshot staffed FTE must be a finite non-negative Decimal.",
+            next_action="Provide a finite non-negative Decimal FTE, then rebuild the snapshot.",
+        )
+    if staffed_fte.is_zero():
+        return _ZERO_FTE
+    if staffed_fte > Decimal(staffed_assignment_count):
+        raise SingleValuedFactError(
+            "Workforce snapshot aggregate values are internally inconsistent.",
+            next_action=(
+                "Rebuild the snapshot so staffed FTE does not exceed one full allocation per staffed assignment."
+            ),
+        )
+    parts = staffed_fte.as_tuple()
+    if parts.exponent < _CANONICAL_FTE_EXPONENT:
+        raise SingleValuedFactError(
+            "Workforce snapshot staffed FTE must use at most four decimal places.",
+            next_action="Round source allocation evidence to the governed four-decimal scale, then rebuild.",
+        )
+    if parts.exponent == _CANONICAL_FTE_EXPONENT:
+        return staffed_fte
+    return Decimal(
+        (
+            0,
+            parts.digits + (0,) * (parts.exponent - _CANONICAL_FTE_EXPONENT),
+            _CANONICAL_FTE_EXPONENT,
+        )
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,13 +165,57 @@ class WorkforceCompositionSnapshot:
     employment_status_counts: tuple[tuple[str, int], ...]
 
     def __post_init__(self) -> None:
-        """Reject non-canonical direct evidence before it can be hashed or exported."""
-        if self.known_at.utcoffset() is None:
+        """Freeze caller-owned values, then reject inconsistent evidence."""
+        object.__setattr__(
+            self,
+            "known_at",
+            _validate_snapshot_temporal_coordinate(self.effective_on, self.known_at),
+        )
+        object.__setattr__(
+            self,
+            "employment_status_counts",
+            _freeze_employment_status_counts(self.employment_status_counts),
+        )
+        object.__setattr__(
+            self,
+            "staffed_fte",
+            _canonicalize_staffed_fte(self.staffed_fte, self.staffed_assignment_count),
+        )
+        self._validate_canonical_invariants()
+
+    def _validate_canonical_invariants(self) -> None:
+        """Revalidate every portable evidence invariant without mutating the snapshot."""
+        if type(self.effective_on) is not date or (
+            type(self.known_at) is not datetime or self.known_at.tzinfo is not timezone.utc
+        ):
             raise IntervalError(
-                "Workforce snapshot knowledge cutoff must be timezone-aware.",
-                next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
+                "Workforce snapshot temporal evidence is not canonical.",
+                next_action="Rebuild the snapshot through its validated constructor, then export it again.",
             )
-        status_codes = tuple(status for status, _count in self.employment_status_counts)
+        _validate_snapshot_tenant_id(self.tenant_record_id)
+
+        aggregate_counts = (
+            self.person_headcount,
+            self.employment_count,
+            self.staffed_assignment_count,
+            self.unassigned_person_count,
+        )
+        if not all(type(value) is int and value >= 0 for value in aggregate_counts):
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action=(
+                    "Rebuild the snapshot from authoritative HRIS facts so every aggregate count is a "
+                    "non-negative integer."
+                ),
+            )
+
+        canonical_status_counts = _freeze_employment_status_counts(self.employment_status_counts)
+        if canonical_status_counts != self.employment_status_counts:
+            raise SingleValuedFactError(
+                "Workforce snapshot employment status evidence is not canonical.",
+                next_action="Rebuild the snapshot so zero-count or mutable status rows cannot reach export.",
+            )
+        status_codes = tuple(status for status, _count in canonical_status_counts)
         if len(status_codes) != len(set(status_codes)):
             raise SingleValuedFactError(
                 "Workforce snapshot contains a duplicate status code.",
@@ -68,8 +227,71 @@ class WorkforceCompositionSnapshot:
                 next_action="Sort employment status counts by status code, then rebuild the snapshot.",
             )
 
+        canonical_staffed_fte = _canonicalize_staffed_fte(
+            self.staffed_fte,
+            self.staffed_assignment_count,
+        )
+        if self.staffed_fte.as_tuple() != canonical_staffed_fte.as_tuple():
+            raise SingleValuedFactError(
+                "Workforce snapshot staffed FTE is not canonical four-decimal evidence.",
+                next_action="Rebuild the snapshot from governed four-decimal allocation evidence.",
+            )
+        if self.staffed_assignment_count > 0 and self.staffed_fte <= _ZERO_FTE:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot so every staffed assignment contributes positive FTE.",
+            )
+        if self.staffed_assignment_count > 0 and self.employment_count == 0:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot with reportable employment for every staffed assignment.",
+            )
+        if self.staffed_assignment_count > 0 and self.person_headcount == 0:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot with a reportable person for every staffed assignment.",
+            )
+        if self.person_headcount > self.employment_count or self.unassigned_person_count > self.person_headcount:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action=(
+                    "Rebuild the snapshot from authoritative HRIS facts so headcount, employment, and "
+                    "unassigned-person totals reconcile."
+                ),
+            )
+        assigned_person_count = self.person_headcount - self.unassigned_person_count
+        if self.staffed_assignment_count == 0 and assigned_person_count != 0:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot so people without assignments are counted as unassigned.",
+            )
+        if self.staffed_assignment_count > 0 and assigned_person_count == 0:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot with an assigned person for every staffed workforce.",
+            )
+        if assigned_person_count > self.staffed_assignment_count:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot so every assigned person has a staffed assignment.",
+            )
+        if any(status not in _WORKFORCE_INCLUDED_STATUSES for status in status_codes):
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action="Rebuild the snapshot using only reportable workforce employment statuses.",
+            )
+        if sum(count for _status, count in canonical_status_counts) != self.employment_count:
+            raise SingleValuedFactError(
+                "Workforce snapshot aggregate values are internally inconsistent.",
+                next_action=(
+                    "Rebuild the snapshot from authoritative HRIS facts so per-status employment counts "
+                    "reconcile to the total employment count."
+                ),
+            )
+
     def canonical_json(self) -> str:
         """Return deterministic aggregate evidence suitable for audit correlation."""
+        self._validate_canonical_invariants()
         payload = {
             "effective_on": self.effective_on.isoformat(),
             "employment_count": self.employment_count,
@@ -80,9 +302,7 @@ class WorkforceCompositionSnapshot:
                 }
                 for status, count in self.employment_status_counts
             ],
-            "known_at": self.known_at.astimezone(timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z"),
+            "known_at": self.known_at.isoformat().replace("+00:00", "Z"),
             "person_headcount": self.person_headcount,
             "schema_version": "orgmetra.workforce_composition.v1",
             "staffed_assignment_count": self.staffed_assignment_count,
@@ -217,20 +437,17 @@ def build_workforce_composition_snapshot(
         Aggregate workforce counts and deterministic evidence without row-level PII.
 
     Raises:
-        IntervalError: ``known_at`` is timezone-naive or has no usable UTC offset.
+        IntervalError: ``effective_on`` is not an exact calendar date, or ``known_at``
+            is not an exact timezone-aware datetime with a usable UTC offset.
         SingleValuedFactError: One employment or assignment has contradictory
-            visible versions.
+            visible versions, or direct aggregate evidence is inconsistent.
         EmploymentExclusivityError: A worker has malformed or overlapping
             exclusive employment at the report coordinate.
         EmploymentCoverageError: Existing assignment integrity rejects a worker link.
         AssignmentPortfolioError: Existing allocation integrity rejects visible FTE.
         PositionSeatError: Existing position-capacity integrity rejects visible FTE.
     """
-    if known_at.utcoffset() is None:
-        raise IntervalError(
-            "Workforce snapshot knowledge cutoff must be timezone-aware.",
-            next_action="Convert the knowledge cutoff to UTC, then rebuild the snapshot.",
-        )
+    known_at = _validate_snapshot_temporal_coordinate(effective_on, known_at)
 
     _validate_visible_employment_portfolios(
         employment_versions,
@@ -254,7 +471,6 @@ def build_workforce_composition_snapshot(
     portfolio_keys: set[tuple[UUID, UUID]] = set()
     position_record_ids: set[UUID] = set()
     staffed_people: set[UUID] = set()
-    staffed_fte = _ZERO_FTE
     staffed_assignment_count = 0
 
     for assignment in visible_assignments:
@@ -266,7 +482,6 @@ def build_workforce_composition_snapshot(
         portfolio_keys.add((assignment.person_record_id, assignment.employment_record_id))
         position_record_ids.add(assignment.position_record_id)
         staffed_people.add(assignment.person_record_id)
-        staffed_fte += assignment.allocation_ratio
         staffed_assignment_count += 1
 
     for person_record_id, employment_record_id in portfolio_keys:
@@ -296,7 +511,9 @@ def build_workforce_composition_snapshot(
         person_headcount=len(workforce_people),
         employment_count=len(visible_employments),
         staffed_assignment_count=staffed_assignment_count,
-        staffed_fte=staffed_fte,
+        staffed_fte=_exact_decimal_total(
+            tuple(assignment.allocation_ratio for assignment in visible_assignments)
+        ),
         unassigned_person_count=len(workforce_people - staffed_people),
         employment_status_counts=tuple(sorted(status_counts.items())),
     )
