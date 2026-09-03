@@ -1,0 +1,81 @@
+name: Candidate Application Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "database/migrations/**"
+      - "tests/test_candidate_application_postgres.sh"
+      - "tests/test_candidate_application_decision_boundary_postgres.sh"
+      - "tests/test_candidate_application_rls_postgres.sh"
+      - ".github/workflows/candidate-application-quality.yml"
+      - "manifest.json"
+      - "docs/DATA_MODEL.md"
+      - "docs/ERD.md"
+      - "docs/adr/0026-normalized-candidate-application.md"
+      - "docs/traceability/candidate-application-core.md"
+      - "docs/doctoring/candidate-application-references.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidate-application-quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres_contract:
+    name: Candidate application PostgreSQL contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        env:
+          POSTGRES_USER: orgmetra
+          POSTGRES_PASSWORD: orgmetra
+          POSTGRES_DB: orgmetra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orgmetra -d orgmetra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Prove documented normalized application model
+        run: |
+          grep -Fq '| `candidate_application_record` |' docs/DATA_MODEL.md
+          grep -Fq '| `candidate_application_record_version` |' docs/DATA_MODEL.md
+          grep -Fq '| `candidate_application_stage_record` |' docs/DATA_MODEL.md
+          grep -Fq 'candidate_application_record ||--o{ candidate_application_record_version : scopes_through' docs/ERD.md
+          if grep -Fq 'candidate_application_record ||--|{ candidate_application_record_version : scopes_through' docs/ERD.md; then
+            echo 'candidate application ERD must allow an anchor with zero scope versions' >&2
+            exit 1
+          fi
+          grep -Fq 'candidate_application_stage_record' docs/ERD.md
+      - name: Prove test syntax
+        run: bash -n tests/test_candidate_application_postgres.sh tests/test_candidate_application_decision_boundary_postgres.sh tests/test_candidate_application_rls_postgres.sh
+      - name: Prove normalized application persistence
+        run: bash tests/test_candidate_application_postgres.sh
+      - name: Prove high-impact decision boundary
+        run: bash tests/test_candidate_application_decision_boundary_postgres.sh
+      - name: Prove forced tenant RLS behavior
+        run: bash tests/test_candidate_application_rls_postgres.sh
+      - name: Prove validation is read-only
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

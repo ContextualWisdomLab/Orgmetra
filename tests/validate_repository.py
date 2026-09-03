@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -55,7 +56,9 @@ REQUIRED = [
     "docs/adr/0012-governed-migration-handoff.md",
     "docs/adr/0013-governed-requisition-review-packet.md",
     "docs/adr/0014-job-analysis-snapshot-persistence.md",
+    "docs/adr/0026-normalized-candidate-application.md",
     "docs/doctoring/REFERENCES.md",
+    "docs/doctoring/candidate-application-references.md",
     "docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md",
     "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
     "database/migrations/0001_foundation_schema.sql",
@@ -71,6 +74,9 @@ REQUIRED = [
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
+    "database/migrations/0014_candidate_application_core.sql",
+    "docs/traceability/candidate-application-core.md",
+    ".github/workflows/candidate-application-quality.yml",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -87,6 +93,9 @@ REQUIRED = [
     "tests/test_outbox_claim_postgres.sh",
     "tests/test_outbox_dead_letter_postgres.sh",
     "tests/test_audit_outbox_hardening_postgres.sh",
+    "tests/test_candidate_application_decision_boundary_postgres.sh",
+    "tests/test_candidate_application_postgres.sh",
+    "tests/test_candidate_application_rls_postgres.sh",
     "tests/test_candidate_worker_conversion_postgres.sh",
     "tests/test_validity_study_case_postgres.sh",
     "tests/test_criterion_observation_scope_postgres.sh",
@@ -100,6 +109,22 @@ UNFINISHED_MARKER_LINE_PATTERN = re.compile(
     r"(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|"
     r"<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$",
     flags=re.IGNORECASE,
+)
+
+# Vendor, build-output, and tool-cache trees that are never repository
+# documentation. Pruning them keeps the unfinished-marker and code-fence scan
+# identical between a CI checkout and a developer workspace that carries
+# installed dependencies or generated artifacts.
+MARKDOWN_SCAN_PRUNED_DIRECTORIES = frozenset(
+    {
+        ".codegraph",
+        ".git",
+        ".pytest_cache",
+        ".venv",
+        "node_modules",
+        "storybook-static",
+        "test-results",
+    }
 )
 
 
@@ -139,7 +164,7 @@ def _expected_manifest_document() -> dict[str, Any]:
     return {
         "package": "orgmetra-foundation-pack",
         "version": "0.1.0",
-        "generated_for_branch": "feat/audit-outbox-envelope",
+        "generated_for_branch": "feat/normalized-candidate-application",
         "files": files,
     }
 
@@ -153,10 +178,10 @@ def _manifest_entries() -> dict[str, dict[str, Any]]:
 
     if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
         _fail("manifest.json must contain a files array")
-    if manifest.get("generated_for_branch") != "feat/audit-outbox-envelope":
+    if manifest.get("generated_for_branch") != "feat/normalized-candidate-application":
         _fail(
             "manifest generated_for_branch must identify the active generation branch "
-            "feat/audit-outbox-envelope"
+            "feat/normalized-candidate-application"
         )
 
     entries: dict[str, dict[str, Any]] = {}
@@ -594,18 +619,30 @@ def _validate_openapi_contract() -> None:
         _fail("Client error schemas must not expose internal trace identifiers")
 
 
+def _scan_markdown_file(path: Path) -> None:
+    """Reject unfinished-work markers and unbalanced fences in one markdown file."""
+    text = path.read_text(encoding="utf-8")
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if UNFINISHED_MARKER_LINE_PATTERN.fullmatch(line):
+            _fail(
+                "Explicit unfinished-work marker found in "
+                f"{path.relative_to(ROOT)}:{line_number}"
+            )
+    if text.count("```") % 2:
+        _fail(f"Unbalanced code fence in {path.relative_to(ROOT)}")
+
+
 def _validate_markdown() -> None:
     """Reject explicit unfinished-work markers with exact path/line and malformed fences."""
-    for path in ROOT.rglob("*.md"):
-        text = path.read_text(encoding="utf-8")
-        for line_number, line in enumerate(text.splitlines(), start=1):
-            if UNFINISHED_MARKER_LINE_PATTERN.fullmatch(line):
-                _fail(
-                    "Explicit unfinished-work marker found in "
-                    f"{path.relative_to(ROOT)}:{line_number}"
-                )
-        if text.count("```") % 2:
-            _fail(f"Unbalanced code fence in {path.relative_to(ROOT)}")
+    for directory, subdirectories, filenames in os.walk(ROOT):
+        subdirectories[:] = [
+            name
+            for name in subdirectories
+            if name not in MARKDOWN_SCAN_PRUNED_DIRECTORIES
+        ]
+        for filename in (name for name in filenames if name.endswith(".md")):
+            path = Path(directory) / filename
+            _scan_markdown_file(path)
 
 
 def _validate_license() -> None:
