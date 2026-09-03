@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 
+import orgmetra_keyverse_adapter.authorization as authorization_module
 from orgmetra_keyverse_adapter import (
     AuthorizationDecision,
     PurposeBoundAccessPolicy,
@@ -34,6 +35,39 @@ def test_direct_decision_constructor_cannot_mint_allow_authority() -> None:
             authorized_fields=REQUESTED_FIELDS,
             reason_code="access_permitted",
             next_action="Continue with only the authorized fields.",
+        )
+
+
+def test_module_decision_helper_cannot_mint_from_fabricated_snapshots() -> None:
+    """Module-callable helpers must not turn fabricated snapshots into authority."""
+    request_snapshot = authorization_module._RequestSnapshot(
+        TENANT.int,
+        TENANT.int,
+        TENANT.int,
+        "keyverse_subject:operator-17",
+        RESOURCE_REFERENCE,
+        "workforce_admin",
+        "correct_record",
+        "assignment_record",
+        REQUESTED_FIELDS,
+        frozenset({"orgmetra.people.write"}),
+    )
+    policy_snapshot = authorization_module._PolicySnapshot(
+        TENANT.int,
+        "assignment-correction-v1",
+        "assignment_record",
+        "workforce_admin",
+        "correct_record",
+        "orgmetra.people.write",
+        REQUESTED_FIELDS,
+    )
+
+    with pytest.raises(TypeError, match="internal to evaluate_purpose_bound_access"):
+        authorization_module._decision(
+            request=request_snapshot,
+            policy=policy_snapshot,
+            allowed=True,
+            reason_code="access_permitted",
         )
 
 
