@@ -52,6 +52,15 @@ def test_decision_cannot_be_subclassed_to_bypass_post_init_validation() -> None:
                 return None
 
 
+def test_decision_resists_object_setattr_after_valid_construction() -> None:
+    """Low-level attribute writes must not replace already-validated authorization evidence."""
+    decision = _decision()
+    with pytest.raises((AttributeError, TypeError)):
+        object.__setattr__(decision, "allowed", False)
+    assert decision.allowed is True
+    assert decision.reason_code == "access_permitted"
+
+
 def test_decision_rejects_non_boolean_allowed_flag() -> None:
     """Do not let truthy integers masquerade as an authorization verdict."""
     with pytest.raises(ValueError, match="allowed must be a boolean"):
