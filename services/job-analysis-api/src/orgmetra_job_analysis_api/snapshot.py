@@ -322,6 +322,8 @@ def command_digest(
     criterion_blueprint_id: UUID | None,
 ) -> str:
     """Return SHA-256 over the exact snapshot bytes plus optional scope identities."""
+    if type(snapshot) is not JobAnalysisSnapshot:
+        raise TypeError("snapshot must be an exact JobAnalysisSnapshot")
     payload = {
         "criterion_blueprint_id": None if criterion_blueprint_id is None else str(criterion_blueprint_id),
         "position_record_id": None if position_record_id is None else str(position_record_id),
