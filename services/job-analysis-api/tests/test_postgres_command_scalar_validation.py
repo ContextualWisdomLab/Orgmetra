@@ -26,7 +26,11 @@ def _never_connect() -> object:
     raise AssertionError("database acquired before durable command scalar validation")
 
 
-def _audit_event() -> AuditOutboxEvent:
+def _audit_event(
+    *,
+    actor_reference: str = _ACTOR_REFERENCE,
+    purpose_code: str = _PURPOSE_CODE,
+) -> AuditOutboxEvent:
     """Build one valid audit event matching the Job Analysis write authority."""
     snapshot = clinical_psychologist_snapshot()
     return AuditOutboxEvent(
@@ -35,8 +39,8 @@ def _audit_event() -> AuditOutboxEvent:
         source_service="job_analysis_api",
         event_type="orgmetra.job_architecture.snapshot_recorded",
         resource_reference=_RESOURCE_REFERENCE,
-        actor_reference=_ACTOR_REFERENCE,
-        purpose_code=_PURPOSE_CODE,
+        actor_reference=actor_reference,
+        purpose_code=purpose_code,
         reason_code="snapshot_persisted",
         evidence_version_code=snapshot.analysis_version_code,
         result_code="recorded",
@@ -49,6 +53,8 @@ def _persist(
     *,
     idempotency_key: str = IDEMPOTENCY_KEY,
     request_digest: str | None = None,
+    actor_reference: str = _ACTOR_REFERENCE,
+    purpose_code: str = _PURPOSE_CODE,
 ) -> None:
     """Invoke the PostgreSQL port with otherwise-valid durable command evidence."""
     snapshot = clinical_psychologist_snapshot()
@@ -63,11 +69,14 @@ def _persist(
         snapshot=snapshot,
         idempotency_key=idempotency_key,
         request_digest=digest,
-        actor_reference=_ACTOR_REFERENCE,
-        purpose_code=_PURPOSE_CODE,
+        actor_reference=actor_reference,
+        purpose_code=purpose_code,
         position_record_id=None,
         criterion_blueprint_id=None,
-        audit_event=_audit_event(),
+        audit_event=_audit_event(
+            actor_reference=actor_reference,
+            purpose_code=purpose_code,
+        ),
         outbox_delivery_record_id=UUID("0198a412-6000-7000-8000-000000000412"),
         write_command_id=UUID("0198a412-6000-7000-8000-000000000413"),
     )
@@ -97,3 +106,23 @@ def test_durable_request_digest_fails_closed_before_database(request_digest: str
     """Persistence must accept only exact lowercase SHA-256 command digests."""
     with pytest.raises(ValueError, match="request_digest"):
         _persist(request_digest=request_digest)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "actor_reference", "purpose_code"),
+    [
+        ("actor_reference", _TextSubtype(_ACTOR_REFERENCE), _PURPOSE_CODE),
+        ("purpose_code", _ACTOR_REFERENCE, _TextSubtype(_PURPOSE_CODE)),
+    ],
+)
+def test_durable_authority_text_fails_closed_before_database(
+    field_name: str,
+    actor_reference: str,
+    purpose_code: str,
+) -> None:
+    """Actor and purpose authority must be exact immutable text before DB acquisition."""
+    with pytest.raises(ValueError, match=field_name):
+        _persist(
+            actor_reference=actor_reference,
+            purpose_code=purpose_code,
+        )
