@@ -37,16 +37,16 @@ class AuthenticatedPrincipal:
     granted_scope_codes: frozenset[str]
 
     def __post_init__(self) -> None:
-        """Reject sentinel identities, mutable grants, wildcards, and bad references."""
-        if not isinstance(self.tenant_record_id, UUID):
+        """Reject sentinel identities, runtime subtypes, wildcards, and bad references."""
+        if type(self.tenant_record_id) is not UUID:
             raise ValueError("tenant_record_id must be a UUID.")
         if self.tenant_record_id.int in (0, _MAX_UUID_INT):
             raise ValueError("tenant_record_id must not use a reserved UUID sentinel.")
-        if not isinstance(self.actor_reference, str) or _REFERENCE_PATTERN.fullmatch(self.actor_reference) is None:
+        if type(self.actor_reference) is not str or _REFERENCE_PATTERN.fullmatch(self.actor_reference) is None:
             raise ValueError("actor_reference must be a namespaced opaque reference.")
-        if not isinstance(self.granted_scope_codes, frozenset) or not self.granted_scope_codes:
+        if type(self.granted_scope_codes) is not frozenset or not self.granted_scope_codes:
             raise ValueError("granted_scope_codes must be a non-empty frozenset.")
-        if any(not isinstance(scope, str) or _SCOPE_PATTERN.fullmatch(scope) is None for scope in self.granted_scope_codes):
+        if any(type(scope) is not str or _SCOPE_PATTERN.fullmatch(scope) is None for scope in self.granted_scope_codes):
             raise ValueError("granted_scope_codes must contain explicit Orgmetra scopes.")
 
 
