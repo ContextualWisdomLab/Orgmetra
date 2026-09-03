@@ -168,8 +168,8 @@ def correct_assignment_record_category(
     mutation_port: AssignmentCorrectionMutationPort,
 ) -> AssignmentCorrectionMutationResult:
     """Authorize exactly one predecessor's category field before correction."""
-    if not isinstance(command, AssignmentCorrectionMutationCommand):
-        raise TypeError("command must be an AssignmentCorrectionMutationCommand")
+    if type(command) is not AssignmentCorrectionMutationCommand:
+        raise TypeError("command must be an exact AssignmentCorrectionMutationCommand")
     if not isinstance(mutation_port, AssignmentCorrectionMutationPort):
         raise TypeError("mutation_port must implement AssignmentCorrectionMutationPort")
     authorization = authorize_resource_fields(
