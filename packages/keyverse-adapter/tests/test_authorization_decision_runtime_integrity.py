@@ -43,6 +43,15 @@ def _decision(**overrides: object) -> AuthorizationDecision:
     return AuthorizationDecision(**values)  # type: ignore[arg-type]
 
 
+def test_decision_cannot_be_subclassed_to_bypass_post_init_validation() -> None:
+    """Caller-defined decision classes must not bypass the sealed evidence validator."""
+    with pytest.raises(TypeError, match="AuthorizationDecision must not be subclassed"):
+
+        class _ForgedDecision(AuthorizationDecision):
+            def __post_init__(self) -> None:
+                return None
+
+
 def test_decision_rejects_non_boolean_allowed_flag() -> None:
     """Do not let truthy integers masquerade as an authorization verdict."""
     with pytest.raises(ValueError, match="allowed must be a boolean"):
