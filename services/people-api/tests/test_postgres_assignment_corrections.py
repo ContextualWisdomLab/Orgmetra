@@ -120,6 +120,11 @@ class PostgresAssignmentCorrectionMutationTests(unittest.TestCase):
         predecessor_lock = next(i for i, statement in enumerate(sql) if "FOR UPDATE OF assignment" in statement)
         employment_lock = next(i for i, statement in enumerate(sql) if "FOR UPDATE OF employment" in statement)
         position_lock = next(i for i, statement in enumerate(sql) if "FOR UPDATE OF position" in statement)
+        portfolio_lock = next(
+            i
+            for i, statement in enumerate(sql)
+            if "OR assignment.position_record_id = %s" in statement
+        )
         clock_read = sql.index("SELECT pg_catalog.clock_timestamp()")
         close_write = next(i for i, statement in enumerate(sql) if statement.startswith("UPDATE public.assignment_record"))
         replacement_write = next(
@@ -140,7 +145,8 @@ class PostgresAssignmentCorrectionMutationTests(unittest.TestCase):
         )
         self.assertLess(predecessor_lock, employment_lock)
         self.assertLess(employment_lock, position_lock)
-        self.assertLess(position_lock, clock_read)
+        self.assertLess(position_lock, portfolio_lock)
+        self.assertLess(portfolio_lock, clock_read)
         self.assertLess(clock_read, close_write)
         self.assertLess(close_write, replacement_write)
         self.assertLess(replacement_write, supersession_write)
