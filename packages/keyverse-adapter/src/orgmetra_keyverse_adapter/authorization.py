@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+import weakref
 from uuid import UUID
 
 _MAX_UUID_INT = (1 << 128) - 1
@@ -185,9 +186,83 @@ class PurposeBoundAccessRequest:
         _validate_scope_set(self.granted_scope_codes)
 
 
-@dataclass(frozen=True, slots=True)
+_DECISION_SNAPSHOT_REGISTRY: dict[
+    int,
+    tuple[weakref.ReferenceType[object], tuple[object, ...]],
+] = {}
+
+
+def _validated_decision_snapshot(
+    *,
+    allowed: object,
+    tenant_record_id: object,
+    actor_reference: object,
+    resource_reference: object,
+    policy_version_code: object,
+    purpose_code: object,
+    operation_code: object,
+    resource_kind: object,
+    requested_fields: object,
+    authorized_fields: object,
+    reason_code: object,
+    next_action: object,
+) -> tuple[object, ...]:
+    """Validate decision evidence and detach caller-owned mutable runtime objects."""
+    if type(allowed) is not bool:
+        raise ValueError("allowed must be a boolean.")
+    _validate_uuid("tenant_record_id", tenant_record_id)
+    tenant_int = tenant_record_id.int
+    if type(tenant_int) is not int or not 0 <= tenant_int <= _MAX_UUID_INT:
+        raise ValueError("tenant_record_id must contain a valid UUID integer.")
+    _validate_reference("actor_reference", actor_reference)
+    _validate_resource_kind(resource_kind)
+    _validate_reference(
+        "resource_reference",
+        resource_reference,
+        expected_namespace=resource_kind,
+    )
+    _validate_version(policy_version_code)
+    _validate_code("purpose_code", purpose_code)
+    _validate_code("operation_code", operation_code)
+    _validate_field_set("requested_fields", requested_fields)
+    _validate_authorized_field_set(authorized_fields)
+    _validate_code("reason_code", reason_code)
+    if type(next_action) is not str or not next_action.strip() or len(next_action) > 500:
+        raise ValueError("next_action must be a non-blank string of at most 500 characters.")
+    if allowed and authorized_fields != requested_fields:
+        raise ValueError("allow decision must authorize exactly the requested fields.")
+    if not allowed and authorized_fields:
+        raise ValueError("deny decision must not authorize fields.")
+    if allowed and reason_code != "access_permitted":
+        raise ValueError("allow decision must use access_permitted reason.")
+    if not allowed and reason_code == "access_permitted":
+        raise ValueError("deny decision must not use access_permitted reason.")
+    return (
+        allowed,
+        tenant_int,
+        actor_reference,
+        resource_reference,
+        policy_version_code,
+        purpose_code,
+        operation_code,
+        resource_kind,
+        requested_fields,
+        authorized_fields,
+        reason_code,
+        next_action,
+    )
+
+
 class AuthorizationDecision:
-    """PII-minimized, runtime-validated authorization evidence for downstream use."""
+    """PII-minimized authorization evidence with detached, structurally immutable state.
+
+    Validated values live in a module-owned snapshot rather than writable instance
+    slots. In particular the tenant UUID is stored as its integer value and rebuilt
+    on access, so a later low-level mutation of the caller's UUID cannot rewrite
+    already-issued authorization evidence.
+    """
+
+    __slots__ = ("__weakref__",)
 
     allowed: bool
     tenant_record_id: UUID
@@ -202,38 +277,147 @@ class AuthorizationDecision:
     reason_code: str
     next_action: str
 
+    def __init__(
+        self,
+        *,
+        allowed: bool,
+        tenant_record_id: UUID,
+        actor_reference: str,
+        resource_reference: str,
+        policy_version_code: str,
+        purpose_code: str,
+        operation_code: str,
+        resource_kind: str,
+        requested_fields: frozenset[str],
+        authorized_fields: frozenset[str],
+        reason_code: str,
+        next_action: str,
+    ) -> None:
+        """Validate once and register a detached immutable evidence snapshot."""
+        key = id(self)
+        if key in _DECISION_SNAPSHOT_REGISTRY:
+            raise TypeError("AuthorizationDecision is already initialized")
+        snapshot = _validated_decision_snapshot(
+            allowed=allowed,
+            tenant_record_id=tenant_record_id,
+            actor_reference=actor_reference,
+            resource_reference=resource_reference,
+            policy_version_code=policy_version_code,
+            purpose_code=purpose_code,
+            operation_code=operation_code,
+            resource_kind=resource_kind,
+            requested_fields=requested_fields,
+            authorized_fields=authorized_fields,
+            reason_code=reason_code,
+            next_action=next_action,
+        )
+        reference = weakref.ref(
+            self,
+            lambda _reference, evidence_key=key: _DECISION_SNAPSHOT_REGISTRY.pop(
+                evidence_key,
+                None,
+            ),
+        )
+        _DECISION_SNAPSHOT_REGISTRY[key] = (reference, snapshot)
+
     def __init_subclass__(cls, **kwargs: object) -> None:
         """Seal the evidence type so subclasses cannot override validation hooks."""
         raise TypeError("AuthorizationDecision must not be subclassed")
 
-    def __post_init__(self) -> None:
-        """Reject malformed, contradictory, or executable downstream authorization evidence."""
-        if type(self.allowed) is not bool:
-            raise ValueError("allowed must be a boolean.")
-        _validate_uuid("tenant_record_id", self.tenant_record_id)
-        _validate_reference("actor_reference", self.actor_reference)
-        _validate_resource_kind(self.resource_kind)
-        _validate_reference(
-            "resource_reference",
-            self.resource_reference,
-            expected_namespace=self.resource_kind,
+    def _snapshot(self) -> tuple[object, ...]:
+        """Return the issued snapshot or fail closed for low-level forged instances."""
+        entry = _DECISION_SNAPSHOT_REGISTRY.get(id(self))
+        if entry is None or entry[0]() is not self:
+            raise ValueError("AuthorizationDecision was not issued by the validated constructor")
+        return entry[1]
+
+    @property
+    def allowed(self) -> bool:
+        """Return the immutable allow/deny verdict."""
+        return self._snapshot()[0]  # type: ignore[return-value]
+
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return a detached UUID copy of the authorized tenant identity."""
+        return UUID(int=self._snapshot()[1])  # type: ignore[arg-type]
+
+    @property
+    def actor_reference(self) -> str:
+        """Return the PII-minimized actor reference."""
+        return self._snapshot()[2]  # type: ignore[return-value]
+
+    @property
+    def resource_reference(self) -> str:
+        """Return the opaque target reference bound to the decision."""
+        return self._snapshot()[3]  # type: ignore[return-value]
+
+    @property
+    def policy_version_code(self) -> str:
+        """Return the immutable policy version used for evaluation."""
+        return self._snapshot()[4]  # type: ignore[return-value]
+
+    @property
+    def purpose_code(self) -> str:
+        """Return the purpose bound to the decision."""
+        return self._snapshot()[5]  # type: ignore[return-value]
+
+    @property
+    def operation_code(self) -> str:
+        """Return the operation bound to the decision."""
+        return self._snapshot()[6]  # type: ignore[return-value]
+
+    @property
+    def resource_kind(self) -> str:
+        """Return the governed resource kind."""
+        return self._snapshot()[7]  # type: ignore[return-value]
+
+    @property
+    def requested_fields(self) -> frozenset[str]:
+        """Return the exact immutable requested-field set."""
+        return self._snapshot()[8]  # type: ignore[return-value]
+
+    @property
+    def authorized_fields(self) -> frozenset[str]:
+        """Return the exact immutable authorized-field set."""
+        return self._snapshot()[9]  # type: ignore[return-value]
+
+    @property
+    def reason_code(self) -> str:
+        """Return the governed allow/deny reason code."""
+        return self._snapshot()[10]  # type: ignore[return-value]
+
+    @property
+    def next_action(self) -> str:
+        """Return bounded non-authoritative recovery guidance."""
+        return self._snapshot()[11]  # type: ignore[return-value]
+
+    def __repr__(self) -> str:
+        """Preserve a deterministic value-style representation for diagnostics."""
+        return (
+            "AuthorizationDecision("
+            f"allowed={self.allowed!r}, "
+            f"tenant_record_id={self.tenant_record_id!r}, "
+            f"actor_reference={self.actor_reference!r}, "
+            f"resource_reference={self.resource_reference!r}, "
+            f"policy_version_code={self.policy_version_code!r}, "
+            f"purpose_code={self.purpose_code!r}, "
+            f"operation_code={self.operation_code!r}, "
+            f"resource_kind={self.resource_kind!r}, "
+            f"requested_fields={self.requested_fields!r}, "
+            f"authorized_fields={self.authorized_fields!r}, "
+            f"reason_code={self.reason_code!r}, "
+            f"next_action={self.next_action!r})"
         )
-        _validate_version(self.policy_version_code)
-        _validate_code("purpose_code", self.purpose_code)
-        _validate_code("operation_code", self.operation_code)
-        _validate_field_set("requested_fields", self.requested_fields)
-        _validate_authorized_field_set(self.authorized_fields)
-        _validate_code("reason_code", self.reason_code)
-        if type(self.next_action) is not str or not self.next_action.strip() or len(self.next_action) > 500:
-            raise ValueError("next_action must be a non-blank string of at most 500 characters.")
-        if self.allowed and self.authorized_fields != self.requested_fields:
-            raise ValueError("allow decision must authorize exactly the requested fields.")
-        if not self.allowed and self.authorized_fields:
-            raise ValueError("deny decision must not authorize fields.")
-        if self.allowed and self.reason_code != "access_permitted":
-            raise ValueError("allow decision must use access_permitted reason.")
-        if not self.allowed and self.reason_code == "access_permitted":
-            raise ValueError("deny decision must not use access_permitted reason.")
+
+    def __eq__(self, other: object) -> bool:
+        """Retain dataclass-like value equality only for exact issued decisions."""
+        if type(other) is not AuthorizationDecision:
+            return False
+        return self._snapshot() == other._snapshot()
+
+    def __hash__(self) -> int:
+        """Retain stable value hashing over detached immutable evidence."""
+        return hash(self._snapshot())
 
 
 class AuthorizationDeniedError(PermissionError):
