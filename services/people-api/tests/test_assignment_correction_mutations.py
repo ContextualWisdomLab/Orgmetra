@@ -34,6 +34,10 @@ class ForgedString(str):
     """Represent executable string behavior at the application trust boundary."""
 
 
+class ForgedCorrectionCommand(AssignmentCorrectionMutationCommand):
+    """Represent caller-defined command subtype behavior at the service boundary."""
+
+
 def correction_command(**overrides: object) -> AssignmentCorrectionMutationCommand:
     """Build one deterministic category-correction command."""
     values: dict[str, object] = {
@@ -76,6 +80,7 @@ class RecordingCorrectionPort:
     """Capture the exact authorized command without persisting HRIS truth."""
 
     def __init__(self) -> None:
+        """Initialize an empty authorized-call ledger."""
         self.calls: list[tuple[AssignmentCorrectionMutationCommand, object]] = []
 
     def correct_assignment_category(
@@ -110,6 +115,7 @@ class AssignmentCorrectionMutationTests(unittest.TestCase):
     """Prove correction authority, evidence, identity, and replay semantics."""
 
     def test_authorizes_exact_predecessor_category_field_before_persistence(self) -> None:
+        """Authorize only the predecessor Assignment category before invoking persistence."""
         port = RecordingCorrectionPort()
         result = correct_assignment_record_category(
             principal=PRINCIPAL,
@@ -129,6 +135,7 @@ class AssignmentCorrectionMutationTests(unittest.TestCase):
         self.assertEqual(authorization.authorized_fields, frozenset({"assignment_category_code"}))
 
     def test_policy_denial_prevents_correction(self) -> None:
+        """Do not call persistence when purpose-bound authorization denies the correction."""
         port = RecordingCorrectionPort()
         with self.assertRaises(AuthorizationDeniedError):
             correct_assignment_record_category(
@@ -141,6 +148,7 @@ class AssignmentCorrectionMutationTests(unittest.TestCase):
         self.assertEqual(port.calls, [])
 
     def test_command_rejects_malformed_identity_category_and_evidence(self) -> None:
+        """Reject malformed trust-bearing command values before authorization."""
         cases = (
             lambda: correction_command(tenant_record_id=UUID(int=0)),
             lambda: correction_command(predecessor_assignment_record_id=UUID(int=(1 << 128) - 1)),
@@ -167,6 +175,7 @@ class AssignmentCorrectionMutationTests(unittest.TestCase):
                 builder()
 
     def test_command_accepts_exact_high_impact_metadata_limits(self) -> None:
+        """Accept confirmation and evidence metadata exactly at their governed maxima."""
         confirmation_reference = "human_confirmation:" + "a" * 281
         evidence_version_code = "v" * 200
 
@@ -179,6 +188,7 @@ class AssignmentCorrectionMutationTests(unittest.TestCase):
         self.assertEqual(len(command.evidence_version_code), 200)
 
     def test_digest_binds_semantics_but_excludes_generated_correction_ids(self) -> None:
+        """Keep semantic replay stable across retry-generated correction identities."""
         port = RecordingCorrectionPort()
         correct_assignment_record_category(
             principal=PRINCIPAL,
@@ -214,6 +224,27 @@ class AssignmentCorrectionMutationTests(unittest.TestCase):
         self.assertNotEqual(first, changed_confirmation)
 
     def test_service_requires_typed_command_port_and_result(self) -> None:
+        """Reject ungoverned command types, ports, results, and command subtypes."""
+        forged_command = ForgedCorrectionCommand(
+            tenant_record_id=TENANT,
+            predecessor_assignment_record_id=PREDECESSOR,
+            replacement_assignment_record_id=REPLACEMENT,
+            assignment_supersession_record_id=SUPERSESSION,
+            audit_event_record_id=AUDIT_EVENT,
+            outbox_delivery_record_id=OUTBOX,
+            corrected_category_code="concurrent_secondary",
+            confirmation_reference=CONFIRMATION,
+            evidence_version_code=EVIDENCE,
+            idempotency_key=IDEMPOTENCY,
+        )
+        with self.assertRaisesRegex(TypeError, "exact AssignmentCorrectionMutationCommand"):
+            correct_assignment_record_category(
+                principal=PRINCIPAL,
+                command=forged_command,
+                purpose_code="workforce_admin",
+                policy=correction_policy(),
+                mutation_port=RecordingCorrectionPort(),
+            )
         with self.assertRaisesRegex(TypeError, "AssignmentCorrectionMutationCommand"):
             correct_assignment_record_category(
                 principal=PRINCIPAL,
