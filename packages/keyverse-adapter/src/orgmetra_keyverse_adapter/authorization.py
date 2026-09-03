@@ -167,7 +167,7 @@ _DECISION_SNAPSHOT_REGISTRY: dict[
 ] = {}
 
 
-@dataclass(frozen=True, slots=True, weakref_slot=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True, init=False)
 class PurposeBoundAccessPolicy:
     """One tenant-local field policy for one purpose, resource, and operation.
 
@@ -183,6 +183,29 @@ class PurposeBoundAccessPolicy:
     operation_code: str
     required_scope_code: str
     permitted_fields: frozenset[str]
+
+    def __init__(
+        self,
+        *,
+        tenant_record_id: UUID,
+        policy_version_code: str,
+        resource_kind: str,
+        purpose_code: str,
+        operation_code: str,
+        required_scope_code: str,
+        permitted_fields: frozenset[str],
+    ) -> None:
+        """Write constructor fields only before the object has issued authority."""
+        if id(self) in _POLICY_SNAPSHOT_REGISTRY:
+            raise TypeError("PurposeBoundAccessPolicy is already initialized")
+        object.__setattr__(self, "tenant_record_id", tenant_record_id)
+        object.__setattr__(self, "policy_version_code", policy_version_code)
+        object.__setattr__(self, "resource_kind", resource_kind)
+        object.__setattr__(self, "purpose_code", purpose_code)
+        object.__setattr__(self, "operation_code", operation_code)
+        object.__setattr__(self, "required_scope_code", required_scope_code)
+        object.__setattr__(self, "permitted_fields", permitted_fields)
+        self.__post_init__()
 
     def __post_init__(self) -> None:
         """Validate and register the creation-time authority snapshot exactly once."""
@@ -200,7 +223,7 @@ class PurposeBoundAccessPolicy:
         _POLICY_SNAPSHOT_REGISTRY[key] = (reference, snapshot)
 
 
-@dataclass(frozen=True, slots=True, weakref_slot=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True, init=False)
 class PurposeBoundAccessRequest:
     """PII access attributes resolved before any protected field is returned.
 
@@ -223,6 +246,35 @@ class PurposeBoundAccessRequest:
     resource_kind: str
     requested_fields: frozenset[str]
     granted_scope_codes: frozenset[str]
+
+    def __init__(
+        self,
+        *,
+        tenant_record_id: UUID,
+        actor_tenant_record_id: UUID,
+        resource_tenant_record_id: UUID,
+        actor_reference: str,
+        resource_reference: str,
+        purpose_code: str,
+        operation_code: str,
+        resource_kind: str,
+        requested_fields: frozenset[str],
+        granted_scope_codes: frozenset[str],
+    ) -> None:
+        """Write constructor fields only before the object has issued authority."""
+        if id(self) in _REQUEST_SNAPSHOT_REGISTRY:
+            raise TypeError("PurposeBoundAccessRequest is already initialized")
+        object.__setattr__(self, "tenant_record_id", tenant_record_id)
+        object.__setattr__(self, "actor_tenant_record_id", actor_tenant_record_id)
+        object.__setattr__(self, "resource_tenant_record_id", resource_tenant_record_id)
+        object.__setattr__(self, "actor_reference", actor_reference)
+        object.__setattr__(self, "resource_reference", resource_reference)
+        object.__setattr__(self, "purpose_code", purpose_code)
+        object.__setattr__(self, "operation_code", operation_code)
+        object.__setattr__(self, "resource_kind", resource_kind)
+        object.__setattr__(self, "requested_fields", requested_fields)
+        object.__setattr__(self, "granted_scope_codes", granted_scope_codes)
+        self.__post_init__()
 
     def __post_init__(self) -> None:
         """Validate and register the creation-time request snapshot exactly once."""
