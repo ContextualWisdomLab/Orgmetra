@@ -94,10 +94,15 @@ class AuthenticatedPrincipalStorageRevalidationTests(unittest.TestCase):
             actor_reference="keyverse:actor-ja-1",
             granted_scope_codes=frozenset({SCOPE}),
         )
+        expected_storage = (TENANT.int, "keyverse:actor-ja-1", frozenset({SCOPE}))
 
         self.assertEqual(structurally_valid.tenant_record_id, TENANT)
         self.assertEqual(structurally_valid.actor_reference, "keyverse:actor-ja-1")
         self.assertEqual(structurally_valid.granted_scope_codes, frozenset({SCOPE}))
+        self.assertEqual(structurally_valid[0], TENANT.int)
+        self.assertEqual(structurally_valid[1:], expected_storage[1:])
+        self.assertEqual(list(structurally_valid), list(expected_storage))
+        self.assertEqual(tuple(structurally_valid), expected_storage)
         self.assertEqual(structurally_valid, canonical)
         self.assertEqual(hash(structurally_valid), hash(canonical))
 
