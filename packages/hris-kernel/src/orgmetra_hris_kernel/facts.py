@@ -1,4 +1,4 @@
-"""Immutable employment, organization, position, and assignment facts."""
+"""Immutable employment, absence, organization, position, and assignment facts."""
 
 from __future__ import annotations
 
@@ -12,11 +12,13 @@ IDENTITY_FIELDS = frozenset(
     {
         "tenant_record_id",
         "employment_record_id",
+        "employment_absence_record_id",
         "person_record_id",
         "organization_unit_id",
         "position_record_id",
         "assignment_record_id",
         "employment_record_version_id",
+        "employment_absence_version_id",
         "organization_unit_version_id",
         "position_record_version_id",
     }
@@ -35,6 +37,25 @@ class EmploymentVersion:
     effective: DateInterval
     recorded: RecordedInterval
     employment_concurrency_code: str = "exclusive"
+
+
+@dataclass(frozen=True, slots=True)
+class EmploymentAbsenceVersion:
+    """One reason-free recorded version of an Employment absence period.
+
+    The fact intentionally records *that* one Employment is absent, not why.
+    Sensitive case, medical, family, statutory, or free-form leave details belong
+    behind a separate purpose-bound case boundary rather than this workforce fact.
+    """
+
+    tenant_record_id: UUID
+    employment_absence_record_id: UUID
+    employment_absence_version_id: UUID
+    employment_record_id: UUID
+    person_record_id: UUID
+    absence_status_code: str
+    effective: DateInterval
+    recorded: RecordedInterval
 
 
 @dataclass(frozen=True, slots=True)

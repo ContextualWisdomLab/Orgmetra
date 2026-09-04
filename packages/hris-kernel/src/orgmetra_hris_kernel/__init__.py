@@ -6,6 +6,10 @@ boundary before persistence. Persistence, authorization, and UI stay outside
 this package.
 """
 
+from orgmetra_hris_kernel.absence import (
+    EmploymentAbsenceSnapshot,
+    build_employment_absence_snapshot,
+)
 from orgmetra_hris_kernel.assignment import (
     validate_assignment_employment_coverage,
     validate_assignment_portfolio,
@@ -19,6 +23,7 @@ from orgmetra_hris_kernel.employment import validate_person_employment_exclusivi
 from orgmetra_hris_kernel.errors import (
     AssignmentPortfolioError,
     CorrectionError,
+    EmploymentAbsenceError,
     EmploymentCoverageError,
     EmploymentExclusivityError,
     IdentityScopeError,
@@ -31,6 +36,7 @@ from orgmetra_hris_kernel.errors import (
 )
 from orgmetra_hris_kernel.facts import (
     AssignmentFact,
+    EmploymentAbsenceVersion,
     EmploymentVersion,
     OrganizationUnitVersion,
     PositionVersion,
@@ -57,6 +63,9 @@ __all__ = [
     "AuditOutboxEvent",
     "CorrectionError",
     "DateInterval",
+    "EmploymentAbsenceError",
+    "EmploymentAbsenceSnapshot",
+    "EmploymentAbsenceVersion",
     "EmploymentCoverageError",
     "EmploymentExclusivityError",
     "EmploymentVersion",
@@ -77,6 +86,7 @@ __all__ = [
     "TaskEvidence",
     "TaskKSAOLink",
     "WorkforceCompositionSnapshot",
+    "build_employment_absence_snapshot",
     "build_workforce_composition_snapshot",
     "close_recorded_interval",
     "resolve_bitemporal_facts",
