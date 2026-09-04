@@ -10,7 +10,7 @@ business mutation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
@@ -32,6 +32,7 @@ _REQUIRED_TEXT_FIELDS = (
     "result_code",
 )
 _ALL_REQUIRED_TEXT_FIELDS = ("source_service", "event_type", *_REQUIRED_TEXT_FIELDS)
+_EVENT_SNAPSHOT_FIELD_COUNT = 13
 
 
 def _freeze_timestamp(value: datetime) -> datetime:
@@ -131,6 +132,63 @@ def _validate_event_snapshot(
         raise ValueError("high-impact events require confirmation_reference.")
 
 
+def _event_snapshot(
+    *,
+    event_id: object,
+    tenant_record_id: object,
+    source_service: object,
+    event_type: object,
+    resource_reference: object,
+    actor_reference: object,
+    purpose_code: object,
+    reason_code: object,
+    evidence_version_code: object,
+    result_code: object,
+    occurred_at: object,
+    high_impact: object,
+    confirmation_reference: object,
+) -> tuple[object, ...]:
+    """Capture one immutable tuple of already-read audit evidence values."""
+    return (
+        event_id,
+        tenant_record_id,
+        source_service,
+        event_type,
+        resource_reference,
+        actor_reference,
+        purpose_code,
+        reason_code,
+        evidence_version_code,
+        result_code,
+        occurred_at,
+        high_impact,
+        confirmation_reference,
+    )
+
+
+def _validate_creation_snapshot(snapshot: object) -> tuple[object, ...]:
+    """Validate the private creation snapshot before comparing it with live evidence."""
+    if type(snapshot) is not tuple or len(snapshot) != _EVENT_SNAPSHOT_FIELD_COUNT:
+        raise ValueError("creation-time audit evidence is unavailable.")
+    _validate_event_snapshot(
+        event_id=snapshot[0],
+        tenant_record_id=snapshot[1],
+        source_service=snapshot[2],
+        event_type=snapshot[3],
+        resource_reference=snapshot[4],
+        actor_reference=snapshot[5],
+        purpose_code=snapshot[6],
+        reason_code=snapshot[7],
+        evidence_version_code=snapshot[8],
+        result_code=snapshot[9],
+        occurred_at=snapshot[10],
+        high_impact=snapshot[11],
+        confirmation_reference=snapshot[12],
+    )
+    _canonical_timestamp(snapshot[10])
+    return snapshot
+
+
 @dataclass(frozen=True, slots=True)
 class AuditOutboxEvent:
     """One immutable governance envelope for an Orgmetra domain mutation.
@@ -155,6 +213,7 @@ class AuditOutboxEvent:
     occurred_at: datetime
     high_impact: bool
     confirmation_reference: str | None = None
+    _creation_snapshot: tuple[object, ...] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         """Reject envelopes that cannot provide accountable, portable audit evidence."""
@@ -173,7 +232,27 @@ class AuditOutboxEvent:
             high_impact=self.high_impact,
             confirmation_reference=self.confirmation_reference,
         )
-        object.__setattr__(self, "occurred_at", _freeze_timestamp(self.occurred_at))
+        frozen_occurred_at = _freeze_timestamp(self.occurred_at)
+        object.__setattr__(self, "occurred_at", frozen_occurred_at)
+        object.__setattr__(
+            self,
+            "_creation_snapshot",
+            _event_snapshot(
+                event_id=self.event_id,
+                tenant_record_id=self.tenant_record_id,
+                source_service=self.source_service,
+                event_type=self.event_type,
+                resource_reference=self.resource_reference,
+                actor_reference=self.actor_reference,
+                purpose_code=self.purpose_code,
+                reason_code=self.reason_code,
+                evidence_version_code=self.evidence_version_code,
+                result_code=self.result_code,
+                occurred_at=frozen_occurred_at,
+                high_impact=self.high_impact,
+                confirmation_reference=self.confirmation_reference,
+            ),
+        )
 
     def to_cloudevent(self) -> dict[str, object]:
         """Return the canonical structured CloudEvent 1.0 envelope.
@@ -211,6 +290,24 @@ class AuditOutboxEvent:
             high_impact=high_impact,
             confirmation_reference=confirmation_reference,
         )
+        current_snapshot = _event_snapshot(
+            event_id=event_id,
+            tenant_record_id=tenant_record_id,
+            source_service=source_service,
+            event_type=event_type,
+            resource_reference=resource_reference,
+            actor_reference=actor_reference,
+            purpose_code=purpose_code,
+            reason_code=reason_code,
+            evidence_version_code=evidence_version_code,
+            result_code=result_code,
+            occurred_at=occurred_at,
+            high_impact=high_impact,
+            confirmation_reference=confirmation_reference,
+        )
+        creation_snapshot = _validate_creation_snapshot(self._creation_snapshot)
+        if current_snapshot != creation_snapshot:
+            raise ValueError("canonical audit evidence no longer matches creation-time audit evidence.")
         canonical_time = _canonical_timestamp(occurred_at)
         envelope: dict[str, object] = {
             "specversion": "1.0",
