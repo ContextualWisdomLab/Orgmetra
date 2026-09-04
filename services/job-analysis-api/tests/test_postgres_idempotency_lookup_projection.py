@@ -12,13 +12,23 @@ from fixtures import IDEMPOTENCY_KEY, clinical_psychologist_snapshot
 from test_postgres import FakeConnection, FakeCursor, _audit_event
 
 
+class _MissingProjectionCursor(FakeCursor):
+    """Model a DB-API cursor violating the one-row LEFT JOIN projection contract."""
+
+    def fetchone(self) -> object:
+        """Return no row only for the idempotency projection under test."""
+        if self.executions and "FROM idempotency_lock" in self.executions[-1][0]:
+            return None
+        return super().fetchone()
+
+
 class PostgresIdempotencyLookupProjectionTests(unittest.TestCase):
     """Require the advisory-lock LEFT JOIN to return its one-row projection."""
 
     def test_missing_lookup_projection_fails_before_scope_reads(self) -> None:
         """Treat DB-API ``None`` as impossible evidence, not as command absence."""
         snapshot = clinical_psychologist_snapshot()
-        cursor = FakeCursor([None, None])
+        cursor = _MissingProjectionCursor([None, None])
         port = PostgresJobAnalysisPort(lambda: FakeConnection(cursor))
 
         with self.assertRaisesRegex(JobAnalysisIntegrityError, "lookup.*projection"):
