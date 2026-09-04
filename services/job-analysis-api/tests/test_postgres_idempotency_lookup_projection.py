@@ -32,6 +32,27 @@ class _GeneratorProjectionCursor(FakeCursor):
         return super().fetchone()
 
 
+class _ExecutableTupleProjection(tuple[object, ...]):
+    """Expose whether fixed-row validation dispatches caller-controlled iteration."""
+
+    iterated = False
+
+    def __iter__(self):  # type: ignore[override]
+        """Fail if validation executes this untrusted sequence hook."""
+        type(self).iterated = True
+        raise RuntimeError("projection iterator executed")
+
+
+class _ExecutableTupleProjectionCursor(FakeCursor):
+    """Return a tuple subclass whose iterator is executable boundary behavior."""
+
+    def fetchone(self) -> object:
+        """Return executable tuple storage only for the idempotency projection."""
+        if self.executions and "FROM idempotency_lock" in self.executions[-1][0]:
+            return _ExecutableTupleProjection((None, None, None, None))
+        return super().fetchone()
+
+
 class PostgresIdempotencyLookupProjectionTests(unittest.TestCase):
     """Require the advisory-lock LEFT JOIN to return its one-row projection."""
 
@@ -74,6 +95,19 @@ class PostgresIdempotencyLookupProjectionTests(unittest.TestCase):
         with self.assertRaisesRegex(JobAnalysisIntegrityError, "durable command.*shape"):
             self._persist(cursor)
 
+        self.assertFalse(
+            any("FROM public.job_profile" in statement for statement, _ in cursor.executions)
+        )
+
+    def test_executable_tuple_projection_is_rejected_without_iteration(self) -> None:
+        """Reject tuple subclasses before their caller-controlled iterator can run."""
+        _ExecutableTupleProjection.iterated = False
+        cursor = _ExecutableTupleProjectionCursor([None, None])
+
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "durable command.*shape"):
+            self._persist(cursor)
+
+        self.assertFalse(_ExecutableTupleProjection.iterated)
         self.assertFalse(
             any("FROM public.job_profile" in statement for statement, _ in cursor.executions)
         )
