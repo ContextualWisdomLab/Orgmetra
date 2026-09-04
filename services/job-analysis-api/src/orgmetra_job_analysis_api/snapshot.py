@@ -483,10 +483,38 @@ def _validate_resolved_source_runtime(
     }
 
 
+def _validate_resolved_owner_runtime(
+    field_name: str,
+    *,
+    tenant_record_id: object,
+    job_record_id: object,
+    expected_tenant_record_id: UUID,
+    expected_job_record_id: UUID,
+) -> None:
+    """Require returned nested evidence to retain the detached root ownership pair."""
+    resolved_tenant_record_id = _resolved_uuid(
+        f"{field_name}.tenant_record_id",
+        tenant_record_id,
+    )
+    resolved_job_record_id = _resolved_uuid(
+        f"{field_name}.job_record_id",
+        job_record_id,
+    )
+    if (
+        resolved_tenant_record_id != expected_tenant_record_id
+        or resolved_job_record_id != expected_job_record_id
+    ):
+        raise JobAnalysisIntegrityError(
+            f"resolved snapshot graph ownership mismatch at {field_name}"
+        )
+
+
 def _validate_resolved_snapshot_graph_runtime(
     snapshot: JobAnalysisSnapshot,
-) -> dict[str, object]:
-    """Capture every validated non-target field into the exact document to emit."""
+) -> tuple[UUID, UUID, dict[str, object]]:
+    """Capture target/root ownership and validated evidence into the document to emit."""
+    tenant_record_id = _resolved_uuid("tenant_record_id", snapshot.tenant_record_id)
+    analysis_record_id = _resolved_uuid("analysis_record_id", snapshot.analysis_record_id)
     job_record_id = _resolved_uuid("job_record_id", snapshot.job_record_id)
     analysis_version_code = _resolved_exact(
         "analysis_version_code",
@@ -509,8 +537,13 @@ def _validate_resolved_snapshot_graph_runtime(
     for index, task_value in enumerate(tasks):
         task = _resolved_exact(f"tasks[{index}]", task_value, TaskEvidence)
         assert type(task) is TaskEvidence
-        _resolved_uuid(f"tasks[{index}].tenant_record_id", task.tenant_record_id)
-        _resolved_uuid(f"tasks[{index}].job_record_id", task.job_record_id)
+        _validate_resolved_owner_runtime(
+            f"tasks[{index}]",
+            tenant_record_id=task.tenant_record_id,
+            job_record_id=task.job_record_id,
+            expected_tenant_record_id=tenant_record_id,
+            expected_job_record_id=job_record_id,
+        )
         task_record_id = _resolved_uuid(
             f"tasks[{index}].task_record_id",
             task.task_record_id,
@@ -555,13 +588,12 @@ def _validate_resolved_snapshot_graph_runtime(
             KSAORequirement,
         )
         assert type(ksao) is KSAORequirement
-        _resolved_uuid(
-            f"ksao_requirements[{index}].tenant_record_id",
-            ksao.tenant_record_id,
-        )
-        _resolved_uuid(
-            f"ksao_requirements[{index}].job_record_id",
-            ksao.job_record_id,
+        _validate_resolved_owner_runtime(
+            f"ksao_requirements[{index}]",
+            tenant_record_id=ksao.tenant_record_id,
+            job_record_id=ksao.job_record_id,
+            expected_tenant_record_id=tenant_record_id,
+            expected_job_record_id=job_record_id,
         )
         ksao_record_id = _resolved_uuid(
             f"ksao_requirements[{index}].ksao_record_id",
@@ -647,8 +679,13 @@ def _validate_resolved_snapshot_graph_runtime(
 
     fja = _resolved_exact("fja_profile", snapshot.fja_profile, FunctionalJobAnalysisProfile)
     assert type(fja) is FunctionalJobAnalysisProfile
-    _resolved_uuid("fja_profile.tenant_record_id", fja.tenant_record_id)
-    _resolved_uuid("fja_profile.job_record_id", fja.job_record_id)
+    _validate_resolved_owner_runtime(
+        "fja_profile",
+        tenant_record_id=fja.tenant_record_id,
+        job_record_id=fja.job_record_id,
+        expected_tenant_record_id=tenant_record_id,
+        expected_job_record_id=job_record_id,
+    )
     data_function_code = _resolved_exact(
         "fja_profile.data_function_code",
         fja.data_function_code,
@@ -701,7 +738,7 @@ def _validate_resolved_snapshot_graph_runtime(
         )
     if reviewed_at is not None:
         document["reviewed_at"] = _resolved_datetime_text("reviewed_at", reviewed_at)
-    return document
+    return tenant_record_id, analysis_record_id, document
 
 
 @runtime_checkable
@@ -837,7 +874,18 @@ def persist_job_analysis_snapshot(
     ):
         raise JobAnalysisIntegrityError("persisted snapshot escaped posted payload")
     try:
-        persisted_graph = _validate_resolved_snapshot_graph_runtime(persisted)
+        (
+            captured_tenant_record_id,
+            captured_analysis_record_id,
+            persisted_graph,
+        ) = _validate_resolved_snapshot_graph_runtime(persisted)
+        if (
+            captured_tenant_record_id != persisted_tenant_record_id
+            or captured_analysis_record_id != persisted_analysis_record_id
+        ):
+            raise JobAnalysisIntegrityError(
+                "persisted snapshot target changed during graph capture"
+            )
     except JobAnalysisIntegrityError as error:
         raise JobAnalysisIntegrityError(
             "persisted snapshot graph has invalid runtime evidence"
@@ -918,7 +966,16 @@ def read_job_analysis_snapshot(
     ):
         raise JobAnalysisIntegrityError("resolved snapshot does not match authorized target")
 
-    resolved_graph = _validate_resolved_snapshot_graph_runtime(snapshot)
+    (
+        captured_tenant_record_id,
+        captured_analysis_record_id,
+        resolved_graph,
+    ) = _validate_resolved_snapshot_graph_runtime(snapshot)
+    if (
+        captured_tenant_record_id != resolved_tenant_record_id
+        or captured_analysis_record_id != resolved_analysis_record_id
+    ):
+        raise JobAnalysisIntegrityError("resolved snapshot target changed during graph capture")
     resolved_document = {
         "analysis_record_id": str(resolved_analysis_record_id),
         "tenant_record_id": str(resolved_tenant_record_id),
