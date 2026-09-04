@@ -20,7 +20,7 @@
 | Bound opening cardinality | `requested_opening_count` | bool/non-integer/zero/>100 rejection and exact-position one-seat invariant |
 | Produce stable immutable correlation evidence | canonical JSON plus SHA-256 | deterministic serialization and independent SHA-256 recomputation regression |
 | Avoid host-time ambiguity | timezone-aware `generated_at`, canonical UTC rendering | naive/unknown-offset rejection, non-UTC-to-UTC canonicalization, and fractional-second preservation regressions |
-| Meet owned production coverage gate | `orgmetra_requisition_review` | Requisition Review Quality requires exact 100% statement and branch coverage |
+| Meet owned production coverage gate | `orgmetra_requisition_review` | Foundation CI requires exact 100% statement and branch coverage |
 
 ## Authority boundary
 
