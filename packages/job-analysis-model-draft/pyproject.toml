@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orgmetra-job-analysis-model-draft"
+version = "0.1.0"
+description = "Governed model-assisted Job Analysis draft orchestration for Orgmetra"
+requires-python = ">=3.14,<3.15"
+
+[tool.pytest.ini_options]
+addopts = "--cov=orgmetra_job_analysis_model_draft --cov-branch --cov-report=term-missing --cov-fail-under=100"
+testpaths = ["tests"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
