@@ -78,7 +78,7 @@ if [[ "${#package_lines[@]}" -ne 7 ]]; then
 fi
 
 for package_line in "${package_lines[@]}"; do
-  if [[ ! "${package_line}" =~ ^[A-Za-z0-9._-]+==[0-9][A-Za-z0-9._-]*[[:space:]]--hash=sha256:[0-9a-f]{64}$ ]]; then
+  if [[ ! "${package_line}" =~ ^[A-Za-z0-9._-]+==[0-9][A-Za-z0-9._-]*([[:space:]]--hash=sha256:[0-9a-f]{64})+$ ]]; then
     printf 'Unpinned or unhashed Foundation CI requirement: %s\n' "${package_line}" >&2
     exit 1
   fi
@@ -90,3 +90,22 @@ for package_name in coverage iniconfig packaging pluggy Pygments pytest pytest-c
     exit 1
   fi
 done
+
+coverage_line="$(printf '%s\n' "${package_lines[@]}" | grep -E '^coverage==')"
+expected_coverage_hashes=(
+  "8b4910cce599cd2438f8da65f5ef199a70a1cdb6ab314926df78271ca5954240"
+  "1d9a1b5813d00ea6151f6ccf64d1fa16892771dfdda12ba87162d15ec4ea3e1e"
+  "cda36d8e7bfd63b3e44e75163265429caa5d935b672b00f71bccc8c010518c64"
+)
+for expected_hash in "${expected_coverage_hashes[@]}"; do
+  if [[ "${coverage_line}" != *"--hash=sha256:${expected_hash}"* ]]; then
+    printf 'Foundation CI coverage requirement is missing reviewed artifact hash: %s\n' "${expected_hash}" >&2
+    exit 1
+  fi
+done
+
+actual_coverage_hash_count="$(grep -o -- '--hash=sha256:[0-9a-f]\{64\}' <<<"${coverage_line}" | wc -l)"
+if [[ "${actual_coverage_hash_count}" -ne "${#expected_coverage_hashes[@]}" ]]; then
+  printf 'Foundation CI coverage requirement must contain exactly the reviewed Python 3.12-3.14 artifact hashes.\n' >&2
+  exit 1
+fi

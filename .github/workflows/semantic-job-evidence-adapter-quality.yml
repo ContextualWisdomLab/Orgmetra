@@ -1,0 +1,98 @@
+name: Semantic Job Evidence Adapter Quality
+
+on:
+  pull_request:
+    branches:
+      - bootstrap
+      - develop
+      - main
+    paths:
+      - "packages/semantic-job-evidence-adapter/**"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/semantic-job-evidence-adapter-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semantic-job-evidence-adapter-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Semantic source evidence contract and 100% coverage (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          check-latest: false
+      - name: Install reviewed test and build toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          printf '%s\n' 'setuptools==84.0.0 --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670' > /tmp/orgmetra-semantic-job-evidence-build.txt
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r /tmp/orgmetra-semantic-job-evidence-build.txt
+          python -m pip check
+      - name: Compile adapter boundary
+        run: python -m compileall -q packages/semantic-job-evidence-adapter/src packages/semantic-job-evidence-adapter/tests
+      - name: Build and install exact package artifact
+        run: |
+          rm -rf /tmp/orgmetra-semantic-job-evidence-adapter-build /tmp/orgmetra-semantic-job-evidence-adapter-dist /tmp/orgmetra-semantic-job-evidence-adapter-venv
+          cp -a packages/semantic-job-evidence-adapter /tmp/orgmetra-semantic-job-evidence-adapter-build
+          mkdir -p /tmp/orgmetra-semantic-job-evidence-adapter-dist
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-semantic-job-evidence-adapter-dist /tmp/orgmetra-semantic-job-evidence-adapter-build
+          test "$(find /tmp/orgmetra-semantic-job-evidence-adapter-dist -maxdepth 1 -type f -name '*.whl' | wc -l)" -eq 1
+          python -m venv /tmp/orgmetra-semantic-job-evidence-adapter-venv
+          /tmp/orgmetra-semantic-job-evidence-adapter-venv/bin/python -m pip install --require-hashes --no-deps --only-binary=:all: -r "$GITHUB_WORKSPACE/.github/requirements/foundation-test.txt"
+          wheel_path="$(find /tmp/orgmetra-semantic-job-evidence-adapter-dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          wheel_sha="$(sha256sum "$wheel_path" | awk '{print $1}')"
+          printf 'orgmetra-semantic-job-evidence-adapter[test] @ file://%s --hash=sha256:%s\n' "$wheel_path" "$wheel_sha" > /tmp/orgmetra-semantic-job-evidence-install.txt
+          /tmp/orgmetra-semantic-job-evidence-adapter-venv/bin/python -m pip install --require-hashes --no-deps -r /tmp/orgmetra-semantic-job-evidence-install.txt
+          /tmp/orgmetra-semantic-job-evidence-adapter-venv/bin/python -m pip check
+          /tmp/orgmetra-semantic-job-evidence-adapter-venv/bin/python - <<'PY'
+          from importlib.metadata import metadata
+          from pathlib import Path
+          import coverage
+          import pytest
+          import pytest_cov
+          import orgmetra_semantic_job_evidence_adapter
+
+          venv_root = Path("/tmp/orgmetra-semantic-job-evidence-adapter-venv").resolve()
+          module_path = Path(orgmetra_semantic_job_evidence_adapter.__file__).resolve()
+          if not module_path.is_relative_to(venv_root):
+              raise SystemExit(f"package imported outside isolated environment: {module_path}")
+          for module in (coverage, pytest, pytest_cov):
+              dependency_path = Path(module.__file__).resolve()
+              if not dependency_path.is_relative_to(venv_root):
+                  raise SystemExit(
+                      f"test dependency imported outside isolated environment: {dependency_path}"
+                  )
+          if "test" not in (metadata("orgmetra-semantic-job-evidence-adapter").get_all("Provides-Extra") or []):
+              raise SystemExit("built distribution does not expose the reviewed test extra")
+          PY
+      - name: Test installed semantic source evidence with exact statement and branch coverage
+        env:
+          COVERAGE_FILE: /tmp/orgmetra-semantic-job-evidence-adapter.coverage
+        run: |
+          cd /tmp
+          /tmp/orgmetra-semantic-job-evidence-adapter-venv/bin/python -m pytest -c "$GITHUB_WORKSPACE/packages/semantic-job-evidence-adapter/pyproject.toml" "$GITHUB_WORKSPACE/packages/semantic-job-evidence-adapter/tests"
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
