@@ -433,7 +433,7 @@ def _resolved_uuid(field_name: str, value: object) -> UUID:
 
 
 def _resolved_datetime(field_name: str, value: object) -> datetime:
-    """Require an exact fixed-offset datetime before `_utc_text` can execute it."""
+    """Require an exact fixed-offset datetime before canonicalization can use it."""
     resolved = _resolved_exact(field_name, value, datetime)
     assert type(resolved) is datetime
     if type(resolved.tzinfo) is not timezone:
@@ -443,28 +443,60 @@ def _resolved_datetime(field_name: str, value: object) -> datetime:
     return resolved
 
 
-def _validate_resolved_source_runtime(field_name: str, value: object) -> None:
-    """Validate one returned provenance object before source-document export."""
+def _resolved_datetime_text(field_name: str, value: object) -> str:
+    """Capture one inert returned instant as the kernel's canonical UTC text."""
+    resolved = _resolved_datetime(field_name, value)
+    return resolved.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _validate_resolved_source_runtime(
+    field_name: str,
+    value: object,
+) -> dict[str, object]:
+    """Capture one returned provenance object into validated inert evidence."""
     source = _resolved_exact(field_name, value, EvidenceSource)
     assert type(source) is EvidenceSource
-    for attribute in (
-        "source_uri",
-        "source_title",
-        "source_version_code",
-        "content_digest_sha256",
-        "origin_code",
-    ):
-        _resolved_exact(f"{field_name}.{attribute}", getattr(source, attribute), str)
-    _resolved_datetime(f"{field_name}.retrieved_at", source.retrieved_at)
+    source_uri = _resolved_exact(f"{field_name}.source_uri", source.source_uri, str)
+    source_title = _resolved_exact(f"{field_name}.source_title", source.source_title, str)
+    source_version_code = _resolved_exact(
+        f"{field_name}.source_version_code",
+        source.source_version_code,
+        str,
+    )
+    retrieved_at = _resolved_datetime_text(
+        f"{field_name}.retrieved_at",
+        source.retrieved_at,
+    )
+    content_digest_sha256 = _resolved_exact(
+        f"{field_name}.content_digest_sha256",
+        source.content_digest_sha256,
+        str,
+    )
+    origin_code = _resolved_exact(f"{field_name}.origin_code", source.origin_code, str)
+    return {
+        "source_uri": source_uri,
+        "source_title": source_title,
+        "source_version_code": source_version_code,
+        "retrieved_at": retrieved_at,
+        "content_digest_sha256": content_digest_sha256,
+        "origin_code": origin_code,
+    }
 
 
-def _validate_resolved_snapshot_graph_runtime(snapshot: JobAnalysisSnapshot) -> None:
-    """Prove every live value consumed by ``to_snapshot`` is inert before export."""
-    _resolved_uuid("job_record_id", snapshot.job_record_id)
-    _resolved_exact("analysis_version_code", snapshot.analysis_version_code, str)
-    _resolved_exact("status_code", snapshot.status_code, str)
-    _resolved_exact("effective_from", snapshot.effective_from, date)
-    _resolved_datetime("recorded_at", snapshot.recorded_at)
+def _validate_resolved_snapshot_graph_runtime(
+    snapshot: JobAnalysisSnapshot,
+) -> dict[str, object]:
+    """Capture every validated non-target field into the exact document to emit."""
+    job_record_id = _resolved_uuid("job_record_id", snapshot.job_record_id)
+    analysis_version_code = _resolved_exact(
+        "analysis_version_code",
+        snapshot.analysis_version_code,
+        str,
+    )
+    status_code = _resolved_exact("status_code", snapshot.status_code, str)
+    effective_from = _resolved_exact("effective_from", snapshot.effective_from, date)
+    assert type(effective_from) is date
+    recorded_at = _resolved_datetime_text("recorded_at", snapshot.recorded_at)
 
     tasks = _resolved_exact("tasks", snapshot.tasks, tuple)
     ksaos = _resolved_exact("ksao_requirements", snapshot.ksao_requirements, tuple)
@@ -473,17 +505,49 @@ def _validate_resolved_snapshot_graph_runtime(snapshot: JobAnalysisSnapshot) -> 
     assert type(ksaos) is tuple
     assert type(links) is tuple
 
+    task_entries: list[tuple[str, dict[str, object]]] = []
     for index, task_value in enumerate(tasks):
         task = _resolved_exact(f"tasks[{index}]", task_value, TaskEvidence)
         assert type(task) is TaskEvidence
         _resolved_uuid(f"tasks[{index}].tenant_record_id", task.tenant_record_id)
         _resolved_uuid(f"tasks[{index}].job_record_id", task.job_record_id)
-        _resolved_uuid(f"tasks[{index}].task_record_id", task.task_record_id)
-        _resolved_exact(f"tasks[{index}].task_statement", task.task_statement, str)
-        _resolved_exact(f"tasks[{index}].importance_level", task.importance_level, int)
-        _resolved_exact(f"tasks[{index}].difficulty_level", task.difficulty_level, int)
-        _validate_resolved_source_runtime(f"tasks[{index}].source", task.source)
+        task_record_id = _resolved_uuid(
+            f"tasks[{index}].task_record_id",
+            task.task_record_id,
+        )
+        task_statement = _resolved_exact(
+            f"tasks[{index}].task_statement",
+            task.task_statement,
+            str,
+        )
+        importance_level = _resolved_exact(
+            f"tasks[{index}].importance_level",
+            task.importance_level,
+            int,
+        )
+        difficulty_level = _resolved_exact(
+            f"tasks[{index}].difficulty_level",
+            task.difficulty_level,
+            int,
+        )
+        task_record_id_text = str(task_record_id)
+        task_entries.append(
+            (
+                task_record_id_text,
+                {
+                    "task_record_id": task_record_id_text,
+                    "task_statement": task_statement,
+                    "importance_level": importance_level,
+                    "difficulty_level": difficulty_level,
+                    "source": _validate_resolved_source_runtime(
+                        f"tasks[{index}].source",
+                        task.source,
+                    ),
+                },
+            )
+        )
 
+    ksao_entries: list[tuple[str, dict[str, object]]] = []
     for index, ksao_value in enumerate(ksaos):
         ksao = _resolved_exact(
             f"ksao_requirements[{index}]",
@@ -499,35 +563,49 @@ def _validate_resolved_snapshot_graph_runtime(snapshot: JobAnalysisSnapshot) -> 
             f"ksao_requirements[{index}].job_record_id",
             ksao.job_record_id,
         )
-        _resolved_uuid(
+        ksao_record_id = _resolved_uuid(
             f"ksao_requirements[{index}].ksao_record_id",
             ksao.ksao_record_id,
         )
-        _resolved_exact(
+        category_code = _resolved_exact(
             f"ksao_requirements[{index}].category_code",
             ksao.category_code,
             str,
         )
-        _resolved_exact(
+        requirement_statement = _resolved_exact(
             f"ksao_requirements[{index}].requirement_statement",
             ksao.requirement_statement,
             str,
         )
-        _resolved_exact(
+        importance_level = _resolved_exact(
             f"ksao_requirements[{index}].importance_level",
             ksao.importance_level,
             int,
         )
-        _resolved_exact(
+        proficiency_level = _resolved_exact(
             f"ksao_requirements[{index}].proficiency_level",
             ksao.proficiency_level,
             int,
         )
-        _validate_resolved_source_runtime(
-            f"ksao_requirements[{index}].source",
-            ksao.source,
+        ksao_record_id_text = str(ksao_record_id)
+        ksao_entries.append(
+            (
+                ksao_record_id_text,
+                {
+                    "ksao_record_id": ksao_record_id_text,
+                    "category_code": category_code,
+                    "requirement_statement": requirement_statement,
+                    "importance_level": importance_level,
+                    "proficiency_level": proficiency_level,
+                    "source": _validate_resolved_source_runtime(
+                        f"ksao_requirements[{index}].source",
+                        ksao.source,
+                    ),
+                },
+            )
         )
 
+    link_entries: list[tuple[tuple[str, str], dict[str, object]]] = []
     for index, link_value in enumerate(links):
         link = _resolved_exact(
             f"task_ksao_links[{index}]",
@@ -535,38 +613,95 @@ def _validate_resolved_snapshot_graph_runtime(snapshot: JobAnalysisSnapshot) -> 
             TaskKSAOLink,
         )
         assert type(link) is TaskKSAOLink
-        _resolved_uuid(
+        task_record_id = _resolved_uuid(
             f"task_ksao_links[{index}].task_record_id",
             link.task_record_id,
         )
-        _resolved_uuid(
+        ksao_record_id = _resolved_uuid(
             f"task_ksao_links[{index}].ksao_record_id",
             link.ksao_record_id,
         )
-        _resolved_exact(
+        relationship_strength = _resolved_exact(
             f"task_ksao_links[{index}].relationship_strength",
             link.relationship_strength,
             int,
         )
-        _resolved_exact(
+        essential_for_task = _resolved_exact(
             f"task_ksao_links[{index}].essential_for_task",
             link.essential_for_task,
             bool,
+        )
+        task_record_id_text = str(task_record_id)
+        ksao_record_id_text = str(ksao_record_id)
+        link_entries.append(
+            (
+                (task_record_id_text, ksao_record_id_text),
+                {
+                    "task_record_id": task_record_id_text,
+                    "ksao_record_id": ksao_record_id_text,
+                    "relationship_strength": relationship_strength,
+                    "essential_for_task": essential_for_task,
+                },
+            )
         )
 
     fja = _resolved_exact("fja_profile", snapshot.fja_profile, FunctionalJobAnalysisProfile)
     assert type(fja) is FunctionalJobAnalysisProfile
     _resolved_uuid("fja_profile.tenant_record_id", fja.tenant_record_id)
     _resolved_uuid("fja_profile.job_record_id", fja.job_record_id)
-    _resolved_exact("fja_profile.data_function_code", fja.data_function_code, int)
-    _resolved_exact("fja_profile.people_function_code", fja.people_function_code, int)
-    _resolved_exact("fja_profile.things_function_code", fja.things_function_code, int)
-    _validate_resolved_source_runtime("fja_profile.source", fja.source)
+    data_function_code = _resolved_exact(
+        "fja_profile.data_function_code",
+        fja.data_function_code,
+        int,
+    )
+    people_function_code = _resolved_exact(
+        "fja_profile.people_function_code",
+        fja.people_function_code,
+        int,
+    )
+    things_function_code = _resolved_exact(
+        "fja_profile.things_function_code",
+        fja.things_function_code,
+        int,
+    )
+    fja_source = _validate_resolved_source_runtime("fja_profile.source", fja.source)
 
-    if snapshot.reviewed_by_reference is not None:
-        _resolved_exact("reviewed_by_reference", snapshot.reviewed_by_reference, str)
-    if snapshot.reviewed_at is not None:
-        _resolved_datetime("reviewed_at", snapshot.reviewed_at)
+    reviewed_by_reference = snapshot.reviewed_by_reference
+    reviewed_at = snapshot.reviewed_at
+    document: dict[str, object] = {
+        "job_record_id": str(job_record_id),
+        "analysis_version_code": analysis_version_code,
+        "status_code": status_code,
+        "effective_from": effective_from.isoformat(),
+        "recorded_at": recorded_at,
+        "tasks": [
+            item_document
+            for _, item_document in sorted(task_entries, key=lambda item: item[0])
+        ],
+        "ksao_requirements": [
+            item_document
+            for _, item_document in sorted(ksao_entries, key=lambda item: item[0])
+        ],
+        "task_ksao_links": [
+            item_document
+            for _, item_document in sorted(link_entries, key=lambda item: item[0])
+        ],
+        "fja_profile": {
+            "data_function_code": data_function_code,
+            "people_function_code": people_function_code,
+            "things_function_code": things_function_code,
+            "source": fja_source,
+        },
+    }
+    if reviewed_by_reference is not None:
+        document["reviewed_by_reference"] = _resolved_exact(
+            "reviewed_by_reference",
+            reviewed_by_reference,
+            str,
+        )
+    if reviewed_at is not None:
+        document["reviewed_at"] = _resolved_datetime_text("reviewed_at", reviewed_at)
+    return document
 
 
 @runtime_checkable
@@ -688,8 +823,7 @@ def persist_job_analysis_snapshot(
             "persisted snapshot analysis_record_id",
             persisted.analysis_record_id,
         )
-        _validate_resolved_snapshot_graph_runtime(persisted)
-    except (ValueError, JobAnalysisIntegrityError) as error:
+    except ValueError as error:
         raise JobAnalysisIntegrityError(
             "persisted snapshot graph has invalid runtime evidence"
         ) from error
@@ -698,7 +832,17 @@ def persist_job_analysis_snapshot(
         or persisted_analysis_record_id != snapshot.analysis_record_id
     ):
         raise JobAnalysisIntegrityError("persisted snapshot escaped posted payload")
-    persisted_document = persisted.to_snapshot()
+    try:
+        persisted_graph = _validate_resolved_snapshot_graph_runtime(persisted)
+    except JobAnalysisIntegrityError as error:
+        raise JobAnalysisIntegrityError(
+            "persisted snapshot graph has invalid runtime evidence"
+        ) from error
+    persisted_document = {
+        "analysis_record_id": str(persisted_analysis_record_id),
+        "tenant_record_id": str(persisted_tenant_record_id),
+        **persisted_graph,
+    }
     try:
         governed_persisted = snapshot_from_document(
             persisted_document,
@@ -770,8 +914,12 @@ def read_job_analysis_snapshot(
     ):
         raise JobAnalysisIntegrityError("resolved snapshot does not match authorized target")
 
-    _validate_resolved_snapshot_graph_runtime(snapshot)
-    resolved_document = snapshot.to_snapshot()
+    resolved_graph = _validate_resolved_snapshot_graph_runtime(snapshot)
+    resolved_document = {
+        "analysis_record_id": str(resolved_analysis_record_id),
+        "tenant_record_id": str(resolved_tenant_record_id),
+        **resolved_graph,
+    }
     try:
         governed_snapshot = snapshot_from_document(
             resolved_document,
