@@ -101,7 +101,7 @@ INSERT INTO public.person_record (
     tenant_record_id,
     person_record_id,
     recorded_from
-) VALUES (%s, %s, %s, %s)
+) VALUES (%s, %s, %s)
 """.strip()
 
 _INSERT_PERSON_NAME_SQL = """
@@ -401,6 +401,7 @@ class PostgresHireAcceptancePort:
                     (
                         command.tenant_record_id,
                         command.person_name_record_id,
+                        command.person_record_id,
                         command.display_name,
                         command.effective_from,
                         transaction_recorded_at,
