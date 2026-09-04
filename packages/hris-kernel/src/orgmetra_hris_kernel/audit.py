@@ -72,8 +72,8 @@ def _validate_event_snapshot(
     occurred_at: object,
     high_impact: object,
     confirmation_reference: object,
-) -> datetime:
-    """Validate one captured audit snapshot and return its detached UTC instant."""
+) -> None:
+    """Validate one captured audit snapshot without rereading live event fields."""
     if type(event_id) is not UUID:
         raise ValueError("event_id must be a UUID.")
     if type(tenant_record_id) is not UUID:
@@ -106,7 +106,6 @@ def _validate_event_snapshot(
     if confirmation_reference is not None and type(confirmation_reference) is not str:
         raise ValueError("confirmation_reference must be a string when supplied.")
 
-    frozen_occurred_at = _freeze_timestamp(occurred_at)
     if _SOURCE_SERVICE_PATTERN.fullmatch(source_service) is None:
         raise ValueError("source_service must contain two or more lower snake_case words.")
     if _EVENT_TYPE_PATTERN.fullmatch(event_type) is None:
@@ -130,7 +129,6 @@ def _validate_event_snapshot(
             raise ValueError("confirmation_reference must be a namespaced opaque reference.")
     if high_impact and confirmation_reference is None:
         raise ValueError("high-impact events require confirmation_reference.")
-    return frozen_occurred_at
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,7 +158,7 @@ class AuditOutboxEvent:
 
     def __post_init__(self) -> None:
         """Reject envelopes that cannot provide accountable, portable audit evidence."""
-        frozen_occurred_at = _validate_event_snapshot(
+        _validate_event_snapshot(
             event_id=self.event_id,
             tenant_record_id=self.tenant_record_id,
             source_service=self.source_service,
@@ -175,7 +173,7 @@ class AuditOutboxEvent:
             high_impact=self.high_impact,
             confirmation_reference=self.confirmation_reference,
         )
-        object.__setattr__(self, "occurred_at", frozen_occurred_at)
+        object.__setattr__(self, "occurred_at", _freeze_timestamp(self.occurred_at))
 
     def to_cloudevent(self) -> dict[str, object]:
         """Return the canonical structured CloudEvent 1.0 envelope.
@@ -198,7 +196,7 @@ class AuditOutboxEvent:
         occurred_at = self.occurred_at
         high_impact = self.high_impact
         confirmation_reference = self.confirmation_reference
-        occurred_at = _validate_event_snapshot(
+        _validate_event_snapshot(
             event_id=event_id,
             tenant_record_id=tenant_record_id,
             source_service=source_service,
@@ -213,13 +211,14 @@ class AuditOutboxEvent:
             high_impact=high_impact,
             confirmation_reference=confirmation_reference,
         )
+        canonical_time = _canonical_timestamp(occurred_at)
         envelope: dict[str, object] = {
             "specversion": "1.0",
             "id": str(event_id),
             "source": f"urn:orgmetra:{source_service}",
             "type": event_type,
             "subject": resource_reference,
-            "time": _canonical_timestamp(occurred_at),
+            "time": canonical_time,
             "datacontenttype": "application/json",
             "orgmetratenant": str(tenant_record_id),
             "orgmetraactor": actor_reference,
