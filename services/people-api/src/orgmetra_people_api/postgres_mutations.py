@@ -305,7 +305,7 @@ def _replayed_record_id(
     if len(rows) != 1:
         raise PeopleMutationIntegrityError("idempotency row is invalid")
     created_record_id, stored_digest = rows[0]
-    if not _is_operational_uuid(created_record_id) or not isinstance(stored_digest, str):
+    if not _is_operational_uuid(created_record_id) or type(stored_digest) is not str:
         raise PeopleMutationIntegrityError("idempotency row is invalid")
     if stored_digest != digest:
         raise PeopleMutationIntegrityError("idempotency key is bound to a different command")
