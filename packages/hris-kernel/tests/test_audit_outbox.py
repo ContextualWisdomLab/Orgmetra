@@ -200,35 +200,46 @@ def test_event_rejects_nonopaque_optional_confirmation_reference():
         _event(high_impact=False, confirmation_reference="approved by Ada")
 
 
-def test_canonical_export_revalidates_actor_after_low_level_mutation():
-    """Canonical evidence must not emit an actor value that bypassed construction validation."""
+def test_canonical_event_prevents_actor_replacement_after_construction():
+    """Canonical actor evidence is structurally immutable after validation."""
     event = _event()
-    object.__setattr__(event, "actor_reference", "Ada Lovelace")
+    original = event.canonical_json()
 
-    with pytest.raises(ValueError, match="opaque reference"):
-        event.canonical_json()
+    with pytest.raises(AttributeError):
+        object.__setattr__(event, "actor_reference", "Ada Lovelace")
+
+    assert event.canonical_json() == original
 
 
-def test_canonical_export_revalidates_high_impact_confirmation_after_low_level_mutation():
-    """A high-impact event cannot lose its human-confirmation evidence after construction."""
+def test_canonical_event_prevents_confirmation_removal_after_construction():
+    """A validated high-impact confirmation cannot be removed from the immutable event."""
     event = _event()
-    object.__setattr__(event, "confirmation_reference", None)
+    original = event.canonical_json()
 
-    with pytest.raises(ValueError, match="confirmation_reference"):
-        event.canonical_json()
+    with pytest.raises(AttributeError):
+        object.__setattr__(event, "confirmation_reference", None)
+
+    assert event.canonical_json() == original
 
 
-def test_canonical_export_rejects_mutated_event_identity_before_stringification():
-    """Canonicalization must validate identity type before executing arbitrary stringification."""
+def test_canonical_event_prevents_identity_replacement_before_stringification():
+    """Untrusted replacement identities cannot be installed into the canonical value object."""
 
     class ExecutableIdentifier:
-        """Fail if canonicalization stringifies this untrusted replacement identity."""
+        """Fail if any rejected replacement is unexpectedly stringified."""
+
+        def __init__(self) -> None:
+            self.calls = 0
 
         def __str__(self) -> str:
+            self.calls += 1
             raise AssertionError("untrusted identity stringification executed")
 
     event = _event()
-    object.__setattr__(event, "event_id", ExecutableIdentifier())
+    replacement = ExecutableIdentifier()
 
-    with pytest.raises(ValueError, match="event_id must be a UUID"):
-        event.canonical_json()
+    with pytest.raises(AttributeError):
+        object.__setattr__(event, "event_id", replacement)
+
+    assert replacement.calls == 0
+    assert event.event_id == EVENT_ID
