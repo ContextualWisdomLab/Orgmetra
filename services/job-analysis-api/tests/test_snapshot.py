@@ -34,6 +34,18 @@ from fixtures import (
 )
 
 
+class _ExecutableIdempotencyKey(str):
+    """Model caller text that tries to execute through sequence validation hooks."""
+
+    def __len__(self) -> int:
+        """Raise if validation executes caller-controlled length behavior."""
+        raise RuntimeError("idempotency key length hook executed")
+
+    def __iter__(self):
+        """Raise if validation executes caller-controlled iteration behavior."""
+        raise RuntimeError("idempotency key iteration hook executed")
+
+
 class RecordingWritePort:
     """Capture the exact write-port arguments, including Idempotency-Key."""
 
@@ -237,6 +249,23 @@ class PersistUseCaseTests(unittest.TestCase):
                 policy=write_policy(),
                 write_port=port,
             )
+
+    def test_rejects_executable_idempotency_text_before_sequence_hooks(self) -> None:
+        """Reject a str subtype before caller-defined length or iteration can execute."""
+        port = RecordingWritePort()
+
+        with self.assertRaisesRegex(ValueError, "idempotency_key"):
+            persist_job_analysis_snapshot(
+                principal=write_principal(),
+                tenant_record_id=TENANT,
+                document=clinical_psychologist_document(),
+                idempotency_key=_ExecutableIdempotencyKey(IDEMPOTENCY_KEY),
+                purpose_code="job_analysis_write",
+                policy=write_policy(),
+                write_port=port,
+            )
+
+        self.assertEqual(port.calls, [])
 
     def test_rejects_reserved_tenant_and_short_idempotency_key(self) -> None:
         port = RecordingWritePort()
