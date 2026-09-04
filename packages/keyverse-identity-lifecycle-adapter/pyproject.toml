@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orgmetra-keyverse-identity-lifecycle-adapter"
+version = "0.1.0"
+description = "Governed, non-executing Keyverse identity lifecycle handoff evidence for Orgmetra."
+requires-python = ">=3.12"
+
+[project.optional-dependencies]
+test = ["pytest>=8.3", "pytest-cov>=5.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = [
+  "--cov=orgmetra_keyverse_identity_lifecycle_adapter",
+  "--cov-branch",
+  "--cov-report=term-missing",
+  "--cov-fail-under=100",
+]
