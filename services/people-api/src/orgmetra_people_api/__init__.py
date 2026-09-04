@@ -7,6 +7,14 @@ from orgmetra_people_api.auth import (
     extract_bearer_token,
 )
 from orgmetra_people_api.authorization import authorize_resource_fields
+from orgmetra_people_api.employment_history import (
+    AuthorizedEmploymentHistoryEntry,
+    AuthorizedEmploymentHistoryView,
+    EmploymentHistoryIntegrityError,
+    EmploymentHistoryReadPort,
+    EmploymentHistoryRecord,
+    read_employment_history,
+)
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
     HireAcceptancePort,
@@ -45,13 +53,22 @@ from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
 
 __all__ = [
+    "AssignmentMutationCommand",
+    "AssignmentMutationResult",
     "AuthenticatedPrincipal",
     "AuthenticationFailed",
+    "AuthorizedEmploymentHistoryEntry",
+    "AuthorizedEmploymentHistoryView",
     "AuthorizedWorkerPeopleView",
+    "EmploymentHistoryIntegrityError",
+    "EmploymentHistoryReadPort",
+    "EmploymentHistoryRecord",
+    "EmploymentMutationCommand",
+    "EmploymentMutationResult",
+    "HireAcceptanceAsgiApp",
     "HireAcceptanceCommand",
     "HireAcceptancePort",
     "HireAcceptanceResult",
-    "HireAcceptanceAsgiApp",
     "HireDecisionIntegrityError",
     "HireDecisionNotFound",
     "PeopleAsgiApp",
@@ -67,10 +84,6 @@ __all__ = [
     "PostgresHireAcceptancePort",
     "PostgresPeopleMutationPort",
     "PostgresPeopleReadPort",
-    "AssignmentMutationCommand",
-    "AssignmentMutationResult",
-    "EmploymentMutationCommand",
-    "EmploymentMutationResult",
     "TokenAuthenticator",
     "WorkerPeopleRecord",
     "accept_confirmed_hire",
@@ -79,5 +92,6 @@ __all__ = [
     "create_employment_record",
     "create_position_record",
     "extract_bearer_token",
+    "read_employment_history",
     "read_worker_people_record",
 ]
