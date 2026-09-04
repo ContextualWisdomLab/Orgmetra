@@ -116,6 +116,28 @@ class PostgresScopeProjectionIntegrityTests(unittest.TestCase):
 
         self._assert_no_write(cursor)
 
+    def test_position_scope_projection_rejects_forged_job_relationship_uuid(self) -> None:
+        cursor = FakeCursor([None, None, (JOB,), (POSITION, _FORGED_JOB)])
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "position_record.job_profile_id scope row",
+        ):
+            self._persist(cursor, position_record_id=POSITION)
+
+        self._assert_no_write(cursor)
+
+    def test_criterion_scope_projection_rejects_forged_job_relationship_uuid(self) -> None:
+        cursor = FakeCursor([None, None, (JOB,), (CRITERION, _FORGED_JOB)])
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "criterion_blueprint.job_profile_id scope row",
+        ):
+            self._persist(cursor, criterion_blueprint_id=CRITERION)
+
+        self._assert_no_write(cursor)
+
 
 if __name__ == "__main__":
     unittest.main()
