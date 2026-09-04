@@ -233,6 +233,13 @@ def _validate_projection_uuid(
         raise JobAnalysisIntegrityError(f"{row_label} has invalid identity") from error
 
 
+def _validate_projection_digest(field_name: str, value: object) -> str:
+    """Require inert lowercase SHA-256 text before durable-evidence comparison."""
+    if type(value) is not str or _REQUEST_DIGEST_PATTERN.fullmatch(value) is None:
+        raise JobAnalysisIntegrityError(f"{field_name} row has invalid scalar evidence")
+    return value
+
+
 def _unpack_fixed_projection(
     row_label: str,
     row: Any,
@@ -802,6 +809,10 @@ class PostgresJobAnalysisPort:
             header[1],
             row_label="job_analysis_snapshot.analysis_record_id row",
         )
+        header_content_digest = _validate_projection_digest(
+            "job_analysis_snapshot.content_digest_sha256",
+            header[9],
+        )
         if header_tenant_id != tenant_record_id or header_analysis_id != analysis_record_id:
             raise JobAnalysisIntegrityError("database row escaped requested target")
         cursor.execute(_READ_TASKS_SQL, (tenant_record_id, analysis_record_id))
@@ -858,7 +869,7 @@ class PostgresJobAnalysisPort:
             reviewed_by_reference=header[7],
             reviewed_at=header[8],
         )
-        if snapshot.content_digest() != header[9]:
+        if snapshot.content_digest() != header_content_digest:
             raise JobAnalysisIntegrityError("stored snapshot digest does not match reconstructed evidence")
         return snapshot
 
