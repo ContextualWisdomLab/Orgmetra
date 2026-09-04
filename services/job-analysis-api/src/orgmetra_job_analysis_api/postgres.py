@@ -314,9 +314,6 @@ def _snapshot_durable_audit_authority(
         if type(value) is not str:
             raise ValueError(f"audit_event.{field_name} must be exact built-in text.")
         audit_text[field_name] = value
-    occurred_at = audit_event.occurred_at
-    if type(occurred_at) is not datetime:
-        raise ValueError("audit_event.occurred_at must be an exact built-in datetime.")
     high_impact = audit_event.high_impact
     confirmation_reference = audit_event.confirmation_reference
     canonical_json = audit_event.canonical_json()
@@ -370,7 +367,7 @@ def _is_unique_violation(error: Exception) -> bool:
     return getattr(error, "sqlstate", getattr(error, "pgcode", None)) == "23505"
 
 
-def _constraint_name(error: Exception) -> str | str:
+def _constraint_name(error: Exception) -> str | None:
     """Return a driver-provided PostgreSQL constraint name when available."""
     diagnostic = getattr(error, "diag", None)
     constraint_name = getattr(diagnostic, "constraint_name", None)
@@ -832,7 +829,7 @@ class PostgresJobAnalysisPort:
             tenant_record_id=header_tenant_id,
             job_record_id=header[2],
             analysis_version_code=header[3],
-            job_status_code=header[4],
+            status_code=header[4],
             effective_from=header[5],
             recorded_at=header[6],
             tasks=tuple(_task_from_row(tenant_record_id, header[2], row) for row in task_rows),
