@@ -16,6 +16,7 @@ from hashlib import sha256
 import json
 import re
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 _SOURCE_SERVICE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _EVENT_TYPE_PATTERN = re.compile(r"^orgmetra(?:\.[a-z][a-z0-9_]*){2,}$")
@@ -50,12 +51,15 @@ _AUDIT_EVENT_FIELDS = (
 
 
 def _freeze_timestamp(value: datetime) -> datetime:
-    """Detach caller-controlled timezone behavior as one immutable UTC instant."""
+    """Detach only standard-library timezone evidence as one immutable UTC instant."""
     if type(value) is not datetime or value.tzinfo is None:
         raise ValueError("occurred_at must be an exact timezone-aware datetime.")
+    zone = value.tzinfo
+    if type(zone) not in (timezone, ZoneInfo):
+        raise ValueError("occurred_at timezone must be exact datetime.timezone or zoneinfo.ZoneInfo.")
     try:
         offset = value.utcoffset()
-    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+    except Exception as exc:  # noqa: BLE001 - normalize standard-library provider failures.
         raise ValueError("occurred_at must resolve to a UTC offset.") from exc
     if offset is None or type(offset) is not timedelta:
         raise ValueError("occurred_at must resolve to a UTC offset.")
