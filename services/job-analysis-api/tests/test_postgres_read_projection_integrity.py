@@ -29,6 +29,20 @@ class _EqualityForgedUUID(UUID):
         return False
 
 
+class _ExecutableDigest(str):
+    """Model durable digest text whose comparison would execute adapter-owned code."""
+
+    calls = 0
+
+    def __eq__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise AssertionError("durable digest equality executed before exact validation")
+
+    def __ne__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise AssertionError("durable digest inequality executed before exact validation")
+
+
 class _BrokenSequence(Sequence[object]):
     """Model a DB-API row sequence that fails while values are detached."""
 
@@ -152,6 +166,20 @@ class PostgresReadProjectionIntegrityTests(unittest.TestCase):
             with self.subTest(expected=expected):
                 with self.assertRaisesRegex(JobAnalysisIntegrityError, expected):
                     self._read(self._valid_script(headers=[header]))
+
+    def test_read_rejects_executable_stored_digest_before_comparison(self) -> None:
+        canonical = _header_row()
+        digest = _ExecutableDigest(canonical[9])
+        header = canonical[:9] + (digest,) + canonical[10:]
+        _ExecutableDigest.calls = 0
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "job_analysis_snapshot.content_digest_sha256 row has invalid scalar evidence",
+        ):
+            self._read(self._valid_script(headers=[header]))
+
+        self.assertEqual(_ExecutableDigest.calls, 0)
 
 
 if __name__ == "__main__":
