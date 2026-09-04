@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
+from typing import cast
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -57,12 +58,7 @@ def _freeze_timestamp(value: datetime) -> datetime:
     zone = value.tzinfo
     if type(zone) not in (timezone, ZoneInfo):
         raise ValueError("occurred_at timezone must be exact datetime.timezone or zoneinfo.ZoneInfo.")
-    try:
-        offset = value.utcoffset()
-    except Exception as exc:  # noqa: BLE001 - normalize standard-library provider failures.
-        raise ValueError("occurred_at must resolve to a UTC offset.") from exc
-    if offset is None or type(offset) is not timedelta:
-        raise ValueError("occurred_at must resolve to a UTC offset.")
+    offset = cast(timedelta, value.utcoffset())
     try:
         return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
     except OverflowError as exc:
