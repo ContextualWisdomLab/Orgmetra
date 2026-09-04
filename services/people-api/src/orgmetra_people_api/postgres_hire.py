@@ -12,12 +12,13 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 import re
 from typing import Any, Callable
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from orgmetra_hris_kernel.audit import AuditOutboxEvent
 from orgmetra_keyverse_adapter import AuthorizationDecision
@@ -100,7 +101,7 @@ INSERT INTO public.person_record (
     tenant_record_id,
     person_record_id,
     recorded_from
-) VALUES (%s, %s, %s)
+) VALUES (%s, %s, %s, %s)
 """.strip()
 
 _INSERT_PERSON_NAME_SQL = """
@@ -169,8 +170,12 @@ def _is_operational_uuid(value: object) -> bool:
 
 
 def _is_aware_datetime(value: object) -> bool:
-    """Return whether a value is a timezone-aware datetime with a real offset."""
-    return isinstance(value, datetime) and value.tzinfo is not None and value.utcoffset() is not None
+    """Return whether durable time is exact and backed by an inert standard provider."""
+    if type(value) is not datetime or value.tzinfo is None:
+        return False
+    if type(value.tzinfo) not in (timezone, ZoneInfo):
+        return False
+    return value.utcoffset() is not None
 
 
 def _validate_authorization(command: HireAcceptanceCommand, authorization: object) -> AuthorizationDecision:
@@ -396,7 +401,6 @@ class PostgresHireAcceptancePort:
                     (
                         command.tenant_record_id,
                         command.person_name_record_id,
-                        command.person_record_id,
                         command.display_name,
                         command.effective_from,
                         transaction_recorded_at,
