@@ -155,6 +155,39 @@ class PostgresScopeProjectionIntegrityTests(unittest.TestCase):
 
                 self._assert_no_write(cursor)
 
+    def test_job_scope_projection_rejects_non_sequence_iterable(self) -> None:
+        cursor = FakeCursor([None, None, (value for value in (JOB,))])
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "job_profile scope row has invalid shape",
+        ):
+            self._persist(cursor)
+
+        self._assert_no_write(cursor)
+
+    def test_position_scope_projection_rejects_non_sequence_iterable(self) -> None:
+        cursor = FakeCursor([None, None, (JOB,), (value for value in (POSITION, JOB))])
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "position_record scope row has invalid shape",
+        ):
+            self._persist(cursor, position_record_id=POSITION)
+
+        self._assert_no_write(cursor)
+
+    def test_criterion_scope_projection_rejects_non_sequence_iterable(self) -> None:
+        cursor = FakeCursor([None, None, (JOB,), (value for value in (CRITERION, JOB))])
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "criterion_blueprint scope row has invalid shape",
+        ):
+            self._persist(cursor, criterion_blueprint_id=CRITERION)
+
+        self._assert_no_write(cursor)
+
     def test_position_scope_projection_rejects_forged_job_relationship_uuid(self) -> None:
         cursor = FakeCursor([None, None, (JOB,), (POSITION, _FORGED_JOB)])
 
