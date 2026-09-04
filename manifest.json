@@ -341,9 +341,9 @@
     },
     {
       "path": "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
-      "sha256": "208f83b9f1c9e96777d20d20cd58fc4a1fa1b3e9b5cc4b36767d611d51c967bf",
-      "bytes": 14790,
-      "lines": 352
+      "sha256": "e866fb2aab5257adb7b01e799802f901906980a639d2b0a9e346126d1a348ca4",
+      "bytes": 15481,
+      "lines": 364
     },
     {
       "path": "packages/hris-kernel/tests/test_audit_outbox.py",
