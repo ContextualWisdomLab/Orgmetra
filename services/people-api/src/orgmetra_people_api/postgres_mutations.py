@@ -261,6 +261,23 @@ def _is_aware_datetime(value: object) -> bool:
     return isinstance(value, datetime) and value.tzinfo is not None and value.utcoffset() is not None
 
 
+def _unpack_fixed_rows(
+    value: object,
+    *,
+    row_width: int,
+    error_message: str,
+) -> tuple[tuple[object, ...], ...]:
+    """Detach exact built-in DB row containers before projection values are inspected."""
+    if type(value) not in (list, tuple):
+        raise PeopleMutationIntegrityError(error_message)
+    detached: list[tuple[object, ...]] = []
+    for row in value:
+        if type(row) not in (list, tuple) or len(row) != row_width:
+            raise PeopleMutationIntegrityError(error_message)
+        detached.append(tuple(row))
+    return tuple(detached)
+
+
 def _replayed_record_id(
     cursor: Any,
     *,
@@ -273,10 +290,14 @@ def _replayed_record_id(
     key_parameters = (command.tenant_record_id, route, command.idempotency_key)
     cursor.execute(_LOOKUP_IDEMPOTENCY_SQL, key_parameters)
     cursor.execute(_READ_IDEMPOTENCY_SQL, key_parameters)
-    rows = cursor.fetchmany(2)
+    rows = _unpack_fixed_rows(
+        cursor.fetchmany(2),
+        row_width=2,
+        error_message="idempotency row is invalid",
+    )
     if not rows:
         return None
-    if len(rows) != 1 or len(rows[0]) != 2:
+    if len(rows) != 1:
         raise PeopleMutationIntegrityError("idempotency row is invalid")
     created_record_id, stored_digest = rows[0]
     if not _is_operational_uuid(created_record_id) or not isinstance(stored_digest, str):
@@ -485,15 +506,18 @@ def _assignment_from_row(tenant_record_id: UUID, row: tuple[object, ...]) -> Ass
     )
 
 
-def _require_one_conversion(rows: list[tuple[object, ...]]) -> tuple[UUID, datetime]:
+def _require_one_conversion(rows: object) -> tuple[UUID, datetime]:
     """Require exactly one current conversion row and a usable transaction timestamp."""
-    if not rows:
+    detached = _unpack_fixed_rows(
+        rows,
+        row_width=2,
+        error_message="conversion row has an invalid shape",
+    )
+    if not detached:
         raise PeopleMutationIntegrityError("person has no governed candidate-worker conversion")
-    if len(rows) != 1:
+    if len(detached) != 1:
         raise PeopleMutationIntegrityError("multiple candidate-worker conversions matched the person")
-    if len(rows[0]) != 2:
-        raise PeopleMutationIntegrityError("conversion row has an invalid shape")
-    conversion_id, recorded_at = rows[0]
+    conversion_id, recorded_at = detached[0]
     if not _is_operational_uuid(conversion_id) or not _is_aware_datetime(recorded_at):
         raise PeopleMutationIntegrityError("conversion identity or transaction time is invalid")
     assert isinstance(conversion_id, UUID)
@@ -504,8 +528,12 @@ def _require_one_conversion(rows: list[tuple[object, ...]]) -> tuple[UUID, datet
 def _post_lock_recorded_at(cursor: Any) -> datetime:
     """Read one database clock instant only after the relevant conflict lock is held."""
     cursor.execute(_POST_LOCK_RECORDED_AT_SQL)
-    rows = cursor.fetchmany(2)
-    if len(rows) != 1 or len(rows[0]) != 1 or not _is_aware_datetime(rows[0][0]):
+    rows = _unpack_fixed_rows(
+        cursor.fetchmany(2),
+        row_width=1,
+        error_message="post-lock database clock row is invalid",
+    )
+    if len(rows) != 1 or not _is_aware_datetime(rows[0][0]):
         raise PeopleMutationIntegrityError("post-lock database clock row is invalid")
     recorded_at = rows[0][0]
     assert isinstance(recorded_at, datetime)
@@ -517,7 +545,9 @@ class PostgresPeopleMutationPort:
     """Persist People mutations and governance evidence in one DB transaction.
 
     ``connection_factory`` must return a DB-API connection context manager whose
-    successful exit commits and exceptional exit rolls back.
+    successful exit commits and exceptional exit rolls back. Fixed query
+    projections must arrive as exact built-in list/tuple batches and rows;
+    custom row factories must normalize before this trust boundary.
     """
 
     connection_factory: PostgresConnectionFactory
@@ -557,9 +587,14 @@ class PostgresPeopleMutationPort:
                     _EMPLOYMENT_VERSIONS_SQL,
                     (command.tenant_record_id, command.person_record_id),
                 )
+                existing_rows = _unpack_fixed_rows(
+                    cursor.fetchall(),
+                    row_width=9,
+                    error_message="employment version row has an invalid shape",
+                )
                 existing = [
                     _employment_version_from_row(command.tenant_record_id, row)
-                    for row in cursor.fetchall()
+                    for row in existing_rows
                 ]
                 proposed = EmploymentVersion(
                     tenant_record_id=command.tenant_record_id,
@@ -657,10 +692,14 @@ class PostgresPeopleMutationPort:
                     _POSITION_PARENTS_SQL,
                     (command.job_profile_id, command.tenant_record_id, command.organization_unit_id),
                 )
-                rows = cursor.fetchmany(2)
+                rows = _unpack_fixed_rows(
+                    cursor.fetchmany(2),
+                    row_width=3,
+                    error_message="position parent row is invalid",
+                )
                 if not rows:
                     raise PeopleMutationNotFound("organization unit or job profile was not found")
-                if len(rows) != 1 or len(rows[0]) != 3:
+                if len(rows) != 1:
                     raise PeopleMutationIntegrityError("position parent row is invalid")
                 organization_unit_id, job_profile_id, recorded_at = rows[0]
                 if (
@@ -749,17 +788,27 @@ class PostgresPeopleMutationPort:
                     _NAMED_EMPLOYMENT_VERSIONS_SQL,
                     (command.tenant_record_id, command.employment_record_id),
                 )
+                employment_rows = _unpack_fixed_rows(
+                    cursor.fetchall(),
+                    row_width=9,
+                    error_message="employment version row has an invalid shape",
+                )
                 employment_versions = [
                     _employment_version_from_row(command.tenant_record_id, row)
-                    for row in cursor.fetchall()
+                    for row in employment_rows
                 ]
                 cursor.execute(
                     _NAMED_POSITION_VERSIONS_SQL,
                     (command.tenant_record_id, command.position_record_id),
                 )
+                position_rows = _unpack_fixed_rows(
+                    cursor.fetchall(),
+                    row_width=7,
+                    error_message="position version row has an invalid shape",
+                )
                 position_versions = [
                     _position_version_from_row(command.tenant_record_id, row)
-                    for row in cursor.fetchall()
+                    for row in position_rows
                 ]
                 recorded_at = _post_lock_recorded_at(cursor)
                 cursor.execute(
@@ -770,9 +819,14 @@ class PostgresPeopleMutationPort:
                         command.position_record_id,
                     ),
                 )
+                assignment_rows = _unpack_fixed_rows(
+                    cursor.fetchall(),
+                    row_width=9,
+                    error_message="assignment row has an invalid shape",
+                )
                 existing_assignments = [
                     _assignment_from_row(command.tenant_record_id, row)
-                    for row in cursor.fetchall()
+                    for row in assignment_rows
                 ]
                 proposed = AssignmentFact(
                     tenant_record_id=command.tenant_record_id,
