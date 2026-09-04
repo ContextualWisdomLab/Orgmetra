@@ -1,14 +1,16 @@
 """Runtime-integrity contracts for generic People durable scalar evidence."""
 
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from orgmetra_people_api.mutations import PeopleMutationIntegrityError
 from orgmetra_people_api.postgres_mutations import (
+    _employment_version_from_row,
     _is_aware_datetime,
     _is_operational_uuid,
+    _position_version_from_row,
     _replayed_record_id,
 )
 from test_people_mutations import employment_command
@@ -70,6 +72,33 @@ class _ExecutableDigest(str):
         del other
         self.calls += 1
         raise AssertionError("digest subtype inequality executed before exact-type validation")
+
+
+class _ExecutableStatusText(str):
+    """Expose persisted status-code behavior before an exact durable type gate."""
+
+    def __new__(cls, value: str) -> _ExecutableStatusText:
+        """Create one status-code tripwire without invoking comparison behavior."""
+        instance = super().__new__(cls, value)
+        instance.calls = 0
+        return instance
+
+    def __hash__(self) -> int:
+        """Fail if HRIS validation hashes persisted subtype text."""
+        self.calls += 1
+        raise AssertionError("status subtype hashing executed before exact-type validation")
+
+    def __eq__(self, other: object) -> bool:
+        """Fail if HRIS validation compares persisted subtype text."""
+        del other
+        self.calls += 1
+        raise AssertionError("status subtype equality executed before exact-type validation")
+
+    def __ne__(self, other: object) -> bool:
+        """Fail if HRIS validation compares persisted subtype text for inequality."""
+        del other
+        self.calls += 1
+        raise AssertionError("status subtype inequality executed before exact-type validation")
 
 
 class _ReplayCursor:
@@ -145,3 +174,76 @@ def test_generic_replay_digest_rejects_subtype_before_comparison() -> None:
         raise AssertionError("digest subtype was not rejected")
 
     assert digest.calls == 0
+
+
+def test_employment_projection_rejects_status_subtype_before_kernel_behavior() -> None:
+    """Persisted Employment status text must be inert before HRIS fact construction."""
+    status = _ExecutableStatusText("active")
+    row = (
+        UUID("0198a412-7100-7000-8000-000000000071"),
+        UUID("0198a412-7100-7000-8000-000000000072"),
+        UUID("0198a412-7100-7000-8000-000000000073"),
+        status,
+        "exclusive",
+        date(2026, 9, 5),
+        None,
+        datetime(2026, 9, 5, 0, 0, tzinfo=timezone.utc),
+        None,
+    )
+
+    try:
+        _employment_version_from_row(UUID("0198a412-7100-7000-8000-000000000070"), row)
+    except PeopleMutationIntegrityError as error:
+        assert str(error) == "employment version row is invalid"
+    else:
+        raise AssertionError("employment status subtype was not rejected")
+
+    assert status.calls == 0
+
+
+def test_employment_projection_rejects_concurrency_subtype_before_kernel_behavior() -> None:
+    """Persisted concurrency text must be inert before exclusivity validation can hash it."""
+    concurrency = _ExecutableStatusText("exclusive")
+    row = (
+        UUID("0198a412-7100-7000-8000-000000000081"),
+        UUID("0198a412-7100-7000-8000-000000000082"),
+        UUID("0198a412-7100-7000-8000-000000000083"),
+        "active",
+        concurrency,
+        date(2026, 9, 5),
+        None,
+        datetime(2026, 9, 5, 0, 0, tzinfo=timezone.utc),
+        None,
+    )
+
+    try:
+        _employment_version_from_row(UUID("0198a412-7100-7000-8000-000000000080"), row)
+    except PeopleMutationIntegrityError as error:
+        assert str(error) == "employment version row is invalid"
+    else:
+        raise AssertionError("employment concurrency subtype was not rejected")
+
+    assert concurrency.calls == 0
+
+
+def test_position_projection_rejects_status_subtype_before_kernel_behavior() -> None:
+    """Persisted Position status text must be exact before assignment validation can compare it."""
+    status = _ExecutableStatusText("active")
+    row = (
+        UUID("0198a412-7100-7000-8000-000000000091"),
+        UUID("0198a412-7100-7000-8000-000000000092"),
+        status,
+        date(2026, 9, 5),
+        None,
+        datetime(2026, 9, 5, 0, 0, tzinfo=timezone.utc),
+        None,
+    )
+
+    try:
+        _position_version_from_row(UUID("0198a412-7100-7000-8000-000000000090"), row)
+    except PeopleMutationIntegrityError as error:
+        assert str(error) == "position version row is invalid"
+    else:
+        raise AssertionError("position status subtype was not rejected")
+
+    assert status.calls == 0
