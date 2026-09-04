@@ -220,32 +220,33 @@ def _validate_durable_command_scalars(
         raise ValueError("purpose_code must be exact built-in text.")
 
 
-def _validate_scope_projection_uuid(field_name: str, value: object) -> UUID:
-    """Normalize malformed durable scope identity evidence to an integrity failure."""
+def _validate_projection_uuid(
+    field_name: str,
+    value: object,
+    *,
+    row_label: str,
+) -> UUID:
+    """Normalize malformed durable projection identity to an integrity failure."""
     try:
         return validate_operational_uuid(field_name, value)
     except ValueError as error:
-        raise JobAnalysisIntegrityError(
-            f"{field_name} scope row has invalid identity"
-        ) from error
+        raise JobAnalysisIntegrityError(f"{row_label} has invalid identity") from error
 
 
-def _unpack_scope_projection(
-    field_name: str,
+def _unpack_fixed_projection(
+    row_label: str,
     row: Any,
     expected_columns: int,
 ) -> tuple[object, ...]:
-    """Reject scope rows whose sequence shape disagrees with the fixed SQL projection."""
+    """Reject durable rows whose sequence shape disagrees with a fixed SQL projection."""
     if not isinstance(row, Sequence) or isinstance(row, (str, bytes, bytearray, memoryview)):
-        raise JobAnalysisIntegrityError(f"{field_name} scope row has invalid shape")
+        raise JobAnalysisIntegrityError(f"{row_label} row has invalid shape")
     try:
         values = tuple(row)
     except TypeError as error:
-        raise JobAnalysisIntegrityError(
-            f"{field_name} scope row has invalid shape"
-        ) from error
+        raise JobAnalysisIntegrityError(f"{row_label} row has invalid shape") from error
     if len(values) != expected_columns:
-        raise JobAnalysisIntegrityError(f"{field_name} scope row has invalid shape")
+        raise JobAnalysisIntegrityError(f"{row_label} row has invalid shape")
     return values
 
 
@@ -563,14 +564,15 @@ class PostgresJobAnalysisPort:
                     job_row = cursor.fetchone()
                     if job_row is None:
                         raise JobAnalysisScopeMissing("job_profile does not exist in the tenant")
-                    (job_projection_value,) = _unpack_scope_projection(
-                        "job_profile",
+                    (job_projection_value,) = _unpack_fixed_projection(
+                        "job_profile scope",
                         job_row,
                         1,
                     )
-                    job_projection_id = _validate_scope_projection_uuid(
+                    job_projection_id = _validate_projection_uuid(
                         "job_profile",
                         job_projection_value,
+                        row_label="job_profile scope row",
                     )
                     if job_projection_id != snapshot.job_record_id:
                         raise JobAnalysisIntegrityError(
@@ -584,20 +586,22 @@ class PostgresJobAnalysisPort:
                         position_row = cursor.fetchone()
                         if position_row is None:
                             raise JobAnalysisScopeMissing("position_record is missing or not bound to the job")
-                        position_projection_value, position_job_value = _unpack_scope_projection(
-                            "position_record",
+                        position_projection_value, position_job_value = _unpack_fixed_projection(
+                            "position_record scope",
                             position_row,
                             2,
                         )
-                        position_job_id = _validate_scope_projection_uuid(
+                        position_job_id = _validate_projection_uuid(
                             "position_record.job_profile_id",
                             position_job_value,
+                            row_label="position_record.job_profile_id scope row",
                         )
                         if position_job_id != snapshot.job_record_id:
                             raise JobAnalysisScopeMissing("position_record is missing or not bound to the job")
-                        position_projection_id = _validate_scope_projection_uuid(
+                        position_projection_id = _validate_projection_uuid(
                             "position_record",
                             position_projection_value,
+                            row_label="position_record scope row",
                         )
                         if position_projection_id != position_record_id:
                             raise JobAnalysisIntegrityError(
@@ -613,22 +617,24 @@ class PostgresJobAnalysisPort:
                             raise JobAnalysisScopeMissing(
                                 "criterion_blueprint is missing or not bound to the job"
                             )
-                        criterion_projection_value, criterion_job_value = _unpack_scope_projection(
-                            "criterion_blueprint",
+                        criterion_projection_value, criterion_job_value = _unpack_fixed_projection(
+                            "criterion_blueprint scope",
                             criterion_row,
                             2,
                         )
-                        criterion_job_id = _validate_scope_projection_uuid(
+                        criterion_job_id = _validate_projection_uuid(
                             "criterion_blueprint.job_profile_id",
                             criterion_job_value,
+                            row_label="criterion_blueprint.job_profile_id scope row",
                         )
                         if criterion_job_id != snapshot.job_record_id:
                             raise JobAnalysisScopeMissing(
                                 "criterion_blueprint is missing or not bound to the job"
                             )
-                        criterion_projection_id = _validate_scope_projection_uuid(
+                        criterion_projection_id = _validate_projection_uuid(
                             "criterion_blueprint",
                             criterion_projection_value,
+                            row_label="criterion_blueprint scope row",
                         )
                         if criterion_projection_id != criterion_blueprint_id:
                             raise JobAnalysisIntegrityError(
@@ -769,18 +775,37 @@ class PostgresJobAnalysisPort:
             return None
         if len(headers) != 1:
             raise JobAnalysisIntegrityError("multiple snapshot headers match the requested target")
-        header = headers[0]
-        if header[0] != tenant_record_id or header[1] != analysis_record_id:
+        header = _unpack_fixed_projection("job_analysis_snapshot", headers[0], 19)
+        header_tenant_id = _validate_projection_uuid(
+            "job_analysis_snapshot.tenant_record_id",
+            header[0],
+            row_label="job_analysis_snapshot.tenant_record_id row",
+        )
+        header_analysis_id = _validate_projection_uuid(
+            "job_analysis_snapshot.analysis_record_id",
+            header[1],
+            row_label="job_analysis_snapshot.analysis_record_id row",
+        )
+        if header_tenant_id != tenant_record_id or header_analysis_id != analysis_record_id:
             raise JobAnalysisIntegrityError("database row escaped requested target")
         cursor.execute(_READ_TASKS_SQL, (tenant_record_id, analysis_record_id))
-        task_rows = cursor.fetchall()
+        task_rows = tuple(
+            _unpack_fixed_projection("job_analysis_task_item", row, 10)
+            for row in cursor.fetchall()
+        )
         cursor.execute(_READ_KSAOS_SQL, (tenant_record_id, analysis_record_id))
-        ksao_rows = cursor.fetchall()
+        ksao_rows = tuple(
+            _unpack_fixed_projection("job_analysis_ksao_item", row, 11)
+            for row in cursor.fetchall()
+        )
         cursor.execute(_READ_LINKS_SQL, (tenant_record_id, analysis_record_id))
-        link_rows = cursor.fetchall()
+        link_rows = tuple(
+            _unpack_fixed_projection("job_analysis_task_ksao_link", row, 4)
+            for row in cursor.fetchall()
+        )
         snapshot = JobAnalysisSnapshot(
-            analysis_record_id=header[1],
-            tenant_record_id=header[0],
+            analysis_record_id=header_analysis_id,
+            tenant_record_id=header_tenant_id,
             job_record_id=header[2],
             analysis_version_code=header[3],
             status_code=header[4],
