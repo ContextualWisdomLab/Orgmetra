@@ -52,6 +52,31 @@ def test_valid_post_construction_replacement_cannot_reissue_canonical_evidence(
     assert replacement not in original
 
 
+def test_post_init_reentry_cannot_reseal_valid_mutated_evidence() -> None:
+    """Re-entering initialization cannot replace the creation-bound audit truth."""
+    event = _event()
+    original_snapshot = audit_module._AUDIT_CREATION_SNAPSHOTS[id(event)]
+    object.__setattr__(event, "reason_code", "manager_transfer")
+
+    with pytest.raises(ValueError, match="already issued"):
+        event.__post_init__()
+
+    assert audit_module._AUDIT_CREATION_SNAPSHOTS[id(event)] is original_snapshot
+    with pytest.raises(ValueError, match="creation-time audit evidence"):
+        event.canonical_json()
+
+
+def test_missing_creation_snapshot_does_not_restore_issuance_eligibility() -> None:
+    """Losing the snapshot cannot let one live event issue a replacement snapshot."""
+    event = _event()
+    audit_module._AUDIT_CREATION_SNAPSHOTS.pop(id(event))
+
+    with pytest.raises(ValueError, match="already issued"):
+        event.__post_init__()
+
+    assert id(event) not in audit_module._AUDIT_CREATION_SNAPSHOTS
+
+
 def test_event_has_no_mutable_instance_slot_for_creation_seal() -> None:
     """Low-level event mutation cannot rewrite the module-owned issuance proof."""
     event = _event()
