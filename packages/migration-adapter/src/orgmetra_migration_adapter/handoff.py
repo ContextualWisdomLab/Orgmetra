@@ -101,6 +101,10 @@ class MigrationHandoffEnvelope:
 
     def __post_init__(self) -> None:
         """Reject direct construction that would produce noncanonical evidence."""
+        _require_exact_text(
+            self.contract_version,
+            "migration envelope contract version is unsupported",
+        )
         if self.contract_version != MIGRATION_CONTRACT_VERSION:
             raise ContractViolation("migration envelope contract version is unsupported")
         canonical_targets = _validate_migration_evidence(
@@ -123,12 +127,24 @@ class MigrationHandoffEnvelope:
         )
         if self.target_object_codes != canonical_targets:
             raise ContractViolation("migration target objects must be sorted and unique")
+        _require_exact_text(
+            self.privacy_mode,
+            "migration envelope privacy mode must remain value_free",
+        )
         if self.privacy_mode != "value_free":
             raise ContractViolation("migration envelope privacy mode must remain value_free")
+        _require_exact_text(
+            self.execution_mode,
+            "migration envelope execution mode is unsupported",
+        )
         if self.execution_mode != "bounded_atomic_batch":
             raise ContractViolation("migration envelope execution mode is unsupported")
         if self.requires_reconciliation is not True:
             raise ContractViolation("migration completion requires explicit reconciliation")
+        _require_exact_text(
+            self.next_action,
+            "migration envelope next action is noncanonical",
+        )
         if self.next_action != _MIGRATION_NEXT_ACTION:
             raise ContractViolation("migration envelope next action is noncanonical")
 
@@ -226,18 +242,33 @@ def _validate_migration_evidence(
     if record_count > MAXIMUM_BATCH_RECORDS:
         raise ContractViolation("migration batch exceeds the reviewed record bound")
     canonical_targets = _canonical_target_objects(target_object_codes)
+    _require_exact_text(
+        mhtml_contract_revision,
+        "MHTML ETL Gateway contract revision requires revalidation",
+    )
     if mhtml_contract_revision != MHTML_ETL_GATEWAY_REVISION:
         raise ContractViolation("MHTML ETL Gateway contract revision requires revalidation")
+    _require_exact_text(
+        mightyetl_contract_revision,
+        "mightyETL contract revision requires revalidation",
+    )
     if mightyetl_contract_revision != MIGHTY_ETL_REVISION:
         raise ContractViolation("mightyETL contract revision requires revalidation")
     return canonical_targets
 
 
+def _require_exact_text(value: object, message: str) -> None:
+    """Reject caller-controlled string subclasses before equality or serialization."""
+    if type(value) is not str:
+        raise ContractViolation(message)
+
+
 def _require_operational_uuid(value: str) -> None:
     """Require one canonical, non-sentinel tenant UUID before migration handoff."""
+    _require_exact_text(value, "tenant record identifier is malformed")
     try:
         parsed = UUID(value)
-    except (AttributeError, TypeError, ValueError) as exc:
+    except ValueError as exc:
         raise ContractViolation("tenant record identifier is malformed") from exc
     if str(parsed) != value:
         raise ContractViolation("tenant record identifier must use canonical UUID text")
@@ -247,39 +278,39 @@ def _require_operational_uuid(value: str) -> None:
 
 def _require_reference(value: str, label: str) -> None:
     """Require a bounded namespaced opaque reference without echoing bad input."""
-    if not isinstance(value, str) or not _REFERENCE_PATTERN.fullmatch(value):
+    if type(value) is not str or not _REFERENCE_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} is malformed")
 
 
 def _require_code(value: str, label: str) -> None:
     """Require a lowercase snake-case governance code used by stable contracts."""
-    if not isinstance(value, str) or not _CODE_PATTERN.fullmatch(value):
+    if type(value) is not str or not _CODE_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} is malformed")
 
 
 def _require_schema_proposal_id(value: str) -> None:
     """Require the immutable identifier for the reviewed source schema proposal."""
-    if not isinstance(value, str) or not _SCHEMA_PROPOSAL_PATTERN.fullmatch(value):
+    if type(value) is not str or not _SCHEMA_PROPOSAL_PATTERN.fullmatch(value):
         raise ContractViolation("schema proposal identifier is malformed")
 
 
 def _require_sha256(value: str, label: str) -> None:
     """Require a lowercase SHA-256 hex digest for provenance-bearing evidence."""
-    if not isinstance(value, str) or not _SHA256_PATTERN.fullmatch(value):
+    if type(value) is not str or not _SHA256_PATTERN.fullmatch(value):
         raise ContractViolation(f"{label} must be lowercase SHA-256")
 
 
 def _require_positive_int(value: int, label: str) -> None:
-    """Require a positive integer while rejecting booleans masquerading as counts."""
-    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+    """Require an exact positive integer so callers cannot override comparisons."""
+    if type(value) is not int or value <= 0:
         raise ContractViolation(f"{label} must be a positive integer")
 
 
 def _canonical_target_objects(values: tuple[str, ...]) -> tuple[str, ...]:
     """Validate supported HRIS targets and return their stable canonical ordering."""
-    if not isinstance(values, tuple) or not values:
+    if type(values) is not tuple or not values:
         raise ContractViolation("migration target objects must be a non-empty tuple")
-    if any(not isinstance(value, str) for value in values):
+    if any(type(value) is not str for value in values):
         raise ContractViolation("migration target object code is malformed")
     if len(set(values)) != len(values):
         raise ContractViolation("migration target objects must be unique")
