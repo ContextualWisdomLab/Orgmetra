@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 import unittest
 from uuid import UUID
 
 from orgmetra_job_analysis_api.postgres import PostgresJobAnalysisPort
 from orgmetra_job_analysis_api.snapshot import JobAnalysisIntegrityError
-from fixtures import ANALYSIS, JOB, OTHER_TENANT, TENANT
+from fixtures import ANALYSIS, JOB, OTHER_TENANT, RECORDED_AT, TENANT
 from test_postgres import (
     FakeConnection,
     FakeCursor,
@@ -59,6 +60,48 @@ class _ExecutableDigest(str):
     def __ne__(self, other: object) -> bool:
         type(self).calls += 1
         raise AssertionError("durable digest inequality executed before exact validation")
+
+
+class _ExecutableText(str):
+    """Model durable text whose normalization would dispatch a custom method."""
+
+    calls = 0
+
+    def split(self, *args: object, **kwargs: object) -> list[str]:
+        type(self).calls += 1
+        raise AssertionError("durable text split executed before exact validation")
+
+
+class _ExecutableInt(int):
+    """Model a durable ordinal whose range comparison would execute custom code."""
+
+    calls = 0
+
+    def __ge__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise AssertionError("durable integer comparison executed before exact validation")
+
+    def __le__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise AssertionError("durable integer comparison executed before exact validation")
+
+    def __lt__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise AssertionError("durable integer comparison executed before exact validation")
+
+    def __gt__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise AssertionError("durable integer comparison executed before exact validation")
+
+
+class _ExecutableDatetime(datetime):
+    """Model a durable instant whose offset lookup would execute custom code."""
+
+    calls = 0
+
+    def utcoffset(self) -> object:
+        type(self).calls += 1
+        raise AssertionError("durable datetime offset executed before exact validation")
 
 
 class _BrokenSequence(Sequence[object]):
@@ -212,6 +255,57 @@ class PostgresReadProjectionIntegrityTests(unittest.TestCase):
             self._read(self._valid_script(headers=[header]))
 
         self.assertEqual(_ExecutableDigest.calls, 0)
+
+    def test_read_rejects_executable_task_text_before_kernel_normalization(self) -> None:
+        rows = list(_task_rows())
+        row = rows[0]
+        rows[0] = row[:1] + (_ExecutableText(row[1]),) + row[2:]
+        _ExecutableText.calls = 0
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "job_analysis_task_item.task_statement row has invalid scalar evidence",
+        ):
+            self._read(self._valid_script(tasks=rows))
+
+        self.assertEqual(_ExecutableText.calls, 0)
+
+    def test_read_rejects_executable_task_level_before_kernel_comparison(self) -> None:
+        rows = list(_task_rows())
+        row = rows[0]
+        rows[0] = row[:2] + (_ExecutableInt(row[2]),) + row[3:]
+        _ExecutableInt.calls = 0
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "job_analysis_task_item.importance_level row has invalid scalar evidence",
+        ):
+            self._read(self._valid_script(tasks=rows))
+
+        self.assertEqual(_ExecutableInt.calls, 0)
+
+    def test_read_rejects_executable_recorded_at_before_offset_lookup(self) -> None:
+        executable = _ExecutableDatetime(
+            RECORDED_AT.year,
+            RECORDED_AT.month,
+            RECORDED_AT.day,
+            RECORDED_AT.hour,
+            RECORDED_AT.minute,
+            RECORDED_AT.second,
+            RECORDED_AT.microsecond,
+            tzinfo=RECORDED_AT.tzinfo,
+        )
+        canonical = _header_row()
+        header = canonical[:6] + (executable,) + canonical[7:]
+        _ExecutableDatetime.calls = 0
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "job_analysis_snapshot.recorded_at row has invalid scalar evidence",
+        ):
+            self._read(self._valid_script(headers=[header]))
+
+        self.assertEqual(_ExecutableDatetime.calls, 0)
 
 
 if __name__ == "__main__":
