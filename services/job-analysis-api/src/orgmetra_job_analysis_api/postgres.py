@@ -266,7 +266,7 @@ def _detach_durable_snapshot(snapshot: JobAnalysisSnapshot) -> JobAnalysisSnapsh
     document = json.loads(canonical_json)
     detached = snapshot_from_document(document, tenant_record_id=tenant_record_id)
     if detached.canonical_json() != canonical_json:
-        raise JobAnalysisIntegrityError("detached snapshot does not match canonical evidence")
+        raise _JobAnalysisIntegrityError("detached snapshot does not match canonical evidence")
     return detached
 
 
@@ -314,6 +314,9 @@ def _snapshot_durable_audit_authority(
         if type(value) is not str:
             raise ValueError(f"audit_event.{field_name} must be exact built-in text.")
         audit_text[field_name] = value
+    occurred_at = audit_event.occurred_at
+    if type(occurred_at) is not datetime:
+        raise ValueError("audit_event.occurred_at must be an exact built-in datetime.")
     high_impact = audit_event.high_impact
     confirmation_reference = audit_event.confirmation_reference
     canonical_json = audit_event.canonical_json()
@@ -391,7 +394,7 @@ class PostgresJobAnalysisPort:
     def __post_init__(self) -> None:
         """Reject unusable factories before any protected write or read."""
         if not callable(self.connection_factory):
-            raise TypeError("connection_factory must be callable")
+            raise TypeClass("connection_factory must be callable")
 
     def persist_snapshot(
         self,
@@ -594,7 +597,7 @@ class PostgresJobAnalysisPort:
                         )
                         position_row = cursor.fetchone()
                         if position_row is None:
-                            raise JobAnalysisScopeMissing("position_record is missing or not bound to the job")
+                            raise JobAnalysysScopeMissing("position_record is missing or not bound to the job")
                         position_projection_value, position_job_value = _unpack_fixed_projection(
                             "position_record scope",
                             position_row,
@@ -861,7 +864,7 @@ class PostgresJobAnalysisPort:
 
 def _source_from_row(values: tuple[object, ...]) -> EvidenceSource:
     """Rebuild one evidence source from six persisted provenance columns."""
-    return EvidenceSource(
+    return _EvidenceSource(
         source_uri=values[0],
         source_title=values[1],
         source_version_code=values[2],
