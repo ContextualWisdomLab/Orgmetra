@@ -1,6 +1,7 @@
 """Regression coverage for creation-bound audit canonical evidence."""
 
 from datetime import datetime, timezone
+import gc
 from uuid import UUID
 
 import pytest
@@ -75,6 +76,39 @@ def test_missing_creation_snapshot_does_not_restore_issuance_eligibility() -> No
         event.__post_init__()
 
     assert id(event) not in audit_module._AUDIT_CREATION_SNAPSHOTS
+
+
+def test_event_lifetime_cleanup_releases_both_creation_registries() -> None:
+    """Object finalization releases the issuance marker and creation snapshot together."""
+    event = _event()
+    event_identity = id(event)
+
+    assert event_identity in audit_module._AUDIT_LIVE_ISSUANCES
+    assert event_identity in audit_module._AUDIT_CREATION_SNAPSHOTS
+
+    del event
+    gc.collect()
+
+    assert event_identity not in audit_module._AUDIT_LIVE_ISSUANCES
+    assert event_identity not in audit_module._AUDIT_CREATION_SNAPSHOTS
+
+
+def test_stale_finalizer_marker_cannot_clear_reused_identity_state() -> None:
+    """A stale lifetime callback cannot delete evidence registered by a replacement identity."""
+    event_identity = -1
+    stale_marker = object()
+    replacement_marker = object()
+    replacement_snapshot = ("replacement",)
+    audit_module._AUDIT_LIVE_ISSUANCES[event_identity] = replacement_marker
+    audit_module._AUDIT_CREATION_SNAPSHOTS[event_identity] = replacement_snapshot  # type: ignore[assignment]
+    try:
+        audit_module._clear_audit_creation_state(event_identity, stale_marker)
+
+        assert audit_module._AUDIT_LIVE_ISSUANCES[event_identity] is replacement_marker
+        assert audit_module._AUDIT_CREATION_SNAPSHOTS[event_identity] is replacement_snapshot
+    finally:
+        audit_module._AUDIT_LIVE_ISSUANCES.pop(event_identity, None)
+        audit_module._AUDIT_CREATION_SNAPSHOTS.pop(event_identity, None)
 
 
 def test_event_has_no_mutable_instance_slot_for_creation_seal() -> None:
