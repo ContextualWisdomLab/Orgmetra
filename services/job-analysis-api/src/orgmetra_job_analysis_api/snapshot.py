@@ -122,7 +122,9 @@ def _reject_unknown_fields(
     allowed_fields: frozenset[str],
 ) -> None:
     """Reject object members that the published evidence contract does not own."""
-    unknown_fields = sorted(str(key) for key in value if key not in allowed_fields)
+    if any(type(key) is not str for key in value):
+        raise ValueError(f"{boundary_name} field names must be exact built-in text.")
+    unknown_fields = sorted(key for key in value if key not in allowed_fields)
     if unknown_fields:
         raise ValueError(
             f"{boundary_name} contains unsupported fields: {', '.join(unknown_fields)}."
@@ -150,9 +152,9 @@ def _validate_idempotency_key(value: object) -> str:
 
 def _parse_uuid(field_name: str, value: object) -> UUID:
     """Parse one posted UUID string or reject a non-operational identity."""
-    if isinstance(value, UUID):
+    if type(value) is UUID:
         return validate_operational_uuid(field_name, value)
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ValueError(f"{field_name} must be a UUID string.")
     try:
         parsed = UUID(value)
@@ -163,11 +165,15 @@ def _parse_uuid(field_name: str, value: object) -> UUID:
 
 def _parse_aware_datetime(field_name: str, value: object) -> datetime:
     """Parse one posted UTC instant used as evidence time."""
-    if isinstance(value, datetime):
-        if value.tzinfo is None or value.utcoffset() is None:
+    if type(value) is datetime:
+        if value.tzinfo is None:
+            raise ValueError(f"{field_name} must be timezone-aware.")
+        if type(value.tzinfo) is not timezone:
+            raise ValueError(f"{field_name} must use a fixed UTC offset.")
+        if value.utcoffset() is None:
             raise ValueError(f"{field_name} must be timezone-aware.")
         return value
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ValueError(f"{field_name} must be an ISO-8601 datetime.")
     normalized = value.replace("Z", "+00:00")
     try:
@@ -181,11 +187,11 @@ def _parse_aware_datetime(field_name: str, value: object) -> datetime:
 
 def _parse_business_date(field_name: str, value: object) -> date:
     """Parse one posted business date without accepting a datetime."""
-    if isinstance(value, datetime):
+    if type(value) is datetime:
         raise ValueError(f"{field_name} must be a date.")
-    if isinstance(value, date):
+    if type(value) is date:
         return value
-    if not isinstance(value, str):
+    if type(value) is not str:
         raise ValueError(f"{field_name} must be an ISO business date.")
     try:
         return date.fromisoformat(value)
@@ -195,7 +201,7 @@ def _parse_business_date(field_name: str, value: object) -> date:
 
 def _parse_source(value: object) -> EvidenceSource:
     """Rebuild one evidence source from posted provenance fields."""
-    if not isinstance(value, dict):
+    if type(value) is not dict:
         raise ValueError("source must be an object.")
     _reject_unknown_fields("source", value, _SOURCE_FIELDS)
     return EvidenceSource(
@@ -218,7 +224,7 @@ def snapshot_from_document(
     The posted tenant must match the authorized route tenant. Kernel constructors
     then enforce linkage completeness, provenance, and review governance.
     """
-    if not isinstance(document, dict):
+    if type(document) is not dict:
         raise ValueError("snapshot document must be an object.")
     _reject_unknown_fields("snapshot document", document, _SNAPSHOT_FIELDS)
     posted_tenant = _parse_uuid("tenant_record_id", document.get("tenant_record_id"))
@@ -229,26 +235,26 @@ def snapshot_from_document(
     raw_ksaos = document.get("ksao_requirements")
     raw_links = document.get("task_ksao_links")
     raw_fja = document.get("fja_profile")
-    if not isinstance(raw_tasks, list) or not raw_tasks:
+    if type(raw_tasks) is not list or not raw_tasks:
         raise ValueError("tasks must be a non-empty list.")
     if len(raw_tasks) > _MAX_TASKS:
         raise ValueError(f"tasks must contain at most {_MAX_TASKS} items.")
-    if not isinstance(raw_ksaos, list) or not raw_ksaos:
+    if type(raw_ksaos) is not list or not raw_ksaos:
         raise ValueError("ksao_requirements must be a non-empty list.")
     if len(raw_ksaos) > _MAX_KSAOS:
         raise ValueError(f"ksao_requirements must contain at most {_MAX_KSAOS} items.")
-    if not isinstance(raw_links, list) or not raw_links:
+    if type(raw_links) is not list or not raw_links:
         raise ValueError("task_ksao_links must be a non-empty list.")
     if len(raw_links) > _MAX_TASK_KSAO_LINKS:
         raise ValueError(
             f"task_ksao_links must contain at most {_MAX_TASK_KSAO_LINKS} items."
         )
-    if not isinstance(raw_fja, dict):
+    if type(raw_fja) is not dict:
         raise ValueError("fja_profile must be an object.")
     _reject_unknown_fields("fja_profile", raw_fja, _FJA_FIELDS)
     tasks = []
     for item in raw_tasks:
-        if not isinstance(item, dict):
+        if type(item) is not dict:
             raise ValueError("tasks must contain objects.")
         _reject_unknown_fields("task", item, _TASK_FIELDS)
         tasks.append(
@@ -264,7 +270,7 @@ def snapshot_from_document(
         )
     ksaos = []
     for item in raw_ksaos:
-        if not isinstance(item, dict):
+        if type(item) is not dict:
             raise ValueError("ksao_requirements must contain objects.")
         _reject_unknown_fields("ksao_requirement", item, _KSAO_FIELDS)
         ksaos.append(
@@ -281,7 +287,7 @@ def snapshot_from_document(
         )
     links = []
     for item in raw_links:
-        if not isinstance(item, dict):
+        if type(item) is not dict:
             raise ValueError("task_ksao_links must contain objects.")
         _reject_unknown_fields("task_ksao_link", item, _TASK_KSAO_LINK_FIELDS)
         links.append(
