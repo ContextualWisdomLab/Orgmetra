@@ -107,6 +107,35 @@ def test_unissued_exact_event_cannot_export_canonical_evidence() -> None:
         event.canonical_json()
 
 
+def test_private_runtime_rejects_wrong_marker_before_snapshot_commit() -> None:
+    """Only the opaque marker returned by the first live claim may commit evidence."""
+    claim, record, lookup = audit_module._build_audit_creation_runtime()
+    event = _event()
+    event_identity, identity_marker = claim(event)
+    snapshot = _creation_snapshot(event)
+
+    with pytest.raises(ValueError, match="not the active issuance"):
+        record(event_identity, object(), snapshot)
+
+    assert lookup(event_identity) is None
+    record(event_identity, identity_marker, snapshot)
+    assert lookup(event_identity) is snapshot
+
+
+def test_private_runtime_rejects_duplicate_snapshot_commit() -> None:
+    """One live claim cannot overwrite creation evidence after the first commit."""
+    claim, record, lookup = audit_module._build_audit_creation_runtime()
+    event = _event()
+    event_identity, identity_marker = claim(event)
+    snapshot = _creation_snapshot(event)
+    record(event_identity, identity_marker, snapshot)
+
+    with pytest.raises(ValueError, match="already issued"):
+        record(event_identity, identity_marker, snapshot)
+
+    assert lookup(event_identity) is snapshot
+
+
 def test_event_lifetime_cleanup_releases_private_runtime_state() -> None:
     """The closure-private runtime releases its snapshot when the claimed object dies."""
     claim, record, lookup = audit_module._build_audit_creation_runtime()
