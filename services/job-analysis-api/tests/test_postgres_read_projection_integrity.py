@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from datetime import datetime
 import unittest
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from orgmetra_job_analysis_api.postgres import PostgresJobAnalysisPort
 from orgmetra_job_analysis_api.snapshot import JobAnalysisIntegrityError
@@ -306,6 +307,13 @@ class PostgresReadProjectionIntegrityTests(unittest.TestCase):
             self._read(self._valid_script(headers=[header]))
 
         self.assertEqual(_ExecutableDatetime.calls, 0)
+
+    def test_read_accepts_psycopg3_zoneinfo_timestamptz_projection(self) -> None:
+        canonical = _header_row()
+        zoneinfo_recorded_at = RECORDED_AT.astimezone(ZoneInfo("UTC"))
+        header = canonical[:6] + (zoneinfo_recorded_at,) + canonical[7:]
+
+        self._read(self._valid_script(headers=[header]))
 
 
 if __name__ == "__main__":
