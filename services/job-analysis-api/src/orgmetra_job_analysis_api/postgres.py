@@ -380,15 +380,6 @@ def _is_unique_violation(error: Exception) -> bool:
     return sqlstate == "23505"
 
 
-def _constraint_name(error: Exception) -> str | None:
-    """Return an inert PostgreSQL constraint diagnostic when safely stored."""
-    try:
-        diagnostic = getattr_static(error, "diag")
-    except AttributeError:
-        return None
-    return _static_builtin_text_attribute(diagnostic, "constraint_name")
-
-
 @dataclass(frozen=True, slots=True)
 class PostgresJobAnalysisPort:
     """Persist and reconstruct snapshots through parameterized PostgreSQL SQL.
@@ -689,9 +680,8 @@ class PostgresJobAnalysisPort:
                 except Exception as error:  # noqa: BLE001 - DB-API errors are normalized below.
                     if not _is_unique_violation(error):
                         raise
-                    constraint_name = _constraint_name(error)
                     raise JobAnalysisIntegrityError(
-                        f"job-analysis snapshot identity or version already exists ({constraint_name!r})"
+                        "job-analysis snapshot identity or version already exists"
                     ) from error
 
                 for task in snapshot.tasks:
@@ -749,9 +739,8 @@ class PostgresJobAnalysisPort:
                 except Exception as error:  # noqa: BLE001 - DB-API errors are normalized below.
                     if not _is_unique_violation(error):
                         raise
-                    constraint_name = _constraint_name(error)
                     raise JobAnalysisIdempotencyConflict(
-                        f"idempotency or command identity was recorded concurrently ({constraint_name!r})"
+                        "idempotency or command identity was recorded concurrently"
                     ) from error
                 cursor.execute(
                     _AUDIT_OUTBOX_SQL,
