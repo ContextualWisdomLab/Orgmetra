@@ -8,7 +8,7 @@ from uuid import UUID
 
 from orgmetra_job_analysis_api.postgres import PostgresJobAnalysisPort
 from orgmetra_job_analysis_api.snapshot import JobAnalysisIntegrityError
-from fixtures import ANALYSIS, OTHER_TENANT, TENANT
+from fixtures import ANALYSIS, JOB, OTHER_TENANT, TENANT
 from test_postgres import (
     FakeConnection,
     FakeCursor,
@@ -27,6 +27,24 @@ class _EqualityForgedUUID(UUID):
 
     def __ne__(self, other: object) -> bool:
         return False
+
+
+class _ExecutableUUID(UUID):
+    """Model a durable UUID scalar that executes when kernel ownership is compared."""
+
+    calls = 0
+
+    def __eq__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise AssertionError("durable UUID equality executed before exact validation")
+
+    def __ne__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise AssertionError("durable UUID inequality executed before exact validation")
+
+    def __hash__(self) -> int:
+        type(self).calls += 1
+        raise AssertionError("durable UUID hashing executed before exact validation")
 
 
 class _ExecutableDigest(str):
@@ -166,6 +184,20 @@ class PostgresReadProjectionIntegrityTests(unittest.TestCase):
             with self.subTest(expected=expected):
                 with self.assertRaisesRegex(JobAnalysisIntegrityError, expected):
                     self._read(self._valid_script(headers=[header]))
+
+    def test_read_rejects_executable_stored_job_identity_before_kernel_use(self) -> None:
+        canonical = _header_row()
+        executable_job = _ExecutableUUID(str(JOB))
+        header = canonical[:2] + (executable_job,) + canonical[3:]
+        _ExecutableUUID.calls = 0
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "job_analysis_snapshot.job_profile_id row has invalid identity",
+        ):
+            self._read(self._valid_script(headers=[header]))
+
+        self.assertEqual(_ExecutableUUID.calls, 0)
 
     def test_read_rejects_executable_stored_digest_before_comparison(self) -> None:
         canonical = _header_row()
