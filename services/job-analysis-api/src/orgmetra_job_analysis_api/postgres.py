@@ -9,6 +9,7 @@ authoritative insert. A missing parent identity fails closed.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -234,7 +235,9 @@ def _unpack_scope_projection(
     row: Any,
     expected_columns: int,
 ) -> tuple[object, ...]:
-    """Reject scope rows whose cardinality disagrees with the fixed SQL projection."""
+    """Reject scope rows whose sequence shape disagrees with the fixed SQL projection."""
+    if not isinstance(row, Sequence) or isinstance(row, (str, bytes, bytearray, memoryview)):
+        raise JobAnalysisIntegrityError(f"{field_name} scope row has invalid shape")
     try:
         values = tuple(row)
     except TypeError as error:
