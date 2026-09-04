@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, tzinfo
 import unittest
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -103,6 +103,22 @@ class _ExecutableDatetime(datetime):
     def utcoffset(self) -> object:
         type(self).calls += 1
         raise AssertionError("durable datetime offset executed before exact validation")
+
+
+class _ExecutableTzinfo(tzinfo):
+    """Model an exact datetime carrying executable non-standard timezone evidence."""
+
+    calls = 0
+
+    def utcoffset(self, dt: datetime | None) -> object:
+        type(self).calls += 1
+        raise AssertionError("durable timezone offset executed before exact validation")
+
+    def dst(self, dt: datetime | None) -> None:
+        return None
+
+    def tzname(self, dt: datetime | None) -> str:
+        return "executable"
 
 
 class _BrokenSequence(Sequence[object]):
@@ -307,6 +323,30 @@ class PostgresReadProjectionIntegrityTests(unittest.TestCase):
             self._read(self._valid_script(headers=[header]))
 
         self.assertEqual(_ExecutableDatetime.calls, 0)
+
+    def test_read_rejects_exact_datetime_with_executable_timezone_before_offset_lookup(self) -> None:
+        executable_timezone = _ExecutableTzinfo()
+        executable = datetime(
+            RECORDED_AT.year,
+            RECORDED_AT.month,
+            RECORDED_AT.day,
+            RECORDED_AT.hour,
+            RECORDED_AT.minute,
+            RECORDED_AT.second,
+            RECORDED_AT.microsecond,
+            tzinfo=executable_timezone,
+        )
+        canonical = _header_row()
+        header = canonical[:6] + (executable,) + canonical[7:]
+        _ExecutableTzinfo.calls = 0
+
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            "job_analysis_snapshot.recorded_at row has invalid scalar evidence",
+        ):
+            self._read(self._valid_script(headers=[header]))
+
+        self.assertEqual(_ExecutableTzinfo.calls, 0)
 
     def test_read_accepts_psycopg3_zoneinfo_timestamptz_projection(self) -> None:
         canonical = _header_row()
