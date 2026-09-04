@@ -178,6 +178,18 @@ def _is_aware_datetime(value: object) -> bool:
     return value.utcoffset() is not None
 
 
+def _unpack_fixed_rows(value: object, *, row_width: int, error_message: str) -> tuple[tuple[object, ...], ...]:
+    """Detach one bounded fixed projection only from inert built-in containers."""
+    if type(value) not in (list, tuple):
+        raise HireDecisionIntegrityError(error_message)
+    rows: list[tuple[object, ...]] = []
+    for row in value:
+        if type(row) not in (list, tuple) or len(row) != row_width:
+            raise HireDecisionIntegrityError(error_message)
+        rows.append(tuple(row))
+    return tuple(rows)
+
+
 def _validate_authorization(command: HireAcceptanceCommand, authorization: object) -> AuthorizationDecision:
     """Require an exact allow decision for this immutable selection decision."""
     expected_reference = f"selection_decision:{command.selection_decision_id.hex}"
@@ -232,10 +244,14 @@ def _replayed_hire(
     key_parameters = (command.tenant_record_id, _HIRE_IDEMPOTENCY_ROUTE, command.idempotency_key)
     cursor.execute(_LOOKUP_HIRE_IDEMPOTENCY_SQL, key_parameters)
     cursor.execute(_READ_HIRE_IDEMPOTENCY_SQL, key_parameters)
-    rows = cursor.fetchmany(2)
+    rows = _unpack_fixed_rows(
+        cursor.fetchmany(2),
+        row_width=2,
+        error_message="hire idempotency row is invalid",
+    )
     if not rows:
         return None
-    if len(rows) != 1 or len(rows[0]) != 2:
+    if len(rows) != 1:
         raise HireDecisionIntegrityError("hire idempotency row is invalid")
     created_record_id, stored_digest = rows[0]
     if not _is_operational_uuid(created_record_id) or type(stored_digest) is not str:
@@ -282,8 +298,11 @@ class PostgresHireAcceptancePort:
 
     ``connection_factory`` must return a DB-API connection context manager whose
     successful exit commits and exceptional exit rolls back, as psycopg
-    connections do. Pooling, TLS, credentials, and database roles remain a
-    deployment concern outside this service package.
+    connections do. Fixed projections must cross this adapter boundary as exact
+    built-in list/tuple row collections containing exact built-in list/tuple
+    rows; custom row factories must normalize before durable evidence is read.
+    Pooling, TLS, credentials, and database roles remain a deployment concern
+    outside this service package.
     """
 
     connection_factory: PostgresConnectionFactory
@@ -328,14 +347,15 @@ class PostgresHireAcceptancePort:
                         command.candidate_profile_id,
                     ),
                 )
-                rows = cursor.fetchmany(2)
+                rows = _unpack_fixed_rows(
+                    cursor.fetchmany(2),
+                    row_width=7,
+                    error_message="decision provenance row has an invalid shape",
+                )
                 if not rows:
                     raise HireDecisionNotFound("confirmed hire decision with sealed evidence was not found")
                 if len(rows) != 1:
                     raise HireDecisionIntegrityError("multiple decision provenance rows matched the hire")
-                row = rows[0]
-                if len(row) != 7:
-                    raise HireDecisionIntegrityError("decision provenance row has an invalid shape")
                 (
                     decision_actor_reference,
                     decision_purpose_code,
@@ -344,7 +364,7 @@ class PostgresHireAcceptancePort:
                     decided_at,
                     evidence_set_id,
                     transaction_recorded_at,
-                ) = row
+                ) = rows[0]
 
                 if any(
                     type(value) is not str
