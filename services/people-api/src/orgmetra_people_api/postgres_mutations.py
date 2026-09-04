@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from orgmetra_hris_kernel import (
     AssignmentFact,
@@ -252,13 +253,17 @@ INSERT INTO public.people_mutation_idempotency_record (
 
 
 def _is_operational_uuid(value: object) -> bool:
-    """Return whether a value is an Orgmetra operational UUID."""
-    return isinstance(value, UUID) and value.int not in (0, _MAX_UUID_INT)
+    """Return whether a value is an exact operational UUID."""
+    return type(value) is UUID and value.int not in (0, _MAX_UUID_INT)
 
 
 def _is_aware_datetime(value: object) -> bool:
-    """Return whether a value is a timezone-aware datetime with a real offset."""
-    return isinstance(value, datetime) and value.tzinfo is not None and value.utcoffset() is not None
+    """Return whether durable time is exact and backed by an inert standard provider."""
+    if type(value) is not datetime or value.tzinfo is None:
+        return False
+    if type(value.tzinfo) not in (timezone, ZoneInfo):
+        return False
+    return value.utcoffset() is not None
 
 
 def _unpack_fixed_rows(
