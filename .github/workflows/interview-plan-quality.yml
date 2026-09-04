@@ -1,0 +1,104 @@
+name: Structured Interview Plan Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "packages/interview-plan/**"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/interview-plan-quality.yml"
+      - ".gitignore"
+      - ".python-version"
+      - "conftest.py"
+      - "packages/conftest.py"
+      - "pyproject.toml"
+      - "pytest.ini"
+      - "setup.cfg"
+      - "tox.ini"
+      - "docs/adr/0015-governed-structured-interview-plan.md"
+      - "docs/doctoring/structured-interview-plan-references.md"
+      - "docs/traceability/structured-interview-plan.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: structured-interview-plan-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Structured interview plan contract and 100% coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Compile structured interview plan package
+        run: python -m compileall -q packages/interview-plan/src packages/interview-plan/tests
+      - name: Test structured interview plan with exact statement and branch coverage
+        env:
+          PYTHONPATH: packages/interview-plan/src
+          COVERAGE_FILE: /tmp/orgmetra-structured-interview-plan.coverage
+        run: python -m pytest -c packages/interview-plan/pyproject.toml packages/interview-plan/tests
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+  compatibility:
+    name: Python ${{ matrix.python-version }} compatibility and 100% coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Compile structured interview plan package
+        run: python -m compileall -q packages/interview-plan/src packages/interview-plan/tests
+      - name: Test supported Python with exact statement and branch coverage
+        env:
+          PYTHONPATH: packages/interview-plan/src
+          COVERAGE_FILE: /tmp/orgmetra-structured-interview-plan-${{ matrix.python-version }}.coverage
+        run: python -m pytest -c packages/interview-plan/pyproject.toml packages/interview-plan/tests
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
