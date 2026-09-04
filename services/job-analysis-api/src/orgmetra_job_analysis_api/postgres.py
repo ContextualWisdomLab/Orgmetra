@@ -246,6 +246,16 @@ def _unpack_fixed_projection(
     return values
 
 
+def _unpack_projection_rows(
+    row_label: str,
+    rows: Any,
+) -> tuple[object, ...]:
+    """Reject executable row collections before fixed projection processing."""
+    if type(rows) not in (tuple, list):
+        raise JobAnalysisIntegrityError(f"{row_label} row collection has invalid shape")
+    return tuple(rows)
+
+
 def _detach_durable_snapshot(snapshot: JobAnalysisSnapshot) -> JobAnalysisSnapshot:
     """Rebuild exact snapshot evidence before any executable database boundary runs."""
     tenant_record_id = validate_operational_uuid(
@@ -369,8 +379,9 @@ class PostgresJobAnalysisPort:
     """Persist and reconstruct snapshots through parameterized PostgreSQL SQL.
 
     ``connection_factory`` must return a DB-API-style connection context manager
-    whose cursor fetch methods return exact built-in ``tuple`` or ``list`` rows.
-    Custom row factories must normalize to those inert row types before crossing
+    whose cursor fetch methods return exact built-in ``tuple`` or ``list`` row
+    collections containing exact built-in ``tuple`` or ``list`` rows. Custom row
+    and collection factories must normalize to those inert types before crossing
     this durable-evidence boundary. Deployment code owns pooling, credentials,
     TLS, role selection, and that row-factory configuration.
     """
@@ -768,7 +779,10 @@ class PostgresJobAnalysisPort:
     ) -> JobAnalysisSnapshot | None:
         """Assemble one kernel snapshot from normalized rows or return None."""
         cursor.execute(_READ_SNAPSHOT_SQL, (tenant_record_id, analysis_record_id))
-        headers = cursor.fetchmany(2)
+        headers = _unpack_projection_rows(
+            "job_analysis_snapshot",
+            cursor.fetchmany(2),
+        )
         if not headers:
             return None
         if len(headers) != 1:
@@ -789,17 +803,26 @@ class PostgresJobAnalysisPort:
         cursor.execute(_READ_TASKS_SQL, (tenant_record_id, analysis_record_id))
         task_rows = tuple(
             _unpack_fixed_projection("job_analysis_task_item", row, 10)
-            for row in cursor.fetchall()
+            for row in _unpack_projection_rows(
+                "job_analysis_task_item",
+                cursor.fetchall(),
+            )
         )
         cursor.execute(_READ_KSAOS_SQL, (tenant_record_id, analysis_record_id))
         ksao_rows = tuple(
             _unpack_fixed_projection("job_analysis_ksao_item", row, 11)
-            for row in cursor.fetchall()
+            for row in _unpack_projection_rows(
+                "job_analysis_ksao_item",
+                cursor.fetchall(),
+            )
         )
         cursor.execute(_READ_LINKS_SQL, (tenant_record_id, analysis_record_id))
         link_rows = tuple(
             _unpack_fixed_projection("job_analysis_task_ksao_link", row, 4)
-            for row in cursor.fetchall()
+            for row in _unpack_projection_rows(
+                "job_analysis_task_ksao_link",
+                cursor.fetchall(),
+            )
         )
         snapshot = JobAnalysisSnapshot(
             analysis_record_id=header_analysis_id,
