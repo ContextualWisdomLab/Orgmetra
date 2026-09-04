@@ -16,7 +16,7 @@ from hashlib import sha256
 import json
 import re
 from uuid import UUID
-from weakref import finalize, ref
+from weakref import finalize
 
 _SOURCE_SERVICE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _EVENT_TYPE_PATTERN = re.compile(r"^orgmetra(?:\.[a-z][a-z0-9_]*){2,}$")
@@ -227,7 +227,7 @@ class AuditOutboxEvent:
     def __post_init__(self) -> None:
         """Reject envelopes that cannot provide accountable, portable audit evidence."""
         event_identity = id(self)
-        identity_marker = ref(self)
+        identity_marker = object()
         registered_marker = _AUDIT_LIVE_ISSUANCES.setdefault(event_identity, identity_marker)
         if registered_marker is not identity_marker:
             raise ValueError("audit event identity has already issued canonical evidence.")
