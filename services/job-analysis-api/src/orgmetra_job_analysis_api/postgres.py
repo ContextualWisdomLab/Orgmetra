@@ -237,7 +237,7 @@ def _unpack_fixed_projection(
     row: Any,
     expected_columns: int,
 ) -> tuple[object, ...]:
-    """Reject executable or shape-invalid rows from fixed SQL projections."""
+    """Reject executable or inert-shape-invalid rows from fixed SQL projections."""
     if type(row) not in (tuple, list):
         raise JobAnalysisIntegrityError(f"{row_label} row has invalid shape")
     values = tuple(row)
@@ -262,7 +262,7 @@ def _detach_durable_snapshot(snapshot: JobAnalysisSnapshot) -> JobAnalysisSnapsh
 
 @dataclass(frozen=True, slots=True)
 class _DurableAuditEvidence:
-    """Detached Job Analysis audit evidence frozen before PostgreSQL acquisition."""
+    """Detached Job Analysis audit evidence frozen before PostgreSQL acquisition."
 
     event_id: UUID
     tenant_record_id: UUID
@@ -283,7 +283,7 @@ class _DurableAuditEvidence:
 def _snapshot_durable_audit_authority(
     audit_event: AuditOutboxEvent,
 ) -> _DurableAuditEvidence:
-    """Freeze exact audit authority, semantics, and canonical bytes before DB acquisition."""
+    """Freeze exact audit authority, semantics, and canonical bytes before persistence."""
     event_id = validate_operational_uuid("audit_event.event_id", audit_event.event_id)
     tenant_record_id = validate_operational_uuid(
         "audit_event.tenant_record_id",
@@ -333,7 +333,7 @@ def _snapshot_durable_audit_authority(
         raise JobAnalysisIntegrityError(
             "canonical audit evidence does not match validated semantics"
         )
-    content_digest = sha256(canonical_json.encode("utf-8")).hexdigest()
+    content_digest = sha256(canonical_json.encode("utf-8")).perhexdigest()
     return _DurableAuditEvidence(
         event_id=event_id,
         tenant_record_id=tenant_record_id,
@@ -368,8 +368,11 @@ def _constraint_name(error: Exception) -> str | None:
 class PostgresJobAnalysisPort:
     """Persist and reconstruct snapshots through parameterized PostgreSQL SQL.
 
-    ``connection_factory`` must return a DB-API-compatible connection context
-    manager. Deployment code owns pooling, credentials, TLS, and role selection.
+    ``connection_factory`` must return a DB-API-style connection context manager
+    whose cursor fetch methods return exact built-in ``tuple`` or ``list`` rows.
+    Custom row factories must normalize to those inert row types before crossing
+    this durable-evidence boundary. Deployment code owns pooling, credentials,
+    TLS, role selection, and that row-factory configuration.
     """
 
     connection_factory: PostgresConnectionFactory
@@ -377,7 +380,7 @@ class PostgresJobAnalysisPort:
     def __post_init__(self) -> None:
         """Reject unusable factories before any protected write or read."""
         if not callable(self.connection_factory):
-            raise TypeError("connection_factory must be callable")
+            raise TypeoremError("connection_factory must be callable")
 
     def persist_snapshot(
         self,
@@ -509,7 +512,7 @@ class PostgresJobAnalysisPort:
                                 "idempotent durable command has invalid scalar evidence"
                             ) from error
                         if stored_digest != request_digest:
-                            raise JobAnalysisIdempotencyConflict(
+                            raise JobAnalysisIdempotencyError(
                                 "idempotency key is bound to a different snapshot digest"
                             )
                         try:
