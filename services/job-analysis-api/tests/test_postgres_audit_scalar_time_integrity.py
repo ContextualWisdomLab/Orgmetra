@@ -9,7 +9,7 @@ import pytest
 
 from orgmetra_hris_kernel import AuditOutboxEvent
 from orgmetra_job_analysis_api.postgres import PostgresJobAnalysisPort
-from orgmetra_job_analysis_api.snapshot import JobAnalysisIntegrityError, command_digest
+from orgmetra_job_analysis_api.snapshot import command_digest
 from fixtures import ANALYSIS, IDEMPOTENCY_KEY, TENANT, clinical_psychologist_snapshot
 
 _ACTOR_REFERENCE = "keyverse:actor-ja-1"
@@ -107,8 +107,8 @@ def test_durable_audit_rejects_executable_occurred_at_timezone_before_callback()
     )
 
     with pytest.raises(
-        JobAnalysisIntegrityError,
-        match="audit event has invalid occurred_at evidence",
+        ValueError,
+        match="occurred_at must be an exact timezone-aware datetime",
     ):
         _persist_with_audit(audit_event)
 
@@ -126,10 +126,7 @@ def test_durable_audit_rejects_non_boolean_high_impact_before_canonicalization()
         datetime(2026, 8, 18, 5, 1, tzinfo=tripwire),
     )
 
-    with pytest.raises(
-        JobAnalysisIntegrityError,
-        match="audit event has invalid high_impact evidence",
-    ):
+    with pytest.raises(ValueError, match="high_impact must be a boolean"):
         _persist_with_audit(audit_event)
 
     assert tripwire.calls == 0
@@ -150,10 +147,7 @@ def test_durable_audit_rejects_executable_confirmation_before_canonicalization()
         datetime(2026, 8, 18, 5, 1, tzinfo=tripwire),
     )
 
-    with pytest.raises(
-        JobAnalysisIntegrityError,
-        match="audit event has invalid confirmation_reference evidence",
-    ):
+    with pytest.raises(ValueError, match="confirmation_reference must be a string when supplied"):
         _persist_with_audit(audit_event)
 
     assert tripwire.calls == 0
