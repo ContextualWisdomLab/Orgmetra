@@ -229,6 +229,23 @@ def _validate_scope_projection_uuid(field_name: str, value: object) -> UUID:
         ) from error
 
 
+def _unpack_scope_projection(
+    field_name: str,
+    row: Any,
+    expected_columns: int,
+) -> tuple[object, ...]:
+    """Reject scope rows whose cardinality disagrees with the fixed SQL projection."""
+    try:
+        values = tuple(row)
+    except TypeError as error:
+        raise JobAnalysisIntegrityError(
+            f"{field_name} scope row has invalid shape"
+        ) from error
+    if len(values) != expected_columns:
+        raise JobAnalysisIntegrityError(f"{field_name} scope row has invalid shape")
+    return values
+
+
 def _detach_durable_snapshot(snapshot: JobAnalysisSnapshot) -> JobAnalysisSnapshot:
     """Rebuild exact snapshot evidence before any executable database boundary runs."""
     tenant_record_id = validate_operational_uuid(
@@ -543,9 +560,14 @@ class PostgresJobAnalysisPort:
                     job_row = cursor.fetchone()
                     if job_row is None:
                         raise JobAnalysisScopeMissing("job_profile does not exist in the tenant")
+                    (job_projection_value,) = _unpack_scope_projection(
+                        "job_profile",
+                        job_row,
+                        1,
+                    )
                     job_projection_id = _validate_scope_projection_uuid(
                         "job_profile",
-                        job_row[0],
+                        job_projection_value,
                     )
                     if job_projection_id != snapshot.job_record_id:
                         raise JobAnalysisIntegrityError(
@@ -559,15 +581,20 @@ class PostgresJobAnalysisPort:
                         position_row = cursor.fetchone()
                         if position_row is None:
                             raise JobAnalysisScopeMissing("position_record is missing or not bound to the job")
+                        position_projection_value, position_job_value = _unpack_scope_projection(
+                            "position_record",
+                            position_row,
+                            2,
+                        )
                         position_job_id = _validate_scope_projection_uuid(
                             "position_record.job_profile_id",
-                            position_row[1],
+                            position_job_value,
                         )
                         if position_job_id != snapshot.job_record_id:
                             raise JobAnalysisScopeMissing("position_record is missing or not bound to the job")
                         position_projection_id = _validate_scope_projection_uuid(
                             "position_record",
-                            position_row[0],
+                            position_projection_value,
                         )
                         if position_projection_id != position_record_id:
                             raise JobAnalysisIntegrityError(
@@ -583,9 +610,14 @@ class PostgresJobAnalysisPort:
                             raise JobAnalysisScopeMissing(
                                 "criterion_blueprint is missing or not bound to the job"
                             )
+                        criterion_projection_value, criterion_job_value = _unpack_scope_projection(
+                            "criterion_blueprint",
+                            criterion_row,
+                            2,
+                        )
                         criterion_job_id = _validate_scope_projection_uuid(
                             "criterion_blueprint.job_profile_id",
-                            criterion_row[1],
+                            criterion_job_value,
                         )
                         if criterion_job_id != snapshot.job_record_id:
                             raise JobAnalysisScopeMissing(
@@ -593,7 +625,7 @@ class PostgresJobAnalysisPort:
                             )
                         criterion_projection_id = _validate_scope_projection_uuid(
                             "criterion_blueprint",
-                            criterion_row[0],
+                            criterion_projection_value,
                         )
                         if criterion_projection_id != criterion_blueprint_id:
                             raise JobAnalysisIntegrityError(
