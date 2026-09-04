@@ -18,6 +18,7 @@ import json
 import re
 from typing import Any, Callable
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from orgmetra_hris_kernel import (
     AuditOutboxEvent,
@@ -269,10 +270,10 @@ def _validate_projection_date(field_name: str, value: object) -> date:
 
 
 def _validate_projection_datetime(field_name: str, value: object) -> datetime:
-    """Require an exact fixed-offset instant before offset-aware kernel operations."""
+    """Require an exact standard-library instant before offset-aware kernel operations."""
     resolved = _validate_projection_scalar(field_name, value, datetime)
     assert type(resolved) is datetime
-    if type(resolved.tzinfo) is not timezone:
+    if type(resolved.tzinfo) not in (timezone, ZoneInfo):
         raise JobAnalysisIntegrityError(f"{field_name} row has invalid scalar evidence")
     return resolved
 
@@ -283,7 +284,7 @@ def _validate_projection_optional_text(field_name: str, value: object) -> str | 
 
 
 def _validate_projection_optional_datetime(field_name: str, value: object) -> datetime | None:
-    """Require optional durable time to be absent or an inert fixed-offset datetime."""
+    """Require optional durable time to be absent or an inert standard-library datetime."""
     return None if value is None else _validate_projection_datetime(field_name, value)
 
 
