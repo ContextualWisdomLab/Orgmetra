@@ -52,6 +52,24 @@ class _MutableOffset(tzinfo):
         return timedelta(0)
 
 
+class _TripwireOffset(tzinfo):
+    """Fail if canonicalization executes reintroduced timezone behavior."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def utcoffset(self, value):  # type: ignore[no-untyped-def]
+        """Record and reject any callback before the exact UTC gate."""
+        del value
+        self.calls += 1
+        raise AssertionError("reintroduced timezone callback executed before rejection")
+
+    def dst(self, value):  # type: ignore[no-untyped-def]
+        """Keep daylight saving fixed if unexpectedly queried."""
+        del value
+        return timedelta(0)
+
+
 class _ExplodingOffset(tzinfo):
     """Raise arbitrary provider behavior while an event instant is resolved."""
 
@@ -167,12 +185,16 @@ def test_audit_event_normalizes_offset_overflow_to_value_error() -> None:
 
 
 def test_audit_event_canonicalization_rejects_reintroduced_timezone_behavior() -> None:
-    """Fail closed if low-level mutation reintroduces executable timezone behavior."""
+    """Fail before callbacks if low-level mutation reintroduces executable timezone behavior."""
     event = _event()
+    tripwire = _TripwireOffset()
     object.__setattr__(
         event,
         "occurred_at",
-        datetime(2026, 8, 21, 5, 20, tzinfo=_MutableOffset()),
+        datetime(2026, 8, 21, 5, 20, tzinfo=tripwire),
     )
+
     with pytest.raises(ValueError, match="exact timezone-aware datetime"):
         event.to_cloudevent()
+
+    assert tripwire.calls == 0
