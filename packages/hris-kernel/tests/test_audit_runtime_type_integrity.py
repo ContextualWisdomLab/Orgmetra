@@ -53,13 +53,13 @@ class _MutableOffset(tzinfo):
 
 
 class _TripwireOffset(tzinfo):
-    """Fail if canonicalization executes reintroduced timezone behavior."""
+    """Fail if post-construction mutation can reintroduce timezone behavior."""
 
     def __init__(self) -> None:
         self.calls = 0
 
     def utcoffset(self, value):  # type: ignore[no-untyped-def]
-        """Record and reject any callback before the exact UTC gate."""
+        """Record and reject any callback if mutation unexpectedly succeeds."""
         del value
         self.calls += 1
         raise AssertionError("reintroduced timezone callback executed before rejection")
@@ -184,17 +184,14 @@ def test_audit_event_normalizes_offset_overflow_to_value_error() -> None:
         _event(occurred_at=datetime(1, 1, 1, 0, 0, tzinfo=_OversizedOffset()))
 
 
-def test_audit_event_canonicalization_rejects_reintroduced_timezone_behavior() -> None:
-    """Fail before callbacks if low-level mutation reintroduces executable timezone behavior."""
+def test_audit_event_prevents_reintroduced_timezone_behavior_by_structure() -> None:
+    """Post-construction mutation fails before caller-controlled timezone callbacks can exist."""
     event = _event()
     tripwire = _TripwireOffset()
-    object.__setattr__(
-        event,
-        "occurred_at",
-        datetime(2026, 8, 21, 5, 20, tzinfo=tripwire),
-    )
+    replacement = datetime(2026, 8, 21, 5, 20, tzinfo=tripwire)
 
-    with pytest.raises(ValueError, match="exact timezone-aware datetime"):
-        event.to_cloudevent()
+    with pytest.raises(AttributeError):
+        object.__setattr__(event, "occurred_at", replacement)
 
+    assert event.occurred_at.tzinfo is timezone.utc
     assert tripwire.calls == 0
