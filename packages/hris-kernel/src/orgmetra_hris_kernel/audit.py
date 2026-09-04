@@ -10,6 +10,7 @@ business mutation.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
@@ -34,15 +35,65 @@ _REQUIRED_TEXT_FIELDS = (
 )
 _ALL_REQUIRED_TEXT_FIELDS = ("source_service", "event_type", *_REQUIRED_TEXT_FIELDS)
 _EVENT_SNAPSHOT_FIELD_COUNT = 13
-_AUDIT_CREATION_SNAPSHOTS: dict[int, tuple[object, ...]] = {}
-_AUDIT_LIVE_ISSUANCES: dict[int, object] = {}
+_AuditSnapshot = tuple[object, ...]
+_AuditClaim = Callable[[object], tuple[int, object]]
+_AuditRecord = Callable[[int, object, _AuditSnapshot], None]
+_AuditLookup = Callable[[int], _AuditSnapshot | None]
 
 
-def _clear_audit_creation_state(event_identity: int, identity_marker: object) -> None:
+def _clear_audit_creation_state(
+    live_issuances: dict[int, object],
+    creation_snapshots: dict[int, _AuditSnapshot],
+    event_identity: int,
+    identity_marker: object,
+) -> None:
     """Release process-local issuance evidence only for the exact finished identity."""
-    if _AUDIT_LIVE_ISSUANCES.get(event_identity) is identity_marker:
-        _AUDIT_LIVE_ISSUANCES.pop(event_identity, None)
-        _AUDIT_CREATION_SNAPSHOTS.pop(event_identity, None)
+    if live_issuances.get(event_identity) is identity_marker:
+        live_issuances.pop(event_identity, None)
+        creation_snapshots.pop(event_identity, None)
+
+
+def _build_audit_creation_runtime() -> tuple[_AuditClaim, _AuditRecord, _AuditLookup]:
+    """Build closure-private single-use issuance state for canonical audit evidence."""
+    creation_snapshots: dict[int, _AuditSnapshot] = {}
+    live_issuances: dict[int, object] = {}
+
+    def claim(event: object) -> tuple[int, object]:
+        """Claim one live object identity exactly once and attach lifetime cleanup."""
+        event_identity = id(event)
+        identity_marker = object()
+        registered_marker = live_issuances.setdefault(event_identity, identity_marker)
+        if registered_marker is not identity_marker:
+            raise ValueError("audit event identity has already issued canonical evidence.")
+        finalize(
+            event,
+            _clear_audit_creation_state,
+            live_issuances,
+            creation_snapshots,
+            event_identity,
+            identity_marker,
+        )
+        return event_identity, identity_marker
+
+    def record(
+        event_identity: int,
+        identity_marker: object,
+        snapshot: _AuditSnapshot,
+    ) -> None:
+        """Commit one validated creation snapshot only for the active opaque claim."""
+        if live_issuances.get(event_identity) is not identity_marker:
+            raise ValueError("audit event identity is not the active issuance.")
+        if event_identity in creation_snapshots:
+            raise ValueError("audit event identity has already issued canonical evidence.")
+        creation_snapshots[event_identity] = _validate_creation_snapshot(snapshot)
+
+    def lookup(event_identity: int) -> _AuditSnapshot | None:
+        """Return immutable creation evidence only while the matching identity is live."""
+        if event_identity not in live_issuances:
+            return None
+        return creation_snapshots.get(event_identity)
+
+    return claim, record, lookup
 
 
 def _freeze_timestamp(value: datetime) -> datetime:
@@ -157,7 +208,7 @@ def _event_snapshot(
     occurred_at: object,
     high_impact: object,
     confirmation_reference: object,
-) -> tuple[object, ...]:
+) -> _AuditSnapshot:
     """Capture one immutable tuple of already-read audit evidence values."""
     return (
         event_id,
@@ -176,7 +227,7 @@ def _event_snapshot(
     )
 
 
-def _validate_creation_snapshot(snapshot: object) -> tuple[object, ...]:
+def _validate_creation_snapshot(snapshot: object) -> _AuditSnapshot:
     """Validate the private creation snapshot before comparing it with live evidence."""
     if type(snapshot) is not tuple or len(snapshot) != _EVENT_SNAPSHOT_FIELD_COUNT:
         raise ValueError("creation-time audit evidence is unavailable.")
@@ -197,6 +248,11 @@ def _validate_creation_snapshot(snapshot: object) -> tuple[object, ...]:
     )
     _canonical_timestamp(snapshot[10])
     return snapshot
+
+
+_claim_audit_issuance, _record_audit_creation_snapshot, _lookup_audit_creation_snapshot = (
+    _build_audit_creation_runtime()
+)
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
@@ -226,12 +282,7 @@ class AuditOutboxEvent:
 
     def __post_init__(self) -> None:
         """Reject envelopes that cannot provide accountable, portable audit evidence."""
-        event_identity = id(self)
-        identity_marker = object()
-        registered_marker = _AUDIT_LIVE_ISSUANCES.setdefault(event_identity, identity_marker)
-        if registered_marker is not identity_marker:
-            raise ValueError("audit event identity has already issued canonical evidence.")
-        finalize(self, _clear_audit_creation_state, event_identity, identity_marker)
+        event_identity, identity_marker = _claim_audit_issuance(self)
         _validate_event_snapshot(
             event_id=self.event_id,
             tenant_record_id=self.tenant_record_id,
@@ -249,20 +300,24 @@ class AuditOutboxEvent:
         )
         frozen_occurred_at = _freeze_timestamp(self.occurred_at)
         object.__setattr__(self, "occurred_at", frozen_occurred_at)
-        _AUDIT_CREATION_SNAPSHOTS[event_identity] = _event_snapshot(
-            event_id=self.event_id,
-            tenant_record_id=self.tenant_record_id,
-            source_service=self.source_service,
-            event_type=self.event_type,
-            resource_reference=self.resource_reference,
-            actor_reference=self.actor_reference,
-            purpose_code=self.purpose_code,
-            reason_code=self.reason_code,
-            evidence_version_code=self.evidence_version_code,
-            result_code=self.result_code,
-            occurred_at=frozen_occurred_at,
-            high_impact=self.high_impact,
-            confirmation_reference=self.confirmation_reference,
+        _record_audit_creation_snapshot(
+            event_identity,
+            identity_marker,
+            _event_snapshot(
+                event_id=self.event_id,
+                tenant_record_id=self.tenant_record_id,
+                source_service=self.source_service,
+                event_type=self.event_type,
+                resource_reference=self.resource_reference,
+                actor_reference=self.actor_reference,
+                purpose_code=self.purpose_code,
+                reason_code=self.reason_code,
+                evidence_version_code=self.evidence_version_code,
+                result_code=self.result_code,
+                occurred_at=frozen_occurred_at,
+                high_impact=self.high_impact,
+                confirmation_reference=self.confirmation_reference,
+            ),
         )
 
     def to_cloudevent(self) -> dict[str, object]:
@@ -317,7 +372,7 @@ class AuditOutboxEvent:
             high_impact=high_impact,
             confirmation_reference=confirmation_reference,
         )
-        creation_snapshot = _AUDIT_CREATION_SNAPSHOTS.get(id(self))
+        creation_snapshot = _lookup_audit_creation_snapshot(id(self))
         if creation_snapshot is None:
             raise ValueError("creation-time audit evidence is unavailable.")
         creation_snapshot = _validate_creation_snapshot(creation_snapshot)
