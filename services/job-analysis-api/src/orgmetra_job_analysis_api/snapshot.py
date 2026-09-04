@@ -563,9 +563,20 @@ def read_job_analysis_snapshot(
         raise JobAnalysisSnapshotNotFound("job-analysis snapshot is unavailable")
     if type(snapshot) is not JobAnalysisSnapshot:
         raise JobAnalysisIntegrityError("resolved snapshot has an invalid runtime type")
+    try:
+        resolved_tenant_record_id = validate_operational_uuid(
+            "resolved snapshot tenant_record_id",
+            snapshot.tenant_record_id,
+        )
+        resolved_analysis_record_id = validate_operational_uuid(
+            "resolved snapshot analysis_record_id",
+            snapshot.analysis_record_id,
+        )
+    except ValueError as error:
+        raise JobAnalysisIntegrityError("resolved snapshot target identity is invalid") from error
     if (
-        snapshot.tenant_record_id != tenant_record_id
-        or snapshot.analysis_record_id != analysis_record_id
+        resolved_tenant_record_id != tenant_record_id
+        or resolved_analysis_record_id != analysis_record_id
     ):
         raise JobAnalysisIntegrityError("resolved snapshot does not match authorized target")
     return PersistedJobAnalysisView(
