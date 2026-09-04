@@ -708,7 +708,9 @@ class PostgresPeopleMutationPort:
                     raise PeopleMutationIntegrityError("position parent row is invalid")
                 organization_unit_id, job_profile_id, recorded_at = rows[0]
                 if (
-                    organization_unit_id != command.organization_unit_id
+                    not _is_operational_uuid(organization_unit_id)
+                    or not _is_operational_uuid(job_profile_id)
+                    or organization_unit_id != command.organization_unit_id
                     or job_profile_id != command.job_profile_id
                     or not _is_aware_datetime(recorded_at)
                 ):
