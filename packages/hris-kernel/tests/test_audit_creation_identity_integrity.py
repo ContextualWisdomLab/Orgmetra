@@ -10,23 +10,36 @@ from orgmetra_hris_kernel import audit as audit_module
 from orgmetra_hris_kernel.audit import AuditOutboxEvent
 
 
+def _event_values() -> dict[str, object]:
+    """Return one valid high-impact audit event payload with stable opaque evidence."""
+    return {
+        "event_id": UUID("00000000-0000-4000-8000-000000000002"),
+        "tenant_record_id": UUID("00000000-0000-4000-8000-000000000001"),
+        "source_service": "people_core",
+        "event_type": "orgmetra.people.assignment.recorded",
+        "resource_reference": "assignment_record:01JTESTOPAQUE",
+        "actor_reference": "keyverse_subject:01JACTOROPAQUE",
+        "purpose_code": "workforce_administration",
+        "reason_code": "hire_completion",
+        "evidence_version_code": "employment-offer:v3",
+        "result_code": "recorded",
+        "occurred_at": datetime(2026, 8, 17, 1, 30, tzinfo=timezone.utc),
+        "high_impact": True,
+        "confirmation_reference": "confirmation:01JCONFIRMOPAQUE",
+    }
+
+
 def _event() -> AuditOutboxEvent:
     """Build one valid high-impact audit event with stable opaque evidence."""
-    return AuditOutboxEvent(
-        event_id=UUID("00000000-0000-4000-8000-000000000002"),
-        tenant_record_id=UUID("00000000-0000-4000-8000-000000000001"),
-        source_service="people_core",
-        event_type="orgmetra.people.assignment.recorded",
-        resource_reference="assignment_record:01JTESTOPAQUE",
-        actor_reference="keyverse_subject:01JACTOROPAQUE",
-        purpose_code="workforce_administration",
-        reason_code="hire_completion",
-        evidence_version_code="employment-offer:v3",
-        result_code="recorded",
-        occurred_at=datetime(2026, 8, 17, 1, 30, tzinfo=timezone.utc),
-        high_impact=True,
-        confirmation_reference="confirmation:01JCONFIRMOPAQUE",
-    )
+    return AuditOutboxEvent(**_event_values())  # type: ignore[arg-type]
+
+
+def _unissued_event() -> AuditOutboxEvent:
+    """Populate an exact event object without running its governed issuance hook."""
+    event = object.__new__(AuditOutboxEvent)
+    for field_name, value in _event_values().items():
+        object.__setattr__(event, field_name, value)
+    return event
 
 
 @pytest.mark.parametrize(
@@ -56,41 +69,39 @@ def test_valid_post_construction_replacement_cannot_reissue_canonical_evidence(
 def test_post_init_reentry_cannot_reseal_valid_mutated_evidence() -> None:
     """Re-entering initialization cannot replace the creation-bound audit truth."""
     event = _event()
-    original_snapshot = audit_module._AUDIT_CREATION_SNAPSHOTS[id(event)]
+    original = event.canonical_json()
     object.__setattr__(event, "reason_code", "manager_transfer")
 
     with pytest.raises(ValueError, match="already issued"):
         event.__post_init__()
 
-    assert audit_module._AUDIT_CREATION_SNAPSHOTS[id(event)] is original_snapshot
     with pytest.raises(ValueError, match="creation-time audit evidence"):
+        event.canonical_json()
+    assert "manager_transfer" not in original
+
+
+def test_unissued_exact_event_cannot_export_canonical_evidence() -> None:
+    """Low-level field population cannot substitute for the governed issuance lifecycle."""
+    event = _unissued_event()
+
+    with pytest.raises(ValueError, match="creation-time audit evidence is unavailable"):
         event.canonical_json()
 
 
-def test_missing_creation_snapshot_does_not_restore_issuance_eligibility() -> None:
-    """Losing the snapshot cannot let one live event issue a replacement snapshot."""
+def test_event_lifetime_cleanup_releases_private_runtime_state() -> None:
+    """The closure-private runtime releases its snapshot when the claimed object dies."""
+    claim, record, lookup = audit_module._build_audit_creation_runtime()
     event = _event()
-    audit_module._AUDIT_CREATION_SNAPSHOTS.pop(id(event))
+    event_identity, identity_marker = claim(event)
+    snapshot = ("isolated-test-snapshot",)
+    record(event_identity, identity_marker, snapshot)
 
-    with pytest.raises(ValueError, match="already issued"):
-        event.__post_init__()
-
-    assert id(event) not in audit_module._AUDIT_CREATION_SNAPSHOTS
-
-
-def test_event_lifetime_cleanup_releases_both_creation_registries() -> None:
-    """Object finalization releases the issuance marker and creation snapshot together."""
-    event = _event()
-    event_identity = id(event)
-
-    assert event_identity in audit_module._AUDIT_LIVE_ISSUANCES
-    assert event_identity in audit_module._AUDIT_CREATION_SNAPSHOTS
+    assert lookup(event_identity) is snapshot
 
     del event
     gc.collect()
 
-    assert event_identity not in audit_module._AUDIT_LIVE_ISSUANCES
-    assert event_identity not in audit_module._AUDIT_CREATION_SNAPSHOTS
+    assert lookup(event_identity) is None
 
 
 def test_stale_finalizer_marker_cannot_clear_reused_identity_state() -> None:
@@ -99,16 +110,18 @@ def test_stale_finalizer_marker_cannot_clear_reused_identity_state() -> None:
     stale_marker = object()
     replacement_marker = object()
     replacement_snapshot = ("replacement",)
-    audit_module._AUDIT_LIVE_ISSUANCES[event_identity] = replacement_marker
-    audit_module._AUDIT_CREATION_SNAPSHOTS[event_identity] = replacement_snapshot  # type: ignore[assignment]
-    try:
-        audit_module._clear_audit_creation_state(event_identity, stale_marker)
+    live_issuances = {event_identity: replacement_marker}
+    creation_snapshots = {event_identity: replacement_snapshot}
 
-        assert audit_module._AUDIT_LIVE_ISSUANCES[event_identity] is replacement_marker
-        assert audit_module._AUDIT_CREATION_SNAPSHOTS[event_identity] is replacement_snapshot
-    finally:
-        audit_module._AUDIT_LIVE_ISSUANCES.pop(event_identity, None)
-        audit_module._AUDIT_CREATION_SNAPSHOTS.pop(event_identity, None)
+    audit_module._clear_audit_creation_state(
+        live_issuances,
+        creation_snapshots,
+        event_identity,
+        stale_marker,
+    )
+
+    assert live_issuances[event_identity] is replacement_marker
+    assert creation_snapshots[event_identity] is replacement_snapshot
 
 
 def test_event_has_no_mutable_instance_slot_for_creation_seal() -> None:
@@ -120,20 +133,10 @@ def test_event_has_no_mutable_instance_slot_for_creation_seal() -> None:
         object.__setattr__(event, "_creation_snapshot", ())
 
 
-def test_canonical_export_fails_closed_when_issuance_proof_is_missing() -> None:
-    """Missing process-local issuance evidence cannot silently mint a canonical event."""
-    event = _event()
-    audit_module._AUDIT_CREATION_SNAPSHOTS.pop(id(event))
-
-    with pytest.raises(ValueError, match="creation-time audit evidence is unavailable"):
-        event.canonical_json()
-
-
 @pytest.mark.parametrize("corrupt_snapshot", [[], tuple(range(12))])
-def test_canonical_export_rejects_malformed_issuance_proof(corrupt_snapshot: object) -> None:
-    """Malformed module-owned issuance state fails closed before evidence comparison."""
-    event = _event()
-    audit_module._AUDIT_CREATION_SNAPSHOTS[id(event)] = corrupt_snapshot  # type: ignore[assignment]
-
+def test_creation_snapshot_validator_rejects_malformed_private_evidence(
+    corrupt_snapshot: object,
+) -> None:
+    """Malformed private issuance evidence fails closed before value comparison."""
     with pytest.raises(ValueError, match="creation-time audit evidence is unavailable"):
-        event.canonical_json()
+        audit_module._validate_creation_snapshot(corrupt_snapshot)
