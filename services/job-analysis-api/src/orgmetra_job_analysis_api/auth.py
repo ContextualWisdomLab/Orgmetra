@@ -16,6 +16,8 @@ from uuid import UUID
 _MAX_UUID_INT = (1 << 128) - 1
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _SCOPE_PATTERN = re.compile(r"^orgmetra(?:\.[a-z][a-z0-9_]*){2,}$")
+_MAX_BEARER_TOKEN_LENGTH = 8192
+_MAX_AUTHORIZATION_HEADER_LENGTH = 8199
 
 
 def _validated_principal_storage(
@@ -224,11 +226,13 @@ def extract_bearer_token(authorization_header: str | None) -> str:
         raise AuthenticationFailed("bearer authentication is required")
     if type(authorization_header) is not str:
         raise AuthenticationFailed("authorization header must be plain text")
+    if len(authorization_header) > _MAX_AUTHORIZATION_HEADER_LENGTH:
+        raise AuthenticationFailed("authorization header length is invalid")
     parts = authorization_header.split(" ", 1)
     if len(parts) != 2 or parts[0].casefold() != "bearer":
         raise AuthenticationFailed("authorization must use the Bearer scheme")
     token = parts[1]
-    if not token or len(token) > 8192:
+    if not token or len(token) > _MAX_BEARER_TOKEN_LENGTH:
         raise AuthenticationFailed("bearer token length is invalid")
     if any(ord(character) < 0x21 or ord(character) > 0x7E for character in token):
         raise AuthenticationFailed("bearer token contains invalid characters")
