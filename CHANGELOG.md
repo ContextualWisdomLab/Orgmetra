@@ -18,7 +18,7 @@ All notable changes to Orgmetra will be documented in this file.
 - `employment_record_version.employment_concurrency_code` constrained to `exclusive` or `concurrent`.
 - ADR 0005 for exclusive employment and staffable seats.
 - `orgmetra_hris_kernel` 0.3.0 with identity-scoped bitemporal resolution, assignment-employment coverage, allocation-portfolio checks, and a Memorial Hospital RN correction case at 100% statement and branch coverage.
-- `employment_record_version` and `position_record_version` so employment and position identity stay stable across retroactive corrections.
+- `employment_record_version` and `position_record_version` so corrections no longer mint a new employment or position identifier.
 - `assignment_record.employment_record_id` bound to the same person as the covering employment.
 - `orgmetra_keyverse_adapter` that binds an opaque Keyverse subject to a person and rejects passwords, passkeys, and tokens.
 - Design tokens for the repeating HR actions: approve, review, correct, request evidence, compare, export, and escalate.
@@ -37,6 +37,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- Consolidated repository-owned PR validation from twelve workflows into one Foundation CI job, while keeping the dual-cluster recovery rehearsal separately path-scoped. Central required review and security workflows remain organization-owned.
 - New predictive-validity membership must use one normalized worker-level case; the three independent validity-study decision/evidence/outcome link relations are historical read surfaces only and can no longer accept new rows. A case insert also rejects a criterion observation whose recorded interval is already closed at `linked_at`.
 - Canonicalized service identifiers as two-or-more-word `snake_case` across architecture, deployment, ACL, metrics, and client contracts.
 - Separated fast-mlsirm, TEPP, and Psychometrics Commons into immutable external scientific contracts.
