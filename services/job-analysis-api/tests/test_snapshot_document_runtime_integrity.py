@@ -42,6 +42,24 @@ class _ExecutableText(str):
         raise AssertionError("text subtype replace executed")
 
 
+class _ExecutableFieldName(str):
+    """Trip if unknown-field validation hashes a caller-defined key before exact gating."""
+
+    armed: bool
+
+    def __new__(cls, value: str):
+        """Create an initially inert key so the test mapping itself can be assembled."""
+        instance = super().__new__(cls, value)
+        instance.armed = False
+        return instance
+
+    def __hash__(self) -> int:
+        """Reject set membership after the fixture is armed."""
+        if self.armed:
+            raise AssertionError("field-name subtype hash executed")
+        return str.__hash__(self)
+
+
 class _ExecutableDateTime(datetime):
     """Trip if timezone validation consumes a caller-defined datetime subtype."""
 
@@ -55,6 +73,18 @@ def test_rejects_executable_top_level_mapping_before_iteration() -> None:
     posted = _ExecutableMapping(clinical_psychologist_document())
 
     with pytest.raises(ValueError, match="snapshot document must be an object"):
+        snapshot_from_document(posted, tenant_record_id=TENANT)
+
+
+def test_rejects_executable_field_name_before_hash_or_membership() -> None:
+    """Exact built-in field names must be established before schema membership checks."""
+    posted = clinical_psychologist_document()
+    value = posted.pop("analysis_record_id")
+    field_name = _ExecutableFieldName("analysis_record_id")
+    posted[field_name] = value
+    field_name.armed = True
+
+    with pytest.raises(ValueError, match="field names must be exact built-in text"):
         snapshot_from_document(posted, tenant_record_id=TENANT)
 
 
