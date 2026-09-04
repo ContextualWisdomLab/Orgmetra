@@ -557,7 +557,13 @@ class PostgresJobAnalysisPort:
                             (snapshot.tenant_record_id, position_record_id),
                         )
                         position_row = cursor.fetchone()
-                        if position_row is None or position_row[1] != snapshot.job_record_id:
+                        if position_row is None:
+                            raise JobAnalysisScopeMissing("position_record is missing or not bound to the job")
+                        position_job_id = _validate_scope_projection_uuid(
+                            "position_record.job_profile_id",
+                            position_row[1],
+                        )
+                        if position_job_id != snapshot.job_record_id:
                             raise JobAnalysisScopeMissing("position_record is missing or not bound to the job")
                         position_projection_id = _validate_scope_projection_uuid(
                             "position_record",
@@ -573,7 +579,15 @@ class PostgresJobAnalysisPort:
                             (snapshot.tenant_record_id, criterion_blueprint_id),
                         )
                         criterion_row = cursor.fetchone()
-                        if criterion_row is None or criterion_row[1] != snapshot.job_record_id:
+                        if criterion_row is None:
+                            raise JobAnalysisScopeMissing(
+                                "criterion_blueprint is missing or not bound to the job"
+                            )
+                        criterion_job_id = _validate_scope_projection_uuid(
+                            "criterion_blueprint.job_profile_id",
+                            criterion_row[1],
+                        )
+                        if criterion_job_id != snapshot.job_record_id:
                             raise JobAnalysisScopeMissing(
                                 "criterion_blueprint is missing or not bound to the job"
                             )
