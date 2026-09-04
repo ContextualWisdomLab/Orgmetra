@@ -1,0 +1,77 @@
+name: HR Document Retrieval Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "packages/hr-document-retrieval/**"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/hr-document-retrieval-quality.yml"
+      - "docs/adr/0116-purpose-bound-hr-document-retrieval.md"
+      - "docs/doctoring/hr-document-retrieval-references.md"
+      - "docs/traceability/hr-document-retrieval.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hr-document-retrieval-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: HR document retrieval contract and exact coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up exact Python runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Install reviewed package build backend
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r packages/hr-document-retrieval/build-requirements.txt
+          python -m pip check
+      - name: Compile package and tests
+        run: python -m compileall -q packages/hr-document-retrieval/src packages/hr-document-retrieval/tests
+      - name: Test exact statement and branch coverage
+        env:
+          PYTHONPATH: packages/hr-document-retrieval/src
+          COVERAGE_FILE: /tmp/orgmetra-hr-document-retrieval.coverage
+        run: python -m pytest -c packages/hr-document-retrieval/pyproject.toml packages/hr-document-retrieval/tests
+      - name: Prove hash-bound isolated package install
+        run: |
+          rm -rf /tmp/orgmetra-hr-document-retrieval-build /tmp/orgmetra-hr-document-retrieval-wheels /tmp/orgmetra-hr-document-retrieval-installed
+          cp -R packages/hr-document-retrieval /tmp/orgmetra-hr-document-retrieval-build
+          mkdir -p /tmp/orgmetra-hr-document-retrieval-wheels
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-hr-document-retrieval-wheels /tmp/orgmetra-hr-document-retrieval-build
+          mapfile -t wheels < <(find /tmp/orgmetra-hr-document-retrieval-wheels -maxdepth 1 -type f -name '*.whl' -print)
+          test "${#wheels[@]}" -eq 1
+          wheel="${wheels[0]}"
+          wheel_sha="$(sha256sum "$wheel" | cut -d' ' -f1)"
+          printf 'file://%s --hash=sha256:%s\n' "$wheel" "$wheel_sha" > /tmp/orgmetra-hr-document-retrieval-wheel.txt
+          python -m pip install --require-hashes --no-deps --target /tmp/orgmetra-hr-document-retrieval-installed -r /tmp/orgmetra-hr-document-retrieval-wheel.txt
+          PYTHONPATH=/tmp/orgmetra-hr-document-retrieval-installed python - <<'PY'
+          import orgmetra_hr_document_retrieval as package
+          assert "retrieve_hr_document" in package.__all__
+          PY
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
