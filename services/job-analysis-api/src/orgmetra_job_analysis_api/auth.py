@@ -222,6 +222,8 @@ def extract_bearer_token(authorization_header: str | None) -> str:
     """Return one bounded printable bearer token without logging its value."""
     if authorization_header is None:
         raise AuthenticationFailed("bearer authentication is required")
+    if type(authorization_header) is not str:
+        raise AuthenticationFailed("authorization header must be plain text")
     parts = authorization_header.split(" ", 1)
     if len(parts) != 2 or parts[0].casefold() != "bearer":
         raise AuthenticationFailed("authorization must use the Bearer scheme")
