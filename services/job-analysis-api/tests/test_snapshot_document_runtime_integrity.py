@@ -158,6 +158,17 @@ def test_rejects_executable_rating_before_kernel_comparison() -> None:
         snapshot_from_document(posted, tenant_record_id=TENANT)
 
 
+def test_rejects_non_boolean_essential_flag_at_request_boundary() -> None:
+    """Boolean relationship flags must not reuse the integer acceptance surface."""
+    posted = clinical_psychologist_document()
+    first_link = dict(posted["task_ksao_links"][0])
+    first_link["essential_for_task"] = 1
+    posted["task_ksao_links"] = [first_link, *posted["task_ksao_links"][1:]]
+
+    with pytest.raises(ValueError, match="essential_for_task must be an exact built-in boolean"):
+        snapshot_from_document(posted, tenant_record_id=TENANT)
+
+
 def test_rejects_executable_timestamp_text_before_replace() -> None:
     """ISO timestamp parsing must exact-gate text before `.replace` can execute."""
     posted = clinical_psychologist_document()
