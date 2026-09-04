@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from hashlib import sha256
 from inspect import getattr_static
 import json
@@ -231,6 +231,60 @@ def _validate_projection_uuid(
         return validate_operational_uuid(field_name, value)
     except ValueError as error:
         raise JobAnalysisIntegrityError(f"{row_label} has invalid identity") from error
+
+
+def _validate_projection_scalar(field_name: str, value: object, expected_type: type[object]) -> object:
+    """Require one inert exact built-in scalar before kernel reconstruction."""
+    if type(value) is not expected_type:
+        raise JobAnalysisIntegrityError(f"{field_name} row has invalid scalar evidence")
+    return value
+
+
+def _validate_projection_text(field_name: str, value: object) -> str:
+    """Require inert exact text before durable evidence reaches kernel validators."""
+    resolved = _validate_projection_scalar(field_name, value, str)
+    assert type(resolved) is str
+    return resolved
+
+
+def _validate_projection_integer(field_name: str, value: object) -> int:
+    """Require an exact integer before ordinal or worker-function comparisons."""
+    resolved = _validate_projection_scalar(field_name, value, int)
+    assert type(resolved) is int
+    return resolved
+
+
+def _validate_projection_boolean(field_name: str, value: object) -> bool:
+    """Require an exact boolean before link evidence enters the kernel."""
+    resolved = _validate_projection_scalar(field_name, value, bool)
+    assert type(resolved) is bool
+    return resolved
+
+
+def _validate_projection_date(field_name: str, value: object) -> date:
+    """Require an exact business date before kernel serialization."""
+    resolved = _validate_projection_scalar(field_name, value, date)
+    assert type(resolved) is date
+    return resolved
+
+
+def _validate_projection_datetime(field_name: str, value: object) -> datetime:
+    """Require an exact fixed-offset instant before offset-aware kernel operations."""
+    resolved = _validate_projection_scalar(field_name, value, datetime)
+    assert type(resolved) is datetime
+    if type(resolved.tzinfo) is not timezone:
+        raise JobAnalysisIntegrityError(f"{field_name} row has invalid scalar evidence")
+    return resolved
+
+
+def _validate_projection_optional_text(field_name: str, value: object) -> str | None:
+    """Require optional durable text to be absent or an inert exact string."""
+    return None if value is None else _validate_projection_text(field_name, value)
+
+
+def _validate_projection_optional_datetime(field_name: str, value: object) -> datetime | None:
+    """Require optional durable time to be absent or an inert fixed-offset datetime."""
+    return None if value is None else _validate_projection_datetime(field_name, value)
 
 
 def _validate_projection_digest(field_name: str, value: object) -> str:
@@ -788,7 +842,7 @@ class PostgresJobAnalysisPort:
         tenant_record_id: UUID,
         analysis_record_id: UUID,
     ) -> JobAnalysisSnapshot | None:
-        """Assemble one kernel snapshot from normalized rows or return None."""
+        """Assemble one kernel snapshot from exact-validated durable rows or return None."""
         cursor.execute(_READ_SNAPSHOT_SQL, (tenant_record_id, analysis_record_id))
         headers = _unpack_projection_rows(
             "job_analysis_snapshot",
@@ -809,12 +863,58 @@ class PostgresJobAnalysisPort:
             header[1],
             row_label="job_analysis_snapshot.analysis_record_id row",
         )
+        if header_tenant_id != tenant_record_id or header_analysis_id != analysis_record_id:
+            raise JobAnalysisIntegrityError("database row escaped requested target")
+        header_job_id = _validate_projection_uuid(
+            "job_analysis_snapshot.job_profile_id",
+            header[2],
+            row_label="job_analysis_snapshot.job_profile_id row",
+        )
+        header_analysis_version_code = _validate_projection_text(
+            "job_analysis_snapshot.analysis_version_code",
+            header[3],
+        )
+        header_status_code = _validate_projection_text(
+            "job_analysis_snapshot.status_code",
+            header[4],
+        )
+        header_effective_from = _validate_projection_date(
+            "job_analysis_snapshot.effective_from",
+            header[5],
+        )
+        header_recorded_at = _validate_projection_datetime(
+            "job_analysis_snapshot.recorded_at",
+            header[6],
+        )
+        header_reviewed_by_reference = _validate_projection_optional_text(
+            "job_analysis_snapshot.reviewed_by_reference",
+            header[7],
+        )
+        header_reviewed_at = _validate_projection_optional_datetime(
+            "job_analysis_snapshot.reviewed_at",
+            header[8],
+        )
         header_content_digest = _validate_projection_digest(
             "job_analysis_snapshot.content_digest_sha256",
             header[9],
         )
-        if header_tenant_id != tenant_record_id or header_analysis_id != analysis_record_id:
-            raise JobAnalysisIntegrityError("database row escaped requested target")
+        fja_data_function_code = _validate_projection_integer(
+            "job_analysis_snapshot.data_function_code",
+            header[10],
+        )
+        fja_people_function_code = _validate_projection_integer(
+            "job_analysis_snapshot.people_function_code",
+            header[11],
+        )
+        fja_things_function_code = _validate_projection_integer(
+            "job_analysis_snapshot.things_function_code",
+            header[12],
+        )
+        fja_source = _source_from_row(
+            header[13:19],
+            row_label="job_analysis_snapshot.fja_source",
+        )
+
         cursor.execute(_READ_TASKS_SQL, (tenant_record_id, analysis_record_id))
         task_rows = tuple(
             _unpack_fixed_projection("job_analysis_task_item", row, 10)
@@ -842,72 +942,122 @@ class PostgresJobAnalysisPort:
         snapshot = JobAnalysisSnapshot(
             analysis_record_id=header_analysis_id,
             tenant_record_id=header_tenant_id,
-            job_record_id=header[2],
-            analysis_version_code=header[3],
-            status_code=header[4],
-            effective_from=header[5],
-            recorded_at=header[6],
-            tasks=tuple(_task_from_row(tenant_record_id, header[2], row) for row in task_rows),
-            ksao_requirements=tuple(_ksao_from_row(tenant_record_id, header[2], row) for row in ksao_rows),
-            task_ksao_links=tuple(
-                TaskKSAOLink(
-                    task_record_id=row[0],
-                    ksao_record_id=row[1],
-                    relationship_strength=row[2],
-                    essential_for_task=row[3],
-                )
-                for row in link_rows
+            job_record_id=header_job_id,
+            analysis_version_code=header_analysis_version_code,
+            status_code=header_status_code,
+            effective_from=header_effective_from,
+            recorded_at=header_recorded_at,
+            tasks=tuple(_task_from_row(tenant_record_id, header_job_id, row) for row in task_rows),
+            ksao_requirements=tuple(
+                _ksao_from_row(tenant_record_id, header_job_id, row) for row in ksao_rows
             ),
+            task_ksao_links=tuple(_link_from_row(row) for row in link_rows),
             fja_profile=FunctionalJobAnalysisProfile(
                 tenant_record_id=tenant_record_id,
-                job_record_id=header[2],
-                data_function_code=header[10],
-                people_function_code=header[11],
-                things_function_code=header[12],
-                source=_source_from_row(header[13:19]),
+                job_record_id=header_job_id,
+                data_function_code=fja_data_function_code,
+                people_function_code=fja_people_function_code,
+                things_function_code=fja_things_function_code,
+                source=fja_source,
             ),
-            reviewed_by_reference=header[7],
-            reviewed_at=header[8],
+            reviewed_by_reference=header_reviewed_by_reference,
+            reviewed_at=header_reviewed_at,
         )
         if snapshot.content_digest() != header_content_digest:
             raise JobAnalysisIntegrityError("stored snapshot digest does not match reconstructed evidence")
         return snapshot
 
 
-def _source_from_row(values: tuple[object, ...]) -> EvidenceSource:
-    """Rebuild one evidence source from six persisted provenance columns."""
+def _source_from_row(values: tuple[object, ...], *, row_label: str) -> EvidenceSource:
+    """Rebuild one evidence source only from exact-validated persisted scalars."""
     return EvidenceSource(
-        source_uri=values[0],
-        source_title=values[1],
-        source_version_code=values[2],
-        retrieved_at=values[3],
-        content_digest_sha256=values[4],
-        origin_code=values[5],
+        source_uri=_validate_projection_text(f"{row_label}.source_uri", values[0]),
+        source_title=_validate_projection_text(f"{row_label}.source_title", values[1]),
+        source_version_code=_validate_projection_text(
+            f"{row_label}.source_version_code",
+            values[2],
+        ),
+        retrieved_at=_validate_projection_datetime(f"{row_label}.retrieved_at", values[3]),
+        content_digest_sha256=_validate_projection_digest(
+            f"{row_label}.content_digest_sha256",
+            values[4],
+        ),
+        origin_code=_validate_projection_text(f"{row_label}.origin_code", values[5]),
     )
 
 
 def _task_from_row(tenant_record_id: UUID, job_record_id: UUID, row: tuple[object, ...]) -> TaskEvidence:
-    """Rebuild one task item from its persisted 3NF row."""
+    """Rebuild one task item only after exact-validating its persisted scalars."""
     return TaskEvidence(
         tenant_record_id=tenant_record_id,
         job_record_id=job_record_id,
-        task_record_id=row[0],
-        task_statement=row[1],
-        importance_level=row[2],
-        difficulty_level=row[3],
-        source=_source_from_row(row[4:10]),
+        task_record_id=_validate_projection_uuid(
+            "job_analysis_task_item.task_record_id",
+            row[0],
+            row_label="job_analysis_task_item.task_record_id row",
+        ),
+        task_statement=_validate_projection_text(
+            "job_analysis_task_item.task_statement",
+            row[1],
+        ),
+        importance_level=_validate_projection_integer(
+            "job_analysis_task_item.importance_level",
+            row[2],
+        ),
+        difficulty_level=_validate_projection_integer(
+            "job_analysis_task_item.difficulty_level",
+            row[3],
+        ),
+        source=_source_from_row(row[4:10], row_label="job_analysis_task_item.source"),
     )
 
 
 def _ksao_from_row(tenant_record_id: UUID, job_record_id: UUID, row: tuple[object, ...]) -> KSAORequirement:
-    """Rebuild one KSAO item from its persisted 3NF row."""
+    """Rebuild one KSAO item only after exact-validating its persisted scalars."""
     return KSAORequirement(
         tenant_record_id=tenant_record_id,
         job_record_id=job_record_id,
-        ksao_record_id=row[0],
-        category_code=row[1],
-        requirement_statement=row[2],
-        importance_level=row[3],
-        proficiency_level=row[4],
-        source=_source_from_row(row[5:11]),
+        ksao_record_id=_validate_projection_uuid(
+            "job_analysis_ksao_item.ksao_record_id",
+            row[0],
+            row_label="job_analysis_ksao_item.ksao_record_id row",
+        ),
+        category_code=_validate_projection_text("job_analysis_ksao_item.category_code", row[1]),
+        requirement_statement=_validate_projection_text(
+            "job_analysis_ksao_item.requirement_statement",
+            row[2],
+        ),
+        importance_level=_validate_projection_integer(
+            "job_analysis_ksao_item.importance_level",
+            row[3],
+        ),
+        proficiency_level=_validate_projection_integer(
+            "job_analysis_ksao_item.proficiency_level",
+            row[4],
+        ),
+        source=_source_from_row(row[5:11], row_label="job_analysis_ksao_item.source"),
+    )
+
+
+def _link_from_row(row: tuple[object, ...]) -> TaskKSAOLink:
+    """Rebuild one task-KSAO link only from exact-validated persisted scalars."""
+    return TaskKSAOLink(
+        task_record_id=_validate_projection_uuid(
+            "job_analysis_task_ksao_link.task_record_id",
+            row[0],
+            row_label="job_analysis_task_ksao_link.task_record_id row",
+        ),
+        ksao_record_id=_validate_projection_uuid(
+            "job_analysis_task_ksao_link.ksao_record_id",
+            row[1],
+            row_label="job_analysis_task_ksao_link.ksao_record_id row",
+        ),
+        relationship_strength=_validate_projection_integer(
+            "job_analysis_task_ksao_link.relationship_strength",
+            row[2],
+        ),
+        essential_for_task=_validate_projection_boolean(
+            "job_analysis_task_ksao_link.essential_for_task",
+            row[3],
+        ),
     )
