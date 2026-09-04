@@ -341,15 +341,15 @@
     },
     {
       "path": "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
-      "sha256": "bf9fd96882ba67359e060c513fa3f046e7edb42d8ef87b30268f2a17e9f4a30a",
-      "bytes": 17496,
-      "lines": 419
+      "sha256": "dcc7f78fbbe9cf0cf0207e3d18c6173bb1ad3ed133aeb7b578ef3657af49a192",
+      "bytes": 12593,
+      "lines": 307
     },
     {
       "path": "packages/hris-kernel/tests/test_audit_outbox.py",
-      "sha256": "d0044548f59493adaca8ca54b78ac678dfe8cea5399737ce493bc904360d7100",
-      "bytes": 8886,
-      "lines": 234
+      "sha256": "6dd86c98e3b4667e47d99cb009f8aa3fc410a6c1c6e59fee7f198dd52331b412",
+      "bytes": 9228,
+      "lines": 253
     },
     {
       "path": "schemas/openapi.yaml",
