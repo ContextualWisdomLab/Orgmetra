@@ -198,3 +198,37 @@ def test_event_rejects_nonopaque_optional_confirmation_reference():
     """Free-text confirmation data cannot enter an opaque-reference field."""
     with pytest.raises(ValueError, match="opaque reference"):
         _event(high_impact=False, confirmation_reference="approved by Ada")
+
+
+def test_canonical_export_revalidates_actor_after_low_level_mutation():
+    """Canonical evidence must not emit an actor value that bypassed construction validation."""
+    event = _event()
+    object.__setattr__(event, "actor_reference", "Ada Lovelace")
+
+    with pytest.raises(ValueError, match="opaque reference"):
+        event.canonical_json()
+
+
+def test_canonical_export_revalidates_high_impact_confirmation_after_low_level_mutation():
+    """A high-impact event cannot lose its human-confirmation evidence after construction."""
+    event = _event()
+    object.__setattr__(event, "confirmation_reference", None)
+
+    with pytest.raises(ValueError, match="confirmation_reference"):
+        event.canonical_json()
+
+
+def test_canonical_export_rejects_mutated_event_identity_before_stringification():
+    """Canonicalization must validate identity type before executing arbitrary stringification."""
+
+    class ExecutableIdentifier:
+        """Fail if canonicalization stringifies this untrusted replacement identity."""
+
+        def __str__(self) -> str:
+            raise AssertionError("untrusted identity stringification executed")
+
+    event = _event()
+    object.__setattr__(event, "event_id", ExecutableIdentifier())
+
+    with pytest.raises(ValueError, match="event_id must be a UUID"):
+        event.canonical_json()
