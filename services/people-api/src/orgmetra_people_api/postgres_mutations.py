@@ -404,8 +404,8 @@ def _employment_version_from_row(tenant_record_id: UUID, row: tuple[object, ...]
         not _is_operational_uuid(employment_record_id)
         or not _is_operational_uuid(employment_record_version_id)
         or not _is_operational_uuid(person_record_id)
-        or not isinstance(status_code, str)
-        or not isinstance(concurrency_code, str)
+        or type(status_code) is not str
+        or type(concurrency_code) is not str
         or type(effective_from) is not date
         or (effective_to is not None and type(effective_to) is not date)
         or not _is_aware_datetime(recorded_from)
@@ -445,7 +445,7 @@ def _position_version_from_row(tenant_record_id: UUID, row: tuple[object, ...]) 
     if (
         not _is_operational_uuid(position_record_id)
         or not _is_operational_uuid(position_record_version_id)
-        or not isinstance(status_code, str)
+        or type(status_code) is not str
         or type(effective_from) is not date
         or (effective_to is not None and type(effective_to) is not date)
         or not _is_aware_datetime(recorded_from)
