@@ -9,7 +9,6 @@ authoritative insert. A missing parent identity fails closed.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -238,13 +237,10 @@ def _unpack_fixed_projection(
     row: Any,
     expected_columns: int,
 ) -> tuple[object, ...]:
-    """Reject durable rows whose sequence shape disagrees with a fixed SQL projection."""
-    if not isinstance(row, Sequence) or isinstance(row, (str, bytes, bytearray, memoryview)):
+    """Reject executable or shape-invalid rows from fixed SQL projections."""
+    if type(row) not in (tuple, list):
         raise JobAnalysisIntegrityError(f"{row_label} row has invalid shape")
-    try:
-        values = tuple(row)
-    except TypeError as error:
-        raise JobAnalysisIntegrityError(f"{row_label} row has invalid shape") from error
+    values = tuple(row)
     if len(values) != expected_columns:
         raise JobAnalysisIntegrityError(f"{row_label} row has invalid shape")
     return values
