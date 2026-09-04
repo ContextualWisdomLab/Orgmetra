@@ -1,0 +1,56 @@
+name: HR Data Retention Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "packages/hr-data-retention/**"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/hr-data-retention-quality.yml"
+      - "docs/doctoring/hr-data-retention-references.md"
+      - "docs/traceability/hr-data-retention-review.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hr-data-retention-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Retention review contract and 100% coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Compile retention review package
+        run: python -m compileall -q packages/hr-data-retention/src packages/hr-data-retention/tests
+      - name: Test retention review with exact statement and branch coverage
+        env:
+          PYTHONPATH: packages/hr-data-retention/src
+          COVERAGE_FILE: /tmp/orgmetra-hr-data-retention.coverage
+        run: python -m pytest -c packages/hr-data-retention/pyproject.toml packages/hr-data-retention/tests
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
