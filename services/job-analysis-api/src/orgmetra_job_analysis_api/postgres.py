@@ -478,17 +478,16 @@ class PostgresJobAnalysisPort:
                         "idempotent durable command lookup returned no projection"
                     )
                 if existing is not None:
-                    try:
-                        (
-                            stored_digest,
-                            stored_analysis_id,
-                            stored_actor_reference,
-                            stored_purpose_code,
-                        ) = existing
-                    except (TypeError, ValueError) as error:
-                        raise JobAnalysisIntegrityError(
-                            "idempotent durable command row has invalid shape"
-                        ) from error
+                    (
+                        stored_digest,
+                        stored_analysis_id,
+                        stored_actor_reference,
+                        stored_purpose_code,
+                    ) = _unpack_fixed_projection(
+                        "idempotent durable command",
+                        existing,
+                        4,
+                    )
                     if stored_digest is None:
                         if any(
                             value is not None
