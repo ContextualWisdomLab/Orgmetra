@@ -346,16 +346,23 @@ class PostgresHireAcceptancePort:
                     transaction_recorded_at,
                 ) = row
 
+                if any(
+                    type(value) is not str
+                    for value in (
+                        decision_actor_reference,
+                        decision_purpose_code,
+                        decision_code,
+                        confirmation_reference,
+                    )
+                ):
+                    raise HireDecisionIntegrityError("selection decision provenance text is invalid")
                 if decision_code != "hire":
                     raise HireDecisionIntegrityError("selection decision is not an explicit hire")
                 if decision_actor_reference != decision.actor_reference:
                     raise HireDecisionIntegrityError("selection decision actor does not match authorized actor")
                 if decision_purpose_code != decision.purpose_code:
                     raise HireDecisionIntegrityError("selection decision purpose does not match authorized purpose")
-                if (
-                    not isinstance(confirmation_reference, str)
-                    or _REFERENCE_PATTERN.fullmatch(confirmation_reference) is None
-                ):
+                if _REFERENCE_PATTERN.fullmatch(confirmation_reference) is None:
                     raise HireDecisionIntegrityError("selection decision lacks valid human confirmation")
                 if not _is_operational_uuid(evidence_set_id):
                     raise HireDecisionIntegrityError("selection decision evidence set identity is invalid")
