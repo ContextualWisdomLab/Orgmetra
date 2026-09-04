@@ -16,6 +16,21 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 _RUNS_ON_PATTERN = re.compile(r"^\s*runs-on\s*:\s*(.*?)\s*$")
 _EXPECTED_RUNNER = "ubuntu-24.04"
+_CENTRAL_WORKFLOW_NAMES = {
+    "close-empty-pr.yml",
+    "codeql-pr.yml",
+    "dependency-review.yml",
+    "noema-review.yml",
+    "opencode-review.yml",
+    "pr-governance.yml",
+    "sast-semgrep.yml",
+    "security-scan.yml",
+    "strix.yml",
+}
+_EXPECTED_LOCAL_WORKFLOWS = {
+    "foundation-ci.yml",
+    "recovery-rehearsal-quality.yml",
+}
 
 
 def _workflow_paths() -> list[Path]:
@@ -133,6 +148,56 @@ class GitHubActionsRunnerImageContractTest(unittest.TestCase):
             ],
             [value for _, value in _runner_declarations(sample)],
         )
+
+
+class GitHubActionsQueueContractTest(unittest.TestCase):
+    """Keep local workflows bounded and same-PR cancellation isolated."""
+
+    def test_local_workflow_inventory_is_minimal_and_not_centrally_duplicated(self) -> None:
+        """Retain only repository-owned quality and recovery execution."""
+        workflow_names = {path.name for path in _workflow_paths()}
+        self.assertEqual(_EXPECTED_LOCAL_WORKFLOWS, workflow_names)
+        self.assertTrue(workflow_names.isdisjoint(_CENTRAL_WORKFLOW_NAMES))
+
+    def test_workflow_concurrency_is_repository_and_pull_request_scoped(self) -> None:
+        """Cancel only an older head of the same workflow, repository, and PR."""
+        for workflow_path in _workflow_paths():
+            workflow = workflow_path.read_text(encoding="utf-8")
+            expected_group = (
+                f"group: {workflow_path.stem}-"
+                "${{ github.repository }}-"
+                "${{ github.event.pull_request.number || github.run_id }}"
+            )
+            self.assertIn(expected_group, workflow)
+            self.assertIn(
+                "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+                workflow,
+            )
+
+    def test_foundation_workflow_expands_to_one_job(self) -> None:
+        """Do not recreate the previous matrix-driven 60-job admission pressure."""
+        workflow = (WORKFLOWS / "foundation-ci.yml").read_text(encoding="utf-8")
+        jobs = workflow.split("\njobs:\n", maxsplit=1)[1]
+        job_keys = re.findall(r"^  ([a-z][a-z0-9_-]*):$", jobs, flags=re.MULTILINE)
+        self.assertEqual(["quality"], job_keys)
+        self.assertNotIn("matrix:", jobs)
+
+    def test_postgres_contracts_wait_on_the_dynamic_host_port(self) -> None:
+        """Prove Docker port forwarding is usable before running each database contract."""
+        workflow = (WORKFLOWS / "foundation-ci.yml").read_text(encoding="utf-8")
+        dynamic_publish = "--publish 127.0.0.1::5432"
+        port_lookup = 'postgres_binding="$(docker port "$container_name" 5432/tcp)"'
+        host_probe = "psql \"$database_url\" -Atqc 'SELECT 1'"
+        contract_run = 'DATABASE_URL="$database_url" bash "tests/$contract"'
+        self.assertIn(dynamic_publish, workflow)
+        self.assertIn('postgres_port="${postgres_binding##*:}"', workflow)
+        self.assertIn(
+            'database_url="postgresql://orgmetra:orgmetra@127.0.0.1:$postgres_port/orgmetra"',
+            workflow,
+        )
+        self.assertLess(workflow.index(dynamic_publish), workflow.index(port_lookup))
+        self.assertLess(workflow.index(port_lookup), workflow.index(host_probe))
+        self.assertLess(workflow.index(host_probe), workflow.index(contract_run))
 
 
 if __name__ == "__main__":  # pragma: no cover - normal execution is via unittest discovery.
