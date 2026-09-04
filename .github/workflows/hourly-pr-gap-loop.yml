@@ -1,0 +1,45 @@
+name: Hourly Gap Baseline Freshness Audit
+
+# Read-only Orgmetra heartbeat for buyer-facing gap truth.
+#
+# The central ContextualWisdomLab/.github scheduler already owns review dispatch,
+# branch updates and protected PR integration on its established cadence. This
+# workflow deliberately does not invoke or duplicate that writer. It only audits
+# docs/product-technical-gap-baseline.md against fresh GitHub state so a quiet
+# repository cannot leave buyer-facing baseline copy silently stale.
+
+on:
+  schedule:
+    - cron: "37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: hourly-gap-baseline-freshness
+  cancel-in-progress: false
+
+jobs:
+  gap-baseline-freshness:
+    name: Gap baseline freshness audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout default branch truth
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Audit gap baseline against live repository state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/ops/gap_baseline_freshness.py \
+            --baseline docs/product-technical-gap-baseline.md >> "$GITHUB_STEP_SUMMARY"
