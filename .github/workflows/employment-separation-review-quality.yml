@@ -1,0 +1,65 @@
+name: Employment Separation Review Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "packages/employment-separation-review/**"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/employment-separation-review-quality.yml"
+      - ".gitignore"
+      - ".python-version"
+      - "conftest.py"
+      - "packages/conftest.py"
+      - "pyproject.toml"
+      - "pytest.ini"
+      - "setup.cfg"
+      - "tox.ini"
+      - "docs/adr/0020-governed-employment-separation-review.md"
+      - "docs/doctoring/employment-separation-review-references.md"
+      - "docs/traceability/employment-separation-review.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: employment-separation-review-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Employment separation review contract and 100% coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Compile employment separation review package
+        run: python -m compileall -q packages/employment-separation-review/src packages/employment-separation-review/tests
+      - name: Test employment separation review with exact statement and branch coverage
+        env:
+          PYTHONPATH: packages/employment-separation-review/src
+          COVERAGE_FILE: /tmp/orgmetra-employment-separation-review.coverage
+        run: python -m pytest -c packages/employment-separation-review/pyproject.toml packages/employment-separation-review/tests
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
