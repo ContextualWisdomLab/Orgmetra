@@ -530,8 +530,13 @@ class PostgresJobAnalysisPort:
                         _JOB_SCOPE_SQL,
                         (snapshot.tenant_record_id, snapshot.job_record_id),
                     )
-                    if cursor.fetchone() is None:
+                    job_row = cursor.fetchone()
+                    if job_row is None:
                         raise JobAnalysisScopeMissing("job_profile does not exist in the tenant")
+                    if job_row[0] != snapshot.job_record_id:
+                        raise JobAnalysisIntegrityError(
+                            "job_profile scope row escaped requested target"
+                        )
                     if position_record_id is not None:
                         cursor.execute(
                             _POSITION_SCOPE_SQL,
@@ -540,6 +545,10 @@ class PostgresJobAnalysisPort:
                         position_row = cursor.fetchone()
                         if position_row is None or position_row[1] != snapshot.job_record_id:
                             raise JobAnalysisScopeMissing("position_record is missing or not bound to the job")
+                        if position_row[0] != position_record_id:
+                            raise JobAnalysisIntegrityError(
+                                "position_record scope row escaped requested target"
+                            )
                     if criterion_blueprint_id is not None:
                         cursor.execute(
                             _CRITERION_SCOPE_SQL,
@@ -549,6 +558,10 @@ class PostgresJobAnalysisPort:
                         if criterion_row is None or criterion_row[1] != snapshot.job_record_id:
                             raise JobAnalysisScopeMissing(
                                 "criterion_blueprint is missing or not bound to the job"
+                            )
+                        if criterion_row[0] != criterion_blueprint_id:
+                            raise JobAnalysisIntegrityError(
+                                "criterion_blueprint scope row escaped requested target"
                             )
 
                     cursor.execute(
