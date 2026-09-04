@@ -10,12 +10,13 @@ business mutation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import re
 from uuid import UUID
+from weakref import finalize
 
 _SOURCE_SERVICE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _EVENT_TYPE_PATTERN = re.compile(r"^orgmetra(?:\.[a-z][a-z0-9_]*){2,}$")
@@ -33,6 +34,7 @@ _REQUIRED_TEXT_FIELDS = (
 )
 _ALL_REQUIRED_TEXT_FIELDS = ("source_service", "event_type", *_REQUIRED_TEXT_FIELDS)
 _EVENT_SNAPSHOT_FIELD_COUNT = 13
+_AUDIT_CREATION_SNAPSHOTS: dict[int, tuple[object, ...]] = {}
 
 
 def _freeze_timestamp(value: datetime) -> datetime:
@@ -189,7 +191,7 @@ def _validate_creation_snapshot(snapshot: object) -> tuple[object, ...]:
     return snapshot
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class AuditOutboxEvent:
     """One immutable governance envelope for an Orgmetra domain mutation.
 
@@ -213,7 +215,6 @@ class AuditOutboxEvent:
     occurred_at: datetime
     high_impact: bool
     confirmation_reference: str | None = None
-    _creation_snapshot: tuple[object, ...] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         """Reject envelopes that cannot provide accountable, portable audit evidence."""
@@ -234,25 +235,23 @@ class AuditOutboxEvent:
         )
         frozen_occurred_at = _freeze_timestamp(self.occurred_at)
         object.__setattr__(self, "occurred_at", frozen_occurred_at)
-        object.__setattr__(
-            self,
-            "_creation_snapshot",
-            _event_snapshot(
-                event_id=self.event_id,
-                tenant_record_id=self.tenant_record_id,
-                source_service=self.source_service,
-                event_type=self.event_type,
-                resource_reference=self.resource_reference,
-                actor_reference=self.actor_reference,
-                purpose_code=self.purpose_code,
-                reason_code=self.reason_code,
-                evidence_version_code=self.evidence_version_code,
-                result_code=self.result_code,
-                occurred_at=frozen_occurred_at,
-                high_impact=self.high_impact,
-                confirmation_reference=self.confirmation_reference,
-            ),
+        event_identity = id(self)
+        _AUDIT_CREATION_SNAPSHOTS[event_identity] = _event_snapshot(
+            event_id=self.event_id,
+            tenant_record_id=self.tenant_record_id,
+            source_service=self.source_service,
+            event_type=self.event_type,
+            resource_reference=self.resource_reference,
+            actor_reference=self.actor_reference,
+            purpose_code=self.purpose_code,
+            reason_code=self.reason_code,
+            evidence_version_code=self.evidence_version_code,
+            result_code=self.result_code,
+            occurred_at=frozen_occurred_at,
+            high_impact=self.high_impact,
+            confirmation_reference=self.confirmation_reference,
         )
+        finalize(self, _AUDIT_CREATION_SNAPSHOTS.pop, event_identity, None)
 
     def to_cloudevent(self) -> dict[str, object]:
         """Return the canonical structured CloudEvent 1.0 envelope.
@@ -305,7 +304,10 @@ class AuditOutboxEvent:
             high_impact=high_impact,
             confirmation_reference=confirmation_reference,
         )
-        creation_snapshot = _validate_creation_snapshot(self._creation_snapshot)
+        creation_snapshot = _AUDIT_CREATION_SNAPSHOTS.get(id(self))
+        if creation_snapshot is None:
+            raise ValueError("creation-time audit evidence is unavailable.")
+        creation_snapshot = _validate_creation_snapshot(creation_snapshot)
         if current_snapshot != creation_snapshot:
             raise ValueError("canonical audit evidence no longer matches creation-time audit evidence.")
         canonical_time = _canonical_timestamp(occurred_at)
