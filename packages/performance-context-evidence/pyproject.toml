@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=84"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orgmetra-performance-context-evidence"
+version = "0.1.0"
+description = "Governed work-context evidence for performance and validation interpretation in Orgmetra."
+requires-python = ">=3.14"
+
+[project.optional-dependencies]
+test = ["pytest>=8.3", "pytest-cov>=5.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+  "--cov=orgmetra_performance_context_evidence",
+  "--cov-branch",
+  "--cov-report=term-missing",
+  "--cov-fail-under=100",
+]
