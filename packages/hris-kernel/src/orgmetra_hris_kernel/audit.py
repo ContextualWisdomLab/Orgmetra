@@ -16,7 +16,7 @@ from hashlib import sha256
 import json
 import re
 from uuid import UUID
-from weakref import finalize
+from weakref import finalize, ref
 
 _SOURCE_SERVICE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _EVENT_TYPE_PATTERN = re.compile(r"^orgmetra(?:\.[a-z][a-z0-9_]*){2,}$")
@@ -35,6 +35,14 @@ _REQUIRED_TEXT_FIELDS = (
 _ALL_REQUIRED_TEXT_FIELDS = ("source_service", "event_type", *_REQUIRED_TEXT_FIELDS)
 _EVENT_SNAPSHOT_FIELD_COUNT = 13
 _AUDIT_CREATION_SNAPSHOTS: dict[int, tuple[object, ...]] = {}
+_AUDIT_LIVE_ISSUANCES: dict[int, object] = {}
+
+
+def _clear_audit_creation_state(event_identity: int, identity_marker: object) -> None:
+    """Release process-local issuance evidence only for the exact finished identity."""
+    if _AUDIT_LIVE_ISSUANCES.get(event_identity) is identity_marker:
+        _AUDIT_LIVE_ISSUANCES.pop(event_identity, None)
+        _AUDIT_CREATION_SNAPSHOTS.pop(event_identity, None)
 
 
 def _freeze_timestamp(value: datetime) -> datetime:
@@ -218,6 +226,12 @@ class AuditOutboxEvent:
 
     def __post_init__(self) -> None:
         """Reject envelopes that cannot provide accountable, portable audit evidence."""
+        event_identity = id(self)
+        identity_marker = ref(self)
+        registered_marker = _AUDIT_LIVE_ISSUANCES.setdefault(event_identity, identity_marker)
+        if registered_marker is not identity_marker:
+            raise ValueError("audit event identity has already issued canonical evidence.")
+        finalize(self, _clear_audit_creation_state, event_identity, identity_marker)
         _validate_event_snapshot(
             event_id=self.event_id,
             tenant_record_id=self.tenant_record_id,
@@ -235,7 +249,6 @@ class AuditOutboxEvent:
         )
         frozen_occurred_at = _freeze_timestamp(self.occurred_at)
         object.__setattr__(self, "occurred_at", frozen_occurred_at)
-        event_identity = id(self)
         _AUDIT_CREATION_SNAPSHOTS[event_identity] = _event_snapshot(
             event_id=self.event_id,
             tenant_record_id=self.tenant_record_id,
@@ -251,7 +264,6 @@ class AuditOutboxEvent:
             high_impact=self.high_impact,
             confirmation_reference=self.confirmation_reference,
         )
-        finalize(self, _AUDIT_CREATION_SNAPSHOTS.pop, event_identity, None)
 
     def to_cloudevent(self) -> dict[str, object]:
         """Return the canonical structured CloudEvent 1.0 envelope.
