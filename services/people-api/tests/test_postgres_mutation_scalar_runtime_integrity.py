@@ -1,12 +1,14 @@
 """Runtime-integrity contracts for generic People durable scalar evidence."""
 
 from datetime import date, datetime, timedelta, timezone, tzinfo
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from orgmetra_people_api.mutations import PeopleMutationIntegrityError
 from orgmetra_people_api.postgres_mutations import (
+    _assignment_from_row,
     _employment_version_from_row,
     _is_aware_datetime,
     _is_operational_uuid,
@@ -99,6 +101,40 @@ class _ExecutableStatusText(str):
         del other
         self.calls += 1
         raise AssertionError("status subtype inequality executed before exact-type validation")
+
+
+class _ExecutableDecimal(Decimal):
+    """Expose persisted allocation-ratio behavior before an exact durable type gate."""
+
+    def __new__(cls, value: str) -> _ExecutableDecimal:
+        """Create one Decimal tripwire without performing portfolio arithmetic."""
+        instance = super().__new__(cls, value)
+        instance.calls = 0
+        return instance
+
+    def __gt__(self, other: object) -> bool:
+        """Fail if FTE validation compares persisted subtype allocation."""
+        del other
+        self.calls += 1
+        raise AssertionError("Decimal subtype comparison executed before exact-type validation")
+
+    def __le__(self, other: object) -> bool:
+        """Fail if FTE validation compares persisted subtype allocation."""
+        del other
+        self.calls += 1
+        raise AssertionError("Decimal subtype comparison executed before exact-type validation")
+
+    def __add__(self, other: object) -> Decimal:
+        """Fail if portfolio aggregation adds persisted subtype allocation."""
+        del other
+        self.calls += 1
+        raise AssertionError("Decimal subtype addition executed before exact-type validation")
+
+    def __radd__(self, other: object) -> Decimal:
+        """Fail if portfolio aggregation reverse-adds persisted subtype allocation."""
+        del other
+        self.calls += 1
+        raise AssertionError("Decimal subtype reverse addition executed before exact-type validation")
 
 
 class _ReplayCursor:
@@ -247,3 +283,28 @@ def test_position_projection_rejects_status_subtype_before_kernel_behavior() -> 
         raise AssertionError("position status subtype was not rejected")
 
     assert status.calls == 0
+
+
+def test_assignment_projection_rejects_decimal_subtype_before_fte_math() -> None:
+    """Persisted allocation Decimal must be exact before portfolio comparison or summation."""
+    allocation = _ExecutableDecimal("0.5000")
+    row = (
+        UUID("0198a412-7100-7000-8000-0000000000a1"),
+        UUID("0198a412-7100-7000-8000-0000000000a2"),
+        UUID("0198a412-7100-7000-8000-0000000000a3"),
+        UUID("0198a412-7100-7000-8000-0000000000a4"),
+        allocation,
+        date(2026, 9, 5),
+        None,
+        datetime(2026, 9, 5, 0, 0, tzinfo=timezone.utc),
+        None,
+    )
+
+    try:
+        _assignment_from_row(UUID("0198a412-7100-7000-8000-0000000000a0"), row)
+    except PeopleMutationIntegrityError as error:
+        assert str(error) == "assignment row is invalid"
+    else:
+        raise AssertionError("assignment allocation Decimal subtype was not rejected")
+
+    assert allocation.calls == 0
