@@ -35,6 +35,9 @@ _ROUTE_PREFIX = ("v1", "tenants")
 _PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _MAX_UUID_INT = (1 << 128) - 1
 _MAX_REQUEST_BODY_BYTES = 1 << 20
+_MAX_REQUEST_PATH_CHARACTERS = 256
+_MAX_REQUEST_HEADERS = 64
+_MAX_REQUEST_HEADER_BYTES = 16384
 _ERROR_NEXT_ACTION = {
     "route_not_found": "Use the documented tenant-scoped job-analysis route and retry.",
     "method_not_allowed": "Use POST to persist or GET to read one job-analysis snapshot.",
@@ -291,7 +294,9 @@ class JobAnalysisAsgiApp:
 
 
 def _looks_like_snapshot_route(path: str) -> bool:
-    """Recognize collection or item snapshot routes before parsing identifiers."""
+    """Recognize only one bounded collection or item snapshot route."""
+    if len(path) > _MAX_REQUEST_PATH_CHARACTERS:
+        return False
     parts = path.strip("/").split("/")
     if len(parts) not in {4, 5}:
         return False
@@ -314,17 +319,21 @@ def _optional_uuid(value: object) -> UUID | None:
 
 
 def _typed_headers(scope: Mapping[str, object]) -> dict[bytes, bytes]:
-    """Return lower-cased singleton headers or reject malformed header frames."""
+    """Return one bounded set of lower-cased singleton request headers."""
     raw_headers = scope.get("headers", ())
-    if not isinstance(raw_headers, Sequence):
+    if not isinstance(raw_headers, Sequence) or len(raw_headers) > _MAX_REQUEST_HEADERS:
         raise AuthenticationFailed("request headers are invalid")
     headers: dict[bytes, bytes] = {}
+    total_header_bytes = 0
     for header in raw_headers:
         if not isinstance(header, Sequence) or len(header) != 2:
             raise AuthenticationFailed("request headers are invalid")
         name, value = header
         if not isinstance(name, bytes) or not isinstance(value, bytes):
             raise AuthenticationFailed("request headers are invalid")
+        total_header_bytes += len(name) + len(value)
+        if total_header_bytes > _MAX_REQUEST_HEADER_BYTES:
+            raise AuthenticationFailed("request headers exceed the accepted size")
         key = name.lower()
         if key in headers:
             raise AuthenticationFailed("duplicate request header")
