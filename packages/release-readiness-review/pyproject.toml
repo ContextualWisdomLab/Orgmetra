@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orgmetra-release-readiness-review"
+version = "0.1.0"
+description = "Governed non-authorizing release-readiness review evidence for Orgmetra"
+requires-python = ">=3.14,<3.15"
+
+[tool.pytest.ini_options]
+addopts = "--cov=orgmetra_release_readiness_review --cov-branch --cov-report=term-missing --cov-fail-under=100"
+testpaths = ["tests"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
