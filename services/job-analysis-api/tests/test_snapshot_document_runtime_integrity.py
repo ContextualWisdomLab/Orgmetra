@@ -35,11 +35,15 @@ class _ExecutableList(list):
 
 
 class _ExecutableText(str):
-    """Trip if text normalization executes caller-defined string behavior."""
+    """Trip if validation executes caller-defined string behavior."""
 
     def replace(self, old: str, new: str, count: int = -1) -> str:
         """Reject ISO timestamp normalization before exact text validation."""
         raise AssertionError("text subtype replace executed")
+
+    def split(self, sep: str | None = None, maxsplit: int = -1) -> list[str]:
+        """Reject kernel text normalization before exact leaf validation."""
+        raise AssertionError("text subtype split executed")
 
 
 class _ExecutableFieldName(str):
@@ -58,6 +62,18 @@ class _ExecutableFieldName(str):
         if self.armed:
             raise AssertionError("field-name subtype hash executed")
         return str.__hash__(self)
+
+
+class _ExecutableInteger(int):
+    """Trip if kernel ordinal validation compares a caller-defined integer subtype."""
+
+    def __ge__(self, other: object) -> bool:
+        """Reject lower-bound comparison before exact integer validation."""
+        raise AssertionError("integer subtype comparison executed")
+
+    def __le__(self, other: object) -> bool:
+        """Reject upper-bound comparison before exact integer validation."""
+        raise AssertionError("integer subtype comparison executed")
 
 
 class _ExecutableDateTime(datetime):
@@ -117,6 +133,28 @@ def test_rejects_executable_nested_source_mapping_before_field_reads() -> None:
     posted["tasks"] = [first_task, *posted["tasks"][1:]]
 
     with pytest.raises(ValueError, match="source must be an object"):
+        snapshot_from_document(posted, tenant_record_id=TENANT)
+
+
+def test_rejects_executable_task_text_before_kernel_normalization() -> None:
+    """Leaf text must be exact built-in text before kernel `.split` normalization."""
+    posted = clinical_psychologist_document()
+    first_task = dict(posted["tasks"][0])
+    first_task["task_statement"] = _ExecutableText(first_task["task_statement"])
+    posted["tasks"] = [first_task, *posted["tasks"][1:]]
+
+    with pytest.raises(ValueError, match="task_statement must be exact built-in text"):
+        snapshot_from_document(posted, tenant_record_id=TENANT)
+
+
+def test_rejects_executable_rating_before_kernel_comparison() -> None:
+    """Ordinal ratings must be exact built-in integers before range comparison."""
+    posted = clinical_psychologist_document()
+    first_task = dict(posted["tasks"][0])
+    first_task["importance_level"] = _ExecutableInteger(first_task["importance_level"])
+    posted["tasks"] = [first_task, *posted["tasks"][1:]]
+
+    with pytest.raises(ValueError, match="importance_level must be an exact built-in integer"):
         snapshot_from_document(posted, tenant_record_id=TENANT)
 
 
