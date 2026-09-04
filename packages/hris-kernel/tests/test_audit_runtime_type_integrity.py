@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone, tzinfo
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -34,66 +35,20 @@ class _OpaqueText(str):
     """Represent valid audit text through an untrusted runtime subclass."""
 
 
-class _MutableOffset(tzinfo):
-    """Expose timezone state that can change after event construction."""
-
-    def __init__(self) -> None:
-        """Start with a UTC offset."""
-        self.offset = timedelta(0)
-
-    def utcoffset(self, value):  # type: ignore[no-untyped-def]
-        """Return the currently configured offset."""
-        del value
-        return self.offset
-
-    def dst(self, value):  # type: ignore[no-untyped-def]
-        """Keep daylight saving fixed."""
-        del value
-        return timedelta(0)
-
-
 class _TripwireOffset(tzinfo):
-    """Fail if post-construction mutation can reintroduce timezone behavior."""
+    """Fail if caller-defined timezone behavior executes at an audit trust boundary."""
 
     def __init__(self) -> None:
         self.calls = 0
 
     def utcoffset(self, value):  # type: ignore[no-untyped-def]
-        """Record and reject any callback if mutation unexpectedly succeeds."""
+        """Record and reject any callback if the trust boundary invokes this provider."""
         del value
         self.calls += 1
-        raise AssertionError("reintroduced timezone callback executed before rejection")
+        raise AssertionError("caller-defined timezone callback executed before rejection")
 
     def dst(self, value):  # type: ignore[no-untyped-def]
         """Keep daylight saving fixed if unexpectedly queried."""
-        del value
-        return timedelta(0)
-
-
-class _ExplodingOffset(tzinfo):
-    """Raise arbitrary provider behavior while an event instant is resolved."""
-
-    def utcoffset(self, value):  # type: ignore[no-untyped-def]
-        """Force the trust boundary to normalize provider failures."""
-        del value
-        raise RuntimeError("provider details must not escape")
-
-    def dst(self, value):  # type: ignore[no-untyped-def]
-        """Keep daylight saving fixed if queried."""
-        del value
-        return timedelta(0)
-
-
-class _OversizedOffset(tzinfo):
-    """Return an extreme offset that cannot be detached from year one."""
-
-    def utcoffset(self, value):  # type: ignore[no-untyped-def]
-        """Force UTC detachment outside representable datetime values."""
-        del value
-        return timedelta(hours=23, minutes=59)
-
-    def dst(self, value):  # type: ignore[no-untyped-def]
-        """Keep daylight saving fixed."""
         del value
         return timedelta(0)
 
@@ -156,32 +111,42 @@ def test_audit_event_rejects_string_subclasses_before_canonicalization(
         _event(**{field_name: value})
 
 
-def test_audit_event_detaches_mutable_timezone_state() -> None:
-    """Keep canonical audit chronology stable after timezone state mutates."""
-    zone = _MutableOffset()
+def test_audit_event_accepts_standard_zoneinfo_and_detaches_to_utc() -> None:
+    """Psycopg-style standard-library ZoneInfo timestamps remain supported."""
     event = _event(
         high_impact=False,
         confirmation_reference=None,
-        occurred_at=datetime(2026, 8, 21, 5, 20, tzinfo=zone),
+        occurred_at=datetime(2026, 8, 21, 14, 20, tzinfo=ZoneInfo("Asia/Seoul")),
     )
-    first = event.to_cloudevent()
 
-    zone.offset = timedelta(hours=9)
-
+    assert event.occurred_at == datetime(2026, 8, 21, 5, 20, tzinfo=timezone.utc)
+    assert type(event.occurred_at) is datetime
     assert event.occurred_at.tzinfo is timezone.utc
-    assert event.to_cloudevent() == first
 
 
-def test_audit_event_normalizes_timezone_provider_exceptions() -> None:
-    """Do not leak arbitrary timezone-provider exceptions from event construction."""
-    with pytest.raises(ValueError, match="occurred_at must resolve to a UTC offset"):
-        _event(occurred_at=datetime(2026, 8, 21, 5, 20, tzinfo=_ExplodingOffset()))
+def test_audit_event_rejects_custom_timezone_before_provider_callback() -> None:
+    """Caller-defined tzinfo must fail closed before any executable provider hook runs."""
+    tripwire = _TripwireOffset()
+    occurred_at = datetime(2026, 8, 21, 5, 20, tzinfo=tripwire)
+
+    with pytest.raises(ValueError, match="datetime.timezone or zoneinfo.ZoneInfo"):
+        _event(occurred_at=occurred_at)
+
+    assert tripwire.calls == 0
 
 
 def test_audit_event_normalizes_offset_overflow_to_value_error() -> None:
-    """Fail closed when UTC detachment exceeds representable datetime values."""
+    """Fail closed when a standard-library UTC detachment exceeds representable values."""
+    occurred_at = datetime(
+        1,
+        1,
+        1,
+        0,
+        0,
+        tzinfo=timezone(timedelta(hours=23, minutes=59)),
+    )
     with pytest.raises(ValueError, match="occurred_at must be a representable"):
-        _event(occurred_at=datetime(1, 1, 1, 0, 0, tzinfo=_OversizedOffset()))
+        _event(occurred_at=occurred_at)
 
 
 def test_audit_event_prevents_reintroduced_timezone_behavior_by_structure() -> None:
