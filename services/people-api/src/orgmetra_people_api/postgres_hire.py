@@ -238,7 +238,7 @@ def _replayed_hire(
     if len(rows) != 1 or len(rows[0]) != 2:
         raise HireDecisionIntegrityError("hire idempotency row is invalid")
     created_record_id, stored_digest = rows[0]
-    if not _is_operational_uuid(created_record_id) or not isinstance(stored_digest, str):
+    if not _is_operational_uuid(created_record_id) or type(stored_digest) is not str:
         raise HireDecisionIntegrityError("hire idempotency row is invalid")
     if stored_digest != _hire_command_digest(command, authorization):
         raise HireDecisionIntegrityError("hire idempotency key is bound to a different command")
