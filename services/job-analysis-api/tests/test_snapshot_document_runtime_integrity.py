@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -68,6 +68,18 @@ class _ExecutableDateTime(datetime):
         raise AssertionError("datetime subtype utcoffset executed")
 
 
+class _ExecutableTimezone(tzinfo):
+    """Trip if an exact datetime can delegate validation to caller-defined tzinfo."""
+
+    def utcoffset(self, value: datetime | None) -> timedelta:
+        """Reject caller-controlled UTC offset computation."""
+        raise AssertionError("timezone provider utcoffset executed")
+
+    def dst(self, value: datetime | None) -> timedelta:
+        """Provide the abstract method without making it usable by the parser."""
+        return timedelta(0)
+
+
 def test_rejects_executable_top_level_mapping_before_iteration() -> None:
     """The posted document must be an inert built-in mapping before any field scan."""
     posted = _ExecutableMapping(clinical_psychologist_document())
@@ -130,4 +142,20 @@ def test_rejects_executable_datetime_before_timezone_behavior() -> None:
     )
 
     with pytest.raises(ValueError, match="recorded_at must be an ISO-8601 datetime"):
+        snapshot_from_document(posted, tenant_record_id=TENANT)
+
+
+def test_rejects_executable_timezone_provider_before_utcoffset() -> None:
+    """An exact datetime must not delegate trust validation to caller-defined tzinfo."""
+    posted = clinical_psychologist_document()
+    posted["recorded_at"] = datetime(
+        2026,
+        8,
+        18,
+        5,
+        0,
+        tzinfo=_ExecutableTimezone(),
+    )
+
+    with pytest.raises(ValueError, match="recorded_at must use a fixed UTC offset"):
         snapshot_from_document(posted, tenant_record_id=TENANT)
