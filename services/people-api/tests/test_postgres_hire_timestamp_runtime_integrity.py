@@ -10,6 +10,7 @@ class _ExecutableTimezone(tzinfo):
     """Record forbidden offset resolution at the People durable boundary."""
 
     def __init__(self) -> None:
+        """Initialize the callback counter without resolving an offset."""
         self.calls = 0
 
     def utcoffset(self, dt: datetime | None) -> timedelta:
