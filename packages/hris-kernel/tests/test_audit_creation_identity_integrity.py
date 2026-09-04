@@ -42,6 +42,25 @@ def _unissued_event() -> AuditOutboxEvent:
     return event
 
 
+def _creation_snapshot(event: AuditOutboxEvent) -> tuple[object, ...]:
+    """Capture the same exact inert values accepted by the private runtime."""
+    return audit_module._event_snapshot(
+        event_id=event.event_id,
+        tenant_record_id=event.tenant_record_id,
+        source_service=event.source_service,
+        event_type=event.event_type,
+        resource_reference=event.resource_reference,
+        actor_reference=event.actor_reference,
+        purpose_code=event.purpose_code,
+        reason_code=event.reason_code,
+        evidence_version_code=event.evidence_version_code,
+        result_code=event.result_code,
+        occurred_at=event.occurred_at,
+        high_impact=event.high_impact,
+        confirmation_reference=event.confirmation_reference,
+    )
+
+
 @pytest.mark.parametrize(
     ("field_name", "replacement"),
     [
@@ -93,7 +112,7 @@ def test_event_lifetime_cleanup_releases_private_runtime_state() -> None:
     claim, record, lookup = audit_module._build_audit_creation_runtime()
     event = _event()
     event_identity, identity_marker = claim(event)
-    snapshot = ("isolated-test-snapshot",)
+    snapshot = _creation_snapshot(event)
     record(event_identity, identity_marker, snapshot)
 
     assert lookup(event_identity) is snapshot
