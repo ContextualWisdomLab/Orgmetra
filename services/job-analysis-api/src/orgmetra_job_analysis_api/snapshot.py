@@ -14,6 +14,7 @@ from hashlib import sha256
 import json
 from typing import Protocol, runtime_checkable
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 from orgmetra_hris_kernel import (
     AuditOutboxEvent,
@@ -433,10 +434,10 @@ def _resolved_uuid(field_name: str, value: object) -> UUID:
 
 
 def _resolved_datetime(field_name: str, value: object) -> datetime:
-    """Require an exact fixed-offset datetime before canonicalization can use it."""
+    """Require an exact standard-library datetime before canonicalization can use it."""
     resolved = _resolved_exact(field_name, value, datetime)
     assert type(resolved) is datetime
-    if type(resolved.tzinfo) is not timezone:
+    if type(resolved.tzinfo) not in (timezone, ZoneInfo):
         raise JobAnalysisIntegrityError(
             f"resolved snapshot graph has invalid runtime evidence at {field_name}"
         )
