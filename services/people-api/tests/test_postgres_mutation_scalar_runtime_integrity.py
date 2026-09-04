@@ -1,10 +1,18 @@
 """Runtime-integrity contracts for generic People durable scalar evidence."""
 
 from datetime import datetime, timedelta, timezone, tzinfo
+from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from orgmetra_people_api.postgres_mutations import _is_aware_datetime, _is_operational_uuid
+from orgmetra_people_api.mutations import PeopleMutationIntegrityError
+from orgmetra_people_api.postgres_mutations import (
+    _is_aware_datetime,
+    _is_operational_uuid,
+    _replayed_record_id,
+)
+from test_people_mutations import employment_command
+from test_postgres_people_mutations import employment_authorization
 
 
 _MAX_UUID_INT = (1 << 128) - 1
@@ -40,6 +48,44 @@ class _ExecutableDatetime(datetime):
     def utcoffset(self) -> timedelta:
         """Expose subtype execution if the exact-type gate is missing."""
         raise AssertionError("datetime subtype callback executed")
+
+
+class _ExecutableDigest(str):
+    """Expose digest comparison performed before an exact-type gate."""
+
+    def __new__(cls, value: str) -> _ExecutableDigest:
+        """Create one tripwire text value without invoking comparison behavior."""
+        instance = super().__new__(cls, value)
+        instance.calls = 0
+        return instance
+
+    def __eq__(self, other: object) -> bool:
+        """Fail if durable replay validation executes subtype equality."""
+        del other
+        self.calls += 1
+        raise AssertionError("digest subtype equality executed before exact-type validation")
+
+    def __ne__(self, other: object) -> bool:
+        """Fail if durable replay validation executes subtype inequality."""
+        del other
+        self.calls += 1
+        raise AssertionError("digest subtype inequality executed before exact-type validation")
+
+
+class _ReplayCursor:
+    """Return one scripted exact built-in idempotency row."""
+
+    def __init__(self, row: tuple[object, object]) -> None:
+        """Store the row without inspecting its scalar values."""
+        self.row = row
+
+    def execute(self, sql: str, parameters: tuple[object, ...] | None = None) -> None:
+        """Accept the two replay lookup statements without side effects."""
+        del sql, parameters
+
+    def fetchmany(self, size: int) -> list[tuple[object, object]]:
+        """Return the scripted exact row within the requested bound."""
+        return [self.row][:size]
 
 
 def test_generic_durable_uuid_rejects_subtype_before_identity_inspection() -> None:
@@ -79,3 +125,23 @@ def test_generic_timestamp_accepts_exact_standard_library_timezones() -> None:
 
     assert _is_aware_datetime(utc_value) is True
     assert _is_aware_datetime(seoul_value) is True
+
+
+def test_generic_replay_digest_rejects_subtype_before_comparison() -> None:
+    """Persisted digest subtypes fail without executing equality behavior."""
+    command = employment_command()
+    digest = _ExecutableDigest("persisted-untrusted-digest")
+    cursor: Any = _ReplayCursor((command.employment_record_id, digest))
+
+    try:
+        _replayed_record_id(
+            cursor,
+            command=command,
+            authorization=employment_authorization(),
+        )
+    except PeopleMutationIntegrityError as error:
+        assert str(error) == "idempotency row is invalid"
+    else:
+        raise AssertionError("digest subtype was not rejected")
+
+    assert digest.calls == 0
