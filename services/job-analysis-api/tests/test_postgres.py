@@ -47,6 +47,8 @@ class FakeCursor:
         """Record each SQL statement and advance the scripted response."""
         self.executions.append((sql, parameters))
         self._last = self.script.pop(0) if self.script else None
+        if self._last is None and "FROM idempotency_lock" in sql:
+            self._last = (None, None, None, None)
 
     def fetchone(self) -> object:
         """Return the row prepared by the previous execute."""
