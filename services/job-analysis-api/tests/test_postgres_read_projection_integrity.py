@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import unittest
 from uuid import UUID
 
@@ -26,6 +27,16 @@ class _EqualityForgedUUID(UUID):
 
     def __ne__(self, other: object) -> bool:
         return False
+
+
+class _BrokenSequence(Sequence[object]):
+    """Model a DB-API row sequence that fails while values are detached."""
+
+    def __len__(self) -> int:
+        return 1
+
+    def __getitem__(self, index: int) -> object:
+        raise TypeError("broken row sequence")
 
 
 class PostgresReadProjectionIntegrityTests(unittest.TestCase):
@@ -57,6 +68,7 @@ class PostgresReadProjectionIntegrityTests(unittest.TestCase):
         header = _header_row()
         malformed_rows = (
             object(),
+            _BrokenSequence(),
             header[:-1],
             header + ("surplus",),
             (value for value in header),
