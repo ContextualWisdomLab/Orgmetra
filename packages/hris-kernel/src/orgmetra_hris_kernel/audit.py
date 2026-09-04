@@ -289,6 +289,7 @@ class AuditOutboxEvent:
             high_impact=high_impact,
             confirmation_reference=confirmation_reference,
         )
+        canonical_time = _canonical_timestamp(occurred_at)
         current_snapshot = _event_snapshot(
             event_id=event_id,
             tenant_record_id=tenant_record_id,
@@ -310,7 +311,6 @@ class AuditOutboxEvent:
         creation_snapshot = _validate_creation_snapshot(creation_snapshot)
         if current_snapshot != creation_snapshot:
             raise ValueError("canonical audit evidence no longer matches creation-time audit evidence.")
-        canonical_time = _canonical_timestamp(occurred_at)
         envelope: dict[str, object] = {
             "specversion": "1.0",
             "id": str(event_id),
