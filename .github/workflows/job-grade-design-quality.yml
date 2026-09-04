@@ -1,0 +1,95 @@
+name: Job Grade Design Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "packages/job-grade-design/**"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/job-grade-design-quality.yml"
+      - "docs/adr/0101-governed-job-grade-design-review.md"
+      - "docs/doctoring/job-grade-design-review-references.md"
+      - "docs/traceability/job-grade-design-review.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: job-grade-design-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Job grade design review contract and 100% coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+      - name: Install reviewed test and build toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          printf '%s\n' 'setuptools==84.0.0 --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670' > /tmp/orgmetra-job-grade-design-build.txt
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r /tmp/orgmetra-job-grade-design-build.txt
+          python -m pip check
+      - name: Compile Job grade design package
+        run: python -m compileall -q packages/job-grade-design/src packages/job-grade-design/tests
+      - name: Build and install exact package artifact
+        run: |
+          rm -rf /tmp/orgmetra-job-grade-design-build-tree /tmp/orgmetra-job-grade-design-dist /tmp/orgmetra-job-grade-design-venv
+          cp -a packages/job-grade-design /tmp/orgmetra-job-grade-design-build-tree
+          mkdir -p /tmp/orgmetra-job-grade-design-dist
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-job-grade-design-dist /tmp/orgmetra-job-grade-design-build-tree
+          test "$(find /tmp/orgmetra-job-grade-design-dist -maxdepth 1 -type f -name '*.whl' | wc -l)" -eq 1
+          python -m venv /tmp/orgmetra-job-grade-design-venv
+          /tmp/orgmetra-job-grade-design-venv/bin/python -m pip install --require-hashes --no-deps --only-binary=:all: -r "$GITHUB_WORKSPACE/.github/requirements/foundation-test.txt"
+          wheel_path="$(find /tmp/orgmetra-job-grade-design-dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          wheel_sha="$(sha256sum "$wheel_path" | awk '{print $1}')"
+          printf 'orgmetra-job-grade-design[test] @ file://%s --hash=sha256:%s\n' "$wheel_path" "$wheel_sha" > /tmp/orgmetra-job-grade-design-install.txt
+          /tmp/orgmetra-job-grade-design-venv/bin/python -m pip install --require-hashes --no-deps -r /tmp/orgmetra-job-grade-design-install.txt
+          /tmp/orgmetra-job-grade-design-venv/bin/python -m pip check
+          /tmp/orgmetra-job-grade-design-venv/bin/python - <<'PY'
+          from importlib.metadata import metadata
+          from pathlib import Path
+          import coverage
+          import pytest
+          import pytest_cov
+          import orgmetra_job_grade_design
+
+          venv_root = Path("/tmp/orgmetra-job-grade-design-venv").resolve()
+          module_path = Path(orgmetra_job_grade_design.__file__).resolve()
+          if not module_path.is_relative_to(venv_root):
+              raise SystemExit(f"package imported outside isolated environment: {module_path}")
+          for module in (coverage, pytest, pytest_cov):
+              dependency_path = Path(module.__file__).resolve()
+              if not dependency_path.is_relative_to(venv_root):
+                  raise SystemExit(
+                      f"test dependency imported outside isolated environment: {dependency_path}"
+                  )
+          if "test" not in (metadata("orgmetra-job-grade-design").get_all("Provides-Extra") or []):
+              raise SystemExit("built distribution does not expose the reviewed test extra")
+          PY
+      - name: Test installed Job grade design artifact with exact statement and branch coverage
+        env:
+          COVERAGE_FILE: /tmp/orgmetra-job-grade-design.coverage
+        run: |
+          cd /tmp
+          /tmp/orgmetra-job-grade-design-venv/bin/python -m pytest -c "$GITHUB_WORKSPACE/packages/job-grade-design/pyproject.toml" "$GITHUB_WORKSPACE/packages/job-grade-design/tests"
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
