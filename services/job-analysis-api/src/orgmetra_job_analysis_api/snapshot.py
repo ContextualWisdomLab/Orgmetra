@@ -131,6 +131,27 @@ def _reject_unknown_fields(
         )
 
 
+def _exact_text(field_name: str, value: object) -> str:
+    """Return inert caller text before domain validators may normalize or match it."""
+    if type(value) is not str:
+        raise ValueError(f"{field_name} must be exact built-in text.")
+    return value
+
+
+def _exact_integer(field_name: str, value: object) -> int:
+    """Return an inert integer before domain validators perform ordinal comparisons."""
+    if type(value) is not int:
+        raise ValueError(f"{field_name} must be an exact built-in integer.")
+    return value
+
+
+def _exact_boolean(field_name: str, value: object) -> bool:
+    """Return an exact boolean for a trust-bearing posted flag."""
+    if type(value) is not bool:
+        raise ValueError(f"{field_name} must be an exact built-in boolean.")
+    return value
+
+
 def validate_operational_uuid(field_name: str, value: object) -> UUID:
     """Return a detached exact UUID after validating operational identity evidence."""
     if type(value) is not UUID:
@@ -205,12 +226,18 @@ def _parse_source(value: object) -> EvidenceSource:
         raise ValueError("source must be an object.")
     _reject_unknown_fields("source", value, _SOURCE_FIELDS)
     return EvidenceSource(
-        source_uri=value.get("source_uri"),
-        source_title=value.get("source_title"),
-        source_version_code=value.get("source_version_code"),
+        source_uri=_exact_text("source_uri", value.get("source_uri")),
+        source_title=_exact_text("source_title", value.get("source_title")),
+        source_version_code=_exact_text(
+            "source_version_code",
+            value.get("source_version_code"),
+        ),
         retrieved_at=_parse_aware_datetime("retrieved_at", value.get("retrieved_at")),
-        content_digest_sha256=value.get("content_digest_sha256"),
-        origin_code=value.get("origin_code"),
+        content_digest_sha256=_exact_text(
+            "content_digest_sha256",
+            value.get("content_digest_sha256"),
+        ),
+        origin_code=_exact_text("origin_code", value.get("origin_code")),
     )
 
 
@@ -262,9 +289,15 @@ def snapshot_from_document(
                 tenant_record_id=tenant_record_id,
                 job_record_id=job_record_id,
                 task_record_id=_parse_uuid("task_record_id", item.get("task_record_id")),
-                task_statement=item.get("task_statement"),
-                importance_level=item.get("importance_level"),
-                difficulty_level=item.get("difficulty_level"),
+                task_statement=_exact_text("task_statement", item.get("task_statement")),
+                importance_level=_exact_integer(
+                    "importance_level",
+                    item.get("importance_level"),
+                ),
+                difficulty_level=_exact_integer(
+                    "difficulty_level",
+                    item.get("difficulty_level"),
+                ),
                 source=_parse_source(item.get("source")),
             )
         )
@@ -278,10 +311,19 @@ def snapshot_from_document(
                 tenant_record_id=tenant_record_id,
                 job_record_id=job_record_id,
                 ksao_record_id=_parse_uuid("ksao_record_id", item.get("ksao_record_id")),
-                category_code=item.get("category_code"),
-                requirement_statement=item.get("requirement_statement"),
-                importance_level=item.get("importance_level"),
-                proficiency_level=item.get("proficiency_level"),
+                category_code=_exact_text("category_code", item.get("category_code")),
+                requirement_statement=_exact_text(
+                    "requirement_statement",
+                    item.get("requirement_statement"),
+                ),
+                importance_level=_exact_integer(
+                    "importance_level",
+                    item.get("importance_level"),
+                ),
+                proficiency_level=_exact_integer(
+                    "proficiency_level",
+                    item.get("proficiency_level"),
+                ),
                 source=_parse_source(item.get("source")),
             )
         )
@@ -294,8 +336,14 @@ def snapshot_from_document(
             TaskKSAOLink(
                 task_record_id=_parse_uuid("task_record_id", item.get("task_record_id")),
                 ksao_record_id=_parse_uuid("ksao_record_id", item.get("ksao_record_id")),
-                relationship_strength=item.get("relationship_strength"),
-                essential_for_task=item.get("essential_for_task"),
+                relationship_strength=_exact_integer(
+                    "relationship_strength",
+                    item.get("relationship_strength"),
+                ),
+                essential_for_task=_exact_boolean(
+                    "essential_for_task",
+                    item.get("essential_for_task"),
+                ),
             )
         )
     reviewed_by_reference = document.get("reviewed_by_reference")
@@ -304,8 +352,11 @@ def snapshot_from_document(
         analysis_record_id=_parse_uuid("analysis_record_id", document.get("analysis_record_id")),
         tenant_record_id=tenant_record_id,
         job_record_id=job_record_id,
-        analysis_version_code=document.get("analysis_version_code"),
-        status_code=document.get("status_code"),
+        analysis_version_code=_exact_text(
+            "analysis_version_code",
+            document.get("analysis_version_code"),
+        ),
+        status_code=_exact_text("status_code", document.get("status_code")),
         effective_from=_parse_business_date("effective_from", document.get("effective_from")),
         recorded_at=_parse_aware_datetime("recorded_at", document.get("recorded_at")),
         tasks=tuple(tasks),
@@ -314,12 +365,25 @@ def snapshot_from_document(
         fja_profile=FunctionalJobAnalysisProfile(
             tenant_record_id=tenant_record_id,
             job_record_id=job_record_id,
-            data_function_code=raw_fja.get("data_function_code"),
-            people_function_code=raw_fja.get("people_function_code"),
-            things_function_code=raw_fja.get("things_function_code"),
+            data_function_code=_exact_integer(
+                "data_function_code",
+                raw_fja.get("data_function_code"),
+            ),
+            people_function_code=_exact_integer(
+                "people_function_code",
+                raw_fja.get("people_function_code"),
+            ),
+            things_function_code=_exact_integer(
+                "things_function_code",
+                raw_fja.get("things_function_code"),
+            ),
             source=_parse_source(raw_fja.get("source")),
         ),
-        reviewed_by_reference=reviewed_by_reference,
+        reviewed_by_reference=(
+            None
+            if reviewed_by_reference is None
+            else _exact_text("reviewed_by_reference", reviewed_by_reference)
+        ),
         reviewed_at=None if reviewed_at is None else _parse_aware_datetime("reviewed_at", reviewed_at),
     )
 
