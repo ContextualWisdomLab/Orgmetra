@@ -413,6 +413,162 @@ def _optional_scope_id(field_name: str, value: object) -> UUID | None:
     return _parse_uuid(field_name, value)
 
 
+def _resolved_exact(field_name: str, value: object, expected_type: type[object]) -> object:
+    """Require one inert exact runtime value returned by a snapshot read adapter."""
+    if type(value) is not expected_type:
+        raise JobAnalysisIntegrityError(
+            f"resolved snapshot graph has invalid runtime evidence at {field_name}"
+        )
+    return value
+
+
+def _resolved_uuid(field_name: str, value: object) -> UUID:
+    """Require one operational exact UUID before snapshot export can stringify it."""
+    try:
+        return validate_operational_uuid(field_name, value)
+    except ValueError as error:
+        raise JobAnalysisIntegrityError(
+            f"resolved snapshot graph has invalid runtime evidence at {field_name}"
+        ) from error
+
+
+def _resolved_datetime(field_name: str, value: object) -> datetime:
+    """Require an exact fixed-offset datetime before `_utc_text` can execute it."""
+    resolved = _resolved_exact(field_name, value, datetime)
+    assert type(resolved) is datetime
+    if type(resolved.tzinfo) is not timezone:
+        raise JobAnalysisIntegrityError(
+            f"resolved snapshot graph has invalid runtime evidence at {field_name}"
+        )
+    return resolved
+
+
+def _validate_resolved_source_runtime(field_name: str, value: object) -> None:
+    """Validate one returned provenance object before source-document export."""
+    source = _resolved_exact(field_name, value, EvidenceSource)
+    assert type(source) is EvidenceSource
+    for attribute in (
+        "source_uri",
+        "source_title",
+        "source_version_code",
+        "content_digest_sha256",
+        "origin_code",
+    ):
+        _resolved_exact(f"{field_name}.{attribute}", getattr(source, attribute), str)
+    _resolved_datetime(f"{field_name}.retrieved_at", source.retrieved_at)
+
+
+def _validate_resolved_snapshot_graph_runtime(snapshot: JobAnalysisSnapshot) -> None:
+    """Prove every live value consumed by ``to_snapshot`` is inert before export."""
+    _resolved_uuid("job_record_id", snapshot.job_record_id)
+    _resolved_exact("analysis_version_code", snapshot.analysis_version_code, str)
+    _resolved_exact("status_code", snapshot.status_code, str)
+    _resolved_exact("effective_from", snapshot.effective_from, date)
+    _resolved_datetime("recorded_at", snapshot.recorded_at)
+
+    tasks = _resolved_exact("tasks", snapshot.tasks, tuple)
+    ksaos = _resolved_exact("ksao_requirements", snapshot.ksao_requirements, tuple)
+    links = _resolved_exact("task_ksao_links", snapshot.task_ksao_links, tuple)
+    assert type(tasks) is tuple
+    assert type(ksaos) is tuple
+    assert type(links) is tuple
+
+    for index, task_value in enumerate(tasks):
+        task = _resolved_exact(f"tasks[{index}]", task_value, TaskEvidence)
+        assert type(task) is TaskEvidence
+        _resolved_uuid(f"tasks[{index}].tenant_record_id", task.tenant_record_id)
+        _resolved_uuid(f"tasks[{index}].job_record_id", task.job_record_id)
+        _resolved_uuid(f"tasks[{index}].task_record_id", task.task_record_id)
+        _resolved_exact(f"tasks[{index}].task_statement", task.task_statement, str)
+        _resolved_exact(f"tasks[{index}].importance_level", task.importance_level, int)
+        _resolved_exact(f"tasks[{index}].difficulty_level", task.difficulty_level, int)
+        _validate_resolved_source_runtime(f"tasks[{index}].source", task.source)
+
+    for index, ksao_value in enumerate(ksaos):
+        ksao = _resolved_exact(
+            f"ksao_requirements[{index}]",
+            ksao_value,
+            KSAORequirement,
+        )
+        assert type(ksao) is KSAORequirement
+        _resolved_uuid(
+            f"ksao_requirements[{index}].tenant_record_id",
+            ksao.tenant_record_id,
+        )
+        _resolved_uuid(
+            f"ksao_requirements[{index}].job_record_id",
+            ksao.job_record_id,
+        )
+        _resolved_uuid(
+            f"ksao_requirements[{index}].ksao_record_id",
+            ksao.ksao_record_id,
+        )
+        _resolved_exact(
+            f"ksao_requirements[{index}].category_code",
+            ksao.category_code,
+            str,
+        )
+        _resolved_exact(
+            f"ksao_requirements[{index}].requirement_statement",
+            ksao.requirement_statement,
+            str,
+        )
+        _resolved_exact(
+            f"ksao_requirements[{index}].importance_level",
+            ksao.importance_level,
+            int,
+        )
+        _resolved_exact(
+            f"ksao_requirements[{index}].proficiency_level",
+            ksao.proficiency_level,
+            int,
+        )
+        _validate_resolved_source_runtime(
+            f"ksao_requirements[{index}].source",
+            ksao.source,
+        )
+
+    for index, link_value in enumerate(links):
+        link = _resolved_exact(
+            f"task_ksao_links[{index}]",
+            link_value,
+            TaskKSAOLink,
+        )
+        assert type(link) is TaskKSAOLink
+        _resolved_uuid(
+            f"task_ksao_links[{index}].task_record_id",
+            link.task_record_id,
+        )
+        _resolved_uuid(
+            f"task_ksao_links[{index}].ksao_record_id",
+            link.ksao_record_id,
+        )
+        _resolved_exact(
+            f"task_ksao_links[{index}].relationship_strength",
+            link.relationship_strength,
+            int,
+        )
+        _resolved_exact(
+            f"task_ksao_links[{index}].essential_for_task",
+            link.essential_for_task,
+            bool,
+        )
+
+    fja = _resolved_exact("fja_profile", snapshot.fja_profile, FunctionalJobAnalysisProfile)
+    assert type(fja) is FunctionalJobAnalysisProfile
+    _resolved_uuid("fja_profile.tenant_record_id", fja.tenant_record_id)
+    _resolved_uuid("fja_profile.job_record_id", fja.job_record_id)
+    _resolved_exact("fja_profile.data_function_code", fja.data_function_code, int)
+    _resolved_exact("fja_profile.people_function_code", fja.people_function_code, int)
+    _resolved_exact("fja_profile.things_function_code", fja.things_function_code, int)
+    _validate_resolved_source_runtime("fja_profile.source", fja.source)
+
+    if snapshot.reviewed_by_reference is not None:
+        _resolved_exact("reviewed_by_reference", snapshot.reviewed_by_reference, str)
+    if snapshot.reviewed_at is not None:
+        _resolved_datetime("reviewed_at", snapshot.reviewed_at)
+
+
 @runtime_checkable
 class JobAnalysisWritePort(Protocol):
     """Persist one authorized snapshot and its Idempotency-Key in one transaction."""
@@ -579,7 +735,24 @@ def read_job_analysis_snapshot(
         or resolved_analysis_record_id != analysis_record_id
     ):
         raise JobAnalysisIntegrityError("resolved snapshot does not match authorized target")
+
+    _validate_resolved_snapshot_graph_runtime(snapshot)
+    resolved_document = snapshot.to_snapshot()
+    try:
+        governed_snapshot = snapshot_from_document(
+            resolved_document,
+            tenant_record_id=tenant_record_id,
+        )
+    except (TypeError, ValueError) as error:
+        raise JobAnalysisIntegrityError(
+            "resolved snapshot graph violates governed evidence contract"
+        ) from error
+    governed_document = governed_snapshot.to_snapshot()
+    if governed_document != resolved_document:
+        raise JobAnalysisIntegrityError(
+            "resolved snapshot graph changes under governed reconstruction"
+        )
     return PersistedJobAnalysisView(
         resource_reference=decision.resource_reference,
-        snapshot=snapshot.to_snapshot(),
+        snapshot=governed_document,
     )
