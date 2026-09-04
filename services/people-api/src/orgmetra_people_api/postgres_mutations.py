@@ -486,7 +486,7 @@ def _assignment_from_row(tenant_record_id: UUID, row: tuple[object, ...]) -> Ass
         or not _is_operational_uuid(employment_record_id)
         or not _is_operational_uuid(person_record_id)
         or not _is_operational_uuid(position_record_id)
-        or not isinstance(allocation_ratio, Decimal)
+        or type(allocation_ratio) is not Decimal
         or type(effective_from) is not date
         or (effective_to is not None and type(effective_to) is not date)
         or not _is_aware_datetime(recorded_from)
