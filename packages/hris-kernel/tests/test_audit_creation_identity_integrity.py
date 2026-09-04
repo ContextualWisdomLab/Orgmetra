@@ -5,6 +5,7 @@ from uuid import UUID
 
 import pytest
 
+from orgmetra_hris_kernel import audit as audit_module
 from orgmetra_hris_kernel.audit import AuditOutboxEvent
 
 
@@ -49,3 +50,31 @@ def test_valid_post_construction_replacement_cannot_reissue_canonical_evidence(
         event.canonical_json()
 
     assert replacement not in original
+
+
+def test_event_has_no_mutable_instance_slot_for_creation_seal() -> None:
+    """Low-level event mutation cannot rewrite the module-owned issuance proof."""
+    event = _event()
+
+    assert not hasattr(event, "_creation_snapshot")
+    with pytest.raises(AttributeError):
+        object.__setattr__(event, "_creation_snapshot", ())
+
+
+def test_canonical_export_fails_closed_when_issuance_proof_is_missing() -> None:
+    """Missing process-local issuance evidence cannot silently mint a canonical event."""
+    event = _event()
+    audit_module._AUDIT_CREATION_SNAPSHOTS.pop(id(event))
+
+    with pytest.raises(ValueError, match="creation-time audit evidence is unavailable"):
+        event.canonical_json()
+
+
+@pytest.mark.parametrize("corrupt_snapshot", [[], tuple(range(12))])
+def test_canonical_export_rejects_malformed_issuance_proof(corrupt_snapshot: object) -> None:
+    """Malformed module-owned issuance state fails closed before evidence comparison."""
+    event = _event()
+    audit_module._AUDIT_CREATION_SNAPSHOTS[id(event)] = corrupt_snapshot  # type: ignore[assignment]
+
+    with pytest.raises(ValueError, match="creation-time audit evidence is unavailable"):
+        event.canonical_json()
