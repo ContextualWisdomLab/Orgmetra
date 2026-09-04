@@ -442,6 +442,10 @@ class PostgresJobAnalysisPort:
                     ),
                 )
                 existing = cursor.fetchone()
+                if existing is None:
+                    raise JobAnalysisIntegrityError(
+                        "idempotent durable command lookup returned no projection"
+                    )
                 if existing is not None:
                     try:
                         (
