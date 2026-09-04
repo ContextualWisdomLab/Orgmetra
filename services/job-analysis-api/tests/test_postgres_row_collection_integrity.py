@@ -21,7 +21,7 @@ class _ExecutableRowCollection(list[object]):
     """Fail if database collection hooks run before the durable boundary."""
 
     def __bool__(self) -> bool:
-        raise Assertion impact = AssertionError("row collection truthiness executed")
+        raise AssertionError("row collection truthiness executed")
 
     def __len__(self) -> int:
         raise AssertionError("row collection length executed")
