@@ -141,7 +141,7 @@ def validate_operational_uuid(field_name: str, value: object) -> UUID:
 
 def _validate_idempotency_key(value: object) -> str:
     """Require the exact caller Idempotency-Key that must reach the write port."""
-    if not isinstance(value, str) or not (_IDEMPOTENCY_MIN <= len(value) <= _IDEMPOTENCY_MAX):
+    if type(value) is not str or not (_IDEMPOTENCY_MIN <= len(value) <= _IDEMPOTENCY_MAX):
         raise ValueError("idempotency_key must be 16 to 200 characters.")
     if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
         raise ValueError("idempotency_key must be printable ASCII.")
