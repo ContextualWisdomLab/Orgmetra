@@ -57,6 +57,82 @@ def _canonical_timestamp(value: datetime) -> str:
     return value.isoformat().replace("+00:00", "Z")
 
 
+def _validate_event_snapshot(
+    *,
+    event_id: object,
+    tenant_record_id: object,
+    source_service: object,
+    event_type: object,
+    resource_reference: object,
+    actor_reference: object,
+    purpose_code: object,
+    reason_code: object,
+    evidence_version_code: object,
+    result_code: object,
+    occurred_at: object,
+    high_impact: object,
+    confirmation_reference: object,
+) -> datetime:
+    """Validate one captured audit snapshot and return its detached UTC instant."""
+    if type(event_id) is not UUID:
+        raise ValueError("event_id must be a UUID.")
+    if type(tenant_record_id) is not UUID:
+        raise ValueError("tenant_record_id must be a UUID.")
+    if event_id.int == 0:
+        raise ValueError("event_id must not be the reserved nil UUID.")
+    if tenant_record_id.int == 0:
+        raise ValueError("tenant_record_id must not be the reserved nil UUID.")
+    if event_id.int == _MAX_UUID_INT:
+        raise ValueError("event_id must not be the reserved max UUID.")
+    if tenant_record_id.int == _MAX_UUID_INT:
+        raise ValueError("tenant_record_id must not be the reserved max UUID.")
+    if type(occurred_at) is not datetime:
+        raise ValueError("occurred_at must be a datetime.")
+    if type(high_impact) is not bool:
+        raise ValueError("high_impact must be a boolean.")
+    text_values = {
+        "source_service": source_service,
+        "event_type": event_type,
+        "resource_reference": resource_reference,
+        "actor_reference": actor_reference,
+        "purpose_code": purpose_code,
+        "reason_code": reason_code,
+        "evidence_version_code": evidence_version_code,
+        "result_code": result_code,
+    }
+    for field_name in _ALL_REQUIRED_TEXT_FIELDS:
+        if type(text_values[field_name]) is not str:
+            raise ValueError(f"{field_name} must be a string.")
+    if confirmation_reference is not None and type(confirmation_reference) is not str:
+        raise ValueError("confirmation_reference must be a string when supplied.")
+
+    frozen_occurred_at = _freeze_timestamp(occurred_at)
+    if _SOURCE_SERVICE_PATTERN.fullmatch(source_service) is None:
+        raise ValueError("source_service must contain two or more lower snake_case words.")
+    if _EVENT_TYPE_PATTERN.fullmatch(event_type) is None:
+        raise ValueError("event_type must use a canonical lower-case orgmetra.<context>.<event> namespace.")
+    for field_name in _REQUIRED_TEXT_FIELDS:
+        value = text_values[field_name]
+        if not value.strip():
+            raise ValueError(f"{field_name} must not be blank.")
+    for field_name in ("resource_reference", "actor_reference"):
+        if _OPAQUE_REFERENCE_PATTERN.fullmatch(text_values[field_name]) is None:
+            raise ValueError(f"{field_name} must be a namespaced opaque reference.")
+    for field_name in ("purpose_code", "reason_code", "result_code"):
+        if _CODE_PATTERN.fullmatch(text_values[field_name]) is None:
+            raise ValueError(f"{field_name} must be lower snake_case code data.")
+    if _VERSION_CODE_PATTERN.fullmatch(evidence_version_code) is None:
+        raise ValueError("evidence_version_code must be a whitespace-free version token.")
+    if confirmation_reference is not None:
+        if not confirmation_reference.strip():
+            raise ValueError("confirmation_reference must not be blank when supplied.")
+        if _OPAQUE_REFERENCE_PATTERN.fullmatch(confirmation_reference) is None:
+            raise ValueError("confirmation_reference must be a namespaced opaque reference.")
+    if high_impact and confirmation_reference is None:
+        raise ValueError("high-impact events require confirmation_reference.")
+    return frozen_occurred_at
+
+
 @dataclass(frozen=True, slots=True)
 class AuditOutboxEvent:
     """One immutable governance envelope for an Orgmetra domain mutation.
@@ -84,51 +160,22 @@ class AuditOutboxEvent:
 
     def __post_init__(self) -> None:
         """Reject envelopes that cannot provide accountable, portable audit evidence."""
-        if type(self.event_id) is not UUID:
-            raise ValueError("event_id must be a UUID.")
-        if type(self.tenant_record_id) is not UUID:
-            raise ValueError("tenant_record_id must be a UUID.")
-        if self.event_id.int == 0:
-            raise ValueError("event_id must not be the reserved nil UUID.")
-        if self.tenant_record_id.int == 0:
-            raise ValueError("tenant_record_id must not be the reserved nil UUID.")
-        if self.event_id.int == _MAX_UUID_INT:
-            raise ValueError("event_id must not be the reserved max UUID.")
-        if self.tenant_record_id.int == _MAX_UUID_INT:
-            raise ValueError("tenant_record_id must not be the reserved max UUID.")
-        if type(self.occurred_at) is not datetime:
-            raise ValueError("occurred_at must be a datetime.")
-        if type(self.high_impact) is not bool:
-            raise ValueError("high_impact must be a boolean.")
-        for field_name in _ALL_REQUIRED_TEXT_FIELDS:
-            if type(getattr(self, field_name)) is not str:
-                raise ValueError(f"{field_name} must be a string.")
-        if self.confirmation_reference is not None and type(self.confirmation_reference) is not str:
-            raise ValueError("confirmation_reference must be a string when supplied.")
-        object.__setattr__(self, "occurred_at", _freeze_timestamp(self.occurred_at))
-        if _SOURCE_SERVICE_PATTERN.fullmatch(self.source_service) is None:
-            raise ValueError("source_service must contain two or more lower snake_case words.")
-        if _EVENT_TYPE_PATTERN.fullmatch(self.event_type) is None:
-            raise ValueError("event_type must use a canonical lower-case orgmetra.<context>.<event> namespace.")
-        for field_name in _REQUIRED_TEXT_FIELDS:
-            value = getattr(self, field_name)
-            if not value.strip():
-                raise ValueError(f"{field_name} must not be blank.")
-        for field_name in ("resource_reference", "actor_reference"):
-            if _OPAQUE_REFERENCE_PATTERN.fullmatch(getattr(self, field_name)) is None:
-                raise ValueError(f"{field_name} must be a namespaced opaque reference.")
-        for field_name in ("purpose_code", "reason_code", "result_code"):
-            if _CODE_PATTERN.fullmatch(getattr(self, field_name)) is None:
-                raise ValueError(f"{field_name} must be lower snake_case code data.")
-        if _VERSION_CODE_PATTERN.fullmatch(self.evidence_version_code) is None:
-            raise ValueError("evidence_version_code must be a whitespace-free version token.")
-        if self.confirmation_reference is not None:
-            if not self.confirmation_reference.strip():
-                raise ValueError("confirmation_reference must not be blank when supplied.")
-            if _OPAQUE_REFERENCE_PATTERN.fullmatch(self.confirmation_reference) is None:
-                raise ValueError("confirmation_reference must be a namespaced opaque reference.")
-        if self.high_impact and self.confirmation_reference is None:
-            raise ValueError("high-impact events require confirmation_reference.")
+        frozen_occurred_at = _validate_event_snapshot(
+            event_id=self.event_id,
+            tenant_record_id=self.tenant_record_id,
+            source_service=self.source_service,
+            event_type=self.event_type,
+            resource_reference=self.resource_reference,
+            actor_reference=self.actor_reference,
+            purpose_code=self.purpose_code,
+            reason_code=self.reason_code,
+            evidence_version_code=self.evidence_version_code,
+            result_code=self.result_code,
+            occurred_at=self.occurred_at,
+            high_impact=self.high_impact,
+            confirmation_reference=self.confirmation_reference,
+        )
+        object.__setattr__(self, "occurred_at", frozen_occurred_at)
 
     def to_cloudevent(self) -> dict[str, object]:
         """Return the canonical structured CloudEvent 1.0 envelope.
@@ -138,26 +185,54 @@ class AuditOutboxEvent:
             PII-minimized result body. Persist this mapping atomically with the
             owning business write before asynchronous delivery.
         """
+        event_id = self.event_id
+        tenant_record_id = self.tenant_record_id
+        source_service = self.source_service
+        event_type = self.event_type
+        resource_reference = self.resource_reference
+        actor_reference = self.actor_reference
+        purpose_code = self.purpose_code
+        reason_code = self.reason_code
+        evidence_version_code = self.evidence_version_code
+        result_code = self.result_code
+        occurred_at = self.occurred_at
+        high_impact = self.high_impact
+        confirmation_reference = self.confirmation_reference
+        occurred_at = _validate_event_snapshot(
+            event_id=event_id,
+            tenant_record_id=tenant_record_id,
+            source_service=source_service,
+            event_type=event_type,
+            resource_reference=resource_reference,
+            actor_reference=actor_reference,
+            purpose_code=purpose_code,
+            reason_code=reason_code,
+            evidence_version_code=evidence_version_code,
+            result_code=result_code,
+            occurred_at=occurred_at,
+            high_impact=high_impact,
+            confirmation_reference=confirmation_reference,
+        )
         envelope: dict[str, object] = {
             "specversion": "1.0",
-            "id": str(self.event_id),
-            "source": f"urn:orgmetra:{self.source_service}",
-            "type": self.event_type,
-            "subject": self.resource_reference,
-            "time": _canonical_timestamp(self.occurred_at),
+            "id": str(event_id),
+            "source": f"urn:orgmetra:{source_service}",
+            "type": event_type,
+            "subject": resource_reference,
+            "time": _canonical_timestamp(occurred_at),
             "datacontenttype": "application/json",
-            "orgmetratenant": str(self.tenant_record_id),
-            "orgmetraactor": self.actor_reference,
-            "orgmetrapurpose": self.purpose_code,
-            "orgmetrareason": self.reason_code,
-            "orgmetraevidence": self.evidence_version_code,
+            "orgmetratenant": str(tenant_record_id),
+            "orgmetraactor": actor_reference,
+            "orgmetrapurpose": purpose_code,
+            "orgmetrareason": reason_code,
+            "orgmetraevidence": evidence_version_code,
             "data": {
-                "result_code": self.result_code,
-                "high_impact": self.high_impact,
+                "result_code": result_code,
+                "high_impact": high_impact,
             },
         }
-        if self.confirmation_reference is not None:
-            envelope["orgmetraconfirmation"] = self.confirmation_reference
+        if confirmation_reference is not None:
+            envelope["orgmetraconfirmation"] = confirmation_reference
         return envelope
 
     def canonical_json(self) -> str:
