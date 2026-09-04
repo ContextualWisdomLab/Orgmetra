@@ -1,0 +1,97 @@
+name: Psychometrics Result Adapter Quality
+
+on:
+  pull_request:
+    branches:
+      - bootstrap
+      - develop
+      - main
+    paths:
+      - "packages/psychometrics-result-adapter/**"
+      - "docs/adr/psychometrics-result-evidence.md"
+      - "docs/doctoring/psychometrics-result-evidence-references.md"
+      - "docs/traceability/psychometrics-result-evidence.md"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/psychometrics-result-adapter-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: psychometrics-result-adapter-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Psychometrics result evidence contract and 100% coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+      - name: Install reviewed test and build toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          printf '%s\n' 'setuptools==84.0.0 --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670' > /tmp/orgmetra-psychometrics-build.txt
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r /tmp/orgmetra-psychometrics-build.txt
+          python -m pip check
+      - name: Compile adapter boundary
+        run: python -m compileall -q packages/psychometrics-result-adapter/src packages/psychometrics-result-adapter/tests
+      - name: Build and install exact package artifact
+        run: |
+          rm -rf /tmp/orgmetra-psychometrics-result-build /tmp/orgmetra-psychometrics-result-dist /tmp/orgmetra-psychometrics-result-venv
+          cp -a packages/psychometrics-result-adapter /tmp/orgmetra-psychometrics-result-build
+          mkdir -p /tmp/orgmetra-psychometrics-result-dist
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-psychometrics-result-dist /tmp/orgmetra-psychometrics-result-build
+          test "$(find /tmp/orgmetra-psychometrics-result-dist -maxdepth 1 -type f -name '*.whl' | wc -l)" -eq 1
+          python -m venv /tmp/orgmetra-psychometrics-result-venv
+          /tmp/orgmetra-psychometrics-result-venv/bin/python -m pip install --require-hashes --no-deps --only-binary=:all: -r "$GITHUB_WORKSPACE/.github/requirements/foundation-test.txt"
+          wheel_path="$(find /tmp/orgmetra-psychometrics-result-dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          wheel_sha="$(sha256sum "$wheel_path" | awk '{print $1}')"
+          printf 'orgmetra-psychometrics-result-adapter[test] @ file://%s --hash=sha256:%s\n' "$wheel_path" "$wheel_sha" > /tmp/orgmetra-psychometrics-result-install.txt
+          /tmp/orgmetra-psychometrics-result-venv/bin/python -m pip install --require-hashes --no-deps -r /tmp/orgmetra-psychometrics-result-install.txt
+          /tmp/orgmetra-psychometrics-result-venv/bin/python -m pip check
+          /tmp/orgmetra-psychometrics-result-venv/bin/python - <<'PY'
+          from importlib.metadata import metadata
+          from pathlib import Path
+          import coverage
+          import pytest
+          import pytest_cov
+          import orgmetra_psychometrics_result_adapter
+
+          venv_root = Path("/tmp/orgmetra-psychometrics-result-venv").resolve()
+          module_path = Path(orgmetra_psychometrics_result_adapter.__file__).resolve()
+          if not module_path.is_relative_to(venv_root):
+              raise SystemExit(f"package imported outside isolated environment: {module_path}")
+          for module in (coverage, pytest, pytest_cov):
+              dependency_path = Path(module.__file__).resolve()
+              if not dependency_path.is_relative_to(venv_root):
+                  raise SystemExit(
+                      f"test dependency imported outside isolated environment: {dependency_path}"
+                  )
+          if "test" not in (metadata("orgmetra-psychometrics-result-adapter").get_all("Provides-Extra") or []):
+              raise SystemExit("built distribution does not expose the reviewed test extra")
+          PY
+      - name: Test installed psychometrics result artifact with exact statement and branch coverage
+        env:
+          COVERAGE_FILE: /tmp/orgmetra-psychometrics-result-adapter.coverage
+        run: |
+          cd /tmp
+          /tmp/orgmetra-psychometrics-result-venv/bin/python -m pytest -c "$GITHUB_WORKSPACE/packages/psychometrics-result-adapter/pyproject.toml" "$GITHUB_WORKSPACE/packages/psychometrics-result-adapter/tests"
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
