@@ -40,6 +40,14 @@ from orgmetra_people_api.people import (
     WorkerPeopleRecord,
     read_worker_people_record,
 )
+from orgmetra_people_api.position_history import (
+    AuthorizedPositionHistoryEntry,
+    AuthorizedPositionHistoryView,
+    PositionHistoryIntegrityError,
+    PositionHistoryReadPort,
+    PositionHistoryRecord,
+    read_position_history,
+)
 from orgmetra_people_api.postgres import PostgresPeopleReadPort
 from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
@@ -47,6 +55,8 @@ from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
 __all__ = [
     "AuthenticatedPrincipal",
     "AuthenticationFailed",
+    "AuthorizedPositionHistoryEntry",
+    "AuthorizedPositionHistoryView",
     "AuthorizedWorkerPeopleView",
     "HireAcceptanceCommand",
     "HireAcceptancePort",
@@ -62,6 +72,9 @@ __all__ = [
     "PeopleReadPort",
     "PeopleRecordIntegrityError",
     "PeopleRecordNotFound",
+    "PositionHistoryIntegrityError",
+    "PositionHistoryReadPort",
+    "PositionHistoryRecord",
     "PositionMutationCommand",
     "PositionMutationResult",
     "PostgresHireAcceptancePort",
@@ -79,5 +92,6 @@ __all__ = [
     "create_employment_record",
     "create_position_record",
     "extract_bearer_token",
+    "read_position_history",
     "read_worker_people_record",
 ]
