@@ -173,19 +173,27 @@ def test_digest_changes_when_governance_context_changes():
     assert original != changed
 
 
-def test_event_rejects_timezone_object_without_resolved_offset():
-    """A tzinfo object that cannot resolve an offset is not auditable time evidence."""
+def test_event_rejects_custom_timezone_before_provider_callback():
+    """Caller-defined timezone behavior is rejected before any provider hook executes."""
     from datetime import tzinfo
 
-    class UnresolvedTimezone(tzinfo):
-        """Minimal tzinfo fixture with intentionally unresolved UTC offset."""
+    class ExecutableTimezone(tzinfo):
+        """Record any forbidden UTC-offset callback at the audit trust boundary."""
+
+        def __init__(self):
+            self.calls = 0
 
         def utcoffset(self, dt):
-            """Return no offset so the contract must reject this timestamp."""
-            return None
+            """Expose a tripwire if the boundary executes this provider."""
+            del dt
+            self.calls += 1
+            return timedelta(0)
 
-    with pytest.raises(ValueError, match="resolve to a UTC offset"):
-        _event(occurred_at=datetime(2026, 8, 17, 1, 30, tzinfo=UnresolvedTimezone()))
+    provider = ExecutableTimezone()
+    with pytest.raises(ValueError, match="datetime.timezone or zoneinfo.ZoneInfo"):
+        _event(occurred_at=datetime(2026, 8, 17, 1, 30, tzinfo=provider))
+
+    assert provider.calls == 0
 
 
 def test_event_rejects_blank_optional_confirmation_reference():
