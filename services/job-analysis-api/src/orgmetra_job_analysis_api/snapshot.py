@@ -679,7 +679,41 @@ def persist_job_analysis_snapshot(
     )
     if type(persisted) is not JobAnalysisSnapshot:
         raise JobAnalysisIntegrityError("persisted snapshot has an invalid runtime type")
-    if persisted.to_snapshot() != authorized_snapshot:
+    try:
+        persisted_tenant_record_id = validate_operational_uuid(
+            "persisted snapshot tenant_record_id",
+            persisted.tenant_record_id,
+        )
+        persisted_analysis_record_id = validate_operational_uuid(
+            "persisted snapshot analysis_record_id",
+            persisted.analysis_record_id,
+        )
+        _validate_resolved_snapshot_graph_runtime(persisted)
+    except (ValueError, JobAnalysisIntegrityError) as error:
+        raise JobAnalysisIntegrityError(
+            "persisted snapshot graph has invalid runtime evidence"
+        ) from error
+    if (
+        persisted_tenant_record_id != tenant_record_id
+        or persisted_analysis_record_id != snapshot.analysis_record_id
+    ):
+        raise JobAnalysisIntegrityError("persisted snapshot escaped posted payload")
+    persisted_document = persisted.to_snapshot()
+    try:
+        governed_persisted = snapshot_from_document(
+            persisted_document,
+            tenant_record_id=tenant_record_id,
+        )
+    except (TypeError, ValueError) as error:
+        raise JobAnalysisIntegrityError(
+            "persisted snapshot graph violates governed evidence contract"
+        ) from error
+    governed_document = governed_persisted.to_snapshot()
+    if governed_document != persisted_document:
+        raise JobAnalysisIntegrityError(
+            "persisted snapshot graph changes under governed reconstruction"
+        )
+    if governed_document != authorized_snapshot:
         raise JobAnalysisIntegrityError("persisted snapshot escaped posted payload")
     return PersistedJobAnalysisView(
         resource_reference=decision.resource_reference,
