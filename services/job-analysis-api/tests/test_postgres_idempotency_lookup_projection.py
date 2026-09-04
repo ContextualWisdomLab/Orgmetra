@@ -22,32 +22,57 @@ class _MissingProjectionCursor(FakeCursor):
         return super().fetchone()
 
 
+class _GeneratorProjectionCursor(FakeCursor):
+    """Model an executable iterable where a fixed DB-API projection row is required."""
+
+    def fetchone(self) -> object:
+        """Return a four-value generator only for the idempotency projection."""
+        if self.executions and "FROM idempotency_lock" in self.executions[-1][0]:
+            return (value for value in (None, None, None, None))
+        return super().fetchone()
+
+
 class PostgresIdempotencyLookupProjectionTests(unittest.TestCase):
     """Require the advisory-lock LEFT JOIN to return its one-row projection."""
 
-    def test_missing_lookup_projection_fails_before_scope_reads(self) -> None:
-        """Treat DB-API ``None`` as impossible evidence, not as command absence."""
+    def _persist(self, cursor: FakeCursor) -> None:
+        """Execute one write attempt against the supplied projection cursor."""
         snapshot = clinical_psychologist_snapshot()
-        cursor = _MissingProjectionCursor([None, None])
         port = PostgresJobAnalysisPort(lambda: FakeConnection(cursor))
-
-        with self.assertRaisesRegex(JobAnalysisIntegrityError, "lookup.*projection"):
-            port.persist_snapshot(
+        port.persist_snapshot(
+            snapshot=snapshot,
+            idempotency_key=IDEMPOTENCY_KEY,
+            request_digest=command_digest(
                 snapshot=snapshot,
-                idempotency_key=IDEMPOTENCY_KEY,
-                request_digest=command_digest(
-                    snapshot=snapshot,
-                    position_record_id=None,
-                    criterion_blueprint_id=None,
-                ),
-                actor_reference="keyverse:actor-ja-1",
-                purpose_code="job_analysis_write",
                 position_record_id=None,
                 criterion_blueprint_id=None,
-                audit_event=_audit_event(),
-                outbox_delivery_record_id=UUID("0198a412-6000-7000-8000-000000000302"),
-                write_command_id=UUID("0198a412-6000-7000-8000-000000000303"),
-            )
+            ),
+            actor_reference="keyverse:actor-ja-1",
+            purpose_code="job_analysis_write",
+            position_record_id=None,
+            criterion_blueprint_id=None,
+            audit_event=_audit_event(),
+            outbox_delivery_record_id=UUID("0198a412-6000-7000-8000-000000000302"),
+            write_command_id=UUID("0198a412-6000-7000-8000-000000000303"),
+        )
+
+    def test_missing_lookup_projection_fails_before_scope_reads(self) -> None:
+        """Treat DB-API ``None`` as impossible evidence, not as command absence."""
+        cursor = _MissingProjectionCursor([None, None])
+
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "lookup.*projection"):
+            self._persist(cursor)
+
+        self.assertFalse(
+            any("FROM public.job_profile" in statement for statement, _ in cursor.executions)
+        )
+
+    def test_generator_lookup_projection_fails_before_scope_reads(self) -> None:
+        """Reject arbitrary iterables even when they yield the four selected values."""
+        cursor = _GeneratorProjectionCursor([None, None])
+
+        with self.assertRaisesRegex(JobAnalysisIntegrityError, "durable command.*shape"):
+            self._persist(cursor)
 
         self.assertFalse(
             any("FROM public.job_profile" in statement for statement, _ in cursor.executions)
