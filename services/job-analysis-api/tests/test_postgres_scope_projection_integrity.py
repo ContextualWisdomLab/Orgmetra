@@ -117,7 +117,7 @@ class PostgresScopeProjectionIntegrityTests(unittest.TestCase):
         self._assert_no_write(cursor)
 
     def test_job_scope_projection_rejects_invalid_shape(self) -> None:
-        for malformed_row in ((), (JOB, JOB)):
+        for malformed_row in (object(), (), (JOB, JOB)):
             with self.subTest(malformed_row=malformed_row):
                 cursor = FakeCursor([None, None, malformed_row])
 
@@ -130,7 +130,7 @@ class PostgresScopeProjectionIntegrityTests(unittest.TestCase):
                 self._assert_no_write(cursor)
 
     def test_position_scope_projection_rejects_invalid_shape(self) -> None:
-        for malformed_row in ((POSITION,), (POSITION, JOB, JOB)):
+        for malformed_row in (object(), (POSITION,), (POSITION, JOB, JOB)):
             with self.subTest(malformed_row=malformed_row):
                 cursor = FakeCursor([None, None, (JOB,), malformed_row])
 
@@ -143,7 +143,7 @@ class PostgresScopeProjectionIntegrityTests(unittest.TestCase):
                 self._assert_no_write(cursor)
 
     def test_criterion_scope_projection_rejects_invalid_shape(self) -> None:
-        for malformed_row in ((CRITERION,), (CRITERION, JOB, JOB)):
+        for malformed_row in (object(), (CRITERION,), (CRITERION, JOB, JOB)):
             with self.subTest(malformed_row=malformed_row):
                 cursor = FakeCursor([None, None, (JOB,), malformed_row])
 
