@@ -13,6 +13,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
+from inspect import getattr_static
 import json
 import re
 from typing import Any, Callable
@@ -362,19 +363,30 @@ def _snapshot_durable_audit_authority(
     )
 
 
+def _static_builtin_text_attribute(owner: object, attribute_name: str) -> str | None:
+    """Read stored driver metadata without invoking dynamic attribute behavior."""
+    try:
+        value = getattr_static(owner, attribute_name)
+    except AttributeError:
+        return None
+    return value if type(value) is str else None
+
+
 def _is_unique_violation(error: Exception) -> bool:
     """Return whether inert PostgreSQL DB-API metadata reports SQLSTATE 23505."""
-    sqlstate = getattr(error, "sqlstate", None)
+    sqlstate = _static_builtin_text_attribute(error, "sqlstate")
     if sqlstate is None:
-        sqlstate = getattr(error, "pgcode", None)
-    return type(sqlstate) is str and sqlstate == "23505"
+        sqlstate = _static_builtin_text_attribute(error, "pgcode")
+    return sqlstate == "23505"
 
 
 def _constraint_name(error: Exception) -> str | None:
-    """Return an exact built-in PostgreSQL constraint diagnostic when available."""
-    diagnostic = getattr(error, "diag", None)
-    constraint_name = getattr(diagnostic, "constraint_name", None)
-    return constraint_name if type(constraint_name) is str else None
+    """Return an inert PostgreSQL constraint diagnostic when safely stored."""
+    try:
+        diagnostic = getattr_static(error, "diag")
+    except AttributeError:
+        return None
+    return _static_builtin_text_attribute(diagnostic, "constraint_name")
 
 
 @dataclass(frozen=True, slots=True)
