@@ -363,15 +363,18 @@ def _snapshot_durable_audit_authority(
 
 
 def _is_unique_violation(error: Exception) -> bool:
-    """Return whether a PostgreSQL DB-API error reports SQLSTATE 23505."""
-    return getattr(error, "sqlstate", getattr(error, "pgcode", None)) == "23505"
+    """Return whether inert PostgreSQL DB-API metadata reports SQLSTATE 23505."""
+    sqlstate = getattr(error, "sqlstate", None)
+    if sqlstate is None:
+        sqlstate = getattr(error, "pgcode", None)
+    return type(sqlstate) is str and sqlstate == "23505"
 
 
 def _constraint_name(error: Exception) -> str | None:
-    """Return a driver-provided PostgreSQL constraint name when available."""
+    """Return an exact built-in PostgreSQL constraint diagnostic when available."""
     diagnostic = getattr(error, "diag", None)
     constraint_name = getattr(diagnostic, "constraint_name", None)
-    return constraint_name if isinstance(constraint_name, str) else None
+    return constraint_name if type(constraint_name) is str else None
 
 
 @dataclass(frozen=True, slots=True)
