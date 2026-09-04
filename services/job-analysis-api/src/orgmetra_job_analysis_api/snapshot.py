@@ -796,6 +796,10 @@ def persist_job_analysis_snapshot(
         high_impact=False,
     )
     authorized_snapshot = snapshot.to_snapshot()
+    authorized_analysis_record_id = validate_operational_uuid(
+        "authorized snapshot analysis_record_id",
+        snapshot.analysis_record_id,
+    )
     persisted = write_port.persist_snapshot(
         snapshot=snapshot,
         idempotency_key=key,
@@ -829,7 +833,7 @@ def persist_job_analysis_snapshot(
         ) from error
     if (
         persisted_tenant_record_id != tenant_record_id
-        or persisted_analysis_record_id != snapshot.analysis_record_id
+        or persisted_analysis_record_id != authorized_analysis_record_id
     ):
         raise JobAnalysisIntegrityError("persisted snapshot escaped posted payload")
     try:
