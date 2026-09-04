@@ -1,0 +1,57 @@
+name: Outbox Delivery Receipt Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "packages/outbox-delivery-receipt/**"
+      - ".github/requirements/foundation-test.txt"
+      - ".github/workflows/outbox-delivery-receipt-quality.yml"
+      - "docs/adr/0151-governed-external-delivery-receipt.md"
+      - "docs/traceability/outbox-delivery-receipt.md"
+      - "docs/doctoring/outbox-delivery-receipt-references.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: outbox-delivery-receipt-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: External delivery receipt contract and 100% coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Compile delivery receipt package
+        run: python -m compileall -q packages/outbox-delivery-receipt/src packages/outbox-delivery-receipt/tests
+      - name: Test external delivery receipt with exact statement and branch coverage
+        env:
+          PYTHONPATH: packages/outbox-delivery-receipt/src
+          COVERAGE_FILE: /tmp/orgmetra-outbox-delivery-receipt.coverage
+        run: python -m pytest -c packages/outbox-delivery-receipt/pyproject.toml packages/outbox-delivery-receipt/tests
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
