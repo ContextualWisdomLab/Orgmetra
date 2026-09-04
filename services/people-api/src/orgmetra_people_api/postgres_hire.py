@@ -166,7 +166,7 @@ INSERT INTO public.people_mutation_idempotency_record (
 
 def _is_operational_uuid(value: object) -> bool:
     """Return whether a value is an Orgmetra operational UUID."""
-    return isinstance(value, UUID) and value.int not in (0, _MAX_UUID_INT)
+    return type(value) is UUID and value.int not in (0, _MAX_UUID_INT)
 
 
 def _is_aware_datetime(value: object) -> bool:
