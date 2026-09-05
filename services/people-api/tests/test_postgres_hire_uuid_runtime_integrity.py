@@ -14,7 +14,7 @@ class _ExecutableUUID(UUID):
     def __getattribute__(self, name: str) -> object:
         """Fail when untrusted UUID evidence is inspected as if it were inert."""
         if name == "int":
-            raise AssertionError("UUID subtype behavior executed before exact-type validation")
+            raise AttributeError("UUID subtype behavior executed before exact-type validation")
         return super().__getattribute__(name)
 
 
