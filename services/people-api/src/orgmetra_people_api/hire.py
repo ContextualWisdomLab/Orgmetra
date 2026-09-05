@@ -149,6 +149,7 @@ def accept_confirmed_hire(
     """
     if type(command) is not HireAcceptanceCommand:
         raise TypeError("command must be a HireAcceptanceCommand")
+    HireAcceptanceCommand.__post_init__(command)
     if not isinstance(mutation_port, HireAcceptancePort):
         raise TypeError("mutation_port must implement HireAcceptancePort")
 
@@ -166,4 +167,5 @@ def accept_confirmed_hire(
     result = mutation_port.accept_hire(command=command, authorization=authorization)
     if type(result) is not HireAcceptanceResult:
         raise TypeError("mutation_port must return HireAcceptanceResult")
+    HireAcceptanceResult.__post_init__(result)
     return result
