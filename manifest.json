@@ -83,7 +83,7 @@
     },
     {
       "path": "database/migrations/0005_outbox_delivery_finalization.sql",
-      "sha256": "b7e8790595b288f7525d6ef5cc6cbfe4e1b6712248f5b7a3a25fa60016b6a4961",
+      "sha256": "b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5b7a3a25fa60016b6a4961",
       "bytes": 6125,
       "lines": 170
     },
