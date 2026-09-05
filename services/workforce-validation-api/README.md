@@ -10,11 +10,13 @@ It does **not** query People, Talent Acquisition, Performance Management, Job Ar
 
 - accepts structurally immutable authenticated Keyverse identity attributes, not credentials;
 - reconstructs and revalidates principal storage before building the access request, so exact tuple type alone is not treated as identity authority;
+- stores UUID identity evidence behind the tuple-backed principal/record/view as exact integer payloads and reconstructs fresh UUID objects at public boundaries, so a retained UUID reference cannot rewrite accepted tenant/study/criterion identity through `object.__setattr__`;
+- preserves tenant/study authorization targets as immutable integer snapshots across the executable repository call, so a repository cannot make a foreign record self-consistent by mutating the UUID objects it receives;
 - inertly verifies that the owner repository exposes a statically callable `read_validity_study` capability before authorization, without executing caller-controlled descriptors;
 - evaluates tenant, purpose, operation, scope, resource, and requested fields before persistence;
 - calls only a `ValidityStudyReadPort` owned by this context;
 - reconstructs persisted registry scalars into structurally immutable owner evidence before target validation and output;
-- returns only the fields authorized for the exact study record;
+- returns only the fields authorized for the exact study record; UUID-valued projected fields are reconstituted fresh rather than exposing mutable internal UUID aliases;
 - issues `ValidityStudyView` only from the authorized read path. Its public constructor fails closed, and the returned tuple-backed projection cannot be rewritten through ordinary assignment or `object.__setattr__`.
 
 `ValidityStudyView` is a data projection, not a durable authorization credential or cryptographic capability. Downstream consequential actions must perform their own purpose-bound authorization and authoritative re-resolution rather than treating the Python runtime type as reusable authority. Low-level interpreter construction is outside the supported public API and is not accepted as proof that authorization occurred.
@@ -23,7 +25,7 @@ It does **not** query People, Talent Acquisition, Performance Management, Job Ar
 
 Protected foundation migrations still create validity-study tables in the legacy foundation schema, so the next forward-only persistence increment must adopt those records without normalizing `public.validity_study` as a long-lived service contract or breaking existing linkage evidence.
 
-Issue #234 owns the remaining order: durable owner-schema adoption and PostgreSQL adapter, idempotent registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, OpenAPI/gateway exposure, and realistic p95 measurement. Issues #236–#242 retain the current bootstrap trust-boundary findings through exact-head acceptance and protected integration: persisted-record immutability, principal immutability and constructor revalidation, owner-role/runtime-role separation, inert repository-capability validation, immutable minimized output, and non-public issuance of that output.
+Issue #234 owns the remaining order: durable owner-schema adoption and PostgreSQL adapter, idempotent registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, OpenAPI/gateway exposure, and realistic p95 measurement. Issues #236–#243 retain the current bootstrap trust-boundary findings through exact-head acceptance and protected integration: persisted-record immutability, principal immutability and constructor revalidation, owner-role/runtime-role separation, inert repository-capability validation, immutable minimized output, non-public issuance of that output, and detached UUID storage/target snapshots.
 
 ## Test
 
