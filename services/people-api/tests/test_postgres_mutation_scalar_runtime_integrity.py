@@ -125,13 +125,13 @@ class _ExecutableDecimal(Decimal):
         """Fail if portfolio aggregation adds persisted subtype allocation."""
         del other
         self.calls += 1
-        raise AssertionError("Decimal subtype addition executed before exact-type validation")
+        raise TypeError("Decimal subtype addition executed before exact-type validation")
 
     def __radd__(self, other: object) -> Decimal:
         """Fail if portfolio aggregation reverse-adds persisted subtype allocation."""
         del other
         self.calls += 1
-        raise AssertionError("Decimal subtype reverse addition executed before exact-type validation")
+        raise TypeError("Decimal subtype reverse addition executed before exact-type validation")
 
 
 class _ReplayCursor:
