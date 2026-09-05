@@ -8,7 +8,7 @@ candidate-to-worker conversion and its immutable audit/outbox evidence.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 import re
 from typing import Protocol, runtime_checkable
@@ -149,7 +149,7 @@ def accept_confirmed_hire(
     """
     if type(command) is not HireAcceptanceCommand:
         raise TypeError("command must be a HireAcceptanceCommand")
-    HireAcceptanceCommand.__post_init__(command)
+    command = replace(command)
     expected_person_record_id = UUID(int=command.person_record_id.int)
     expected_employment_record_id = UUID(int=command.employment_record_id.int)
     expected_conversion_record_id = UUID(
