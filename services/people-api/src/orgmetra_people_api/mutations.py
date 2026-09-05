@@ -10,7 +10,7 @@ writes require a current ``candidate_worker_conversion_record``
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
 from hashlib import sha256
@@ -369,7 +369,7 @@ def create_employment_record(
     """Authorize the exact employment target before persisting worker employment truth."""
     if type(command) is not EmploymentMutationCommand:
         raise TypeError("command must be an EmploymentMutationCommand")
-    EmploymentMutationCommand.__post_init__(command)
+    command = replace(command)
     expected_employment_record_id = UUID(int=command.employment_record_id.int)
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
@@ -403,7 +403,7 @@ def create_position_record(
     """Authorize the exact position target before persisting a staffable seat."""
     if type(command) is not PositionMutationCommand:
         raise TypeError("command must be a PositionMutationCommand")
-    PositionMutationCommand.__post_init__(command)
+    command = replace(command)
     expected_position_record_id = UUID(int=command.position_record_id.int)
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
@@ -437,7 +437,7 @@ def create_assignment_record(
     """Authorize the exact assignment target before persisting seat allocation."""
     if type(command) is not AssignmentMutationCommand:
         raise TypeError("command must be an AssignmentMutationCommand")
-    AssignmentMutationCommand.__post_init__(command)
+    command = replace(command)
     expected_assignment_record_id = UUID(int=command.assignment_record_id.int)
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
