@@ -348,6 +348,9 @@ class ValidityStudyReadPort(Protocol):
         ...
 
 
+_PROTOCOL_READ_CAPABILITY = getattr_static(ValidityStudyReadPort, "read_validity_study")
+
+
 def read_validity_study(
     *,
     principal: ValidationPrincipal,
@@ -373,7 +376,7 @@ def read_validity_study(
     if type(policy) is not PurposeBoundAccessPolicy:
         raise TypeError("policy must be an exact PurposeBoundAccessPolicy.")
     read_capability = getattr_static(type(read_port), "read_validity_study", None)
-    if type(read_capability) is not FunctionType:
+    if type(read_capability) is not FunctionType or read_capability is _PROTOCOL_READ_CAPABILITY:
         raise TypeError("read_port must expose a statically callable read_validity_study.")
 
     detached_principal = ValidationPrincipal(
