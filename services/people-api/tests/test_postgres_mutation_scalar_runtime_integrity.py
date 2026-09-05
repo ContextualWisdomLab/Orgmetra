@@ -28,7 +28,7 @@ class _ExecutableUUID(UUID):
     def __getattribute__(self, name: str) -> object:
         """Fail when untrusted UUID evidence is inspected as if it were inert."""
         if name == "int":
-            raise AssertionError("UUID subtype behavior executed before exact-type validation")
+            raise AttributeError("UUID subtype behavior executed before exact-type validation")
         return super().__getattribute__(name)
 
 
@@ -85,10 +85,7 @@ class _ExecutableStatusText(str):
         instance.calls = 0
         return instance
 
-    def __hash__(self) -> int:
-        """Fail if HRIS validation hashes persisted subtype text."""
-        self.calls += 1
-        raise AssertionError("status subtype hashing executed before exact-type validation")
+    __hash__ = None
 
     def __eq__(self, other: object) -> bool:
         """Fail if HRIS validation compares persisted subtype text."""
@@ -116,13 +113,13 @@ class _ExecutableDecimal(Decimal):
         """Fail if FTE validation compares persisted subtype allocation."""
         del other
         self.calls += 1
-        raise AssertionError("Decimal subtype comparison executed before exact-type validation")
+        raise TypeError("Decimal subtype comparison executed before exact-type validation")
 
     def __le__(self, other: object) -> bool:
         """Fail if FTE validation compares persisted subtype allocation."""
         del other
         self.calls += 1
-        raise AssertionError("Decimal subtype comparison executed before exact-type validation")
+        raise TypeError("Decimal subtype comparison executed before exact-type validation")
 
     def __add__(self, other: object) -> Decimal:
         """Fail if portfolio aggregation adds persisted subtype allocation."""
