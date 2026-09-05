@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 
+import orgmetra_workforce_validation_api.registry as registry
 from orgmetra_workforce_validation_api.registry import ValidityStudyView
 
 
@@ -19,3 +20,8 @@ def test_direct_authorized_view_construction_fails_closed() -> None:
             validity_study_id=STUDY,
             fields=(("study_status_code", "study_draft"),),
         )
+
+
+def test_registry_module_exposes_no_unconditional_view_issuer() -> None:
+    """Keep ordinary view issuance inside the authorized read application path."""
+    assert not hasattr(registry, "_issue_validity_study_view")
