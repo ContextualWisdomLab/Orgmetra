@@ -16,7 +16,7 @@ class _ExecutableRows(list[object]):
     def __bool__(self) -> bool:
         """Fail if durable validation asks this untrusted collection for truthiness."""
         type(self).calls += 1
-        raise AssertionError("outer durable row collection executed __bool__")
+        raise TypeError("outer durable row collection executed __bool__")
 
     def __len__(self) -> int:
         """Fail if durable validation asks this untrusted collection for cardinality."""
@@ -26,7 +26,7 @@ class _ExecutableRows(list[object]):
     def __getitem__(self, index: object) -> object:
         """Fail if durable validation indexes this untrusted collection."""
         type(self).calls += 1
-        raise AssertionError("outer durable row collection executed __getitem__")
+        raise IndexError("outer durable row collection executed __getitem__")
 
     def __iter__(self):
         """Fail if durable validation iterates this untrusted collection."""
