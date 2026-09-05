@@ -34,7 +34,7 @@ class _ExecutableBatch(list[object]):
 
     def __bool__(self) -> bool:
         """Reject pre-gate truthiness."""
-        raise AssertionError("row collection truthiness executed before exact-type validation")
+        raise TypeError("row collection truthiness executed before exact-type validation")
 
     def __len__(self) -> int:
         """Reject pre-gate length inspection."""
@@ -43,7 +43,7 @@ class _ExecutableBatch(list[object]):
     def __getitem__(self, key: object) -> object:
         """Reject pre-gate indexed access."""
         del key
-        raise AssertionError("row collection indexing executed before exact-type validation")
+        raise IndexError("row collection indexing executed before exact-type validation")
 
     def __iter__(self):
         """Reject pre-gate row iteration."""
@@ -60,7 +60,7 @@ class _ExecutableRow(tuple):
     def __getitem__(self, key: object) -> object:
         """Reject pre-gate row indexing."""
         del key
-        raise AssertionError("row indexing executed before exact-type validation")
+        raise IndexError("row indexing executed before exact-type validation")
 
     def __iter__(self):
         """Reject pre-gate row iteration."""
