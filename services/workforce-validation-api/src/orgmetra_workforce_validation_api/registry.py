@@ -333,23 +333,6 @@ class ValidityStudyView(tuple):
         return _restore_view_fields(self[2])
 
 
-def _issue_validity_study_view(
-    *,
-    tenant_record_id: UUID,
-    validity_study_id: UUID,
-    fields: tuple[tuple[str, object], ...],
-) -> ValidityStudyView:
-    """Issue one immutable view after authorization and target validation complete."""
-    return tuple.__new__(
-        ValidityStudyView,
-        (
-            _store_operational_uuid("tenant_record_id", tenant_record_id),
-            _store_operational_uuid("validity_study_id", validity_study_id),
-            _store_view_fields(fields),
-        ),
-    )
-
-
 @runtime_checkable
 class ValidityStudyReadPort(Protocol):
     """Owner repository contract for one tenant-local validity-study header."""
@@ -449,8 +432,12 @@ def read_validity_study(
         "recorded_from": record.recorded_from,
         "recorded_to": record.recorded_to,
     }
-    return _issue_validity_study_view(
-        tenant_record_id=_restore_operational_uuid("tenant_record_id", tenant_identity),
-        validity_study_id=_restore_operational_uuid("validity_study_id", study_identity),
-        fields=tuple((field_name, values[field_name]) for field_name in sorted(fields)),
+    projected_fields = tuple((field_name, values[field_name]) for field_name in sorted(fields))
+    return tuple.__new__(
+        ValidityStudyView,
+        (
+            tenant_identity,
+            study_identity,
+            _store_view_fields(projected_fields),
+        ),
     )
