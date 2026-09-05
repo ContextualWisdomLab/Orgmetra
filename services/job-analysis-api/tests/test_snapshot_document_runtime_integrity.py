@@ -63,6 +63,10 @@ class _ExecutableFieldName(str):
             raise AssertionError("field-name subtype hash executed")
         return str.__hash__(self)
 
+    def __eq__(self, other: object) -> bool:
+        """Preserve normal string equality while hash remains the execution tripwire."""
+        return bool(str.__eq__(self, other))
+
 
 class _ExecutableInteger(int):
     """Trip if kernel ordinal validation compares a caller-defined integer subtype."""
@@ -73,6 +77,14 @@ class _ExecutableInteger(int):
 
     def __le__(self, other: object) -> bool:
         """Reject upper-bound comparison before exact integer validation."""
+        raise AssertionError("integer subtype comparison executed")
+
+    def __lt__(self, other: object) -> bool:
+        """Reject strict lower-bound comparison before exact integer validation."""
+        raise AssertionError("integer subtype comparison executed")
+
+    def __gt__(self, other: object) -> bool:
+        """Reject strict upper-bound comparison before exact integer validation."""
         raise AssertionError("integer subtype comparison executed")
 
 
