@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from inspect import getattr_static
 import re
+from types import FunctionType
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -359,17 +360,20 @@ def read_validity_study(
 ) -> ValidityStudyView:
     """Authorize and read one validity-study header through the canonical owner port.
 
-    Authorization is completed before persistence. Immutable integer snapshots
-    preserve the authorized target across the executable repository call. The
-    persistence result is reconstructed into an exact immutable value and must
-    match those snapshots before any field is returned.
+    Authorization is completed before persistence. The exact ordinary repository
+    method is captured inertly before authorization and that same function is
+    invoked after authorization, so dynamic instance lookup cannot switch the
+    validated capability. Immutable integer snapshots preserve the authorized
+    target across the executable repository call. The persistence result is
+    reconstructed into an exact immutable value and must match those snapshots
+    before any field is returned.
     """
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
     if type(policy) is not PurposeBoundAccessPolicy:
         raise TypeError("policy must be an exact PurposeBoundAccessPolicy.")
-    read_capability = getattr_static(read_port, "read_validity_study", None)
-    if not callable(read_capability):
+    read_capability = getattr_static(type(read_port), "read_validity_study", None)
+    if type(read_capability) is not FunctionType:
         raise TypeError("read_port must expose a statically callable read_validity_study.")
 
     detached_principal = ValidationPrincipal(
@@ -401,7 +405,8 @@ def read_validity_study(
         policy=detached_policy,
     )
 
-    persisted = read_port.read_validity_study(
+    persisted = read_capability(
+        read_port,
         tenant_record_id=_restore_operational_uuid("tenant_record_id", tenant_identity),
         validity_study_id=_restore_operational_uuid("validity_study_id", study_identity),
     )
