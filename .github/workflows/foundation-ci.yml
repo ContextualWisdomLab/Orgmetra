@@ -84,6 +84,7 @@ jobs:
             test_audit_outbox_hardening_postgres.sh
             test_candidate_worker_conversion_postgres.sh
             test_validity_study_case_postgres.sh
+            test_workforce_validation_owner_schema_postgres.sh
             test_criterion_observation_scope_postgres.sh
             test_people_mutation_idempotency_postgres.sh
             test_job_analysis_snapshot_postgres.sh
