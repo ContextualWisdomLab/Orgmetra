@@ -67,8 +67,6 @@ def _require_aware_datetime(field_name: str, value: object) -> datetime:
     provider = value.tzinfo
     if type(provider) is not timezone and type(provider) is not ZoneInfo:
         raise ValueError(f"{field_name} must use a standard-library timezone provider.")
-    if value.utcoffset() is None:
-        raise ValueError(f"{field_name} must be timezone-aware.")
     return value.astimezone(timezone.utc)
 
 
