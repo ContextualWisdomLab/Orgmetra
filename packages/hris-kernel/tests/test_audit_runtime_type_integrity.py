@@ -35,6 +35,12 @@ class _OpaqueText(str):
     """Represent valid audit text through an untrusted runtime subclass."""
 
 
+class _ForgedAuditOutboxEvent(AuditOutboxEvent):
+    """Represent a non-canonical audit tuple created through a low-level bypass."""
+
+    __slots__ = ()
+
+
 class _TripwireOffset(tzinfo):
     """Fail if caller-defined timezone behavior executes at an audit trust boundary."""
 
@@ -160,3 +166,27 @@ def test_audit_event_prevents_reintroduced_timezone_behavior_by_structure() -> N
 
     assert event.occurred_at.tzinfo is timezone.utc
     assert tripwire.calls == 0
+
+
+def test_audit_event_rejects_subclass_construction_before_snapshot_validation() -> None:
+    """Canonical construction rejects a tuple subtype before accepting any evidence."""
+    with pytest.raises(TypeError, match="exact canonical type"):
+        _ForgedAuditOutboxEvent(*_event())
+
+
+def test_audit_event_rejects_low_level_subclass_before_export() -> None:
+    """A low-level tuple subtype cannot cross the canonical export boundary."""
+    forged = tuple.__new__(_ForgedAuditOutboxEvent, tuple(_event()))
+
+    with pytest.raises(ValueError, match="exact canonical type"):
+        forged.to_cloudevent()
+
+
+def test_audit_event_rejects_low_level_non_utc_datetime_before_rendering() -> None:
+    """A low-level exact tuple with non-canonical time still fails closed on export."""
+    values = list(_event())
+    values[10] = datetime(2026, 8, 21, 5, 20)
+    forged = tuple.__new__(AuditOutboxEvent, values)
+
+    with pytest.raises(ValueError, match="exact timezone-aware datetime"):
+        forged.to_cloudevent()
