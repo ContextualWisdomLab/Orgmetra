@@ -10,6 +10,7 @@ It does **not** query People, Talent Acquisition, Performance Management, Job Ar
 
 - accepts structurally immutable authenticated Keyverse identity attributes, not credentials;
 - reconstructs and revalidates principal storage before building the access request, so exact tuple type alone is not treated as identity authority;
+- requires both exact `UUID` outer type and exact built-in integer UUID payload before any sentinel/range comparison, so a forged exact UUID with executable internal storage is rejected without invoking caller-defined equality behavior;
 - stores UUID identity evidence behind the tuple-backed principal/record/view as exact integer payloads and reconstructs fresh UUID objects at public boundaries, so a retained UUID reference cannot rewrite accepted tenant/study/criterion identity through `object.__setattr__`;
 - preserves tenant/study authorization targets as immutable integer snapshots across the executable repository call, so a repository cannot make a foreign record self-consistent by mutating the UUID objects it receives;
 - inertly verifies that the owner repository exposes a statically callable `read_validity_study` capability before authorization, without executing caller-controlled descriptors;
@@ -25,7 +26,7 @@ It does **not** query People, Talent Acquisition, Performance Management, Job Ar
 
 Protected foundation migrations still create validity-study tables in the legacy foundation schema, so the next forward-only persistence increment must adopt those records without normalizing `public.validity_study` as a long-lived service contract or breaking existing linkage evidence.
 
-Issue #234 owns the remaining order: durable owner-schema adoption and PostgreSQL adapter, idempotent registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, OpenAPI/gateway exposure, and realistic p95 measurement. Issues #236–#243 retain the current bootstrap trust-boundary findings through exact-head acceptance and protected integration: persisted-record immutability, principal immutability and constructor revalidation, owner-role/runtime-role separation, inert repository-capability validation, immutable minimized output, non-public issuance of that output, and detached UUID storage/target snapshots.
+Issue #234 owns the remaining order: durable owner-schema adoption and PostgreSQL adapter, idempotent registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, OpenAPI/gateway exposure, and realistic p95 measurement. Issues #236–#244 retain the current bootstrap trust-boundary findings through exact-head acceptance and protected integration: persisted-record immutability, principal immutability and constructor revalidation, owner-role/runtime-role separation, inert repository-capability validation, immutable minimized output, non-public issuance of that output, detached UUID storage/target snapshots, and exact validation of UUID internal payloads before comparison.
 
 ## Test
 
