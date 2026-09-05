@@ -17,11 +17,11 @@ def test_owner_schema_migration_establishes_deny_default_role_boundary() -> None
         "CREATE ROLE workforce_validation_role NOLOGIN",
         "CREATE SCHEMA workforce_validation AUTHORIZATION workforce_validation_role",
         "REVOKE ALL ON SCHEMA workforce_validation FROM PUBLIC",
-        "ALTER ROLE workforce_validation_role SET search_path = workforce_validation, pg_catalog",
     )
     for contract in required:
         assert contract in sql
 
+    assert "ALTER ROLE workforce_validation_role SET search_path" not in sql
     assert "CREATE TABLE" not in sql
     assert "public.validity_study" not in sql
     assert "GRANT ALL" not in sql
