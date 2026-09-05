@@ -203,6 +203,22 @@ def test_principal_rejects_invalid_identity_and_scope_shapes() -> None:
             ValidationPrincipal(**values)
 
 
+def test_principal_is_structurally_immutable_after_identity_validation() -> None:
+    principal = _principal()
+
+    for field_name, replacement in (
+        ("tenant_record_id", OTHER_TENANT),
+        ("actor_reference", "person:attacker-2"),
+        ("granted_scope_codes", frozenset({"orgmetra.audit.read"})),
+    ):
+        with pytest.raises(AttributeError):
+            object.__setattr__(principal, field_name, replacement)
+
+    assert principal.tenant_record_id == TENANT
+    assert principal.actor_reference == "person:analyst-1"
+    assert principal.granted_scope_codes == frozenset({"orgmetra.workforce_validation.read"})
+
+
 def test_record_rejects_noncanonical_or_invalid_durable_scalars() -> None:
     valid = dict(
         tenant_record_id=TENANT,
