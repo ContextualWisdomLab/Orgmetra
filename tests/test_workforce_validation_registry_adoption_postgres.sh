@@ -144,12 +144,13 @@ if [[ "${missing_tenant_count}" != "0" ]]; then
 fi
 
 tenant_read="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
-SELECT pg_catalog.set_config('orgmetra.tenant_record_id', '${TENANT_ID}', false);
+SET orgmetra.tenant_record_id = '${TENANT_ID}';
 SET ROLE workforce_validation_runtime_role;
 SELECT validity_study_id::text FROM workforce_validation.validity_study;
 RESET ROLE;
+RESET orgmetra.tenant_record_id;
 ")"
-if [[ "${tenant_read}" != "${TENANT_ID}|${STUDY_ID}" && "${tenant_read}" != "${STUDY_ID}" ]]; then
+if [[ "${tenant_read}" != "${STUDY_ID}" ]]; then
     echo "runtime role did not read the tenant-scoped owner registry: ${tenant_read}" >&2
     exit 1
 fi
