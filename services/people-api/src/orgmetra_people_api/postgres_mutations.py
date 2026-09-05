@@ -288,8 +288,8 @@ def _replayed_record_id(
     *,
     command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
     authorization: AuthorizationDecision,
-) -> UUID | None:
-    """Serialize one key, then return its committed record identity when present."""
+) -> tuple[UUID, str] | None:
+    """Serialize one key and return its committed identity plus verified semantic digest."""
     route = command_route(command)
     digest = mutation_command_digest(command=command, authorization=authorization)
     key_parameters = (command.tenant_record_id, route, command.idempotency_key)
@@ -310,7 +310,7 @@ def _replayed_record_id(
     if stored_digest != digest:
         raise PeopleMutationIntegrityError("idempotency key is bound to a different command")
     assert isinstance(created_record_id, UUID)
-    return created_record_id
+    return created_record_id, stored_digest
 
 
 def _record_idempotency(
@@ -585,7 +585,11 @@ class PostgresPeopleMutationPort:
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
                 replayed = _replayed_record_id(cursor, command=command, authorization=decision)
                 if replayed is not None:
-                    return EmploymentMutationResult(employment_record_id=replayed)
+                    replayed_record_id, replay_digest = replayed
+                    return EmploymentMutationResult(
+                        employment_record_id=replayed_record_id,
+                        replay_command_digest=replay_digest,
+                    )
                 cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
                 _require_one_conversion(cursor.fetchmany(2))
                 recorded_at = _post_lock_recorded_at(cursor)
@@ -694,7 +698,11 @@ class PostgresPeopleMutationPort:
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
                 replayed = _replayed_record_id(cursor, command=command, authorization=decision)
                 if replayed is not None:
-                    return PositionMutationResult(position_record_id=replayed)
+                    replayed_record_id, replay_digest = replayed
+                    return PositionMutationResult(
+                        position_record_id=replayed_record_id,
+                        replay_command_digest=replay_digest,
+                    )
                 cursor.execute(
                     _POSITION_PARENTS_SQL,
                     (command.job_profile_id, command.tenant_record_id, command.organization_unit_id),
@@ -791,7 +799,11 @@ class PostgresPeopleMutationPort:
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
                 replayed = _replayed_record_id(cursor, command=command, authorization=decision)
                 if replayed is not None:
-                    return AssignmentMutationResult(assignment_record_id=replayed)
+                    replayed_record_id, replay_digest = replayed
+                    return AssignmentMutationResult(
+                        assignment_record_id=replayed_record_id,
+                        replay_command_digest=replay_digest,
+                    )
                 cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
                 _require_one_conversion(cursor.fetchmany(2))
                 cursor.execute(
