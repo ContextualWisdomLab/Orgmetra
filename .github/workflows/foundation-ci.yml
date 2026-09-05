@@ -68,6 +68,7 @@ jobs:
           PYTHONPATH=packages/selection-review/src COVERAGE_FILE=/tmp/orgmetra-selection-review.coverage python -m pytest -c packages/selection-review/pyproject.toml packages/selection-review/tests
           PYTHONPATH=services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-job-analysis-api.coverage python -m pytest -c services/job-analysis-api/pyproject.toml services/job-analysis-api/tests
           PYTHONPATH=services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-people-api.coverage python -m pytest -c services/people-api/pyproject.toml services/people-api/tests
+          PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-workforce-validation-api.coverage python -m pytest -c services/workforce-validation-api/pyproject.toml services/workforce-validation-api/tests
       - name: Run PostgreSQL contracts in isolated containers
         env:
           PGPASSWORD: orgmetra
@@ -83,6 +84,7 @@ jobs:
             test_audit_outbox_hardening_postgres.sh
             test_candidate_worker_conversion_postgres.sh
             test_validity_study_case_postgres.sh
+            test_workforce_validation_owner_schema_postgres.sh
             test_criterion_observation_scope_postgres.sh
             test_people_mutation_idempotency_postgres.sh
             test_job_analysis_snapshot_postgres.sh
