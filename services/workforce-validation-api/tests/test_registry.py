@@ -272,3 +272,28 @@ def test_record_is_structurally_immutable_against_object_setattr() -> None:
         object.__setattr__(record, "study_status_code", "study_closed")
 
     assert record.study_status_code == "study_draft"
+
+
+def test_authorized_view_is_structurally_immutable_after_field_minimization() -> None:
+    view = read_validity_study(
+        principal=_principal(),
+        tenant_record_id=TENANT,
+        validity_study_id=STUDY,
+        purpose_code="validation_review",
+        requested_fields=frozenset({"study_status_code"}),
+        policy=_policy(),
+        read_port=_ReadPort(_record()),
+    )
+    original_fields = view.fields
+
+    for field_name, replacement in (
+        ("tenant_record_id", OTHER_TENANT),
+        ("validity_study_id", OTHER_STUDY),
+        ("fields", (("study_status_code", "study_closed"),)),
+    ):
+        with pytest.raises(AttributeError):
+            object.__setattr__(view, field_name, replacement)
+
+    assert view.tenant_record_id == TENANT
+    assert view.validity_study_id == STUDY
+    assert view.fields == original_fields
