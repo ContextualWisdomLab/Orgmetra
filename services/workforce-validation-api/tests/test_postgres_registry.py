@@ -150,11 +150,15 @@ def test_invalid_row_scalar_is_reported_as_persistence_integrity_failure() -> No
         port.read_validity_study(tenant_record_id=TENANT, validity_study_id=STUDY)
 
 
-def test_foreign_row_target_fails_closed() -> None:
-    other_study = UUID("00000000-0000-7000-8000-0000000000c2")
-    port = PostgresValidityStudyReadPort(
-        connection_factory=_Factory([_row(validity_study_id=other_study)])
-    )
+@pytest.mark.parametrize(
+    "row",
+    [
+        _row(tenant_record_id=UUID("10000000-0000-7000-8000-000000000002")),
+        _row(validity_study_id=UUID("00000000-0000-7000-8000-0000000000c2")),
+    ],
+)
+def test_foreign_row_target_fails_closed(row: tuple[object, ...]) -> None:
+    port = PostgresValidityStudyReadPort(connection_factory=_Factory([row]))
 
     with pytest.raises(ValidityStudyIntegrityError, match="another target"):
         port.read_validity_study(tenant_record_id=TENANT, validity_study_id=STUDY)
