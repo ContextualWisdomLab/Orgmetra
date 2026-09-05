@@ -247,3 +247,12 @@ def test_valid_record_detaches_supported_timezones_to_utc() -> None:
         assert record.recorded_from.hour == 0
         assert record.recorded_to is not None
         assert record.recorded_to.tzinfo is timezone.utc
+
+
+def test_record_is_structurally_immutable_against_object_setattr() -> None:
+    record = _record()
+
+    with pytest.raises(AttributeError):
+        object.__setattr__(record, "study_status_code", "study_closed")
+
+    assert record.study_status_code == "study_draft"
