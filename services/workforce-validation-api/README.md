@@ -1,10 +1,10 @@
 # Orgmetra Workforce Validation API
 
-This package is the application boundary for the `workforce_validation` bounded context. The current slice exposes one purpose-bound read use case for the existing validity-study registry header and establishes the context-local PostgreSQL ownership bootstrap.
+This package is the application and persistence boundary for the `workforce_validation` bounded context. The current stack exposes a purpose-bound validity-study registry read and adopts the existing registry table into the context-owned PostgreSQL schema without copying authoritative HR evidence.
 
-It does **not** query People, Talent Acquisition, Performance Management, Job Architecture, Psychometrics Commons, fast-mlsirm, or TEPP tables. Those contexts remain separate owners. Exact foreign identifiers and immutable specialist result references cross the boundary only through published contracts.
+It does **not** query People, Talent Acquisition, Performance Management, Job Architecture, Psychometrics Commons, fast-mlsirm, or TEPP tables. Those contexts remain separate owners. Exact foreign identifiers and immutable specialist result references cross the boundary only through published contracts or explicitly approved database constraints inside the modular deployment.
 
-## Current slice
+## Current read boundary
 
 `read_validity_study(...)`:
 
@@ -22,15 +22,21 @@ It does **not** query People, Talent Acquisition, Performance Management, Job Ar
 
 `ValidityStudyView` is a data projection, not a durable authorization credential or cryptographic capability. Downstream consequential actions must perform their own purpose-bound authorization and authoritative re-resolution rather than treating the Python runtime type as reusable authority. Low-level interpreter construction is outside the supported public API and is not accepted as proof that authorization occurred.
 
-`services/workforce-validation-api/database/migrations/0001_owner_schema.sql` starts this bounded context's own migration history. It creates the `workforce_validation` schema and deny-default `workforce_validation_role`, revokes public schema access, and intentionally creates or moves no application table yet. The role is a **NOLOGIN migration/schema owner only**; runtime principals must not be granted that owner role. PostgreSQL applies role-level configuration defaults at login and does not re-apply them on `SET ROLE`, so an `ALTER ROLE ... SET search_path` entry on this NOLOGIN role is not treated as a runtime isolation control. The later durable adapter must use a distinct least-privilege runtime role, schema-qualified `workforce_validation` relations, and explicit function-level `search_path` where `SECURITY DEFINER` code is introduced.
+## PostgreSQL ownership
 
-Protected foundation migrations still create validity-study tables in the legacy foundation schema, so the next forward-only persistence increment must adopt those records without normalizing `public.validity_study` as a long-lived service contract or breaking existing linkage evidence.
+`database/migrations/0001_owner_schema.sql` creates the deny-default `workforce_validation` schema and `workforce_validation_role`. That role remains a **NOLOGIN migration/schema owner only**; runtime principals must not be granted it. PostgreSQL role-level configuration defaults are not treated as runtime isolation because `SET ROLE` does not re-apply login-time defaults.
 
-Issue #234 owns the remaining order: durable owner-schema adoption and PostgreSQL adapter, idempotent registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, OpenAPI/gateway exposure, and realistic p95 measurement. Issues #236–#244 retain the current bootstrap trust-boundary findings through exact-head acceptance and protected integration: persisted-record immutability, principal immutability and constructor revalidation, owner-role/runtime-role separation, inert repository-capability validation, immutable minimized output, non-public issuance of that output, detached UUID storage/target snapshots, and exact validation of UUID internal payloads before comparison.
+`database/migrations/0002_registry_adoption.sql` is a forward-only adoption migration. It uses `ALTER TABLE public.validity_study SET SCHEMA workforce_validation`, so the existing relation OID, rows, indexes, foreign-key dependencies, forced tenant RLS policy, and bitemporal mutation trigger stay attached to the same table object. It creates a separate deny-default `workforce_validation_runtime_role`, grants only schema `USAGE`, registry `SELECT`, and the tenant-context helper required by the preserved RLS policy, and grants no registry mutation privilege. No `public.validity_study` compatibility view or second mutable registry is created.
+
+`PostgresValidityStudyReadPort` uses only `workforce_validation.validity_study` and `pg_catalog.set_config(...)`. It snapshots tenant/study UUID authority into immutable integer payloads before executable connection acquisition, reconstructs fresh UUID parameters, opens a read-only transaction, binds `orgmetra.tenant_record_id` transaction-locally, fetches at most two rows, and fails closed on duplicate, malformed, non-canonical, or foreign-target persistence results. Deployment code owns the actual login, pooling, TLS and assumption/grant of the runtime role; the adapter does not elevate itself with `SET ROLE`.
+
+The legacy decision/evidence/outcome links remain separate relations for now. Their existing foreign keys continue to reference the moved registry by relation identity, which PostgreSQL preserves across `SET SCHEMA`. Later increments must adopt the remaining `workforce_validation` relations deliberately rather than create cross-service SQL or duplicate the registry.
+
+Issue #234 owns the broader FR-007 order. Issue #247 owns this durable registry adoption/read-port slice. After its exact-head acceptance and the parent #235 protected integration, the next buyer/scientific work is idempotent validity-study registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, versioned OpenAPI/gateway exposure, and realistic PostgreSQL-backed p95 evidence.
 
 ## Test
 
-The Draft branch is admitted to the canonical Foundation quality workflow with the same hash-locked test toolchain and direct source-tree dependency policy used by the existing owner services:
+The service remains in the canonical Foundation unit gate with the repository's hash-locked test toolchain:
 
 ```bash
 PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src \
@@ -39,6 +45,6 @@ PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src \
   services/workforce-validation-api/tests
 ```
 
-The same Foundation job also runs `tests/test_workforce_validation_owner_schema_postgres.sh` in its own pinned PostgreSQL 16.14 container. That contract executes the service-local owner migration and checks the exact deny-default role flags, schema owner, absence of ineffective login-only `rolconfig`, actual `SET ROLE` search-path behavior, absence of inherited PUBLIC `USAGE`/`CREATE`, and absence of application relations in the bootstrap schema. The test intentionally demonstrates that `SET ROLE` retains the caller's existing `search_path`; runtime isolation therefore cannot be inferred from owner-role metadata.
+`tests/test_workforce_validation_owner_schema_postgres.sh`, already admitted to the pinned PostgreSQL 16.14 Foundation lane, first proves the empty owner-schema bootstrap and then applies the foundation schema plus `0002_registry_adoption.sql`. It verifies preserved relation OID/FK dependencies/RLS/bitemporal guard, absence of `public.validity_study`, deny-default runtime-role flags, read-only privileges, no-row behavior without tenant context, and tenant-scoped owner reads.
 
-Those source contracts are not terminal acceptance by themselves. The slice remains Draft until the exact current head actually executes with 100% owned statement/branch coverage, the PostgreSQL owner-schema contract is GREEN, applicable security workflows are terminal, and the normal review/governance requirements are satisfied. Only then may the next forward-only owner-table adoption and durable adapter be treated as eligible for integration.
+Source contracts are not terminal acceptance by themselves. This child remains Draft while #235 is mutable and until, after parent integration/retarget, its exact head executes with 100% owned statement/branch coverage, the isolated PostgreSQL contract is GREEN, applicable security workflows are terminal, and normal review/governance requirements are satisfied.
