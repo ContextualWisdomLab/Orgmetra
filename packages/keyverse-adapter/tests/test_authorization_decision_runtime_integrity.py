@@ -92,9 +92,7 @@ def _validate_decision(**overrides: object) -> tuple[object, ...]:
 def test_decision_cannot_be_subclassed_to_override_runtime_behavior() -> None:
     """Caller-defined decision classes cannot override validated field semantics."""
     with pytest.raises(TypeError, match="AuthorizationDecision must not be subclassed"):
-
-        class _ForgedDecision(AuthorizationDecision):
-            pass
+        type("_ForgedDecision", (AuthorizationDecision,), {})
 
 
 def test_consumer_revalidation_detects_low_level_decision_mutation() -> None:
