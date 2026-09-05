@@ -16,7 +16,7 @@ It does **not** query People, Talent Acquisition, Performance Management, Job Ar
 
 `services/workforce-validation-api/database/migrations/0001_owner_schema.sql` starts this bounded context's own migration history. It creates the `workforce_validation` schema and `workforce_validation_role`, revokes public schema access, and limits the role's default search path to the owner schema plus `pg_catalog`. It intentionally creates or moves no application table yet. Protected foundation migrations still create validity-study tables in the legacy foundation schema, so the next forward-only persistence increment must adopt those records without normalizing `public.validity_study` as a long-lived service contract or breaking existing linkage evidence.
 
-Issue #234 owns the remaining order: PostgreSQL-backed owner-schema acceptance and durable adapter, idempotent registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, OpenAPI/gateway exposure, and realistic p95 measurement. Issue #237 separately tracks the authenticated-principal structural-immutability repair until exact-head acceptance and protected integration.
+Issue #234 owns the remaining order: durable owner-schema adoption and PostgreSQL adapter, idempotent registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, OpenAPI/gateway exposure, and realistic p95 measurement. Issue #237 separately tracks the authenticated-principal structural-immutability repair until exact-head acceptance and protected integration.
 
 ## Test
 
@@ -29,4 +29,6 @@ PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src \
   services/workforce-validation-api/tests
 ```
 
-The package declares 100% owned statement and branch coverage. The current test suite also seals the location and deny-default shape of the bounded-context-local owner-schema migration. Source-level workflow admission and static migration contract are not PostgreSQL acceptance evidence by themselves: this slice remains Draft until the exact current head has terminal owner coverage, required security/review evidence, and a PostgreSQL-backed owner-schema contract before any durable adapter is treated as production-ready.
+The same Foundation job now also runs `tests/test_workforce_validation_owner_schema_postgres.sh` in its own pinned PostgreSQL 16.14 container. That contract executes the service-local owner migration and checks the exact role flags, schema owner, role search path, absence of inherited PUBLIC `USAGE`/`CREATE`, and absence of application relations in the bootstrap schema. The workflow manifest is resealed after admitting this contract.
+
+Those source contracts are not terminal acceptance by themselves. The slice remains Draft until the exact current head actually executes with 100% owned statement/branch coverage, the PostgreSQL owner-schema contract is GREEN, applicable security workflows are terminal, and the normal review/governance requirements are satisfied. Only then may the next forward-only owner-table adoption and durable adapter be treated as eligible for integration.
