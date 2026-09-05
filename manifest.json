@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2d2e0b488c0440533effa821808f2f17e37d92f8fb586174c2fdb594f760ca5",
-      "bytes": 17539,
-      "lines": 77
+      "sha256": "791d0d29d9b27223e86331d91dd0743b48761818b76db0468caa7e90b812ec10",
+      "bytes": 17761,
+      "lines": 78
     },
     {
       "path": "CLAUDE.md",
@@ -341,15 +341,15 @@
     },
     {
       "path": "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
-      "sha256": "3e5b7190cf857dc8c1fc7e898cef303060f34aabee6c27a9034d4d9650e33190",
-      "bytes": 7707,
-      "lines": 160
+      "sha256": "dcc7f78fbbe9cf0cf0207e3d18c6173bb1ad3ed133aeb7b578ef3657af49a192",
+      "bytes": 12593,
+      "lines": 307
     },
     {
       "path": "packages/hris-kernel/tests/test_audit_outbox.py",
-      "sha256": "5928dd7b97fe38d6b7472ce62966437e339058a59c3b301a93a7b5c05432b40c",
-      "bytes": 7556,
-      "lines": 200
+      "sha256": "6dd86c98e3b4667e47d99cb009f8aa3fc410a6c1c6e59fee7f198dd52331b412",
+      "bytes": 9228,
+      "lines": 253
     },
     {
       "path": "schemas/openapi.yaml",

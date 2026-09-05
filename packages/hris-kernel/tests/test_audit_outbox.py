@@ -173,19 +173,27 @@ def test_digest_changes_when_governance_context_changes():
     assert original != changed
 
 
-def test_event_rejects_timezone_object_without_resolved_offset():
-    """A tzinfo object that cannot resolve an offset is not auditable time evidence."""
+def test_event_rejects_custom_timezone_before_provider_callback():
+    """Caller-defined timezone behavior is rejected before any provider hook executes."""
     from datetime import tzinfo
 
-    class UnresolvedTimezone(tzinfo):
-        """Minimal tzinfo fixture with intentionally unresolved UTC offset."""
+    class ExecutableTimezone(tzinfo):
+        """Record any forbidden UTC-offset callback at the audit trust boundary."""
+
+        def __init__(self):
+            self.calls = 0
 
         def utcoffset(self, dt):
-            """Return no offset so the contract must reject this timestamp."""
-            return None
+            """Expose a tripwire if the boundary executes this provider."""
+            del dt
+            self.calls += 1
+            return timedelta(0)
 
-    with pytest.raises(ValueError, match="resolve to a UTC offset"):
-        _event(occurred_at=datetime(2026, 8, 17, 1, 30, tzinfo=UnresolvedTimezone()))
+    provider = ExecutableTimezone()
+    with pytest.raises(ValueError, match="datetime.timezone or zoneinfo.ZoneInfo"):
+        _event(occurred_at=datetime(2026, 8, 17, 1, 30, tzinfo=provider))
+
+    assert provider.calls == 0
 
 
 def test_event_rejects_blank_optional_confirmation_reference():
@@ -198,3 +206,48 @@ def test_event_rejects_nonopaque_optional_confirmation_reference():
     """Free-text confirmation data cannot enter an opaque-reference field."""
     with pytest.raises(ValueError, match="opaque reference"):
         _event(high_impact=False, confirmation_reference="approved by Ada")
+
+
+def test_canonical_event_prevents_actor_replacement_after_construction():
+    """Canonical actor evidence is structurally immutable after validation."""
+    event = _event()
+    original = event.canonical_json()
+
+    with pytest.raises(AttributeError):
+        object.__setattr__(event, "actor_reference", "Ada Lovelace")
+
+    assert event.canonical_json() == original
+
+
+def test_canonical_event_prevents_confirmation_removal_after_construction():
+    """A validated high-impact confirmation cannot be removed from the immutable event."""
+    event = _event()
+    original = event.canonical_json()
+
+    with pytest.raises(AttributeError):
+        object.__setattr__(event, "confirmation_reference", None)
+
+    assert event.canonical_json() == original
+
+
+def test_canonical_event_prevents_identity_replacement_before_stringification():
+    """Untrusted replacement identities cannot be installed into the canonical value object."""
+
+    class ExecutableIdentifier:
+        """Fail if any rejected replacement is unexpectedly stringified."""
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def __str__(self) -> str:
+            self.calls += 1
+            raise AssertionError("untrusted identity stringification executed")
+
+    event = _event()
+    replacement = ExecutableIdentifier()
+
+    with pytest.raises(AttributeError):
+        object.__setattr__(event, "event_id", replacement)
+
+    assert replacement.calls == 0
+    assert event.event_id == EVENT_ID
