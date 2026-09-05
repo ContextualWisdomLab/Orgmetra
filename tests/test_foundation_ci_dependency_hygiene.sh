@@ -18,6 +18,7 @@ expected_pythonpaths=(
   "packages/selection-review/src"
   "services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src"
   "services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src"
+  "services/workforce-validation-api/src:packages/keyverse-adapter/src"
 )
 
 if ! grep -Fq -- "${expected_install}" "${workflow_path}"; then
