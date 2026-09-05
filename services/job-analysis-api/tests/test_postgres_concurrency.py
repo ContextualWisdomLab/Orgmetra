@@ -10,7 +10,6 @@ from uuid import UUID
 from orgmetra_job_analysis_api.postgres import (
     PostgresJobAnalysisPort,
     _IDEMPOTENCY_LOOKUP_SQL,
-    _constraint_name,
     _is_unique_violation,
 )
 from orgmetra_job_analysis_api.snapshot import (
@@ -22,21 +21,10 @@ from test_postgres import _audit_event
 from fixtures import IDEMPOTENCY_KEY, JOB, clinical_psychologist_snapshot
 
 
-class _Diagnostic:
-    """Expose the PostgreSQL constraint name carried by a driver error."""
-
-    def __init__(self, constraint_name: str) -> None:
-        self.constraint_name = constraint_name
-
-
 class _UniqueViolation(Exception):
     """Mimic a DB-API unique violation from psycopg-style drivers."""
 
     sqlstate = "23505"
-
-    def __init__(self, constraint_name: str) -> None:
-        super().__init__(constraint_name)
-        self.diag = _Diagnostic(constraint_name)
 
 
 class _ConstraintCursor:
@@ -67,7 +55,7 @@ class _ConstraintCursor:
             self._last = None
             return
         if "FROM public.job_analysis_write_command" in sql:
-            self._last = (None, None)
+            self._last = (None, None, None, None)
         elif "FROM public.job_profile" in sql:
             self._last = (JOB,)
         else:
@@ -149,27 +137,28 @@ class PostgresJobAnalysisConcurrencyTests(unittest.TestCase):
         self.assertIn("idempotency_key", normalized)
 
     def test_unique_violation_metadata_is_read_without_driver_lock_in(self) -> None:
-        """Support modern and legacy PostgreSQL DB-API error attributes."""
+        """Support modern and legacy PostgreSQL DB-API SQLSTATE attributes."""
         error = _UniqueViolation("job_analysis_snapshot_job_version_unique")
         self.assertTrue(_is_unique_violation(error))
-        self.assertEqual(
-            _constraint_name(error),
-            "job_analysis_snapshot_job_version_unique",
-        )
         legacy = Exception("legacy")
         legacy.pgcode = "23505"  # type: ignore[attr-defined]
         self.assertTrue(_is_unique_violation(legacy))
         self.assertFalse(_is_unique_violation(RuntimeError("other")))
-        self.assertIsNone(_constraint_name(RuntimeError("other")))
 
     def test_snapshot_version_race_maps_to_integrity_error(self) -> None:
-        """Do not leak a raw driver exception for a concurrent job/version write."""
-        with self.assertRaisesRegex(JobAnalysisIntegrityError, "already exists"):
+        """Normalize a unique race without depending on optional driver diagnostics."""
+        with self.assertRaisesRegex(
+            JobAnalysisIntegrityError,
+            r"^job-analysis snapshot identity or version already exists$",
+        ):
             _persist_with_constraint("job_analysis_snapshot_job_version_unique")
 
     def test_command_key_race_maps_to_idempotency_conflict(self) -> None:
-        """Do not expose a raw driver error if an uncoordinated writer wins the key."""
-        with self.assertRaisesRegex(JobAnalysisIdempotencyConflict, "concurrently"):
+        """Normalize a command race without depending on optional driver diagnostics."""
+        with self.assertRaisesRegex(
+            JobAnalysisIdempotencyConflict,
+            r"^idempotency or command identity was recorded concurrently$",
+        ):
             _persist_with_constraint("job_analysis_write_command_idempotency_unique")
 
     def test_non_unique_snapshot_failure_is_not_reclassified(self) -> None:

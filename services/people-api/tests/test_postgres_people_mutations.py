@@ -20,6 +20,7 @@ from orgmetra_people_api.mutations import (
     mutation_command_digest,
 )
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
+from authorization_test_support import issued_authorization
 from test_people_mutations import (
     TENANT,
     PERSON,
@@ -100,9 +101,8 @@ class FakeConnection:
 
 
 def employment_authorization() -> AuthorizationDecision:
-    """Return the exact allow decision created by the employment policy."""
-    return AuthorizationDecision(
-        allowed=True,
+    """Return the exact allow decision issued by the employment policy evaluator."""
+    return issued_authorization(
         tenant_record_id=TENANT,
         actor_reference=ACTOR,
         resource_reference=f"employment_record:{EMPLOYMENT.hex}",
@@ -111,16 +111,13 @@ def employment_authorization() -> AuthorizationDecision:
         operation_code="create_record",
         resource_kind="employment_record",
         requested_fields=frozenset({"employment_record"}),
-        authorized_fields=frozenset({"employment_record"}),
-        reason_code="access_permitted",
-        next_action="continue",
+        required_scope_code="orgmetra.people.write",
     )
 
 
 def position_authorization() -> AuthorizationDecision:
-    """Return the exact allow decision created by the position policy."""
-    return AuthorizationDecision(
-        allowed=True,
+    """Return the exact allow decision issued by the position policy evaluator."""
+    return issued_authorization(
         tenant_record_id=TENANT,
         actor_reference=ACTOR,
         resource_reference=f"position_record:{POSITION.hex}",
@@ -129,16 +126,13 @@ def position_authorization() -> AuthorizationDecision:
         operation_code="create_record",
         resource_kind="position_record",
         requested_fields=frozenset({"position_record"}),
-        authorized_fields=frozenset({"position_record"}),
-        reason_code="access_permitted",
-        next_action="continue",
+        required_scope_code="orgmetra.job_architecture.write",
     )
 
 
 def assignment_authorization() -> AuthorizationDecision:
-    """Return the exact allow decision created by the assignment policy."""
-    return AuthorizationDecision(
-        allowed=True,
+    """Return the exact allow decision issued by the assignment policy evaluator."""
+    return issued_authorization(
         tenant_record_id=TENANT,
         actor_reference=ACTOR,
         resource_reference=f"assignment_record:{ASSIGNMENT.hex}",
@@ -147,9 +141,7 @@ def assignment_authorization() -> AuthorizationDecision:
         operation_code="create_record",
         resource_kind="assignment_record",
         requested_fields=frozenset({"assignment_record"}),
-        authorized_fields=frozenset({"assignment_record"}),
-        reason_code="access_permitted",
-        next_action="continue",
+        required_scope_code="orgmetra.people.write",
     )
 
 
@@ -432,8 +424,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         port = PostgresPeopleMutationPort(factory)
         with self.assertRaisesRegex(PeopleMutationIntegrityError, "authorization"):
             port.create_employment(command=employment_command(), authorization=object())  # type: ignore[arg-type]
-        denied = AuthorizationDecision(
-            allowed=False,
+        denied = issued_authorization(
             tenant_record_id=TENANT,
             actor_reference=ACTOR,
             resource_reference=f"employment_record:{EMPLOYMENT.hex}",
@@ -442,10 +433,10 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             operation_code="create_record",
             resource_kind="employment_record",
             requested_fields=frozenset({"employment_record"}),
-            authorized_fields=frozenset(),
-            reason_code="access_denied",
-            next_action="stop",
+            required_scope_code="orgmetra.people.write",
+            granted_scope_codes=frozenset({"orgmetra.people.read"}),
         )
+        self.assertFalse(denied.allowed)
         with self.assertRaisesRegex(PeopleMutationIntegrityError, "authorization"):
             port.create_employment(command=employment_command(), authorization=denied)
         with self.assertRaisesRegex(TypeError, "EmploymentMutationCommand"):

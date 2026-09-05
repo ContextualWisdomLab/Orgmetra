@@ -10,6 +10,7 @@ from uuid import UUID
 from orgmetra_keyverse_adapter import AuthorizationDecision
 from orgmetra_people_api.mutation_http import _command_for_route
 from orgmetra_people_api.mutations import EmploymentMutationCommand, mutation_command_digest
+from authorization_test_support import issued_authorization
 
 TENANT = UUID("0198a412-8a00-7000-8000-000000000001")
 PERSON = UUID("0198a412-8a00-7000-8000-000000000002")
@@ -64,9 +65,8 @@ def _command(payload: dict[str, object]) -> EmploymentMutationCommand:
 
 
 def _authorization(command: EmploymentMutationCommand) -> AuthorizationDecision:
-    """Return matching PII-minimized authorization evidence for digest comparison."""
-    return AuthorizationDecision(
-        allowed=True,
+    """Return evaluator-issued authorization evidence for digest comparison."""
+    return issued_authorization(
         tenant_record_id=TENANT,
         actor_reference="keyverse_subject:operator-20",
         resource_reference=f"employment_record:{command.employment_record_id.hex}",
@@ -75,9 +75,7 @@ def _authorization(command: EmploymentMutationCommand) -> AuthorizationDecision:
         operation_code="create_record",
         resource_kind="employment_record",
         requested_fields=frozenset({"employment_record"}),
-        authorized_fields=frozenset({"employment_record"}),
-        reason_code="access_permitted",
-        next_action="Continue with only the authorized fields.",
+        required_scope_code="orgmetra.people.write",
     )
 
 
