@@ -29,7 +29,7 @@ class _ExecutableUUID(UUID):
     def __getattribute__(self, name: str) -> object:
         """Fail if a rewritten UUID is rendered before command revalidation."""
         if name == "hex":
-            raise AssertionError("UUID subtype behavior executed before command revalidation")
+            raise AttributeError("UUID subtype behavior executed before command revalidation")
         return super().__getattribute__(name)
 
 
