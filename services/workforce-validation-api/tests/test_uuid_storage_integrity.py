@@ -5,9 +5,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
+import pytest
+
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_workforce_validation_api.registry import (
     ValidationPrincipal,
+    ValidityStudyIntegrityError,
     ValidityStudyRecord,
     read_validity_study,
 )
@@ -37,6 +40,28 @@ class _ReadPort:
         return self.result
 
 
+class _TargetSwitchingReadPort:
+    """Attempt to rewrite the authorized UUID target during the executable port call."""
+
+    def read_validity_study(
+        self,
+        *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+    ) -> ValidityStudyRecord:
+        """Mutate received UUID aliases and return a record matching the rewritten target."""
+        object.__setattr__(tenant_record_id, "int", OTHER_TENANT.int)
+        object.__setattr__(validity_study_id, "int", OTHER_STUDY.int)
+        return ValidityStudyRecord(
+            tenant_record_id=OTHER_TENANT,
+            validity_study_id=OTHER_STUDY,
+            criterion_blueprint_id=UUID(CRITERION_TEXT),
+            study_status_code="study_draft",
+            recorded_from=RECORDED_FROM,
+            recorded_to=None,
+        )
+
+
 def _policy() -> PurposeBoundAccessPolicy:
     """Return the canonical purpose-bound policy for the regression read."""
     return PurposeBoundAccessPolicy(
@@ -47,6 +72,15 @@ def _policy() -> PurposeBoundAccessPolicy:
         operation_code="read",
         required_scope_code="orgmetra.workforce_validation.read",
         permitted_fields=frozenset({"criterion_blueprint_id"}),
+    )
+
+
+def _principal() -> ValidationPrincipal:
+    """Return one canonical principal for UUID target-integrity tests."""
+    return ValidationPrincipal(
+        tenant_record_id=UUID(TENANT_TEXT),
+        actor_reference="person:analyst-1",
+        granted_scope_codes=frozenset({"orgmetra.workforce_validation.read"}),
     )
 
 
@@ -79,15 +113,24 @@ def test_principal_and_record_do_not_retain_mutable_uuid_inputs() -> None:
     assert record.criterion_blueprint_id == UUID(CRITERION_TEXT)
 
 
+def test_port_cannot_switch_the_authorized_target_by_mutating_received_uuid_objects() -> None:
+    """The target comparison uses pre-port immutable identity evidence, not mutable aliases."""
+    with pytest.raises(ValidityStudyIntegrityError, match="another target"):
+        read_validity_study(
+            principal=_principal(),
+            tenant_record_id=UUID(TENANT_TEXT),
+            validity_study_id=UUID(STUDY_TEXT),
+            purpose_code="validation_review",
+            requested_fields=frozenset({"criterion_blueprint_id"}),
+            policy=_policy(),
+            read_port=_TargetSwitchingReadPort(),
+        )
+
+
 def test_authorized_view_does_not_retain_or_expose_mutable_uuid_storage() -> None:
     """Target and projected UUID evidence remain stable across retained-reference rewrites."""
     tenant = UUID(TENANT_TEXT)
     study = UUID(STUDY_TEXT)
-    principal = ValidationPrincipal(
-        tenant_record_id=UUID(TENANT_TEXT),
-        actor_reference="person:analyst-1",
-        granted_scope_codes=frozenset({"orgmetra.workforce_validation.read"}),
-    )
     record = ValidityStudyRecord(
         tenant_record_id=UUID(TENANT_TEXT),
         validity_study_id=UUID(STUDY_TEXT),
@@ -98,7 +141,7 @@ def test_authorized_view_does_not_retain_or_expose_mutable_uuid_storage() -> Non
     )
 
     view = read_validity_study(
-        principal=principal,
+        principal=_principal(),
         tenant_record_id=tenant,
         validity_study_id=study,
         purpose_code="validation_review",
