@@ -462,6 +462,6 @@ def create_assignment_record(
 
 def parse_allocation_ratio(raw_value: object) -> Decimal:
     """Parse the OpenAPI allocation token into an exact four-decimal ratio."""
-    if type(raw_value) is not str or re.fullmatch(r"^(0\.[0-9]{4}|1\.0000)$", raw_value) is None:
+    if type(raw_value) is not str or re.fullmatch(r"^(0\.(?!0000)[0-9]{4}|1\.0000)$", raw_value) is None:
         raise ValueError("allocation_ratio must match 0.0001-1.0000 four-decimal form.")
     return Decimal(raw_value)
