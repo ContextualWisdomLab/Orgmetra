@@ -5,6 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 MIGRATION = ROOT / "services/workforce-validation-api/database/migrations/0001_owner_schema.sql"
+FOUNDATION_WORKFLOW = ROOT / ".github/workflows/foundation-ci.yml"
+OWNER_SCHEMA_POSTGRES_CONTRACT = "test_workforce_validation_owner_schema_postgres.sh"
 
 
 def test_owner_schema_migration_establishes_deny_default_role_boundary() -> None:
@@ -30,3 +32,10 @@ def test_owner_migration_history_is_bounded_context_local() -> None:
     relative_path = MIGRATION.relative_to(ROOT).as_posix()
 
     assert relative_path == "services/workforce-validation-api/database/migrations/0001_owner_schema.sql"
+
+
+def test_owner_schema_postgres_contract_is_admitted_to_foundation() -> None:
+    """Require the owner-schema bootstrap to execute in the canonical PostgreSQL matrix."""
+    workflow = FOUNDATION_WORKFLOW.read_text(encoding="utf-8")
+
+    assert OWNER_SCHEMA_POSTGRES_CONTRACT in workflow
