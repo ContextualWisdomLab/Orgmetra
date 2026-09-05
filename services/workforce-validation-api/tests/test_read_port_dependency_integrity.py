@@ -10,6 +10,7 @@ import pytest
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_workforce_validation_api.registry import (
     ValidationPrincipal,
+    ValidityStudyReadPort,
     ValidityStudyRecord,
     read_validity_study,
 )
@@ -67,6 +68,10 @@ class _DynamicLookupReadPort:
         )
 
 
+class _InheritedProtocolReadPort(ValidityStudyReadPort):
+    """Intentionally inherit the Protocol declaration without implementing persistence."""
+
+
 def _principal() -> ValidationPrincipal:
     """Return one exact authenticated validation principal."""
     return ValidationPrincipal(
@@ -100,6 +105,20 @@ def test_noncallable_repository_capability_fails_before_authorization() -> None:
             requested_fields=frozenset({"study_status_code"}),
             policy=_policy(purpose_code="audit_review"),
             read_port=_DescriptorReadPort(),  # type: ignore[arg-type]
+        )
+
+
+def test_inherited_protocol_placeholder_fails_before_authorization() -> None:
+    """Require a concrete repository implementation before Keyverse policy evaluation."""
+    with pytest.raises(TypeError, match="read_port must expose a statically callable read_validity_study"):
+        read_validity_study(
+            principal=_principal(),
+            tenant_record_id=TENANT,
+            validity_study_id=STUDY,
+            purpose_code="validation_review",
+            requested_fields=frozenset({"study_status_code"}),
+            policy=_policy(purpose_code="audit_review"),
+            read_port=_InheritedProtocolReadPort(),
         )
 
 
