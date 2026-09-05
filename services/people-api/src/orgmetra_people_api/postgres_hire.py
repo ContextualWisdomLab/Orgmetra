@@ -330,6 +330,7 @@ class PostgresHireAcceptancePort:
         """
         if type(command) is not HireAcceptanceCommand:
             raise TypeError("command must be a HireAcceptanceCommand")
+        HireAcceptanceCommand.__post_init__(command)
         decision = _validate_authorization(command, authorization)
 
         with self.connection_factory() as connection:
