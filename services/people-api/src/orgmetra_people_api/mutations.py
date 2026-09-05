@@ -370,6 +370,7 @@ def create_employment_record(
     if type(command) is not EmploymentMutationCommand:
         raise TypeError("command must be an EmploymentMutationCommand")
     EmploymentMutationCommand.__post_init__(command)
+    expected_employment_record_id = UUID(int=command.employment_record_id.int)
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
         principal=principal,
@@ -386,7 +387,7 @@ def create_employment_record(
     if type(result) is not EmploymentMutationResult:
         raise TypeError("mutation_port must return EmploymentMutationResult")
     EmploymentMutationResult.__post_init__(result)
-    if result.employment_record_id != command.employment_record_id:
+    if result.employment_record_id != expected_employment_record_id:
         raise PeopleMutationIntegrityError("employment result identity does not match command")
     return result
 
@@ -403,6 +404,7 @@ def create_position_record(
     if type(command) is not PositionMutationCommand:
         raise TypeError("command must be a PositionMutationCommand")
     PositionMutationCommand.__post_init__(command)
+    expected_position_record_id = UUID(int=command.position_record_id.int)
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
         principal=principal,
@@ -419,7 +421,7 @@ def create_position_record(
     if type(result) is not PositionMutationResult:
         raise TypeError("mutation_port must return PositionMutationResult")
     PositionMutationResult.__post_init__(result)
-    if result.position_record_id != command.position_record_id:
+    if result.position_record_id != expected_position_record_id:
         raise PeopleMutationIntegrityError("position result identity does not match command")
     return result
 
@@ -436,6 +438,7 @@ def create_assignment_record(
     if type(command) is not AssignmentMutationCommand:
         raise TypeError("command must be an AssignmentMutationCommand")
     AssignmentMutationCommand.__post_init__(command)
+    expected_assignment_record_id = UUID(int=command.assignment_record_id.int)
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
         principal=principal,
@@ -452,7 +455,7 @@ def create_assignment_record(
     if type(result) is not AssignmentMutationResult:
         raise TypeError("mutation_port must return AssignmentMutationResult")
     AssignmentMutationResult.__post_init__(result)
-    if result.assignment_record_id != command.assignment_record_id:
+    if result.assignment_record_id != expected_assignment_record_id:
         raise PeopleMutationIntegrityError("assignment result identity does not match command")
     return result
 
