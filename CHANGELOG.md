@@ -18,7 +18,7 @@ All notable changes to Orgmetra will be documented in this file.
 - `employment_record_version.employment_concurrency_code` constrained to `exclusive` or `concurrent`.
 - ADR 0005 for exclusive employment and staffable seats.
 - `orgmetra_hris_kernel` 0.3.0 with identity-scoped bitemporal resolution, assignment-employment coverage, allocation-portfolio checks, and a Memorial Hospital RN correction case at 100% statement and branch coverage.
-- `employment_record_version` and `position_record_version` so employment and position identity stay stable across retroactive corrections.
+- `employment_record_version` and `position_record_version` so corrections no longer mint a new employment or position identifier.
 - `assignment_record.employment_record_id` bound to the same person as the covering employment.
 - `orgmetra_keyverse_adapter` that binds an opaque Keyverse subject to a person and rejects passwords, passkeys, and tokens.
 - Design tokens for the repeating HR actions: approve, review, correct, request evidence, compare, export, and escalate.
@@ -54,6 +54,7 @@ All notable changes to Orgmetra will be documented in this file.
 - Made assignment coverage status-aware: `active` and `leave` remain staffable while `terminated` and other non-eligible employment statuses fail closed.
 - Made organization hierarchy reconstruction fail closed on a cycle at the requested tenant, effective day, and knowledge cutoff while ignoring future-recorded and foreign-tenant facts.
 - Build the outbox due-work index concurrently during migration 0008, requiring that index step to run outside an explicit transaction block so established queues do not block writers while the index is built; pre-index hardening and post-index privileged role setup use separate explicit transactions.
+- Active-PR People mutation commands now require exact built-in governance text and hire status values before digesting or persisting high-impact employment evidence.
 
 ### Security
 

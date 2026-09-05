@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2d2e0b488c0440533effa821808f2f17e37d92f8fb586174c2fdb594f760ca5",
-      "bytes": 17539,
-      "lines": 77
+      "sha256": "9ad6dad273c94c30741522ca87205ff24eb92c53becc8b53739d93acb28126f9",
+      "bytes": 17697,
+      "lines": 78
     },
     {
       "path": "CLAUDE.md",
@@ -353,8 +353,8 @@
     },
     {
       "path": "schemas/openapi.yaml",
-      "sha256": "09c1e43486779198574fe31b8bcabbd1c1f74beec7bf86245ae578061619838f",
-      "bytes": 29503,
+      "sha256": "c37522504d1f6ac6410eaac833dddbf09aacc85572da38a1cf7539541833ea8e",
+      "bytes": 29511,
       "lines": 1020
     },
     {

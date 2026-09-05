@@ -641,7 +641,7 @@ components:
           format: uuid
         allocation_ratio:
           type: string
-          pattern: '^(0\.[0-9]{4}|1\.0000)$'
+          pattern: '^(0\.(?!0000)[0-9]{4}|1\.0000)$'
         effective_from:
           type: string
           format: date
