@@ -46,16 +46,19 @@ class ValidityStudyIntegrityError(RuntimeError):
     """Indicate that persistence returned a record outside the authorized target."""
 
 
-def _require_operational_uuid(field_name: str, value: object) -> UUID:
-    """Return one exact operational UUID and reject protocol sentinels or subtypes."""
-    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
+def _require_operational_uuid(field_name: str, value: object) -> int:
+    """Return one inert UUID integer after exact outer and internal-type validation."""
+    if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an exact operational UUID.")
-    return value
+    identity = value.int
+    if type(identity) is not int or identity <= 0 or identity >= _MAX_UUID_INT:
+        raise ValueError(f"{field_name} must be an exact operational UUID.")
+    return identity
 
 
 def _store_operational_uuid(field_name: str, value: object) -> int:
     """Reduce one validated UUID to immutable integer storage without retaining its object alias."""
-    return _require_operational_uuid(field_name, value).int
+    return _require_operational_uuid(field_name, value)
 
 
 def _restore_operational_uuid(field_name: str, value: object) -> UUID:
