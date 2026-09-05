@@ -9,7 +9,6 @@ parameterized SQL, target snapshots and fail-closed row reconstruction.
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
 from typing import Any, Callable
 from uuid import UUID
 
@@ -40,22 +39,33 @@ LIMIT 2
 """.strip()
 
 
-@dataclass(frozen=True, slots=True)
-class PostgresValidityStudyReadPort:
+class PostgresValidityStudyReadPort(tuple):
     """Read one current validity-study header under forced tenant RLS.
 
     ``connection_factory`` must return a DB-API-compatible connection context
-    manager configured by deployment code. The adapter snapshots UUID identity
-    before invoking that executable factory so retained caller UUID aliases cannot
-    change the authorized SQL target during connection acquisition.
+    manager configured by deployment code. Tuple-backed storage prevents a
+    retained port reference from replacing that accepted dependency after
+    validation. The adapter snapshots UUID identity before invoking the factory so
+    retained caller UUID aliases cannot change the authorized SQL target during
+    connection acquisition.
     """
 
-    connection_factory: PostgresConnectionFactory
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        """Reject an unusable connection dependency before protected reads."""
-        if not callable(self.connection_factory):
+    def __new__(
+        cls,
+        *,
+        connection_factory: PostgresConnectionFactory,
+    ) -> PostgresValidityStudyReadPort:
+        """Validate and structurally bind the executable connection dependency."""
+        if not callable(connection_factory):
             raise TypeError("connection_factory must be callable")
+        return tuple.__new__(cls, (connection_factory,))
+
+    @property
+    def connection_factory(self) -> PostgresConnectionFactory:
+        """Return the structurally bound connection dependency."""
+        return self[0]
 
     def read_validity_study(
         self,
