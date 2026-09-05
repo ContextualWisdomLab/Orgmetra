@@ -132,25 +132,44 @@ def _detach_policy(policy: PurposeBoundAccessPolicy) -> PurposeBoundAccessPolicy
     )
 
 
-@dataclass(frozen=True, slots=True)
-class ValidationPrincipal:
-    """Authenticated Keyverse identity attributes needed by the validation context.
+class ValidationPrincipal(tuple):
+    """Structurally immutable authenticated Keyverse attributes for validation reads.
 
-    The bearer credential itself never enters this value. ``actor_reference`` is
-    an opaque namespaced reference and scopes are the already-authenticated token
-    scopes supplied by the product authentication boundary.
+    The bearer credential itself never enters this value. Tuple-backed storage
+    prevents a retained caller reference from rewriting tenant, actor, or scope
+    evidence through ``object.__setattr__`` after constructor validation.
     """
 
-    tenant_record_id: UUID
-    actor_reference: str
-    granted_scope_codes: frozenset[str]
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        """Reject malformed or mutable identity attributes before authorization."""
-        _require_operational_uuid("tenant_record_id", self.tenant_record_id)
-        if type(self.actor_reference) is not str or _REFERENCE_PATTERN.fullmatch(self.actor_reference) is None:
+    def __new__(
+        cls,
+        *,
+        tenant_record_id: UUID,
+        actor_reference: str,
+        granted_scope_codes: frozenset[str],
+    ) -> ValidationPrincipal:
+        """Validate exact identity evidence before creating the immutable principal."""
+        tenant_id = _require_operational_uuid("tenant_record_id", tenant_record_id)
+        if type(actor_reference) is not str or _REFERENCE_PATTERN.fullmatch(actor_reference) is None:
             raise ValueError("actor_reference must be an exact namespaced opaque reference.")
-        _validate_scope_set(self.granted_scope_codes)
+        scope_codes = _validate_scope_set(granted_scope_codes)
+        return tuple.__new__(cls, (tenant_id, actor_reference, scope_codes))
+
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return the authenticated tenant identity."""
+        return self[0]
+
+    @property
+    def actor_reference(self) -> str:
+        """Return the opaque authenticated actor reference."""
+        return self[1]
+
+    @property
+    def granted_scope_codes(self) -> frozenset[str]:
+        """Return the immutable authenticated scope set."""
+        return self[2]
 
 
 class ValidityStudyRecord(tuple):
