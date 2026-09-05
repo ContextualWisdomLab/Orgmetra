@@ -11,7 +11,7 @@ It does **not** query People, Talent Acquisition, Performance Management, Job Ar
 - accepts authenticated Keyverse identity attributes, not credentials;
 - evaluates tenant, purpose, operation, scope, resource, and requested fields before persistence;
 - calls only a `ValidityStudyReadPort` owned by this context;
-- reconstructs and validates durable registry scalars before returning them;
+- reconstructs persisted registry scalars into structurally immutable owner evidence before target validation and output;
 - returns only the fields authorized for the exact study record.
 
 The repository port is intentionally abstract in this increment. Protected foundation migrations still create the validity-study tables in the legacy foundation schema while `ARCHITECTURE.md` assigns them to the `workforce_validation` schema and database role. A direct `public.validity_study` adapter here would turn that implementation drift into a new long-lived service contract.
@@ -20,12 +20,13 @@ Issue #234 owns the next order: service-owned schema/role, durable PostgreSQL ad
 
 ## Test
 
-Once this service is admitted to Foundation CI, its contract is:
+The Draft branch is admitted to the canonical Foundation quality workflow with the same hash-locked test toolchain and direct source-tree dependency policy used by the existing owner services:
 
 ```bash
 PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src \
+  COVERAGE_FILE=/tmp/orgmetra-workforce-validation-api.coverage \
   python -m pytest -c services/workforce-validation-api/pyproject.toml \
   services/workforce-validation-api/tests
 ```
 
-The package declares 100% owned statement and branch coverage. Until the repository-wide Foundation writer includes this command and the exact head is GREEN, this slice remains Draft evidence rather than shipped product truth.
+The package declares 100% owned statement and branch coverage. Source-level workflow admission is not acceptance evidence by itself: this slice remains Draft until that command and the repository gates are terminal GREEN on the exact current head and qualifying independent review is satisfied.
