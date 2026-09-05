@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -174,9 +175,11 @@ def test_dependency_and_request_types_fail_before_repository_use() -> None:
         ("tenant_record_id", "not-a-uuid", ValueError),
         ("validity_study_id", UUID(int=0), ValueError),
         ("purpose_code", "Validation Review", ValueError),
+        ("purpose_code", 7, ValueError),
         ("requested_fields", set({"study_status_code"}), ValueError),
         ("requested_fields", frozenset(), ValueError),
         ("requested_fields", frozenset({"unknown_field"}), ValueError),
+        ("requested_fields", frozenset({7}), ValueError),
     ):
         arguments = dict(common)
         arguments[key] = value
@@ -190,8 +193,10 @@ def test_principal_rejects_invalid_identity_and_scope_shapes() -> None:
     invalid_values = (
         dict(tenant_record_id=UUID(int=0), actor_reference="person:analyst-1", granted_scope_codes=frozenset({"orgmetra.workforce_validation.read"})),
         dict(tenant_record_id=TENANT, actor_reference="not namespaced", granted_scope_codes=frozenset({"orgmetra.workforce_validation.read"})),
+        dict(tenant_record_id=TENANT, actor_reference=7, granted_scope_codes=frozenset({"orgmetra.workforce_validation.read"})),
         dict(tenant_record_id=TENANT, actor_reference="person:analyst-1", granted_scope_codes=frozenset()),
         dict(tenant_record_id=TENANT, actor_reference="person:analyst-1", granted_scope_codes=frozenset({"bad-scope"})),
+        dict(tenant_record_id=TENANT, actor_reference="person:analyst-1", granted_scope_codes=frozenset({7})),
     )
     for values in invalid_values:
         with pytest.raises(ValueError):
@@ -212,6 +217,7 @@ def test_record_rejects_noncanonical_or_invalid_durable_scalars() -> None:
         ("validity_study_id", "not-a-uuid"),
         ("criterion_blueprint_id", UUID(int=(1 << 128) - 1)),
         ("study_status_code", "Study Draft"),
+        ("study_status_code", 7),
         ("recorded_from", datetime(2026, 11, 3)),
         ("recorded_to", "not-a-datetime"),
     )
@@ -225,18 +231,19 @@ def test_record_rejects_noncanonical_or_invalid_durable_scalars() -> None:
         ValidityStudyRecord(**{**valid, "recorded_to": RECORDED_FROM})
 
 
-def test_valid_record_detaches_times_to_utc() -> None:
-    offset = timezone.utc
-    record = ValidityStudyRecord(
-        tenant_record_id=TENANT,
-        validity_study_id=STUDY,
-        criterion_blueprint_id=CRITERION,
-        study_status_code="study_draft",
-        recorded_from=datetime(2026, 11, 3, 9, tzinfo=offset),
-        recorded_to=datetime(2026, 11, 4, 9, tzinfo=offset),
-    )
+def test_valid_record_detaches_supported_timezones_to_utc() -> None:
+    for provider in (timezone(timedelta(hours=9)), ZoneInfo("Asia/Seoul")):
+        record = ValidityStudyRecord(
+            tenant_record_id=TENANT,
+            validity_study_id=STUDY,
+            criterion_blueprint_id=CRITERION,
+            study_status_code="study_draft",
+            recorded_from=datetime(2026, 11, 3, 9, tzinfo=provider),
+            recorded_to=datetime(2026, 11, 4, 9, tzinfo=provider),
+        )
 
-    assert type(record.recorded_from) is datetime
-    assert record.recorded_from.tzinfo is timezone.utc
-    assert record.recorded_to is not None
-    assert record.recorded_to.tzinfo is timezone.utc
+        assert type(record.recorded_from) is datetime
+        assert record.recorded_from.tzinfo is timezone.utc
+        assert record.recorded_from.hour == 0
+        assert record.recorded_to is not None
+        assert record.recorded_to.tzinfo is timezone.utc
