@@ -22,7 +22,7 @@ class _ExecutableUUID(UUID):
 
     def __getattribute__(self, name: str) -> object:
         if name == "int":
-            raise AssertionError("UUID subtype behavior executed")
+            raise AttributeError("UUID subtype behavior executed")
         return super().__getattribute__(name)
 
 
