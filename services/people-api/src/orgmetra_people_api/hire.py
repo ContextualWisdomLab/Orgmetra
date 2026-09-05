@@ -168,4 +168,10 @@ def accept_confirmed_hire(
     if type(result) is not HireAcceptanceResult:
         raise TypeError("mutation_port must return HireAcceptanceResult")
     HireAcceptanceResult.__post_init__(result)
+    if (
+        result.person_record_id != command.person_record_id
+        or result.employment_record_id != command.employment_record_id
+        or result.candidate_worker_conversion_record_id != command.candidate_worker_conversion_record_id
+    ):
+        raise HireDecisionIntegrityError("hire result identity does not match command")
     return result
