@@ -9,7 +9,7 @@ never insert ``candidate_worker_link``. Every accepted write calls
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable
@@ -571,7 +571,7 @@ class PostgresPeopleMutationPort:
         """Persist one employment after conversion and exclusivity checks."""
         if type(command) is not EmploymentMutationCommand:
             raise TypeError("command must be an EmploymentMutationCommand")
-        EmploymentMutationCommand.__post_init__(command)
+        command = replace(command)
         decision = _require_authorization(
             authorization=authorization,
             tenant_record_id=command.tenant_record_id,
@@ -680,7 +680,7 @@ class PostgresPeopleMutationPort:
         """Persist one position after organization and job parent checks."""
         if type(command) is not PositionMutationCommand:
             raise TypeError("command must be a PositionMutationCommand")
-        PositionMutationCommand.__post_init__(command)
+        command = replace(command)
         decision = _require_authorization(
             authorization=authorization,
             tenant_record_id=command.tenant_record_id,
@@ -777,7 +777,7 @@ class PostgresPeopleMutationPort:
         """Persist one assignment after conversion and kernel coverage checks."""
         if type(command) is not AssignmentMutationCommand:
             raise TypeError("command must be an AssignmentMutationCommand")
-        AssignmentMutationCommand.__post_init__(command)
+        command = replace(command)
         decision = _require_authorization(
             authorization=authorization,
             tenant_record_id=command.tenant_record_id,
