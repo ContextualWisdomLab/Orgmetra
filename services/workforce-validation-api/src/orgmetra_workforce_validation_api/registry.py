@@ -9,7 +9,6 @@ of normalizing direct cross-context SQL into a long-lived service contract.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from inspect import getattr_static
 import re
@@ -245,13 +244,40 @@ class ValidityStudyRecord(tuple):
         return self[5]
 
 
-@dataclass(frozen=True, slots=True)
-class ValidityStudyView:
-    """Field-minimized authorized view returned to the gateway or role workspace."""
+class ValidityStudyView(tuple):
+    """Structurally immutable field-minimized view returned after authorization.
 
-    tenant_record_id: UUID
-    validity_study_id: UUID
-    fields: tuple[tuple[str, object], ...]
+    Tuple-backed storage prevents downstream gateway, audit, or workspace code
+    from rewriting the authorized target identity or minimized field evidence
+    through ``object.__setattr__`` after the access decision has completed.
+    """
+
+    __slots__ = ()
+
+    def __new__(
+        cls,
+        *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        fields: tuple[tuple[str, object], ...],
+    ) -> ValidityStudyView:
+        """Create one immutable authorized-output envelope from already validated values."""
+        return tuple.__new__(cls, (tenant_record_id, validity_study_id, fields))
+
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return the tenant identity authorized for this view."""
+        return self[0]
+
+    @property
+    def validity_study_id(self) -> UUID:
+        """Return the validity-study identity authorized for this view."""
+        return self[1]
+
+    @property
+    def fields(self) -> tuple[tuple[str, object], ...]:
+        """Return the ordered field-minimized evidence authorized for release."""
+        return self[2]
 
 
 @runtime_checkable
