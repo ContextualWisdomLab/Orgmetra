@@ -289,37 +289,49 @@ class AssignmentMutationCommand:
         validate_idempotency_key(self.idempotency_key)
 
 
+def _validate_replay_command_digest(value: object) -> None:
+    """Require exact inert replay evidence when a mutation result carries it."""
+    if value is not None and type(value) is not str:
+        raise ValueError("replay_command_digest must be an exact string when present.")
+
+
 @dataclass(frozen=True, slots=True)
 class EmploymentMutationResult:
-    """Opaque identity returned after one committed employment mutation."""
+    """Opaque identity and optional verified-replay evidence for one employment mutation."""
 
     employment_record_id: UUID
+    replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
         """Prevent malformed persistence results from crossing the service boundary."""
         _validate_operational_uuid("employment_record_id", self.employment_record_id)
+        _validate_replay_command_digest(self.replay_command_digest)
 
 
 @dataclass(frozen=True, slots=True)
 class PositionMutationResult:
-    """Opaque identity returned after one committed position mutation."""
+    """Opaque identity and optional verified-replay evidence for one position mutation."""
 
     position_record_id: UUID
+    replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
         """Prevent malformed persistence results from crossing the service boundary."""
         _validate_operational_uuid("position_record_id", self.position_record_id)
+        _validate_replay_command_digest(self.replay_command_digest)
 
 
 @dataclass(frozen=True, slots=True)
 class AssignmentMutationResult:
-    """Opaque identity returned after one committed assignment mutation."""
+    """Opaque identity and optional verified-replay evidence for one assignment mutation."""
 
     assignment_record_id: UUID
+    replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
         """Prevent malformed persistence results from crossing the service boundary."""
         _validate_operational_uuid("assignment_record_id", self.assignment_record_id)
+        _validate_replay_command_digest(self.replay_command_digest)
 
 
 @runtime_checkable
@@ -358,6 +370,24 @@ def _require_port(mutation_port: object) -> PeopleMutationPort:
     return mutation_port
 
 
+def _require_result_identity_or_replay(
+    *,
+    result_record_id: UUID,
+    expected_record_id: UUID,
+    replay_command_digest: str | None,
+    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
+    authorization: AuthorizationDecision,
+    result_name: str,
+) -> None:
+    """Accept a foreign identity only with replay evidence bound to this semantic command."""
+    if replay_command_digest is not None:
+        if replay_command_digest != mutation_command_digest(command=command, authorization=authorization):
+            raise PeopleMutationIntegrityError(f"{result_name} replay evidence does not match command")
+        return
+    if result_record_id != expected_record_id:
+        raise PeopleMutationIntegrityError(f"{result_name} result identity does not match command")
+
+
 def create_employment_record(
     *,
     principal: AuthenticatedPrincipal,
@@ -387,8 +417,14 @@ def create_employment_record(
     if type(result) is not EmploymentMutationResult:
         raise TypeError("mutation_port must return EmploymentMutationResult")
     EmploymentMutationResult.__post_init__(result)
-    if result.employment_record_id != expected_employment_record_id:
-        raise PeopleMutationIntegrityError("employment result identity does not match command")
+    _require_result_identity_or_replay(
+        result_record_id=result.employment_record_id,
+        expected_record_id=expected_employment_record_id,
+        replay_command_digest=result.replay_command_digest,
+        command=command,
+        authorization=authorization,
+        result_name="employment",
+    )
     return result
 
 
@@ -421,8 +457,14 @@ def create_position_record(
     if type(result) is not PositionMutationResult:
         raise TypeError("mutation_port must return PositionMutationResult")
     PositionMutationResult.__post_init__(result)
-    if result.position_record_id != expected_position_record_id:
-        raise PeopleMutationIntegrityError("position result identity does not match command")
+    _require_result_identity_or_replay(
+        result_record_id=result.position_record_id,
+        expected_record_id=expected_position_record_id,
+        replay_command_digest=result.replay_command_digest,
+        command=command,
+        authorization=authorization,
+        result_name="position",
+    )
     return result
 
 
@@ -455,8 +497,14 @@ def create_assignment_record(
     if type(result) is not AssignmentMutationResult:
         raise TypeError("mutation_port must return AssignmentMutationResult")
     AssignmentMutationResult.__post_init__(result)
-    if result.assignment_record_id != expected_assignment_record_id:
-        raise PeopleMutationIntegrityError("assignment result identity does not match command")
+    _require_result_identity_or_replay(
+        result_record_id=result.assignment_record_id,
+        expected_record_id=expected_assignment_record_id,
+        replay_command_digest=result.replay_command_digest,
+        command=command,
+        authorization=authorization,
+        result_name="assignment",
+    )
     return result
 
 
