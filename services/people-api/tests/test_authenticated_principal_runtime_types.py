@@ -58,9 +58,7 @@ class AuthenticatedPrincipalRuntimeTypeTests(unittest.TestCase):
     def test_principal_runtime_class_cannot_be_subclassed(self) -> None:
         """Executable principal subclasses cannot override authenticated evidence access."""
         with self.assertRaisesRegex(TypeError, "AuthenticatedPrincipal must not be subclassed"):
-
-            class _PrincipalSubtype(AuthenticatedPrincipal):
-                pass
+            type("_PrincipalSubtype", (AuthenticatedPrincipal,), {})
 
     def test_tenant_uuid_is_detached_from_caller_owned_instance(self) -> None:
         """Post-construction mutation of the caller UUID cannot retarget the principal."""
