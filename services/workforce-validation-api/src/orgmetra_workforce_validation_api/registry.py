@@ -53,6 +53,18 @@ def _require_operational_uuid(field_name: str, value: object) -> UUID:
     return value
 
 
+def _store_operational_uuid(field_name: str, value: object) -> int:
+    """Reduce one validated UUID to immutable integer storage without retaining its object alias."""
+    return _require_operational_uuid(field_name, value).int
+
+
+def _restore_operational_uuid(field_name: str, value: object) -> UUID:
+    """Reconstruct one fresh UUID from immutable internal integer storage."""
+    if type(value) is not int or value <= 0 or value >= _MAX_UUID_INT:
+        raise ValueError(f"{field_name} must be an exact operational UUID.")
+    return UUID(int=value)
+
+
 def _require_code(field_name: str, value: object) -> str:
     """Return one exact lower-snake-case code used in an auditable policy request."""
     if type(value) is not str or _CODE_PATTERN.fullmatch(value) is None:
@@ -94,9 +106,9 @@ def _detach_policy(policy: PurposeBoundAccessPolicy) -> PurposeBoundAccessPolicy
     The protected Keyverse adapter accepts subclass-compatible scalar inputs for
     backward compatibility. This owner boundary is stricter because a caller-
     defined ``str``/``UUID`` subtype could otherwise execute Python behavior when
-    the evaluator compares or hashes policy attributes. Locals snapshot each
-    immutable value first; the reconstructed exact policy is the only one used by
-    authorization.
+    the evaluator compares or hashes policy attributes. Immutable UUID integer
+    storage also prevents a retained policy UUID alias from switching the tenant
+    after this boundary has accepted it.
     """
     tenant_record_id = policy.tenant_record_id
     policy_version_code = policy.policy_version_code
@@ -106,7 +118,7 @@ def _detach_policy(policy: PurposeBoundAccessPolicy) -> PurposeBoundAccessPolicy
     required_scope_code = policy.required_scope_code
     permitted_fields = policy.permitted_fields
 
-    _require_operational_uuid("policy tenant_record_id", tenant_record_id)
+    tenant_identity = _store_operational_uuid("policy tenant_record_id", tenant_record_id)
     for field_name, value in (
         ("policy_version_code", policy_version_code),
         ("resource_kind", resource_kind),
@@ -122,7 +134,7 @@ def _detach_policy(policy: PurposeBoundAccessPolicy) -> PurposeBoundAccessPolicy
         raise ValueError("policy permitted_fields must contain exact strings in an exact frozenset.")
 
     return PurposeBoundAccessPolicy(
-        tenant_record_id=tenant_record_id,
+        tenant_record_id=_restore_operational_uuid("policy tenant_record_id", tenant_identity),
         policy_version_code=policy_version_code,
         resource_kind=resource_kind,
         purpose_code=purpose_code,
@@ -136,8 +148,8 @@ class ValidationPrincipal(tuple):
     """Structurally immutable authenticated Keyverse attributes for validation reads.
 
     The bearer credential itself never enters this value. Tuple-backed storage
-    prevents a retained caller reference from rewriting tenant, actor, or scope
-    evidence through ``object.__setattr__`` after constructor validation.
+    keeps only immutable UUID integer evidence plus immutable actor/scope values,
+    so retained UUID references cannot rewrite tenant identity after validation.
     """
 
     __slots__ = ()
@@ -150,16 +162,16 @@ class ValidationPrincipal(tuple):
         granted_scope_codes: frozenset[str],
     ) -> ValidationPrincipal:
         """Validate exact identity evidence before creating the immutable principal."""
-        tenant_id = _require_operational_uuid("tenant_record_id", tenant_record_id)
+        tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
         if type(actor_reference) is not str or _REFERENCE_PATTERN.fullmatch(actor_reference) is None:
             raise ValueError("actor_reference must be an exact namespaced opaque reference.")
         scope_codes = _validate_scope_set(granted_scope_codes)
-        return tuple.__new__(cls, (tenant_id, actor_reference, scope_codes))
+        return tuple.__new__(cls, (tenant_identity, actor_reference, scope_codes))
 
     @property
     def tenant_record_id(self) -> UUID:
-        """Return the authenticated tenant identity."""
-        return self[0]
+        """Return a fresh authenticated tenant identity."""
+        return _restore_operational_uuid("tenant_record_id", self[0])
 
     @property
     def actor_reference(self) -> str:
@@ -175,12 +187,12 @@ class ValidationPrincipal(tuple):
 class ValidityStudyRecord(tuple):
     """Structurally immutable owner projection of one recorded validity-study header.
 
-    The tuple-backed representation prevents a repository adapter that retains an
-    accepted record from rewriting durable study evidence through
-    ``object.__setattr__`` after construction. Only fields already represented by
-    the protected foundation schema are carried here. Predictor, sample,
-    decision-policy and analysis-protocol versions remain a later scientific-model
-    increment owned by Issue #234.
+    The tuple-backed representation stores UUIDs as immutable integers, preventing
+    a repository adapter that retains accepted UUID objects from rewriting durable
+    study identity through ``object.__setattr__`` after construction. Only fields
+    already represented by the protected foundation schema are carried here.
+    Predictor, sample, decision-policy and analysis-protocol versions remain a
+    later scientific-model increment owned by Issue #234.
     """
 
     __slots__ = ()
@@ -196,9 +208,11 @@ class ValidityStudyRecord(tuple):
         recorded_to: datetime | None,
     ) -> ValidityStudyRecord:
         """Validate and detach durable scalars before creating the immutable tuple."""
-        tenant_id = _require_operational_uuid("tenant_record_id", tenant_record_id)
-        study_id = _require_operational_uuid("validity_study_id", validity_study_id)
-        criterion_id = _require_operational_uuid("criterion_blueprint_id", criterion_blueprint_id)
+        tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
+        study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
+        criterion_identity = _store_operational_uuid(
+            "criterion_blueprint_id", criterion_blueprint_id
+        )
         status_code = _require_code("study_status_code", study_status_code)
         recorded_start = _require_aware_datetime("recorded_from", recorded_from)
         recorded_end = (
@@ -210,23 +224,30 @@ class ValidityStudyRecord(tuple):
             raise ValueError("recorded_to must be later than recorded_from.")
         return tuple.__new__(
             cls,
-            (tenant_id, study_id, criterion_id, status_code, recorded_start, recorded_end),
+            (
+                tenant_identity,
+                study_identity,
+                criterion_identity,
+                status_code,
+                recorded_start,
+                recorded_end,
+            ),
         )
 
     @property
     def tenant_record_id(self) -> UUID:
-        """Return the tenant that owns this validity study."""
-        return self[0]
+        """Return a fresh tenant identity for this validity study."""
+        return _restore_operational_uuid("tenant_record_id", self[0])
 
     @property
     def validity_study_id(self) -> UUID:
-        """Return the stable validity-study identity."""
-        return self[1]
+        """Return a fresh stable validity-study identity."""
+        return _restore_operational_uuid("validity_study_id", self[1])
 
     @property
     def criterion_blueprint_id(self) -> UUID:
-        """Return the criterion blueprint linked to the study header."""
-        return self[2]
+        """Return a fresh criterion-blueprint identity linked to the study header."""
+        return _restore_operational_uuid("criterion_blueprint_id", self[2])
 
     @property
     def study_status_code(self) -> str:
@@ -244,13 +265,39 @@ class ValidityStudyRecord(tuple):
         return self[5]
 
 
+def _store_view_fields(fields: tuple[tuple[str, object], ...]) -> tuple[tuple[str, object], ...]:
+    """Store UUID-valued projection fields without retaining mutable UUID object aliases."""
+    return tuple(
+        (
+            field_name,
+            _store_operational_uuid(field_name, value)
+            if field_name == "criterion_blueprint_id"
+            else value,
+        )
+        for field_name, value in fields
+    )
+
+
+def _restore_view_fields(fields: tuple[tuple[str, object], ...]) -> tuple[tuple[str, object], ...]:
+    """Return a public projection with fresh UUID objects for UUID-valued fields."""
+    return tuple(
+        (
+            field_name,
+            _restore_operational_uuid(field_name, value)
+            if field_name == "criterion_blueprint_id"
+            else value,
+        )
+        for field_name, value in fields
+    )
+
+
 class ValidityStudyView(tuple):
     """Structurally immutable field-minimized view returned after authorization.
 
-    Tuple-backed storage prevents downstream gateway, audit, or workspace code
-    from rewriting the authorized target identity or minimized field evidence
-    through ``object.__setattr__`` after the access decision has completed. The
-    public constructor is deliberately non-issuing: callers obtain this data-only
+    Tuple-backed storage keeps target UUIDs and UUID-valued projected evidence as
+    immutable integers, so downstream gateway, audit, or workspace code cannot
+    rewrite authorized identity through retained UUID objects. The public
+    constructor is deliberately non-issuing: callers obtain this data-only
     projection from ``read_validity_study`` and must re-authorize consequential
     actions rather than treating the Python runtime type as a durable credential.
     """
@@ -269,18 +316,18 @@ class ValidityStudyView(tuple):
 
     @property
     def tenant_record_id(self) -> UUID:
-        """Return the tenant identity authorized for this view."""
-        return self[0]
+        """Return a fresh tenant identity authorized for this view."""
+        return _restore_operational_uuid("tenant_record_id", self[0])
 
     @property
     def validity_study_id(self) -> UUID:
-        """Return the validity-study identity authorized for this view."""
-        return self[1]
+        """Return a fresh validity-study identity authorized for this view."""
+        return _restore_operational_uuid("validity_study_id", self[1])
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
-        """Return the ordered field-minimized evidence authorized for release."""
-        return self[2]
+        """Return ordered field-minimized evidence with fresh UUID-valued projections."""
+        return _restore_view_fields(self[2])
 
 
 def _issue_validity_study_view(
@@ -290,7 +337,14 @@ def _issue_validity_study_view(
     fields: tuple[tuple[str, object], ...],
 ) -> ValidityStudyView:
     """Issue one immutable view after authorization and target validation complete."""
-    return tuple.__new__(ValidityStudyView, (tenant_record_id, validity_study_id, fields))
+    return tuple.__new__(
+        ValidityStudyView,
+        (
+            _store_operational_uuid("tenant_record_id", tenant_record_id),
+            _store_operational_uuid("validity_study_id", validity_study_id),
+            _store_view_fields(fields),
+        ),
+    )
 
 
 @runtime_checkable
@@ -319,9 +373,10 @@ def read_validity_study(
 ) -> ValidityStudyView:
     """Authorize and read one validity-study header through the canonical owner port.
 
-    Authorization is completed before persistence. The persistence result is then
-    reconstructed into an exact immutable value and must match the authorized
-    tenant/study identity before any field is returned.
+    Authorization is completed before persistence. Immutable integer snapshots
+    preserve the authorized target across the executable repository call. The
+    persistence result is reconstructed into an exact immutable value and must
+    match those snapshots before any field is returned.
     """
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
@@ -336,8 +391,10 @@ def read_validity_study(
         actor_reference=principal.actor_reference,
         granted_scope_codes=principal.granted_scope_codes,
     )
-    tenant_id = _require_operational_uuid("tenant_record_id", tenant_record_id)
-    study_id = _require_operational_uuid("validity_study_id", validity_study_id)
+    tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
+    study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
+    tenant_id = _restore_operational_uuid("tenant_record_id", tenant_identity)
+    study_id = _restore_operational_uuid("validity_study_id", study_identity)
     purpose = _require_code("purpose_code", purpose_code)
     fields = _validate_requested_fields(requested_fields)
     detached_policy = _detach_policy(policy)
@@ -359,8 +416,8 @@ def read_validity_study(
     )
 
     persisted = read_port.read_validity_study(
-        tenant_record_id=tenant_id,
-        validity_study_id=study_id,
+        tenant_record_id=_restore_operational_uuid("tenant_record_id", tenant_identity),
+        validity_study_id=_restore_operational_uuid("validity_study_id", study_identity),
     )
     if persisted is None:
         raise ValidityStudyNotFound(str(study_id))
@@ -375,7 +432,12 @@ def read_validity_study(
         recorded_from=persisted.recorded_from,
         recorded_to=persisted.recorded_to,
     )
-    if record.tenant_record_id != tenant_id or record.validity_study_id != study_id:
+    if (
+        _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
+        != tenant_identity
+        or _store_operational_uuid("record validity_study_id", record.validity_study_id)
+        != study_identity
+    ):
         raise ValidityStudyIntegrityError("repository returned a validity-study record for another target")
 
     values = {
@@ -385,7 +447,7 @@ def read_validity_study(
         "recorded_to": record.recorded_to,
     }
     return _issue_validity_study_view(
-        tenant_record_id=tenant_id,
-        validity_study_id=study_id,
+        tenant_record_id=_restore_operational_uuid("tenant_record_id", tenant_identity),
+        validity_study_id=_restore_operational_uuid("validity_study_id", study_identity),
         fields=tuple((field_name, values[field_name]) for field_name in sorted(fields)),
     )
