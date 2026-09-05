@@ -153,39 +153,76 @@ class ValidationPrincipal:
         _validate_scope_set(self.granted_scope_codes)
 
 
-@dataclass(frozen=True, slots=True)
-class ValidityStudyRecord:
-    """Canonical owner-side projection of one recorded validity-study header.
+class ValidityStudyRecord(tuple):
+    """Structurally immutable owner projection of one recorded validity-study header.
 
-    This value intentionally contains only fields already represented by the
-    protected foundation schema. Predictor, sample, decision-policy and analysis
-    protocol versions are not invented here; Issue #234 owns that later scientific
-    model increment.
+    The tuple-backed representation prevents a repository adapter that retains an
+    accepted record from rewriting durable study evidence through
+    ``object.__setattr__`` after construction. Only fields already represented by
+    the protected foundation schema are carried here. Predictor, sample,
+    decision-policy and analysis-protocol versions remain a later scientific-model
+    increment owned by Issue #234.
     """
 
-    tenant_record_id: UUID
-    validity_study_id: UUID
-    criterion_blueprint_id: UUID
-    study_status_code: str
-    recorded_from: datetime
-    recorded_to: datetime | None
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        """Detach durable scalar evidence before the application layer exposes it."""
-        _require_operational_uuid("tenant_record_id", self.tenant_record_id)
-        _require_operational_uuid("validity_study_id", self.validity_study_id)
-        _require_operational_uuid("criterion_blueprint_id", self.criterion_blueprint_id)
-        _require_code("study_status_code", self.study_status_code)
-        recorded_from = _require_aware_datetime("recorded_from", self.recorded_from)
-        recorded_to = (
+    def __new__(
+        cls,
+        *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        criterion_blueprint_id: UUID,
+        study_status_code: str,
+        recorded_from: datetime,
+        recorded_to: datetime | None,
+    ) -> ValidityStudyRecord:
+        """Validate and detach durable scalars before creating the immutable tuple."""
+        tenant_id = _require_operational_uuid("tenant_record_id", tenant_record_id)
+        study_id = _require_operational_uuid("validity_study_id", validity_study_id)
+        criterion_id = _require_operational_uuid("criterion_blueprint_id", criterion_blueprint_id)
+        status_code = _require_code("study_status_code", study_status_code)
+        recorded_start = _require_aware_datetime("recorded_from", recorded_from)
+        recorded_end = (
             None
-            if self.recorded_to is None
-            else _require_aware_datetime("recorded_to", self.recorded_to)
+            if recorded_to is None
+            else _require_aware_datetime("recorded_to", recorded_to)
         )
-        if recorded_to is not None and recorded_to <= recorded_from:
+        if recorded_end is not None and recorded_end <= recorded_start:
             raise ValueError("recorded_to must be later than recorded_from.")
-        object.__setattr__(self, "recorded_from", recorded_from)
-        object.__setattr__(self, "recorded_to", recorded_to)
+        return tuple.__new__(
+            cls,
+            (tenant_id, study_id, criterion_id, status_code, recorded_start, recorded_end),
+        )
+
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return the tenant that owns this validity study."""
+        return self[0]
+
+    @property
+    def validity_study_id(self) -> UUID:
+        """Return the stable validity-study identity."""
+        return self[1]
+
+    @property
+    def criterion_blueprint_id(self) -> UUID:
+        """Return the criterion blueprint linked to the study header."""
+        return self[2]
+
+    @property
+    def study_status_code(self) -> str:
+        """Return the governed study lifecycle status code."""
+        return self[3]
+
+    @property
+    def recorded_from(self) -> datetime:
+        """Return the exact UTC instant when this version became recorded truth."""
+        return self[4]
+
+    @property
+    def recorded_to(self) -> datetime | None:
+        """Return the exact UTC close instant when present."""
+        return self[5]
 
 
 @dataclass(frozen=True, slots=True)
