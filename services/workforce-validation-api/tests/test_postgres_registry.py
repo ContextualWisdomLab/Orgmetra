@@ -90,6 +90,20 @@ def test_constructor_rejects_non_callable_factory() -> None:
         PostgresValidityStudyReadPort(connection_factory=object())  # type: ignore[arg-type]
 
 
+def test_connection_factory_cannot_be_replaced_after_port_validation() -> None:
+    original_factory = _Factory([])
+    replacement_factory = _Factory([])
+    port = PostgresValidityStudyReadPort(connection_factory=original_factory)
+
+    with pytest.raises(AttributeError):
+        object.__setattr__(port, "connection_factory", replacement_factory)
+
+    assert port.connection_factory is original_factory
+    assert port.read_validity_study(tenant_record_id=TENANT, validity_study_id=STUDY) is None
+    assert original_factory.calls == 1
+    assert replacement_factory.calls == 0
+
+
 def test_invalid_target_is_rejected_before_connection_acquisition() -> None:
     factory = _Factory([])
     port = PostgresValidityStudyReadPort(connection_factory=factory)
