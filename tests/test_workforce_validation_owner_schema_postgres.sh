@@ -27,12 +27,23 @@ if [[ "${schema_owner}" != "workforce_validation_role" ]]; then
 fi
 
 role_config="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
-SELECT array_to_string(rolconfig, ',')
+SELECT COALESCE(array_to_string(rolconfig, ','), '')
 FROM pg_roles
 WHERE rolname = 'workforce_validation_role';
 ")"
-if [[ "${role_config}" != "search_path=workforce_validation, pg_catalog" ]]; then
-    echo "workforce_validation_role search_path is not owner-local: ${role_config}" >&2
+if [[ -n "${role_config}" ]]; then
+    echo "NOLOGIN schema owner must not carry ineffective login-only runtime defaults: ${role_config}" >&2
+    exit 1
+fi
+
+set_role_probe="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SET search_path = public;
+SET ROLE workforce_validation_role;
+SELECT current_user || '|' || current_setting('search_path');
+RESET ROLE;
+")"
+if [[ "${set_role_probe}" != "workforce_validation_role|public" ]]; then
+    echo "unexpected SET ROLE search_path behavior: ${set_role_probe}" >&2
     exit 1
 fi
 
