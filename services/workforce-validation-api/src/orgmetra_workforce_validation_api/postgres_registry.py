@@ -64,8 +64,8 @@ class PostgresValidityStudyReadPort(tuple):
 
     @property
     def connection_factory(self) -> PostgresConnectionFactory:
-        """Return the structurally bound connection dependency."""
-        return self[0]
+        """Return the exact callable stored by the validating base constructor."""
+        return tuple.__getitem__(self, 0)
 
     def read_validity_study(
         self,
@@ -74,13 +74,14 @@ class PostgresValidityStudyReadPort(tuple):
         validity_study_id: UUID,
     ) -> ValidityStudyRecord | None:
         """Return one exact current owner record or ``None`` for the tenant target."""
+        connection_factory = tuple.__getitem__(self, 0)
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
         study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
 
         sql_tenant_id = _restore_operational_uuid("tenant_record_id", tenant_identity)
         sql_study_id = _restore_operational_uuid("validity_study_id", study_identity)
 
-        with self.connection_factory() as connection:
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(sql_tenant_id),))
