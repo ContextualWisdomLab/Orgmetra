@@ -386,6 +386,8 @@ def create_employment_record(
     if type(result) is not EmploymentMutationResult:
         raise TypeError("mutation_port must return EmploymentMutationResult")
     EmploymentMutationResult.__post_init__(result)
+    if result.employment_record_id != command.employment_record_id:
+        raise PeopleMutationIntegrityError("employment result identity does not match command")
     return result
 
 
@@ -417,6 +419,8 @@ def create_position_record(
     if type(result) is not PositionMutationResult:
         raise TypeError("mutation_port must return PositionMutationResult")
     PositionMutationResult.__post_init__(result)
+    if result.position_record_id != command.position_record_id:
+        raise PeopleMutationIntegrityError("position result identity does not match command")
     return result
 
 
@@ -448,6 +452,8 @@ def create_assignment_record(
     if type(result) is not AssignmentMutationResult:
         raise TypeError("mutation_port must return AssignmentMutationResult")
     AssignmentMutationResult.__post_init__(result)
+    if result.assignment_record_id != command.assignment_record_id:
+        raise PeopleMutationIntegrityError("assignment result identity does not match command")
     return result
 
 
