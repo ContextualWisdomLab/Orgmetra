@@ -88,6 +88,50 @@ def _validate_requested_fields(values: object) -> frozenset[str]:
     return values
 
 
+def _detach_policy(policy: PurposeBoundAccessPolicy) -> PurposeBoundAccessPolicy:
+    """Copy policy evidence into exact inert values before any authorization comparison.
+
+    The protected Keyverse adapter accepts subclass-compatible scalar inputs for
+    backward compatibility. This owner boundary is stricter because a caller-
+    defined ``str``/``UUID`` subtype could otherwise execute Python behavior when
+    the evaluator compares or hashes policy attributes. Locals snapshot each
+    immutable value first; the reconstructed exact policy is the only one used by
+    authorization.
+    """
+    tenant_record_id = policy.tenant_record_id
+    policy_version_code = policy.policy_version_code
+    resource_kind = policy.resource_kind
+    purpose_code = policy.purpose_code
+    operation_code = policy.operation_code
+    required_scope_code = policy.required_scope_code
+    permitted_fields = policy.permitted_fields
+
+    _require_operational_uuid("policy tenant_record_id", tenant_record_id)
+    for field_name, value in (
+        ("policy_version_code", policy_version_code),
+        ("resource_kind", resource_kind),
+        ("purpose_code", purpose_code),
+        ("operation_code", operation_code),
+        ("required_scope_code", required_scope_code),
+    ):
+        if type(value) is not str:
+            raise ValueError(f"policy {field_name} must be an exact string.")
+    if type(permitted_fields) is not frozenset or any(
+        type(value) is not str for value in permitted_fields
+    ):
+        raise ValueError("policy permitted_fields must contain exact strings in an exact frozenset.")
+
+    return PurposeBoundAccessPolicy(
+        tenant_record_id=tenant_record_id,
+        policy_version_code=policy_version_code,
+        resource_kind=resource_kind,
+        purpose_code=purpose_code,
+        operation_code=operation_code,
+        required_scope_code=required_scope_code,
+        permitted_fields=permitted_fields,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ValidationPrincipal:
     """Authenticated Keyverse identity attributes needed by the validation context.
@@ -194,6 +238,7 @@ def read_validity_study(
     study_id = _require_operational_uuid("validity_study_id", validity_study_id)
     purpose = _require_code("purpose_code", purpose_code)
     fields = _validate_requested_fields(requested_fields)
+    detached_policy = _detach_policy(policy)
 
     require_purpose_bound_access(
         request=PurposeBoundAccessRequest(
@@ -208,7 +253,7 @@ def read_validity_study(
             requested_fields=fields,
             granted_scope_codes=principal.granted_scope_codes,
         ),
-        policy=policy,
+        policy=detached_policy,
     )
 
     persisted = read_port.read_validity_study(
