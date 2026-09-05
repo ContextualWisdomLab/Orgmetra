@@ -119,6 +119,7 @@ def mutation_command_digest(
     if type(authorization) is not AuthorizationDecision:
         raise TypeError("authorization must be an AuthorizationDecision")
     if type(command) is EmploymentMutationCommand:
+        EmploymentMutationCommand.__post_init__(command)
         route = "employment-records"
         semantic_command: dict[str, object] = {
             "confirmation_reference": command.confirmation_reference,
@@ -129,6 +130,7 @@ def mutation_command_digest(
             "person_record_id": str(command.person_record_id),
         }
     elif type(command) is PositionMutationCommand:
+        PositionMutationCommand.__post_init__(command)
         route = "position-records"
         semantic_command = {
             "confirmation_reference": command.confirmation_reference,
@@ -139,6 +141,7 @@ def mutation_command_digest(
             "position_status_code": command.position_status_code,
         }
     elif type(command) is AssignmentMutationCommand:
+        AssignmentMutationCommand.__post_init__(command)
         route = "assignment-records"
         semantic_command = {
             "allocation_ratio": _canonical_allocation_ratio(command.allocation_ratio),
@@ -366,6 +369,7 @@ def create_employment_record(
     """Authorize the exact employment target before persisting worker employment truth."""
     if type(command) is not EmploymentMutationCommand:
         raise TypeError("command must be an EmploymentMutationCommand")
+    EmploymentMutationCommand.__post_init__(command)
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
         principal=principal,
@@ -381,6 +385,7 @@ def create_employment_record(
     result = port.create_employment(command=command, authorization=authorization)
     if type(result) is not EmploymentMutationResult:
         raise TypeError("mutation_port must return EmploymentMutationResult")
+    EmploymentMutationResult.__post_init__(result)
     return result
 
 
@@ -395,6 +400,7 @@ def create_position_record(
     """Authorize the exact position target before persisting a staffable seat."""
     if type(command) is not PositionMutationCommand:
         raise TypeError("command must be a PositionMutationCommand")
+    PositionMutationCommand.__post_init__(command)
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
         principal=principal,
@@ -410,6 +416,7 @@ def create_position_record(
     result = port.create_position(command=command, authorization=authorization)
     if type(result) is not PositionMutationResult:
         raise TypeError("mutation_port must return PositionMutationResult")
+    PositionMutationResult.__post_init__(result)
     return result
 
 
@@ -424,6 +431,7 @@ def create_assignment_record(
     """Authorize the exact assignment target before persisting seat allocation."""
     if type(command) is not AssignmentMutationCommand:
         raise TypeError("command must be an AssignmentMutationCommand")
+    AssignmentMutationCommand.__post_init__(command)
     port = _require_port(mutation_port)
     authorization = authorize_resource_fields(
         principal=principal,
@@ -439,6 +447,7 @@ def create_assignment_record(
     result = port.create_assignment(command=command, authorization=authorization)
     if type(result) is not AssignmentMutationResult:
         raise TypeError("mutation_port must return AssignmentMutationResult")
+    AssignmentMutationResult.__post_init__(result)
     return result
 
 
