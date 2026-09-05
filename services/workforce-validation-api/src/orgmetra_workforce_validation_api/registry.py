@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from inspect import getattr_static
 import re
 from typing import Protocol, runtime_checkable
 from uuid import UUID
@@ -287,8 +288,9 @@ def read_validity_study(
         raise TypeError("principal must be an exact ValidationPrincipal.")
     if type(policy) is not PurposeBoundAccessPolicy:
         raise TypeError("policy must be an exact PurposeBoundAccessPolicy.")
-    if not isinstance(read_port, ValidityStudyReadPort):
-        raise TypeError("read_port must implement ValidityStudyReadPort.")
+    read_capability = getattr_static(read_port, "read_validity_study", None)
+    if not callable(read_capability):
+        raise TypeError("read_port must expose a statically callable read_validity_study.")
 
     detached_principal = ValidationPrincipal(
         tenant_record_id=principal.tenant_record_id,
