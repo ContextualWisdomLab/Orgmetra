@@ -150,6 +150,11 @@ def accept_confirmed_hire(
     if type(command) is not HireAcceptanceCommand:
         raise TypeError("command must be a HireAcceptanceCommand")
     HireAcceptanceCommand.__post_init__(command)
+    expected_person_record_id = UUID(int=command.person_record_id.int)
+    expected_employment_record_id = UUID(int=command.employment_record_id.int)
+    expected_conversion_record_id = UUID(
+        int=command.candidate_worker_conversion_record_id.int
+    )
     if not isinstance(mutation_port, HireAcceptancePort):
         raise TypeError("mutation_port must implement HireAcceptancePort")
 
@@ -169,9 +174,9 @@ def accept_confirmed_hire(
         raise TypeError("mutation_port must return HireAcceptanceResult")
     HireAcceptanceResult.__post_init__(result)
     if (
-        result.person_record_id != command.person_record_id
-        or result.employment_record_id != command.employment_record_id
-        or result.candidate_worker_conversion_record_id != command.candidate_worker_conversion_record_id
+        result.person_record_id != expected_person_record_id
+        or result.employment_record_id != expected_employment_record_id
+        or result.candidate_worker_conversion_record_id != expected_conversion_record_id
     ):
         raise HireDecisionIntegrityError("hire result identity does not match command")
     return result
