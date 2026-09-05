@@ -290,6 +290,11 @@ def read_validity_study(
     if not isinstance(read_port, ValidityStudyReadPort):
         raise TypeError("read_port must implement ValidityStudyReadPort.")
 
+    detached_principal = ValidationPrincipal(
+        tenant_record_id=principal.tenant_record_id,
+        actor_reference=principal.actor_reference,
+        granted_scope_codes=principal.granted_scope_codes,
+    )
     tenant_id = _require_operational_uuid("tenant_record_id", tenant_record_id)
     study_id = _require_operational_uuid("validity_study_id", validity_study_id)
     purpose = _require_code("purpose_code", purpose_code)
@@ -299,15 +304,15 @@ def read_validity_study(
     require_purpose_bound_access(
         request=PurposeBoundAccessRequest(
             tenant_record_id=tenant_id,
-            actor_tenant_record_id=principal.tenant_record_id,
+            actor_tenant_record_id=detached_principal.tenant_record_id,
             resource_tenant_record_id=tenant_id,
-            actor_reference=principal.actor_reference,
+            actor_reference=detached_principal.actor_reference,
             resource_reference=f"{_RESOURCE_KIND}:{study_id}",
             purpose_code=purpose,
             operation_code=_OPERATION,
             resource_kind=_RESOURCE_KIND,
             requested_fields=fields,
-            granted_scope_codes=principal.granted_scope_codes,
+            granted_scope_codes=detached_principal.granted_scope_codes,
         ),
         policy=detached_policy,
     )
