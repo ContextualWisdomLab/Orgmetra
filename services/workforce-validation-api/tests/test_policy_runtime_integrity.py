@@ -22,8 +22,13 @@ class _ExecutableText(str):
 
     calls = 0
 
+    def __eq__(self, other: object) -> bool:
+        """Expose any equality comparison before the boundary rejects the subtype."""
+        type(self).calls += 1
+        raise AssertionError("caller-defined policy comparison executed")
+
     def __ne__(self, other: object) -> bool:
-        """Expose any comparison before the boundary rejects the subtype."""
+        """Expose any inequality comparison before the boundary rejects the subtype."""
         type(self).calls += 1
         raise AssertionError("caller-defined policy comparison executed")
 
