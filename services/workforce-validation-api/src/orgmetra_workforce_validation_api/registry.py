@@ -249,7 +249,10 @@ class ValidityStudyView(tuple):
 
     Tuple-backed storage prevents downstream gateway, audit, or workspace code
     from rewriting the authorized target identity or minimized field evidence
-    through ``object.__setattr__`` after the access decision has completed.
+    through ``object.__setattr__`` after the access decision has completed. The
+    public constructor is deliberately non-issuing: callers obtain this data-only
+    projection from ``read_validity_study`` and must re-authorize consequential
+    actions rather than treating the Python runtime type as a durable credential.
     """
 
     __slots__ = ()
@@ -261,8 +264,8 @@ class ValidityStudyView(tuple):
         validity_study_id: UUID,
         fields: tuple[tuple[str, object], ...],
     ) -> ValidityStudyView:
-        """Create one immutable authorized-output envelope from already validated values."""
-        return tuple.__new__(cls, (tenant_record_id, validity_study_id, fields))
+        """Reject public construction so only the authorized read path issues views."""
+        raise TypeError("ValidityStudyView is issued only by read_validity_study.")
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -278,6 +281,16 @@ class ValidityStudyView(tuple):
     def fields(self) -> tuple[tuple[str, object], ...]:
         """Return the ordered field-minimized evidence authorized for release."""
         return self[2]
+
+
+def _issue_validity_study_view(
+    *,
+    tenant_record_id: UUID,
+    validity_study_id: UUID,
+    fields: tuple[tuple[str, object], ...],
+) -> ValidityStudyView:
+    """Issue one immutable view after authorization and target validation complete."""
+    return tuple.__new__(ValidityStudyView, (tenant_record_id, validity_study_id, fields))
 
 
 @runtime_checkable
@@ -371,7 +384,7 @@ def read_validity_study(
         "recorded_from": record.recorded_from,
         "recorded_to": record.recorded_to,
     }
-    return ValidityStudyView(
+    return _issue_validity_study_view(
         tenant_record_id=tenant_id,
         validity_study_id=study_id,
         fields=tuple((field_name, values[field_name]) for field_name in sorted(fields)),
