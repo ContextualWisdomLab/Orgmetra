@@ -16,9 +16,12 @@ CREATE ROLE workforce_validation_role NOLOGIN
 CREATE SCHEMA workforce_validation AUTHORIZATION workforce_validation_role;
 REVOKE ALL ON SCHEMA workforce_validation FROM PUBLIC;
 
--- Any login role granted this owner role resolves only owner objects and the
--- PostgreSQL catalog by default. Cross-context application tables are never put
--- on the implicit search path.
-ALTER ROLE workforce_validation_role SET search_path = workforce_validation, pg_catalog;
+-- workforce_validation_role is a migration/schema-owner identity only. Runtime
+-- principals must not be granted this owner role. PostgreSQL role-level GUC
+-- defaults apply at login and are not re-applied by SET ROLE; because this role
+-- is NOLOGIN, an ALTER ROLE ... SET search_path entry would not provide runtime
+-- isolation. Future runtime adapters must use a distinct least-privilege role,
+-- schema-qualified owner relations, and explicit function-level search_path for
+-- any SECURITY DEFINER code.
 
 COMMIT;
