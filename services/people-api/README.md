@@ -17,3 +17,19 @@ The People API quality workflow is part of this contract and must run for pull r
 `PeopleMutationAsgiApp` exposes the governed People mutation API as `POST /v1/employment-records`, `POST /v1/position-records`, and `POST /v1/assignment-records`. Each command requires an idempotency key, tenant/actor/purpose headers, a non-blank accountable decision reason, human confirmation, and versioned evidence. The HTTP boundary enforces the exact OpenAPI evidence-object shape and cardinality, rejects additional fields and duplicate evidence items, and canonicalizes the complete reference/version set independent of array order. It first derives a PII-minimized `evidence_set_v1:<sha256>` identity and then binds that identity together with the exact validated decision reason into `governance_evidence_v1:<sha256>`. The free-text reason and raw evidence references are not copied into the portable audit envelope, but any reason/reference/version drift changes the governance binding, the immutable audit correlation evidence, and the durable idempotency command digest. A caller therefore cannot reuse the same key after silently changing the high-impact rationale and receive an incorrect replay. The validated `Idempotency-Key` is copied onto the application command and into `PostgresPeopleMutationPort`. Employment and assignment writes require a current `candidate_worker_conversion_record` (`recorded_to IS NULL`) and reuse `orgmetra_hris_kernel` exclusivity and assignment-coverage checks before the port inserts the authoritative fact, calls `record_audit_outbox_event`, and stores `people_mutation_idempotency_record` in the same transaction. A matching retry returns the first committed identity without a second HRIS, audit, or outbox fact. Successful responses contain only opaque record identifiers.
 
 The superseded persistence model must not be restored, and the service must not use direct cross-service application-table SQL.
+
+## Operational telemetry wiring
+
+`PeopleHttpTelemetryMiddleware` is the governed composition point for privacy-safe People HTTP telemetry. Deployment adapters wrap each mounted ASGI app exactly once so live traffic emits one bounded `http.server.request.duration` measurement without ever placing tenant, person, candidate, raw path, query, header, credential, or payload values into metric dimensions:
+
+```python
+from orgmetra_people_api import (
+    PeopleAsgiApp,
+    PeopleHttpTelemetryMiddleware,
+)
+
+governed_reads = PeopleAsgiApp(authenticator=..., policy=..., read_port=...)
+served_app = PeopleHttpTelemetryMiddleware(app=governed_reads, sink=your_metric_sink)
+```
+
+The middleware never changes request status or exception behavior: exporter, route-classification, and even clock-source failures degrade telemetry to a value-free warning record while the wrapped HR request completes normally. Route labels are restricted to the application-owned low-cardinality templates in `classify_people_http_route`; every other path is recorded with no route label rather than a raw URL.
