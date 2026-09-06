@@ -11,3 +11,4 @@
 - Bind canonical export to the exact snapshot that passed issuance-seal validation so an interleaving valid-value rewrite cannot become emitted audit evidence after the integrity check.
 - Add exact 100% statement/branch coverage and exact-head CI for the owned package.
 - Build a wheel and execute the quality suite against the SHA-256-bound installed artifact in a fully isolated virtual environment; install the reviewed hash-pinned pytest/coverage toolchain inside that environment and fail closed if package or test-tool imports resolve outside it.
+- Retire the package-specific quality workflow after protected repository-workflow consolidation; preserve the same SHA-256-bound installed-wheel and isolated-toolchain contract inside the canonical one-job Foundation CI lane.

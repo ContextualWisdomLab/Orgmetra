@@ -24,7 +24,7 @@
 | Caller-defined scalar/time subclasses cannot forge canonical evidence | Active PR | exact runtime type checks and hostile-subclass regressions |
 | Post-construction rewriting invalidates evidence | Active PR | creation-time canonical digest seal plus mutation regressions |
 | Canonical export emits the same snapshot that passed integrity validation | Active PR | `_assert_integrity()` returns the checked canonical bytes; `test_checked_snapshot_integrity.py` reproduces an interleaving valid-value rewrite and requires the previously checked snapshot to be emitted |
-| Exact 100% owned statement/branch coverage | Active PR | `.github/workflows/candidate-offer-response-quality.yml` |
+| Exact 100% owned statement/branch coverage | Active PR | canonical `.github/workflows/foundation-ci.yml` builds the candidate-offer-response wheel, installs it by exact SHA-256 into an isolated venv, and executes `packages/candidate-offer-response/tests`; `test_artifact_execution.py` keeps the retired leaf workflow from returning |
 | Keyverse credentials or source state are never persisted here | Dependency contract | existing `packages/keyverse-adapter`; candidate-response packet stores opaque identity-resolution evidence only |
 | Actual identity proofing/authentication assurance selection | Out of scope | authoritative identity owner / relying-party risk assessment |
 | Offer eligibility, expiry, supersession and authoritative uniqueness | Out of scope for packet; required next step | owning talent-acquisition/offer workflow must re-resolve before action |
