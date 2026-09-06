@@ -10,73 +10,76 @@
 ## Finding
 
 Protected Foundation CI executes repository-owned Python quality on CPython 3.14, while several merged
-packages declare `requires-python = ">=3.12"`. The Structured Interview Plan work in #40 also declares
-Python 3.12 support and carried real Python 3.12/3.13 compatibility jobs in its historical package-local
-workflow. Protected #161 correctly retired package-local quality workflows, but adopting that deletion
-without replacing the compatibility evidence would silently weaken the declared runtime contract.
+packages declare `requires-python = ">=3.12"`. Structured Interview Plan #40 also carried real CPython
+3.12/3.13 execution in its historical package-local workflow. Protected #161 correctly retired package-local
+quality workflows, but adopting that deletion without replacement evidence would weaken the declared runtime
+contract.
 
-A package-local workflow is not restored. The compatibility capability belongs to the existing
-`.github/workflows/foundation-ci.yml` owner.
+Three follow-up reviews found separate fail-open defects in the first compatibility implementation. Metadata
+parser failures could be reclassified as unsupported-package skips; PEP 440 was evaluated against a fabricated
+`major.minor.0` rather than the executed interpreter patch; and an owned `packages/*/pyproject.toml` could
+escape package acceptance if either `src/` or `tests/` disappeared. Those paths now fail closed.
 
-A follow-up exact-tree review found a separate discovery fail-open edge: both Foundation package loops
-intentionally skip directory entries that are not complete Python packages. Without an independent
-repository-quality invariant, an owned `packages/*/pyproject.toml` could therefore become invisible to
-package execution simply by losing `src/` or `tests/`. Canonical Foundation now treats that layout as a
-repository contract violation before package execution rather than accepting a silent skip.
+Exact-head Foundation run `34050838082` exposed a fourth defect in the implementation shape. Python 3.12 and
+3.13 were introduced as a second matrix job, but protected repository policy intentionally constrains
+Foundation to one job to avoid recreating the previous matrix-driven Actions admission pressure. The two
+compatibility jobs themselves passed, while the canonical runner/queue contract failed before repository
+validation. Compatibility evidence is therefore kept, but it executes sequentially inside the existing
+`quality` job rather than widening the job graph.
+
+A package-local workflow is not restored. The capability remains owned by
+`.github/workflows/foundation-ci.yml`.
 
 ## Decision
 
-Foundation keeps its CPython 3.14 repository-quality lane and adds CPython 3.12 and 3.13 compatibility
-lanes on the same pinned `ubuntu-24.04` runner image. Both primary and compatibility package execution
-discover `packages/*/pyproject.toml` rather than naming packages in the workflow.
+Foundation keeps one `quality` job on pinned `ubuntu-24.04`. That job runs the primary CPython 3.14 package,
+service, and PostgreSQL contracts, then switches to CPython 3.12 and CPython 3.13 in sequence with
+`actions/setup-python`. Each compatibility runtime installs the separately reviewed hash-locked compatibility
+toolchain and executes every package whose `project.requires-python` includes the actual interpreter patch.
+No compatibility matrix or second Foundation job is permitted.
 
-For each compatibility runtime, Foundation reads `project.requires-python` with `tomllib` and
-`packaging.specifiers.SpecifierSet`. The selector evaluates that specifier against the actual interpreter
-release installed by `actions/setup-python`, using `sys.version_info.major`, `minor`, and `micro`; it does
-not fabricate a `.0` patch. A syntactically valid constraint may skip a package only when it excludes that
-exact executed interpreter release. Missing, blank, non-string, malformed TOML, or invalid specifier
-metadata fails the compatibility job instead of being reclassified as an unsupported runtime. Every
-selected package is compiled and its own pytest configuration is executed from its source tree. Package
-pytest contracts retain their existing exact statement and branch coverage gates.
+Primary and compatibility package execution discover `packages/*/pyproject.toml` rather than naming packages
+in workflow logic. For each compatibility runtime, Foundation reads `project.requires-python` with `tomllib`
+and `packaging.specifiers.SpecifierSet`, evaluates it against
+`sys.version_info.major.minor.micro`, and permits a skip only when a syntactically valid constraint excludes
+that exact executed release. Missing, blank, non-string, malformed TOML, invalid specifiers, or parser failures
+terminate the compatibility execution. Every selected package is compiled and runs its own pytest
+configuration, preserving its exact statement and branch coverage gate.
 
-The repository-quality hygiene contract enumerates every `packages/*/pyproject.toml` and requires both
-`src/` and `tests/` to exist. Its self-regression constructs incomplete package fixtures and proves that
-missing either directory fails closed. This keeps non-Python directories outside discovery while preventing
-an owned Python package from escaping Foundation acceptance by becoming structurally incomplete.
+The repository-quality hygiene contract independently enumerates every `packages/*/pyproject.toml` and
+requires both `src/` and `tests/`. Its self-regression constructs missing-`src` and missing-`tests` fixtures and
+requires both to fail closed. Non-Python directories without a `pyproject.toml` remain outside this contract.
 
-The primary CPython 3.14 toolchain remains bound by `.github/requirements/foundation-test.txt`.
-CPython 3.12/3.13 use `.github/requirements/foundation-compatibility-test.txt`, installed with
-`--require-hashes --no-deps --only-binary=:all:`. The compatibility lock reuses the reviewed versions from
-the primary toolchain and binds the reviewed coverage wheels for both compatibility minors.
+The primary CPython 3.14 toolchain remains bound by `.github/requirements/foundation-test.txt`. CPython
+3.12/3.13 use `.github/requirements/foundation-compatibility-test.txt`, installed with
+`--require-hashes --no-deps --only-binary=:all:` and reviewed wheel hashes for both compatibility runtimes.
 
 ## Invariants
 
-- `.github/workflows/foundation-ci.yml` remains the repository quality owner.
-- Every Foundation job uses `ubuntu-24.04`; `ubuntu-latest` is rejected by executable hygiene checks.
+- `.github/workflows/foundation-ci.yml` remains the only repository quality owner.
+- Foundation expands to exactly one repository-owned job; compatibility must not add a matrix or second job.
+- The Foundation job uses `ubuntu-24.04`; `ubuntu-latest` remains rejected by executable regression.
+- CPython 3.12 and 3.13 compatibility executes sequentially after the primary CPython 3.14 quality contracts.
 - Compatibility discovery is package-neutral and contains no Interview Plan or Selection Monitoring switch.
-- Every discovered owned Python package must have both `src/` and `tests/`; incomplete package layout is a
-  Foundation failure, not an accepted discovery skip.
-- Invalid or missing `project.requires-python` metadata fails closed; only a valid constraint that excludes
-  the actual executed interpreter patch may skip one package.
-- Patch-sensitive PEP 440 constraints are evaluated against the real interpreter release, never a fabricated
-  `major.minor.0` surrogate.
-- A compatibility lane fails if no owned package actually declares that runtime supported; static parsing
-  cannot satisfy the gate by itself.
-- Exact-head checkout and a clean checkout after execution are required in every compatibility lane.
+- Every discovered owned Python package has both `src/` and `tests/`; incomplete layout is a Foundation
+  failure rather than an accepted skip.
+- Invalid or missing `project.requires-python` metadata fails closed; only a valid constraint excluding the
+  actual executed interpreter patch may skip a package.
+- Patch-sensitive PEP 440 constraints are evaluated against the executed release, never a fabricated `.0`.
+- Each compatibility runtime fails if no owned package actually declares that runtime supported.
 - Repository-local packages are not installed into the checkout as an implicit dependency workaround.
 - Package-local quality workflows retired by protected #161 remain retired.
 
 ## Scope boundary
 
 This change proves declared compatibility for Python packages under `packages/`. The two HTTP services
-currently declare Python 3.11 support but are still exercised by Foundation only on the primary Python
-runtime. No Python 3.11 service-compatibility claim is made by this change; that is a separate service
-runtime contract rather than evidence for #258 or #40.
+currently declare Python 3.11 support but remain a separate #260 service-runtime contract. No Python 3.11
+service-compatibility claim is made by #258 or #40.
 
 ## Adoption
 
 After this capability is integrated on protected `develop`, #40 can discard
 `.github/workflows/interview-plan-quality.yml`, retain its `requires-python = ">=3.12"` declaration and
-package tests, and receive Python 3.12/3.13/3.14 evidence through Foundation without adding a package name
-to shared workflow logic. #42 should likewise adopt the protected generic package execution rather than
-copying its mutable shared-dispatcher implementation.
+package tests, and receive Python 3.12/3.13/3.14 evidence through Foundation without adding a package name to
+shared workflow logic. #42 should likewise adopt the protected generic package execution rather than copying
+its mutable shared-dispatcher implementation.
