@@ -8,7 +8,7 @@
 - Fail-closed human-review, authoritative-resolution, no-HRIS-mutation, and no-payroll-execution states with separate requester/reviewer actor references and bounded evidence versions.
 - Deterministic canonical JSON/SHA-256 evidence, redacted representations, canonical non-sentinel UUIDv4 identities for packet-owned namespaced opaque trust references, and exact 100% owned statement/branch coverage regressions.
 - Creation-bound process-local evidence integrity: low-level valid-value field rewrites and unsupported object copies cannot emit a second valid-looking canonical compensation-review truth.
-- `Compensation Change Review Quality` now retriggers on shared repository Python/test/clean-checkout configuration, with an executable regression preventing stale package-quality evidence after shared tooling changes.
+- Compensation-review quality now runs inside canonical `Foundation CI`; the package-specific workflow is retired after protected repository-quality consolidation, while the package `pyproject.toml` continues to enforce exact 100% statement and branch coverage.
 
 ### Changed
 

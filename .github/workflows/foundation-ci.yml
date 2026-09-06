@@ -59,6 +59,7 @@ jobs:
       - name: Run owned unit and service contracts once
         run: |
           PYTHONPATH=packages/candidate-evidence/src COVERAGE_FILE=/tmp/orgmetra-candidate-evidence.coverage python -m pytest -c packages/candidate-evidence/pyproject.toml packages/candidate-evidence/tests
+          PYTHONPATH=packages/compensation-change-review/src COVERAGE_FILE=/tmp/orgmetra-compensation-change-review.coverage python -m pytest -c packages/compensation-change-review/pyproject.toml packages/compensation-change-review/tests
           PYTHONPATH=packages/hris-kernel/src COVERAGE_FILE=/tmp/orgmetra-hris-kernel.coverage python -m pytest -c packages/hris-kernel/pyproject.toml packages/hris-kernel/tests
           PYTHONPATH=packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-keyverse-adapter.coverage python -m pytest -c packages/keyverse-adapter/pyproject.toml packages/keyverse-adapter/tests
           PYTHONPATH=packages/migration-adapter/src COVERAGE_FILE=/tmp/orgmetra-migration-adapter.coverage python -m pytest -c packages/migration-adapter/pyproject.toml packages/migration-adapter/tests
