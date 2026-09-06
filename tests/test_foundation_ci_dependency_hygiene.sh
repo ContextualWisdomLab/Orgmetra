@@ -4,7 +4,6 @@ set -euo pipefail
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 workflow_path="${repository_root}/.github/workflows/foundation-ci.yml"
 requirements_path="${repository_root}/.github/requirements/foundation-test.txt"
-selection_monitoring_contract="${repository_root}/tests/test_selection_monitoring_artifact.sh"
 
 expected_install="python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt"
 expected_default_pr_target=$'  pull_request:\n    branches:\n      - develop\n'
@@ -92,9 +91,17 @@ for package_name in coverage iniconfig packaging pluggy Pygments pytest pytest-c
   fi
 done
 
-if [[ ! -f "${selection_monitoring_contract}" ]]; then
-  printf 'Foundation CI Selection Monitoring artifact contract is missing.\n' >&2
+shopt -s nullglob
+delegated_artifact_contracts=(
+  "${repository_root}"/tests/test_foundation_ci_*_artifact.sh
+)
+shopt -u nullglob
+
+if [[ "${#delegated_artifact_contracts[@]}" -eq 0 ]]; then
+  printf 'Foundation CI must own at least one delegated artifact contract.\n' >&2
   exit 1
 fi
 
-bash "${selection_monitoring_contract}"
+for artifact_contract in "${delegated_artifact_contracts[@]}"; do
+  bash "${artifact_contract}"
+done

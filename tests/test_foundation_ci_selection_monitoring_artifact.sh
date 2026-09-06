@@ -13,9 +13,15 @@ if [[ -e "${retired_workflow}" ]]; then
 fi
 
 rm -rf "${venv_dir}"
+cleanup() {
+  rm -rf "${venv_dir}"
+}
+trap cleanup EXIT
+
 python -m venv "${venv_dir}"
 "${venv_dir}/bin/python" -m pip install --require-hashes --no-deps --only-binary=:all: -r "${requirements_path}"
 "${venv_dir}/bin/python" -m pip check
+"${venv_dir}/bin/python" -m compileall -q "${package_root}/src" "${package_root}/tests"
 
 PYTHONPATH="${package_root}/src" \
 COVERAGE_FILE=/tmp/orgmetra-selection-monitoring.coverage \
