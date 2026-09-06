@@ -4,28 +4,25 @@ on:
   pull_request:
     branches:
       - develop
-      - bootstrap
-      - main
-      - feat/foundation-product-baseline
   push:
     branches:
-      - bootstrap
-      - main
-      - feat/audit-outbox-envelope
+      - develop
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: foundation-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: foundation-ci-${{ github.repository }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  validate:
-    name: Foundation validation
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  quality:
+    name: Repository quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      ORGMETRA_POSTGRES_IMAGE: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,78 +43,127 @@ jobs:
         with:
           node-version: "24"
           check-latest: false
-      - name: Compile validation code
-        run: python -m compileall -q tests
+      - name: Compile owned Python boundaries
+        run: >-
+          python -m compileall -q tests packages services
+      - name: Prove explicit GitHub-hosted runner image contract
+        run: python -m unittest tests.test_github_actions_runner_image
       - name: Validate foundation pack
         run: npm run validate
       - name: Prove Foundation CI dependency hygiene
         run: bash tests/test_foundation_ci_dependency_hygiene.sh
-      - name: Prove HRIS kernel
-        env:
-          PYTHONPATH: packages/hris-kernel/src:packages/keyverse-adapter/src
+      - name: Set up exact Job Qualification Rule Review Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+          check-latest: false
+      - name: Install reviewed test toolchain
         run: |
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
-          python -m pytest packages/hris-kernel/tests
-          python -m pytest packages/keyverse-adapter/tests
+      - name: Run Job qualification rule review installed-artifact contract
+        run: |
+          printf '%s\n' 'setuptools==84.0.0 --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670' > /tmp/orgmetra-job-qualification-rule-review-build.txt
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r /tmp/orgmetra-job-qualification-rule-review-build.txt
+          rm -rf /tmp/orgmetra-job-qualification-rule-review-build-tree /tmp/orgmetra-job-qualification-rule-review-dist /tmp/orgmetra-job-qualification-rule-review-venv
+          cp -a packages/job-qualification-rule-review /tmp/orgmetra-job-qualification-rule-review-build-tree
+          mkdir -p /tmp/orgmetra-job-qualification-rule-review-dist
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-job-qualification-rule-review-dist /tmp/orgmetra-job-qualification-rule-review-build-tree
+          test "$(find /tmp/orgmetra-job-qualification-rule-review-dist -maxdepth 1 -type f -name '*.whl' | wc -l)" -eq 1
+          python -m venv /tmp/orgmetra-job-qualification-rule-review-venv
+          /tmp/orgmetra-job-qualification-rule-review-venv/bin/python -m pip install --require-hashes --no-deps --only-binary=:all: -r "$GITHUB_WORKSPACE/.github/requirements/foundation-test.txt"
+          wheel_path="$(find /tmp/orgmetra-job-qualification-rule-review-dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          wheel_sha="$(sha256sum "$wheel_path" | awk '{print $1}')"
+          printf 'orgmetra-job-qualification-rule-review[test] @ file://%s --hash=sha256:%s\n' "$wheel_path" "$wheel_sha" > /tmp/orgmetra-job-qualification-rule-review-install.txt
+          /tmp/orgmetra-job-qualification-rule-review-venv/bin/python -m pip install --require-hashes --no-deps -r /tmp/orgmetra-job-qualification-rule-review-install.txt
+          /tmp/orgmetra-job-qualification-rule-review-venv/bin/python -m pip check
+          /tmp/orgmetra-job-qualification-rule-review-venv/bin/python - <<'PY'
+          from importlib.metadata import metadata
+          from pathlib import Path
+          import coverage
+          import pytest
+          import pytest_cov
+          import orgmetra_job_qualification_rule_review
+
+          venv_root = Path("/tmp/orgmetra-job-qualification-rule-review-venv").resolve()
+          module_path = Path(orgmetra_job_qualification_rule_review.__file__).resolve()
+          if not module_path.is_relative_to(venv_root):
+              raise SystemExit(f"package imported outside isolated environment: {module_path}")
+          for module in (coverage, pytest, pytest_cov):
+              dependency_path = Path(module.__file__).resolve()
+              if not dependency_path.is_relative_to(venv_root):
+                  raise SystemExit(
+                      f"test dependency imported outside isolated environment: {dependency_path}"
+                  )
+          if "test" not in (metadata("orgmetra-job-qualification-rule-review").get_all("Provides-Extra") or []):
+              raise SystemExit("built distribution does not expose the reviewed test extra")
+          PY
+          cd /tmp
+          COVERAGE_FILE=/tmp/orgmetra-job-qualification-rule-review.coverage /tmp/orgmetra-job-qualification-rule-review-venv/bin/python -m pytest -c "$GITHUB_WORKSPACE/packages/job-qualification-rule-review/pyproject.toml" "$GITHUB_WORKSPACE/packages/job-qualification-rule-review/tests"
+      - name: Run owned unit and service contracts once
+        run: |
+          PYTHONPATH=packages/candidate-evidence/src COVERAGE_FILE=/tmp/orgmetra-candidate-evidence.coverage python -m pytest -c packages/candidate-evidence/pyproject.toml packages/candidate-evidence/tests
+          PYTHONPATH=packages/hris-kernel/src COVERAGE_FILE=/tmp/orgmetra-hris-kernel.coverage python -m pytest -c packages/hris-kernel/pyproject.toml packages/hris-kernel/tests
+          PYTHONPATH=packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-keyverse-adapter.coverage python -m pytest -c packages/keyverse-adapter/pyproject.toml packages/keyverse-adapter/tests
+          PYTHONPATH=packages/migration-adapter/src COVERAGE_FILE=/tmp/orgmetra-migration-adapter.coverage python -m pytest -c packages/migration-adapter/pyproject.toml packages/migration-adapter/tests
+          PYTHONPATH=packages/naruon-adapter/src COVERAGE_FILE=/tmp/orgmetra-naruon-adapter.coverage python -m pytest -c packages/naruon-adapter/pyproject.toml packages/naruon-adapter/tests
+          PYTHONPATH=packages/offer-approval/src COVERAGE_FILE=/tmp/orgmetra-offer-approval.coverage python -m pytest -c packages/offer-approval/pyproject.toml packages/offer-approval/tests
+          PYTHONPATH=packages/requisition-review/src COVERAGE_FILE=/tmp/orgmetra-requisition-review.coverage python -m pytest -c packages/requisition-review/pyproject.toml packages/requisition-review/tests
+          PYTHONPATH=packages/selection-review/src COVERAGE_FILE=/tmp/orgmetra-selection-review.coverage python -m pytest -c packages/selection-review/pyproject.toml packages/selection-review/tests
+          PYTHONPATH=services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-job-analysis-api.coverage python -m pytest -c services/job-analysis-api/pyproject.toml services/job-analysis-api/tests
+          PYTHONPATH=services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-people-api.coverage python -m pytest -c services/people-api/pyproject.toml services/people-api/tests
+      - name: Run PostgreSQL contracts in isolated containers
+        env:
+          PGPASSWORD: orgmetra
+        run: |
+          contracts=(
+            test_bitemporal_postgres.sh
+            test_tenant_isolation_postgres.sh
+            test_evidence_sealing_postgres.sh
+            test_operational_uuid_postgres.sh
+            test_audit_outbox_postgres.sh
+            test_outbox_claim_postgres.sh
+            test_outbox_dead_letter_postgres.sh
+            test_audit_outbox_hardening_postgres.sh
+            test_candidate_worker_conversion_postgres.sh
+            test_validity_study_case_postgres.sh
+            test_criterion_observation_scope_postgres.sh
+            test_people_mutation_idempotency_postgres.sh
+            test_job_analysis_snapshot_postgres.sh
+          )
+          for contract in "${contracts[@]}"; do
+            container_name="orgmetra-${GITHUB_RUN_ID}-${contract%.sh}"
+            docker run --detach --name "$container_name" \
+              --env POSTGRES_USER=orgmetra \
+              --env POSTGRES_PASSWORD=orgmetra \
+              --env POSTGRES_DB=orgmetra \
+              --publish 127.0.0.1::5432 \
+              "$ORGMETRA_POSTGRES_IMAGE"
+            trap 'docker rm --force "$container_name" >/dev/null 2>&1 || true' EXIT
+            postgres_binding="$(docker port "$container_name" 5432/tcp)"
+            postgres_port="${postgres_binding##*:}"
+            database_url="postgresql://orgmetra:orgmetra@127.0.0.1:$postgres_port/orgmetra"
+            for attempt in {1..30}; do
+              if psql "$database_url" -Atqc 'SELECT 1' >/dev/null 2>&1; then
+                break
+              fi
+              if [[ "$attempt" -eq 30 ]]; then
+                docker logs "$container_name"
+                exit 1
+              fi
+              sleep 1
+            done
+            DATABASE_URL="$database_url" bash "tests/$contract"
+            if [[ "$contract" == "test_job_analysis_snapshot_postgres.sh" ]]; then
+              DATABASE_URL="$database_url" bash tests/test_job_analysis_snapshot_schema_hardening.sh
+            fi
+            docker rm --force "$container_name" >/dev/null
+            trap - EXIT
+          done
       - name: Print exact manifest repair data
         if: failure()
         run: python tests/validate_repository.py --print-manifest
       - name: Prove validation is read-only
-        run: |
-          git diff --exit-code
-          test -z "$(git status --porcelain)"
-
-  postgres_contract:
-    name: PostgreSQL integrity contracts
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        contract:
-          - test_bitemporal_postgres.sh
-          - test_tenant_isolation_postgres.sh
-          - test_evidence_sealing_postgres.sh
-          - test_operational_uuid_postgres.sh
-          - test_audit_outbox_postgres.sh
-          - test_outbox_claim_postgres.sh
-          - test_outbox_dead_letter_postgres.sh
-          - test_audit_outbox_hardening_postgres.sh
-          - test_candidate_worker_conversion_postgres.sh
-          - test_validity_study_case_postgres.sh
-          - test_criterion_observation_scope_postgres.sh
-          - test_people_mutation_idempotency_postgres.sh
-          - test_job_analysis_snapshot_postgres.sh
-    services:
-      postgres:
-        image: postgres:16.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
-        env:
-          POSTGRES_USER: orgmetra
-          POSTGRES_PASSWORD: orgmetra
-          POSTGRES_DB: orgmetra
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U orgmetra -d orgmetra"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://orgmetra:orgmetra@localhost:5432/orgmetra
-    steps:
-      - name: Checkout exact candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - name: Prove exact candidate checkout
-        env:
-          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
-      - name: Run PostgreSQL contract
-        run: bash "tests/${{ matrix.contract }}"
-      - name: Prove test is read-only
         run: |
           git diff --exit-code
           test -z "$(git status --porcelain)"
