@@ -68,6 +68,17 @@ if ! grep -Fq -- 'compatibility_decision="$(' "${workflow_path}" ||
   exit 1
 fi
 
+expected_exact_runtime='runtime = Version(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")'
+if ! grep -Fq -- "${expected_exact_runtime}" "${workflow_path}"; then
+  printf 'Foundation compatibility selection must evaluate requires-python against the exact executed interpreter patch.\n' >&2
+  exit 1
+fi
+
+if grep -Fq -- 'runtime = Version(f"{sys.version_info.major}.{sys.version_info.minor}.0")' "${workflow_path}"; then
+  printf 'Foundation compatibility selection must not fabricate a .0 patch for requires-python checks.\n' >&2
+  exit 1
+fi
+
 for expected_pythonpath in "${expected_service_pythonpaths[@]}"; do
   if ! grep -Fq -- "PYTHONPATH=${expected_pythonpath} COVERAGE_FILE=" "${workflow_path}"; then
     printf 'Foundation CI must preserve reviewed service source-tree execution: %s\n' "${expected_pythonpath}" >&2
