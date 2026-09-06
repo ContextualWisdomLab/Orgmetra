@@ -146,6 +146,21 @@ def test_rejects_two_visible_managers_for_one_subordinate() -> None:
         )
 
 
+def test_rejects_duplicate_visible_relationship_identity() -> None:
+    """One durable reporting relationship identity cannot represent two visible edges."""
+    with pytest.raises(PositionReportingHierarchyError, match="identity appears more than once"):
+        build_position_reporting_snapshot(
+            [
+                relationship(RELATIONSHIP_A, POSITION_B, POSITION_A),
+                relationship(RELATIONSHIP_A, POSITION_C, POSITION_A),
+            ],
+            visible_positions(),
+            tenant_record_id=TENANT_ALPHA,
+            effective_on=EFFECTIVE_ON,
+            known_at=KNOWN_AT,
+        )
+
+
 def test_rejects_visible_reporting_cycle() -> None:
     """A position reporting chain must fail closed when it cycles."""
     with pytest.raises(PositionReportingHierarchyError, match="form a cycle"):

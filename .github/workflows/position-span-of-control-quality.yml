@@ -1,0 +1,58 @@
+name: Position Span of Control Quality
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - feat/position-reporting-hierarchy
+    paths:
+      - '.github/workflows/position-span-of-control-quality.yml'
+      - '.github/requirements/foundation-test.txt'
+      - 'packages/hris-kernel/**'
+      - 'docs/adr/0133-position-span-of-control-evidence.md'
+      - 'docs/doctoring/position-span-of-control-references.md'
+      - 'docs/traceability/position-span-of-control.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: position-span-of-control-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  span-of-control:
+    name: Position span-of-control contract and HRIS kernel 100% coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+          check-latest: false
+      - name: Install reviewed test toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
+          python -m pip check
+      - name: Compile HRIS workforce boundary
+        run: python -m compileall -q packages/hris-kernel/src packages/hris-kernel/tests
+      - name: Test complete HRIS kernel with exact statement and branch coverage
+        env:
+          PYTHONPATH: packages/hris-kernel/src
+          COVERAGE_FILE: /tmp/orgmetra-position-span.coverage
+        run: python -m pytest -c packages/hris-kernel/pyproject.toml packages/hris-kernel/tests
+      - name: Require clean checkout
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
