@@ -1,8 +1,8 @@
 # Position reporting hierarchy traceability
 
-## Protected-main truth
+## Protected-main truth and parent adoption
 
-At protected `develop@9e3e4847510e1e612b48474ba42b177b8ed824df`, Orgmetra separates Job, Position and Assignment and stores organization-unit parentage, but it has no position-to-position reporting fact. A manager therefore cannot be reconstructed from protected-main authoritative HRIS facts without incorrectly inferring supervision from a worker assignment or an organization-unit parent.
+The feature was originally proved against `develop@9e3e4847510e1e612b48474ba42b177b8ed824df`, where Orgmetra separated Job, Position and Assignment and stored organization-unit parentage but had no position-to-position reporting fact. Current protected truth is `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f`; this branch adopts that protected revision non-destructively while preserving the position-reporting delta. Protected #161 consolidates repository workflows but does not add authoritative position-reporting persistence or mutation, so the buyer gap remains after parent adoption.
 
 ## Active PR
 
