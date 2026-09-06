@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "b6a4365936b66803a8112f034c77d53d33301a7a798ed4f68746a4f2d8b081d7",
-      "bytes": 6651,
-      "lines": 125
+      "sha256": "27fd3f2a69181e6a31b49ab2a3d394bfc8dca2b8ef5e9ce39324273f7962773d",
+      "bytes": 11708,
+      "lines": 251
     },
     {
       "path": ".gitignore",
