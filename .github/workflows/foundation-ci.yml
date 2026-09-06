@@ -176,7 +176,7 @@ jobs:
           requires_python = project.get("requires-python")
           if not isinstance(requires_python, str) or not requires_python.strip():
               raise SystemExit(f"{pyproject}: project.requires-python is required")
-          runtime = Version(f"{sys.version_info.major}.{sys.version_info.minor}.0")
+          runtime = Version(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
           try:
               supported = runtime in SpecifierSet(requires_python)
           except InvalidSpecifier as exc:
