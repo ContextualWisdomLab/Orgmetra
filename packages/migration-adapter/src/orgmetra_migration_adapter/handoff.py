@@ -2,7 +2,10 @@
 
 This module owns only Orgmetra's pre-write governance envelope. It does not parse
 MHTML, transform source values, call mightyETL, hold credentials, or write HRIS
-tables. Those responsibilities remain behind their published owner contracts.
+tables. Those responsibilities remain behind their owner boundaries. The MHTML
+revision is bound to an immutable owner release; the mightyETL revision remains
+reviewed proposal evidence until its canonical owner publishes an immutable
+release binding that execution contract.
 """
 
 from __future__ import annotations
@@ -16,6 +19,8 @@ from uuid import UUID
 
 
 MHTML_ETL_GATEWAY_REVISION: Final = "779254927abb1e7cee80fd949907ccd03f9fc7be"
+# Reviewed owner snapshot only. Orgmetra #256 blocks release acceptance until
+# mightyETL publishes an immutable release binding this execution contract.
 MIGHTY_ETL_REVISION: Final = "ba8911f50ed20a39927a0d51c0cf20f9b7c91820"
 MIGRATION_CONTRACT_VERSION: Final = "orgmetra.migration_handoff.v1"
 MAXIMUM_BATCH_RECORDS: Final = 1000
