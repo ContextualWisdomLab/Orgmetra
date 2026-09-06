@@ -25,9 +25,11 @@ lanes on the same pinned `ubuntu-24.04` runner image. Both primary and compatibi
 discover `packages/*/pyproject.toml` rather than naming packages in the workflow.
 
 For each compatibility runtime, Foundation reads `project.requires-python` with `tomllib` and
-`packaging.specifiers.SpecifierSet`. A package is executed only when that runtime satisfies the package's
-declared constraint. Every selected package is compiled and its own pytest configuration is executed from
-its source tree. Package pytest contracts retain their existing exact statement and branch coverage gates.
+`packaging.specifiers.SpecifierSet`. A syntactically valid constraint that excludes the current minor may
+skip that package. Missing, blank, non-string, malformed TOML, or invalid specifier metadata fails the
+compatibility job instead of being reclassified as an unsupported runtime. Every selected package is
+compiled and its own pytest configuration is executed from its source tree. Package pytest contracts retain
+their existing exact statement and branch coverage gates.
 
 The primary CPython 3.14 toolchain remains bound by `.github/requirements/foundation-test.txt`.
 CPython 3.12/3.13 use `.github/requirements/foundation-compatibility-test.txt`, installed with
@@ -39,6 +41,8 @@ the primary toolchain and binds the reviewed coverage wheels for both compatibil
 - `.github/workflows/foundation-ci.yml` remains the repository quality owner.
 - Every Foundation job uses `ubuntu-24.04`; `ubuntu-latest` is rejected by executable hygiene checks.
 - Compatibility discovery is package-neutral and contains no Interview Plan or Selection Monitoring switch.
+- Invalid or missing `project.requires-python` metadata fails closed; only a valid constraint that excludes
+  the current minor may skip one package.
 - A compatibility lane fails if no owned package actually declares that runtime supported; static parsing
   cannot satisfy the gate by itself.
 - Exact-head checkout and a clean checkout after execution are required in every compatibility lane.

@@ -56,6 +56,18 @@ if grep -Eq -- 'packages/(interview-plan|selection-monitoring)' "${workflow_path
   exit 1
 fi
 
+if grep -Fq -- 'if ! python - "$pyproject"' "${workflow_path}"; then
+  printf 'Foundation compatibility selection must not convert metadata/parser failures into unsupported-package skips.\n' >&2
+  exit 1
+fi
+
+if ! grep -Fq -- 'compatibility_decision="$(' "${workflow_path}" ||
+   ! grep -Fq -- 'from packaging.specifiers import InvalidSpecifier, SpecifierSet' "${workflow_path}" ||
+   ! grep -Fq -- 'Unexpected compatibility decision for %s: %s' "${workflow_path}"; then
+  printf 'Foundation compatibility selection must fail closed on invalid requires-python metadata.\n' >&2
+  exit 1
+fi
+
 for expected_pythonpath in "${expected_service_pythonpaths[@]}"; do
   if ! grep -Fq -- "PYTHONPATH=${expected_pythonpath} COVERAGE_FILE=" "${workflow_path}"; then
     printf 'Foundation CI must preserve reviewed service source-tree execution: %s\n' "${expected_pythonpath}" >&2

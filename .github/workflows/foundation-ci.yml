@@ -163,11 +163,12 @@ jobs:
           for pyproject in packages/*/pyproject.toml; do
             package_dir="${pyproject%/pyproject.toml}"
             [[ -d "$package_dir/src" && -d "$package_dir/tests" ]] || continue
-            if ! python - "$pyproject" <<'PY'
+            compatibility_decision="$(
+              python - "$pyproject" <<'PY'
           import sys
           import tomllib
           from pathlib import Path
-          from packaging.specifiers import SpecifierSet
+          from packaging.specifiers import InvalidSpecifier, SpecifierSet
           from packaging.version import Version
 
           pyproject = Path(sys.argv[1])
@@ -176,10 +177,21 @@ jobs:
           if not isinstance(requires_python, str) or not requires_python.strip():
               raise SystemExit(f"{pyproject}: project.requires-python is required")
           runtime = Version(f"{sys.version_info.major}.{sys.version_info.minor}.0")
-          raise SystemExit(0 if runtime in SpecifierSet(requires_python) else 1)
+          try:
+              supported = runtime in SpecifierSet(requires_python)
+          except InvalidSpecifier as exc:
+              raise SystemExit(
+                  f"{pyproject}: invalid project.requires-python: {requires_python!r}"
+              ) from exc
+          print("supported" if supported else "unsupported")
           PY
-            then
+            )"
+            if [[ "$compatibility_decision" == "unsupported" ]]; then
               continue
+            fi
+            if [[ "$compatibility_decision" != "supported" ]]; then
+              printf 'Unexpected compatibility decision for %s: %s\n' "$pyproject" "$compatibility_decision" >&2
+              exit 1
             fi
             package_name="$(basename "$package_dir")"
             python -m compileall -q "$package_dir/src" "$package_dir/tests"
