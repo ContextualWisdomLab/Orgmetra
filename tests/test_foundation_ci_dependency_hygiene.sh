@@ -16,6 +16,51 @@ expected_service_pythonpaths=(
   "services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src"
 )
 
+validate_owned_package_layout() {
+  local root="$1"
+  local pyproject
+  local package_dir
+  local discovered=0
+
+  for pyproject in "${root}"/packages/*/pyproject.toml; do
+    [[ -f "${pyproject}" ]] || continue
+    discovered=$((discovered + 1))
+    package_dir="${pyproject%/pyproject.toml}"
+    if [[ ! -d "${package_dir}/src" || ! -d "${package_dir}/tests" ]]; then
+      printf 'Owned Python package must provide both src and tests directories: %s\n' "${package_dir}" >&2
+      return 1
+    fi
+  done
+
+  if [[ "${discovered}" -eq 0 ]]; then
+    printf 'Foundation CI package discovery found no owned Python packages.\n' >&2
+    return 1
+  fi
+}
+
+validate_owned_package_layout "${repository_root}"
+
+layout_fixture_root="$(mktemp -d)"
+trap 'rm -rf "${layout_fixture_root}"' EXIT
+for missing_directory in src tests; do
+  fixture_package="${layout_fixture_root}/packages/missing-${missing_directory}"
+  mkdir -p "${fixture_package}/src" "${fixture_package}/tests"
+  rm -rf "${fixture_package}/${missing_directory}"
+  cat >"${fixture_package}/pyproject.toml" <<'EOF'
+[project]
+name = "orgmetra-foundation-layout-fixture"
+version = "0.0.0"
+requires-python = ">=3.12"
+EOF
+  if validate_owned_package_layout "${layout_fixture_root}" >/dev/null 2>&1; then
+    printf 'Foundation package discovery must fail closed when an owned package omits %s.\n' "${missing_directory}" >&2
+    exit 1
+  fi
+  rm -rf "${fixture_package}"
+done
+rm -rf "${layout_fixture_root}"
+trap - EXIT
+
 if ! grep -Fq -- "${expected_install}" "${workflow_path}"; then
   printf 'Foundation CI must install only the hash-locked primary test toolchain.\n' >&2
   exit 1
