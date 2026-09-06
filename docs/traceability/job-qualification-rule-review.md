@@ -2,8 +2,8 @@
 
 ## State boundary
 
-- **Protected-main truth:** `develop@9e3e4847510e1e612b48474ba42b177b8ed824df` has authoritative Job Analysis Task/FJA/KSAO evidence but no dedicated governed qualification-rule review packet.
-- **Active PR truth:** this branch proposes `JobQualificationRuleReviewPacket`; it is not protected-main truth until merged.
+- **Protected-parent adoption snapshot:** `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` includes protected #161's repository-quality consolidation and remains the parent adopted by this Draft lane. The protected branch must be re-read again before merge; this snapshot is evidence of the adoption point, not a perpetual claim about the latest protected head.
+- **Active PR truth:** this Draft branch proposes `JobQualificationRuleReviewPacket`; it is not protected-main truth until normal protected integration completes.
 - **Foreign dependencies:** none are written or queried directly. This slice is Orgmetra-owned and standalone.
 
 ## Requirement-to-evidence matrix
@@ -19,7 +19,7 @@
 | Require accountable human review | distinct requester/reviewer UUIDv4 correlations and mandatory review state | actor-overlap and governance regressions |
 | Version high-impact evidence | bounded exact integer `evidence_version` | bool/non-int/range and digest-change regressions |
 | Detect in-process post-issuance mutation | process-local weak issuance digest outside packet slots; export revalidates one snapshot | valid-field and hostile-runtime mutation regressions |
-| Preserve exact package/artifact evidence | dedicated exact-head workflow builds and SHA-256-binds isolated wheel | Job Qualification Rule Review Quality |
+| Preserve exact package/artifact evidence | canonical Foundation CI builds and SHA-256-binds the isolated wheel after leaf-workflow retirement | Foundation installed-artifact contract + leaf-reintroduction regression |
 | Preserve exact owned test sufficiency | package pytest config requires statement and branch coverage 100% | `--cov-fail-under=100`, branch coverage enabled |
 
 ## Authoritative next action
