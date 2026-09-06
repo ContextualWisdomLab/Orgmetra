@@ -4,6 +4,7 @@ set -euo pipefail
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 workflow_path="${repository_root}/.github/workflows/foundation-ci.yml"
 requirements_path="${repository_root}/.github/requirements/foundation-test.txt"
+position_lifecycle_contract="${repository_root}/tests/test_position_lifecycle_review_artifact.sh"
 
 expected_install="python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt"
 expected_default_pr_target=$'  pull_request:\n    branches:\n      - develop\n'
@@ -90,3 +91,10 @@ for package_name in coverage iniconfig packaging pluggy Pygments pytest pytest-c
     exit 1
   fi
 done
+
+if [[ ! -f "${position_lifecycle_contract}" ]]; then
+  printf 'Foundation CI Position Lifecycle Review artifact contract is missing.\n' >&2
+  exit 1
+fi
+
+bash "${position_lifecycle_contract}"
