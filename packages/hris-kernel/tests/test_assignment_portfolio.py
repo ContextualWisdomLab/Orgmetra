@@ -134,6 +134,48 @@ def test_portfolio_rejects_non_positive_or_oversized_ratio(jordan_icu_assignment
         )
 
 
+
+def test_portfolio_rejects_ungoverned_assignment_categories(
+    jordan_icu_assignment,
+) -> None:
+    """HR must choose a governed string category before saving an assignment."""
+    invalid_type = replace(jordan_icu_assignment, assignment_category_code=1)
+    invalid_code = replace(jordan_icu_assignment, assignment_category_code="lead")
+
+    for invalid in (invalid_type, invalid_code):
+        with pytest.raises(AssignmentPortfolioError, match="classification"):
+            validate_assignment_portfolio(
+                [invalid],
+                tenant_record_id=TENANT,
+                person_record_id=JORDAN,
+                employment_record_id=JORDAN_EMPLOYMENT,
+                effective_on=date(2024, 5, 1),
+                known_at=utc(2024, 5, 1),
+            )
+
+
+def test_portfolio_rejects_two_visible_primary_assignments(
+    jordan_icu_assignment,
+    jordan_float_assignment,
+) -> None:
+    """HR must keep one primary and mark simultaneous additional work secondary."""
+    primary_icu = replace(jordan_icu_assignment, assignment_category_code="primary")
+    primary_float = replace(
+        jordan_float_assignment,
+        assignment_category_code="primary",
+    )
+
+    with pytest.raises(AssignmentPortfolioError, match="two visible primary"):
+        validate_assignment_portfolio(
+            [primary_icu, primary_float],
+            tenant_record_id=TENANT,
+            person_record_id=JORDAN,
+            employment_record_id=JORDAN_EMPLOYMENT,
+            effective_on=date(2024, 5, 1),
+            known_at=utc(2024, 5, 1),
+        )
+
+
 def test_assignment_requires_covering_active_employment(
     jordan_icu_assignment,
     jordan_active_employment,
