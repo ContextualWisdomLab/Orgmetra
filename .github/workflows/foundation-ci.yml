@@ -33,7 +33,7 @@ jobs:
         env:
           ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
-      - name: Set up Python
+      - name: Set up primary Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
@@ -119,44 +119,18 @@ jobs:
             docker rm --force "$container_name" >/dev/null
             trap - EXIT
           done
-      - name: Print exact manifest repair data
-        if: failure()
-        run: python tests/validate_repository.py --print-manifest
-      - name: Prove validation is read-only
-        run: |
-          git diff --exit-code
-          test -z "$(git status --porcelain)"
-
-  python-compatibility:
-    name: Python ${{ matrix.python-version }} declared package compatibility
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13"]
-    steps:
-      - name: Checkout exact candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - name: Prove exact candidate checkout
-        env:
-          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
-      - name: Set up declared Python minor
+      - name: Set up Python 3.12 compatibility runtime
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
           check-latest: false
-      - name: Install reviewed compatibility toolchain
+      - name: Install reviewed Python 3.12 compatibility toolchain
         run: |
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-compatibility-test.txt
           python -m pip check
-      - name: Execute every package that declares this Python minor supported
+      - name: Execute every package that declares Python 3.12 supported
         env:
-          ORGMETRA_PYTHON_MINOR: ${{ matrix.python-version }}
+          ORGMETRA_PYTHON_MINOR: "3.12"
         run: |
           set -euo pipefail
           executed=0
@@ -204,7 +178,69 @@ jobs:
             printf 'No owned package declared Python %s support; compatibility evidence would be vacuous.\n' "$ORGMETRA_PYTHON_MINOR" >&2
             exit 1
           fi
-      - name: Require clean checkout
+      - name: Set up Python 3.13 compatibility runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          check-latest: false
+      - name: Install reviewed Python 3.13 compatibility toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-compatibility-test.txt
+          python -m pip check
+      - name: Execute every package that declares Python 3.13 supported
+        env:
+          ORGMETRA_PYTHON_MINOR: "3.13"
+        run: |
+          set -euo pipefail
+          executed=0
+          for pyproject in packages/*/pyproject.toml; do
+            package_dir="${pyproject%/pyproject.toml}"
+            [[ -d "$package_dir/src" && -d "$package_dir/tests" ]] || continue
+            compatibility_decision="$(
+              python - "$pyproject" <<'PY'
+          import sys
+          import tomllib
+          from pathlib import Path
+          from packaging.specifiers import InvalidSpecifier, SpecifierSet
+          from packaging.version import Version
+
+          pyproject = Path(sys.argv[1])
+          project = tomllib.loads(pyproject.read_text(encoding="utf-8")).get("project", {})
+          requires_python = project.get("requires-python")
+          if not isinstance(requires_python, str) or not requires_python.strip():
+              raise SystemExit(f"{pyproject}: project.requires-python is required")
+          runtime = Version(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+          try:
+              supported = runtime in SpecifierSet(requires_python)
+          except InvalidSpecifier as exc:
+              raise SystemExit(
+                  f"{pyproject}: invalid project.requires-python: {requires_python!r}"
+              ) from exc
+          print("supported" if supported else "unsupported")
+          PY
+            )"
+            if [[ "$compatibility_decision" == "unsupported" ]]; then
+              continue
+            fi
+            if [[ "$compatibility_decision" != "supported" ]]; then
+              printf 'Unexpected compatibility decision for %s: %s\n' "$pyproject" "$compatibility_decision" >&2
+              exit 1
+            fi
+            package_name="$(basename "$package_dir")"
+            python -m compileall -q "$package_dir/src" "$package_dir/tests"
+            PYTHONPATH="$package_dir/src" \
+              COVERAGE_FILE="/tmp/orgmetra-${package_name}-${ORGMETRA_PYTHON_MINOR}.coverage" \
+              python -m pytest -c "$pyproject" "$package_dir/tests"
+            executed=$((executed + 1))
+          done
+          if [[ "$executed" -eq 0 ]]; then
+            printf 'No owned package declared Python %s support; compatibility evidence would be vacuous.\n' "$ORGMETRA_PYTHON_MINOR" >&2
+            exit 1
+          fi
+      - name: Print exact manifest repair data
+        if: failure()
+        run: python tests/validate_repository.py --print-manifest
+      - name: Prove validation is read-only
         run: |
           git diff --exit-code
           test -z "$(git status --porcelain)"
