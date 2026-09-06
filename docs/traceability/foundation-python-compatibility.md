@@ -27,16 +27,30 @@ compatibility jobs themselves passed, while the canonical runner/queue contract 
 validation. Compatibility evidence is therefore kept, but it executes sequentially inside the existing
 `quality` job rather than widening the job graph.
 
+Exact head `79e8757515673144b68687517360cf493e93ccb8` then produced a complete Foundation GREEN in run
+`34053906336`: the one `Repository quality` job passed exact checkout, runner-image proof, Foundation validation,
+dependency hygiene, primary package/service/PostgreSQL contracts, Python 3.12 compatibility, Python 3.13
+compatibility, and clean-checkout proof.
+
+A fifth review found a provenance gap despite that GREEN. The compatibility requirement file was hash-locked at
+the package line level, but the file itself was not part of the canonical Foundation manifest inventory. A
+reviewed dependency set could therefore change without changing the manifest unless another tracked artifact
+bound it. The active successor now makes that binding explicit: the manifest-sealed Foundation workflow verifies
+SHA-256 `cebb36181e8ac995a36d73a02a45094a204ff5adb3cbcdc0c9eccff309ac6aab` for
+`.github/requirements/foundation-compatibility-test.txt` before either compatibility runtime can install it.
+The workflow itself is resealed in `manifest.json`, so the dependency input is transitively integrity-bound
+without adding a second quality owner or mutable external source.
+
 A package-local workflow is not restored. The capability remains owned by
 `.github/workflows/foundation-ci.yml`.
 
 ## Decision
 
 Foundation keeps one `quality` job on pinned `ubuntu-24.04`. That job runs the primary CPython 3.14 package,
-service, and PostgreSQL contracts, then switches to CPython 3.12 and CPython 3.13 in sequence with
-`actions/setup-python`. Each compatibility runtime installs the separately reviewed hash-locked compatibility
-toolchain and executes every package whose `project.requires-python` includes the actual interpreter patch.
-No compatibility matrix or second Foundation job is permitted.
+service, and PostgreSQL contracts, proves the reviewed compatibility-toolchain file digest, then switches to
+CPython 3.12 and CPython 3.13 in sequence with `actions/setup-python`. Each compatibility runtime installs the
+same reviewed hash-locked compatibility toolchain and executes every package whose `project.requires-python`
+includes the actual interpreter patch. No compatibility matrix or second Foundation job is permitted.
 
 Primary and compatibility package execution discover `packages/*/pyproject.toml` rather than naming packages
 in workflow logic. For each compatibility runtime, Foundation reads `project.requires-python` with `tomllib`
@@ -52,7 +66,9 @@ requires both to fail closed. Non-Python directories without a `pyproject.toml` 
 
 The primary CPython 3.14 toolchain remains bound by `.github/requirements/foundation-test.txt`. CPython
 3.12/3.13 use `.github/requirements/foundation-compatibility-test.txt`, installed with
-`--require-hashes --no-deps --only-binary=:all:` and reviewed wheel hashes for both compatibility runtimes.
+`--require-hashes --no-deps --only-binary=:all:` and reviewed wheel hashes for both compatibility runtimes. The
+compatibility file's complete bytes are additionally pinned by the manifest-sealed Foundation workflow before
+installation.
 
 ## Invariants
 
@@ -60,6 +76,7 @@ The primary CPython 3.14 toolchain remains bound by `.github/requirements/founda
 - Foundation expands to exactly one repository-owned job; compatibility must not add a matrix or second job.
 - The Foundation job uses `ubuntu-24.04`; `ubuntu-latest` remains rejected by executable regression.
 - CPython 3.12 and 3.13 compatibility executes sequentially after the primary CPython 3.14 quality contracts.
+- The compatibility requirement file must match the reviewed SHA-256 before either compatibility install.
 - Compatibility discovery is package-neutral and contains no Interview Plan or Selection Monitoring switch.
 - Every discovered owned Python package has both `src/` and `tests/`; incomplete layout is a Foundation
   failure rather than an accepted skip.
