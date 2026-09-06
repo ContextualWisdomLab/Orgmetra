@@ -19,8 +19,8 @@ fi
 python - <<'PY'
 import sys
 
-if sys.version_info[:2] != (3, 14):
-    raise SystemExit(f"Employment Leave Review quality requires CPython 3.14, got {sys.version}")
+if sys.version_info[:3] != (3, 14, 7):
+    raise SystemExit(f"Employment Leave Review quality requires CPython 3.14.7, got {sys.version}")
 PY
 
 printf '%s\n' 'setuptools==84.0.0 --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670' > "${build_requirement}"

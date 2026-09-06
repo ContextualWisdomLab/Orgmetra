@@ -23,7 +23,7 @@ def test_quality_contract_is_owned_by_canonical_foundation() -> None:
     assert "Prove Foundation CI dependency hygiene" in workflow
     assert "test_employment_leave_review_artifact.sh" in hygiene
     assert "PYTHONPATH=packages/employment-leave-review/src" not in artifact
-    assert 'sys.version_info[:2] != (3, 14)' in artifact
+    assert "sys.version_info[:3] != (3, 14, 7)" in artifact
     assert f'python -m venv "${{venv_dir}}"' in artifact
     assert "--require-hashes --no-deps --only-binary=:all:" in artifact
     assert 'wheel_sha="$(sha256sum "${wheel_path}" | awk \'{print $1}\')"' in artifact
