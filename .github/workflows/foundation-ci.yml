@@ -56,16 +56,19 @@ jobs:
         run: |
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
-      - name: Run owned unit and service contracts once
+      - name: Run owned package contracts once
         run: |
-          PYTHONPATH=packages/candidate-evidence/src COVERAGE_FILE=/tmp/orgmetra-candidate-evidence.coverage python -m pytest -c packages/candidate-evidence/pyproject.toml packages/candidate-evidence/tests
-          PYTHONPATH=packages/hris-kernel/src COVERAGE_FILE=/tmp/orgmetra-hris-kernel.coverage python -m pytest -c packages/hris-kernel/pyproject.toml packages/hris-kernel/tests
-          PYTHONPATH=packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-keyverse-adapter.coverage python -m pytest -c packages/keyverse-adapter/pyproject.toml packages/keyverse-adapter/tests
-          PYTHONPATH=packages/migration-adapter/src COVERAGE_FILE=/tmp/orgmetra-migration-adapter.coverage python -m pytest -c packages/migration-adapter/pyproject.toml packages/migration-adapter/tests
-          PYTHONPATH=packages/naruon-adapter/src COVERAGE_FILE=/tmp/orgmetra-naruon-adapter.coverage python -m pytest -c packages/naruon-adapter/pyproject.toml packages/naruon-adapter/tests
-          PYTHONPATH=packages/offer-approval/src COVERAGE_FILE=/tmp/orgmetra-offer-approval.coverage python -m pytest -c packages/offer-approval/pyproject.toml packages/offer-approval/tests
-          PYTHONPATH=packages/requisition-review/src COVERAGE_FILE=/tmp/orgmetra-requisition-review.coverage python -m pytest -c packages/requisition-review/pyproject.toml packages/requisition-review/tests
-          PYTHONPATH=packages/selection-review/src COVERAGE_FILE=/tmp/orgmetra-selection-review.coverage python -m pytest -c packages/selection-review/pyproject.toml packages/selection-review/tests
+          set -euo pipefail
+          for pyproject in packages/*/pyproject.toml; do
+            package_dir="${pyproject%/pyproject.toml}"
+            [[ -d "$package_dir/src" && -d "$package_dir/tests" ]] || continue
+            package_name="$(basename "$package_dir")"
+            PYTHONPATH="$package_dir/src" \
+              COVERAGE_FILE="/tmp/orgmetra-${package_name}.coverage" \
+              python -m pytest -c "$pyproject" "$package_dir/tests"
+          done
+      - name: Run owned service contracts once
+        run: |
           PYTHONPATH=services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-job-analysis-api.coverage python -m pytest -c services/job-analysis-api/pyproject.toml services/job-analysis-api/tests
           PYTHONPATH=services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-people-api.coverage python -m pytest -c services/people-api/pyproject.toml services/people-api/tests
       - name: Run PostgreSQL contracts in isolated containers
@@ -120,6 +123,76 @@ jobs:
         if: failure()
         run: python tests/validate_repository.py --print-manifest
       - name: Prove validation is read-only
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+  python-compatibility:
+    name: Python ${{ matrix.python-version }} declared package compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact candidate checkout
+        env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+      - name: Set up declared Python minor
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          check-latest: false
+      - name: Install reviewed compatibility toolchain
+        run: |
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-compatibility-test.txt
+          python -m pip check
+      - name: Execute every package that declares this Python minor supported
+        env:
+          ORGMETRA_PYTHON_MINOR: ${{ matrix.python-version }}
+        run: |
+          set -euo pipefail
+          executed=0
+          for pyproject in packages/*/pyproject.toml; do
+            package_dir="${pyproject%/pyproject.toml}"
+            [[ -d "$package_dir/src" && -d "$package_dir/tests" ]] || continue
+            if ! python - "$pyproject" <<'PY'
+          import sys
+          import tomllib
+          from pathlib import Path
+          from packaging.specifiers import SpecifierSet
+          from packaging.version import Version
+
+          pyproject = Path(sys.argv[1])
+          project = tomllib.loads(pyproject.read_text(encoding="utf-8")).get("project", {})
+          requires_python = project.get("requires-python")
+          if not isinstance(requires_python, str) or not requires_python.strip():
+              raise SystemExit(f"{pyproject}: project.requires-python is required")
+          runtime = Version(f"{sys.version_info.major}.{sys.version_info.minor}.0")
+          raise SystemExit(0 if runtime in SpecifierSet(requires_python) else 1)
+          PY
+            then
+              continue
+            fi
+            package_name="$(basename "$package_dir")"
+            python -m compileall -q "$package_dir/src" "$package_dir/tests"
+            PYTHONPATH="$package_dir/src" \
+              COVERAGE_FILE="/tmp/orgmetra-${package_name}-${ORGMETRA_PYTHON_MINOR}.coverage" \
+              python -m pytest -c "$pyproject" "$package_dir/tests"
+            executed=$((executed + 1))
+          done
+          if [[ "$executed" -eq 0 ]]; then
+            printf 'No owned package declared Python %s support; compatibility evidence would be vacuous.\n' "$ORGMETRA_PYTHON_MINOR" >&2
+            exit 1
+          fi
+      - name: Require clean checkout
         run: |
           git diff --exit-code
           test -z "$(git status --porcelain)"
