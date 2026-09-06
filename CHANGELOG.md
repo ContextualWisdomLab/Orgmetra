@@ -37,6 +37,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- Consolidated repository-owned PR validation from twelve workflows into one Foundation CI job, while keeping the dual-cluster recovery rehearsal separately path-scoped. Central required review and security workflows remain organization-owned.
 - New predictive-validity membership must use one normalized worker-level case; the three independent validity-study decision/evidence/outcome link relations are historical read surfaces only and can no longer accept new rows. A case insert also rejects a criterion observation whose recorded interval is already closed at `linked_at`.
 - Canonicalized service identifiers as two-or-more-word `snake_case` across architecture, deployment, ACL, metrics, and client contracts.
 - Separated fast-mlsirm, TEPP, and Psychometrics Commons into immutable external scientific contracts.
