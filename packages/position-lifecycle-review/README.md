@@ -4,7 +4,9 @@ This package records **human-reviewed evidence for a proposed lifecycle change t
 
 ## Why it exists
 
-Current Orgmetra `develop` product truth already treats `Job`, `Position`, and `Assignment` as separate HRIS facts and recognizes Position statuses `open`, `active`, `frozen`, `closed`, and `abolished`. Repository control is separate from that product claim: an **effective organization ruleset** governs the default branch with pull-request integration, two approvals, stale-review dismissal, last-push approval, required conversation resolution, central required workflows, and non-fast-forward/deletion protection. Repository-governance issue #89 remains open for the narrower acquisition-grade gaps around routine administrator `always` bypass and executable proof that every applicable Orgmetra-local gate is fail-closed required. A commercial HRIS also needs review evidence before a seat is frozen, closed, abolished, or reactivated, because those changes can alter staffing availability and downstream workforce reporting.
+Current Orgmetra `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` product truth already treats `Job`, `Position`, and `Assignment` as separate HRIS facts and recognizes Position statuses `open`, `active`, `frozen`, `closed`, and `abolished`. Repository control is separate from that product claim: effective organization ruleset `18156473` currently requires one approving review, stale-review dismissal after push, review-thread resolution, extra approval for unattributed changes, seven central required workflows, and non-fast-forward/deletion protection; last-push approval is not currently required. Repository-governance issue #89 remains open for the control-plane gap, including routine `OrganizationAdmin/always` bypass. Those controls must be re-read before merge/release claims and do not make this unmerged package protected product truth.
+
+A commercial HRIS also needs review evidence before a seat is frozen, closed, abolished, or reactivated, because those changes can alter staffing availability and downstream workforce reporting.
 
 `PositionLifecycleChangeReviewPacket` binds:
 
@@ -35,6 +37,8 @@ The packet permits reviewed transitions among normal seat states but treats `abo
 ## Integrity boundary
 
 Trust-bearing scalar values require exact built-in runtime types. Canonical evidence is deterministic JSON with SHA-256 content digest and a redacted routine representation. A process-local issuance seal detects post-construction field rewriting, while a live tenant-qualified change-reference binding prevents one correlation from denoting conflicting evidence while any duplicate packet remains alive. These are defense-in-depth controls only; durable uniqueness and mutation authorization belong to authoritative persistence/audit.
+
+Package-quality evidence is owned by canonical Foundation CI rather than a package-local workflow. The active branch keeps the retired `position-lifecycle-review-quality.yml` absent and uses a repository-owned artifact contract to require CPython 3.14.7, a hash-bound isolated wheel installation, and exact 100% statement/branch coverage without package-local `PYTHONPATH` execution.
 
 ## Scope
 

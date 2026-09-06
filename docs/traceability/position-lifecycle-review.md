@@ -2,8 +2,9 @@
 
 ## Truth state
 
-- **Default-branch product truth:** `develop@9e3e4847510e1e612b48474ba42b177b8ed824df` has distinct Job/Position/Assignment HRIS facts, Position status vocabulary, Position vacancy evidence dependencies, purpose-bound authorization, and immutable audit/outbox foundations. It can create Position records but has no dedicated lifecycle-change review artifact or authoritative existing-Position lifecycle mutation. Repository governance is separate: an **effective organization ruleset** applies to the default branch and requires pull-request integration, two approvals, stale-review dismissal, last-push approval, required conversation resolution, central required workflows, and non-fast-forward/deletion protection. Issue #89 tracks the remaining routine administrator `always` bypass and Orgmetra-local fail-closed gate-proof gaps.
-- **Active PR truth:** this branch adds only the governed review evidence packet and its exact-head quality gate.
+- **Default-branch product truth:** `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` keeps Job, Position, and Assignment as distinct HRIS facts, owns Position lifecycle vocabulary, and carries purpose-bound authorization plus immutable audit/outbox foundations. It does not yet integrate this active PR's dedicated existing-Position lifecycle review artifact or authoritative lifecycle mutation.
+- **Repository governance truth:** effective organization ruleset `18156473` applies to the default branch. The live payload requires one approving review, stale-review dismissal after push, review-thread resolution, extra approval for unattributed changes, seven central required workflows, and deletion/non-fast-forward protection; `require_last_push_approval` is currently false. Issue #89 owns the remaining governance/control-plane gap, including routine `OrganizationAdmin/always` bypass. These repository controls are not product capability and must be re-read before merge/release claims.
+- **Active PR truth:** this branch adds only the governed review evidence packet and an exact-head installed-artifact/coverage contract consolidated under canonical Foundation CI.
 - **Planned:** authoritative bitemporal Position lifecycle mutation/persistence that consumes reviewed evidence, re-resolves staffing truth, and atomically records immutable audit/outbox.
 - **Out of scope:** autonomous employment decisions, Person/candidate data, compensation, assessment/rating data, reporting-line mutation, Keyverse/Naruon/other CWL repository writes, and direct foreign application-table SQL.
 
@@ -19,7 +20,7 @@
 | Minimize PII and high-impact payloads | packet carries no Person/candidate identity, allocation, compensation, rating, assessment, free text, credential, prompt, or model output |
 | Fail closed on lifecycle ambiguity | explicit transition vocabulary; no-op rejection; abolished terminal; reason bound to target status |
 | Tamper/correlation defense in depth | issuance digest verification; live tenant-qualified review-reference binding; adversarial `object.__setattr__` and `dataclasses.replace` regressions |
-| Exact owned test coverage | `Position Lifecycle Review Quality` installed-wheel gate with `--cov-branch --cov-fail-under=100` |
+| Exact owned test coverage without retired leaf CI | canonical Foundation delegates to `tests/test_position_lifecycle_review_artifact.sh`, which requires CPython 3.14.7, hash-bound isolated wheel installation, and the package's exact `--cov-branch --cov-fail-under=100` contract; `test_artifact_execution.py` rejects leaf-workflow resurrection |
 
 ## Buyer behavior
 

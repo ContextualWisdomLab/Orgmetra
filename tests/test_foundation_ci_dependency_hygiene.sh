@@ -4,10 +4,22 @@ set -euo pipefail
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 workflow_path="${repository_root}/.github/workflows/foundation-ci.yml"
 requirements_path="${repository_root}/.github/requirements/foundation-test.txt"
+position_lifecycle_contract="${repository_root}/tests/test_position_lifecycle_review_artifact.sh"
 
 expected_install="python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt"
-expected_pythonpath="PYTHONPATH: packages/hris-kernel/src:packages/keyverse-adapter/src"
 expected_default_pr_target=$'  pull_request:\n    branches:\n      - develop\n'
+expected_pythonpaths=(
+  "packages/candidate-evidence/src"
+  "packages/hris-kernel/src"
+  "packages/keyverse-adapter/src"
+  "packages/migration-adapter/src"
+  "packages/naruon-adapter/src"
+  "packages/offer-approval/src"
+  "packages/requisition-review/src"
+  "packages/selection-review/src"
+  "services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src"
+  "services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src"
+)
 
 if ! grep -Fq -- "${expected_install}" "${workflow_path}"; then
   printf 'Foundation CI must install only the hash-locked test toolchain.\n' >&2
@@ -19,10 +31,12 @@ if grep -Eq -- 'python -m pip install .*packages/' "${workflow_path}"; then
   exit 1
 fi
 
-if ! grep -Fq -- "${expected_pythonpath}" "${workflow_path}"; then
-  printf 'Foundation CI must import repository-local packages directly from their src trees.\n' >&2
-  exit 1
-fi
+for expected_pythonpath in "${expected_pythonpaths[@]}"; do
+  if ! grep -Fq -- "PYTHONPATH=${expected_pythonpath} COVERAGE_FILE=" "${workflow_path}"; then
+    printf 'Foundation CI must import repository-local src tree directly: %s\n' "${expected_pythonpath}" >&2
+    exit 1
+  fi
+done
 
 if ! grep -Fq -- "${expected_default_pr_target}" "${workflow_path}"; then
   printf 'Foundation CI must run for pull requests targeting the repository default branch develop.\n' >&2
@@ -77,3 +91,10 @@ for package_name in coverage iniconfig packaging pluggy Pygments pytest pytest-c
     exit 1
   fi
 done
+
+if [[ ! -f "${position_lifecycle_contract}" ]]; then
+  printf 'Foundation CI Position Lifecycle Review artifact contract is missing.\n' >&2
+  exit 1
+fi
+
+bash "${position_lifecycle_contract}"
