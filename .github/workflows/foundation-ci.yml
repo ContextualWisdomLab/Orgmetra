@@ -119,6 +119,11 @@ jobs:
             docker rm --force "$container_name" >/dev/null
             trap - EXIT
           done
+      - name: Prove compatibility toolchain provenance
+        run: |
+          expected_sha256=cebb36181e8ac995a36d73a02a45094a204ff5adb3cbcdc0c9eccff309ac6aab
+          actual_sha256="$(sha256sum .github/requirements/foundation-compatibility-test.txt | awk '{print $1}')"
+          test "$actual_sha256" = "$expected_sha256"
       - name: Set up Python 3.12 compatibility runtime
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
