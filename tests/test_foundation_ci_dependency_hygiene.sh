@@ -9,7 +9,6 @@ compatibility_requirements_path="${repository_root}/.github/requirements/foundat
 expected_install="python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt"
 expected_compatibility_install="python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-compatibility-test.txt"
 expected_default_pr_target=$'  pull_request:\n    branches:\n      - develop\n'
-expected_compatibility_matrix='        python-version: ["3.12", "3.13"]'
 expected_package_discovery='for pyproject in packages/*/pyproject.toml; do'
 expected_service_pythonpaths=(
   "services/job-analysis-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src"
@@ -66,8 +65,8 @@ if ! grep -Fq -- "${expected_install}" "${workflow_path}"; then
   exit 1
 fi
 
-if ! grep -Fq -- "${expected_compatibility_install}" "${workflow_path}"; then
-  printf 'Foundation CI must install the hash-locked compatibility toolchain.\n' >&2
+if [[ "$(grep -Fc -- "${expected_compatibility_install}" "${workflow_path}")" -ne 2 ]]; then
+  printf 'Foundation CI must install the hash-locked compatibility toolchain once for each declared compatibility runtime.\n' >&2
   exit 1
 fi
 
@@ -81,18 +80,29 @@ if grep -Fq -- 'runs-on: ubuntu-latest' "${workflow_path}"; then
   exit 1
 fi
 
-if [[ "$(grep -Fc -- 'runs-on: ubuntu-24.04' "${workflow_path}")" -ne 2 ]]; then
-  printf 'Foundation CI must pin both repository-quality and compatibility jobs to ubuntu-24.04.\n' >&2
+if [[ "$(grep -Fc -- 'runs-on: ubuntu-24.04' "${workflow_path}")" -ne 1 ]]; then
+  printf 'Foundation CI must preserve one repository-owned job on ubuntu-24.04.\n' >&2
   exit 1
 fi
 
-if ! grep -Fq -- "${expected_compatibility_matrix}" "${workflow_path}"; then
-  printf 'Foundation CI must execute declared package compatibility on Python 3.12 and 3.13.\n' >&2
+if grep -Fq -- 'matrix:' "${workflow_path}" || grep -Fq -- 'python-compatibility:' "${workflow_path}"; then
+  printf 'Foundation compatibility must not recreate matrix-driven or second-job admission pressure.\n' >&2
   exit 1
 fi
 
-if [[ "$(grep -Fc -- "${expected_package_discovery}" "${workflow_path}")" -ne 2 ]]; then
-  printf 'Foundation CI must use package-neutral discovery in both primary and compatibility lanes.\n' >&2
+for python_minor in 3.12 3.13; do
+  if [[ "$(grep -Fc -- "python-version: \"${python_minor}\"" "${workflow_path}")" -ne 1 ]]; then
+    printf 'Foundation CI must set up Python %s exactly once for sequential compatibility evidence.\n' "${python_minor}" >&2
+    exit 1
+  fi
+  if [[ "$(grep -Fc -- "ORGMETRA_PYTHON_MINOR: \"${python_minor}\"" "${workflow_path}")" -ne 1 ]]; then
+    printf 'Foundation CI must bind compatibility execution to Python %s.\n' "${python_minor}" >&2
+    exit 1
+  fi
+done
+
+if [[ "$(grep -Fc -- "${expected_package_discovery}" "${workflow_path}")" -ne 3 ]]; then
+  printf 'Foundation CI must use package-neutral discovery in primary, Python 3.12, and Python 3.13 execution.\n' >&2
   exit 1
 fi
 
@@ -106,21 +116,26 @@ if grep -Fq -- 'if ! python - "$pyproject"' "${workflow_path}"; then
   exit 1
 fi
 
-if ! grep -Fq -- 'compatibility_decision="$(' "${workflow_path}" ||
-   ! grep -Fq -- 'from packaging.specifiers import InvalidSpecifier, SpecifierSet' "${workflow_path}" ||
-   ! grep -Fq -- 'Unexpected compatibility decision for %s: %s' "${workflow_path}"; then
-  printf 'Foundation compatibility selection must fail closed on invalid requires-python metadata.\n' >&2
+if [[ "$(grep -Fc -- 'compatibility_decision="$(' "${workflow_path}")" -ne 2 ]] ||
+   [[ "$(grep -Fc -- 'from packaging.specifiers import InvalidSpecifier, SpecifierSet' "${workflow_path}")" -ne 2 ]] ||
+   [[ "$(grep -Fc -- 'Unexpected compatibility decision for %s: %s' "${workflow_path}")" -ne 2 ]]; then
+  printf 'Foundation compatibility selection must fail closed in both sequential compatibility executions.\n' >&2
   exit 1
 fi
 
 expected_exact_runtime='runtime = Version(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")'
-if ! grep -Fq -- "${expected_exact_runtime}" "${workflow_path}"; then
-  printf 'Foundation compatibility selection must evaluate requires-python against the exact executed interpreter patch.\n' >&2
+if [[ "$(grep -Fc -- "${expected_exact_runtime}" "${workflow_path}")" -ne 2 ]]; then
+  printf 'Foundation compatibility selection must evaluate both runtimes against the exact executed interpreter patch.\n' >&2
   exit 1
 fi
 
 if grep -Fq -- 'runtime = Version(f"{sys.version_info.major}.{sys.version_info.minor}.0")' "${workflow_path}"; then
   printf 'Foundation compatibility selection must not fabricate a .0 patch for requires-python checks.\n' >&2
+  exit 1
+fi
+
+if [[ "$(grep -Fc -- 'No owned package declared Python %s support; compatibility evidence would be vacuous.' "${workflow_path}")" -ne 2 ]]; then
+  printf 'Foundation compatibility must fail non-vacuously for both sequential runtimes.\n' >&2
   exit 1
 fi
 
