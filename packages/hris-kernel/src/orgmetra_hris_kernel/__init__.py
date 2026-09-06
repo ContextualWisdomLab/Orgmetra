@@ -45,6 +45,12 @@ from orgmetra_hris_kernel.job_analysis import (
     TaskKSAOLink,
 )
 from orgmetra_hris_kernel.organization import validate_organization_hierarchy
+from orgmetra_hris_kernel.position_reporting import (
+    PositionReportingHierarchyError,
+    PositionReportingRelationship,
+    PositionReportingSnapshot,
+    build_position_reporting_snapshot,
+)
 from orgmetra_hris_kernel.resolution import resolve_bitemporal_facts, resolve_single_valued_fact
 from orgmetra_hris_kernel.workforce import (
     WorkforceCompositionSnapshot,
@@ -70,6 +76,9 @@ __all__ = [
     "OrganizationHierarchyError",
     "OrganizationUnitVersion",
     "PositionCoverageError",
+    "PositionReportingHierarchyError",
+    "PositionReportingRelationship",
+    "PositionReportingSnapshot",
     "PositionSeatError",
     "PositionVersion",
     "RecordedInterval",
@@ -77,6 +86,7 @@ __all__ = [
     "TaskEvidence",
     "TaskKSAOLink",
     "WorkforceCompositionSnapshot",
+    "build_position_reporting_snapshot",
     "build_workforce_composition_snapshot",
     "close_recorded_interval",
     "resolve_bitemporal_facts",
