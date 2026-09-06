@@ -2,6 +2,10 @@
 
 **Status:** active PR / proposed capability. Not protected-main truth until merged from one fully validated exact head.
 
+## Current protected-parent adoption
+
+Feature predecessor `adf055d79d188ba18d06ecf80dc1117858c987f4` was non-destructively reconciled with protected `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` by ordinary two-parent adoption commit `2317c367aa200e2cd1636cc26dd96c8b01966804`. The resulting tree preserves the protected #161 repository-workflow consolidation and does not import mutable #94 source. Historical checks on the predecessor remain causal evidence only; the resulting successor must reacquire all applicable exact-head gates before Ready or merge.
+
 | Requirement | Design / implementation evidence | Executable evidence |
 |---|---|---|
 | Keep reporting authority attached to Position rather than Person | Packet carries subordinate/current-manager/proposed-manager `position_record:` references and no Person identifier | `test_builds_value_minimized_human_review_packet`, `test_operational_position_references_accept_uuid7` |
