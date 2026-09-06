@@ -18,6 +18,12 @@ without replacing the compatibility evidence would silently weaken the declared 
 A package-local workflow is not restored. The compatibility capability belongs to the existing
 `.github/workflows/foundation-ci.yml` owner.
 
+A follow-up exact-tree review found a separate discovery fail-open edge: both Foundation package loops
+intentionally skip directory entries that are not complete Python packages. Without an independent
+repository-quality invariant, an owned `packages/*/pyproject.toml` could therefore become invisible to
+package execution simply by losing `src/` or `tests/`. Canonical Foundation now treats that layout as a
+repository contract violation before package execution rather than accepting a silent skip.
+
 ## Decision
 
 Foundation keeps its CPython 3.14 repository-quality lane and adds CPython 3.12 and 3.13 compatibility
@@ -33,6 +39,11 @@ metadata fails the compatibility job instead of being reclassified as an unsuppo
 selected package is compiled and its own pytest configuration is executed from its source tree. Package
 pytest contracts retain their existing exact statement and branch coverage gates.
 
+The repository-quality hygiene contract enumerates every `packages/*/pyproject.toml` and requires both
+`src/` and `tests/` to exist. Its self-regression constructs incomplete package fixtures and proves that
+missing either directory fails closed. This keeps non-Python directories outside discovery while preventing
+an owned Python package from escaping Foundation acceptance by becoming structurally incomplete.
+
 The primary CPython 3.14 toolchain remains bound by `.github/requirements/foundation-test.txt`.
 CPython 3.12/3.13 use `.github/requirements/foundation-compatibility-test.txt`, installed with
 `--require-hashes --no-deps --only-binary=:all:`. The compatibility lock reuses the reviewed versions from
@@ -43,6 +54,8 @@ the primary toolchain and binds the reviewed coverage wheels for both compatibil
 - `.github/workflows/foundation-ci.yml` remains the repository quality owner.
 - Every Foundation job uses `ubuntu-24.04`; `ubuntu-latest` is rejected by executable hygiene checks.
 - Compatibility discovery is package-neutral and contains no Interview Plan or Selection Monitoring switch.
+- Every discovered owned Python package must have both `src/` and `tests/`; incomplete package layout is a
+  Foundation failure, not an accepted discovery skip.
 - Invalid or missing `project.requires-python` metadata fails closed; only a valid constraint that excludes
   the actual executed interpreter patch may skip one package.
 - Patch-sensitive PEP 440 constraints are evaluated against the real interpreter release, never a fabricated
