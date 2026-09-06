@@ -23,7 +23,17 @@ POST requires `Authorization`, `Content-Type: application/json`,
 types receive `415 unsupported_media_type` before the body is read. Optional
 `position_record_id` and `criterion_blueprint_id` may be included and are bound
 through foreign keys that fail closed when the parent is missing. GET requires
-`purpose` and returns the persisted snapshot document.
+`Authorization` and `X-Purpose-Code`, accepts no query parameters, and returns
+the persisted snapshot document.
+
+Attacker-controlled request metadata is bounded before bearer authentication.
+The transport rejects paths longer than 256 characters before splitting route
+segments or parsing UUIDs, accepts at most 64 ASGI header frames, and accepts at
+most 16 KiB of aggregate header-name and header-value bytes before lower-casing
+or dictionary allocation. Requests above a header budget fail closed as
+authentication failures, while an oversized path fails route recognition; none
+reaches the identity provider, authorization policy, request body, or persistence
+boundary.
 
 Posted evidence is bounded and unambiguous. The transport stops reading once the
 cumulative chunked body exceeds 1 MiB and rejects duplicate JSON member names at
