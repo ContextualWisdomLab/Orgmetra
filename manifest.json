@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "ff5a9ae9a311ad7e2a491f753ecc3fe91c1533e469c7551371ed5c76fc831538",
-      "bytes": 11381,
-      "lines": 246
+      "sha256": "27fd3f2a69181e6a31b49ab2a3d394bfc8dca2b8ef5e9ce39324273f7962773d",
+      "bytes": 11708,
+      "lines": 251
     },
     {
       "path": ".gitignore",
@@ -83,7 +83,7 @@
     },
     {
       "path": "database/migrations/0005_outbox_delivery_finalization.sql",
-      "sha256": "b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5b7a3a25fa60016b6a4961",
+      "sha256": "b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5ef9e8a92abba5c3cf182",
       "bytes": 6125,
       "lines": 170
     },
