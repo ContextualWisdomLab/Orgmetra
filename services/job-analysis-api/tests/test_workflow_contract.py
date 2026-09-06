@@ -8,19 +8,19 @@ def _workflow(path: str) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
-def test_job_analysis_api_quality_runs_on_current_default_branch_pull_requests() -> None:
-    """Keep service coverage evidence alive when Orgmetra's default branch changes."""
-    assert "      - develop\n" in _workflow(".github/workflows/job-analysis-api-quality.yml")
-
-
-def test_job_analysis_quality_reruns_when_foundation_contract_changes() -> None:
-    """Revalidate the service when its asserted foundation workflow changes."""
-    workflow = _workflow(".github/workflows/job-analysis-api-quality.yml")
-    assert '      - ".github/workflows/foundation-ci.yml"\n' in workflow
+def test_foundation_ci_runs_job_analysis_on_default_branch_pull_requests() -> None:
+    """Keep Job Analysis coverage in the single repository quality workflow."""
+    workflow = _workflow(".github/workflows/foundation-ci.yml")
+    assert "      - develop\n" in workflow
+    assert "services/job-analysis-api/pyproject.toml services/job-analysis-api/tests" in workflow
 
 
 def test_foundation_ci_includes_job_analysis_postgres_contract() -> None:
-    """Keep the snapshot persistence contract in the PostgreSQL integrity matrix."""
+    """Keep snapshot persistence in the isolated PostgreSQL contract sequence."""
     workflow = _workflow(".github/workflows/foundation-ci.yml")
     assert "test_job_analysis_snapshot_postgres.sh" in workflow
+    assert "test_job_analysis_snapshot_schema_hardening.sh" in workflow
+    assert workflow.index('DATABASE_URL="$database_url" bash "tests/$contract"') < workflow.index(
+        'DATABASE_URL="$database_url" bash tests/test_job_analysis_snapshot_schema_hardening.sh'
+    )
     assert "      - develop\n" in workflow
