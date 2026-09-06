@@ -5,7 +5,7 @@ from pathlib import Path
 
 def test_openapi_matches_the_path_tenant_and_authenticated_actor_authority() -> None:
     """Do not publish a global route or duplicate tenant/actor header authority."""
-    schema = Path("schemas/openapi.yaml").read_text(encoding="utf-8")
+    schema = (Path(__file__).resolve().parents[3] / "schemas" / "openapi.yaml").read_text(encoding="utf-8")
     collection_path = "  /tenants/{tenant_record_id}/job-analysis-snapshots:"
     item_path = "  /tenants/{tenant_record_id}/job-analysis-snapshots/{analysis_record_id}:"
     assert collection_path in schema
