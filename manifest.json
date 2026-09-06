@@ -53,9 +53,9 @@
     },
     {
       "path": "README.md",
-      "sha256": "1a9fc400d26d8137ae5911488794a6d3fa915957c95f27b36a48cef0fdf823c6",
-      "bytes": 3785,
-      "lines": 81
+      "sha256": "10f4ad947efee5e54166cd31e18cf30d34489b7c13fd05cb565363c1a86271c5",
+      "bytes": 9344,
+      "lines": 141
     },
     {
       "path": "database/migrations/0001_foundation_schema.sql",
