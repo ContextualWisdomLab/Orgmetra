@@ -158,6 +158,7 @@ JOIN public.employment_record_version AS version
  AND version.employment_record_id = employment.employment_record_id
 WHERE employment.tenant_record_id = %s
   AND employment.employment_record_id = %s
+FOR UPDATE OF employment
 """.strip()
 
 _NAMED_POSITION_VERSIONS_SQL = """
@@ -721,7 +722,7 @@ class PostgresPeopleMutationPort(tuple):
                 rows = _unpack_fixed_rows(
                     cursor.fetchmany(2),
                     row_width=3,
-                    error_message="position parent row is invalid",
+                    error_message="position parent row is invalid shape",
                 )
                 if not rows:
                     raise PeopleMutationNotFound("organization unit or job profile was not found")
