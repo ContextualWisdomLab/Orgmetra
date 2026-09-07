@@ -11,7 +11,6 @@ entire transaction before commit.
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -295,25 +294,35 @@ def _record_hire_idempotency(
     )
 
 
-@dataclass(frozen=True, slots=True)
-class PostgresHireAcceptancePort:
+class PostgresHireAcceptancePort(tuple):
     """Persist confirmed hire facts and governance evidence in one DB transaction.
 
     ``connection_factory`` must return a DB-API connection context manager whose
     successful exit commits and exceptional exit rolls back, as psycopg
-    connections do. Fixed projections must cross this adapter boundary as exact
-    built-in list/tuple row collections containing exact built-in list/tuple
-    rows; custom row factories must normalize before durable evidence is read.
-    Pooling, TLS, credentials, and database roles remain a deployment concern
-    outside this service package.
+    connections do. The accepted executable factory is stored in the immutable
+    tuple payload so retained references cannot replace the validated database
+    capability before a later authoritative write. Fixed projections must cross
+    this adapter boundary as exact built-in list/tuple row collections containing
+    exact built-in list/tuple rows; custom row factories must normalize before
+    durable evidence is read. Pooling, TLS, credentials, and database roles
+    remain a deployment concern outside this service package.
     """
 
-    connection_factory: PostgresConnectionFactory
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        """Reject unusable database factories before protected mutation is attempted."""
-        if not callable(self.connection_factory):
+    def __new__(
+        cls,
+        connection_factory: PostgresConnectionFactory,
+    ) -> PostgresHireAcceptancePort:
+        """Validate and structurally bind the executable database capability."""
+        if not callable(connection_factory):
             raise TypeError("connection_factory must be callable")
+        return tuple.__new__(cls, (connection_factory,))
+
+    @property
+    def connection_factory(self) -> PostgresConnectionFactory:
+        """Expose the exact factory retained by the structural binding."""
+        return tuple.__getitem__(self, 0)
 
     def accept_hire(
         self,
@@ -335,8 +344,9 @@ class PostgresHireAcceptancePort:
             raise TypeError("command must be a HireAcceptanceCommand")
         HireAcceptanceCommand.__post_init__(command)
         decision = _validate_authorization(command, authorization)
+        connection_factory = tuple.__getitem__(self, 0)
 
-        with self.connection_factory() as connection:
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
