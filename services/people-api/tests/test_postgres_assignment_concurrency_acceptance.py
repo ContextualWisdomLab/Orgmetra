@@ -25,8 +25,6 @@ import time
 from typing import Iterator, Sequence
 from uuid import UUID, uuid4
 
-import pytest
-
 from orgmetra_keyverse_adapter import AuthorizationDecision
 from orgmetra_people_api.mutations import AssignmentMutationCommand, PeopleMutationIntegrityError
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
@@ -339,7 +337,7 @@ class _ConnectionFactory:
 @dataclass(slots=True)
 class _WriterOutcome:
     result_id: UUID | None = None
-    error: BaseException | None = None
+    error: Exception | None = None
 
 
 def _psql(database_url: str, sql: str) -> str:
@@ -595,7 +593,7 @@ def _run_writer(
             authorization=_authorization(command.assignment_record_id),
         )
         outcome.result_id = result.assignment_record_id
-    except BaseException as error:
+    except Exception as error:
         outcome.error = error
 
 
