@@ -14,6 +14,8 @@ PostgreSQL 18 `READ COMMITTED` gives each command a new committed snapshot. A re
 
 A second distributed race exists after a capacity debit is fenced. A point-in-time People read that currently finds no Assignment is not proof that a delayed or in-flight `create_assignment` operation cannot commit later. Releasing capacity from that observation can therefore re-open the seat before the original Assignment commits. Post-fence release needs a terminal People-owned attempt outcome that also fences every later commit for the same attempt.
 
+A third race exists if Position eligibility is treated as a mutable read after the capacity fence. An authentic fence issued while Position version V1 is `active|open` cannot remain safe if Organization may independently commit an overlapping `closed`/otherwise-ineligible Position version before People commits Assignment. A People-side recheck does not solve this because Position can change again after the recheck. The Organization reservation therefore has to fence both seat capacity and the Position eligibility required by ADR 0005 for the reservation interval.
+
 ## Decision drivers
 
 The design must:
@@ -21,9 +23,10 @@ The design must:
 - keep Position and Position capacity as Organization-domain truth while keeping Assignment history as People-domain truth;
 - preserve the bitemporal and allocation semantics already Accepted in ADR 0004/0005;
 - expose one canonical capacity writer and no cross-service application-table access;
-- remain correct under concurrent claims, retries, delayed requests, process loss, message loss/duplication/reordering, and ambiguous timeouts;
+- remain correct under concurrent claims, retries, delayed requests, process loss, message loss/duplication/reordering, ambiguous timeouts, and concurrent Position status/version mutation;
 - bind idempotency to semantic intent rather than a caller-controlled key alone;
 - distinguish a terminal abort fence from a point-in-time absence observation;
+- make a post-fence receipt durable evidence of both consumed capacity and Position eligibility for its effective interval, rather than requiring an unsafe People-side mutable recheck;
 - minimize PII at the Organization boundary; and
 - support a fenced cutover from the existing same-database People mutation path without a dual-writer interval.
 
@@ -35,7 +38,7 @@ This gives the simplest local transaction for seat allocation, but it moves work
 
 ### B. Keep Position in Organization and call a synchronous availability read before People writes Assignment
 
-This preserves nominal ownership but is not sufficient for correctness. Between availability read and Assignment commit, another writer can consume the same capacity. Reject as a TOCTOU design.
+This preserves nominal ownership but is not sufficient for correctness. Between availability read and Assignment commit, another writer can consume the same capacity or change Position eligibility. Reject as a TOCTOU design.
 
 ### C. Organization-owned `PositionCapacityReservation` with a commit fence and People-owned terminal attempt outcome
 
@@ -50,17 +53,17 @@ People first stores an Assignment in a non-active `pending_capacity` state, Orga
 `organization_core` owns:
 
 - `Position`: aggregate root for one tenant-qualified staffable seat and its bitemporal status/version evidence.
-- `PositionCapacityReservation`: entity under the Position capacity authority. It binds an opaque reservation identifier, tenant, Position, allocation ratio, effective interval, opaque `assignment_attempt_id`, assignment intent/reference, exact Position version/evidence, idempotency key, semantic command digest, lifecycle state, and immutable audit/outbox correlation.
+- `PositionCapacityReservation`: entity under the Position capacity authority. It binds an opaque reservation identifier, tenant, Position, allocation ratio, effective interval, opaque `assignment_attempt_id`, assignment intent/reference, exact Position version/eligibility evidence, idempotency key, semantic command digest, lifecycle state, and immutable audit/outbox correlation.
 - `AllocationRatio` and `EffectiveInterval`: value objects used to calculate overlapping capacity.
 
 `people_core` owns:
 
-- `Assignment`: employment-history fact bound to tenant, Employment, Person, Position, allocation, effective interval, and the exact Organization capacity receipt that authorized the write.
+- `Assignment`: employment-history fact bound to tenant, Employment, Person, Position, allocation, effective interval, and the exact Organization capacity/eligibility receipt that authorized the write.
 - `AssignmentAttemptOutcome`: terminal, tenant-qualified protocol evidence for one opaque `assignment_attempt_id` and exact reservation version/digest. Its terminal state is `committed` with the authoritative Assignment receipt or `aborted` with an immutable abort tombstone. A terminal `aborted` outcome fences every later create/retry for that same attempt from committing an Assignment.
 
-No Person name, compensation, rating, assessment result, or other worker payload is copied into `PositionCapacityReservation`. The cross-context protocol carries only opaque references, semantic digests, version evidence, and terminal receipts required to enforce the seat invariant.
+No Person name, compensation, rating, assessment result, or other worker payload is copied into `PositionCapacityReservation`. The cross-context protocol carries only opaque references, semantic digests, version/eligibility evidence, and terminal receipts required to enforce the seat invariant.
 
-## Capacity invariant
+## Capacity and Position-eligibility invariants
 
 While a reservation is effective, `held`, `commit_fenced`, and `confirmed` states consume capacity. `released`, `expired`, and `cancelled` states do not. Only `held` may expire autonomously.
 
@@ -68,27 +71,30 @@ For every tenant-qualified Position and every overlapping valid-time slice:
 
 `sum(allocation_ratio for effective held + commit_fenced + confirmed reservations) <= 1.0000`
 
-`organization_core` enforces this by serializing capacity mutations at the stable Position root and re-reading the authoritative overlapping capacity debit set inside that transaction. A stale read model is never capacity authority.
+Every effective `commit_fenced` or `confirmed` reservation also requires Organization-owned Position state to remain assignment-eligible (`active|open` under ADR 0005) for the reservation interval. A Position mutation that would make an effective slice ineligible while such a debit exists cannot commit as an unrelated independent change.
+
+`organization_core` enforces both rules by serializing reservation and Position-status/version mutations at the stable Position root and re-reading the authoritative overlapping debit and Position-version sets inside that transaction. A stale read model is never capacity or eligibility authority.
 
 ## Protocol
 
 1. `reserve`: under Position-root serialization, validate Position status/version and capacity, then create `held`. The reservation binds one opaque `assignment_attempt_id`. Exact replay of the same idempotency key and semantic digest returns the same reservation; the same key with a different digest fails closed.
-2. `arm_commit_fence`: convert the exact `held` reservation to `commit_fenced`. This is durable, idempotent, version-bound, and non-expiring.
-3. `create_assignment`: People accepts only an authentic published/versioned Organization receipt proving the exact reservation is `commit_fenced` for the same tenant, Position, allocation, effective interval, semantic intent, and `assignment_attempt_id`. Inside one People transaction, it serializes the attempt identity and either writes the Assignment plus terminal `AssignmentAttemptOutcome=committed` atomically, returns the existing equivalent terminal outcome, or fails closed on contradictory evidence. A previously terminal `aborted` attempt can never later commit.
+2. `arm_commit_fence`: under the same Position-root authority, revalidate capacity and `active|open` coverage for the exact effective interval, then convert `held` to `commit_fenced`. This is durable, idempotent, version-bound, non-expiring, and becomes an Organization promise not to commit an incompatible Position-status/version transition for that interval while the debit remains `commit_fenced` or `confirmed`.
+3. `create_assignment`: People accepts only an authentic published/versioned Organization receipt proving the exact reservation is `commit_fenced` for the same tenant, Position, allocation, effective interval, semantic intent, Position eligibility evidence, and `assignment_attempt_id`. People does not perform a second mutable Position availability/status read as correctness authority. Inside one People transaction, it serializes the attempt identity and either writes the Assignment plus terminal `AssignmentAttemptOutcome=committed` atomically, returns the existing equivalent terminal outcome, or fails closed on contradictory evidence. A previously terminal `aborted` attempt can never later commit.
 4. `terminalize_attempt`: reconciliation may ask People to resolve the exact attempt. People serializes on `assignment_attempt_id`; if the Assignment already committed, it returns the terminal `committed` outcome. Otherwise it writes a durable terminal `aborted` tombstone that prevents every delayed or retried `create_assignment` for that attempt from committing. A point-in-time `not found`, empty result, HTTP timeout, or missing event is not a terminal outcome.
 5. `confirm`: Organization converts the `commit_fenced` debit to `confirmed` only from the terminal People `committed` receipt for the exact attempt/reservation/version/digest. Duplicate or reordered confirmation is idempotent when equivalent and fails closed when contradictory.
 6. `release`/`adjust`: an ordinary `held` reservation may be released or expire before a commit fence. A `commit_fenced` debit may return capacity only from the terminal People `aborted` receipt for the exact attempt, or after a later governed Assignment correction/end makes the debit no longer effective. Timeout, elapsed time, one missing event, one stale read, or present-time Assignment absence is never release authority.
+7. `change_position_status_or_version`: Organization serializes the mutation at the same Position root. A change that would remove `active|open` coverage from an interval consumed by `commit_fenced` or `confirmed` reservations must fail closed or execute an explicit governed coordination that first resolves/corrects the affected Assignment attempts and reservations. It cannot invalidate an outstanding fence and leave People holding a stale-but-authentic receipt.
 
 A timeout may enqueue reconciliation; it may not undo a commit fence.
 
 ## Failure and recovery semantics
 
 - Crash after `held` but before commit fence: bounded expiry may reclaim capacity.
-- Crash after commit fence before People receives or commits the create: capacity stays consumed. Reconciliation may terminalize the attempt, but capacity returns only after People durably records `aborted` and thereby fences all future commits for that attempt.
+- Crash after commit fence before People receives or commits the create: capacity and Position eligibility stay fenced. Reconciliation may terminalize the attempt, but capacity/eligibility are released only after People durably records `aborted` and thereby fences all future commits for that attempt.
 - Delayed/in-flight `create_assignment` racing `terminalize_attempt`: People serializes both by `assignment_attempt_id`, so exactly one terminal outcome wins. If `committed` wins, Organization must confirm and cannot release; if `aborted` wins, the delayed create must replay/fail as aborted and cannot commit.
-- Crash after People commits Assignment plus terminal `committed` outcome but before Organization receives `confirm`: capacity stays consumed; a second overlapping claim that would exceed `1.0000` is rejected. Reconciliation confirms from authoritative People evidence.
+- Position status/version mutation racing a fenced Assignment attempt: Organization serializes the status/version mutation against the same Position root and live reservation set. If the proposed change would make the fenced/confirmed effective slice ineligible, it cannot independently commit. People never relies on a check-then-write status query to repair this race.
+- Crash after People commits Assignment plus terminal `committed` outcome but before Organization receives `confirm`: capacity and Position eligibility stay fenced; a second overlapping claim that would exceed `1.0000` is rejected. Reconciliation confirms from authoritative People evidence.
 - Lost, duplicated, or reordered confirm/release messages: attempt/reservation version and semantic-digest-bound idempotency preserves one outcome or fails closed on contradiction.
-- Position version/status changes while a reservation is in flight: the transition policy must revalidate the exact version/evidence required by the command. A stale receipt cannot silently authorize a new Assignment.
 - Reconciliation records its evidence and decision in immutable audit/outbox data. It cannot infer terminal absence from time, request delivery state, or a current read that finds no Assignment.
 
 This is a Saga-style compensating protocol, not a distributed ACID claim. Compensations are explicit domain transitions with evidence; retries, TTLs, present-time absence, and transport observations are recovery signals, not atomicity or terminal-outcome evidence.
@@ -101,7 +107,7 @@ Extraction must not create two Position/capacity writers.
 2. Integrate #96 and then #119 through their canonical Organization stack; descendants adopt protected predecessors with ordinary non-force history.
 3. Implement and test the Organization owner and published/versioned capacity contract while this ADR remains Proposed.
 4. Before authority switch, fence new Assignment capacity mutations.
-5. Project current and future-effective Assignment occupancy into the Organization reservation ledger. Bind the projection to an immutable migration manifest/digest and verify tenant, Position, effective interval, allocation, and aggregate-sum equivalence.
+5. Project current and future-effective Assignment occupancy into the Organization reservation ledger. Bind the projection to an immutable migration manifest/digest and verify tenant, Position, effective interval, allocation, Position eligibility, and aggregate-sum equivalence.
 6. Switch Position/capacity write authority to `organization_core`, then switch `people_core` to the published capacity/attempt protocol, then remove the fence.
 
 Rollback must be defined and rehearsed before un-fencing. It must select one writer authority; it must never re-enable both the legacy People Position/capacity writer and the Organization writer.
@@ -116,24 +122,25 @@ This ADR may move from Proposed only after the owner stack has executable eviden
 - crash after `held` before commit fence and bounded expiry;
 - crash after commit fence before People commit with no release from mere absence;
 - a deliberately delayed `create_assignment` racing attempt terminalization: exactly one terminal People outcome (`committed` or `aborted`) wins, `aborted` fences the late create, and `committed` prevents Organization release;
-- crash after Assignment commit before confirm with capacity remaining consumed;
+- a Position close/status-version change racing a fenced create: the Organization mutation cannot make the reservation interval ineligible while People can still commit from the authentic fence receipt;
+- crash after Assignment commit before confirm with capacity and Position eligibility remaining fenced;
 - lost/duplicated/out-of-order confirm/release messages with version/digest-bound idempotency;
-- stale Position version/status rejection;
-- Assignment correction/end and capacity adjustment without leakage or overbooking;
+- Assignment correction/end and capacity/eligibility adjustment without leakage, overbooking, or an Assignment visible outside `active|open` Position coverage;
 - migration projection equivalence and rollback rehearsal without a dual-writer interval;
-- real two-service/PostgreSQL interleavings proving no effective slice exposes allocation above `1.0000` and proving no cross-service SQL;
+- real two-service/PostgreSQL interleavings proving no effective slice exposes allocation above `1.0000`, no Assignment write is authorized outside its fenced Position eligibility, and no cross-service SQL exists;
 - connection/resource cleanup and immutable audit/outbox evidence for failures as well as success; and
-- buyer-path reserve/fence/create/terminalize/confirm/release measurements at p95 <= 20 ms under real concurrency without sample shrinking, excluded slow paths, or warm-cache-only evidence.
+- buyer-path reserve/fence/create/terminalize/confirm/release plus conflicting Position-change measurements at p95 <= 20 ms under real concurrency without sample shrinking, excluded slow paths, or warm-cache-only evidence.
 
 Synthetic fixtures may prove deterministic mechanism behavior. Buyer-realistic or scientific claims require provenance-backed right-cleared data.
 
 ## Consequences
 
 - Position ownership can match the accepted context map without moving worker Assignment history into Organization.
-- Capacity becomes an explicit Organization domain authority rather than an implicit People SQL read.
+- Capacity and Position eligibility become explicit Organization domain authority rather than implicit People SQL reads.
 - A post-fence debit can no longer be released merely because People currently shows no Assignment; release requires a terminal People abort tombstone that also prevents a delayed commit for the same attempt.
-- Ambiguous post-fence failures fail closed as bounded capacity leakage until an explicit terminal attempt outcome exists, preferring temporary under-utilization over durable overbooking.
-- The protocol adds reservation state, a People attempt-outcome fence, reconciliation, and operational evidence that a single local transaction does not require; that cost is accepted only if executable evidence confirms the bounded-context separation remains worthwhile.
+- Organization also cannot independently close or otherwise invalidate the fenced effective slice while People can still commit from the authentic receipt; the same Position-root serialization governs capacity debits and eligibility-changing Position mutations.
+- Ambiguous post-fence failures fail closed as capacity/eligibility reservation until an explicit terminal attempt outcome exists, preferring temporary under-utilization over durable overbooking or invalid Assignment coverage.
+- The protocol adds reservation state, a People attempt-outcome fence, Position eligibility fencing, reconciliation, and operational evidence that a single local transaction does not require; that cost is accepted only if executable evidence confirms the bounded-context separation remains worthwhile.
 - ADR 0004/0005 remain Accepted semantic authority. This ADR amends only the future service-ownership/consistency mechanism after successful extraction evidence.
 
 ## References
