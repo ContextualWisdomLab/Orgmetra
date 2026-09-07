@@ -7,7 +7,7 @@ from uuid import UUID
 
 import pytest
 
-from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
+from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
@@ -17,6 +17,7 @@ from orgmetra_people_api.hire import (
 from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 
 TENANT = UUID("0198a412-7800-7000-8000-000000000001")
+REWRITTEN_TENANT = UUID("0198a412-7800-7000-8000-0000000000fe")
 SELECTION_DECISION = UUID("0198a412-7800-7000-8000-000000000002")
 PERSON = UUID("0198a412-7800-7000-8000-000000000003")
 EMPLOYMENT = UUID("0198a412-7800-7000-8000-000000000004")
@@ -66,6 +67,53 @@ class _RewrittenResultPort:
         return result
 
 
+class _StopAfterTenantContext(RuntimeError):
+    """Stop the durable-port regression after the tenant context is observed."""
+
+
+class _TenantCaptureCursor:
+    """Capture the first parameterized SQL call after database acquisition."""
+
+    def __init__(self) -> None:
+        """Start without an observed tenant context."""
+        self.parameters: tuple[object, ...] | None = None
+
+    def __enter__(self) -> _TenantCaptureCursor:
+        """Enter the deterministic cursor context."""
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        """Leave exception propagation unchanged."""
+        return None
+
+    def execute(self, sql: str, parameters: tuple[object, ...] | None = None) -> None:
+        """Stop once the tenant-setting call exposes which command snapshot was used."""
+        del sql
+        if parameters is not None:
+            self.parameters = parameters
+            raise _StopAfterTenantContext
+
+
+class _TenantCaptureConnection:
+    """Expose the tenant-capture cursor through the expected DB-API shape."""
+
+    def __init__(self, cursor: _TenantCaptureCursor) -> None:
+        """Bind the deterministic cursor."""
+        self._cursor = cursor
+
+    def __enter__(self) -> _TenantCaptureConnection:
+        """Enter the deterministic connection context."""
+        return self
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        """Leave exception propagation unchanged."""
+        return None
+
+    def cursor(self) -> _TenantCaptureCursor:
+        """Return the deterministic cursor."""
+        return self._cursor
+
+
 def _command() -> HireAcceptanceCommand:
     """Build one valid confirmed-hire command before deliberate low-level rewrite."""
     return HireAcceptanceCommand(
@@ -105,6 +153,24 @@ def _policy() -> PurposeBoundAccessPolicy:
         operation_code="materialize_worker",
         required_scope_code="orgmetra.people.materialize_worker",
         permitted_fields=frozenset({"candidate_worker_conversion"}),
+    )
+
+
+def _authorization() -> AuthorizationDecision:
+    """Return the exact durable-port allow decision for the original command snapshot."""
+    return AuthorizationDecision(
+        allowed=True,
+        tenant_record_id=TENANT,
+        actor_reference="keyverse_subject:operator-228",
+        resource_reference=f"selection_decision:{SELECTION_DECISION.hex}",
+        policy_version_code="people-hire-v1",
+        purpose_code="candidate_hire",
+        operation_code="materialize_worker",
+        resource_kind="selection_decision",
+        requested_fields=frozenset({"candidate_worker_conversion"}),
+        authorized_fields=frozenset({"candidate_worker_conversion"}),
+        reason_code="access_permitted",
+        next_action="continue",
     )
 
 
@@ -160,3 +226,21 @@ def test_postgres_port_revalidates_rewritten_hire_command_before_authorization_o
 
     with pytest.raises(ValueError, match="selection_decision_id must be an operational UUID"):
         port.accept_hire(command=command, authorization=object())  # type: ignore[arg-type]
+
+
+def test_postgres_port_detaches_hire_command_before_database_acquisition() -> None:
+    """A connection-factory side effect must not change the already-authorized durable command."""
+    command = _command()
+    cursor = _TenantCaptureCursor()
+
+    def mutating_connection_factory() -> _TenantCaptureConnection:
+        object.__setattr__(command, "tenant_record_id", REWRITTEN_TENANT)
+        return _TenantCaptureConnection(cursor)
+
+    port = PostgresHireAcceptancePort(connection_factory=mutating_connection_factory)
+
+    with pytest.raises(_StopAfterTenantContext):
+        port.accept_hire(command=command, authorization=_authorization())
+
+    assert command.tenant_record_id == REWRITTEN_TENANT
+    assert cursor.parameters == (str(TENANT),)
