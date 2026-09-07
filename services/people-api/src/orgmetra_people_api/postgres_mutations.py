@@ -9,7 +9,7 @@ never insert ``candidate_worker_link``. Every accepted write calls
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable
@@ -548,22 +548,33 @@ def _post_lock_recorded_at(cursor: Any) -> datetime:
     return recorded_at
 
 
-@dataclass(frozen=True, slots=True)
-class PostgresPeopleMutationPort:
+class PostgresPeopleMutationPort(tuple):
     """Persist People mutations and governance evidence in one DB transaction.
 
     ``connection_factory`` must return a DB-API connection context manager whose
-    successful exit commits and exceptional exit rolls back. Fixed query
-    projections must arrive as exact built-in list/tuple batches and rows;
-    custom row factories must normalize before this trust boundary.
+    successful exit commits and exceptional exit rolls back. The accepted
+    executable factory is stored in the immutable tuple payload so retained
+    references cannot replace the validated database capability before later
+    authoritative writes. Fixed query projections must arrive as exact built-in
+    list/tuple batches and rows; custom row factories must normalize before this
+    trust boundary.
     """
 
-    connection_factory: PostgresConnectionFactory
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        """Reject unusable database factories before protected mutation is attempted."""
-        if not callable(self.connection_factory):
+    def __new__(
+        cls,
+        connection_factory: PostgresConnectionFactory,
+    ) -> PostgresPeopleMutationPort:
+        """Validate and structurally bind the executable database capability."""
+        if not callable(connection_factory):
             raise TypeError("connection_factory must be callable")
+        return tuple.__new__(cls, (connection_factory,))
+
+    @property
+    def connection_factory(self) -> PostgresConnectionFactory:
+        """Expose the exact factory retained by the structural binding."""
+        return tuple.__getitem__(self, 0)
 
     def create_employment(
         self,
@@ -582,7 +593,8 @@ class PostgresPeopleMutationPort:
             resource_kind="employment_record",
             requested_fields=_EMPLOYMENT_FIELDS,
         )
-        with self.connection_factory() as connection:
+        connection_factory = tuple.__getitem__(self, 0)
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
@@ -695,7 +707,8 @@ class PostgresPeopleMutationPort:
             resource_kind="position_record",
             requested_fields=_POSITION_FIELDS,
         )
-        with self.connection_factory() as connection:
+        connection_factory = tuple.__getitem__(self, 0)
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
@@ -796,7 +809,8 @@ class PostgresPeopleMutationPort:
             resource_kind="assignment_record",
             requested_fields=_ASSIGNMENT_FIELDS,
         )
-        with self.connection_factory() as connection:
+        connection_factory = tuple.__getitem__(self, 0)
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
