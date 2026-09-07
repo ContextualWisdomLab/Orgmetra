@@ -35,8 +35,11 @@ class HireDecisionIntegrityError(RuntimeError):
 
 
 def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require an exact UUID outside Orgmetra's reserved protocol sentinels."""
-    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
+    """Require an exact UUID with an inert integer payload in the operational range."""
+    if type(value) is not UUID:
+        raise ValueError(f"{field_name} must be an operational UUID.")
+    identity = value.int
+    if type(identity) is not int or not (0 < identity < _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
 
 
