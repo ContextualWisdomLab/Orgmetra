@@ -571,11 +571,6 @@ class PostgresPeopleMutationPort(tuple):
             raise TypeError("connection_factory must be callable")
         return tuple.__new__(cls, (connection_factory,))
 
-    @property
-    def connection_factory(self) -> PostgresConnectionFactory:
-        """Expose the exact factory retained by the structural binding."""
-        return tuple.__getitem__(self, 0)
-
     def create_employment(
         self,
         *,
