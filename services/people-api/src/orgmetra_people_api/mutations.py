@@ -385,13 +385,12 @@ def _require_result_identity_or_replay(
     result_record_id: UUID,
     expected_record_id: UUID,
     replay_command_digest: str | None,
-    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
-    authorization: AuthorizationDecision,
+    expected_replay_command_digest: str,
     result_name: str,
 ) -> None:
-    """Accept a foreign identity only with replay evidence bound to this semantic command."""
+    """Accept a foreign identity only with replay evidence bound before executable persistence."""
     if replay_command_digest is not None:
-        if replay_command_digest != mutation_command_digest(command=command, authorization=authorization):
+        if replay_command_digest != expected_replay_command_digest:
             raise PeopleMutationIntegrityError(f"{result_name} replay evidence does not match command")
         return
     if result_record_id != expected_record_id:
@@ -423,6 +422,7 @@ def create_employment_record(
         requested_fields=_EMPLOYMENT_FIELDS,
         policy=policy,
     )
+    expected_replay_command_digest = mutation_command_digest(command=command, authorization=authorization)
     port_command = replace(command)
     result = port.create_employment(command=port_command, authorization=authorization)
     if type(result) is not EmploymentMutationResult:
@@ -432,8 +432,7 @@ def create_employment_record(
         result_record_id=result.employment_record_id,
         expected_record_id=expected_employment_record_id,
         replay_command_digest=result.replay_command_digest,
-        command=command,
-        authorization=authorization,
+        expected_replay_command_digest=expected_replay_command_digest,
         result_name="employment",
     )
     return result
@@ -464,6 +463,7 @@ def create_position_record(
         requested_fields=_POSITION_FIELDS,
         policy=policy,
     )
+    expected_replay_command_digest = mutation_command_digest(command=command, authorization=authorization)
     port_command = replace(command)
     result = port.create_position(command=port_command, authorization=authorization)
     if type(result) is not PositionMutationResult:
@@ -473,8 +473,7 @@ def create_position_record(
         result_record_id=result.position_record_id,
         expected_record_id=expected_position_record_id,
         replay_command_digest=result.replay_command_digest,
-        command=command,
-        authorization=authorization,
+        expected_replay_command_digest=expected_replay_command_digest,
         result_name="position",
     )
     return result
@@ -505,6 +504,7 @@ def create_assignment_record(
         requested_fields=_ASSIGNMENT_FIELDS,
         policy=policy,
     )
+    expected_replay_command_digest = mutation_command_digest(command=command, authorization=authorization)
     port_command = replace(command)
     result = port.create_assignment(command=port_command, authorization=authorization)
     if type(result) is not AssignmentMutationResult:
@@ -514,8 +514,7 @@ def create_assignment_record(
         result_record_id=result.assignment_record_id,
         expected_record_id=expected_assignment_record_id,
         replay_command_digest=result.replay_command_digest,
-        command=command,
-        authorization=authorization,
+        expected_replay_command_digest=expected_replay_command_digest,
         result_name="assignment",
     )
     return result
