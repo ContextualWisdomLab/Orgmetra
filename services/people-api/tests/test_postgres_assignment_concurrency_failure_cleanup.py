@@ -131,24 +131,27 @@ def test_expired_cleanup_join_terminates_live_backend_before_returning() -> None
             super().__init__(*args, **kwargs)
             created_factories.append(self)
 
-    class _ExpireFirstJoinThread(original_threading.Thread):
-        """Make the first bounded join expire immediately, then allow a real cleanup join."""
+    class _ExpireHeldWriterJoinThread(original_threading.Thread):
+        """Expire only the held writer's first join; let the released writer quiesce normally."""
 
         def __init__(self, *args: object, **kwargs: object) -> None:
+            writer_kwargs = kwargs.get("kwargs")
+            factory = writer_kwargs.get("factory") if isinstance(writer_kwargs, dict) else None
+            self._expire_first_join = getattr(factory, "_barrier", None) is None
             super().__init__(*args, **kwargs)
             self._join_calls = 0
             created_threads.append(self)
 
         def join(self, timeout: float | None = None) -> None:
             self._join_calls += 1
-            if self._join_calls == 1:
+            if self._expire_first_join and self._join_calls == 1:
                 super().join(timeout=0)
                 return
             super().join(timeout=timeout)
 
     class _ThreadingProbe:
         Event = original_threading.Event
-        Thread = _ExpireFirstJoinThread
+        Thread = _ExpireHeldWriterJoinThread
 
     def hold_second_connection_open(
         connection: object, exc_type: object, exc: object, traceback: object
