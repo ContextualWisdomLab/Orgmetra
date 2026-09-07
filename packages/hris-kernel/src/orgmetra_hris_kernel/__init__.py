@@ -13,6 +13,10 @@ from orgmetra_hris_kernel.assignment import (
     validate_assignment_write,
     validate_position_seat_capacity,
 )
+from orgmetra_hris_kernel.assignment_correction import (
+    AssignmentSupersessionFact,
+    correct_assignment_category,
+)
 from orgmetra_hris_kernel.audit import AuditOutboxEvent
 from orgmetra_hris_kernel.correction import close_recorded_interval
 from orgmetra_hris_kernel.employment import validate_person_employment_exclusivity
@@ -54,6 +58,7 @@ from orgmetra_hris_kernel.workforce import (
 __all__ = [
     "AssignmentFact",
     "AssignmentPortfolioError",
+    "AssignmentSupersessionFact",
     "AuditOutboxEvent",
     "CorrectionError",
     "DateInterval",
@@ -79,6 +84,7 @@ __all__ = [
     "WorkforceCompositionSnapshot",
     "build_workforce_composition_snapshot",
     "close_recorded_interval",
+    "correct_assignment_category",
     "resolve_bitemporal_facts",
     "resolve_single_valued_fact",
     "validate_assignment_employment_coverage",
