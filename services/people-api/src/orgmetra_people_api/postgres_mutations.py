@@ -722,7 +722,7 @@ class PostgresPeopleMutationPort(tuple):
                 rows = _unpack_fixed_rows(
                     cursor.fetchmany(2),
                     row_width=3,
-                    error_message="position parent row is invalid shape",
+                    error_message="position parent row is invalid",
                 )
                 if not rows:
                     raise PeopleMutationNotFound("organization unit or job profile was not found")
