@@ -20,7 +20,9 @@ def test_post_lock_assertion_failure_cleans_writer_sessions_before_teardown() ->
     exercise = acceptance["_exercise_conflict"]
     original_lock_assertion = exercise.__globals__["_assert_database_lock_wait"]
     original_connection_factory = exercise.__globals__["_ConnectionFactory"]
+    original_threading = exercise.__globals__["threading"]
     created_factories: list[object] = []
+    join_timeouts: list[float | None] = []
 
     class _CapturingConnectionFactory(original_connection_factory):
         """Retain factories so the failure path can prove client handles were closed."""
@@ -28,6 +30,17 @@ def test_post_lock_assertion_failure_cleans_writer_sessions_before_teardown() ->
         def __init__(self, *args: object, **kwargs: object) -> None:
             super().__init__(*args, **kwargs)
             created_factories.append(self)
+
+    class _CapturingThread(original_threading.Thread):
+        """Record whether cleanup joins can hang without an explicit deadline."""
+
+        def join(self, timeout: float | None = None) -> None:
+            join_timeouts.append(timeout)
+            super().join(timeout=timeout)
+
+    class _ThreadingProbe:
+        Event = original_threading.Event
+        Thread = _CapturingThread
 
     def fail_after_real_lock_observation(
         database_url: str, *, blocked_pid: int, blocker_pid: int
@@ -41,6 +54,7 @@ def test_post_lock_assertion_failure_cleans_writer_sessions_before_teardown() ->
 
     exercise.__globals__["_ConnectionFactory"] = _CapturingConnectionFactory
     exercise.__globals__["_assert_database_lock_wait"] = fail_after_real_lock_observation
+    exercise.__globals__["threading"] = _ThreadingProbe
     try:
         isolated_postgres = acceptance["_isolated_postgres"]
         with isolated_postgres() as database_url:
@@ -75,6 +89,7 @@ def test_post_lock_assertion_failure_cleans_writer_sessions_before_teardown() ->
             else:
                 raise AssertionError("forced concurrency assertion failure was not propagated")
 
+            assert join_timeouts == [30, 30], "concurrency writer cleanup joins must be deadline-bounded"
             assert len(created_factories) == 2
             assert all(
                 connection.closed
@@ -90,3 +105,4 @@ def test_post_lock_assertion_failure_cleans_writer_sessions_before_teardown() ->
     finally:
         exercise.__globals__["_ConnectionFactory"] = original_connection_factory
         exercise.__globals__["_assert_database_lock_wait"] = original_lock_assertion
+        exercise.__globals__["threading"] = original_threading
