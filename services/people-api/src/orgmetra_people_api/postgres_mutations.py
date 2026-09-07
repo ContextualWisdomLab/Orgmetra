@@ -253,8 +253,11 @@ INSERT INTO public.people_mutation_idempotency_record (
 
 
 def _is_operational_uuid(value: object) -> bool:
-    """Return whether a value is an exact operational UUID."""
-    return type(value) is UUID and value.int not in (0, _MAX_UUID_INT)
+    """Return whether durable UUID evidence has an inert operational integer payload."""
+    if type(value) is not UUID:
+        return False
+    identity = value.int
+    return type(identity) is int and identity not in (0, _MAX_UUID_INT)
 
 
 def _is_aware_datetime(value: object) -> bool:
