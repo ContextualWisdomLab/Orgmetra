@@ -46,13 +46,14 @@ class PeopleMutationIntegrityError(RuntimeError):
     """Indicate that the mutation cannot persist without violating employment truth."""
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require an exact UUID with an inert integer payload in the operational range."""
+def _validate_operational_uuid(field_name: str, value: object) -> int:
+    """Return the inert integer payload of one exact operational UUID."""
     if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
     identity = value.int
     if type(identity) is not int or not (0 < identity < _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
+    return identity
 
 
 def _validate_confirmation(value: object) -> None:
@@ -186,7 +187,7 @@ class EmploymentMutationCommand:
     idempotency_key: str
 
     def __post_init__(self) -> None:
-        """Fail closed before authorization or persistence on malformed input."""
+        """Fail closed and detach UUID aliases before authorization or persistence."""
         for field_name in (
             "tenant_record_id",
             "person_record_id",
@@ -195,7 +196,8 @@ class EmploymentMutationCommand:
             "audit_event_record_id",
             "outbox_delivery_record_id",
         ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
+            identity = _validate_operational_uuid(field_name, getattr(self, field_name))
+            object.__setattr__(self, field_name, UUID(int=identity))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
         if type(self.employment_status_code) is not str or self.employment_status_code not in _EMPLOYMENT_STATUSES:
@@ -228,7 +230,7 @@ class PositionMutationCommand:
     idempotency_key: str
 
     def __post_init__(self) -> None:
-        """Fail closed before authorization or persistence on malformed input."""
+        """Fail closed and detach UUID aliases before authorization or persistence."""
         for field_name in (
             "tenant_record_id",
             "organization_unit_id",
@@ -238,7 +240,8 @@ class PositionMutationCommand:
             "audit_event_record_id",
             "outbox_delivery_record_id",
         ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
+            identity = _validate_operational_uuid(field_name, getattr(self, field_name))
+            object.__setattr__(self, field_name, UUID(int=identity))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
         if type(self.position_status_code) is not str or self.position_status_code not in _POSITION_STATUSES:
@@ -266,7 +269,7 @@ class AssignmentMutationCommand:
     idempotency_key: str
 
     def __post_init__(self) -> None:
-        """Fail closed before authorization or persistence on malformed input."""
+        """Fail closed and detach UUID aliases before authorization or persistence."""
         for field_name in (
             "tenant_record_id",
             "employment_record_id",
@@ -276,7 +279,8 @@ class AssignmentMutationCommand:
             "audit_event_record_id",
             "outbox_delivery_record_id",
         ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
+            identity = _validate_operational_uuid(field_name, getattr(self, field_name))
+            object.__setattr__(self, field_name, UUID(int=identity))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
         if type(self.allocation_ratio) is not Decimal:
