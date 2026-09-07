@@ -197,3 +197,49 @@ def test_postgres_position_detaches_validated_command_before_connection_factory_
     )
     assert insert_position[1] is not None
     assert insert_position[1][2] == ORGANIZATION
+
+
+def test_postgres_position_detaches_nested_uuid_before_connection_factory_callback() -> None:
+    """Keep nested Position identity authority fixed across connection acquisition."""
+    command = PositionMutationCommand(
+        tenant_record_id=TENANT,
+        organization_unit_id=UUID(int=ORGANIZATION.int),
+        job_profile_id=JOB_PROFILE,
+        position_record_id=POSITION,
+        position_record_version_id=POSITION_VERSION,
+        audit_event_record_id=AUDIT_EVENT,
+        outbox_delivery_record_id=OUTBOX,
+        position_status_code="open",
+        effective_from=date(2026, 9, 5),
+        confirmation_reference="human_confirmation:post-construction-268-position",
+        evidence_version_code="position-evidence-v1",
+        idempotency_key="post-construction-runtime-268-position",
+    )
+    cursor = ScriptedCursor(
+        [[], [(ORGANIZATION, JOB_PROFILE, RECORDED_AT)]],
+        [],
+    )
+    connection = FakeConnection(cursor)
+
+    def mutating_connection_factory() -> FakeConnection:
+        """Rewrite the caller-owned nested UUID only after direct-port validation."""
+        object.__setattr__(command.organization_unit_id, "int", MUTATED_ORGANIZATION.int)
+        return connection
+
+    port = PostgresPeopleMutationPort(mutating_connection_factory)
+    result = port.create_position(
+        command=command,
+        authorization=_authorization(resource_kind="position_record", record_id=POSITION),
+    )
+
+    assert command.organization_unit_id == MUTATED_ORGANIZATION
+    assert result.position_record_id == POSITION
+    parent_query = next(
+        execution for execution in cursor.executions if "FROM public.organization_unit AS organization" in execution[0]
+    )
+    assert parent_query[1] == (JOB_PROFILE, TENANT, ORGANIZATION)
+    insert_position = next(
+        execution for execution in cursor.executions if execution[0].startswith("INSERT INTO public.position_record (")
+    )
+    assert insert_position[1] is not None
+    assert insert_position[1][2] == ORGANIZATION
