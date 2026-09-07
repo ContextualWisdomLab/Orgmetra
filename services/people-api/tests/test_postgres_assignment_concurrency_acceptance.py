@@ -695,18 +695,21 @@ def _exercise_conflict(
         daemon=True,
     )
     first.start()
-    assert barrier.ready.wait(timeout=30), "first Assignment writer did not reach its pre-COMMIT barrier"
-    assert first_outcome.error is None
-    second.start()
-    assert second_factory.connected.wait(timeout=30), "second Assignment writer did not connect"
-    _assert_database_lock_wait(
-        database_url,
-        blocked_pid=second_factory.backend_pid,
-        blocker_pid=first_factory.backend_pid,
-    )
-    barrier.release.set()
-    first.join(timeout=30)
-    second.join(timeout=30)
+    try:
+        assert barrier.ready.wait(timeout=30), "first Assignment writer did not reach its pre-COMMIT barrier"
+        assert first_outcome.error is None
+        second.start()
+        assert second_factory.connected.wait(timeout=30), "second Assignment writer did not connect"
+        _assert_database_lock_wait(
+            database_url,
+            blocked_pid=second_factory.backend_pid,
+            blocker_pid=first_factory.backend_pid,
+        )
+    finally:
+        barrier.release.set()
+        first.join()
+        if second.ident is not None:
+            second.join()
     assert not first.is_alive() and not second.is_alive()
     assert first_outcome.error is None
     assert first_outcome.result_id == first_command.assignment_record_id
