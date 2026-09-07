@@ -6,7 +6,7 @@
 - **Current executable protected truth:** the shipped People mutation boundary still owns Position creation and enforces Assignment capacity/status coverage in the same PostgreSQL mutation path. There is no protected executable `organization_core` service yet.
 - **Active-PR truth:** ADR 0274 specifies a Proposed Position-capacity/eligibility ownership protocol only. It adds no runtime owner, schema, API, migration, or claim of distributed correctness.
 - **Prerequisite active truth:** #64 owns the current People mutation/concurrency hardening; #96 and #119 own the Organization prerequisite stack. ADR 0274 must not copy their mutable source.
-- **Not yet implemented:** `PositionCapacityReservation`, `PositionEligibilityCoverage`, People-owned terminal `AssignmentAttemptOutcome`, the published/versioned cross-context capacity/attempt API or event contract, Position-eligibility fencing, capacity-revision receipts, transaction-drained writer-fenced migration, deterministic discrepancy manifest, two-service reconciliation, performance evidence, or rollback rehearsal.
+- **Not yet implemented:** `PositionCapacityReservation`, `PositionEligibilityCoverage`, People-owned terminal `AssignmentAttemptOutcome`, stable Assignment-root revision CAS, the published/versioned cross-context capacity/attempt API or event contract, Position-eligibility fencing, capacity-revision receipts, transaction-drained writer-fenced migration, deterministic discrepancy manifest, two-service reconciliation, performance evidence, or rollback rehearsal.
 
 ## Requirement matrix
 
@@ -21,8 +21,10 @@
 | Make `held` consume capacity but allow bounded autonomous expiry before commit fence | ADR 0274 capacity invariant/protocol | proposed_design |
 | Make `commit_fenced` consume capacity without autonomous expiry | ADR 0274 protocol/failure semantics | proposed_design |
 | Give every capacity-affecting Assignment mutation its own opaque `assignment_attempt_id` | ADR 0274 domain model/protocol | proposed_design |
-| Bind mutation digest to operation, exact prior Assignment version, prior reservation evidence, resulting facts, and new delta fences | ADR 0274 `AssignmentAttemptOutcome` | proposed_design |
+| Bind mutation digest to stable Assignment identity, operation, exact expected prior Assignment version, prior reservation evidence, resulting facts, and new delta fences | ADR 0274 `AssignmentAttemptOutcome` | proposed_design |
+| Serialize revisions/ends at the stable Assignment root and compare-and-set the expected prior version | ADR 0274 `revise_assignment_capacity` | proposed_design |
 | Make People commit Assignment create/revision/end plus terminal `committed` evidence atomically | ADR 0274 People mutation protocol | proposed_design |
+| Make a stale-predecessor revision terminally non-committing so its unused delta fences have exact abort/conflict release evidence | ADR 0274 revision protocol | proposed_design |
 | Allow unresolved post-fence capacity release only from a terminal People `aborted` tombstone that fences later commit | ADR 0274 `terminalize_attempt`/release semantics | proposed_design |
 | Reject point-in-time Assignment absence/not-found as release authority | ADR 0274 failure/recovery semantics | proposed_design |
 | Never shrink/release a confirmed debit from a mutable People read | ADR 0274 revision protocol | proposed_design |
@@ -32,7 +34,7 @@
 | Bind `arm_commit_fence` to normalized complete Position eligibility coverage for the reservation interval | ADR 0274 capacity/eligibility invariant | proposed_design |
 | Serialize eligibility-changing Position mutations against live fenced/confirmed debits at the same Position root | ADR 0274 `change_position_status_or_version` | proposed_design |
 | Reject People-side mutable Position recheck as a correctness mechanism after a fence | ADR 0274 protocol/failure semantics | proposed_design |
-| Keep People/network I/O outside Position-root transactions and row-lock lifetime | ADR 0274 protocol/failure semantics | proposed_design |
+| Keep cross-context I/O outside Position-root and Assignment-root transaction/lock lifetime | ADR 0274 protocol/failure semantics | proposed_design |
 | Apply terminal People receipts in new local Organization transactions | ADR 0274 confirm/release/revision protocol | proposed_design |
 | Fail conflicting Position changes locally, resolve People state outside the lock, then retry on exact version/digest evidence | ADR 0274 status-change protocol | proposed_design |
 | Bind retries to idempotency key plus semantic command digest | ADR 0274 protocol | proposed_design |
@@ -45,9 +47,11 @@
 | Preserve Organization hierarchy prerequisite delta before extraction | #96 -> #119 owner order | active_owner_boundary |
 | Prove concurrent overlapping capacity cannot exceed `1.0000` | Future two-service/PostgreSQL acceptance | planned_red_green |
 | Prove delayed create versus terminal abort cannot produce both an aborted receipt and later committed Assignment | Future People attempt-race acceptance | planned_red_green |
+| Prove two different revisions based on the same Assignment predecessor cannot both advance the lineage | Future Assignment-root CAS acceptance | planned_red_green |
+| Prove stale-predecessor abort/conflict releases only that attempt's unused delta fences | Future Assignment-root/capacity integration | planned_red_green |
 | Prove Position close/status mutation cannot invalidate eligibility while an authentic fenced create can still commit | Future Position-status-vs-create race acceptance | planned_red_green |
 | Prove multi-version Position coverage remains complete and fenced across version boundaries | Future Position-coverage acceptance | planned_red_green |
-| Prove remote latency cannot extend Position row-lock lifetime | Future lock/I/O instrumentation acceptance | planned_operability |
+| Prove remote latency cannot extend Position or Assignment root-lock lifetime | Future lock/I/O instrumentation acceptance | planned_operability |
 | Prove crash after People create/revision commit before Organization application cannot free required capacity | Future forced-crash interleavings | planned_red_green |
 | Prove increase/extension fences only positive target deltas before People revision commit | Future revision-capacity integration tests | planned_red_green |
 | Prove move confirms target before source release | Future cross-Position revision tests | planned_red_green |
@@ -77,6 +81,8 @@ The implementation must exercise, not merely document, these transitions and for
 | `commit_fenced` | terminal People `committed` receipt obtained outside Position lock | local Organization `confirmed` transition, idempotently |
 | `commit_fenced` | terminal People `aborted` receipt obtained outside Position lock | local Organization `released` transition, idempotently |
 | `commit_fenced` | current Assignment absence / not-found / timeout / missing event / stale read | no release; reconciliation only |
+| Assignment V1 | revision A2 and revision A3 both expect V1 | stable Assignment-root serialization/CAS permits at most one new authoritative successor; stale loser is terminally non-committing |
+| stale-predecessor revision attempt | exact terminal abort/conflict receipt | only that attempt's unused delta fences may be released idempotently |
 | confirmed Assignment occupancy | proposed allocation increase or interval extension | positive Position/time-slice delta must be `commit_fenced` before People revision can commit |
 | confirmed Assignment occupancy | proposed Position move | full target occupancy not already backed on target must be fenced before People revision commit |
 | confirmed Assignment occupancy | decrease / shortening / end commits in People | old confirmed debit remains until exact terminal revision receipt is applied |
@@ -91,7 +97,7 @@ The implementation must exercise, not merely document, these transitions and for
 | cutover barrier closed | deterministic migration projection | every visible current/future legacy Assignment maps to stable `confirmed` reservation plus terminal committed evidence |
 | drained legacy snapshot invalid or unrepresentable | migration validation | immutable deterministic discrepancy evidence; no semantic rewrite and no authority switch |
 
-The Organization capacity calculation counts every effective `held`, `commit_fenced`, and `confirmed` debit. Existing confirmed occupancy stays counted until exact terminal People revision evidence permits reduction; positive revision deltas are counted before People can commit the larger occupancy. The same Position-root authority protects staffable eligibility for every fenced/confirmed interval. Cross-context calls happen only after local row-locking transactions end. Failures therefore bias toward temporary over-reservation rather than under-reservation or durable overbooking.
+The Organization capacity calculation counts every effective `held`, `commit_fenced`, and `confirmed` debit. Existing confirmed occupancy stays counted until exact terminal People revision evidence permits reduction; positive revision deltas are counted before People can commit the larger occupancy. People independently serializes the stable Assignment lineage and rejects stale expected predecessors, so two distinct attempt IDs cannot fork one Assignment root. The same Position-root authority protects staffable eligibility for every fenced/confirmed interval. Cross-context calls happen only after local row-locking transactions end. Failures therefore bias toward temporary over-reservation rather than under-reservation or durable overbooking.
 
 ## Required failure interleavings
 
@@ -107,12 +113,24 @@ The Organization capacity calculation counts every effective `held`, `commit_fen
 
 Passing requires exactly one terminal People outcome for A and no execution that frees Organization capacity while a later commit for A remains possible.
 
+### Concurrent revisions from the same Assignment predecessor
+
+1. Assignment V1 is authoritative and backed by confirmed reservation evidence R1.
+2. Prepare mutation attempts A2 and A3 independently, both digest-bound to stable Assignment identity, expected prior V1 and R1. Let each obtain any positive delta fence it needs.
+3. Start both People transactions concurrently.
+4. People serializes the same stable Assignment root. The winner verifies V1 is still authoritative and may atomically commit V2 plus terminal `committed` outcome.
+5. The loser resumes after the root lock, finds its expected prior V1 is stale, and must not commit V3 from V1. It records/returns terminal `aborted` conflict evidence for that attempt.
+6. Organization may release the loser's unused delta fences only from that exact terminal abort/conflict receipt. A timeout, mutable current read, or knowledge that another revision won is not release authority.
+7. Retrying the user's intended correction requires a new attempt bound to the now-authoritative Assignment version and current reservation evidence.
+
+Passing requires a single Assignment lineage successor from V1, no orphaned under-reserved committed revision, and no unused delta release without exact loser-attempt evidence.
+
 ### Confirmed Assignment revision versus capacity adjustment
 
 1. Assignment V1 is backed by exact confirmed reservation evidence R1.
-2. Start a capacity-affecting revision attempt A2 bound to V1 and R1.
+2. Start a capacity-affecting revision attempt A2 bound to stable Assignment identity, expected prior V1 and R1.
 3. For an increase or interval extension, Organization fences only the positive Position/time-slice delta R2 before People may commit V2. For a Position move, Organization fences the target occupancy required by V2 before People may commit it.
-4. People atomically commits V2 plus terminal `AssignmentAttemptOutcome=committed(A2)` carrying V1/R1 and R2 evidence.
+4. People serializes the Assignment root, confirms V1 is still authoritative, then atomically commits V2 plus terminal `AssignmentAttemptOutcome=committed(A2)` carrying V1/R1 and R2 evidence.
 5. Crash before Organization applies that receipt. R1 remains confirmed and R2 remains fenced, so capacity is conservative rather than under-reserved.
 6. Recovery confirms R2 before reducing or releasing any R1 slice no longer required by V2. For a move, target is confirmed before source is released.
 7. For a decrease, shortening, or end, People may commit V2 without R2, but R1 remains counted until the exact terminal V2 receipt is applied.
@@ -166,4 +184,4 @@ If executable evidence invalidates the provisional commit-fence design, revise A
 
 ## Evidence boundary
 
-Passing documentation checks proves only that the Proposed decision record is internally present. It does not prove service extraction, concurrency safety, revision safety, Position eligibility safety, cutover linearizability, migration source validity, lock-lifetime safety, availability, performance, security, or commercial readiness. Historical #64/#96 checks do not transfer to a future extraction head; every implementation candidate must obtain fresh exact-head evidence.
+Passing documentation checks proves only that the Proposed decision record is internally present. It does not prove service extraction, concurrency safety, Assignment-lineage serialization, revision safety, Position eligibility safety, cutover linearizability, migration source validity, lock-lifetime safety, availability, performance, security, or commercial readiness. Historical #64/#96 checks do not transfer to a future extraction head; every implementation candidate must obtain fresh exact-head evidence.
