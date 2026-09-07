@@ -257,7 +257,7 @@ def _is_operational_uuid(value: object) -> bool:
     if type(value) is not UUID:
         return False
     identity = value.int
-    return type(identity) is int and identity not in (0, _MAX_UUID_INT)
+    return type(identity) is int and 0 < identity < _MAX_UUID_INT
 
 
 def _is_aware_datetime(value: object) -> bool:
