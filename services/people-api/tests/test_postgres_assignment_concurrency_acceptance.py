@@ -679,11 +679,14 @@ def _join_writer_before_teardown(
         application_name = factory._application_name.replace("'", "''")
         termination = _psql(
             database_url,
-            "SELECT coalesce(bool_and(pg_terminate_backend(pid)), true)::text "
+            "SELECT concat_ws('|', count(*), "
+            "coalesce(bool_and(pg_terminate_backend(pid)), false)::text) "
             "FROM pg_stat_activity "
             f"WHERE pid = {connection.backend_pid} AND application_name = '{application_name}';",
         )
-        assert termination == "t", "failed to terminate expired Assignment writer backend"
+        assert termination == "1|true", (
+            "expired Assignment writer backend identity was absent or termination failed"
+        )
     thread.join(timeout=30)
     assert not thread.is_alive(), "Assignment writer remained live after backend termination"
 
