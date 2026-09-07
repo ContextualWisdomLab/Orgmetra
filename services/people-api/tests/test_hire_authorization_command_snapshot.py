@@ -16,6 +16,7 @@ from orgmetra_people_api.hire import (
 
 TENANT = UUID("0198a412-c200-7000-8000-000000000001")
 CANDIDATE = UUID("0198a412-c200-7000-8000-000000000010")
+MUTATED_CANDIDATE = UUID("0198a412-c200-7000-8000-000000000012")
 SELECTION_DECISION = UUID("0198a412-c200-7000-8000-000000000011")
 PERSON = UUID("0198a412-c200-7000-8000-000000000020")
 PERSON_NAME = UUID("0198a412-c200-7000-8000-000000000021")
@@ -50,8 +51,9 @@ class _MutatingResourceKind(str):
         return instance
 
     def _mutate_command(self) -> None:
-        """Rewrite valid PII after application validation but during authorization."""
+        """Rewrite valid PII and nested UUID state during authorization."""
         object.__setattr__(self.command, "display_name", MUTATED_DISPLAY_NAME)
+        object.__setattr__(self.command.candidate_profile_id, "int", MUTATED_CANDIDATE.int)
 
     def __eq__(self, other: object) -> bool:
         """Mutate before preserving ordinary string equality semantics."""
@@ -89,7 +91,7 @@ def _command() -> HireAcceptanceCommand:
     """Build one valid confirmed-hire command for authorization interleaving."""
     return HireAcceptanceCommand(
         tenant_record_id=TENANT,
-        candidate_profile_id=CANDIDATE,
+        candidate_profile_id=UUID(int=CANDIDATE.int),
         selection_decision_id=SELECTION_DECISION,
         person_record_id=PERSON,
         person_name_record_id=PERSON_NAME,
@@ -121,7 +123,7 @@ class HireAuthorizationCommandSnapshotTests(unittest.TestCase):
     """Require authorization callbacks to have no authority over the port hire command."""
 
     def test_hire_port_receives_pre_authorization_semantics(self) -> None:
-        """Policy execution may mutate caller PII but not the detached port command."""
+        """Policy execution may mutate caller state but not the detached port command."""
         command = _command()
         port = _CapturingHirePort()
 
@@ -134,9 +136,12 @@ class HireAuthorizationCommandSnapshotTests(unittest.TestCase):
         )
 
         self.assertEqual(command.display_name, MUTATED_DISPLAY_NAME)
+        self.assertEqual(command.candidate_profile_id, MUTATED_CANDIDATE)
         self.assertIsNotNone(port.command)
         assert port.command is not None
         self.assertEqual(port.command.display_name, ORIGINAL_DISPLAY_NAME)
+        self.assertEqual(port.command.candidate_profile_id, CANDIDATE)
+        self.assertIsNot(port.command.candidate_profile_id, command.candidate_profile_id)
         self.assertIsNot(port.command, command)
         self.assertEqual(result.person_record_id, PERSON)
         self.assertEqual(result.employment_record_id, EMPLOYMENT)
