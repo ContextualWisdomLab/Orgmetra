@@ -423,7 +423,8 @@ def create_employment_record(
         requested_fields=_EMPLOYMENT_FIELDS,
         policy=policy,
     )
-    result = port.create_employment(command=command, authorization=authorization)
+    port_command = replace(command)
+    result = port.create_employment(command=port_command, authorization=authorization)
     if type(result) is not EmploymentMutationResult:
         raise TypeError("mutation_port must return EmploymentMutationResult")
     result = replace(result)
@@ -463,7 +464,8 @@ def create_position_record(
         requested_fields=_POSITION_FIELDS,
         policy=policy,
     )
-    result = port.create_position(command=command, authorization=authorization)
+    port_command = replace(command)
+    result = port.create_position(command=port_command, authorization=authorization)
     if type(result) is not PositionMutationResult:
         raise TypeError("mutation_port must return PositionMutationResult")
     result = replace(result)
@@ -503,7 +505,8 @@ def create_assignment_record(
         requested_fields=_ASSIGNMENT_FIELDS,
         policy=policy,
     )
-    result = port.create_assignment(command=command, authorization=authorization)
+    port_command = replace(command)
+    result = port.create_assignment(command=port_command, authorization=authorization)
     if type(result) is not AssignmentMutationResult:
         raise TypeError("mutation_port must return AssignmentMutationResult")
     result = replace(result)
