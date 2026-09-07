@@ -662,6 +662,32 @@ def _assert_connection_cleanup(database_url: str, factories: Sequence[_Connectio
     assert active == "0"
 
 
+def _join_writer_before_teardown(
+    database_url: str,
+    *,
+    thread: threading.Thread,
+    factory: _ConnectionFactory,
+) -> None:
+    """Bound cleanup, terminate only the owned backend on expiry, and prove thread quiescence."""
+    thread.join(timeout=30)
+    if not thread.is_alive():
+        return
+    if not factory.connections:
+        raise AssertionError("live Assignment writer has no owned PostgreSQL connection to terminate")
+    connection = factory.connections[-1]
+    if not connection.closed:
+        application_name = factory._application_name.replace("'", "''")
+        termination = _psql(
+            database_url,
+            "SELECT coalesce(bool_and(pg_terminate_backend(pid)), true)::text "
+            "FROM pg_stat_activity "
+            f"WHERE pid = {connection.backend_pid} AND application_name = '{application_name}';",
+        )
+        assert termination == "t", "failed to terminate expired Assignment writer backend"
+    thread.join(timeout=30)
+    assert not thread.is_alive(), "Assignment writer remained live after backend termination"
+
+
 def _exercise_conflict(
     database_url: str,
     *,
@@ -707,9 +733,9 @@ def _exercise_conflict(
         )
     finally:
         barrier.release.set()
-        first.join(timeout=30)
+        _join_writer_before_teardown(database_url, thread=first, factory=first_factory)
         if second.ident is not None:
-            second.join(timeout=30)
+            _join_writer_before_teardown(database_url, thread=second, factory=second_factory)
     assert not first.is_alive() and not second.is_alive()
     assert first_outcome.error is None
     assert first_outcome.result_id == first_command.assignment_record_id
