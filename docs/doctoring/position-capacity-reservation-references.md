@@ -1,6 +1,6 @@
 # Position capacity-reservation references
 
-Checked against primary publisher documentation on 2026-09-08. These sources inform the Proposed architecture in ADR 0274; they do not prove the distributed protocol correct, imply certification, or substitute for executable concurrency/failure evidence.
+Checked against primary publisher documentation on 2026-09-08 (Asia/Seoul). These sources inform the Proposed architecture in ADR 0274; they do not prove the distributed protocol correct, imply certification, or substitute for executable concurrency/failure evidence.
 
 ## APA 7 references
 
@@ -12,7 +12,7 @@ PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: 13.3.
 
 ## Version and bibliographic notes
 
-- PostgreSQL 18 is the current supported major documentation line checked on 2026-09-08; the PostgreSQL documentation surface announces PostgreSQL 18.6 as released on 2026-08-13. ADR 0274 uses the documented semantics, not a patch-specific behavior claim.
+- PostgreSQL 18 is the current supported major documentation line checked on 2026-09-08 (Asia/Seoul); the PostgreSQL documentation surface announces PostgreSQL 18.6 as released on 2026-08-13. ADR 0274 uses the documented semantics, not a patch-specific behavior claim.
 - PostgreSQL documents `READ COMMITTED` as its default isolation level and states that two successive commands in one transaction may see different committed data. That is why a separate availability or Position-status read cannot be the authority for a later People write.
 - PostgreSQL documents `SELECT ... FOR UPDATE` row locking as blocking competing writers/lockers until transaction end. That supports Position-root serialization inside the canonical Organization owner for both reservation debits and Position eligibility-changing mutations. It also means a network call made while that transaction is open would extend the local lock lifetime until the remote operation returns; ADR 0274 therefore keeps People/network I/O outside Position-root transactions.
 - The canonical SIGMOD conference-paper record for Garcia-Molina and Salem is DOI `10.1145/38713.38742`. ACM also exposes a SIGMOD Record representation with DOI `10.1145/38714.38742`; ADR 0274 cites the conference-paper DOI to avoid treating the two identifiers as interchangeable.
@@ -30,4 +30,4 @@ PostgreSQL Global Development Group. (2026). *PostgreSQL 18 documentation: 13.3.
 
 ## Evidence boundary
 
-The sources above justify why the repository must explicitly control concurrency, lock lifetime, and compensation. They do not establish that ADR 0274's provisional choreography, People-owned attempt fence, or Position-eligibility fence is safe. Acceptance requires real two-service/PostgreSQL interleavings, delayed-create-versus-terminal-abort and fenced-create-versus-Position-status-change races, instrumentation proving remote latency cannot extend Position row-lock lifetime, crash-window tests, idempotent replay tests, migration/rollback evidence, and exact-head quality/security/review gates listed in ADR 0274.
+The sources above justify why the repository must explicitly control concurrency, lock lifetime, and compensation. They do not establish that ADR 0274's provisional choreography, People-owned attempt fence, Position-eligibility fence, or migration barrier is safe. Acceptance requires real two-service/PostgreSQL interleavings, delayed-create-versus-terminal-abort and fenced-create-versus-Position-status-change races, instrumentation proving remote latency cannot extend Position row-lock lifetime, transaction-drained cutover tests, deterministic migration replay, crash-window tests, idempotent replay tests, migration/rollback evidence, and exact-head quality/security/review gates listed in ADR 0274.
