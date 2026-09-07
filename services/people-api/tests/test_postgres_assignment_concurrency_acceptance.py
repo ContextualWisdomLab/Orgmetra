@@ -1,11 +1,15 @@
 """Real PostgreSQL interleavings for governed Assignment conflict domains.
 
-The acceptance deliberately drives ``PostgresPeopleMutationPort`` through a
+The integration contract deliberately drives ``PostgresPeopleMutationPort`` through a
 small libpq DB-API boundary instead of mocking cursors.  Each case runs against
 an isolated PostgreSQL container and holds the first writer immediately before
 COMMIT, so the second writer must cross the production row-lock boundary.  The
 wait is observed from ``pg_stat_activity``/``pg_blocking_pids``; sleeps never
 establish the correctness ordering.
+
+The structural records in this module are deterministic synthetic fixtures. They
+prove PostgreSQL serialization mechanics only; they are not real/right-cleared
+buyer acceptance data.
 """
 
 from __future__ import annotations
@@ -446,7 +450,7 @@ def _conversion_event(*, audit_id: UUID, conversion_id: UUID, evidence_set_id: U
 
 
 def _seed_fixture(database_url: str, *, people: int, positions: int) -> None:
-    """Seed right-cleared structural fixtures needed by Assignment acceptance."""
+    """Seed deterministic synthetic records for PostgreSQL concurrency integration."""
     organization = UUID("10000000-0000-7000-8000-000000000131")
     job = UUID("10000000-0000-7000-8000-000000000141")
     person_ids = (_PERSON_ONE, _PERSON_TWO)[:people]
@@ -524,7 +528,7 @@ def _seed_fixture(database_url: str, *, people: int, positions: int) -> None:
                 "confirmation_reference, decided_at, recorded_at) "
                 f"VALUES ('{_TENANT}', '{decision_id}', '{candidate_id}', '{job}', '{evidence_set_id}', "
                 "'keyverse_subject:concurrency-fixture', 'talent_acquisition', 'hire', "
-                "'Right-cleared concurrency acceptance fixture', 'confirmation:concurrency-fixture', "
+                "'Deterministic concurrency integration fixture', 'confirmation:concurrency-fixture', "
                 "TIMESTAMPTZ '2026-08-17 04:59:00+00', TIMESTAMPTZ '2026-08-17 05:00:00+00');",
                 "SELECT record_audit_outbox_event("
                 f"'{_TENANT}'::uuid, '{audit_id}'::uuid, '{outbox_id}'::uuid, '{event}', "
