@@ -8,7 +8,7 @@ candidate-to-worker conversion and its immutable audit/outbox evidence.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 import re
 from typing import Protocol, runtime_checkable
@@ -35,8 +35,8 @@ class HireDecisionIntegrityError(RuntimeError):
 
 
 def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require a real UUID outside Orgmetra's reserved protocol sentinels."""
-    if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
+    """Require an exact UUID outside Orgmetra's reserved protocol sentinels."""
+    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
 
 
@@ -83,7 +83,7 @@ class HireAcceptanceCommand:
             _validate_operational_uuid(field_name, getattr(self, field_name))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.display_name, str):
+        if type(self.display_name) is not str:
             raise ValueError("display_name must be a string.")
         try:
             self.display_name.encode("utf-8")
@@ -95,7 +95,7 @@ class HireAcceptanceCommand:
             raise ValueError("display_name must not contain control characters.")
         validate_idempotency_key(self.idempotency_key)
         if (
-            not isinstance(self.employment_status_code, str)
+            type(self.employment_status_code) is not str
             or _STATUS_CODE_PATTERN.fullmatch(self.employment_status_code) is None
         ):
             raise ValueError("employment_status_code must be a lower snake_case code.")
@@ -147,8 +147,14 @@ def accept_confirmed_hire(
     ``materialize_worker`` operation and ``candidate_worker_conversion`` field;
     possession of an identity token or purpose string alone is insufficient.
     """
-    if not isinstance(command, HireAcceptanceCommand):
+    if type(command) is not HireAcceptanceCommand:
         raise TypeError("command must be a HireAcceptanceCommand")
+    command = replace(command)
+    expected_person_record_id = UUID(int=command.person_record_id.int)
+    expected_employment_record_id = UUID(int=command.employment_record_id.int)
+    expected_conversion_record_id = UUID(
+        int=command.candidate_worker_conversion_record_id.int
+    )
     if not isinstance(mutation_port, HireAcceptancePort):
         raise TypeError("mutation_port must implement HireAcceptancePort")
 
@@ -164,6 +170,13 @@ def accept_confirmed_hire(
         policy=policy,
     )
     result = mutation_port.accept_hire(command=command, authorization=authorization)
-    if not isinstance(result, HireAcceptanceResult):
+    if type(result) is not HireAcceptanceResult:
         raise TypeError("mutation_port must return HireAcceptanceResult")
+    HireAcceptanceResult.__post_init__(result)
+    if (
+        result.person_record_id != expected_person_record_id
+        or result.employment_record_id != expected_employment_record_id
+        or result.candidate_worker_conversion_record_id != expected_conversion_record_id
+    ):
+        raise HireDecisionIntegrityError("hire result identity does not match command")
     return result

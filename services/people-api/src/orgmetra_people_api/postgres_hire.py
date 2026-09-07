@@ -12,12 +12,13 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 import re
 from typing import Any, Callable
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from orgmetra_hris_kernel.audit import AuditOutboxEvent
 from orgmetra_keyverse_adapter import AuthorizationDecision
@@ -165,18 +166,34 @@ INSERT INTO public.people_mutation_idempotency_record (
 
 def _is_operational_uuid(value: object) -> bool:
     """Return whether a value is an Orgmetra operational UUID."""
-    return isinstance(value, UUID) and value.int not in (0, _MAX_UUID_INT)
+    return type(value) is UUID and value.int not in (0, _MAX_UUID_INT)
 
 
 def _is_aware_datetime(value: object) -> bool:
-    """Return whether a value is a timezone-aware datetime with a real offset."""
-    return isinstance(value, datetime) and value.tzinfo is not None and value.utcoffset() is not None
+    """Return whether durable time is exact and backed by an inert standard provider."""
+    if type(value) is not datetime or value.tzinfo is None:
+        return False
+    if type(value.tzinfo) not in (timezone, ZoneInfo):
+        return False
+    return value.utcoffset() is not None
+
+
+def _unpack_fixed_rows(value: object, *, row_width: int, error_message: str) -> tuple[tuple[object, ...], ...]:
+    """Detach one bounded fixed projection only from inert built-in containers."""
+    if type(value) not in (list, tuple):
+        raise HireDecisionIntegrityError(error_message)
+    rows: list[tuple[object, ...]] = []
+    for row in value:
+        if type(row) not in (list, tuple) or len(row) != row_width:
+            raise HireDecisionIntegrityError(error_message)
+        rows.append(tuple(row))
+    return tuple(rows)
 
 
 def _validate_authorization(command: HireAcceptanceCommand, authorization: object) -> AuthorizationDecision:
     """Require an exact allow decision for this immutable selection decision."""
     expected_reference = f"selection_decision:{command.selection_decision_id.hex}"
-    if not isinstance(authorization, AuthorizationDecision):
+    if type(authorization) is not AuthorizationDecision:
         raise HireDecisionIntegrityError("hire mutation requires a typed authorization decision")
     if (
         not authorization.allowed
@@ -227,13 +244,17 @@ def _replayed_hire(
     key_parameters = (command.tenant_record_id, _HIRE_IDEMPOTENCY_ROUTE, command.idempotency_key)
     cursor.execute(_LOOKUP_HIRE_IDEMPOTENCY_SQL, key_parameters)
     cursor.execute(_READ_HIRE_IDEMPOTENCY_SQL, key_parameters)
-    rows = cursor.fetchmany(2)
+    rows = _unpack_fixed_rows(
+        cursor.fetchmany(2),
+        row_width=2,
+        error_message="hire idempotency row is invalid",
+    )
     if not rows:
         return None
-    if len(rows) != 1 or len(rows[0]) != 2:
+    if len(rows) != 1:
         raise HireDecisionIntegrityError("hire idempotency row is invalid")
     created_record_id, stored_digest = rows[0]
-    if not _is_operational_uuid(created_record_id) or not isinstance(stored_digest, str):
+    if not _is_operational_uuid(created_record_id) or type(stored_digest) is not str:
         raise HireDecisionIntegrityError("hire idempotency row is invalid")
     if stored_digest != _hire_command_digest(command, authorization):
         raise HireDecisionIntegrityError("hire idempotency key is bound to a different command")
@@ -277,8 +298,11 @@ class PostgresHireAcceptancePort:
 
     ``connection_factory`` must return a DB-API connection context manager whose
     successful exit commits and exceptional exit rolls back, as psycopg
-    connections do. Pooling, TLS, credentials, and database roles remain a
-    deployment concern outside this service package.
+    connections do. Fixed projections must cross this adapter boundary as exact
+    built-in list/tuple row collections containing exact built-in list/tuple
+    rows; custom row factories must normalize before durable evidence is read.
+    Pooling, TLS, credentials, and database roles remain a deployment concern
+    outside this service package.
     """
 
     connection_factory: PostgresConnectionFactory
@@ -304,8 +328,9 @@ class PostgresHireAcceptancePort:
         authority. Tenant/route/key advisory serialization prevents concurrent
         retries from racing the unique idempotency binding.
         """
-        if not isinstance(command, HireAcceptanceCommand):
+        if type(command) is not HireAcceptanceCommand:
             raise TypeError("command must be a HireAcceptanceCommand")
+        HireAcceptanceCommand.__post_init__(command)
         decision = _validate_authorization(command, authorization)
 
         with self.connection_factory() as connection:
@@ -323,14 +348,15 @@ class PostgresHireAcceptancePort:
                         command.candidate_profile_id,
                     ),
                 )
-                rows = cursor.fetchmany(2)
+                rows = _unpack_fixed_rows(
+                    cursor.fetchmany(2),
+                    row_width=7,
+                    error_message="decision provenance row has an invalid shape",
+                )
                 if not rows:
                     raise HireDecisionNotFound("confirmed hire decision with sealed evidence was not found")
                 if len(rows) != 1:
                     raise HireDecisionIntegrityError("multiple decision provenance rows matched the hire")
-                row = rows[0]
-                if len(row) != 7:
-                    raise HireDecisionIntegrityError("decision provenance row has an invalid shape")
                 (
                     decision_actor_reference,
                     decision_purpose_code,
@@ -339,18 +365,25 @@ class PostgresHireAcceptancePort:
                     decided_at,
                     evidence_set_id,
                     transaction_recorded_at,
-                ) = row
+                ) = rows[0]
 
+                if any(
+                    type(value) is not str
+                    for value in (
+                        decision_actor_reference,
+                        decision_purpose_code,
+                        decision_code,
+                        confirmation_reference,
+                    )
+                ):
+                    raise HireDecisionIntegrityError("selection decision provenance text is invalid")
                 if decision_code != "hire":
                     raise HireDecisionIntegrityError("selection decision is not an explicit hire")
                 if decision_actor_reference != decision.actor_reference:
                     raise HireDecisionIntegrityError("selection decision actor does not match authorized actor")
                 if decision_purpose_code != decision.purpose_code:
                     raise HireDecisionIntegrityError("selection decision purpose does not match authorized purpose")
-                if (
-                    not isinstance(confirmation_reference, str)
-                    or _REFERENCE_PATTERN.fullmatch(confirmation_reference) is None
-                ):
+                if _REFERENCE_PATTERN.fullmatch(confirmation_reference) is None:
                     raise HireDecisionIntegrityError("selection decision lacks valid human confirmation")
                 if not _is_operational_uuid(evidence_set_id):
                     raise HireDecisionIntegrityError("selection decision evidence set identity is invalid")
