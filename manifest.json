@@ -347,8 +347,8 @@
     },
     {
       "path": "packages/hris-kernel/tests/test_audit_outbox.py",
-      "sha256": "6dd86c98e3b4667e47d99cb009f8aa3fc410a6c1c6e59fee7f198dd52331b412",
-      "bytes": 9228,
+      "sha256": "99ad946ffe417e3de04f95779137632c40211d33af004f9edbbc03e910c049d8",
+      "bytes": 9231,
       "lines": 253
     },
     {
