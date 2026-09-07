@@ -11,6 +11,7 @@ entire transaction before commit.
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
+from dataclasses import replace
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -337,7 +338,7 @@ class PostgresHireAcceptancePort(tuple):
         """
         if type(command) is not HireAcceptanceCommand:
             raise TypeError("command must be a HireAcceptanceCommand")
-        HireAcceptanceCommand.__post_init__(command)
+        command = replace(command)
         decision = _validate_authorization(command, authorization)
         connection_factory = tuple.__getitem__(self, 0)
 
