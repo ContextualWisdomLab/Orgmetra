@@ -41,6 +41,38 @@ _PROCESS_PLAN_SEAL_KEY = secrets.token_bytes(32)
 _PLAN_SEALS: dict[int, str] = {}
 _ISSUED_PLAN_IDENTITIES: WeakValueDictionary[int, object] = WeakValueDictionary()
 _PLAN_SEALS_LOCK = RLock()
+_CANONICAL_TEXT_FIELDS = (
+    "tenant_record_id",
+    "monitoring_plan_reference",
+    "job_profile_reference",
+    "selection_process_reference",
+    "population_snapshot_reference",
+    "population_snapshot_digest",
+    "outcome_snapshot_reference",
+    "outcome_snapshot_digest",
+    "protected_attribute_policy_reference",
+    "protected_attribute_policy_digest",
+    "small_sample_policy_reference",
+    "small_sample_policy_digest",
+    "statistical_plan_reference",
+    "statistical_plan_digest",
+    "actor_reference",
+    "reviewer_reference",
+    "purpose_code",
+    "reason_code",
+    "analysis_scope",
+    "decision_authority",
+    "review_state",
+    "next_action",
+)
+_CANONICAL_EXACT_TYPE_FIELDS = (
+    ("monitoring_start", date),
+    ("monitoring_end", date),
+    ("generated_at", datetime),
+    ("evidence_version", int),
+    ("contains_individual_records", bool),
+    ("human_confirmation_required", bool),
+)
 
 
 def _discard_plan_seal(plan_id: int) -> None:
@@ -138,6 +170,18 @@ def _canonical_timestamp(value: datetime) -> str:
     if type(value) is not datetime or value.tzinfo is not timezone.utc:
         raise ValueError("generated_at must be an exact timezone-aware datetime")
     return value.isoformat().replace("+00:00", "Z")
+
+
+def _assert_canonical_runtime_evidence(plan: "SelectionOutcomeMonitoringPlan") -> None:
+    """Reject executable aliases before canonical serialization can touch them."""
+    for field_name in _CANONICAL_TEXT_FIELDS:
+        if type(getattr(plan, field_name)) is not str:
+            raise ValueError(f"{field_name} runtime evidence must remain exact built-in text")
+    for field_name, expected_type in _CANONICAL_EXACT_TYPE_FIELDS:
+        if type(getattr(plan, field_name)) is not expected_type:
+            raise ValueError(
+                f"{field_name} runtime evidence must remain exact built-in {expected_type.__name__}"
+            )
 
 
 @dataclass(frozen=True, slots=True, repr=False, weakref_slot=True)
@@ -274,6 +318,7 @@ class SelectionOutcomeMonitoringPlan:
 
 def _canonical_plan_json_unchecked(plan: SelectionOutcomeMonitoringPlan) -> str:
     """Render canonical bytes without consulting process-local issuance state."""
+    _assert_canonical_runtime_evidence(plan)
     payload = {
         "actor_reference": plan.actor_reference,
         "analysis_scope": plan.analysis_scope,
