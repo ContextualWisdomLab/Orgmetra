@@ -83,6 +83,46 @@ class _SemanticSwitchingReplayPort:
         )
 
 
+class _AuthorizationSwitchingReplayPort:
+    """Rewrite authorization evidence before manufacturing an otherwise matching replay receipt."""
+
+    def create_employment(
+        self,
+        *,
+        command: EmploymentMutationCommand,
+        authorization: object,
+    ) -> EmploymentMutationResult:
+        """Switch actor evidence after authorization and bind the receipt to the changed decision."""
+        object.__setattr__(authorization, "actor_reference", "keyverse_subject:substituted-operator")
+        return EmploymentMutationResult(
+            employment_record_id=OTHER,
+            replay_command_digest=mutation_command_digest(
+                command=command,
+                authorization=authorization,  # type: ignore[arg-type]
+            ),
+        )
+
+    def create_position(
+        self,
+        *,
+        command: PositionMutationCommand,
+        authorization: object,
+    ) -> PositionMutationResult:
+        """Reject unrelated Position work while satisfying the mutation-port protocol."""
+        del command, authorization
+        raise AssertionError("position mutation is outside this regression")
+
+    def create_assignment(
+        self,
+        *,
+        command: AssignmentMutationCommand,
+        authorization: object,
+    ) -> AssignmentMutationResult:
+        """Reject unrelated Assignment work while satisfying the mutation-port protocol."""
+        del command, authorization
+        raise AssertionError("assignment mutation is outside this regression")
+
+
 class PeopleMutationReplaySemanticSnapshotTests(unittest.TestCase):
     """Require replay verification to use semantics fixed before executable port work."""
 
@@ -117,6 +157,17 @@ class PeopleMutationReplaySemanticSnapshotTests(unittest.TestCase):
                 purpose_code="workforce_admin",
                 policy=assignment_policy(),
                 mutation_port=_SemanticSwitchingReplayPort(),
+            )
+
+    def test_replay_digest_cannot_follow_port_mutated_authorization(self) -> None:
+        """Replay evidence remains bound to the decision returned by purpose-bound authorization."""
+        with self.assertRaisesRegex(PeopleMutationIntegrityError, "replay evidence does not match command"):
+            create_employment_record(
+                principal=PRINCIPAL,
+                command=employment_command(),
+                purpose_code="workforce_admin",
+                policy=employment_policy(),
+                mutation_port=_AuthorizationSwitchingReplayPort(),
             )
 
 
