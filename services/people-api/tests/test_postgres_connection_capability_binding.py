@@ -24,13 +24,13 @@ class PostgresConnectionCapabilityBindingTests(unittest.TestCase):
             return nullcontext(object())
 
         port = port_type(accepted_factory)
-        try:
+        with self.assertRaises((AttributeError, TypeError)):
             object.__setattr__(port, "connection_factory", replacement_factory)
-        except (AttributeError, TypeError):
-            pass
 
-        self.assertIs(port.connection_factory, accepted_factory)
-        with port.connection_factory():
+        self.assertFalse(hasattr(type(port), "connection_factory"))
+        bound_factory = tuple.__getitem__(port, 0)
+        self.assertIs(bound_factory, accepted_factory)
+        with bound_factory():
             pass
         self.assertEqual(calls, ["accepted"])
 
