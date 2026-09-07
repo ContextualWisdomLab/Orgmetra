@@ -190,7 +190,7 @@ def test_event_rejects_custom_timezone_before_provider_callback():
             return timedelta(0)
 
     provider = ExecutableTimezone()
-    with pytest.raises(ValueError, match="datetime.timezone or zoneinfo.ZoneInfo"):
+    with pytest.raises(ValueError, match=r"datetime\.timezone or zoneinfo\.ZoneInfo"):
         _event(occurred_at=datetime(2026, 8, 17, 1, 30, tzinfo=provider))
 
     assert provider.calls == 0
