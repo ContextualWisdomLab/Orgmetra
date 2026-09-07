@@ -160,10 +160,11 @@ def test_expired_cleanup_join_terminates_live_backend_before_returning() -> None
         original_connection_exit(connection, exc_type, exc, traceback)
 
     def observing_psql(database_url: str, sql: str) -> str:
+        result = original_psql(database_url, sql)
         if "pg_terminate_backend" in sql:
             termination_sql.append(sql)
             hold_second_exit.set()
-        return original_psql(database_url, sql)
+        return result
 
     def fail_after_real_lock_observation(
         database_url: str, *, blocked_pid: int, blocker_pid: int
