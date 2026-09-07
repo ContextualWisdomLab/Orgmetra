@@ -20,7 +20,13 @@
 | Prevent caller polymorphism and post-construction rewriting from changing checked-vs-emitted evidence | `test_rejects_caller_defined_runtime_subclasses`, `test_detects_post_construction_tampering_before_evidence_export` | active_pr |
 | Prevent one still-live tenant-qualified review reference from identifying conflicting valid evidence | `test_live_reference_rejects_conflicting_reissuance` | active_pr |
 | Require authoritative same-tenant bitemporal hierarchy verification, stale-parent/cycle/multiple-parent rejection and immutable audit/outbox before mutation | `test_next_action_preserves_authoritative_bitemporal_and_audit_boundary` | contract_only_in_this_slice |
-| Exact installed-artifact quality | dedicated workflow: CPython 3.14.7, SHA-256-bound wheel, 100% owned statement/branch coverage, clean checkout | active_pr |
+| Exact installed-artifact quality after workflow consolidation | canonical `Foundation CI`: CPython 3.14.7, SHA-256-bound wheel install, package-owned pytest configuration requiring 100% statement/branch coverage, plus `test_repository_contract.py` preventing resurrection of the retired leaf workflow | active_pr |
+
+## Protected-parent reconciliation
+
+This active PR is reconciled onto protected `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f`, which consolidated repository-owned quality execution into `.github/workflows/foundation-ci.yml`. The former `organization-hierarchy-change-review-quality.yml` leaf workflow is intentionally retired rather than resurrected. The package's exact installed-wheel test is executed by canonical Foundation CI, and the repository contract fails if that ownership moves back to the retired leaf or if the pinned CPython/wheel-hash/pytest execution contract disappears.
+
+Historical checks from the pre-consolidation head do not transfer to the reconciled head. Only fresh workflow results bound to the exact reconciled commit are acceptance evidence.
 
 ## Boundary note
 
