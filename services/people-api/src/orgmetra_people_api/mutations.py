@@ -310,8 +310,9 @@ class EmploymentMutationResult:
     replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Prevent malformed persistence results from crossing the service boundary."""
-        _validate_operational_uuid("employment_record_id", self.employment_record_id)
+        """Validate and detach persistence result identity from adapter-owned aliases."""
+        identity = _validate_operational_uuid("employment_record_id", self.employment_record_id)
+        object.__setattr__(self, "employment_record_id", UUID(int=identity))
         _validate_replay_command_digest(self.replay_command_digest)
 
 
@@ -323,8 +324,9 @@ class PositionMutationResult:
     replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Prevent malformed persistence results from crossing the service boundary."""
-        _validate_operational_uuid("position_record_id", self.position_record_id)
+        """Validate and detach persistence result identity from adapter-owned aliases."""
+        identity = _validate_operational_uuid("position_record_id", self.position_record_id)
+        object.__setattr__(self, "position_record_id", UUID(int=identity))
         _validate_replay_command_digest(self.replay_command_digest)
 
 
@@ -336,8 +338,9 @@ class AssignmentMutationResult:
     replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Prevent malformed persistence results from crossing the service boundary."""
-        _validate_operational_uuid("assignment_record_id", self.assignment_record_id)
+        """Validate and detach persistence result identity from adapter-owned aliases."""
+        identity = _validate_operational_uuid("assignment_record_id", self.assignment_record_id)
+        object.__setattr__(self, "assignment_record_id", UUID(int=identity))
         _validate_replay_command_digest(self.replay_command_digest)
 
 
@@ -423,7 +426,7 @@ def create_employment_record(
     result = port.create_employment(command=command, authorization=authorization)
     if type(result) is not EmploymentMutationResult:
         raise TypeError("mutation_port must return EmploymentMutationResult")
-    EmploymentMutationResult.__post_init__(result)
+    result = replace(result)
     _require_result_identity_or_replay(
         result_record_id=result.employment_record_id,
         expected_record_id=expected_employment_record_id,
@@ -463,7 +466,7 @@ def create_position_record(
     result = port.create_position(command=command, authorization=authorization)
     if type(result) is not PositionMutationResult:
         raise TypeError("mutation_port must return PositionMutationResult")
-    PositionMutationResult.__post_init__(result)
+    result = replace(result)
     _require_result_identity_or_replay(
         result_record_id=result.position_record_id,
         expected_record_id=expected_position_record_id,
@@ -503,7 +506,7 @@ def create_assignment_record(
     result = port.create_assignment(command=command, authorization=authorization)
     if type(result) is not AssignmentMutationResult:
         raise TypeError("mutation_port must return AssignmentMutationResult")
-    AssignmentMutationResult.__post_init__(result)
+    result = replace(result)
     _require_result_identity_or_replay(
         result_record_id=result.assignment_record_id,
         expected_record_id=expected_assignment_record_id,
