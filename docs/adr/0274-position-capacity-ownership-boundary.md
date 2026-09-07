@@ -70,7 +70,7 @@ For every tenant-qualified Position and every overlapping valid-time slice:
 
 1. `reserve`: under Position-root serialization, validate Position status/version and capacity, then create `held`. Exact replay of the same idempotency key and semantic digest returns the same reservation; the same key with a different digest fails closed.
 2. `arm_commit_fence`: convert the exact `held` reservation to `commit_fenced`. This is durable, idempotent, version-bound, and non-expiring.
-3. `create_assignment`: People may commit Assignment only from an authentic receipt issued through the released/versioned Organization contract proving the exact reservation is `commit_fenced` for the same tenant, Position, allocation, effective interval, and semantic intent.
+3. `create_assignment`: People may commit Assignment only from an authentic receipt issued through the published/versioned Organization contract proving the exact reservation is `commit_fenced` for the same tenant, Position, allocation, effective interval, and semantic intent.
 4. `confirm`: after People has an authoritative committed Assignment receipt, Organization converts the debit to `confirmed` and binds that receipt. Duplicate or reordered confirmation is idempotent when version/digest-equivalent and fails closed when contradictory.
 5. `release`/`adjust`: an ordinary `held` reservation may be released or expire before a commit fence. A `commit_fenced` debit may return capacity only after authoritative People evidence proves Assignment abort/absence or a later governed correction/end makes the debit no longer effective. Timeout, elapsed time, one missing event, one HTTP failure, or a stale read is never proof of absence.
 
@@ -93,10 +93,10 @@ Extraction must not create two Position/capacity writers.
 
 1. Integrate #64 normally so the currently shipped People mutation/concurrency truth is protected.
 2. Integrate #96 and then #119 through their canonical Organization stack; descendants adopt protected predecessors with ordinary non-force history.
-3. Implement and test the Organization owner and released/versioned capacity contract while this ADR remains Proposed.
+3. Implement and test the Organization owner and published/versioned capacity contract while this ADR remains Proposed.
 4. Before authority switch, fence new Assignment capacity mutations.
 5. Project current and future-effective Assignment occupancy into the Organization reservation ledger. Bind the projection to an immutable migration manifest/digest and verify tenant, Position, effective interval, allocation, and aggregate-sum equivalence.
-6. Switch Position/capacity write authority to `organization_core`, then switch `people_core` to the released capacity contract, then remove the fence.
+6. Switch Position/capacity write authority to `organization_core`, then switch `people_core` to the published capacity contract, then remove the fence.
 
 Rollback must be defined and rehearsed before un-fencing. It must select one writer authority; it must never re-enable both the legacy People Position/capacity writer and the Organization writer.
 

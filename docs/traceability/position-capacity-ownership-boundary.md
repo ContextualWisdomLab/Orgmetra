@@ -6,7 +6,7 @@
 - **Current executable protected truth:** the shipped People mutation boundary still owns Position creation and enforces Assignment capacity in the same PostgreSQL mutation path. There is no protected executable `organization_core` service yet.
 - **Active-PR truth:** ADR 0274 specifies a Proposed Position-capacity ownership protocol only. It adds no runtime owner, schema, API, migration, or claim of distributed correctness.
 - **Prerequisite active truth:** #64 owns the current People mutation/concurrency hardening; #96 and #119 own the Organization prerequisite stack. ADR 0274 must not copy their mutable source.
-- **Not yet implemented:** `PositionCapacityReservation`, the released/versioned cross-context capacity API/event contract, writer-fenced migration, two-service reconciliation, performance evidence, or rollback rehearsal.
+- **Not yet implemented:** `PositionCapacityReservation`, the published/versioned cross-context capacity API/event contract, writer-fenced migration, two-service reconciliation, performance evidence, or rollback rehearsal.
 
 ## Requirement matrix
 
