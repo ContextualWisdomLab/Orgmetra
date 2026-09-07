@@ -1,4 +1,4 @@
-"""Reject forged exact UUID payloads before sentinel comparison in People boundaries."""
+"""Reject forged exact UUID payloads before scalar use in People boundaries."""
 
 from __future__ import annotations
 
@@ -12,10 +12,11 @@ from orgmetra_people_api.postgres_mutations import (
 )
 
 _OPERATIONAL_UUID = UUID("0198a412-9000-7000-8000-0000000000aa")
+_OUT_OF_RANGE_IDENTITIES = (-1, 1 << 128)
 
 
 class _ExecutableUUIDPayload:
-    """Tripwire that exposes sentinel comparison before integer-payload validation."""
+    """Tripwire that exposes scalar comparison before integer-payload validation."""
 
     def __init__(self) -> None:
         self.calls = 0
@@ -54,6 +55,18 @@ class PeopleUuidPayloadIntegrityTests(unittest.TestCase):
 
                 self.assertFalse(validator(_forged_uuid(payload)))
                 self.assertEqual(payload.calls, 0)
+
+    def test_application_uuid_gate_rejects_out_of_range_exact_integer_payload(self) -> None:
+        for identity in _OUT_OF_RANGE_IDENTITIES:
+            with self.subTest(identity=identity):
+                with self.assertRaisesRegex(ValueError, "tenant_record_id must be an operational UUID"):
+                    _validate_operational_uuid("tenant_record_id", _forged_uuid(identity))
+
+    def test_postgres_uuid_gates_reject_out_of_range_exact_integer_payload(self) -> None:
+        for validator in (_is_hire_operational_uuid, _is_mutation_operational_uuid):
+            for identity in _OUT_OF_RANGE_IDENTITIES:
+                with self.subTest(validator=validator.__module__, identity=identity):
+                    self.assertFalse(validator(_forged_uuid(identity)))
 
     def test_exact_operational_uuid_remains_accepted(self) -> None:
         _validate_operational_uuid("tenant_record_id", _OPERATIONAL_UUID)
