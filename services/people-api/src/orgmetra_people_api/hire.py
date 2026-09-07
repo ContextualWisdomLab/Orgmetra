@@ -115,13 +115,14 @@ class HireAcceptanceResult:
     candidate_worker_conversion_record_id: UUID
 
     def __post_init__(self) -> None:
-        """Prevent malformed persistence results from crossing the service boundary."""
+        """Validate and detach persistence result identities from adapter-owned aliases."""
         for field_name in (
             "person_record_id",
             "employment_record_id",
             "candidate_worker_conversion_record_id",
         ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
+            identity = _validate_operational_uuid(field_name, getattr(self, field_name))
+            object.__setattr__(self, field_name, UUID(int=identity))
 
 
 @runtime_checkable
@@ -177,7 +178,7 @@ def accept_confirmed_hire(
     result = mutation_port.accept_hire(command=command, authorization=authorization)
     if type(result) is not HireAcceptanceResult:
         raise TypeError("mutation_port must return HireAcceptanceResult")
-    HireAcceptanceResult.__post_init__(result)
+    result = replace(result)
     if (
         result.person_record_id != expected_person_record_id
         or result.employment_record_id != expected_employment_record_id
