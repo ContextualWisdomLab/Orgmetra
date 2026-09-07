@@ -15,10 +15,19 @@ def _load_acceptance_namespace() -> dict[str, object]:
 
 
 def test_post_lock_assertion_failure_cleans_writer_sessions_before_teardown() -> None:
-    """A failed assertion after a real lock wait must not leave PostgreSQL writers alive."""
+    """A failed assertion after a real lock wait must close both client and server sessions."""
     acceptance = _load_acceptance_namespace()
     exercise = acceptance["_exercise_conflict"]
     original_lock_assertion = exercise.__globals__["_assert_database_lock_wait"]
+    original_connection_factory = exercise.__globals__["_ConnectionFactory"]
+    created_factories: list[object] = []
+
+    class _CapturingConnectionFactory(original_connection_factory):
+        """Retain factories so the failure path can prove client handles were closed."""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            super().__init__(*args, **kwargs)
+            created_factories.append(self)
 
     def fail_after_real_lock_observation(
         database_url: str, *, blocked_pid: int, blocker_pid: int
@@ -30,6 +39,7 @@ def test_post_lock_assertion_failure_cleans_writer_sessions_before_teardown() ->
         )
         raise AssertionError("forced failure after PostgreSQL lock observation")
 
+    exercise.__globals__["_ConnectionFactory"] = _CapturingConnectionFactory
     exercise.__globals__["_assert_database_lock_wait"] = fail_after_real_lock_observation
     try:
         isolated_postgres = acceptance["_isolated_postgres"]
@@ -65,6 +75,12 @@ def test_post_lock_assertion_failure_cleans_writer_sessions_before_teardown() ->
             else:
                 raise AssertionError("forced concurrency assertion failure was not propagated")
 
+            assert len(created_factories) == 2
+            assert all(
+                connection.closed
+                for factory in created_factories
+                for connection in factory.connections
+            )
             active_writers = acceptance["_psql"](
                 database_url,
                 "SELECT count(*) FROM pg_stat_activity "
@@ -72,4 +88,5 @@ def test_post_lock_assertion_failure_cleans_writer_sessions_before_teardown() ->
             )
             assert active_writers == "0"
     finally:
+        exercise.__globals__["_ConnectionFactory"] = original_connection_factory
         exercise.__globals__["_assert_database_lock_wait"] = original_lock_assertion
