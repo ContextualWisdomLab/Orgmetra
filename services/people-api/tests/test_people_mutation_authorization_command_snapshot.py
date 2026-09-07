@@ -54,16 +54,25 @@ class _MutatingResourceKind(str):
         command: object,
         field_name: str,
         replacement: object,
+        mutate_nested_uuid: bool = False,
     ) -> _MutatingResourceKind:
-        """Retain the caller command solely for the adversarial comparison callback."""
+        """Retain caller state solely for the adversarial comparison callback."""
         instance = super().__new__(cls, value)
         instance.command = command
         instance.field_name = field_name
         instance.replacement = replacement
+        instance.mutate_nested_uuid = mutate_nested_uuid
         return instance
 
     def _mutate_command(self) -> None:
         """Simulate caller-owned executable policy behavior during authorization."""
+        if self.mutate_nested_uuid:
+            nested_uuid = getattr(self.command, self.field_name)
+            replacement_uuid = self.replacement
+            if type(nested_uuid) is not UUID or type(replacement_uuid) is not UUID:
+                raise TypeError("nested UUID mutation requires exact UUID values")
+            object.__setattr__(nested_uuid, "int", replacement_uuid.int)
+            return
         object.__setattr__(self.command, self.field_name, self.replacement)
 
     def __eq__(self, other: object) -> bool:
@@ -125,6 +134,7 @@ def _policy(
     command: object,
     command_field_name: str,
     replacement: object,
+    mutate_nested_uuid: bool = False,
 ) -> PurposeBoundAccessPolicy:
     """Build a valid policy whose resource-kind comparison mutates caller state."""
     return PurposeBoundAccessPolicy(
@@ -135,6 +145,7 @@ def _policy(
             command=command,
             field_name=command_field_name,
             replacement=replacement,
+            mutate_nested_uuid=mutate_nested_uuid,
         ),
         purpose_code="workforce_admin",
         operation_code="create_record",
@@ -223,6 +234,31 @@ class PeopleMutationAuthorizationCommandSnapshotTests(unittest.TestCase):
         self.assertEqual(port.employment_command.person_record_id, PERSON)
         self.assertIsNot(port.employment_command, command)
 
+    def test_employment_port_detaches_nested_uuid_authority(self) -> None:
+        """Retained UUID mutation must not cross the Employment policy boundary."""
+        command = _employment_command()
+        object.__setattr__(command, "person_record_id", UUID(int=PERSON.int))
+        port = _CapturingMutationPort()
+        create_employment_record(
+            principal=PRINCIPAL,
+            command=command,
+            purpose_code="workforce_admin",
+            policy=_policy(
+                resource_kind="employment_record",
+                field_name="employment_record",
+                command=command,
+                command_field_name="person_record_id",
+                replacement=OTHER_PERSON,
+                mutate_nested_uuid=True,
+            ),
+            mutation_port=port,
+        )
+        self.assertEqual(command.person_record_id, OTHER_PERSON)
+        self.assertIsNotNone(port.employment_command)
+        assert port.employment_command is not None
+        self.assertEqual(port.employment_command.person_record_id, PERSON)
+        self.assertIsNot(port.employment_command.person_record_id, command.person_record_id)
+
     def test_position_port_receives_pre_authorization_semantics(self) -> None:
         """Policy execution may mutate caller state but not the Position port command."""
         command = _position_command()
@@ -246,6 +282,31 @@ class PeopleMutationAuthorizationCommandSnapshotTests(unittest.TestCase):
         self.assertEqual(port.position_command.job_profile_id, JOB)
         self.assertIsNot(port.position_command, command)
 
+    def test_position_port_detaches_nested_uuid_authority(self) -> None:
+        """Retained UUID mutation must not cross the Position policy boundary."""
+        command = _position_command()
+        object.__setattr__(command, "job_profile_id", UUID(int=JOB.int))
+        port = _CapturingMutationPort()
+        create_position_record(
+            principal=PRINCIPAL,
+            command=command,
+            purpose_code="workforce_admin",
+            policy=_policy(
+                resource_kind="position_record",
+                field_name="position_record",
+                command=command,
+                command_field_name="job_profile_id",
+                replacement=OTHER_JOB,
+                mutate_nested_uuid=True,
+            ),
+            mutation_port=port,
+        )
+        self.assertEqual(command.job_profile_id, OTHER_JOB)
+        self.assertIsNotNone(port.position_command)
+        assert port.position_command is not None
+        self.assertEqual(port.position_command.job_profile_id, JOB)
+        self.assertIsNot(port.position_command.job_profile_id, command.job_profile_id)
+
     def test_assignment_port_receives_pre_authorization_semantics(self) -> None:
         """Policy execution may mutate caller state but not the Assignment port command."""
         command = _assignment_command()
@@ -268,6 +329,31 @@ class PeopleMutationAuthorizationCommandSnapshotTests(unittest.TestCase):
         assert port.assignment_command is not None
         self.assertEqual(port.assignment_command.position_record_id, POSITION)
         self.assertIsNot(port.assignment_command, command)
+
+    def test_assignment_port_detaches_nested_uuid_authority(self) -> None:
+        """Retained UUID mutation must not cross the Assignment policy boundary."""
+        command = _assignment_command()
+        object.__setattr__(command, "position_record_id", UUID(int=POSITION.int))
+        port = _CapturingMutationPort()
+        create_assignment_record(
+            principal=PRINCIPAL,
+            command=command,
+            purpose_code="workforce_admin",
+            policy=_policy(
+                resource_kind="assignment_record",
+                field_name="assignment_record",
+                command=command,
+                command_field_name="position_record_id",
+                replacement=OTHER_POSITION,
+                mutate_nested_uuid=True,
+            ),
+            mutation_port=port,
+        )
+        self.assertEqual(command.position_record_id, OTHER_POSITION)
+        self.assertIsNotNone(port.assignment_command)
+        assert port.assignment_command is not None
+        self.assertEqual(port.assignment_command.position_record_id, POSITION)
+        self.assertIsNot(port.assignment_command.position_record_id, command.position_record_id)
 
 
 if __name__ == "__main__":
