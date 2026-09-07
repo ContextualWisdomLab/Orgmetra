@@ -707,9 +707,9 @@ def _exercise_conflict(
         )
     finally:
         barrier.release.set()
-        first.join()
+        first.join(timeout=30)
         if second.ident is not None:
-            second.join()
+            second.join(timeout=30)
     assert not first.is_alive() and not second.is_alive()
     assert first_outcome.error is None
     assert first_outcome.result_id == first_command.assignment_record_id
