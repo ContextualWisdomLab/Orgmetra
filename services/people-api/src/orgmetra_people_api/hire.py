@@ -34,13 +34,14 @@ class HireDecisionIntegrityError(RuntimeError):
     """Indicate that decision provenance cannot safely materialize worker truth."""
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require an exact UUID with an inert integer payload in the operational range."""
+def _validate_operational_uuid(field_name: str, value: object) -> int:
+    """Return the inert integer payload of one exact operational UUID."""
     if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
     identity = value.int
     if type(identity) is not int or not (0 < identity < _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
+    return identity
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +71,7 @@ class HireAcceptanceCommand:
     employment_status_code: str = "active"
 
     def __post_init__(self) -> None:
-        """Fail closed before authorization or persistence on malformed input."""
+        """Fail closed and detach UUID aliases before authorization or persistence."""
         for field_name in (
             "tenant_record_id",
             "candidate_profile_id",
@@ -83,7 +84,8 @@ class HireAcceptanceCommand:
             "audit_event_record_id",
             "outbox_delivery_record_id",
         ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
+            identity = _validate_operational_uuid(field_name, getattr(self, field_name))
+            object.__setattr__(self, field_name, UUID(int=identity))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
         if type(self.display_name) is not str:
