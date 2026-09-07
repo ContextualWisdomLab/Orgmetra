@@ -6,7 +6,7 @@
 - **Current executable protected truth:** the shipped People mutation boundary still owns Position creation and enforces Assignment capacity/status coverage in the same PostgreSQL mutation path. There is no protected executable `organization_core` service yet.
 - **Active-PR truth:** ADR 0274 specifies a Proposed Position-capacity/eligibility ownership protocol only. It adds no runtime owner, schema, API, migration, or claim of distributed correctness.
 - **Prerequisite active truth:** #64 owns the current People mutation/concurrency hardening; #96 and #119 own the Organization prerequisite stack. ADR 0274 must not copy their mutable source.
-- **Not yet implemented:** `PositionCapacityReservation`, `PositionEligibilityCoverage`, People-owned terminal `AssignmentAttemptOutcome`, the published/versioned cross-context capacity/attempt API or event contract, Position-eligibility fencing, transaction-drained writer-fenced migration, two-service reconciliation, performance evidence, or rollback rehearsal.
+- **Not yet implemented:** `PositionCapacityReservation`, `PositionEligibilityCoverage`, People-owned terminal `AssignmentAttemptOutcome`, the published/versioned cross-context capacity/attempt API or event contract, Position-eligibility fencing, transaction-drained writer-fenced migration, deterministic discrepancy manifest, two-service reconciliation, performance evidence, or rollback rehearsal.
 
 ## Requirement matrix
 
@@ -35,6 +35,7 @@
 | Prevent dual Position/capacity writers during extraction | ADR 0274 cutover/rollback | proposed_design |
 | Drain every pre-fence legacy mutation before taking the migration snapshot | ADR 0274 cutover barrier | proposed_design |
 | Deterministically map each tenant-qualified legacy Assignment to confirmed reservation/terminal committed migration evidence | ADR 0274 cutover manifest | proposed_design |
+| Fail cutover instead of rewriting an invalid/unrepresentable legacy fact to fit the target ledger | ADR 0274 cutover discrepancy rule | proposed_design |
 | Preserve current People mutation behavior while prerequisites remain mutable | #64 owner path; no extraction source in this slice | active_owner_boundary |
 | Preserve Organization hierarchy prerequisite delta before extraction | #96 -> #119 owner order | active_owner_boundary |
 | Prove concurrent overlapping capacity cannot exceed `1.0000` | Future two-service/PostgreSQL acceptance | planned_red_green |
@@ -48,6 +49,7 @@
 | Prove correction/end, reconciliation, and out-of-order delivery | Future contract/integration tests | planned_red_green |
 | Prove a pre-fence legacy transaction cannot commit after projection starts | Future cutover-barrier concurrency test | planned_recovery |
 | Prove deterministic migration identity/digest replay and complete projection equivalence | Future migration/recovery rehearsal | planned_recovery |
+| Prove invalid legacy occupancy creates deterministic discrepancy evidence and no authority switch | Future migration failure rehearsal | planned_recovery |
 | Prove migration projection equivalence and single-writer rollback | Future migration/recovery rehearsal | planned_red_green |
 | Prove reserve/fence/create/terminalize/confirm/release and conflicting Position-change buyer paths at p95 <= 20 ms under real concurrency | Future k6/E2E measurement | planned_performance |
 | Require buyer/scientific realism to use provenance-backed right-cleared data | ADR 0274 acceptance | proposed_evidence_boundary |
@@ -74,6 +76,7 @@ The implementation must exercise, not merely document, these transitions and for
 | any live debit | same idempotency key with different semantic digest | fail closed |
 | legacy writer open | cutover fence enters draining epoch | no new legacy admission; snapshot waits for every pre-fence admitted transaction to commit/rollback |
 | cutover barrier closed | deterministic migration projection | every visible current/future legacy Assignment maps to stable `confirmed` reservation plus terminal committed migration evidence and reproducible eligibility-coverage digest |
+| drained legacy snapshot invalid or unrepresentable | migration validation | immutable deterministic discrepancy evidence; no source fact is silently rewritten and authority does not switch |
 
 The Organization aggregate capacity calculation counts every effective `held`, `commit_fenced`, and `confirmed` debit. The same Position-root authority also protects staffable eligibility for every `commit_fenced`/`confirmed` interval against incompatible status/version mutation. The People attempt outcome is independently monotonic and terminal. Cross-context calls happen only after local row-locking transactions have ended. Together these rules prevent two concurrent holds from exceeding capacity, prevent a committed-but-unconfirmed Assignment from reopening capacity, prevent a delayed create from committing after an abort receipt, prevent an authentic fence from becoming semantically stale because Organization independently closed the Position, and avoid turning a PostgreSQL row lock into a distributed network lock.
 
@@ -116,6 +119,17 @@ Passing requires that no execution exposes a durable Assignment outside the staf
 
 Passing requires an explicit linearization barrier rather than a timing heuristic, plus deterministic replay of the complete migration projection.
 
+### Invalid legacy occupancy versus authority switch
+
+1. Close the cutover barrier only after all pre-fence legacy transactions are terminal.
+2. Use a deterministic fixture/snapshot containing a source fact that cannot be represented without changing its meaning: for example aggregate overlapping allocation above `1.0000`, an Assignment interval without complete staffable Position coverage, or an ambiguous tenant-qualified identity.
+3. Run the complete projection/validation twice.
+4. Both runs must produce identical discrepancy identity/digest and identify the exact source fact/invariant conflict without creating a replacement truth.
+5. The migration must not drop, clamp, split, round, synthesize, or silently rewrite the source Assignment/Position evidence to make the target ledger valid.
+6. Organization authority must remain disabled and the cutover must stay fenced until governed correction is committed under the still-authoritative legacy owner and the full snapshot/projection is rerun.
+
+Passing requires migration failure to be deterministic, auditable, and lossless with respect to the source truth; target validity cannot be manufactured by semantic normalization.
+
 ## Extraction gate
 
 Do not start Position source/schema extraction from this branch. The causal order is:
@@ -126,4 +140,4 @@ If executable evidence invalidates the provisional commit-fence design, revise A
 
 ## Evidence boundary
 
-Passing documentation checks would prove only that the Proposed decision record is internally present. It would not prove service extraction, concurrency safety, Position eligibility safety, cutover linearizability, lock-lifetime safety, availability, performance, security, or commercial readiness. Historical #64/#96 checks do not transfer to a future extraction head; every implementation candidate must obtain fresh exact-head evidence.
+Passing documentation checks would prove only that the Proposed decision record is internally present. It would not prove service extraction, concurrency safety, Position eligibility safety, cutover linearizability, migration source validity, lock-lifetime safety, availability, performance, security, or commercial readiness. Historical #64/#96 checks do not transfer to a future extraction head; every implementation candidate must obtain fresh exact-head evidence.
