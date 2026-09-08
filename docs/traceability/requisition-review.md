@@ -2,7 +2,7 @@
 
 ## Maturity
 
-**Active PR only.** Protected `develop` does not contain this capability until the candidate branch is integrated with fresh protected-head evidence.
+**Protected `develop` capability.** The governed requisition review packet is present on protected `develop`; it remains evidence for accountable human review, not an autonomous employment decision.
 
 ## Requirement-to-evidence map
 
@@ -20,7 +20,7 @@
 | Bound opening cardinality | `requested_opening_count` | bool/non-integer/zero/>100 rejection and exact-position one-seat invariant |
 | Produce stable immutable correlation evidence | canonical JSON plus SHA-256 | deterministic serialization and independent SHA-256 recomputation regression |
 | Avoid host-time ambiguity | timezone-aware `generated_at`, canonical UTC rendering | naive/unknown-offset rejection, non-UTC-to-UTC canonicalization, and fractional-second preservation regressions |
-| Meet owned production coverage gate | `orgmetra_requisition_review` | Foundation CI requires exact 100% statement and branch coverage |
+| Meet owned production coverage gate | `orgmetra_requisition_review` | Foundation CI requires exact candidate SHA and exact 100% statement and branch coverage |
 
 ## Authority boundary
 
