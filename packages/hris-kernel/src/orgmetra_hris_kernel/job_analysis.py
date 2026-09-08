@@ -16,6 +16,7 @@ import json
 import re
 from urllib.parse import urlsplit
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9._~-]+$")
@@ -100,14 +101,17 @@ def _validate_level(value: object, field_name: str) -> int:
 
 
 def _validate_aware_datetime(value: object, field_name: str) -> datetime:
-    """Detach one exact offset-aware instant as immutable UTC evidence."""
+    """Detach one inert standard-library instant as immutable UTC evidence."""
     if type(value) is not datetime:
         raise ValueError(f"{field_name} must be a datetime")
-    if value.tzinfo is None:
+    timezone_provider = value.tzinfo
+    if timezone_provider is None:
         raise ValueError(f"{field_name} must be timezone-aware")
+    if type(timezone_provider) not in (timezone, ZoneInfo):
+        raise ValueError(f"{field_name} must use a standard-library timezone provider")
     try:
         offset = value.utcoffset()
-    except Exception as exc:  # noqa: BLE001 - normalize provider behavior at trust boundary.
+    except Exception as exc:  # noqa: BLE001 - normalize stdlib provider failure at boundary.
         raise ValueError(f"{field_name} must resolve to a UTC offset") from exc
     if offset is None or type(offset) is not timedelta:
         raise ValueError(f"{field_name} must resolve to a UTC offset")
