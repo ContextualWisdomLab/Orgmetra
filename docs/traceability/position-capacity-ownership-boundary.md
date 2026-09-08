@@ -6,7 +6,7 @@
 - **Current executable protected truth:** the shipped People mutation boundary still owns Position creation and enforces Assignment capacity/status coverage in the same PostgreSQL mutation path. There is no protected executable `organization_core` service yet.
 - **Active-PR truth:** ADR 0274 specifies a Proposed Position-capacity/eligibility ownership protocol only. It adds no runtime owner, schema, API, migration, or claim of distributed correctness.
 - **Prerequisite active truth:** #64 owns the current People mutation/concurrency hardening; #96 and #119 own the Organization prerequisite stack. ADR 0274 must not copy their mutable source.
-- **Not yet implemented:** `PositionCapacityReservation`, `PositionEligibilityCoverage`, People-owned terminal `AssignmentAttemptOutcome`, Employment-root Assignment-portfolio serialization, stable Assignment-root revision CAS, authenticated predecessor `AssignmentCapacitySettlement`, the published/versioned authenticated cross-context capacity/attempt API or event contract, epoch/purpose-bound signing-key authorization, owner/rollback epoch validation, Position-eligibility fencing, capacity-revision receipts, transaction-drained writer-fenced migration, pre-existing admission-sequence high-water capture, live-protocol quiescence before epoch retirement, transition-scoped obligation-bounded retirement reconciliation, durable epoch-transition arbitration, deterministic discrepancy manifest, two-service reconciliation, performance evidence, or rollback rehearsal.
+- **Not yet implemented:** `PositionCapacityReservation`, `PositionEligibilityCoverage`, People-owned terminal `AssignmentAttemptOutcome`, Employment-root Assignment-portfolio serialization, stable Assignment-root revision CAS, authenticated predecessor `AssignmentCapacitySettlement`, the published/versioned authenticated cross-context capacity/attempt API or event contract, epoch/purpose-bound signing-key authorization, owner/rollback epoch validation, Position-eligibility fencing, capacity-revision receipts, transaction-drained writer-fenced migration, pre-existing admission-sequence high-water capture, owner-local two-sided admission-close receipts, live-protocol quiescence before epoch retirement, transition-scoped obligation-bounded retirement reconciliation, durable epoch-transition arbitration, deterministic discrepancy manifest, two-service reconciliation, performance evidence, or rollback rehearsal.
 
 ## Requirement matrix
 
@@ -53,18 +53,20 @@
 | Deterministically map every current legacy Assignment, including wholly past-effective occupancy, to confirmed reservation/terminal committed evidence | ADR 0274 cutover manifest | proposed_design |
 | Keep superseded recorded-history as provenance without duplicate live debits | ADR 0274 projection rule | proposed_design |
 | Fail cutover instead of rewriting invalid/unrepresentable legacy truth | ADR 0274 discrepancy rule | proposed_design |
-| Issue transaction admissions from pre-existing owner-local source-epoch sequences and atomically capture owner high-water marks when retirement closes business admission | ADR 0274 `EpochAuthorityTransition` | proposed_recovery_design |
+| Issue transaction admissions from pre-existing owner-local source-epoch sequences and capture each owner's high-water in that owner's own admission-close CAS | ADR 0274 `EpochAuthorityTransition` | proposed_recovery_design |
+| Require authenticated Organization and People admission-closure receipts before treating two-sided business admission as closed; do not assume a cross-service atomic close | ADR 0274 two-sided closure barrier | proposed_recovery_design |
+| Cover the inter-owner closure gap by the later-closing owner's captured high-water while rejecting new work immediately at the owner that already closed | ADR 0274 owner-local closure-gap rule | proposed_recovery_design |
 | Drain every ordinary Organization receipt at/below the captured retiring-epoch high-water mark before recovery work, abort, manifest, snapshot, or activation | ADR 0274 Organization admission/drain rule | proposed_recovery_design |
 | Drain every ordinary People receipt at/below the captured retiring-epoch high-water mark before recovery work, abort, manifest, snapshot, or activation | ADR 0274 People admission/drain rule | proposed_recovery_design |
-| Do not require a transaction admitted before transition creation to retroactively carry transition identity/generation | ADR 0274 high-water barrier | proposed_recovery_design |
+| Do not require a transaction admitted before transition creation or during the other owner's close gap to retroactively carry transition identity/generation | ADR 0274 high-water barrier | proposed_recovery_design |
 | Keep a separate transition/retry-generation-bound reconciliation lane after ordinary business admission closes | ADR 0274 retirement reconciliation rule | proposed_recovery_design |
 | Restrict retirement reconciliation to fixed retiring-epoch obligations and forbid new reservation/fence/Assignment/Position business truth | ADR 0274 recovery work ledger | proposed_recovery_design |
 | Close retirement-reconciliation admission, capture its high-water, and drain every recovery receipt before quiescence/snapshot | ADR 0274 reconciliation drain rule | proposed_recovery_design |
 | Settle every retiring-epoch `commit_fenced` attempt to terminal People evidence and apply its exact capacity disposition before snapshot | ADR 0274 protocol-quiescence sequence | proposed_recovery_design |
 | Apply pending retiring-epoch confirm/release/revision receipts until Organization confirmed capacity and People Assignment truth are equivalent | ADR 0274 protocol-quiescence manifest | proposed_recovery_design |
-| Prove zero unresolved fenced state, zero unapplied capacity-changing terminal outcomes, and no open recovery receipt before authority/rollback epoch rollover | ADR 0274 protocol-quiescence manifest | proposed_recovery_design |
+| Prove both owner closure receipts, zero unresolved fenced state, zero unapplied capacity-changing terminal outcomes, and no open recovery receipt before authority/rollback epoch rollover | ADR 0274 protocol-quiescence manifest | proposed_recovery_design |
 | Serialize concurrent rollovers by expected source epoch-pair CAS so one transition lineage and one target writer win | ADR 0274 `EpochAuthorityTransition` activation | proposed_recovery_design |
-| Permit `aborted` only after both captured ordinary owner drains, recovery drain, and capacity-changing settlement obligations are fully terminal/applied | ADR 0274 abort rule | proposed_recovery_design |
+| Permit `aborted` only after both owner closure receipts, captured ordinary owner drains, recovery drain, and capacity-changing settlement obligations are fully terminal/applied | ADR 0274 abort rule | proposed_recovery_design |
 | Keep an `aborted` rollover bound to the same source-pair transition lineage; retry only by expected-version CAS to a fresh proof generation while source business admission stays closed | ADR 0274 aborted-transition retry rule | proposed_recovery_design |
 | Keep prior retry-generation proof artifacts immutable but ineligible as proof for a later generation | ADR 0274 generation-scoped recovery evidence | proposed_recovery_design |
 | Reject retired-epoch receipts for new writes only after protocol state has been settled, not as a substitute for settlement | ADR 0274 epoch transition | proposed_security_recovery_design |
@@ -98,19 +100,20 @@
 | Migration identity/digest replay is deterministic across full effective-time projection | migration/recovery rehearsal | planned_recovery |
 | Retroactive correction sees migrated historical occupancy | historical correction acceptance | planned_recovery |
 | Invalid legacy occupancy creates discrepancy evidence and no authority switch | migration failure rehearsal | planned_recovery |
-| Transition creation captures all pre-existing Organization/People admissions without retroactive transition binding | owner-local admission high-water race | planned_recovery |
-| Retiring epoch cannot pass recovery-work freeze while any captured ordinary owner admission remains open | two-sided business-admission/drain race | planned_recovery |
+| One transition lineage coordinates independently captured owner-local admission closures without a cross-service transaction | two-owner admission-close protocol race | planned_recovery |
+| Work admitted by the later-closing owner during the inter-owner gap remains below its captured high-water and is drained | staggered owner-close race | planned_recovery |
+| Retiring epoch cannot pass recovery-work freeze while either owner closure receipt is missing or any captured ordinary owner admission remains open | two-sided business-admission/drain race | planned_recovery |
 | Closed business admission does not deadlock terminalization/settlement of already-captured work | bounded retirement-reconciliation liveness race | planned_recovery |
 | Retirement reconciliation cannot create new capacity/Assignment work outside the fixed obligation ledger | recovery-lane negative security/correctness tests | planned_recovery |
 | Reconciliation lane cannot commit after snapshot | recovery admission close/high-water/drain race | planned_recovery |
-| Abort cannot escape a generation while an ordinary captured admission, recovery receipt, or settlement obligation remains nonterminal | abort-versus-drain race | planned_recovery |
+| Abort cannot escape a generation while an owner closure receipt is missing, an ordinary captured admission/recovery receipt is open, or a settlement obligation remains nonterminal | abort-versus-drain race | planned_recovery |
 | Retiring epoch cannot switch while one `commit_fenced` attempt is unresolved | protocol-quiescence rollback race | planned_recovery |
-| Delayed old-epoch business mutation cannot enter after captured admission high-water closes | protocol business-admission/drain race | planned_recovery |
+| Delayed old-epoch business mutation cannot enter after its owner's captured admission high-water closes | protocol business-admission/drain race | planned_recovery |
 | Concurrent rollovers from one epoch pair cannot activate two targets | epoch-transition CAS race | planned_recovery |
 | Abort then retry cannot release source-pair ownership or create a second transition lineage | aborted-transition retry race | planned_recovery |
 | Concurrent equivalent retries of one aborted transition open exactly one fresh retry generation | transition-generation CAS race | planned_recovery |
 | Prior-generation proof artifacts cannot satisfy a later retry generation | generation-evidence isolation rehearsal | planned_recovery |
-| Quiescence manifest proves zero unresolved fences/unapplied terminal outcomes, no open recovery receipt, and cross-owner equivalence | recovery manifest rehearsal | planned_recovery |
+| Quiescence manifest proves both owner closure receipts, zero unresolved fences/unapplied terminal outcomes, no open recovery receipt, and cross-owner equivalence | recovery manifest rehearsal | planned_recovery |
 | After epoch rollover, old receipt cannot mutate state and no old debit is orphaned | epoch security/recovery test | planned_security_recovery |
 | Migration projection equivalence and single-writer rollback | recovery rehearsal | planned_red_green |
 | Buyer paths meet p95 <= 20 ms under real concurrency | k6/E2E measurement | planned_performance |
@@ -151,11 +154,12 @@
 | Position has fenced/confirmed debit | status mutation removes staffable coverage | local fail-closed; no remote call under lock |
 | historical/audit-only key | signs a new receipt claiming current authority epoch | signature may verify cryptographically; write authorization still fails key epoch/purpose binding |
 | legacy writer open | initial cutover enters draining epoch | reject new legacy admission; captured high-water waits for all earlier transactions |
-| epoch E authority active | first rollover request with exact expected `(E,R)` | atomically close owner business admissions, capture Organization/People high-water marks, and create one durable transition lineage |
-| epoch E transaction admitted before transition | receipt source pair/sequence is below captured high-water | ordinary drain obligation despite having no transition identity/generation |
+| epoch E authority active | first rollover request with exact expected `(E,R)` | create one source-pair transition lineage; each owner independently CAS-closes its E admission gate and captures its own high-water; transition cannot advance until both authenticated closure receipts exist |
+| Organization E gate closed, People E gate still open | People business request arrives in close gap | request may be admitted, but its sequence must be at/below People’s later captured high-water and drain before recovery freeze; new Organization E admission is rejected |
+| epoch E transaction admitted before transition or before its owner's local close | receipt source pair/sequence is below captured high-water | ordinary drain obligation despite having no transition identity/generation |
 | epoch E Organization business protocol closed | later reservation/fence request | no E business-admission sequence; reject |
 | epoch E People business protocol closed | later E receipt-authorized create/revise mutation | no E business-admission sequence; reject |
-| both ordinary owner drains closed | derive retirement recovery work | fixed retiring-epoch obligation ledger; no new business subject may enter |
+| both owner closure receipts durable and ordinary drains closed | derive retirement recovery work | fixed retiring-epoch obligation ledger; no new business subject may enter |
 | ordinary E business protocol closed, unresolved listed attempt | transition-bound `terminalize_attempt` recovery admission | allowed only for exact work-ledger obligation; may produce terminal outcome but no Assignment create/revise |
 | ordinary E business protocol closed, exact listed terminal receipt pending | transition-bound apply/confirm/release/settle recovery admission | allowed only by exact version/digest; may reduce ambiguity/over-reservation but cannot create new fence/business mutation |
 | ordinary E business protocol closed | recovery request tries reserve/fence/create/revise/unrelated Position mutation | fail closed; recovery lane is not substitute business admission |
@@ -164,13 +168,13 @@
 | E terminal revision/confirm/release receipt pending | quiescence recovery settlement | apply by exact-version CAS before snapshot |
 | recovery work ledger empty | close reconciliation admission and capture recovery high-water | no new recovery admission; drain every recovery receipt through captured mark before quiescence |
 | reconciliation admission closed but captured recovery receipt nonterminal | attempted quiesce/abort/snapshot/activation | block transition until recovery receipt terminal and authoritative work ledger rechecks empty |
-| retiring E still has unresolved fence, captured open ordinary/recovery admission receipt, or unapplied capacity-changing outcome | attempted manifest/snapshot/epoch increment | block transition |
-| transition `draining`, captured ordinary or recovery receipt still nonterminal | attempted abort | fail closed; remain `draining` |
+| retiring E missing an owner closure receipt, or still has unresolved fence, captured open ordinary/recovery admission receipt, or unapplied capacity-changing outcome | attempted manifest/snapshot/epoch increment | block transition |
+| transition `draining`, owner closure receipt missing or captured ordinary/recovery receipt still nonterminal | attempted abort | fail closed; remain `draining` |
 | transition `draining`, drains closed but capacity-changing outcome unapplied | attempted abort | fail closed; settle first |
-| transition `draining` or `quiesced`, ordinary/recovery drains and settlement complete, no activation receipt, source `(E,R)` still current | governed abort with expected transition version | mark same transition lineage `aborted`; source business admission remains closed |
+| transition `draining` or `quiesced`, both owner closure receipts present, ordinary/recovery drains and settlement complete, no activation receipt, source `(E,R)` still current | governed abort with expected transition version | mark same transition lineage `aborted`; source business admission remains closed |
 | transition `aborted` | equivalent retry with matching expected version/current source/target/digest | CAS same transition to `draining`, increment retry generation, recompute fresh reconciliation/drain proof from authoritative source ledgers/state |
 | transition `aborted` | two equivalent concurrent retries | one CAS opens the next generation; loser observes same generation idempotently |
-| transition `aborted` | different target/digest, stale source pair, activation receipt, or unresolved captured obligation | fail closed; do not create/re-purpose another transition lineage |
+| transition `aborted` | different target/digest, stale source pair, activation receipt, missing/inconsistent owner closure receipt, or unresolved captured obligation | fail closed; do not create/re-purpose another transition lineage |
 | prior aborted retry generation | old proof artifact offered as current retry proof | audit only; recompute current generation proof from source ledgers/state |
 | transition `quiesced` at source `(E,R)` | two concurrent activation attempts | expected-version/source-pair CAS permits one activation and one target writer only |
 | losing equivalent rollover | winning transition/activation already durable | observe same result idempotently |
@@ -271,26 +275,26 @@ Passing requires no durable Assignment outside promised staffable coverage and n
 
 Passing requires an explicit transaction linearization barrier, deterministic projection, and no legacy commit after the snapshot.
 
-### Live epoch retirement versus pre-existing owner admissions
+### Live epoch retirement versus staggered owner admission closure
 
-This RED verifies that transition creation does not require impossible retroactive receipt binding.
+This RED verifies that transition creation neither requires retroactive receipt binding nor invents a cross-service atomic transaction.
 
 1. Under source authority pair `(E,R)`, admit Organization transaction O and People transaction P before any transition exists. Their durable receipts contain `(E,R)` and owner-local monotonic admission sequences, but no transition identity/generation.
-2. Hold O and P open. Start two rollover controllers from the same expected `(E,R)` pair.
-3. Exactly one transition creation CAS wins. In the same authority transaction it closes new E business admission and captures `organization_admission_high_water >= O.sequence` and `people_admission_high_water >= P.sequence`.
-4. Verify later ordinary Organization/People business requests cannot obtain E admission sequences. O and P remain drain obligations solely because their sequences are at/below the captured marks.
-5. Attempt recovery-work freeze, abort, manifest, snapshot, and activation while either O or P is nonterminal. Every attempt must stay blocked.
-6. Let O and P commit or roll back. Any committed E state becomes visible before the bounded recovery work ledger is frozen.
-7. Recompute generation-scoped business-drain proof from the authoritative admission ledgers and continue only after both captured sets are terminal.
+2. Hold O and P open. Start two rollover controllers from the same expected `(E,R)` pair. Exactly one source-pair transition-lineage CAS wins and records immutable target intent; no owner admission gate has to be changed in that transition transaction.
+3. Close Organization E admission by Organization-local CAS, capture `organization_admission_high_water >= O.sequence`, and publish authenticated Organization closure receipt bound to T/G/(E,R). Do not close People yet.
+4. During this deliberate gap, submit another People business mutation P2. It may still obtain a valid E People admission sequence because People owns that gate. A new Organization E request must already be rejected.
+5. Now close People E admission by People-local CAS, capture `people_admission_high_water >= max(P.sequence, P2.sequence)`, and publish the corresponding authenticated People closure receipt. Verify later People E business admission is rejected.
+6. Attempt recovery-work freeze, abort, manifest, snapshot, and activation before both closure receipts exist or while O, P, or P2 is nonterminal. Every attempt must stay blocked.
+7. Let O, P, and P2 commit or roll back. Any committed E state becomes visible before the bounded recovery work ledger is frozen. Recompute generation-scoped drain proof from both authoritative admission ledgers and continue only after both captured sets are terminal.
 
-Passing requires all pre-transition business admissions to be covered without retroactive transition metadata and no ordinary E mutation to commit after the authoritative snapshot.
+Passing requires one transition lineage plus two owner-local closure linearization points: no distributed-ACID claim, no lost mutation in the inter-owner gap, no retroactive transition metadata, and no ordinary E mutation after the authoritative snapshot.
 
 ### Closed business admission versus retirement reconciliation
 
 This RED verifies that fencing new E business work does not make old E obligations impossible to settle.
 
 1. Under E, create and commit-fence reservation R for unresolved attempt A. End the Organization transaction; do not terminalize A.
-2. Start retirement, atomically close ordinary Organization/People E business admission, capture both ordinary high-water marks, and drain all receipts through those marks.
+2. Start retirement, acquire transition T, close Organization and People E business admission independently by owner-local CAS, capture both ordinary high-water marks, require both authenticated closure receipts, and drain all receipts through those marks.
 3. Demonstrate that a new E reserve, fence, create, revise, or unrelated Position mutation cannot obtain ordinary business admission.
 4. Derive transition T generation G recovery work ledger containing the exact R/A obligation. Attempt `terminalize_attempt(A)` through the closed ordinary People lane; it must be rejected. Admit the same exact obligation through T/G's reconciliation lane; it may produce only terminal `committed` or `aborted` evidence for A, never a new Assignment mutation attempt.
 5. Admit the exact resulting receipt application to Organization through the same T/G reconciliation lane. It may confirm/release/settle only R at the expected version/digest; attempts to reserve capacity, arm a new fence, or touch an unrelated reservation fail closed.
@@ -303,23 +307,23 @@ Passing requires both liveness and safety: old captured E work can be settled af
 ### Concurrent epoch rollover arbitration
 
 1. Start with one active authority pair `(E,R)` and no transition.
-2. Race controller A targeting writer W1 and controller B targeting W2, both using the exact expected source pair. Creation uses one durable source-pair CAS/uniqueness boundary and atomically captures owner business-admission high-water marks.
+2. Race controller A targeting writer W1 and controller B targeting W2, both using the exact expected source pair. One durable source-pair CAS/uniqueness boundary creates the transition lineage and immutable target intent only; it does not atomically mutate both owner databases.
 3. Exactly one `EpochAuthorityTransition` becomes active. If both requests are byte-equivalent for the same target/digest, the loser observes the winner idempotently. If targets/digests differ, the loser fails closed or refreshes from current authority; it cannot create a second transition.
-4. Drain Organization and People through the captured ordinary marks, settle protocol state through the bounded reconciliation lane, close/drain that lane, and bind one quiescence-manifest digest to the winning transition by expected transition-version CAS.
+4. Independently close Organization and People E admissions under their owner-local gate CASes and attach both authenticated closure receipts/high-water marks to the winning transition. Any work admitted by the later-closing owner is included in that owner's captured mark. Drain both captured ordinary sets, settle protocol state through the bounded reconciliation lane, close/drain that lane, and bind one quiescence-manifest digest to the winning transition by expected transition-version CAS.
 5. Race activation/retry again. Activation CASes both the transition version and still-current source `(E,R)` pair and atomically publishes the target authority pair plus immutable activation receipt.
 6. Verify exactly one transition is `activated`, exactly one target writer accepts new mutations, the losing target never becomes authoritative, and stale retries from `(E,R)` cannot activate after the winner.
 
-Passing requires one source epoch pair, one transition lineage, one activation receipt, and one target writer under all duplicate/reordered concurrent rollover attempts.
+Passing requires one source epoch pair, one transition lineage, two authenticated owner-local admission-closure receipts, one activation receipt, and one target writer under all duplicate/reordered concurrent rollover attempts.
 
 ### Abort while admission is nonterminal, then retry
 
-1. Start from source `(E,R)`, atomically close ordinary owner business admissions/capture high-water marks, and create transition T generation G.
-2. Hold one captured ordinary Organization or People receipt nonterminal. Attempt expected-version CAS to `aborted`. It must fail closed and T remains `draining`; source business admission remains closed.
+1. Start from source `(E,R)`, create transition T generation G, close both owner admissions independently with authenticated owner-local closure receipts/high-water marks, and leave one captured ordinary receipt nonterminal.
+2. Attempt expected-version CAS to `aborted`. It must fail closed and T remains `draining`; source business admission remains closed.
 3. Make both captured ordinary owner sets terminal, open bounded reconciliation, and deliberately leave one recovery receipt nonterminal or one capacity-changing terminal outcome unapplied in Organization. Abort must still fail closed.
 4. Close/drain reconciliation and apply every capacity-changing obligation. Now, before activation, an expected-version abort may mark the same lineage `aborted` while `(E,R)` remains current and no activation receipt exists.
-5. Preserve generation-G ordinary/recovery receipts, discrepancy/work-ledger/manifests as immutable history. Race two byte-equivalent retries against exact aborted T. One CAS increments retry generation to G+1; the loser observes the same winner.
-6. G+1 does not reopen E business admission and does not treat G's proof artifact as its own. It freshly derives/recomputes reconciliation, drain, settlement, and quiescence proof from authoritative source ledgers/state through the already-closed source boundary.
-7. Submit conflicting target/digest, stale-source, activation-present, or unresolved-obligation retries; all fail closed without a second lineage.
+5. Preserve generation-G ordinary/recovery receipts, closure receipts, discrepancy/work-ledger/manifests as immutable history. Race two byte-equivalent retries against exact aborted T. One CAS increments retry generation to G+1; the loser observes the same winner.
+6. G+1 does not reopen either E business-admission gate and does not treat G's proof artifact as its own. It freshly derives/recomputes reconciliation, drain, settlement, and quiescence proof from authoritative source ledgers/state through the already-closed source boundary.
+7. Submit conflicting target/digest, stale-source, activation-present, missing/inconsistent closure-receipt, or unresolved-obligation retries; all fail closed without a second lineage.
 8. Complete G+1 and verify exactly one activation receipt/target writer.
 
 Passing requires abort never to shed a live ordinary or recovery mutation obligation, retry never to create source-pair ABA, and one source pair to retain one transition lineage across generations.
@@ -329,17 +333,17 @@ Passing requires abort never to shed a live ordinary or recovery mutation obliga
 This is the RED that distinguishes protocol quiescence from ordinary database transaction drain.
 
 1. Under epoch E, Organization creates and commit-fences R for attempt A; Organization transaction ends. People has not yet made A terminal.
-2. Start rollback/epoch retirement by atomically closing E owner business admissions, capturing both ordinary high-water marks, and acquiring the exact source-pair transition.
-3. Intentionally delay one E create before admission and hold another already-admitted E People transaction whose sequence is at/below the captured People mark.
-4. The delayed-but-not-admitted request must no longer enter. The captured transaction must keep the ordinary drain barrier open until it commits or rolls back.
-5. After both ordinary owner admission drains close, derive the bounded reconciliation work ledger. Reconcile A through the transition-scoped lane. `terminalize_attempt(A)` may safely establish `aborted` if no admitted create committed, or it returns `committed` if one did. Exactly one terminal outcome exists.
+2. Start rollback/epoch retirement by acquiring the exact source-pair transition, then close Organization and People E business admissions through separate owner-local CAS/high-water transactions. The transition must collect both authenticated closure receipts before treating ordinary admission as fenced.
+3. Intentionally delay one E create so it arrives after Organization has closed but before People closes, and hold another already-admitted E People transaction. If the delayed create obtains People admission before the People-local close, its sequence must be captured by People’s high-water; if it arrives after that close, it must be rejected. Either way it cannot escape the drain boundary.
+4. The captured People transactions keep the ordinary drain barrier open until they commit or roll back. Missing either owner closure receipt also blocks recovery freeze, snapshot, abort, and activation.
+5. After both owner closure receipts exist and both captured ordinary admission drains close, derive the bounded reconciliation work ledger. Reconcile A through the transition-scoped lane. `terminalize_attempt(A)` may safely establish `aborted` if no admitted create committed, or it returns `committed` if one did. Exactly one terminal outcome exists.
 6. Apply A's exact terminal receipt to Organization through transition-scoped reconciliation. Repeat for every listed E fence and pending E capacity-changing terminal obligation; do not admit new reserve/fence/create/revise work.
 7. Close recovery admission, capture its high-water, and attempt abort, rollback snapshot, or epoch increment while any captured ordinary/recovery receipt is nonterminal, any E `commit_fenced` debit remains, or any E capacity-changing terminal outcome is unapplied. Every attempt must fail closed.
-8. Build a deterministic quiescence manifest and prove both ordinary owner captured-admission drains closed, recovery admission closed/drained, recovery work ledger exhausted, zero unresolved E `commit_fenced` debits, zero unapplied capacity-changing E outcomes, and equivalence between Organization confirmed occupancy and authoritative People Assignment truth.
+8. Build a deterministic quiescence manifest and prove both authenticated owner closure receipts, both captured-admission drains closed, recovery admission closed/drained, recovery work ledger exhausted, zero unresolved E `commit_fenced` debits, zero unapplied capacity-changing E outcomes, and equivalence between Organization confirmed occupancy and authoritative People Assignment truth.
 9. Only now bind the manifest to the winning transition, take the authoritative rollback snapshot, project the chosen target writer, and activate by expected transition/source-pair CAS.
 10. Deliver an otherwise authentic E receipt after rollover. It may support audit or replay of an already-durable terminal result but cannot authorize a new Assignment or capacity transition.
 
-Passing requires no after-snapshot old-epoch business or recovery mutation, no orphaned old-epoch debit/attempt, and no second target authority. Rejecting E receipts is the final authority boundary, not a substitute for pre-switch settlement.
+Passing requires no fictitious cross-service admission-close transaction, no after-snapshot old-epoch business or recovery mutation, no orphaned old-epoch debit/attempt, and no second target authority. Rejecting E receipts is the final authority boundary, not a substitute for pre-switch settlement.
 
 ### Retroactive correction versus migrated historical occupancy
 
