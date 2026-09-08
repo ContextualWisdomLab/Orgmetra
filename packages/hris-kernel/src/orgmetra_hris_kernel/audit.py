@@ -51,22 +51,6 @@ _AUDIT_EVENT_FIELDS = (
 )
 
 
-def _freeze_uuid(value: object, field_name: str) -> UUID:
-    """Validate one exact UUID payload once and return an owned inert UUID value."""
-    if type(value) is not UUID:
-        raise ValueError(f"{field_name} must be a UUID.")
-    identity = value.int
-    if type(identity) is not int:
-        raise ValueError(f"{field_name} must contain a built-in UUID integer.")
-    if not 0 <= identity <= _MAX_UUID_INT:
-        raise ValueError(f"{field_name} must contain a 128-bit UUID integer.")
-    if identity == 0:
-        raise ValueError(f"{field_name} must not be the reserved nil UUID.")
-    if identity == _MAX_UUID_INT:
-        raise ValueError(f"{field_name} must not be the reserved max UUID.")
-    return UUID(int=identity)
-
-
 def _freeze_timestamp(value: datetime) -> datetime:
     """Detach only standard-library timezone evidence as one immutable UTC instant."""
     if type(value) is not datetime or value.tzinfo is None:
@@ -103,10 +87,20 @@ def _validate_event_snapshot(
     occurred_at: object,
     high_impact: object,
     confirmation_reference: object,
-) -> tuple[UUID, UUID]:
+) -> None:
     """Validate one captured audit value set without executing untrusted coercions."""
-    frozen_event_id = _freeze_uuid(event_id, "event_id")
-    frozen_tenant_record_id = _freeze_uuid(tenant_record_id, "tenant_record_id")
+    if type(event_id) is not UUID:
+        raise ValueError("event_id must be a UUID.")
+    if type(tenant_record_id) is not UUID:
+        raise ValueError("tenant_record_id must be a UUID.")
+    if event_id.int == 0:
+        raise ValueError("event_id must not be the reserved nil UUID.")
+    if tenant_record_id.int == 0:
+        raise ValueError("tenant_record_id must not be the reserved nil UUID.")
+    if event_id.int == _MAX_UUID_INT:
+        raise ValueError("event_id must not be the reserved max UUID.")
+    if tenant_record_id.int == _MAX_UUID_INT:
+        raise ValueError("tenant_record_id must not be the reserved max UUID.")
     if type(occurred_at) is not datetime:
         raise ValueError("occurred_at must be a datetime.")
     if type(high_impact) is not bool:
@@ -152,7 +146,6 @@ def _validate_event_snapshot(
             raise ValueError("confirmation_reference must be a namespaced opaque reference.")
     if high_impact and confirmation_reference is None:
         raise ValueError("high-impact events require confirmation_reference.")
-    return frozen_event_id, frozen_tenant_record_id
 
 
 _AuditOutboxEventTuple = namedtuple(
@@ -194,10 +187,10 @@ class AuditOutboxEvent(_AuditOutboxEventTuple):
         high_impact: bool,
         confirmation_reference: str | None = None,
     ) -> AuditOutboxEvent:
-        """Validate, detach identity/time providers, and construct one immutable value."""
+        """Validate, detach time-provider behavior, and construct one immutable value."""
         if cls is not AuditOutboxEvent:
             raise TypeError("AuditOutboxEvent must be constructed as the exact canonical type.")
-        frozen_event_id, frozen_tenant_record_id = _validate_event_snapshot(
+        _validate_event_snapshot(
             event_id=event_id,
             tenant_record_id=tenant_record_id,
             source_service=source_service,
@@ -215,8 +208,8 @@ class AuditOutboxEvent(_AuditOutboxEventTuple):
         frozen_occurred_at = _freeze_timestamp(occurred_at)
         return super().__new__(
             cls,
-            frozen_event_id,
-            frozen_tenant_record_id,
+            event_id,
+            tenant_record_id,
             source_service,
             event_type,
             resource_reference,
