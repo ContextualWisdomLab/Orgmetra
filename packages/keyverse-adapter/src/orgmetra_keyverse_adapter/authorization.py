@@ -43,20 +43,15 @@ _DENIAL_NEXT_ACTION = {
 }
 
 
-def _validate_uuid(field_name: str, value: object) -> None:
-    """Require an exact UUID and reject protocol-reserved Nil/Max sentinels."""
+def _validated_uuid_int(field_name: str, value: object) -> int:
+    """Validate and detach an exact UUID without executing an untrusted retained payload."""
     if type(value) is not UUID:
         raise ValueError(f"{field_name} must be a UUID.")
-    if value.int in (0, _MAX_UUID_INT):
-        raise ValueError(f"{field_name} must not use a reserved UUID sentinel.")
-
-
-def _validated_uuid_int(field_name: str, value: object) -> int:
-    """Validate and detach an exact UUID into one immutable integer snapshot."""
-    _validate_uuid(field_name, value)
     value_int = value.int
     if type(value_int) is not int or not 0 <= value_int <= _MAX_UUID_INT:
         raise ValueError(f"{field_name} must contain a valid UUID integer.")
+    if value_int in (0, _MAX_UUID_INT):
+        raise ValueError(f"{field_name} must not use a reserved UUID sentinel.")
     return value_int
 
 
