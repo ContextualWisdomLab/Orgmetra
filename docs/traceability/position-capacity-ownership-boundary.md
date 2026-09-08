@@ -54,7 +54,9 @@
 | Settle every retiring-epoch `commit_fenced` attempt to terminal People evidence and apply its exact capacity disposition before snapshot | ADR 0274 protocol-quiescence sequence | proposed_recovery_design |
 | Apply pending retiring-epoch confirm/release/revision receipts until Organization confirmed capacity and People Assignment truth are equivalent | ADR 0274 protocol-quiescence manifest | proposed_recovery_design |
 | Prove zero unresolved fenced state and zero unapplied capacity-changing terminal outcomes before authority/rollback epoch rollover | ADR 0274 protocol-quiescence manifest | proposed_recovery_design |
-| Serialize concurrent rollovers by expected source epoch-pair CAS so one transition and one target writer win | ADR 0274 `EpochAuthorityTransition` activation | proposed_recovery_design |
+| Serialize concurrent rollovers by expected source epoch-pair CAS so one transition lineage and one target writer win | ADR 0274 `EpochAuthorityTransition` activation | proposed_recovery_design |
+| Keep an `aborted` rollover bound to the same source-pair transition lineage; retry only by expected-version CAS to a fresh generation | ADR 0274 aborted-transition retry rule | proposed_recovery_design |
+| Keep prior retry-generation admission receipts/manifests immutable but ineligible as proof for a later generation | ADR 0274 generation-scoped recovery evidence | proposed_recovery_design |
 | Reject retired-epoch receipts for new writes only after protocol state has been settled, not as a substitute for settlement | ADR 0274 epoch transition | proposed_security_recovery_design |
 | Preserve current People mutation behavior while prerequisites remain mutable | #64 owner path; no extraction source in this slice | active_owner_boundary |
 | Preserve Organization hierarchy prerequisite delta before extraction | #96 -> #119 owner order | active_owner_boundary |
@@ -88,6 +90,9 @@
 | Delayed old-epoch mutation cannot enter after People admission barrier closes | protocol admission/drain race | planned_recovery |
 | Every old-epoch admitted mutation finishes before terminalization/snapshot | transaction-lifetime protocol admission receipt test | planned_recovery |
 | Concurrent rollovers from one epoch pair cannot activate two targets | epoch-transition CAS race | planned_recovery |
+| Abort then retry cannot release source-pair ownership or create a second transition lineage | aborted-transition retry race | planned_recovery |
+| Concurrent equivalent retries of one aborted transition open exactly one fresh retry generation | transition-generation CAS race | planned_recovery |
+| Prior-generation admission/manifests cannot satisfy a later retry generation | generation-evidence isolation rehearsal | planned_recovery |
 | Quiescence manifest proves zero unresolved fences/unapplied terminal outcomes and cross-owner equivalence | recovery manifest rehearsal | planned_recovery |
 | After epoch rollover, old receipt cannot mutate state and no old debit is orphaned | epoch security/recovery test | planned_security_recovery |
 | Migration projection equivalence and single-writer rollback | recovery rehearsal | planned_red_green |
@@ -132,6 +137,11 @@
 | E `commit_fenced` after both admission drains | terminalize/reconcile exact attempt | terminal committed/aborted outcome, then apply exact disposition |
 | E terminal revision/confirm/release receipt pending | quiescence settlement | apply by exact-version CAS before snapshot |
 | retiring E still has unresolved fence, open admission receipt, or unapplied capacity-changing outcome | attempted manifest/snapshot/epoch increment | block transition |
+| transition `draining` or `quiesced`, no activation receipt, source `(E,R)` still current | governed abort with expected transition version | mark same transition lineage `aborted`; source-pair uniqueness remains owned |
+| transition `aborted` | equivalent retry with matching expected version/current source/target/digest | CAS same transition to `draining`, increment retry generation, establish fresh drain evidence |
+| transition `aborted` | two equivalent concurrent retries | one CAS opens the next generation; loser observes same generation idempotently |
+| transition `aborted` | different target/digest, stale source pair, or activation receipt exists | fail closed; do not create/re-purpose another transition lineage |
+| prior aborted retry generation | receipt/manifest offered as current retry proof | audit only; cannot close current generation drain/quiescence |
 | transition `quiesced` at source `(E,R)` | two concurrent activation attempts | expected-version/source-pair CAS permits one activation and one target writer only |
 | losing equivalent rollover | winning transition/activation already durable | observe same result idempotently |
 | losing contradictory rollover | source pair/transition version no longer expected | fail closed or refresh authority; never activate second target |
@@ -231,6 +241,18 @@ Passing requires no E Organization transaction to commit after the quiescence sn
 6. Verify exactly one transition is `activated`, exactly one target writer accepts new mutations, the losing target never becomes authoritative, and stale retries from `(E,R)` cannot activate after the winner.
 
 Passing requires one source epoch pair, one transition lineage, one activation receipt, and one target writer under all duplicate/reordered concurrent rollover attempts.
+
+### Aborted rollover retry and concurrent retry
+
+1. Start from source authority pair `(E,R)`, create transition T for target W with retry generation G, and begin owner admission drains. Before activation, abort T by expected-transition-version CAS while `(E,R)` is still current and no activation receipt exists.
+2. Verify T is now `aborted` but remains the unique transition lineage for `(E,R)`. Attempting to insert another transition for the same source pair must fail regardless of its state or target.
+3. Preserve generation-G Organization/People admission receipts, discrepancy records, and any manifest candidate as immutable audit evidence. None may satisfy a later generation's admission drain, settlement, quiescence, or snapshot proof.
+4. Race two byte-equivalent retry controllers A and B against the exact aborted T version, same current `(E,R)`, and same target/digest. Exactly one CAS changes T from `aborted` to `draining` and increments retry generation to G+1; the loser observes the same G+1 transition idempotently.
+5. Establish a fresh Organization admission-close boundary and fresh People admission barrier for G+1. Reconcile current source truth and build a new generation-scoped quiescence manifest; generation-G evidence cannot close either barrier.
+6. While T is aborted or G+1 is active, submit a retry with a different target writer/target epoch/digest, a stale source pair, or after an activation receipt exists. Every such request fails closed and cannot create/re-purpose a second transition lineage.
+7. Complete G+1 quiescence and activation. Verify one source pair maps to one transition identity across both generations, one immutable activation receipt exists, and only W becomes authoritative.
+
+Passing requires abort/retry to avoid source-pair ABA, evidence reuse, and lineage multiplication: one source pair has one transition lineage, one winning retry generation at a time, and at most one target writer.
 
 ### Live epoch retirement versus unresolved fenced attempt
 
