@@ -29,6 +29,12 @@
 - Service database roles cannot query another service's application tables.
 - Client error responses expose a random `support_reference`, never an internal trace/span identifier or encoded infrastructure context.
 
+## Model-backed automation boundary
+
+Orgmetra is a consumer of released `contextual-orchestrator` contracts, not a provider-routing authority. Model-backed GitHub Actions use `orchestrator/free` through the approved gateway token. Repository-scoped `GITHUB_TOKEN` and the gateway token authenticate the consumer path; Orgmetra must not require direct provider credentials, hard-code provider/model/group routing, or select a paid fallback.
+
+If the released orchestrator cannot provide a required capability, the consumer fails closed. Provider-key discovery, provider routing, capability availability, default model timeout, user cancellation, provider-end, and administrator-timeout semantics are repaired in the Contextual Orchestrator owner rather than copied into Orgmetra. This prevents provider credentials and routing policy from becoming an additional Orgmetra trust boundary.
+
 ## Purpose-bound PII authorization
 
 Orgmetra evaluates PII access before protected field values leave the authoritative HR boundary. Keyverse supplies authenticated identity and scope attributes through its published contract; Orgmetra owns the HR authorization policy and decision.
