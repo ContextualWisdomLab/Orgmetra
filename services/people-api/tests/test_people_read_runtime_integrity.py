@@ -72,7 +72,7 @@ class _DynamicReadPort:
     def __getattribute__(self, name: str) -> object:
         """Prove governed dependency validation must not execute instance lookup."""
         if name == "read_worker":
-            raise AssertionError("dynamic read capability lookup executed")
+            raise AttributeError("dynamic read capability lookup executed")
         return object.__getattribute__(self, name)
 
 
