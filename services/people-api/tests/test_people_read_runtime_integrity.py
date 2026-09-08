@@ -10,6 +10,7 @@ import pytest
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import (
     AuthenticatedPrincipal,
+    PeopleReadPort,
     PeopleRecordIntegrityError,
     WorkerPeopleRecord,
     read_worker_people_record,
@@ -63,6 +64,20 @@ class _ReadPort:
         """Return the configured result."""
         self.calls.append((tenant_record_id, person_record_id, effective_on))
         return self.result
+
+
+class _DynamicReadPort:
+    """Expose a caller-controlled repository capability only through dynamic lookup."""
+
+    def __getattribute__(self, name: str) -> object:
+        """Prove governed dependency validation must not execute instance lookup."""
+        if name == "read_worker":
+            raise AssertionError("dynamic read capability lookup executed")
+        return object.__getattribute__(self, name)
+
+
+class _ProtocolOnlyReadPort(PeopleReadPort):
+    """Inherit only the Protocol placeholder without a concrete repository method."""
 
 
 def _principal() -> AuthenticatedPrincipal:
@@ -163,6 +178,36 @@ def test_people_read_requires_exact_business_date_before_repository_access() -> 
             read_port=port,
         )
     assert port.calls == []
+
+
+def test_people_read_rejects_dynamic_repository_capability_without_lookup() -> None:
+    """Repository dependency checking must not execute caller-controlled attribute lookup."""
+    with pytest.raises(TypeError, match="statically callable read_worker"):
+        read_worker_people_record(
+            principal=_principal(),
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            effective_on=EFFECTIVE_ON,
+            purpose_code="people_read",
+            requested_fields=frozenset({"display_name"}),
+            policy=_policy("display_name"),
+            read_port=_DynamicReadPort(),  # type: ignore[arg-type]
+        )
+
+
+def test_people_read_rejects_inherited_protocol_placeholder_before_authorization() -> None:
+    """A Protocol declaration is not a concrete executable repository capability."""
+    with pytest.raises(TypeError, match="statically callable read_worker"):
+        read_worker_people_record(
+            principal=_principal(),
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            effective_on=EFFECTIVE_ON,
+            purpose_code="people_read",
+            requested_fields=frozenset({"display_name"}),
+            policy=_policy("display_name"),
+            read_port=_ProtocolOnlyReadPort(),
+        )
 
 
 def test_people_read_rejects_record_subclass_that_skipped_persistence_validation() -> None:
