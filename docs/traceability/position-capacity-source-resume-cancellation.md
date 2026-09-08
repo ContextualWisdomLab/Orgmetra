@@ -2,7 +2,7 @@
 
 ## Authority
 
-This document is executable acceptance planning for the Proposed ADR 0274 source-resume amendment. It is not protected `develop` truth and does not authorize Position ownership extraction.
+This document is executable acceptance planning for Proposed ADR 0275, which extends the Proposed ADR 0274 recovery state machine. It is not protected `develop` truth and does not authorize Position ownership extraction.
 
 ## Requirement-to-evidence map
 
@@ -43,4 +43,4 @@ Operational evidence must expose: source pair, transition identity/version/state
 
 ## Release gate
 
-ADR 0274 remains Proposed until these interleavings are executable on the canonical owner stack after prerequisite protected integration. Documentation review or synthetic state-machine examples alone are not distributed-correctness evidence. The implementation owner must preserve the same invariants through code, schema, API/receipt contract, security tests, recovery rehearsal, and normal protected-branch review/merge governance.
+ADR 0274 and ADR 0275 remain Proposed until these interleavings are executable on the canonical owner stack after prerequisite protected integration. Documentation review or synthetic state-machine examples alone are not distributed-correctness evidence. The implementation owner must preserve the same invariants through code, schema, API/receipt contract, security tests, recovery rehearsal, and normal protected-branch review/merge governance.
