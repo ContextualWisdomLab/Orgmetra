@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from inspect import getattr_static
 import re
+from types import FunctionType
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -91,6 +93,9 @@ class PeopleReadPort(Protocol):
         """Resolve one worker at one business date under the caller's tenant transaction."""
 
 
+_PROTOCOL_READ_CAPABILITY = getattr_static(PeopleReadPort, "read_worker")
+
+
 @dataclass(frozen=True, slots=True)
 class AuthorizedWorkerPeopleView:
     """Immutable customer response payload containing only authorized field values."""
@@ -127,13 +132,18 @@ def read_worker_people_record(
 ) -> AuthorizedWorkerPeopleView:
     """Authorize an exact person target before retrieving any protected worker value.
 
-    The target reference uses only the opaque person UUID. Authorization happens
-    before ``read_port`` is invoked, so denied purposes, scopes, or field sets do
-    not cause PII retrieval. A persistence adapter that returns another tenant or
-    person fails closed rather than widening the authorization decision.
+    The target reference uses only the opaque person UUID. A concrete repository
+    method is captured inertly before authorization and the same exact function is
+    invoked afterward, so caller-controlled instance lookup cannot substitute a
+    different executable capability after the access decision. A persistence
+    adapter that returns another tenant or person fails closed rather than widening
+    the authorization decision.
     """
     if type(principal) is not AuthenticatedPrincipal:
         raise TypeError("principal must be an AuthenticatedPrincipal")
+    read_capability = getattr_static(type(read_port), "read_worker", None)
+    if type(read_capability) is not FunctionType or read_capability is _PROTOCOL_READ_CAPABILITY:
+        raise TypeError("read_port must expose a statically callable read_worker.")
     _validate_operational_uuid("tenant_record_id", tenant_record_id)
     _validate_operational_uuid("person_record_id", person_record_id)
     if type(effective_on) is not date:
@@ -152,7 +162,8 @@ def read_worker_people_record(
         policy=policy,
     )
 
-    record = read_port.read_worker(
+    record = read_capability(
+        read_port,
         tenant_record_id=tenant_record_id,
         person_record_id=person_record_id,
         effective_on=effective_on,
