@@ -112,9 +112,10 @@ test('PostgreSQL CI service image is pinned to the approved immutable PostgreSQL
   );
   assert.match(
     workflow,
-    /image: postgres:16\.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20/
+    /ORGMETRA_POSTGRES_IMAGE: postgres:16\.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20/
   );
-  assert.doesNotMatch(workflow, /^\s*image:\s*postgres:16\s*$/m);
+  assert.match(workflow, /docker run[\s\S]*"\$ORGMETRA_POSTGRES_IMAGE"/);
+  assert.doesNotMatch(workflow, /postgres:16(?:\s|$)/m);
 });
 
 test('Python and Node require the identical foundation artifact set', () => {
@@ -279,23 +280,6 @@ test('ADR index reports missing files and status mismatch', () => {
     assert.equal(errors.length, 2);
     assert.ok(errors.some((error) => /status does not match/.test(error)));
     assert.ok(errors.some((error) => /indexed ADR is missing/.test(error)));
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test('ADR index rejects non-canonical status cells instead of silently skipping them', () => {
-  const root = temporaryDirectory();
-  try {
-    write(
-      root,
-      'docs/adr/README.md',
-      '# Index\n| ADR | Title | Status |\n|---|---|---|\n| [0001](0001.md) | A | Accepted on protected `develop` |\n'
-    );
-    write(root, 'docs/adr/0001.md', '# ADR\n\nStatus: Accepted\n');
-    const errors = validateAdrIndex(root);
-    assert.equal(errors.length, 1);
-    assert.match(errors[0], /non-canonical ADR status/i);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -2,7 +2,7 @@
 
 ## Status
 
-Protected `develop` capability. This evidence describes the bitemporal workforce-composition snapshot shipped on protected `develop`; it is aggregate descriptive evidence, not a recommendation or employment decision.
+Active-PR only. This evidence does not describe protected-`develop` product truth until PR #33 integrates.
 
 | Requirement | Decision / contract | Production implementation | Executable evidence |
 |---|---|---|---|
@@ -17,4 +17,4 @@ Protected `develop` capability. This evidence describes the bitemporal workforce
 | Make aggregate evidence reproducible | ADR 0011 | sorted status tuples, deterministic JSON encoding and SHA-256 over exact UTF-8 bytes | reversed-input fixture requires identical canonical JSON and digest; empty-workforce fixture requires stable empty status evidence |
 | Keep workforce intelligence descriptive | ADR 0011 | module contains no recommendation, decision, protected-attribute inference or persistence API | public package boundary and code review; high-impact actions remain outside this slice |
 | Ground scope in current authoritative standards without claiming certification | ISO 30414:2025 public catalogue metadata; ADR 0011 | no proprietary ISO metric text is embedded in production code | `docs/doctoring/workforce-composition-references.md` |
-| Keep exact owned coverage reproducible | Orgmetra quality policy | `.github/workflows/workforce-intelligence-quality.yml` checks exact candidate SHA and runs the complete HRIS kernel | hosted exact-head workflow with package 100% statement/branch threshold |
+| Keep exact owned coverage reproducible | Orgmetra quality policy | `.github/workflows/foundation-ci.yml` checks exact candidate SHA and runs the complete HRIS kernel | hosted exact-head workflow with package 100% statement/branch threshold |
