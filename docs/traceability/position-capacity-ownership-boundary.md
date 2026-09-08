@@ -6,7 +6,7 @@
 - **Current executable protected truth:** the shipped People mutation boundary still owns Position creation and enforces Assignment capacity/status coverage in the same PostgreSQL mutation path. There is no protected executable `organization_core` service yet.
 - **Active-PR truth:** ADR 0274 specifies a Proposed Position-capacity/eligibility ownership protocol only. It adds no runtime owner, schema, API, migration, or claim of distributed correctness.
 - **Prerequisite active truth:** #64 owns the current People mutation/concurrency hardening; #96 and #119 own the Organization prerequisite stack. ADR 0274 must not copy their mutable source.
-- **Not yet implemented:** `PositionCapacityReservation`, `PositionEligibilityCoverage`, People-owned terminal `AssignmentAttemptOutcome`, stable Assignment-root revision CAS, the published/versioned authenticated cross-context capacity/attempt API or event contract, owner/rollback epoch validation, Position-eligibility fencing, capacity-revision receipts, transaction-drained writer-fenced migration, live-protocol quiescence before epoch retirement, deterministic discrepancy manifest, two-service reconciliation, performance evidence, or rollback rehearsal.
+- **Not yet implemented:** `PositionCapacityReservation`, `PositionEligibilityCoverage`, People-owned terminal `AssignmentAttemptOutcome`, stable Assignment-root revision CAS, the published/versioned authenticated cross-context capacity/attempt API or event contract, owner/rollback epoch validation, Position-eligibility fencing, capacity-revision receipts, transaction-drained writer-fenced migration, live-protocol quiescence before epoch retirement, durable epoch-transition arbitration, deterministic discrepancy manifest, two-service reconciliation, performance evidence, or rollback rehearsal.
 
 ## Requirement matrix
 
@@ -48,11 +48,13 @@
 | Deterministically map every current legacy Assignment, including wholly past-effective occupancy, to confirmed reservation/terminal committed evidence | ADR 0274 cutover manifest | proposed_design |
 | Keep superseded recorded-history as provenance without duplicate live debits | ADR 0274 projection rule | proposed_design |
 | Fail cutover instead of rewriting invalid/unrepresentable legacy truth | ADR 0274 discrepancy rule | proposed_design |
-| Before retiring a live protocol epoch, stop new Organization reservation/fence admissions under that epoch | ADR 0274 protocol-quiescence sequence | proposed_recovery_design |
+| Before retiring a live protocol epoch, atomically acquire one transition and stop new Organization reservation/fence admissions under that epoch | ADR 0274 `EpochAuthorityTransition` and protocol-quiescence sequence | proposed_recovery_design |
+| Drain every Organization reservation/fence transaction admitted under the retiring epoch before settlement, manifest, or snapshot | ADR 0274 Organization transaction-lifetime admission receipt | proposed_recovery_design |
 | Before retiring a live protocol epoch, stop new People mutation admissions from that epoch and drain every already-admitted People transaction | ADR 0274 protocol-quiescence sequence | proposed_recovery_design |
 | Settle every retiring-epoch `commit_fenced` attempt to terminal People evidence and apply its exact capacity disposition before snapshot | ADR 0274 protocol-quiescence sequence | proposed_recovery_design |
 | Apply pending retiring-epoch confirm/release/revision receipts until Organization confirmed capacity and People Assignment truth are equivalent | ADR 0274 protocol-quiescence manifest | proposed_recovery_design |
 | Prove zero unresolved fenced state and zero unapplied capacity-changing terminal outcomes before authority/rollback epoch rollover | ADR 0274 protocol-quiescence manifest | proposed_recovery_design |
+| Serialize concurrent rollovers by expected source epoch-pair CAS so one transition and one target writer win | ADR 0274 `EpochAuthorityTransition` activation | proposed_recovery_design |
 | Reject retired-epoch receipts for new writes only after protocol state has been settled, not as a substitute for settlement | ADR 0274 epoch transition | proposed_security_recovery_design |
 | Preserve current People mutation behavior while prerequisites remain mutable | #64 owner path; no extraction source in this slice | active_owner_boundary |
 | Preserve Organization hierarchy prerequisite delta before extraction | #96 -> #119 owner order | active_owner_boundary |
@@ -81,9 +83,11 @@
 | Migration identity/digest replay is deterministic across full effective-time projection | migration/recovery rehearsal | planned_recovery |
 | Retroactive correction sees migrated historical occupancy | historical correction acceptance | planned_recovery |
 | Invalid legacy occupancy creates discrepancy evidence and no authority switch | migration failure rehearsal | planned_recovery |
+| Retiring epoch cannot pass settlement while an admitted Organization transaction remains open | Organization admission/drain race | planned_recovery |
 | Retiring epoch cannot switch while one `commit_fenced` attempt is unresolved | protocol-quiescence rollback race | planned_recovery |
 | Delayed old-epoch mutation cannot enter after People admission barrier closes | protocol admission/drain race | planned_recovery |
 | Every old-epoch admitted mutation finishes before terminalization/snapshot | transaction-lifetime protocol admission receipt test | planned_recovery |
+| Concurrent rollovers from one epoch pair cannot activate two targets | epoch-transition CAS race | planned_recovery |
 | Quiescence manifest proves zero unresolved fences/unapplied terminal outcomes and cross-owner equivalence | recovery manifest rehearsal | planned_recovery |
 | After epoch rollover, old receipt cannot mutate state and no old debit is orphaned | epoch security/recovery test | planned_security_recovery |
 | Migration projection equivalence and single-writer rollback | recovery rehearsal | planned_red_green |
@@ -120,13 +124,17 @@
 | confirmed debit | mutable People read says smaller/ended/absent | no shrink/release |
 | Position has fenced/confirmed debit | status mutation removes staffable coverage | local fail-closed; no remote call under lock |
 | legacy writer open | initial cutover enters draining epoch | reject new legacy admission; wait for all old transactions |
-| epoch E Organization protocol open | begin retiring E | no new E reservation or fence admission |
+| epoch E authority active | first rollover request with exact expected `(E,R)` | create one durable `EpochAuthorityTransition`; atomically close new E Organization admission |
+| epoch E Organization transaction admitted before transition | transition is `draining` | allow terminal commit/rollback but block settlement/manifest/snapshot until its admission receipt is terminal |
+| epoch E Organization protocol open | transition already `draining` | reject new E reservation or fence admission |
 | epoch E People protocol open | enter People `draining(E)` | no new E receipt-authorized mutation; wait for admitted transactions |
-| E `held` after People drain | ordinary safe release/expiry | settle to non-consuming state before rollover |
-| E `commit_fenced` after People drain | terminalize/reconcile exact attempt | terminal committed/aborted outcome, then apply exact disposition |
+| E `held` after both admission drains | ordinary safe release/expiry | settle to non-consuming state before rollover |
+| E `commit_fenced` after both admission drains | terminalize/reconcile exact attempt | terminal committed/aborted outcome, then apply exact disposition |
 | E terminal revision/confirm/release receipt pending | quiescence settlement | apply by exact-version CAS before snapshot |
-| retiring E still has unresolved fence or unapplied capacity-changing outcome | attempted snapshot/epoch increment | block transition |
-| retiring E quiescence manifest has zero unresolved protocol state and cross-owner equivalence | epoch increment | allow exactly one target authority; E no longer authorizes new transitions |
+| retiring E still has unresolved fence, open admission receipt, or unapplied capacity-changing outcome | attempted manifest/snapshot/epoch increment | block transition |
+| transition `quiesced` at source `(E,R)` | two concurrent activation attempts | expected-version/source-pair CAS permits one activation and one target writer only |
+| losing equivalent rollover | winning transition/activation already durable | observe same result idempotently |
+| losing contradictory rollover | source pair/transition version no longer expected | fail closed or refresh authority; never activate second target |
 | retired E | otherwise valid historical receipt arrives | audit/replay existing terminal result only; no new domain transition |
 | cutover barrier closed | deterministic migration projection | full effective-time Assignment truth maps to stable confirmed reservation evidence |
 | post-cutover historical slice | retroactive overlapping write | migrated historical debit participates; no capacity/coverage bypass |
@@ -200,22 +208,46 @@ Passing requires no durable Assignment outside promised staffable coverage and n
 
 Passing requires an explicit transaction linearization barrier, deterministic projection, and no legacy commit after the snapshot.
 
+### Live epoch retirement versus admitted Organization transaction
+
+This RED closes the Organization-side gap between rejecting new E admission and proving quiescence.
+
+1. Under source authority pair `(E,R)`, admit Organization transaction O to create or fence capacity and persist its transaction-lifetime E admission receipt, but hold O open before commit.
+2. Concurrently start two rollover controllers from the same expected `(E,R)` pair. Exactly one creates the durable `EpochAuthorityTransition`; its creation atomically moves Organization admission to `draining(E)`.
+3. Verify that a later Organization request cannot obtain an E admission receipt or create an E reservation/fence. The already-admitted O may still commit or roll back under E.
+4. Close People E admission and drain any already-admitted People transactions. Even if People is fully drained and no previously visible E fence is unresolved, quiescence settlement, manifest creation, and snapshot must remain blocked while O's Organization admission receipt is nonterminal.
+5. Let O commit a new E reservation/fence. The transition must observe that committed state during settlement; if O rolls back instead, its terminal rollback receipt still closes the admission drain deterministically.
+6. Only after every pre-drain Organization receipt and People receipt is terminal may fence settlement and the quiescence manifest proceed.
+
+Passing requires no E Organization transaction to commit after the quiescence snapshot and no snapshot to be taken while a pre-drain Organization transaction can still create E state.
+
+### Concurrent epoch rollover arbitration
+
+1. Start with one active authority pair `(E,R)` and no transition.
+2. Race controller A targeting writer W1 and controller B targeting W2, both using the exact expected source pair. Creation uses one durable source-pair CAS/uniqueness boundary.
+3. Exactly one `EpochAuthorityTransition` becomes active. If both requests are byte-equivalent for the same target/digest, the loser observes the winner idempotently. If targets/digests differ, the loser fails closed or refreshes from current authority; it cannot create a second active transition.
+4. Drain Organization and People admissions, settle protocol state, and bind one quiescence-manifest digest to the winning transition by expected transition-version CAS.
+5. Race activation/retry again. Activation CASes both the transition version and still-current source `(E,R)` pair and atomically publishes the target authority pair plus immutable activation receipt.
+6. Verify exactly one transition is `activated`, exactly one target writer accepts new mutations, the losing target never becomes authoritative, and stale retries from `(E,R)` cannot activate after the winner.
+
+Passing requires one source epoch pair, one transition lineage, one activation receipt, and one target writer under all duplicate/reordered concurrent rollover attempts.
+
 ### Live epoch retirement versus unresolved fenced attempt
 
 This is the RED that distinguishes protocol quiescence from ordinary database transaction drain.
 
 1. Under epoch E, Organization creates and commit-fences R for attempt A; Organization transaction ends. People has not yet made A terminal.
-2. Start rollback/epoch retirement. Organization enters `draining(E)` and stops issuing new E reservations/fences.
+2. Start rollback/epoch retirement by acquiring the exact source-pair transition. Organization enters `draining(E)`, stops issuing new E reservations/fences, and drains every Organization transaction admitted before the transition.
 3. People enters `draining(E)` for E receipt-authorized mutations. Intentionally delay one E create before admission and hold another already-admitted E People transaction open.
 4. The delayed-but-not-admitted request must no longer enter. The already-admitted transaction must keep the quiescence barrier open until it commits or rolls back.
-5. After admitted People transactions drain, reconcile A. `terminalize_attempt(A)` may now safely establish `aborted` if no admitted create committed, or it returns `committed` if one did. Exactly one terminal outcome exists.
+5. After both owner admission drains close, reconcile A. `terminalize_attempt(A)` may now safely establish `aborted` if no admitted create committed, or it returns `committed` if one did. Exactly one terminal outcome exists.
 6. Apply A's exact terminal receipt to Organization. Repeat for every E fence and every pending E capacity-changing terminal receipt.
-7. Attempt to take the rollback snapshot while any E `commit_fenced` debit or unapplied E capacity-changing terminal outcome remains. The attempt must fail closed.
-8. Build a deterministic quiescence manifest and prove zero unresolved E `commit_fenced` debits, zero unapplied capacity-changing E outcomes, and equivalence between Organization confirmed occupancy and authoritative People Assignment truth.
-9. Only now take the authoritative rollback snapshot, project the chosen target writer, and increment authority/rollback epoch.
+7. Attempt to take the rollback snapshot while any owner admission receipt is nonterminal, any E `commit_fenced` debit remains, or any E capacity-changing terminal outcome is unapplied. The attempt must fail closed.
+8. Build a deterministic quiescence manifest and prove both owner admission drains closed, zero unresolved E `commit_fenced` debits, zero unapplied capacity-changing E outcomes, and equivalence between Organization confirmed occupancy and authoritative People Assignment truth.
+9. Only now bind the manifest to the winning transition, take the authoritative rollback snapshot, project the chosen target writer, and activate by expected transition/source-pair CAS.
 10. Deliver an otherwise authentic E receipt after rollover. It may support audit or replay of an already-durable terminal result but cannot authorize a new Assignment or capacity transition.
 
-Passing requires no after-snapshot old-epoch mutation and no orphaned old-epoch debit/attempt. Rejecting E receipts is the final authority boundary, not a substitute for pre-switch settlement.
+Passing requires no after-snapshot old-epoch mutation, no orphaned old-epoch debit/attempt, and no second target authority. Rejecting E receipts is the final authority boundary, not a substitute for pre-switch settlement.
 
 ### Retroactive correction versus migrated historical occupancy
 
