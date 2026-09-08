@@ -14,6 +14,7 @@
 |---|---|---|
 | Keep Position in Organization and Assignment in People | `ARCHITECTURE.md`, `docs/TRD.md` | protected_architecture |
 | Preserve durable Position identity/bitemporal versions and Assignment binding | ADR 0004 | protected_accepted |
+| Preserve retroactive correction across the complete currently authoritative effective-time domain | protected `docs/TRD.md` retroactive-correction rule plus ADR 0274 cutover scope | proposed_design |
 | Preserve `active` or `open` Position coverage and visible seat allocation `<= 1.0000` | ADR 0005 | protected_accepted |
 | Preserve union coverage when one Assignment interval spans multiple staffable Position versions | protected `validate_assignment_position_coverage` plus ADR 0274 `PositionEligibilityCoverage` | proposed_design |
 | Record why synchronous availability/status-check-only is unsafe | PostgreSQL 18 §13.2 plus ADR 0274 alternative B | proposed_design |
@@ -45,7 +46,8 @@
 | Prevent dual Position/capacity writers during extraction | ADR 0274 cutover/rollback | proposed_design |
 | Drain every pre-fence legacy mutation before taking the migration snapshot | ADR 0274 cutover barrier | proposed_design |
 | Increment and pin authority/rollback epochs across cutover or rollback so superseded receipts cannot authorize writes | ADR 0274 cutover/rollback + receipt envelope | proposed_security_design |
-| Deterministically map each tenant-qualified legacy Assignment to confirmed reservation/terminal committed migration evidence | ADR 0274 cutover manifest | proposed_design |
+| Deterministically map each currently authoritative legacy Assignment, including wholly past-effective occupancy, to confirmed reservation/terminal committed migration evidence | ADR 0274 cutover manifest | proposed_design |
+| Keep superseded recorded-history versions as People/audit provenance without duplicating them as simultaneously live capacity debits | ADR 0274 cutover projection rule | proposed_design |
 | Fail cutover instead of rewriting an invalid/unrepresentable legacy fact to fit the target ledger | ADR 0274 cutover discrepancy rule | proposed_design |
 | Preserve current People mutation behavior while prerequisites remain mutable | #64 owner path; no extraction source in this slice | active_owner_boundary |
 | Preserve Organization hierarchy prerequisite delta before extraction | #96 -> #119 owner order | active_owner_boundary |
@@ -67,7 +69,8 @@
 | Prove stale/duplicate/out-of-order revision receipts cannot release superseded capacity | Future receipt-version tests | planned_red_green |
 | Prove exact replay and same-key/different-digest rejection | Future contract/integration tests | planned_red_green |
 | Prove a pre-fence legacy transaction cannot commit after projection starts | Future cutover-barrier concurrency test | planned_recovery |
-| Prove deterministic migration identity/digest replay and complete projection equivalence | Future migration/recovery rehearsal | planned_recovery |
+| Prove deterministic migration identity/digest replay and complete projection equivalence across past/present/future effective slices | Future migration/recovery rehearsal | planned_recovery |
+| Prove a post-cutover retroactive correction sees migrated historical Position occupancy and cannot exceed `1.0000` | Future retroactive-correction migration acceptance | planned_recovery |
 | Prove invalid legacy occupancy creates deterministic discrepancy evidence and no authority switch | Future migration failure rehearsal | planned_recovery |
 | Prove migration projection equivalence and single-writer rollback | Future migration/recovery rehearsal | planned_red_green |
 | Prove reserve/fence/create/terminalize/confirm/revise/apply-revision/release and Position-change buyer paths at p95 <= 20 ms under real concurrency | Future k6/E2E measurement | planned_performance |
@@ -111,7 +114,8 @@ The implementation must exercise, not merely document, these transitions and for
 | any live debit | same idempotency key with different semantic digest | fail closed |
 | legacy writer open | cutover fence enters draining epoch | no new legacy admission; snapshot waits for every pre-fence transaction to commit/rollback |
 | cutover/rollback authority switch | owner epoch pair increments | receipts from superseded authority/rollback epoch no longer authorize writes |
-| cutover barrier closed | deterministic migration projection | every visible current/future legacy Assignment maps to stable `confirmed` reservation plus terminal committed evidence |
+| cutover barrier closed | deterministic migration projection | every currently recorded-visible legacy Assignment across the complete effective-time domain, including wholly past intervals, maps to stable `confirmed` reservation plus terminal committed evidence |
+| post-cutover historical slice | retroactive create/correction overlaps migrated past-effective occupancy | historical migrated debit participates in capacity/eligibility validation; no slice may exceed `1.0000` or bypass staffable coverage |
 | drained legacy snapshot invalid or unrepresentable | migration validation | immutable deterministic discrepancy evidence; no semantic rewrite and no authority switch |
 
 The Organization capacity calculation counts every effective `held`, `commit_fenced`, and `confirmed` debit. Existing confirmed occupancy stays counted until exact authenticated terminal People revision evidence permits reduction; positive revision deltas are counted before People can commit the larger occupancy. People independently serializes the stable Assignment lineage and rejects stale expected predecessors, so two distinct attempt IDs cannot fork one Assignment root. The same Position-root authority protects staffable eligibility for every fenced/confirmed interval. Cross-context calls happen only after local row-locking transactions end. Failures therefore bias toward temporary over-reservation rather than under-reservation or durable overbooking.
@@ -187,11 +191,22 @@ Passing requires no durable Assignment outside the staffable Position coverage p
 3. A later legacy mutation must be rejected from admission.
 4. Migration snapshot/projection remains blocked while the pre-fence transaction is unresolved.
 5. Commit or roll back that transaction. Only then may the cutover barrier close and record authoritative high-water evidence.
-6. Take the migration snapshot and project it twice. Both projections produce identical tenant-qualified migration identities, `confirmed` states, terminal committed evidence, normalized Position-eligibility coverage digests, and manifest digest.
+6. Take the migration snapshot and project it twice across every currently recorded-visible Assignment in the complete effective-time domain, including wholly past-effective occupancy. Both projections produce identical tenant-qualified migration identities, `confirmed` states, terminal committed evidence, normalized Position-eligibility coverage digests, and manifest digest; superseded recorded-history versions remain provenance and do not appear as duplicate live debits.
 7. Switch authority/rollback epoch and verify that a correctly signed receipt from the superseded epoch is rejected by the new consumer authority.
 8. No transaction admitted under the legacy epoch may commit after that snapshot or after Organization authority is enabled.
 
-Passing requires an explicit linearization barrier rather than a timing heuristic, deterministic replay of the complete migration projection, and rejection of superseded-epoch write authority.
+Passing requires an explicit linearization barrier rather than a timing heuristic, deterministic replay of the complete currently authoritative effective-time projection, and rejection of superseded-epoch write authority.
+
+### Retroactive correction versus migrated historical occupancy
+
+1. In the drained legacy snapshot, keep one currently recorded-visible Assignment on Position P whose effective interval is wholly before the cutover date and whose allocation is `0.6000`.
+2. Project that past-effective Assignment to a deterministic `confirmed` Organization debit while keeping superseded recorded-history versions only as People/audit provenance.
+3. Switch to the new single-writer authority and submit a retroactive create/correction that would add another overlapping `0.6000` on P for the same historical slice.
+4. Organization must include the migrated historical debit in the Position-root capacity calculation and reject the new claim because the effective total would be `1.2000`.
+5. Repeat with a retroactive change whose historical interval lacks `active`/`open` Position coverage. The capacity/eligibility protocol must fail closed rather than treating the past interval as outside ledger scope.
+6. A migration implementation that projected only current/future-effective assignments is the RED counterexample: it would see no historical debit and could authorize a false `0.6000` availability result.
+
+Passing requires post-cutover retroactive bitemporal writes to observe the same currently authoritative historical capacity and Position-eligibility truth that protected `develop` requires before extraction.
 
 ### Invalid legacy occupancy versus authority switch
 
@@ -214,4 +229,4 @@ If executable evidence invalidates the provisional commit-fence design, revise A
 
 ## Evidence boundary
 
-Passing documentation checks proves only that the Proposed decision record is internally present. It does not prove service extraction, concurrency safety, Assignment-lineage serialization, revision safety, Position eligibility safety, cutover linearizability, migration source validity, lock-lifetime safety, authenticated-receipt security, availability, performance, or commercial readiness. Historical #64/#96 checks do not transfer to a future extraction head; every implementation candidate must obtain fresh exact-head evidence.
+Passing documentation checks proves only that the Proposed decision record is internally present. It does not prove service extraction, concurrency safety, Assignment-lineage serialization, revision safety, Position eligibility safety, cutover linearizability, complete historical migration scope for retroactive correction, migration source validity, lock-lifetime safety, authenticated-receipt security, availability, performance, or commercial readiness. Historical #64/#96 checks do not transfer to a future extraction head; every implementation candidate must obtain fresh exact-head evidence.
