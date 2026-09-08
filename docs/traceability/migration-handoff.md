@@ -2,7 +2,7 @@
 
 ## Status
 
-Active-PR only. This evidence does not describe protected-`develop` product truth until the owning PR integrates.
+Protected `develop` capability. This page describes the governed migration handoff contract shipped on protected `develop`; it remains value-free and does not grant Orgmetra direct access to another service's application database.
 
 | Requirement | Decision / owner contract | Production implementation | Executable evidence |
 |---|---|---|---|

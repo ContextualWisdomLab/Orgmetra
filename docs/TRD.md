@@ -88,13 +88,15 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 | `fast_mlsirm_adapter` | `orgmetra.fast_mlsirm.v1`, repository `ContextualWisdomLab/fast-mlsirm` pinned to `fb67ced09d8ee00542c05d56374537a9a7239751`; online role workspaces consume it through Psychometrics Commons, while direct calls are limited to an approved offline validation worker | `workforce_validation` |
 | `tepp_adapter` | `orgmetra.tepp.v1`, repository `ContextualWisdomLab/TEPP` pinned to `40adac9a26a8af85147ffa2795fb548ea243e0e5` | `workforce_validation` |
 | `semantic_data_portal_adapter` | versioned ontology and data-catalog contract | `job_architecture` |
-| `contextual_orchestrator_adapter` | schema-bound draft and verification operations; no authoritative writes | `job_architecture` and `integration_hub` |
+| `contextual_orchestrator_adapter` | released `contextual-orchestrator` schema-bound draft and verification operations; no authoritative writes or provider-routing authority in Orgmetra | `job_architecture` and `integration_hub` |
 | `clearfolio_adapter` | document preview artifact contract | `document_records` |
 | `newsdom_adapter` | canonical document-block and source-span contract | `document_records` |
 | `mhtml_etl_adapter` | governed schema-proposal and row-lineage contract | `integration_hub` |
 | `mightyetl_adapter` | bounded migration/CDC contract | `integration_hub` |
 
 Adapters use bounded timeouts, typed error semantics, tenant validation, idempotency, and provenance. They fail closed, never log credentials, and never promote external data to authoritative HRIS truth without Orgmetra command validation.
+
+Model-backed GitHub Actions consume only a released Contextual Orchestrator API/client/schema through `orchestrator/free` and the approved gateway token. Orgmetra does not hard-code a provider, model, provider group, or paid fallback and does not require provider API keys. Provider-key discovery, routing, capability availability, default model timeout, user cancellation, provider-end, and administrator-timeout semantics are owned by Contextual Orchestrator. If a required capability is unavailable at that boundary, the Orgmetra consumer fails closed and the owner contract is repaired rather than bypassed locally.
 
 ## 7. Testing requirements
 

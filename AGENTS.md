@@ -8,7 +8,8 @@ Build Orgmetra as a commercial-grade, evidence-centered HRIS and HCM platform th
 
 - Never bypass branch protection, required checks, independent review, OpenCode, Noema, Strix, SAST, or Security Scan gates.
 - Never self-approve or manufacture approval evidence.
-- Never use `COPILOT_GITHUB_TOKEN` as a development model credential. Use `NVIDIA_NIM_API_KEY` for model-backed tests and OpenCode development paths.
+- Model-backed product and GitHub Actions behavior must consume a released `contextual-orchestrator` contract. GitHub Actions use `orchestrator/free` through the approved gateway token; Orgmetra does not require direct provider credentials, hard-code provider/model/group selection, or select a paid fallback. Repository-scoped `GITHUB_TOKEN` and an approved gateway token are consumer authentication material, not provider-routing authority.
+- If a required model capability is unavailable through the released Contextual Orchestrator contract, fail closed and repair the capability in the Contextual Orchestrator owner. Provider-key discovery, routing, timeout defaults, user cancellation, provider-end, and administrator-timeout semantics remain Contextual Orchestrator responsibilities and are not reimplemented in Orgmetra.
 - Never make LLM output an autonomous high-impact employment decision.
 - Never copy another CWL product into Orgmetra when an adapter/package/API/event boundary is sufficient.
 - Never directly query another service's application database.

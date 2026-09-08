@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted on active PR #33 only. This document is not protected-`develop` product truth until the owning PR integrates.
+Status: Accepted
+
+Integrated on protected `develop` through PR #33. This ADR is shipped architecture truth; aggregate workforce evidence remains descriptive and does not authorize an employment decision.
 
 ## Context
 

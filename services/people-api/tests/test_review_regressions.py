@@ -162,7 +162,7 @@ class CurrentReviewRegressionTests(unittest.TestCase):
                 )
 
     def test_security_contract_matches_published_openapi_header_scope(self) -> None:
-        """Keep published command scope distinct from currently executable handlers."""
+        """Keep published command scope distinct from protected executable handlers."""
         repository_root = Path(__file__).resolve().parents[3]
         security_contract = (repository_root / "docs/SECURITY.md").read_text(encoding="utf-8")
         api_contract = (repository_root / "docs/API_CONTRACT.md").read_text(encoding="utf-8")
@@ -174,8 +174,8 @@ class CurrentReviewRegressionTests(unittest.TestCase):
             "`X-Actor-Reference`, and `X-Purpose-Code`"
         )
         executable_scope = (
-            "The executable People mutation handlers added on this branch currently implement "
-            "employment, position, and assignment creation with those headers."
+            "Protected `develop` implements employment, position, and assignment creation "
+            "through the executable People mutation handlers with those headers."
         )
         self.assertIn(published_scope, security_contract)
         self.assertIn(executable_scope, security_contract)

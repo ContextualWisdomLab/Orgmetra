@@ -29,6 +29,12 @@
 - Service database roles cannot query another service's application tables.
 - Client error responses expose a random `support_reference`, never an internal trace/span identifier or encoded infrastructure context.
 
+## Model-backed automation boundary
+
+Orgmetra is a consumer of released `contextual-orchestrator` contracts, not a provider-routing authority. Model-backed GitHub Actions use `orchestrator/free` through the approved gateway token. Repository-scoped `GITHUB_TOKEN` and the gateway token authenticate the consumer path; Orgmetra must not require direct provider credentials, hard-code provider/model/group routing, or select a paid fallback.
+
+If the released orchestrator cannot provide a required capability, the consumer fails closed. Provider-key discovery, provider routing, capability availability, default model timeout, user cancellation, provider-end, and administrator-timeout semantics are repaired in the Contextual Orchestrator owner rather than copied into Orgmetra. This prevents provider credentials and routing policy from becoming an additional Orgmetra trust boundary.
+
 ## Purpose-bound PII authorization
 
 Orgmetra evaluates PII access before protected field values leave the authoritative HR boundary. Keyverse supplies authenticated identity and scope attributes through its published contract; Orgmetra owns the HR authorization policy and decision.
@@ -41,7 +47,7 @@ Authorization evidence contains only governance metadata, including the opaque a
 
 ## Mutation security contract
 
-Every mutating HTTP operation and its server-side command handler requires one validated `Idempotency-Key` that crosses the command boundary into durable transactional replay state. The published OpenAPI employment, position, assignment, person, job-profile, and selection-decision command families require `X-Tenant-Reference`, `X-Actor-Reference`, and `X-Purpose-Code`; those values must match the authenticated Keyverse principal and the operation-specific least-privilege scope. The executable People mutation handlers added on this branch currently implement employment, position, and assignment creation with those headers. Person, job-profile, and selection-decision remain published foundation API contracts until their server handlers are integrated; their OpenAPI presence is not runtime evidence. Confirmed-hire materialization instead binds the tenant in `/v1/tenants/{tenant_record_id}/candidate-worker-conversions`, the business purpose in its exact query parameter, and the actor through the authenticated principal. It does not accept weaker duplicate actor/tenant/purpose header authorities.
+Every mutating HTTP operation and its server-side command handler requires one validated `Idempotency-Key` that crosses the command boundary into durable transactional replay state. The published OpenAPI employment, position, assignment, person, job-profile, and selection-decision command families require `X-Tenant-Reference`, `X-Actor-Reference`, and `X-Purpose-Code`; those values must match the authenticated Keyverse principal and the operation-specific least-privilege scope. Protected `develop` implements employment, position, and assignment creation through the executable People mutation handlers with those headers. Person, job-profile, and selection-decision remain published foundation API contracts until their server handlers are integrated; their OpenAPI presence is not runtime evidence. Confirmed-hire materialization instead binds the tenant in `/v1/tenants/{tenant_record_id}/candidate-worker-conversions`, the business purpose in its exact query parameter, and the actor through the authenticated principal. It does not accept weaker duplicate actor/tenant/purpose header authorities.
 
 All mutation families additionally require resource-scoped authorization and a versioned audit/provenance correlation reference. High-risk commands require an explicit human-confirmation boundary and immutable versioned evidence. Employment, position, and assignment commands carry confirmation/evidence on the command. Confirmed-hire materialization resolves the exact previously sealed `selection_decision` in the same tenant-bound transaction and rejects the mutation unless that decision records explicit human confirmation and sealed evidence provenance.
 
