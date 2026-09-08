@@ -18,7 +18,7 @@ All notable changes to Orgmetra will be documented in this file.
 - `employment_record_version.employment_concurrency_code` constrained to `exclusive` or `concurrent`.
 - ADR 0005 for exclusive employment and staffable seats.
 - `orgmetra_hris_kernel` 0.3.0 with identity-scoped bitemporal resolution, assignment-employment coverage, allocation-portfolio checks, and a Memorial Hospital RN correction case at 100% statement and branch coverage.
-- `employment_record_version` and `position_record_version` so employment and position identity stay stable across retroactive corrections.
+- `employment_record_version` and `position_record_version` so corrections no longer mint a new employment or position identifier.
 - `assignment_record.employment_record_id` bound to the same person as the covering employment.
 - `orgmetra_keyverse_adapter` that binds an opaque Keyverse subject to a person and rejects passwords, passkeys, and tokens.
 - Design tokens for the repeating HR actions: approve, review, correct, request evidence, compare, export, and escalate.
@@ -59,6 +59,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 - Predictive-validity cases fail closed when selection evidence, Job scope, study criterion, converted worker, or system-recorded visibility does not match; the normalized case relation is tenant-qualified, append-only, TRUNCATE-protected, and forced through row-level security.
 - Purpose-bound PII authorization now fails closed across active tenant, authenticated actor tenant, resource tenant, resource kind, purpose, operation, operation-specific Keyverse scope, and requested-field subset; malformed/wildcard-like attributes, mutable field/scope collections, reserved UUID sentinels, and cross-tenant confused-deputy contexts are rejected before protected values are returned. Authorization requests and allow/deny evidence now also require and preserve one namespaced opaque target-resource reference, so immutable audit correlation identifies the exact HR record without copying its protected values. Authorization evidence otherwise contains governance metadata and field names only, with stable denial reasons and actionable next steps rather than PII.
+- Active-PR authorization runtime-integrity hardening at `orgmetra_keyverse_adapter` additionally requires exact built-in UUID, string, and `frozenset` values plus exact policy/request classes before evaluation, so subclass-controlled equality, membership, and validation bypasses fail closed. This is active-PR refinement to ADR 0008 and is not yet protected-`develop` truth.
 - LLM output constrained to draft evidence.
 - No direct cross-service application-table access.
 - Service-owned database schemas and roles inside the initially shared physical PostgreSQL cluster.

@@ -19,7 +19,11 @@ import re
 from typing import Protocol, runtime_checkable
 from uuid import UUID, uuid5
 
-from orgmetra_keyverse_adapter import AuthorizationDecision, PurposeBoundAccessPolicy
+from orgmetra_keyverse_adapter import (
+    AuthorizationDecision,
+    PurposeBoundAccessPolicy,
+    validate_authorization_decision,
+)
 
 from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.authorization import authorize_resource_fields
@@ -113,10 +117,10 @@ def mutation_command_digest(
     """Hash method, route, tenant, actor, purpose, and semantic command fields.
 
     Generated record identifiers are excluded so a retry that allocates fresh
-    UUIDs still matches the first committed command.
+    UUIDs still matches the first committed command. Authorization evidence is
+    semantically revalidated and detached before any durable digest reads it.
     """
-    if not isinstance(authorization, AuthorizationDecision):
-        raise TypeError("authorization must be an AuthorizationDecision")
+    decision = validate_authorization_decision(authorization)
     if isinstance(command, EmploymentMutationCommand):
         route = "employment-records"
         semantic_command: dict[str, object] = {
@@ -151,10 +155,10 @@ def mutation_command_digest(
     else:
         raise TypeError("command must be a governed People mutation command")
     payload = {
-        "actor_reference": authorization.actor_reference,
+        "actor_reference": decision.actor_reference,
         "command_route": route,
         "method": "POST",
-        "purpose_code": authorization.purpose_code,
+        "purpose_code": decision.purpose_code,
         "semantic_command": semantic_command,
         "tenant_record_id": str(command.tenant_record_id),
     }

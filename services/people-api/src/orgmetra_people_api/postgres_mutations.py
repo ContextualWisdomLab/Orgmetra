@@ -26,7 +26,7 @@ from orgmetra_hris_kernel import (
     validate_assignment_write,
     validate_person_employment_exclusivity,
 )
-from orgmetra_keyverse_adapter import AuthorizationDecision
+from orgmetra_keyverse_adapter import AuthorizationDecision, validate_authorization_decision
 
 from orgmetra_people_api.mutations import (
     AssignmentMutationCommand,
@@ -321,20 +321,35 @@ def _require_authorization(
     resource_kind: str,
     requested_fields: frozenset[str],
 ) -> AuthorizationDecision:
-    """Require an exact allow decision for the intended mutation target."""
-    if not isinstance(authorization, AuthorizationDecision):
-        raise PeopleMutationIntegrityError("people mutation requires a typed authorization decision")
+    """Revalidate and detach the exact allow decision before opening a transaction."""
+    try:
+        snapshot = validate_authorization_decision(authorization)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as error:
+        raise PeopleMutationIntegrityError("people mutation requires coherent authorization evidence") from error
     if (
-        not authorization.allowed
-        or authorization.tenant_record_id != tenant_record_id
-        or authorization.resource_reference != resource_reference
-        or authorization.resource_kind != resource_kind
-        or authorization.operation_code != "create_record"
-        or authorization.requested_fields != requested_fields
-        or authorization.authorized_fields != requested_fields
+        not snapshot.allowed
+        or snapshot.tenant_record_id_int != tenant_record_id.int
+        or snapshot.resource_reference != resource_reference
+        or snapshot.resource_kind != resource_kind
+        or snapshot.operation_code != "create_record"
+        or snapshot.requested_fields != requested_fields
+        or snapshot.authorized_fields != requested_fields
     ):
         raise PeopleMutationIntegrityError("people mutation authorization does not match the exact record")
-    return authorization
+    return AuthorizationDecision(
+        allowed=snapshot.allowed,
+        tenant_record_id=UUID(int=snapshot.tenant_record_id_int),
+        actor_reference=snapshot.actor_reference,
+        resource_reference=snapshot.resource_reference,
+        policy_version_code=snapshot.policy_version_code,
+        purpose_code=snapshot.purpose_code,
+        operation_code=snapshot.operation_code,
+        resource_kind=snapshot.resource_kind,
+        requested_fields=snapshot.requested_fields,
+        authorized_fields=snapshot.authorized_fields,
+        reason_code=snapshot.reason_code,
+        next_action=snapshot.next_action,
+    )
 
 
 def _record_audit(

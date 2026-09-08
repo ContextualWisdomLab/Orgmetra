@@ -9,6 +9,7 @@ from uuid import UUID
 from orgmetra_keyverse_adapter import AuthorizationDecision
 from orgmetra_people_api.mutation_http import _command_for_route
 from orgmetra_people_api.mutations import mutation_command_digest
+from authorization_test_support import issued_authorization
 
 TENANT = UUID("0198a412-8200-7000-8000-000000000001")
 PERSON = UUID("0198a412-8200-7000-8000-000000000020")
@@ -54,9 +55,8 @@ def command_for(evidence_references: list[object]):
 
 
 def authorization() -> AuthorizationDecision:
-    """Return the exact allow decision used solely to derive command digests."""
-    return AuthorizationDecision(
-        allowed=True,
+    """Return evaluator-issued allow evidence used solely for command digests."""
+    return issued_authorization(
         tenant_record_id=TENANT,
         actor_reference="keyverse_subject:operator-99",
         resource_reference=f"employment_record:{EMPLOYMENT.hex}",
@@ -65,9 +65,7 @@ def authorization() -> AuthorizationDecision:
         operation_code="create_record",
         resource_kind="employment_record",
         requested_fields=frozenset({"employment_record"}),
-        authorized_fields=frozenset({"employment_record"}),
-        reason_code="access_permitted",
-        next_action="continue",
+        required_scope_code="orgmetra.people.write",
     )
 
 
