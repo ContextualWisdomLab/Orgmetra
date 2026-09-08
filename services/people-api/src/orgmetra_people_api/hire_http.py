@@ -35,6 +35,8 @@ from orgmetra_people_api.hire import (
 from orgmetra_people_api.http import (
     AsgiReceive,
     AsgiSend,
+    _MAX_QUERY_STRING_BYTES,
+    _MAX_REQUEST_PATH_CHARACTERS,
     _authorization_header,
     _send_json as _emit_json,
 )
@@ -49,6 +51,7 @@ _MAX_UUID_INT = (1 << 128) - 1
 _MAX_BODY_BYTES = 65536
 _MAX_BODY_FRAMES = 1024
 _MAX_JSON_NESTING_DEPTH = 128
+_MAX_QUERY_FIELDS = 2
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 _REQUIRED_BODY_KEYS = frozenset(
     {
@@ -119,6 +122,7 @@ async def _send_json(
             "support_reference": support_reference,
         },
         extra_headers=extra_headers,
+        support_reference=support_reference,
     )
 
 
@@ -168,7 +172,27 @@ class HireAcceptanceAsgiApp:
             return
 
         path = scope.get("path")
-        if not isinstance(path, str) or not _looks_like_hire_route(path):
+        if not isinstance(path, str):
+            await _send_json(
+                send,
+                status=404,
+                payload={
+                    "error": "route_not_found",
+                    "message": "Use /v1/tenants/{tenant_record_id}/candidate-worker-conversions.",
+                },
+            )
+            return
+        if len(path) > _MAX_REQUEST_PATH_CHARACTERS:
+            await _send_json(
+                send,
+                status=400,
+                payload={
+                    "error": "invalid_request",
+                    "message": "Use the canonical hire route without oversized path data, then retry.",
+                },
+            )
+            return
+        if not _looks_like_hire_route(path):
             await _send_json(
                 send,
                 status=404,
@@ -357,6 +381,11 @@ def _looks_like_hire_route(path: str) -> bool:
 
 def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
     """Validate tenant and purpose before authentication and body interpretation."""
+    if not isinstance(raw_query, bytes):
+        raise _InvalidHttpRequest("query_string must be bytes")
+    if len(raw_query) > _MAX_QUERY_STRING_BYTES:
+        raise _InvalidHttpRequest("query string exceeds the accepted size")
+
     parts = path.strip("/").split("/")
     try:
         tenant_record_id = UUID(parts[2])
@@ -365,14 +394,13 @@ def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
     if tenant_record_id.int in (0, _MAX_UUID_INT):
         raise _InvalidHttpRequest("tenant_record_id must be an operational UUID")
 
-    if not isinstance(raw_query, bytes):
-        raise _InvalidHttpRequest("query_string must be bytes")
     try:
         query_text = raw_query.decode("ascii")
         pairs = parse_qsl(
             query_text,
             keep_blank_values=True,
             strict_parsing=True,
+            max_num_fields=_MAX_QUERY_FIELDS,
         )
     except (UnicodeDecodeError, ValueError) as error:
         raise _InvalidHttpRequest("query string is malformed") from error
