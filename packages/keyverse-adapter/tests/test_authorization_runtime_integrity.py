@@ -23,6 +23,15 @@ class _ForgedUUID(UUID):
         return "10000000-0000-7000-8000-ffffffffffff"
 
 
+class _ExecutableUUIDInt:
+    """Detect executable equality before a forged retained UUID payload is rejected."""
+
+    def __eq__(self, other: object) -> bool:
+        """Fail if validation compares this untrusted payload before proving its type."""
+        del other
+        raise AssertionError("forged UUID payload equality executed before validation")
+
+
 class _ForgedText(str):
     """Attempt to carry caller-controlled runtime behavior through text validation."""
 
@@ -105,6 +114,15 @@ def test_access_policy_rejects_uuid_subclasses() -> None:
     """Persisted policy identity must use the exact built-in UUID contract."""
     forged = _ForgedUUID("10000000-0000-7000-8000-000000000501")
     with pytest.raises(ValueError, match="tenant_record_id must be a UUID"):
+        _policy(tenant_record_id=forged)
+
+
+def test_access_policy_rejects_forged_uuid_payload_before_executable_comparison() -> None:
+    """A forged exact UUID payload must fail type validation before equality can execute."""
+    forged = UUID("10000000-0000-7000-8000-000000000501")
+    object.__setattr__(forged, "int", _ExecutableUUIDInt())
+
+    with pytest.raises(ValueError, match="tenant_record_id must contain a valid UUID integer"):
         _policy(tenant_record_id=forged)
 
 
