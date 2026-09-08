@@ -109,12 +109,8 @@ def _validate_aware_datetime(value: object, field_name: str) -> datetime:
         raise ValueError(f"{field_name} must be timezone-aware")
     if type(timezone_provider) not in (timezone, ZoneInfo):
         raise ValueError(f"{field_name} must use a standard-library timezone provider")
-    try:
-        offset = value.utcoffset()
-    except Exception as exc:  # noqa: BLE001 - normalize stdlib provider failure at boundary.
-        raise ValueError(f"{field_name} must resolve to a UTC offset") from exc
-    if offset is None or type(offset) is not timedelta:
-        raise ValueError(f"{field_name} must resolve to a UTC offset")
+    offset = value.utcoffset()
+    assert type(offset) is timedelta
     try:
         return (value.replace(tzinfo=None) - offset).replace(tzinfo=timezone.utc)
     except OverflowError as exc:
