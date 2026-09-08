@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted on this active PR only. This is not protected-`develop` product truth until the owning PR integrates.
+Status: Accepted
+
+Integrated on protected `develop` through PR #31. This ADR is shipped architecture truth for the pre-write migration handoff; it does not claim that a migration batch completed.
 
 ## Context
 
