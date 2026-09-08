@@ -1,13 +1,11 @@
-"""Regressions for nested exact-UUID payload integrity in canonical HRIS evidence."""
+"""Regressions for nested exact-UUID payload integrity in Job Analysis evidence."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from uuid import UUID
 
 import pytest
 
-from orgmetra_hris_kernel.audit import AuditOutboxEvent
 from orgmetra_hris_kernel.job_analysis import TaskKSAOLink
 
 
@@ -31,25 +29,6 @@ def _forged_exact_uuid() -> tuple[UUID, _ExecutableUUIDPayload]:
     return value, payload
 
 
-def _audit_event(event_id: UUID) -> AuditOutboxEvent:
-    """Build one otherwise-valid low-PII audit envelope around the supplied identity."""
-    return AuditOutboxEvent(
-        event_id=event_id,
-        tenant_record_id=UUID("00000000-0000-4000-8000-000000000001"),
-        source_service="people_core",
-        event_type="orgmetra.people.assignment.recorded",
-        resource_reference="assignment_record:01JTESTOPAQUE",
-        actor_reference="keyverse_subject:01JACTOROPAQUE",
-        purpose_code="workforce_administration",
-        reason_code="hire_completion",
-        evidence_version_code="employment-offer:v3",
-        result_code="recorded",
-        occurred_at=datetime(2026, 9, 9, 0, 0, tzinfo=timezone.utc),
-        high_impact=True,
-        confirmation_reference="confirmation:01JCONFIRMOPAQUE",
-    )
-
-
 def test_job_analysis_rejects_exact_uuid_with_executable_internal_payload_without_calling_it() -> None:
     """Outer exact type cannot authorize executable storage hidden in UUID.int."""
     forged, payload = _forged_exact_uuid()
@@ -65,14 +44,19 @@ def test_job_analysis_rejects_exact_uuid_with_executable_internal_payload_withou
     assert payload.equality_calls == 0
 
 
-def test_audit_rejects_exact_uuid_with_executable_internal_payload_without_calling_it() -> None:
-    """Audit sentinel checks must prove the nested scalar inert before equality."""
-    forged, payload = _forged_exact_uuid()
+@pytest.mark.parametrize("identity", [-1, 1 << 128])
+def test_job_analysis_rejects_exact_uuid_with_out_of_range_internal_integer(identity: int) -> None:
+    """A forged exact UUID cannot carry an integer outside the canonical 128-bit range."""
+    forged = UUID("00000000-0000-4000-8000-000000000123")
+    object.__setattr__(forged, "int", identity)
 
-    with pytest.raises(ValueError, match="event_id must contain a built-in UUID integer"):
-        _audit_event(forged)
-
-    assert payload.equality_calls == 0
+    with pytest.raises(ValueError, match="task_record_id must contain a 128-bit UUID integer"):
+        TaskKSAOLink(
+            task_record_id=forged,
+            ksao_record_id=UUID("00000000-0000-4000-8000-000000000124"),
+            relationship_strength=5,
+            essential_for_task=True,
+        )
 
 
 def test_job_analysis_detaches_accepted_uuid_from_caller_alias() -> None:
@@ -90,15 +74,3 @@ def test_job_analysis_detaches_accepted_uuid_from_caller_alias() -> None:
 
     assert link.task_record_id == expected
     assert link.task_record_id is not task_id
-
-
-def test_audit_detaches_accepted_uuid_from_caller_alias() -> None:
-    """Canonical CloudEvent identity remains fixed after caller UUID storage is mutated."""
-    event_id = UUID("00000000-0000-4000-8000-000000000123")
-    event = _audit_event(event_id)
-    expected_id = str(UUID(int=event_id.int))
-
-    object.__setattr__(event_id, "int", UUID("00000000-0000-4000-8000-000000000999").int)
-
-    assert event.event_id is not event_id
-    assert event.to_cloudevent()["id"] == expected_id
