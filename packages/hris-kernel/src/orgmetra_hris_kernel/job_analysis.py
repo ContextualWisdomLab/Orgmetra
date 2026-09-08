@@ -41,17 +41,23 @@ _ALLOWED_KSAO_CATEGORIES = frozenset(
     }
 )
 _ALLOWED_STATUS_CODES = frozenset({"analysis_draft", "analysis_validated"})
+_MAX_UUID_INT = (1 << 128) - 1
 
 
 def _validate_uuid(value: object, field_name: str) -> UUID:
-    """Return a durable UUID or reject type-confused and sentinel identities."""
+    """Return an owned UUID after validating the exact inert integer payload once."""
     if type(value) is not UUID:
         raise ValueError(f"{field_name} must be a UUID")
-    if value.int == 0:
+    identity = value.int
+    if type(identity) is not int:
+        raise ValueError(f"{field_name} must contain a built-in UUID integer")
+    if not 0 <= identity <= _MAX_UUID_INT:
+        raise ValueError(f"{field_name} must contain a 128-bit UUID integer")
+    if identity == 0:
         raise ValueError(f"{field_name} must not be the nil UUID")
-    if value.int == (1 << 128) - 1:
+    if identity == _MAX_UUID_INT:
         raise ValueError(f"{field_name} must not be the max UUID")
-    return value
+    return UUID(int=identity)
 
 
 def _validate_code(value: object, field_name: str) -> str:
@@ -178,9 +184,9 @@ class TaskEvidence:
 
     def __post_init__(self) -> None:
         """Validate task identity, readable behavior text, ratings, and evidence."""
-        _validate_uuid(self.tenant_record_id, "tenant_record_id")
-        _validate_uuid(self.job_record_id, "job_record_id")
-        _validate_uuid(self.task_record_id, "task_record_id")
+        object.__setattr__(self, "tenant_record_id", _validate_uuid(self.tenant_record_id, "tenant_record_id"))
+        object.__setattr__(self, "job_record_id", _validate_uuid(self.job_record_id, "job_record_id"))
+        object.__setattr__(self, "task_record_id", _validate_uuid(self.task_record_id, "task_record_id"))
         object.__setattr__(
             self,
             "task_statement",
@@ -207,9 +213,9 @@ class KSAORequirement:
 
     def __post_init__(self) -> None:
         """Validate KSAO identity, category, operational statement, and ratings."""
-        _validate_uuid(self.tenant_record_id, "tenant_record_id")
-        _validate_uuid(self.job_record_id, "job_record_id")
-        _validate_uuid(self.ksao_record_id, "ksao_record_id")
+        object.__setattr__(self, "tenant_record_id", _validate_uuid(self.tenant_record_id, "tenant_record_id"))
+        object.__setattr__(self, "job_record_id", _validate_uuid(self.job_record_id, "job_record_id"))
+        object.__setattr__(self, "ksao_record_id", _validate_uuid(self.ksao_record_id, "ksao_record_id"))
         _validate_code(self.category_code, "category_code")
         if self.category_code not in _ALLOWED_KSAO_CATEGORIES:
             raise ValueError("category_code is not an allowed KSAO category")
@@ -242,8 +248,8 @@ class FunctionalJobAnalysisProfile:
 
     def __post_init__(self) -> None:
         """Validate the archived DOT worker-function code ranges and provenance."""
-        _validate_uuid(self.tenant_record_id, "tenant_record_id")
-        _validate_uuid(self.job_record_id, "job_record_id")
+        object.__setattr__(self, "tenant_record_id", _validate_uuid(self.tenant_record_id, "tenant_record_id"))
+        object.__setattr__(self, "job_record_id", _validate_uuid(self.job_record_id, "job_record_id"))
         for value, field_name, maximum in (
             (self.data_function_code, "data_function_code", 6),
             (self.people_function_code, "people_function_code", 8),
@@ -268,8 +274,8 @@ class TaskKSAOLink:
 
     def __post_init__(self) -> None:
         """Validate link identities and the explicit 1..5 relationship rating."""
-        _validate_uuid(self.task_record_id, "task_record_id")
-        _validate_uuid(self.ksao_record_id, "ksao_record_id")
+        object.__setattr__(self, "task_record_id", _validate_uuid(self.task_record_id, "task_record_id"))
+        object.__setattr__(self, "ksao_record_id", _validate_uuid(self.ksao_record_id, "ksao_record_id"))
         _validate_level(self.relationship_strength, "relationship_strength")
         if type(self.essential_for_task) is not bool:
             raise ValueError("essential_for_task must be a bool")
@@ -300,9 +306,9 @@ class JobAnalysisSnapshot:
 
     def __post_init__(self) -> None:
         """Enforce tenant/job scope, linkage completeness, and review governance."""
-        _validate_uuid(self.analysis_record_id, "analysis_record_id")
-        _validate_uuid(self.tenant_record_id, "tenant_record_id")
-        _validate_uuid(self.job_record_id, "job_record_id")
+        object.__setattr__(self, "analysis_record_id", _validate_uuid(self.analysis_record_id, "analysis_record_id"))
+        object.__setattr__(self, "tenant_record_id", _validate_uuid(self.tenant_record_id, "tenant_record_id"))
+        object.__setattr__(self, "job_record_id", _validate_uuid(self.job_record_id, "job_record_id"))
         _validate_version(self.analysis_version_code, "analysis_version_code")
         _validate_code(self.status_code, "status_code")
         if self.status_code not in _ALLOWED_STATUS_CODES:
