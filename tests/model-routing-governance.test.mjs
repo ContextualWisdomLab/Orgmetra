@@ -7,7 +7,7 @@ const REQUIRED_MODEL_BOUNDARY_DOCS = Object.freeze([
   'CLAUDE.md',
   'docs/TRD.md',
   'docs/SECURITY.md',
-  'docs/TRACEABILITY.md'
+  'docs/traceability/contextual-orchestrator-routing.md'
 ]);
 
 function read(path) {
