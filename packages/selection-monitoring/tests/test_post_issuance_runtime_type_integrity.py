@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from datetime import date
+from threading import Event, Thread
 
 import pytest
 
+import orgmetra_selection_monitoring.plan as plan_module
 from test_plan import build_valid
 
 
@@ -46,6 +48,54 @@ def test_date_subclass_is_rejected_before_isoformat_executes() -> None:
             plan.monitoring_start.day,
         ),
     )
+
+    with pytest.raises(ValueError, match="runtime evidence"):
+        plan.canonical_json()
+
+
+def test_canonical_export_uses_the_same_runtime_snapshot_it_validated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Never reread live evidence after the exact-type validation boundary."""
+    plan = build_valid()
+    issued_json = plan.canonical_json()
+    validation_complete = Event()
+    resume_export = Event()
+    original_assert = plan_module._assert_canonical_runtime_evidence
+
+    def blocking_assert(subject: object) -> None:
+        original_assert(subject)
+        validation_complete.set()
+        if not resume_export.wait(timeout=2):
+            raise AssertionError("canonical export validation barrier timed out")
+
+    monkeypatch.setattr(plan_module, "_assert_canonical_runtime_evidence", blocking_assert)
+    outcome: dict[str, object] = {}
+
+    def export() -> None:
+        try:
+            outcome["json"] = plan.canonical_json()
+        except BaseException as exc:  # test captures the exact boundary failure
+            outcome["error"] = exc
+
+    worker = Thread(target=export)
+    worker.start()
+    assert validation_complete.wait(timeout=2)
+    object.__setattr__(
+        plan,
+        "monitoring_start",
+        ExecutableDate(
+            plan.monitoring_start.year,
+            plan.monitoring_start.month,
+            plan.monitoring_start.day,
+        ),
+    )
+    resume_export.set()
+    worker.join(timeout=2)
+
+    assert not worker.is_alive()
+    assert "error" not in outcome
+    assert outcome["json"] == issued_json
 
     with pytest.raises(ValueError, match="runtime evidence"):
         plan.canonical_json()
