@@ -34,6 +34,6 @@ A passing packet proves only that review evidence satisfies this leaf contract. 
 
 `recorded_at` is checked for issuance freshness only when the packet is created. Later canonical export revalidates its exact built-in temporal shape and creation digest but does not re-enter wall-clock freshness, so a backward clock step cannot make already-issued evidence unreadable.
 
-Caller-defined packet classes are rejected at subclass creation, before a subclass can replace `__post_init__`, `__getattribute__`, or another validation/emission hook. The exact runtime check at the beginning of the base `__post_init__` remains defense in depth, and exact primitive checks independently reject scalar runtime substitution.
+Caller-defined packet classes are rejected at subclass creation, before a subclass can replace `__post_init__`, `__getattribute__`, or another validation/emission hook. Exact primitive checks independently reject scalar runtime substitution. Keeping an unreachable base runtime-type branch after subclass creation was sealed would violate the package's owned 100% coverage contract, so finality lives at the class-creation boundary rather than in dead defense code.
 
 The live-reference registry is process-local defense in depth. It prevents conflicting in-process reissuance while an idempotent packet remains alive, but it does not replace durable tenant-qualified uniqueness or immutable persistence across processes/restarts. The authoritative persistence/audit transaction owns those guarantees.
