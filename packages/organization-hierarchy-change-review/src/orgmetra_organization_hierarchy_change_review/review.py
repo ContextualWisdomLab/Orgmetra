@@ -141,7 +141,7 @@ def _canonical_timestamp(value: object) -> str:
 
 
 def _validate_issuance_timestamp(value: object) -> None:
-    """Require structurally valid system-recorded evidence that has already occurred."""
+    """Require a canonical review-evidence timestamp that has already occurred."""
     _canonical_timestamp(value)
     if value > datetime.now(timezone.utc):
         raise ValueError("recorded_at must not be in the future")
