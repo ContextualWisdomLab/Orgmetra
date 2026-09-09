@@ -328,10 +328,40 @@ def _canonical_payload_json(payload: dict[str, object]) -> str:
 
 
 def _build_packet_runtime() -> tuple[object, object, object]:
-    """Build packet methods around private process-local issuance and digest state."""
+    """Build packet methods around private process-local issuance and evidence state."""
+    trusted_getattribute = object.__getattribute__
     trusted_sha256 = sha256
+    trusted_type = type
+    trusted_zip = zip
+    field_names = (
+        "contains_employment_decision",
+        "contains_person_identifier",
+        "contains_worker_value",
+        "current_parent_organization_unit_reference",
+        "decision_authority",
+        "effective_on",
+        "evidence_version",
+        "hierarchy_snapshot_digest",
+        "human_review_required",
+        "mutation_state",
+        "next_action",
+        "organization_hierarchy_change_reference",
+        "organization_unit_reference",
+        "organization_unit_snapshot_digest",
+        "proposed_parent_organization_unit_reference",
+        "purpose_code",
+        "reason_code",
+        "recorded_at",
+        "requester_reference",
+        "review_state",
+        "reviewer_reference",
+        "scope_verification_state",
+        "tenant_record_id",
+    )
     registry_lock = RLock()
     creation_digests: WeakKeyDictionary[object, str] = WeakKeyDictionary()
+    creation_payload_jsons: WeakKeyDictionary[object, str] = WeakKeyDictionary()
+    creation_states: WeakKeyDictionary[object, tuple[object, ...]] = WeakKeyDictionary()
     issuance_in_progress: WeakSet[object] = WeakSet()
     live_reference_bindings: WeakValueDictionary[
         tuple[str, str], _LiveReferenceBinding
@@ -341,6 +371,23 @@ def _build_packet_runtime() -> tuple[object, object, object]:
     def digest_text(value: str) -> str:
         """Hash canonical UTF-8 evidence with the import-time SHA-256 implementation."""
         return trusted_sha256(value.encode("utf-8")).hexdigest()
+
+    def capture_state(packet: OrganizationHierarchyChangeReviewPacket) -> tuple[object, ...]:
+        """Capture direct slot values without selecting a mutable module export helper."""
+        return tuple(trusted_getattribute(packet, name) for name in field_names)
+
+    def state_matches_issuance(
+        current_state: tuple[object, ...],
+        issuance_state: tuple[object, ...],
+    ) -> bool:
+        """Compare exact built-in issuance values without invoking subtype behavior."""
+        for current_value, issuance_value in trusted_zip(current_state, issuance_state, strict=True):
+            if (
+                trusted_type(current_value) is not trusted_type(issuance_value)
+                or current_value != issuance_value
+            ):
+                return False
+        return True
 
     def post_init(self: OrganizationHierarchyChangeReviewPacket) -> None:
         """Validate and seal one creation snapshot; reject all reissuance of this object."""
@@ -353,6 +400,7 @@ def _build_packet_runtime() -> tuple[object, object, object]:
             _validate_issuance_snapshot(snapshot)
             payload_json = _canonical_payload_json(_payload_from_snapshot(snapshot))
             creation_digest = digest_text(payload_json)
+            issuance_state = tuple(snapshot[name] for name in field_names)
             live_key = (
                 snapshot["tenant_record_id"],
                 snapshot["organization_hierarchy_change_reference"],
@@ -367,19 +415,27 @@ def _build_packet_runtime() -> tuple[object, object, object]:
                         "organization_hierarchy_change_reference is already bound to different live evidence"
                     )
                 creation_digests[self] = creation_digest
+                creation_payload_jsons[self] = payload_json
+                creation_states[self] = issuance_state
                 packet_bindings[self] = binding
         finally:
             with registry_lock:
                 issuance_in_progress.discard(self)
 
     def canonical_json(self: OrganizationHierarchyChangeReviewPacket) -> str:
-        """Return one verified snapshot of deterministic canonical audit evidence."""
-        payload = _payload(self)
-        payload_json = _canonical_payload_json(payload)
-        current_digest = digest_text(payload_json)
+        """Return issued canonical evidence only while one direct export snapshot still matches."""
+        current_state = capture_state(self)
         with registry_lock:
             creation_digest = creation_digests.get(self)
-        if current_digest != creation_digest:
+            payload_json = creation_payload_jsons.get(self)
+            issuance_state = creation_states.get(self)
+        if (
+            creation_digest is None
+            or payload_json is None
+            or issuance_state is None
+            or not state_matches_issuance(current_state, issuance_state)
+            or digest_text(payload_json) != creation_digest
+        ):
             raise ValueError("organization hierarchy-change evidence changed after issuance")
         return payload_json
 
