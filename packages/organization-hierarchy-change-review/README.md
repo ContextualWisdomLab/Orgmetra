@@ -33,7 +33,7 @@ Before any later mutation, the authoritative Orgmetra HRIS boundary must re-reso
 
 HRIS-owned tenant and Organization Unit identifiers accept canonical non-sentinel operational UUID text, including UUIDv7, so this package does not freeze the core identifier version. Packet-owned change references and actor correlations are UUIDv4. Lowercase SHA-256 digests bind evidence without copying the source records themselves.
 
-Caller-defined subclasses of trust-bearing strings, integers, dates, or datetimes are rejected before equality, ordering, membership, parsing, or canonical emission can depend on caller polymorphism. Canonical evidence is deterministic and the routine `repr` is redacted.
+The packet itself must be the exact `OrganizationHierarchyChangeReviewPacket` runtime type before any trust-bearing field is read. Caller-defined packet subclasses are rejected so attribute resolution cannot return one value during validation and another during canonical emission. Caller-defined subclasses of trust-bearing strings, integers, dates, or datetimes are likewise rejected before equality, ordering, membership, parsing, or canonical emission can depend on caller polymorphism. Canonical evidence is deterministic and the routine `repr` is redacted.
 
 `recorded_at` is system-recorded issuance evidence: construction rejects a timestamp that is later than the current UTC time. That freshness check is deliberately issuance-only. Later canonical export rechecks the exact built-in timestamp shape and the creation digest without consulting the wall clock, so a backward clock adjustment cannot invalidate evidence that was validly issued.
 
@@ -43,4 +43,4 @@ The in-process creation seal and live-reference binding are defense in depth onl
 
 ## Quality contract
 
-The dedicated GitHub quality lane builds one exact wheel, binds its SHA-256 at install time, executes tests against the installed artifact on CPython 3.14.7, requires exact 100% owned statement and branch coverage, and proves the checkout is clean. Foundation, recovery, SAST, and security workflows remain separate required evidence.
+Canonical Foundation CI builds one exact wheel, binds its SHA-256 at install time, executes tests against the installed artifact on CPython 3.14.7, requires exact 100% owned statement and branch coverage, and proves the checkout is clean. The retired repository-owned feature workflow must not be resurrected. Recovery, SAST, security, and other centrally required workflows remain separate exact-head evidence.
