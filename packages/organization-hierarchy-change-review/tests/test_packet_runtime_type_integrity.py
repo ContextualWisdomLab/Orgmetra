@@ -123,7 +123,7 @@ def test_canonical_export_validates_and_emits_one_snapshot_during_concurrent_mut
 def test_issuance_validates_and_seals_one_snapshot_during_concurrent_mutation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Do not seal a semantic value that changed after its validation already ran."""
+    """Never seal an after-validation mutation as though that value were reviewed."""
     template = _build_packet()
     packet = object.__new__(OrganizationHierarchyChangeReviewPacket)
     for field in fields(OrganizationHierarchyChangeReviewPacket):
@@ -154,8 +154,7 @@ def test_issuance_validates_and_seals_one_snapshot_during_concurrent_mutation(
         assert issuance_timestamp_entered.wait(timeout=5)
         object.__setattr__(packet, "reason_code", "unreviewed_override")
         release_issuance_timestamp.set()
-        with pytest.raises(
-            ValueError,
-            match="reason_code must use the reviewed hierarchy-change vocabulary",
-        ):
-            issuance.result(timeout=5)
+        issuance.result(timeout=5)
+
+    with pytest.raises(ValueError, match="evidence changed after issuance"):
+        packet.canonical_json()
