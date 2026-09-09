@@ -108,6 +108,20 @@ def test_rejects_manual_reissuance_after_reference_retargeting() -> None:
         packet.canonical_json()
 
 
+@pytest.mark.parametrize(
+    "registry_name",
+    [
+        "_CREATION_DIGESTS",
+        "_ISSUANCE_IN_PROGRESS",
+        "_LIVE_REFERENCE_BINDINGS",
+        "_PACKET_BINDINGS",
+    ],
+)
+def test_module_exposes_no_mutable_issuance_registry_capability(registry_name: str) -> None:
+    """Ordinary module consumers must not receive direct mutation handles to issuance state."""
+    assert registry_name not in vars(review_module)
+
+
 def test_rejects_concurrent_reissuance_while_initial_issuance_is_in_progress(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
