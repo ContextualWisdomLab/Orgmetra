@@ -327,8 +327,9 @@ def _canonical_payload_json(payload: dict[str, object]) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
-def _build_packet_runtime() -> tuple[object, object]:
-    """Build packet methods around private process-local issuance state."""
+def _build_packet_runtime() -> tuple[object, object, object]:
+    """Build packet methods around private process-local issuance and digest state."""
+    trusted_sha256 = sha256
     registry_lock = RLock()
     creation_digests: WeakKeyDictionary[object, str] = WeakKeyDictionary()
     issuance_in_progress: WeakSet[object] = WeakSet()
@@ -336,6 +337,10 @@ def _build_packet_runtime() -> tuple[object, object]:
         tuple[str, str], _LiveReferenceBinding
     ] = WeakValueDictionary()
     packet_bindings: WeakKeyDictionary[object, _LiveReferenceBinding] = WeakKeyDictionary()
+
+    def digest_text(value: str) -> str:
+        """Hash canonical UTF-8 evidence with the import-time SHA-256 implementation."""
+        return trusted_sha256(value.encode("utf-8")).hexdigest()
 
     def post_init(self: OrganizationHierarchyChangeReviewPacket) -> None:
         """Validate and seal one creation snapshot; reject all reissuance of this object."""
@@ -347,7 +352,7 @@ def _build_packet_runtime() -> tuple[object, object]:
             snapshot = _snapshot(self)
             _validate_issuance_snapshot(snapshot)
             payload_json = _canonical_payload_json(_payload_from_snapshot(snapshot))
-            creation_digest = sha256(payload_json.encode("utf-8")).hexdigest()
+            creation_digest = digest_text(payload_json)
             live_key = (
                 snapshot["tenant_record_id"],
                 snapshot["organization_hierarchy_change_reference"],
@@ -371,17 +376,21 @@ def _build_packet_runtime() -> tuple[object, object]:
         """Return one verified snapshot of deterministic canonical audit evidence."""
         payload = _payload(self)
         payload_json = _canonical_payload_json(payload)
-        current_digest = sha256(payload_json.encode("utf-8")).hexdigest()
+        current_digest = digest_text(payload_json)
         with registry_lock:
             creation_digest = creation_digests.get(self)
         if current_digest != creation_digest:
             raise ValueError("organization hierarchy-change evidence changed after issuance")
         return payload_json
 
-    return post_init, canonical_json
+    def sha256_digest(self: OrganizationHierarchyChangeReviewPacket) -> str:
+        """Return SHA-256 over the exact verified canonical UTF-8 evidence."""
+        return digest_text(canonical_json(self))
+
+    return post_init, canonical_json, sha256_digest
 
 
-_PACKET_POST_INIT, _PACKET_CANONICAL_JSON = _build_packet_runtime()
+_PACKET_POST_INIT, _PACKET_CANONICAL_JSON, _PACKET_SHA256_DIGEST = _build_packet_runtime()
 
 
 @dataclass(frozen=True, slots=True, repr=False, eq=False, weakref_slot=True)
@@ -424,13 +433,10 @@ class OrganizationHierarchyChangeReviewPacket:
 
     __post_init__ = _PACKET_POST_INIT
     canonical_json = _PACKET_CANONICAL_JSON
-
-    def sha256_digest(self) -> str:
-        """Return SHA-256 over the exact verified canonical UTF-8 evidence."""
-        return sha256(self.canonical_json().encode("utf-8")).hexdigest()
+    sha256_digest = _PACKET_SHA256_DIGEST
 
 
-del _PACKET_POST_INIT, _PACKET_CANONICAL_JSON, _build_packet_runtime
+del _PACKET_POST_INIT, _PACKET_CANONICAL_JSON, _PACKET_SHA256_DIGEST, _build_packet_runtime
 
 
 def build_organization_hierarchy_change_review_packet(
