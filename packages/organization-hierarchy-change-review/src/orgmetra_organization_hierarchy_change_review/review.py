@@ -214,6 +214,8 @@ class OrganizationHierarchyChangeReviewPacket:
 
     def __post_init__(self) -> None:
         """Validate the review contract and bind its live reference to creation evidence."""
+        if type(self) is not OrganizationHierarchyChangeReviewPacket:
+            raise ValueError("review packet must use the exact OrganizationHierarchyChangeReviewPacket runtime type")
         _validate_operational_uuid_text(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.organization_hierarchy_change_reference,
