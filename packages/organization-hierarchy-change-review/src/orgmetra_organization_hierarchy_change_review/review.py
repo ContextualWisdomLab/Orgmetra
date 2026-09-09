@@ -331,6 +331,7 @@ def _build_packet_runtime() -> tuple[object, object, object]:
     """Build packet methods around private process-local issuance and evidence state."""
     trusted_canonical_payload_json = _canonical_payload_json
     trusted_getattribute = object.__getattribute__
+    trusted_live_reference_binding = _LiveReferenceBinding
     trusted_payload_from_snapshot = _payload_from_snapshot
     trusted_sha256 = sha256
     trusted_snapshot = _snapshot
@@ -412,7 +413,7 @@ def _build_packet_runtime() -> tuple[object, object, object]:
             with registry_lock:
                 binding = live_reference_bindings.get(live_key)
                 if binding is None:
-                    binding = _LiveReferenceBinding(creation_digest)
+                    binding = trusted_live_reference_binding(creation_digest)
                     live_reference_bindings[live_key] = binding
                 elif binding.evidence_digest != creation_digest:
                     raise ValueError(
