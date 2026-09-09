@@ -10,7 +10,7 @@ Orgmetra already treats Organization Unit hierarchy as bitemporal HRIS truth. A 
 
 A pre-mutation evidence packet also needs to represent moving an Organization Unit to or from the root without inventing a sentinel parent identifier. It must preserve the requested business-effective date separately from the system-recorded review-evidence time and must not copy Person PII or worker values into durable governance evidence.
 
-The packet-owned hierarchy-change reference is itself audit correlation. Reissuing a different valid payload under the same still-live tenant-qualified reference would make that correlation ambiguous even if each individual payload passed field validation.
+The packet-owned hierarchy-change reference is itself audit correlation. Reissuing a different valid payload under the same still-live tenant-qualified reference would make that correlation ambiguous even if each individual payload passed field validation. A frozen dataclass is not a complete trust boundary by itself because low-level `object.__setattr__` can still replace an issued scalar with a caller-defined runtime subtype. If that subtype serializes to the same JSON primitive value, a digest-only export check cannot distinguish the representation change even though executable caller-owned behavior remains attached to the live packet.
 
 ## Decision
 
@@ -25,8 +25,8 @@ The packet:
 5. binds reviewed Organization Unit and hierarchy snapshots by lowercase SHA-256 digest instead of copying HR record values;
 6. requires distinct requester and reviewer correlations, one fixed purpose, one controlled reason, and explicit evidence versioning;
 7. fixes review/scope/mutation/decision-authority states so the packet can never authorize the mutation itself;
-8. rejects caller-defined packet classes at subclass creation, before they can replace `__post_init__`, `__getattribute__`, or another validation/emission hook, and also rejects caller-defined trust-bearing primitive subclasses;
-9. uses deterministic canonical JSON, redacted routine representation, and a process-local issuance digest as defense in depth against post-construction mutation; and
+8. rejects caller-defined packet classes at subclass creation, before they can replace `__post_init__`, `__getattribute__`, or another validation/emission hook, and also rejects caller-defined trust-bearing primitive subclasses at issuance;
+9. revalidates the exact built-in runtime type of every canonical scalar immediately before export, then uses deterministic canonical JSON plus the issuance digest to reject both representation-preserving runtime substitution and value mutation after issuance; and
 10. binds each still-live `(tenant_record_id, organization_hierarchy_change_reference)` to one canonical evidence digest while allowing exact idempotent duplicate packets to share that binding.
 
 The live-reference binding is deliberately weak/process-local: a shared binding object remains alive while any idempotent packet using that reference remains alive, so collection of one duplicate cannot erase the binding for another. Once every packet is gone or the process restarts, durable uniqueness must come from authoritative persistence rather than this leaf package.
@@ -48,5 +48,6 @@ NIST Privacy Framework 1.0 remains the current final Privacy Framework baseline;
 - Buyers gain an explicit review artifact for organization-structure changes instead of conflating approval evidence with mutation authority.
 - Root transitions remain representable without reserved/sentinel parent identifiers.
 - Conflicting in-process evidence cannot silently reuse a still-live hierarchy-change correlation; exact idempotent duplicates remain possible.
+- Canonical export rejects a caller-defined scalar subtype even when its JSON value and SHA-256 bytes are representation-preserving, so checked evidence cannot retain hidden caller-owned runtime behavior after issuance.
 - The slice stays independently deployable and does not depend on direct cross-service application-table access.
 - Process-local tamper/reference detection is defense in depth only; durable uniqueness, authorization, concurrency control, hierarchy validation and audit remain responsibilities of authoritative persistence/orchestration boundaries.
