@@ -75,7 +75,7 @@ def test_canonical_export_uses_the_same_runtime_snapshot_it_validated(
     def export() -> None:
         try:
             outcome["json"] = plan.canonical_json()
-        except BaseException as exc:  # test captures the exact boundary failure
+        except Exception as exc:
             outcome["error"] = exc
 
     worker = Thread(target=export)
