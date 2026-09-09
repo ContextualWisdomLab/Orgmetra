@@ -10,7 +10,7 @@ Moving an Organization Unit under a different parent can change reporting scope,
 
 - one tenant and one Organization Unit;
 - the reviewed current parent and proposed parent, where `None` represents a real root transition rather than a sentinel identifier;
-- a business-effective date that remains separate from the system-recorded evidence timestamp;
+- a business-effective date that remains separate from the review-evidence timestamp supplied by the invoking boundary;
 - exact Organization Unit and hierarchy snapshot SHA-256 evidence;
 - a controlled purpose and reason;
 - distinct accountable requester and reviewer correlations; and
@@ -27,7 +27,7 @@ Every packet remains:
 - `not_authorized_to_apply`; and
 - `human_review_only`.
 
-Before any later mutation, the authoritative Orgmetra HRIS boundary must re-resolve the Organization Unit, current parent, proposed parent, and hierarchy at the requested business date and current system-recorded cutoff. It must prove same-tenant scope, reject stale current-parent evidence, self-parenting, cycles, and multiple visible parents, re-establish accountable actor separation, verify the reviewed digests/reason, and commit immutable audit/outbox evidence atomically with the mutation.
+Before any later mutation, the authoritative Orgmetra HRIS boundary must re-resolve the Organization Unit, current parent, proposed parent, and hierarchy at the requested business date and current system-recorded cutoff. It must prove same-tenant scope, reject stale current-parent evidence, self-parenting, cycles, and multiple visible parents, re-establish accountable actor separation, verify the reviewed digests/reason, and commit immutable audit/outbox evidence atomically with the mutation. That authoritative transaction must generate or attest its own system-recorded audit/outbox timestamp; packet `recorded_at` is not the transaction clock authority.
 
 ## Identifier and evidence rules
 
@@ -39,11 +39,11 @@ Issuance is single-use for one live packet object. The process-local registry re
 
 Canonical export separately reads every trust-bearing field once into a local snapshot, validates the exact built-in runtime types on that same snapshot, and serializes only those captured values. A caller-defined `str` or `int` subtype observed before export snapshot capture therefore fails closed even if its JSON value and SHA-256 bytes are representation-preserving; a low-level mutation that occurs after capture cannot change the payload already selected for that export. The issuance digest separately rejects semantic value changes on a later export. Canonical evidence is deterministic and the routine `repr` is redacted.
 
-`recorded_at` is system-recorded issuance evidence: construction rejects a timestamp that is later than the current UTC time. That freshness check is deliberately issuance-only. Later canonical export rechecks the exact built-in timestamp shape of the captured snapshot and the creation digest without consulting the wall clock, so a backward clock adjustment cannot invalidate evidence that was validly issued.
+`recorded_at` is a review-evidence timestamp supplied by the invoking boundary. Construction proves canonical built-in fixed-offset representation and rejects a value later than the current UTC clock at issuance, but this leaf package does not prove which clock generated the value. That provenance distinction is intentional: NIST SP 800-53 AU-8 clock ownership belongs at the authoritative audit-generating system boundary. Later canonical export rechecks the exact built-in timestamp shape of the captured snapshot and the creation digest without consulting the wall clock, so a backward clock adjustment cannot invalidate evidence that was validly issued.
 
 A tenant-qualified `organization_hierarchy_change_reference` is also bound to one evidence digest while any idempotent packet carrying that reference remains alive in the process. An exact duplicate is allowed; a different reason, parent, timestamp, digest, actor, or other trust-bearing value under the same still-live reference fails closed. This prevents `dataclasses.replace()` or a second constructor call from silently minting conflicting live review evidence under one packet correlation.
 
-The in-process creation seal, single-use issuance reservation, and live-reference binding are defense in depth only. They are not durable database uniqueness, distributed authorization, restart-stable identity, or a substitute for the authoritative audit/outbox transaction. Durable persistence must enforce tenant-qualified uniqueness and immutable evidence independently.
+The in-process creation seal, single-use issuance reservation, and live-reference binding are defense in depth only. They are not durable database uniqueness, distributed authorization, restart-stable identity, authoritative timestamp provenance, or a substitute for the authoritative audit/outbox transaction. Durable persistence must enforce tenant-qualified uniqueness, authoritative system time, and immutable evidence independently.
 
 ## Quality contract
 
