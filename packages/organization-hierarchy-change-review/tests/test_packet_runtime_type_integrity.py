@@ -228,3 +228,21 @@ def test_issuance_validates_and_seals_one_snapshot_during_concurrent_mutation(
 
     with pytest.raises(ValueError, match="evidence changed after issuance"):
         packet.canonical_json()
+
+
+def test_canonical_export_does_not_trust_mutable_module_digest_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A caller must not forge post-issuance integrity by replacing the module digest binding."""
+    packet = _build_packet()
+    creation_digest = packet.sha256_digest()
+    object.__setattr__(packet, "reason_code", "administrative_correction")
+
+    class _ForgedDigest:
+        def hexdigest(self) -> str:
+            return creation_digest
+
+    monkeypatch.setattr(review_module, "sha256", lambda _payload: _ForgedDigest())
+
+    with pytest.raises(ValueError, match="evidence changed after issuance"):
+        packet.canonical_json()
