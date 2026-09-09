@@ -108,6 +108,46 @@ def test_rejects_manual_reissuance_after_reference_retargeting() -> None:
         packet.canonical_json()
 
 
+def test_rejects_concurrent_reissuance_while_initial_issuance_is_in_progress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A second issuance call must fail while the first call owns the issuance reservation."""
+    template = _build_packet()
+    packet = object.__new__(OrganizationHierarchyChangeReviewPacket)
+    for field in fields(OrganizationHierarchyChangeReviewPacket):
+        object.__setattr__(packet, field.name, object.__getattribute__(template, field.name))
+    object.__setattr__(
+        packet,
+        "organization_hierarchy_change_reference",
+        f"organization_hierarchy_change:{uuid4()}",
+    )
+
+    issuance_timestamp_entered = Event()
+    release_issuance_timestamp = Event()
+    original_validate_issuance_timestamp = review_module._validate_issuance_timestamp
+
+    def blocking_validate_issuance_timestamp(value: object) -> None:
+        original_validate_issuance_timestamp(value)
+        issuance_timestamp_entered.set()
+        if not release_issuance_timestamp.wait(timeout=5):
+            raise AssertionError("test did not release initial issuance")
+
+    monkeypatch.setattr(
+        review_module,
+        "_validate_issuance_timestamp",
+        blocking_validate_issuance_timestamp,
+    )
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        issuance = executor.submit(packet.__post_init__)
+        assert issuance_timestamp_entered.wait(timeout=5)
+        with pytest.raises(ValueError, match="may be issued only once"):
+            packet.__post_init__()
+        release_issuance_timestamp.set()
+        issuance.result(timeout=5)
+
+    assert packet.canonical_json()
+
+
 def test_canonical_export_validates_and_emits_one_snapshot_during_concurrent_mutation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
