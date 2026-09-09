@@ -1,6 +1,7 @@
 """Regression for packet-level checked-versus-emitted runtime substitution."""
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import fields
 from datetime import date, datetime, timezone
 from threading import Event
 from uuid import uuid4
@@ -117,3 +118,44 @@ def test_canonical_export_validates_and_emits_one_snapshot_during_concurrent_mut
 
     with pytest.raises(ValueError, match="evidence changed after issuance"):
         packet.canonical_json()
+
+
+def test_issuance_validates_and_seals_one_snapshot_during_concurrent_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Do not seal a semantic value that changed after its validation already ran."""
+    template = _build_packet()
+    packet = object.__new__(OrganizationHierarchyChangeReviewPacket)
+    for field in fields(OrganizationHierarchyChangeReviewPacket):
+        object.__setattr__(packet, field.name, object.__getattribute__(template, field.name))
+    object.__setattr__(
+        packet,
+        "organization_hierarchy_change_reference",
+        f"organization_hierarchy_change:{uuid4()}",
+    )
+
+    issuance_timestamp_entered = Event()
+    release_issuance_timestamp = Event()
+    original_validate_issuance_timestamp = review_module._validate_issuance_timestamp
+
+    def blocking_validate_issuance_timestamp(value: object) -> None:
+        original_validate_issuance_timestamp(value)
+        issuance_timestamp_entered.set()
+        if not release_issuance_timestamp.wait(timeout=5):
+            raise AssertionError("test did not release issuance timestamp validation")
+
+    monkeypatch.setattr(
+        review_module,
+        "_validate_issuance_timestamp",
+        blocking_validate_issuance_timestamp,
+    )
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        issuance = executor.submit(packet.__post_init__)
+        assert issuance_timestamp_entered.wait(timeout=5)
+        object.__setattr__(packet, "reason_code", "unreviewed_override")
+        release_issuance_timestamp.set()
+        with pytest.raises(
+            ValueError,
+            match="reason_code must use the reviewed hierarchy-change vocabulary",
+        ):
+            issuance.result(timeout=5)
