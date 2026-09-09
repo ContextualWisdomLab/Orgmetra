@@ -55,15 +55,6 @@ class _LiveReferenceBinding:
         self.evidence_digest = evidence_digest
 
 
-_REGISTRY_LOCK = RLock()
-_CREATION_DIGESTS: WeakKeyDictionary[OrganizationHierarchyChangeReviewPacket, str] = WeakKeyDictionary()
-_ISSUANCE_IN_PROGRESS: WeakSet[OrganizationHierarchyChangeReviewPacket] = WeakSet()
-_LIVE_REFERENCE_BINDINGS: WeakValueDictionary[tuple[str, str], _LiveReferenceBinding] = WeakValueDictionary()
-_PACKET_BINDINGS: WeakKeyDictionary[
-    OrganizationHierarchyChangeReviewPacket, _LiveReferenceBinding
-] = WeakKeyDictionary()
-
-
 def _validate_operational_uuid_text(value: object, field_name: str) -> None:
     """Require exact canonical non-sentinel UUID text owned by the HRIS boundary."""
     if type(value) is not str:
@@ -336,6 +327,63 @@ def _canonical_payload_json(payload: dict[str, object]) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
+def _build_packet_runtime() -> tuple[object, object]:
+    """Build packet methods around private process-local issuance state."""
+    registry_lock = RLock()
+    creation_digests: WeakKeyDictionary[object, str] = WeakKeyDictionary()
+    issuance_in_progress: WeakSet[object] = WeakSet()
+    live_reference_bindings: WeakValueDictionary[
+        tuple[str, str], _LiveReferenceBinding
+    ] = WeakValueDictionary()
+    packet_bindings: WeakKeyDictionary[object, _LiveReferenceBinding] = WeakKeyDictionary()
+
+    def post_init(self: OrganizationHierarchyChangeReviewPacket) -> None:
+        """Validate and seal one creation snapshot; reject all reissuance of this object."""
+        with registry_lock:
+            if self in creation_digests or self in issuance_in_progress:
+                raise ValueError("organization hierarchy-change packet may be issued only once")
+            issuance_in_progress.add(self)
+        try:
+            snapshot = _snapshot(self)
+            _validate_issuance_snapshot(snapshot)
+            payload_json = _canonical_payload_json(_payload_from_snapshot(snapshot))
+            creation_digest = sha256(payload_json.encode("utf-8")).hexdigest()
+            live_key = (
+                snapshot["tenant_record_id"],
+                snapshot["organization_hierarchy_change_reference"],
+            )
+            with registry_lock:
+                binding = live_reference_bindings.get(live_key)
+                if binding is None:
+                    binding = _LiveReferenceBinding(creation_digest)
+                    live_reference_bindings[live_key] = binding
+                elif binding.evidence_digest != creation_digest:
+                    raise ValueError(
+                        "organization_hierarchy_change_reference is already bound to different live evidence"
+                    )
+                creation_digests[self] = creation_digest
+                packet_bindings[self] = binding
+        finally:
+            with registry_lock:
+                issuance_in_progress.discard(self)
+
+    def canonical_json(self: OrganizationHierarchyChangeReviewPacket) -> str:
+        """Return one verified snapshot of deterministic canonical audit evidence."""
+        payload = _payload(self)
+        payload_json = _canonical_payload_json(payload)
+        current_digest = sha256(payload_json.encode("utf-8")).hexdigest()
+        with registry_lock:
+            creation_digest = creation_digests.get(self)
+        if current_digest != creation_digest:
+            raise ValueError("organization hierarchy-change evidence changed after issuance")
+        return payload_json
+
+    return post_init, canonical_json
+
+
+_PACKET_POST_INIT, _PACKET_CANONICAL_JSON = _build_packet_runtime()
+
+
 @dataclass(frozen=True, slots=True, repr=False, eq=False, weakref_slot=True)
 class OrganizationHierarchyChangeReviewPacket:
     """PII-minimized human-review evidence for one Organization Unit reparenting."""
@@ -374,50 +422,15 @@ class OrganizationHierarchyChangeReviewPacket:
         """Return a representation that never emits hierarchy correlations."""
         return "OrganizationHierarchyChangeReviewPacket(<redacted>)"
 
-    def __post_init__(self) -> None:
-        """Validate and seal one creation snapshot; reject all reissuance of this object."""
-        with _REGISTRY_LOCK:
-            if self in _CREATION_DIGESTS or self in _ISSUANCE_IN_PROGRESS:
-                raise ValueError("organization hierarchy-change packet may be issued only once")
-            _ISSUANCE_IN_PROGRESS.add(self)
-        try:
-            snapshot = _snapshot(self)
-            _validate_issuance_snapshot(snapshot)
-            payload_json = _canonical_payload_json(_payload_from_snapshot(snapshot))
-            creation_digest = sha256(payload_json.encode("utf-8")).hexdigest()
-            live_key = (
-                snapshot["tenant_record_id"],
-                snapshot["organization_hierarchy_change_reference"],
-            )
-            with _REGISTRY_LOCK:
-                binding = _LIVE_REFERENCE_BINDINGS.get(live_key)
-                if binding is None:
-                    binding = _LiveReferenceBinding(creation_digest)
-                    _LIVE_REFERENCE_BINDINGS[live_key] = binding
-                elif binding.evidence_digest != creation_digest:
-                    raise ValueError(
-                        "organization_hierarchy_change_reference is already bound to different live evidence"
-                    )
-                _CREATION_DIGESTS[self] = creation_digest
-                _PACKET_BINDINGS[self] = binding
-        finally:
-            with _REGISTRY_LOCK:
-                _ISSUANCE_IN_PROGRESS.discard(self)
-
-    def canonical_json(self) -> str:
-        """Return one verified snapshot of deterministic canonical audit evidence."""
-        payload = _payload(self)
-        payload_json = _canonical_payload_json(payload)
-        current_digest = sha256(payload_json.encode("utf-8")).hexdigest()
-        with _REGISTRY_LOCK:
-            creation_digest = _CREATION_DIGESTS.get(self)
-        if current_digest != creation_digest:
-            raise ValueError("organization hierarchy-change evidence changed after issuance")
-        return payload_json
+    __post_init__ = _PACKET_POST_INIT
+    canonical_json = _PACKET_CANONICAL_JSON
 
     def sha256_digest(self) -> str:
         """Return SHA-256 over the exact verified canonical UTF-8 evidence."""
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
+
+
+del _PACKET_POST_INIT, _PACKET_CANONICAL_JSON, _build_packet_runtime
 
 
 def build_organization_hierarchy_change_review_packet(
