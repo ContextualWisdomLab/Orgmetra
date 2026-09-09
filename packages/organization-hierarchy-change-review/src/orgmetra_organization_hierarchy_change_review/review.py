@@ -146,6 +146,35 @@ def _validate_issuance_timestamp(value: object) -> None:
         raise ValueError("recorded_at must not be in the future")
 
 
+def _snapshot(packet: OrganizationHierarchyChangeReviewPacket) -> dict[str, object]:
+    """Capture each trust-bearing packet field once for one validation or export operation."""
+    return {
+        "contains_employment_decision": packet.contains_employment_decision,
+        "contains_person_identifier": packet.contains_person_identifier,
+        "contains_worker_value": packet.contains_worker_value,
+        "current_parent_organization_unit_reference": packet.current_parent_organization_unit_reference,
+        "decision_authority": packet.decision_authority,
+        "effective_on": packet.effective_on,
+        "evidence_version": packet.evidence_version,
+        "hierarchy_snapshot_digest": packet.hierarchy_snapshot_digest,
+        "human_review_required": packet.human_review_required,
+        "mutation_state": packet.mutation_state,
+        "next_action": packet.next_action,
+        "organization_hierarchy_change_reference": packet.organization_hierarchy_change_reference,
+        "organization_unit_reference": packet.organization_unit_reference,
+        "organization_unit_snapshot_digest": packet.organization_unit_snapshot_digest,
+        "proposed_parent_organization_unit_reference": packet.proposed_parent_organization_unit_reference,
+        "purpose_code": packet.purpose_code,
+        "reason_code": packet.reason_code,
+        "recorded_at": packet.recorded_at,
+        "requester_reference": packet.requester_reference,
+        "review_state": packet.review_state,
+        "reviewer_reference": packet.reviewer_reference,
+        "scope_verification_state": packet.scope_verification_state,
+        "tenant_record_id": packet.tenant_record_id,
+    }
+
+
 def _validate_payload_runtime_types(snapshot: dict[str, object]) -> None:
     """Reject caller-owned scalar behavior in the exact snapshot chosen for export."""
     current_parent = snapshot["current_parent_organization_unit_reference"]
@@ -178,33 +207,90 @@ def _validate_payload_runtime_types(snapshot: dict[str, object]) -> None:
         raise ValueError("organization hierarchy-change evidence runtime types changed after issuance")
 
 
-def _payload(packet: OrganizationHierarchyChangeReviewPacket) -> dict[str, object]:
-    """Read every trust-bearing field once, then validate and emit only that snapshot."""
-    snapshot = {
-        "contains_employment_decision": packet.contains_employment_decision,
-        "contains_person_identifier": packet.contains_person_identifier,
-        "contains_worker_value": packet.contains_worker_value,
-        "current_parent_organization_unit_reference": packet.current_parent_organization_unit_reference,
-        "decision_authority": packet.decision_authority,
-        "effective_on": packet.effective_on,
-        "evidence_version": packet.evidence_version,
-        "hierarchy_snapshot_digest": packet.hierarchy_snapshot_digest,
-        "human_review_required": packet.human_review_required,
-        "mutation_state": packet.mutation_state,
-        "next_action": packet.next_action,
-        "organization_hierarchy_change_reference": packet.organization_hierarchy_change_reference,
-        "organization_unit_reference": packet.organization_unit_reference,
-        "organization_unit_snapshot_digest": packet.organization_unit_snapshot_digest,
-        "proposed_parent_organization_unit_reference": packet.proposed_parent_organization_unit_reference,
-        "purpose_code": packet.purpose_code,
-        "reason_code": packet.reason_code,
-        "recorded_at": packet.recorded_at,
-        "requester_reference": packet.requester_reference,
-        "review_state": packet.review_state,
-        "reviewer_reference": packet.reviewer_reference,
-        "scope_verification_state": packet.scope_verification_state,
-        "tenant_record_id": packet.tenant_record_id,
-    }
+def _validate_issuance_snapshot(snapshot: dict[str, object]) -> None:
+    """Validate exactly the snapshot that will be sealed as creation evidence."""
+    tenant_record_id = snapshot["tenant_record_id"]
+    change_reference = snapshot["organization_hierarchy_change_reference"]
+    organization_unit_reference = snapshot["organization_unit_reference"]
+    current_parent = snapshot["current_parent_organization_unit_reference"]
+    proposed_parent = snapshot["proposed_parent_organization_unit_reference"]
+    requester_reference = snapshot["requester_reference"]
+    reviewer_reference = snapshot["reviewer_reference"]
+    purpose_code = snapshot["purpose_code"]
+    reason_code = snapshot["reason_code"]
+    review_state = snapshot["review_state"]
+    scope_verification_state = snapshot["scope_verification_state"]
+    mutation_state = snapshot["mutation_state"]
+    decision_authority = snapshot["decision_authority"]
+
+    _validate_operational_uuid_text(tenant_record_id, "tenant_record_id")
+    _validate_reference(
+        change_reference,
+        "organization_hierarchy_change",
+        "organization_hierarchy_change_reference",
+        require_uuid4=True,
+    )
+    _validate_reference(
+        organization_unit_reference,
+        "organization_unit",
+        "organization_unit_reference",
+        require_uuid4=False,
+    )
+    _validate_optional_organization_reference(
+        current_parent,
+        "current_parent_organization_unit_reference",
+    )
+    _validate_optional_organization_reference(
+        proposed_parent,
+        "proposed_parent_organization_unit_reference",
+    )
+    if current_parent == proposed_parent:
+        raise ValueError("proposed parent must differ from the current parent")
+    if current_parent == organization_unit_reference:
+        raise ValueError("organization unit cannot be its own current parent")
+    if proposed_parent == organization_unit_reference:
+        raise ValueError("organization unit cannot be its own proposed parent")
+    _canonical_date(snapshot["effective_on"])
+    _validate_digest(snapshot["organization_unit_snapshot_digest"], "organization_unit_snapshot_digest")
+    _validate_digest(snapshot["hierarchy_snapshot_digest"], "hierarchy_snapshot_digest")
+    _validate_reference(requester_reference, "actor", "requester_reference", require_uuid4=True)
+    _validate_reference(reviewer_reference, "actor", "reviewer_reference", require_uuid4=True)
+    if requester_reference == reviewer_reference:
+        raise ValueError("reviewer_reference must identify a different accountable actor")
+    _validate_code(purpose_code, "purpose_code")
+    if purpose_code != _PURPOSE_CODE:
+        raise ValueError("purpose_code must remain organization_hierarchy_change_review")
+    _validate_code(reason_code, "reason_code")
+    if reason_code not in _ALLOWED_REASON_CODES:
+        raise ValueError("reason_code must use the reviewed hierarchy-change vocabulary")
+    _validate_issuance_timestamp(snapshot["recorded_at"])
+    _validate_positive_int(snapshot["evidence_version"], "evidence_version")
+    if snapshot["contains_person_identifier"] is not False:
+        raise ValueError("hierarchy-change evidence must not contain a person identifier")
+    if snapshot["contains_worker_value"] is not False:
+        raise ValueError("hierarchy-change evidence must not contain worker values")
+    if snapshot["contains_employment_decision"] is not False:
+        raise ValueError("hierarchy-change evidence must not contain an employment decision")
+    if snapshot["human_review_required"] is not True:
+        raise ValueError("human review is mandatory before organization-hierarchy mutation")
+    _validate_code(review_state, "review_state")
+    if review_state != _REVIEW_STATE:
+        raise ValueError("review_state must remain requires_human_review")
+    _validate_code(scope_verification_state, "scope_verification_state")
+    if scope_verification_state != _SCOPE_STATE:
+        raise ValueError("scope_verification_state must remain requires_authoritative_resolution")
+    _validate_code(mutation_state, "mutation_state")
+    if mutation_state != _MUTATION_STATE:
+        raise ValueError("mutation_state must remain not_authorized_to_apply")
+    _validate_code(decision_authority, "decision_authority")
+    if decision_authority != _DECISION_AUTHORITY:
+        raise ValueError("decision_authority must remain human_review_only")
+    if type(snapshot["next_action"]) is not str or snapshot["next_action"] != _NEXT_ACTION:
+        raise ValueError("next_action must remain the governed hierarchy-change instruction")
+
+
+def _payload_from_snapshot(snapshot: dict[str, object]) -> dict[str, object]:
+    """Validate runtime representation and canonicalize only the supplied snapshot."""
     _validate_payload_runtime_types(snapshot)
     return {
         "contains_employment_decision": snapshot["contains_employment_decision"],
@@ -237,6 +323,11 @@ def _payload(packet: OrganizationHierarchyChangeReviewPacket) -> dict[str, objec
         "scope_verification_state": snapshot["scope_verification_state"],
         "tenant_record_id": snapshot["tenant_record_id"],
     }
+
+
+def _payload(packet: OrganizationHierarchyChangeReviewPacket) -> dict[str, object]:
+    """Capture and emit one exact runtime-validated export snapshot."""
+    return _payload_from_snapshot(_snapshot(packet))
 
 
 def _canonical_payload_json(payload: dict[str, object]) -> str:
@@ -283,75 +374,15 @@ class OrganizationHierarchyChangeReviewPacket:
         return "OrganizationHierarchyChangeReviewPacket(<redacted>)"
 
     def __post_init__(self) -> None:
-        """Validate the review contract and bind its live reference to creation evidence."""
-        _validate_operational_uuid_text(self.tenant_record_id, "tenant_record_id")
-        _validate_reference(
-            self.organization_hierarchy_change_reference,
-            "organization_hierarchy_change",
-            "organization_hierarchy_change_reference",
-            require_uuid4=True,
-        )
-        _validate_reference(
-            self.organization_unit_reference,
-            "organization_unit",
-            "organization_unit_reference",
-            require_uuid4=False,
-        )
-        _validate_optional_organization_reference(
-            self.current_parent_organization_unit_reference,
-            "current_parent_organization_unit_reference",
-        )
-        _validate_optional_organization_reference(
-            self.proposed_parent_organization_unit_reference,
-            "proposed_parent_organization_unit_reference",
-        )
-        if self.current_parent_organization_unit_reference == self.proposed_parent_organization_unit_reference:
-            raise ValueError("proposed parent must differ from the current parent")
-        if self.current_parent_organization_unit_reference == self.organization_unit_reference:
-            raise ValueError("organization unit cannot be its own current parent")
-        if self.proposed_parent_organization_unit_reference == self.organization_unit_reference:
-            raise ValueError("organization unit cannot be its own proposed parent")
-        _canonical_date(self.effective_on)
-        _validate_digest(self.organization_unit_snapshot_digest, "organization_unit_snapshot_digest")
-        _validate_digest(self.hierarchy_snapshot_digest, "hierarchy_snapshot_digest")
-        _validate_reference(self.requester_reference, "actor", "requester_reference", require_uuid4=True)
-        _validate_reference(self.reviewer_reference, "actor", "reviewer_reference", require_uuid4=True)
-        if self.requester_reference == self.reviewer_reference:
-            raise ValueError("reviewer_reference must identify a different accountable actor")
-        _validate_code(self.purpose_code, "purpose_code")
-        if self.purpose_code != _PURPOSE_CODE:
-            raise ValueError("purpose_code must remain organization_hierarchy_change_review")
-        _validate_code(self.reason_code, "reason_code")
-        if self.reason_code not in _ALLOWED_REASON_CODES:
-            raise ValueError("reason_code must use the reviewed hierarchy-change vocabulary")
-        _validate_issuance_timestamp(self.recorded_at)
-        _validate_positive_int(self.evidence_version, "evidence_version")
-        if self.contains_person_identifier is not False:
-            raise ValueError("hierarchy-change evidence must not contain a person identifier")
-        if self.contains_worker_value is not False:
-            raise ValueError("hierarchy-change evidence must not contain worker values")
-        if self.contains_employment_decision is not False:
-            raise ValueError("hierarchy-change evidence must not contain an employment decision")
-        if self.human_review_required is not True:
-            raise ValueError("human review is mandatory before organization-hierarchy mutation")
-        _validate_code(self.review_state, "review_state")
-        if self.review_state != _REVIEW_STATE:
-            raise ValueError("review_state must remain requires_human_review")
-        _validate_code(self.scope_verification_state, "scope_verification_state")
-        if self.scope_verification_state != _SCOPE_STATE:
-            raise ValueError("scope_verification_state must remain requires_authoritative_resolution")
-        _validate_code(self.mutation_state, "mutation_state")
-        if self.mutation_state != _MUTATION_STATE:
-            raise ValueError("mutation_state must remain not_authorized_to_apply")
-        _validate_code(self.decision_authority, "decision_authority")
-        if self.decision_authority != _DECISION_AUTHORITY:
-            raise ValueError("decision_authority must remain human_review_only")
-        if type(self.next_action) is not str or self.next_action != _NEXT_ACTION:
-            raise ValueError("next_action must remain the governed hierarchy-change instruction")
-
-        payload_json = _canonical_payload_json(_payload(self))
+        """Validate and seal exactly one creation snapshot, then bind its live reference."""
+        snapshot = _snapshot(self)
+        _validate_issuance_snapshot(snapshot)
+        payload_json = _canonical_payload_json(_payload_from_snapshot(snapshot))
         creation_digest = sha256(payload_json.encode("utf-8")).hexdigest()
-        live_key = (self.tenant_record_id, self.organization_hierarchy_change_reference)
+        live_key = (
+            snapshot["tenant_record_id"],
+            snapshot["organization_hierarchy_change_reference"],
+        )
         with _REGISTRY_LOCK:
             binding = _LIVE_REFERENCE_BINDINGS.get(live_key)
             if binding is None:
