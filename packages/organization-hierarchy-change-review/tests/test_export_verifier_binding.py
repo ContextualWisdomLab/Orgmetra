@@ -12,11 +12,13 @@ from orgmetra_organization_hierarchy_change_review import (
 )
 
 
-def test_canonical_export_does_not_trust_mutable_module_payload_binding(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A replaced module helper must not hide semantic mutation after issuance."""
-    packet = build_organization_hierarchy_change_review_packet(
+class _ForgedText(str):
+    """Retain caller-owned behavior while preserving serialized text."""
+
+
+def _build_packet():
+    """Build one valid packet with an isolated review correlation."""
+    return build_organization_hierarchy_change_review_packet(
         tenant_record_id="0195c23d-9f00-7000-8000-000000000001",
         organization_hierarchy_change_reference=f"organization_hierarchy_change:{uuid4()}",
         organization_unit_reference="organization_unit:0195c23d-9f00-7000-8000-000000000002",
@@ -31,6 +33,13 @@ def test_canonical_export_does_not_trust_mutable_module_payload_binding(
         reason_code="organizational_realignment",
         recorded_at=datetime(2026, 8, 23, 7, 0, tzinfo=timezone.utc),
     )
+
+
+def test_canonical_export_does_not_trust_mutable_module_payload_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A replaced module helper must not hide semantic mutation after issuance."""
+    packet = _build_packet()
     issued_json = packet.canonical_json()
     issued_payload = json.loads(issued_json)
     object.__setattr__(packet, "reason_code", "administrative_correction")
@@ -38,3 +47,12 @@ def test_canonical_export_does_not_trust_mutable_module_payload_binding(
 
     with pytest.raises(ValueError, match="evidence changed after issuance"):
         packet.canonical_json()
+
+
+def test_module_payload_helper_rejects_runtime_substitution() -> None:
+    """The non-authoritative helper must still reject caller-owned scalar behavior."""
+    packet = _build_packet()
+    object.__setattr__(packet, "reason_code", _ForgedText("organizational_realignment"))
+
+    with pytest.raises(ValueError, match="runtime types changed after issuance"):
+        review_module._payload(packet)
