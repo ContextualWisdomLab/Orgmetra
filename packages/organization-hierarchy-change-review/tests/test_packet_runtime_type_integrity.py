@@ -92,6 +92,22 @@ def test_rejects_representation_preserving_runtime_substitution_after_issuance(
         packet.canonical_json()
 
 
+def test_rejects_manual_reissuance_after_reference_retargeting() -> None:
+    """An issued packet cannot be resealed under a new reference by calling its hook again."""
+    packet = _build_packet()
+    object.__setattr__(
+        packet,
+        "organization_hierarchy_change_reference",
+        f"organization_hierarchy_change:{uuid4()}",
+    )
+    object.__setattr__(packet, "reason_code", "administrative_correction")
+
+    with pytest.raises(ValueError, match="may be issued only once"):
+        packet.__post_init__()
+    with pytest.raises(ValueError, match="evidence changed after issuance"):
+        packet.canonical_json()
+
+
 def test_canonical_export_validates_and_emits_one_snapshot_during_concurrent_mutation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
