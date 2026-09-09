@@ -309,15 +309,15 @@ def test_job_analysis_accepts_all_supported_ksao_categories_and_fja_boundaries()
     assert (high.data_function_code, high.people_function_code, high.things_function_code) == (6, 8, 7)
 
 
-def test_unresolved_timezone_is_rejected_for_source_snapshot_and_review():
+def test_custom_timezone_provider_is_rejected_for_source_snapshot_and_review():
     class UnresolvedTimezone(tzinfo):
         def utcoffset(self, dt):
             return None
 
     bad_time = datetime(2026, 8, 17, 4, 0, tzinfo=UnresolvedTimezone())
-    with pytest.raises(ValueError, match="resolve to a UTC offset"):
+    with pytest.raises(ValueError, match="must use a standard-library timezone provider"):
         _source(retrieved_at=bad_time)
-    with pytest.raises(ValueError, match="resolve to a UTC offset"):
+    with pytest.raises(ValueError, match="must use a standard-library timezone provider"):
         _snapshot(recorded_at=bad_time)
-    with pytest.raises(ValueError, match="resolve to a UTC offset"):
+    with pytest.raises(ValueError, match="must use a standard-library timezone provider"):
         _snapshot(reviewed_at=bad_time)
