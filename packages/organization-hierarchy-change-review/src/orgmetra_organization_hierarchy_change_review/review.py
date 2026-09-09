@@ -146,52 +146,47 @@ def _validate_issuance_timestamp(value: object) -> None:
         raise ValueError("recorded_at must not be in the future")
 
 
-def _validate_payload_runtime_types(packet: OrganizationHierarchyChangeReviewPacket) -> None:
-    """Reject caller-owned scalar behavior before canonical evidence leaves the boundary."""
+def _validate_payload_runtime_types(snapshot: dict[str, object]) -> None:
+    """Reject caller-owned scalar behavior in the exact snapshot chosen for export."""
+    current_parent = snapshot["current_parent_organization_unit_reference"]
+    proposed_parent = snapshot["proposed_parent_organization_unit_reference"]
     if not (
-        type(packet.tenant_record_id) is str
-        and type(packet.organization_hierarchy_change_reference) is str
-        and type(packet.organization_unit_reference) is str
-        and (
-            packet.current_parent_organization_unit_reference is None
-            or type(packet.current_parent_organization_unit_reference) is str
-        )
-        and (
-            packet.proposed_parent_organization_unit_reference is None
-            or type(packet.proposed_parent_organization_unit_reference) is str
-        )
-        and type(packet.effective_on) is date
-        and type(packet.organization_unit_snapshot_digest) is str
-        and type(packet.hierarchy_snapshot_digest) is str
-        and type(packet.requester_reference) is str
-        and type(packet.reviewer_reference) is str
-        and type(packet.purpose_code) is str
-        and type(packet.reason_code) is str
-        and type(packet.recorded_at) is datetime
-        and type(packet.evidence_version) is int
-        and type(packet.contains_person_identifier) is bool
-        and type(packet.contains_worker_value) is bool
-        and type(packet.contains_employment_decision) is bool
-        and type(packet.human_review_required) is bool
-        and type(packet.review_state) is str
-        and type(packet.scope_verification_state) is str
-        and type(packet.mutation_state) is str
-        and type(packet.decision_authority) is str
-        and type(packet.next_action) is str
+        type(snapshot["tenant_record_id"]) is str
+        and type(snapshot["organization_hierarchy_change_reference"]) is str
+        and type(snapshot["organization_unit_reference"]) is str
+        and (current_parent is None or type(current_parent) is str)
+        and (proposed_parent is None or type(proposed_parent) is str)
+        and type(snapshot["effective_on"]) is date
+        and type(snapshot["organization_unit_snapshot_digest"]) is str
+        and type(snapshot["hierarchy_snapshot_digest"]) is str
+        and type(snapshot["requester_reference"]) is str
+        and type(snapshot["reviewer_reference"]) is str
+        and type(snapshot["purpose_code"]) is str
+        and type(snapshot["reason_code"]) is str
+        and type(snapshot["recorded_at"]) is datetime
+        and type(snapshot["evidence_version"]) is int
+        and type(snapshot["contains_person_identifier"]) is bool
+        and type(snapshot["contains_worker_value"]) is bool
+        and type(snapshot["contains_employment_decision"]) is bool
+        and type(snapshot["human_review_required"]) is bool
+        and type(snapshot["review_state"]) is str
+        and type(snapshot["scope_verification_state"]) is str
+        and type(snapshot["mutation_state"]) is str
+        and type(snapshot["decision_authority"]) is str
+        and type(snapshot["next_action"]) is str
     ):
         raise ValueError("organization hierarchy-change evidence runtime types changed after issuance")
 
 
 def _payload(packet: OrganizationHierarchyChangeReviewPacket) -> dict[str, object]:
-    """Snapshot all trust-bearing fields once for validation and canonical emission."""
-    _validate_payload_runtime_types(packet)
-    return {
+    """Read every trust-bearing field once, then validate and emit only that snapshot."""
+    snapshot = {
         "contains_employment_decision": packet.contains_employment_decision,
         "contains_person_identifier": packet.contains_person_identifier,
         "contains_worker_value": packet.contains_worker_value,
         "current_parent_organization_unit_reference": packet.current_parent_organization_unit_reference,
         "decision_authority": packet.decision_authority,
-        "effective_on": _canonical_date(packet.effective_on),
+        "effective_on": packet.effective_on,
         "evidence_version": packet.evidence_version,
         "hierarchy_snapshot_digest": packet.hierarchy_snapshot_digest,
         "human_review_required": packet.human_review_required,
@@ -203,12 +198,44 @@ def _payload(packet: OrganizationHierarchyChangeReviewPacket) -> dict[str, objec
         "proposed_parent_organization_unit_reference": packet.proposed_parent_organization_unit_reference,
         "purpose_code": packet.purpose_code,
         "reason_code": packet.reason_code,
-        "recorded_at": _canonical_timestamp(packet.recorded_at),
+        "recorded_at": packet.recorded_at,
         "requester_reference": packet.requester_reference,
         "review_state": packet.review_state,
         "reviewer_reference": packet.reviewer_reference,
         "scope_verification_state": packet.scope_verification_state,
         "tenant_record_id": packet.tenant_record_id,
+    }
+    _validate_payload_runtime_types(snapshot)
+    return {
+        "contains_employment_decision": snapshot["contains_employment_decision"],
+        "contains_person_identifier": snapshot["contains_person_identifier"],
+        "contains_worker_value": snapshot["contains_worker_value"],
+        "current_parent_organization_unit_reference": snapshot[
+            "current_parent_organization_unit_reference"
+        ],
+        "decision_authority": snapshot["decision_authority"],
+        "effective_on": _canonical_date(snapshot["effective_on"]),
+        "evidence_version": snapshot["evidence_version"],
+        "hierarchy_snapshot_digest": snapshot["hierarchy_snapshot_digest"],
+        "human_review_required": snapshot["human_review_required"],
+        "mutation_state": snapshot["mutation_state"],
+        "next_action": snapshot["next_action"],
+        "organization_hierarchy_change_reference": snapshot[
+            "organization_hierarchy_change_reference"
+        ],
+        "organization_unit_reference": snapshot["organization_unit_reference"],
+        "organization_unit_snapshot_digest": snapshot["organization_unit_snapshot_digest"],
+        "proposed_parent_organization_unit_reference": snapshot[
+            "proposed_parent_organization_unit_reference"
+        ],
+        "purpose_code": snapshot["purpose_code"],
+        "reason_code": snapshot["reason_code"],
+        "recorded_at": _canonical_timestamp(snapshot["recorded_at"]),
+        "requester_reference": snapshot["requester_reference"],
+        "review_state": snapshot["review_state"],
+        "reviewer_reference": snapshot["reviewer_reference"],
+        "scope_verification_state": snapshot["scope_verification_state"],
+        "tenant_record_id": snapshot["tenant_record_id"],
     }
 
 
