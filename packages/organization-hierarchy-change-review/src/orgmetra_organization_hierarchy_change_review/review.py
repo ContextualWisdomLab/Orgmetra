@@ -146,8 +146,45 @@ def _validate_issuance_timestamp(value: object) -> None:
         raise ValueError("recorded_at must not be in the future")
 
 
+def _validate_payload_runtime_types(packet: OrganizationHierarchyChangeReviewPacket) -> None:
+    """Reject caller-owned scalar behavior before canonical evidence leaves the boundary."""
+    if not (
+        type(packet.tenant_record_id) is str
+        and type(packet.organization_hierarchy_change_reference) is str
+        and type(packet.organization_unit_reference) is str
+        and (
+            packet.current_parent_organization_unit_reference is None
+            or type(packet.current_parent_organization_unit_reference) is str
+        )
+        and (
+            packet.proposed_parent_organization_unit_reference is None
+            or type(packet.proposed_parent_organization_unit_reference) is str
+        )
+        and type(packet.effective_on) is date
+        and type(packet.organization_unit_snapshot_digest) is str
+        and type(packet.hierarchy_snapshot_digest) is str
+        and type(packet.requester_reference) is str
+        and type(packet.reviewer_reference) is str
+        and type(packet.purpose_code) is str
+        and type(packet.reason_code) is str
+        and type(packet.recorded_at) is datetime
+        and type(packet.evidence_version) is int
+        and type(packet.contains_person_identifier) is bool
+        and type(packet.contains_worker_value) is bool
+        and type(packet.contains_employment_decision) is bool
+        and type(packet.human_review_required) is bool
+        and type(packet.review_state) is str
+        and type(packet.scope_verification_state) is str
+        and type(packet.mutation_state) is str
+        and type(packet.decision_authority) is str
+        and type(packet.next_action) is str
+    ):
+        raise ValueError("organization hierarchy-change evidence runtime types changed after issuance")
+
+
 def _payload(packet: OrganizationHierarchyChangeReviewPacket) -> dict[str, object]:
     """Snapshot all trust-bearing fields once for validation and canonical emission."""
+    _validate_payload_runtime_types(packet)
     return {
         "contains_employment_decision": packet.contains_employment_decision,
         "contains_person_identifier": packet.contains_person_identifier,
