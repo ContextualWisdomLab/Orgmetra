@@ -208,6 +208,12 @@ class OrganizationHierarchyChangeReviewPacket:
     decision_authority: str = _DECISION_AUTHORITY
     next_action: str = _NEXT_ACTION
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Reject caller-defined packet classes before they can replace validation hooks."""
+        raise TypeError(
+            "OrganizationHierarchyChangeReviewPacket does not support caller-defined subclasses"
+        )
+
     def __repr__(self) -> str:
         """Return a representation that never emits hierarchy correlations."""
         return "OrganizationHierarchyChangeReviewPacket(<redacted>)"
