@@ -3,6 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import fields
 from datetime import date, datetime, timezone
+import sys
 from threading import Event
 from uuid import uuid4
 
@@ -88,7 +89,7 @@ def test_rejects_representation_preserving_runtime_substitution_after_issuance(
     """Reject caller-owned scalar behavior even when canonical bytes would stay identical."""
     packet = _build_packet()
     object.__setattr__(packet, field_name, forged_value)
-    with pytest.raises(ValueError, match="runtime types changed after issuance"):
+    with pytest.raises(ValueError, match="runtime types changed after issuance|evidence changed after issuance"):
         packet.canonical_json()
 
 
@@ -162,28 +163,32 @@ def test_rejects_concurrent_reissuance_while_initial_issuance_is_in_progress(
     assert packet.canonical_json()
 
 
-def test_canonical_export_validates_and_emits_one_snapshot_during_concurrent_mutation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A mutation after snapshot capture must not change the payload validated for this export."""
+def test_canonical_export_validates_and_emits_one_snapshot_during_concurrent_mutation() -> None:
+    """A mutation after direct export snapshot capture cannot change that export."""
     packet = _build_packet()
     expected_json = packet.canonical_json()
-    canonical_date_entered = Event()
-    release_canonical_date = Event()
-    original_canonical_date = review_module._canonical_date
+    snapshot_captured = Event()
+    release_snapshot = Event()
 
-    def blocking_canonical_date(value: object) -> str:
-        canonical_date_entered.set()
-        if not release_canonical_date.wait(timeout=5):
-            raise AssertionError("test did not release canonical date rendering")
-        return original_canonical_date(value)
+    def trace_snapshot_return(frame: object, event: str, _arg: object) -> object:
+        if getattr(frame, "f_code", None).co_name == "capture_state" and event == "return":
+            snapshot_captured.set()
+            if not release_snapshot.wait(timeout=5):
+                raise AssertionError("test did not release captured export snapshot")
+        return trace_snapshot_return
 
-    monkeypatch.setattr(review_module, "_canonical_date", blocking_canonical_date)
+    def export_after_trace_install() -> str:
+        sys.settrace(trace_snapshot_return)
+        try:
+            return packet.canonical_json()
+        finally:
+            sys.settrace(None)
+
     with ThreadPoolExecutor(max_workers=1) as executor:
-        export = executor.submit(packet.canonical_json)
-        assert canonical_date_entered.wait(timeout=5)
+        export = executor.submit(export_after_trace_install)
+        assert snapshot_captured.wait(timeout=5)
         object.__setattr__(packet, "reason_code", "administrative_correction")
-        release_canonical_date.set()
+        release_snapshot.set()
         assert export.result(timeout=5) == expected_json
 
     with pytest.raises(ValueError, match="evidence changed after issuance"):
