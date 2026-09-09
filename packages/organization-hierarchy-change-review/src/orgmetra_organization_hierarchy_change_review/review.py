@@ -329,8 +329,11 @@ def _canonical_payload_json(payload: dict[str, object]) -> str:
 
 def _build_packet_runtime() -> tuple[object, object, object]:
     """Build packet methods around private process-local issuance and evidence state."""
+    trusted_canonical_payload_json = _canonical_payload_json
     trusted_getattribute = object.__getattribute__
+    trusted_payload_from_snapshot = _payload_from_snapshot
     trusted_sha256 = sha256
+    trusted_snapshot = _snapshot
     trusted_validate_issuance_snapshot = _validate_issuance_snapshot
     trusted_type = type
     trusted_zip = zip
@@ -397,9 +400,9 @@ def _build_packet_runtime() -> tuple[object, object, object]:
                 raise ValueError("organization hierarchy-change packet may be issued only once")
             issuance_in_progress.add(self)
         try:
-            snapshot = _snapshot(self)
+            snapshot = trusted_snapshot(self)
             trusted_validate_issuance_snapshot(snapshot)
-            payload_json = _canonical_payload_json(_payload_from_snapshot(snapshot))
+            payload_json = trusted_canonical_payload_json(trusted_payload_from_snapshot(snapshot))
             creation_digest = digest_text(payload_json)
             issuance_state = tuple(snapshot[name] for name in field_names)
             live_key = (
