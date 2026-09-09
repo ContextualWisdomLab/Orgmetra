@@ -90,3 +90,18 @@ for package_name in coverage iniconfig packaging pluggy Pygments pytest pytest-c
     exit 1
   fi
 done
+
+shopt -s nullglob
+delegated_artifact_contracts=(
+  "${repository_root}"/tests/test_foundation_ci_*_artifact.sh
+)
+shopt -u nullglob
+
+if [[ "${#delegated_artifact_contracts[@]}" -eq 0 ]]; then
+  printf 'Foundation CI must own at least one delegated artifact contract.\n' >&2
+  exit 1
+fi
+
+for artifact_contract in "${delegated_artifact_contracts[@]}"; do
+  bash "${artifact_contract}"
+done
