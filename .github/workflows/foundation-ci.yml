@@ -52,10 +52,33 @@ jobs:
         run: npm run validate
       - name: Prove Foundation CI dependency hygiene
         run: bash tests/test_foundation_ci_dependency_hygiene.sh
+      - name: Set up exact Position Reporting Change Review Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+          check-latest: false
       - name: Install reviewed test toolchain
         run: |
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
+      - name: Run Position reporting change review installed-artifact contract
+        run: |
+          printf '%s\n' 'setuptools==84.0.0 --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670' > /tmp/orgmetra-position-reporting-change-review-build.txt
+          python -m pip install --require-hashes --no-deps --only-binary=:all: -r /tmp/orgmetra-position-reporting-change-review-build.txt
+          rm -rf /tmp/orgmetra-position-reporting-change-review-build /tmp/orgmetra-position-reporting-change-review-dist /tmp/orgmetra-position-reporting-change-review-venv
+          cp -a packages/position-reporting-change-review /tmp/orgmetra-position-reporting-change-review-build
+          mkdir -p /tmp/orgmetra-position-reporting-change-review-dist
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-position-reporting-change-review-dist /tmp/orgmetra-position-reporting-change-review-build
+          test "$(find /tmp/orgmetra-position-reporting-change-review-dist -maxdepth 1 -type f -name '*.whl' | wc -l)" -eq 1
+          python -m venv /tmp/orgmetra-position-reporting-change-review-venv
+          /tmp/orgmetra-position-reporting-change-review-venv/bin/python -m pip install --require-hashes --no-deps --only-binary=:all: -r "$GITHUB_WORKSPACE/.github/requirements/foundation-test.txt"
+          wheel_path="$(find /tmp/orgmetra-position-reporting-change-review-dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          wheel_sha="$(sha256sum "$wheel_path" | awk '{print $1}')"
+          printf 'orgmetra-position-reporting-change-review[test] @ file://%s --hash=sha256:%s\n' "$wheel_path" "$wheel_sha" > /tmp/orgmetra-position-reporting-change-review-install.txt
+          /tmp/orgmetra-position-reporting-change-review-venv/bin/python -m pip install --require-hashes --no-deps -r /tmp/orgmetra-position-reporting-change-review-install.txt
+          /tmp/orgmetra-position-reporting-change-review-venv/bin/python -m pip check
+          cd /tmp
+          COVERAGE_FILE=/tmp/orgmetra-position-reporting-change-review.coverage /tmp/orgmetra-position-reporting-change-review-venv/bin/python -m pytest -c "$GITHUB_WORKSPACE/packages/position-reporting-change-review/pyproject.toml" "$GITHUB_WORKSPACE/packages/position-reporting-change-review/tests"
       - name: Run owned unit and service contracts once
         run: |
           PYTHONPATH=packages/candidate-evidence/src COVERAGE_FILE=/tmp/orgmetra-candidate-evidence.coverage python -m pytest -c packages/candidate-evidence/pyproject.toml packages/candidate-evidence/tests
