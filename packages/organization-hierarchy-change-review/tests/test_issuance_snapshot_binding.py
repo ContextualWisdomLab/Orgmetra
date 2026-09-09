@@ -1,4 +1,4 @@
-"""Regressions for hierarchy-review issuance snapshot authority."""
+"""Regressions for hierarchy-review issuance evidence helper authority."""
 
 from datetime import date, datetime, timezone
 import json
@@ -103,3 +103,43 @@ def test_issuance_does_not_trust_mutable_module_serializer_binding(
     assert json.loads(packet.canonical_json())["organization_hierarchy_change_reference"] == (
         "organization_hierarchy_change:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
     )
+
+
+def test_live_reference_guard_does_not_trust_mutable_binding_constructor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep conflicting live-reference detection bound to the runtime's binding type."""
+
+    class AlwaysEqualDigest:
+        """Pretend every digest comparison matches."""
+
+        def __eq__(self, other: object) -> bool:
+            return True
+
+        def __ne__(self, other: object) -> bool:
+            return False
+
+    class ForgedBinding:
+        """Provide weak-reference support while falsifying the stored evidence digest."""
+
+        __slots__ = ("__weakref__",)
+
+        def __init__(self, evidence_digest: str) -> None:
+            pass
+
+        @property
+        def evidence_digest(self) -> AlwaysEqualDigest:
+            return AlwaysEqualDigest()
+
+    monkeypatch.setattr(review_module, "_LiveReferenceBinding", ForgedBinding)
+    change_suffix = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    first = build_organization_hierarchy_change_review_packet(
+        **_valid_kwargs(change_suffix=change_suffix)
+    )
+    conflicting = _valid_kwargs(change_suffix=change_suffix)
+    conflicting["reason_code"] = "administrative_correction"
+
+    with pytest.raises(ValueError, match="already bound to different live evidence"):
+        build_organization_hierarchy_change_review_packet(**conflicting)
+
+    assert first.reason_code == "organizational_realignment"
