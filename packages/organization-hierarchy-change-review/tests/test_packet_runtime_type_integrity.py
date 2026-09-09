@@ -1,10 +1,13 @@
 """Regression for packet-level checked-versus-emitted runtime substitution."""
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
+from threading import Event
 from uuid import uuid4
 
 import pytest
 
+import orgmetra_organization_hierarchy_change_review.review as review_module
 from orgmetra_organization_hierarchy_change_review import (
     OrganizationHierarchyChangeReviewPacket,
     build_organization_hierarchy_change_review_packet,
@@ -85,4 +88,32 @@ def test_rejects_representation_preserving_runtime_substitution_after_issuance(
     packet = _build_packet()
     object.__setattr__(packet, field_name, forged_value)
     with pytest.raises(ValueError, match="runtime types changed after issuance"):
+        packet.canonical_json()
+
+
+def test_canonical_export_validates_and_emits_one_snapshot_during_concurrent_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A mutation after snapshot capture must not change the payload validated for this export."""
+    packet = _build_packet()
+    expected_json = packet.canonical_json()
+    canonical_date_entered = Event()
+    release_canonical_date = Event()
+    original_canonical_date = review_module._canonical_date
+
+    def blocking_canonical_date(value: object) -> str:
+        canonical_date_entered.set()
+        if not release_canonical_date.wait(timeout=5):
+            raise AssertionError("test did not release canonical date rendering")
+        return original_canonical_date(value)
+
+    monkeypatch.setattr(review_module, "_canonical_date", blocking_canonical_date)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        export = executor.submit(packet.canonical_json)
+        assert canonical_date_entered.wait(timeout=5)
+        object.__setattr__(packet, "reason_code", "administrative_correction")
+        release_canonical_date.set()
+        assert export.result(timeout=5) == expected_json
+
+    with pytest.raises(ValueError, match="evidence changed after issuance"):
         packet.canonical_json()
