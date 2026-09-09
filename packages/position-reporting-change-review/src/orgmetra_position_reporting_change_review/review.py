@@ -176,6 +176,10 @@ class PositionReportingChangeReviewPacket:
     decision_authority: str = _DECISION_AUTHORITY
     next_action: str = _NEXT_ACTION
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Reject caller-defined packet classes before validation hooks can be replaced."""
+        raise TypeError("PositionReportingChangeReviewPacket does not support caller-defined subclasses")
+
     def __repr__(self) -> str:
         """Return a representation that never emits reporting correlations."""
         return "PositionReportingChangeReviewPacket(<redacted>)"
