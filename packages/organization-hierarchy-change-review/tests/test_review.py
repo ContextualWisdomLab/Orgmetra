@@ -182,7 +182,7 @@ def test_accepts_fixed_offset_timestamp_and_canonicalizes_to_utc() -> None:
     ],
 )
 def test_rejects_noncanonical_temporal_primitives(field_name: str, invalid_value: object) -> None:
-    """Reject datetime-as-date and naive system-recorded timestamps."""
+    """Reject datetime-as-date and naive review-evidence timestamps."""
     with pytest.raises(ValueError):
         build(**{field_name: invalid_value})
 
