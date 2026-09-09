@@ -1,4 +1,4 @@
-"""Regression for system-recorded issuance chronology."""
+"""Regression for caller-supplied review-evidence issuance chronology."""
 
 from datetime import date, datetime, timezone
 
@@ -9,8 +9,8 @@ from orgmetra_organization_hierarchy_change_review import (
 )
 
 
-def test_rejects_future_system_recorded_time() -> None:
-    """Do not seal hierarchy-review evidence for a system time that has not occurred."""
+def test_rejects_future_review_evidence_time() -> None:
+    """Do not seal hierarchy-review evidence for a review time that has not occurred."""
     with pytest.raises(ValueError, match="recorded_at must not be in the future"):
         build_organization_hierarchy_change_review_packet(
             tenant_record_id="0195c23d-9f00-7000-8000-000000000001",
