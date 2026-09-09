@@ -8,7 +8,7 @@ Active PR only. This ADR is not protected-main truth until the owning PR is inte
 
 Orgmetra already treats Organization Unit hierarchy as bitemporal HRIS truth. A parent change can alter organizational scope used by reporting, authorization, analytics, and downstream workflows. A reviewed request must therefore remain distinct from the authoritative mutation that changes HRIS truth.
 
-A pre-mutation evidence packet also needs to represent moving an Organization Unit to or from the root without inventing a sentinel parent identifier. It must preserve the requested business-effective date separately from the system-recorded review-evidence time and must not copy Person PII or worker values into durable governance evidence.
+A pre-mutation evidence packet also needs to represent moving an Organization Unit to or from the root without inventing a sentinel parent identifier. It must preserve the requested business-effective date separately from the review-evidence timestamp supplied by the invoking boundary and must not copy Person PII or worker values into durable governance evidence. The leaf package can validate that timestamp's canonical fixed-offset representation and reject a future issuance value, but it cannot prove which clock generated the caller-supplied value. Under NIST SP 800-53 Rev. 5 Release 5.2.0 AU-8, authoritative audit timestamp provenance belongs to the internal system-clock owner at the mutation/audit boundary, not to this leaf value object.
 
 The packet-owned hierarchy-change reference is itself audit correlation. Reissuing a different valid payload under the same still-live tenant-qualified reference would make that correlation ambiguous even if each individual payload passed field validation. A frozen dataclass is not a complete trust boundary by itself because low-level `object.__setattr__` can still replace an issued scalar with a caller-defined runtime subtype. If that subtype serializes to the same JSON primitive value, a digest-only export check cannot distinguish the representation change even though executable caller-owned behavior remains attached to the live packet. Export also must not validate one read of a live packet and serialize later reads: concurrent low-level mutation between those phases would make the checked evidence and emitted evidence different observations. The same checked-versus-used rule applies at issuance: semantic validation cannot read the live packet and then let creation sealing reread it, because a value changed after its validator ran could otherwise become the value bound into the issuance digest without ever receiving semantic validation. A further boundary is required because `__post_init__()` remains an ordinary callable method: after valid issuance, low-level mutation to a fresh change reference followed by a second `__post_init__()` call must not be allowed to replace the creation seal for the same live packet object.
 
@@ -21,7 +21,7 @@ The packet:
 1. binds one tenant and one Organization Unit to the reviewed current and proposed parent;
 2. permits `None` only for a real root attachment/detachment and rejects a no-op where current and proposed parents are equal;
 3. rejects self-parenting locally but does not pretend that a leaf packet can prove the full hierarchy is acyclic;
-4. keeps `effective_on` separate from `recorded_at`;
+4. keeps `effective_on` separate from `recorded_at`, treating the latter as review evidence supplied by the invoking boundary rather than as authoritative transaction-clock proof;
 5. binds reviewed Organization Unit and hierarchy snapshots by lowercase SHA-256 digest instead of copying HR record values;
 6. requires distinct requester and reviewer correlations, one fixed purpose, one controlled reason, and explicit evidence versioning;
 7. fixes review/scope/mutation/decision-authority states so the packet can never authorize the mutation itself;
@@ -31,11 +31,13 @@ The packet:
 11. independently captures one export snapshot, validates exact built-in runtime types on that same snapshot, serializes only that snapshot, and compares its deterministic canonical JSON SHA-256 with the issuance digest; this separates representation integrity from semantic mutation detection without a checked-versus-used gap; and
 12. binds each still-live `(tenant_record_id, organization_hierarchy_change_reference)` to one canonical evidence digest while allowing exact idempotent duplicate packets to share that binding.
 
+The leaf timestamp contract is deliberately limited: issuance validates fixed-offset representability and rejects a `recorded_at` value later than the current UTC clock, while export remains deterministic and does not recheck wall-clock freshness. This establishes representation and issuance chronology only. It does not attest that an internal system clock generated the supplied value. The authoritative application/audit transaction must generate or attest its own system-recorded timestamp and must not promote packet `recorded_at` into durable transaction-time authority.
+
 The issuance reservation is weak/process-local and identity-scoped. It exists only to prevent re-entry of the same packet object while issuance is in progress or after that object has been issued; independent packet objects may validate concurrently. The reservation is cleared after a failed initial issuance so invalid never-issued raw objects do not leak registry state.
 
 The live-reference binding is deliberately weak/process-local: a shared binding object remains alive while any idempotent packet using that reference remains alive, so collection of one duplicate cannot erase the binding for another. Once every packet is gone or the process restarts, durable uniqueness must come from authoritative persistence rather than this leaf package.
 
-The next boundary must re-resolve the Organization Unit, current parent, proposed parent, hierarchy and accountable actors against authoritative same-tenant bitemporal HRIS truth. It must reject stale current-parent evidence, self-parenting, cycles and multiple visible parents, verify the reviewed evidence, and persist the resulting mutation with immutable audit/outbox evidence in the authoritative transaction.
+The next boundary must re-resolve the Organization Unit, current parent, proposed parent, hierarchy and accountable actors against authoritative same-tenant bitemporal HRIS truth. It must reject stale current-parent evidence, self-parenting, cycles and multiple visible parents, verify the reviewed evidence, generate or attest authoritative system-recorded audit time, and persist the resulting mutation with immutable audit/outbox evidence in the authoritative transaction.
 
 ## Identifier ownership
 
@@ -45,7 +47,7 @@ Tenant and Organization Unit identifiers are HRIS-owned operational identifiers.
 
 The packet contains no Person identifier, worker value, compensation, rating, free-form personal reason, credential, or employment-decision authority. Purpose, reason, requester/reviewer separation, immutable correlation evidence and later authoritative audit support separation-of-duties and accountability without claiming certification.
 
-NIST Privacy Framework 1.0 remains the current final Privacy Framework baseline; NIST describes Privacy Framework 1.1 as an Initial Public Draft with the final update still forthcoming. NIST SP 800-53 Rev. 5 Release 5.2.0 is the current finalized minor release used for security/privacy-control context. UUID syntax and version semantics follow RFC 9562.
+NIST Privacy Framework 1.0 remains the current final Privacy Framework baseline; NIST describes Privacy Framework 1.1 as an Initial Public Draft with the final update still forthcoming. NIST SP 800-53 Rev. 5 Release 5.2.0 is the current finalized minor release used for security/privacy-control context. AU-8 requires internal system clocks to generate audit-record timestamps and UTC/fixed-offset-compatible representation; this leaf packet implements the representation/chronology part only and leaves clock provenance to authoritative audit generation. UUID syntax and version semantics follow RFC 9562.
 
 ## Consequences
 
@@ -55,5 +57,6 @@ NIST Privacy Framework 1.0 remains the current final Privacy Framework baseline;
 - Issuance semantic validation and creation sealing consume one identical captured snapshot; a live-object mutation after capture cannot become silently sealed reviewed evidence, and any later export of changed live state is rejected by the issuance digest.
 - The same live packet object cannot be manually or concurrently reissued after its issuance reservation is acquired; direct re-entry fails closed rather than replacing its creation digest under a fresh reference.
 - Canonical export rejects a caller-defined scalar subtype observed at snapshot capture even when its JSON value and SHA-256 bytes are representation-preserving; if the live packet changes after export snapshot capture, that export still validates and emits the same captured evidence, while a later export detects the changed live value against the issuance digest.
+- `recorded_at` remains deterministic review evidence, but the leaf package no longer overclaims authoritative clock provenance. Durable audit/outbox time is generated or attested by the authoritative transaction boundary.
 - The slice stays independently deployable and does not depend on direct cross-service application-table access.
-- Process-local tamper/reference detection is defense in depth only; durable uniqueness, authorization, concurrency control, hierarchy validation and audit remain responsibilities of authoritative persistence/orchestration boundaries.
+- Process-local tamper/reference detection is defense in depth only; durable uniqueness, authorization, concurrency control, hierarchy validation, authoritative system time and audit remain responsibilities of authoritative persistence/orchestration boundaries.
