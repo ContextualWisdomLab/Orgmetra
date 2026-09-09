@@ -25,7 +25,7 @@ The packet:
 5. binds reviewed Organization Unit and hierarchy snapshots by lowercase SHA-256 digest instead of copying HR record values;
 6. requires distinct requester and reviewer correlations, one fixed purpose, one controlled reason, and explicit evidence versioning;
 7. fixes review/scope/mutation/decision-authority states so the packet can never authorize the mutation itself;
-8. rejects caller-defined packet classes at subclass creation, before they can replace `__post_init__`, `__getattribute__`, or another validation/emission hook, and also rejects caller-defined trust-bearing primitive subclasses; the exact runtime check in `__post_init__` remains defense in depth;
+8. rejects caller-defined packet classes at subclass creation, before they can replace `__post_init__`, `__getattribute__`, or another validation/emission hook, and also rejects caller-defined trust-bearing primitive subclasses;
 9. uses deterministic canonical JSON, redacted routine representation, and a process-local issuance digest as defense in depth against post-construction mutation; and
 10. binds each still-live `(tenant_record_id, organization_hierarchy_change_reference)` to one canonical evidence digest while allowing exact idempotent duplicate packets to share that binding.
 
