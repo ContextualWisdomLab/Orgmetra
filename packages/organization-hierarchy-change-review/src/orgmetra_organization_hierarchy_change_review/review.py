@@ -331,6 +331,7 @@ def _build_packet_runtime() -> tuple[object, object, object]:
     """Build packet methods around private process-local issuance and evidence state."""
     trusted_getattribute = object.__getattribute__
     trusted_sha256 = sha256
+    trusted_validate_issuance_snapshot = _validate_issuance_snapshot
     trusted_type = type
     trusted_zip = zip
     field_names = (
@@ -397,7 +398,7 @@ def _build_packet_runtime() -> tuple[object, object, object]:
             issuance_in_progress.add(self)
         try:
             snapshot = _snapshot(self)
-            _validate_issuance_snapshot(snapshot)
+            trusted_validate_issuance_snapshot(snapshot)
             payload_json = _canonical_payload_json(_payload_from_snapshot(snapshot))
             creation_digest = digest_text(payload_json)
             issuance_state = tuple(snapshot[name] for name in field_names)
