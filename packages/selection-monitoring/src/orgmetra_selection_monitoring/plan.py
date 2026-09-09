@@ -172,13 +172,24 @@ def _canonical_timestamp(value: datetime) -> str:
     return value.isoformat().replace("+00:00", "Z")
 
 
-def _assert_canonical_runtime_evidence(plan: "SelectionOutcomeMonitoringPlan") -> None:
-    """Reject executable aliases before canonical serialization can touch them."""
+def _capture_canonical_runtime_evidence(
+    plan: "SelectionOutcomeMonitoringPlan",
+) -> dict[str, object]:
+    """Read each serialized trust-bearing field once for validation and rendering."""
+    evidence = {field_name: getattr(plan, field_name) for field_name in _CANONICAL_TEXT_FIELDS}
+    evidence.update(
+        {field_name: getattr(plan, field_name) for field_name, _ in _CANONICAL_EXACT_TYPE_FIELDS}
+    )
+    return evidence
+
+
+def _assert_canonical_runtime_evidence(evidence: dict[str, object]) -> None:
+    """Reject executable aliases in the exact snapshot used for serialization."""
     for field_name in _CANONICAL_TEXT_FIELDS:
-        if type(getattr(plan, field_name)) is not str:
+        if type(evidence[field_name]) is not str:
             raise ValueError(f"{field_name} runtime evidence must remain exact built-in text")
     for field_name, expected_type in _CANONICAL_EXACT_TYPE_FIELDS:
-        if type(getattr(plan, field_name)) is not expected_type:
+        if type(evidence[field_name]) is not expected_type:
             raise ValueError(
                 f"{field_name} runtime evidence must remain exact built-in {expected_type.__name__}"
             )
@@ -317,37 +328,38 @@ class SelectionOutcomeMonitoringPlan:
 
 
 def _canonical_plan_json_unchecked(plan: SelectionOutcomeMonitoringPlan) -> str:
-    """Render canonical bytes without consulting process-local issuance state."""
-    _assert_canonical_runtime_evidence(plan)
+    """Render canonical bytes from the same captured runtime evidence that was validated."""
+    evidence = _capture_canonical_runtime_evidence(plan)
+    _assert_canonical_runtime_evidence(evidence)
     payload = {
-        "actor_reference": plan.actor_reference,
-        "analysis_scope": plan.analysis_scope,
-        "contains_individual_records": plan.contains_individual_records,
-        "decision_authority": plan.decision_authority,
-        "evidence_version": plan.evidence_version,
-        "generated_at": _canonical_timestamp(plan.generated_at),
-        "human_confirmation_required": plan.human_confirmation_required,
-        "job_profile_reference": plan.job_profile_reference,
-        "monitoring_end": plan.monitoring_end.isoformat(),
-        "monitoring_plan_reference": plan.monitoring_plan_reference,
-        "monitoring_start": plan.monitoring_start.isoformat(),
-        "next_action": plan.next_action,
-        "outcome_snapshot_digest": plan.outcome_snapshot_digest,
-        "outcome_snapshot_reference": plan.outcome_snapshot_reference,
-        "population_snapshot_digest": plan.population_snapshot_digest,
-        "population_snapshot_reference": plan.population_snapshot_reference,
-        "protected_attribute_policy_digest": plan.protected_attribute_policy_digest,
-        "protected_attribute_policy_reference": plan.protected_attribute_policy_reference,
-        "purpose_code": plan.purpose_code,
-        "reason_code": plan.reason_code,
-        "review_state": plan.review_state,
-        "reviewer_reference": plan.reviewer_reference,
-        "selection_process_reference": plan.selection_process_reference,
-        "small_sample_policy_digest": plan.small_sample_policy_digest,
-        "small_sample_policy_reference": plan.small_sample_policy_reference,
-        "statistical_plan_digest": plan.statistical_plan_digest,
-        "statistical_plan_reference": plan.statistical_plan_reference,
-        "tenant_record_id": plan.tenant_record_id,
+        "actor_reference": evidence["actor_reference"],
+        "analysis_scope": evidence["analysis_scope"],
+        "contains_individual_records": evidence["contains_individual_records"],
+        "decision_authority": evidence["decision_authority"],
+        "evidence_version": evidence["evidence_version"],
+        "generated_at": _canonical_timestamp(evidence["generated_at"]),
+        "human_confirmation_required": evidence["human_confirmation_required"],
+        "job_profile_reference": evidence["job_profile_reference"],
+        "monitoring_end": evidence["monitoring_end"].isoformat(),
+        "monitoring_plan_reference": evidence["monitoring_plan_reference"],
+        "monitoring_start": evidence["monitoring_start"].isoformat(),
+        "next_action": evidence["next_action"],
+        "outcome_snapshot_digest": evidence["outcome_snapshot_digest"],
+        "outcome_snapshot_reference": evidence["outcome_snapshot_reference"],
+        "population_snapshot_digest": evidence["population_snapshot_digest"],
+        "population_snapshot_reference": evidence["population_snapshot_reference"],
+        "protected_attribute_policy_digest": evidence["protected_attribute_policy_digest"],
+        "protected_attribute_policy_reference": evidence["protected_attribute_policy_reference"],
+        "purpose_code": evidence["purpose_code"],
+        "reason_code": evidence["reason_code"],
+        "review_state": evidence["review_state"],
+        "reviewer_reference": evidence["reviewer_reference"],
+        "selection_process_reference": evidence["selection_process_reference"],
+        "small_sample_policy_digest": evidence["small_sample_policy_digest"],
+        "small_sample_policy_reference": evidence["small_sample_policy_reference"],
+        "statistical_plan_digest": evidence["statistical_plan_digest"],
+        "statistical_plan_reference": evidence["statistical_plan_reference"],
+        "tenant_record_id": evidence["tenant_record_id"],
     }
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
