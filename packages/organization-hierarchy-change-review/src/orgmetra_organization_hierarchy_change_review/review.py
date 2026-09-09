@@ -14,7 +14,7 @@ import json
 import re
 from threading import RLock
 from uuid import UUID
-from weakref import WeakKeyDictionary, WeakValueDictionary
+from weakref import WeakKeyDictionary, WeakSet, WeakValueDictionary
 
 _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -57,6 +57,7 @@ class _LiveReferenceBinding:
 
 _REGISTRY_LOCK = RLock()
 _CREATION_DIGESTS: WeakKeyDictionary[OrganizationHierarchyChangeReviewPacket, str] = WeakKeyDictionary()
+_ISSUANCE_IN_PROGRESS: WeakSet[OrganizationHierarchyChangeReviewPacket] = WeakSet()
 _LIVE_REFERENCE_BINDINGS: WeakValueDictionary[tuple[str, str], _LiveReferenceBinding] = WeakValueDictionary()
 _PACKET_BINDINGS: WeakKeyDictionary[
     OrganizationHierarchyChangeReviewPacket, _LiveReferenceBinding
@@ -374,26 +375,34 @@ class OrganizationHierarchyChangeReviewPacket:
         return "OrganizationHierarchyChangeReviewPacket(<redacted>)"
 
     def __post_init__(self) -> None:
-        """Validate and seal exactly one creation snapshot, then bind its live reference."""
-        snapshot = _snapshot(self)
-        _validate_issuance_snapshot(snapshot)
-        payload_json = _canonical_payload_json(_payload_from_snapshot(snapshot))
-        creation_digest = sha256(payload_json.encode("utf-8")).hexdigest()
-        live_key = (
-            snapshot["tenant_record_id"],
-            snapshot["organization_hierarchy_change_reference"],
-        )
+        """Validate and seal one creation snapshot; reject all reissuance of this object."""
         with _REGISTRY_LOCK:
-            binding = _LIVE_REFERENCE_BINDINGS.get(live_key)
-            if binding is None:
-                binding = _LiveReferenceBinding(creation_digest)
-                _LIVE_REFERENCE_BINDINGS[live_key] = binding
-            elif binding.evidence_digest != creation_digest:
-                raise ValueError(
-                    "organization_hierarchy_change_reference is already bound to different live evidence"
-                )
-            _CREATION_DIGESTS[self] = creation_digest
-            _PACKET_BINDINGS[self] = binding
+            if self in _CREATION_DIGESTS or self in _ISSUANCE_IN_PROGRESS:
+                raise ValueError("organization hierarchy-change packet may be issued only once")
+            _ISSUANCE_IN_PROGRESS.add(self)
+        try:
+            snapshot = _snapshot(self)
+            _validate_issuance_snapshot(snapshot)
+            payload_json = _canonical_payload_json(_payload_from_snapshot(snapshot))
+            creation_digest = sha256(payload_json.encode("utf-8")).hexdigest()
+            live_key = (
+                snapshot["tenant_record_id"],
+                snapshot["organization_hierarchy_change_reference"],
+            )
+            with _REGISTRY_LOCK:
+                binding = _LIVE_REFERENCE_BINDINGS.get(live_key)
+                if binding is None:
+                    binding = _LiveReferenceBinding(creation_digest)
+                    _LIVE_REFERENCE_BINDINGS[live_key] = binding
+                elif binding.evidence_digest != creation_digest:
+                    raise ValueError(
+                        "organization_hierarchy_change_reference is already bound to different live evidence"
+                    )
+                _CREATION_DIGESTS[self] = creation_digest
+                _PACKET_BINDINGS[self] = binding
+        finally:
+            with _REGISTRY_LOCK:
+                _ISSUANCE_IN_PROGRESS.discard(self)
 
     def canonical_json(self) -> str:
         """Return one verified snapshot of deterministic canonical audit evidence."""
