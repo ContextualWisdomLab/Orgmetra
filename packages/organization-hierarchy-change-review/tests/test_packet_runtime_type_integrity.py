@@ -75,6 +75,27 @@ def _build_packet() -> OrganizationHierarchyChangeReviewPacket:
     )
 
 
+def _issue_after_snapshot_capture(
+    packet: OrganizationHierarchyChangeReviewPacket,
+    snapshot_captured: Event,
+    release_snapshot: Event,
+) -> None:
+    """Pause issuance after its snapshot exists without replacing trusted validator bindings."""
+
+    def trace_validator_call(frame: object, event: str, _arg: object) -> object:
+        if getattr(frame, "f_code", None).co_name == "_validate_issuance_snapshot" and event == "call":
+            snapshot_captured.set()
+            if not release_snapshot.wait(timeout=5):
+                raise AssertionError("test did not release captured issuance snapshot")
+        return trace_validator_call
+
+    sys.settrace(trace_validator_call)
+    try:
+        packet.__post_init__()
+    finally:
+        sys.settrace(None)
+
+
 @pytest.mark.parametrize(
     ("field_name", "forged_value"),
     [
@@ -123,9 +144,7 @@ def test_module_exposes_no_mutable_issuance_registry_capability(registry_name: s
     assert registry_name not in vars(review_module)
 
 
-def test_rejects_concurrent_reissuance_while_initial_issuance_is_in_progress(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_rejects_concurrent_reissuance_while_initial_issuance_is_in_progress() -> None:
     """A second issuance call must fail while the first call owns the issuance reservation."""
     template = _build_packet()
     packet = object.__new__(OrganizationHierarchyChangeReviewPacket)
@@ -137,27 +156,19 @@ def test_rejects_concurrent_reissuance_while_initial_issuance_is_in_progress(
         f"organization_hierarchy_change:{uuid4()}",
     )
 
-    issuance_timestamp_entered = Event()
-    release_issuance_timestamp = Event()
-    original_validate_issuance_timestamp = review_module._validate_issuance_timestamp
-
-    def blocking_validate_issuance_timestamp(value: object) -> None:
-        original_validate_issuance_timestamp(value)
-        issuance_timestamp_entered.set()
-        if not release_issuance_timestamp.wait(timeout=5):
-            raise AssertionError("test did not release initial issuance")
-
-    monkeypatch.setattr(
-        review_module,
-        "_validate_issuance_timestamp",
-        blocking_validate_issuance_timestamp,
-    )
+    snapshot_captured = Event()
+    release_snapshot = Event()
     with ThreadPoolExecutor(max_workers=1) as executor:
-        issuance = executor.submit(packet.__post_init__)
-        assert issuance_timestamp_entered.wait(timeout=5)
+        issuance = executor.submit(
+            _issue_after_snapshot_capture,
+            packet,
+            snapshot_captured,
+            release_snapshot,
+        )
+        assert snapshot_captured.wait(timeout=5)
         with pytest.raises(ValueError, match="may be issued only once"):
             packet.__post_init__()
-        release_issuance_timestamp.set()
+        release_snapshot.set()
         issuance.result(timeout=5)
 
     assert packet.canonical_json()
@@ -195,10 +206,8 @@ def test_canonical_export_validates_and_emits_one_snapshot_during_concurrent_mut
         packet.canonical_json()
 
 
-def test_issuance_validates_and_seals_one_snapshot_during_concurrent_mutation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Never seal an after-validation mutation as though that value were reviewed."""
+def test_issuance_validates_and_seals_one_snapshot_during_concurrent_mutation() -> None:
+    """Never seal an after-snapshot mutation as though that value were reviewed."""
     template = _build_packet()
     packet = object.__new__(OrganizationHierarchyChangeReviewPacket)
     for field in fields(OrganizationHierarchyChangeReviewPacket):
@@ -209,26 +218,18 @@ def test_issuance_validates_and_seals_one_snapshot_during_concurrent_mutation(
         f"organization_hierarchy_change:{uuid4()}",
     )
 
-    issuance_timestamp_entered = Event()
-    release_issuance_timestamp = Event()
-    original_validate_issuance_timestamp = review_module._validate_issuance_timestamp
-
-    def blocking_validate_issuance_timestamp(value: object) -> None:
-        original_validate_issuance_timestamp(value)
-        issuance_timestamp_entered.set()
-        if not release_issuance_timestamp.wait(timeout=5):
-            raise AssertionError("test did not release issuance timestamp validation")
-
-    monkeypatch.setattr(
-        review_module,
-        "_validate_issuance_timestamp",
-        blocking_validate_issuance_timestamp,
-    )
+    snapshot_captured = Event()
+    release_snapshot = Event()
     with ThreadPoolExecutor(max_workers=1) as executor:
-        issuance = executor.submit(packet.__post_init__)
-        assert issuance_timestamp_entered.wait(timeout=5)
+        issuance = executor.submit(
+            _issue_after_snapshot_capture,
+            packet,
+            snapshot_captured,
+            release_snapshot,
+        )
+        assert snapshot_captured.wait(timeout=5)
         object.__setattr__(packet, "reason_code", "unreviewed_override")
-        release_issuance_timestamp.set()
+        release_snapshot.set()
         issuance.result(timeout=5)
 
     with pytest.raises(ValueError, match="evidence changed after issuance"):
