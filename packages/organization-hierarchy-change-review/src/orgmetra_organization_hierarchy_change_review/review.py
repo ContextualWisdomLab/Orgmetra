@@ -483,17 +483,20 @@ def _build_packet_runtime() -> tuple[object, object, object]:
         current_state: tuple[object, ...],
         issuance_state: tuple[object, ...],
     ) -> bool:
-        """Compare exact built-in issuance values without invoking nested caller behavior."""
+        """Compare exact built-in issuance values without datetime instant equivalence."""
         for current_value, issuance_value in trusted_zip(current_state, issuance_state, strict=True):
             current_type = trusted_type(current_value)
             if current_type is not trusted_type(issuance_value):
                 return False
-            if (
-                current_type is trusted_datetime_type
-                and trusted_type(trusted_getattribute(current_value, "tzinfo"))
-                is not trusted_timezone_type
-            ):
-                return False
+            if current_type is trusted_datetime_type:
+                if (
+                    trusted_type(trusted_getattribute(current_value, "tzinfo"))
+                    is not trusted_timezone_type
+                ):
+                    return False
+                if current_value is not issuance_value:
+                    return False
+                continue
             if current_value != issuance_value:
                 return False
         return True
