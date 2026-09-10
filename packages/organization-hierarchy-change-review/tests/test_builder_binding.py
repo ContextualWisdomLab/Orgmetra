@@ -11,10 +11,18 @@ from orgmetra_organization_hierarchy_change_review import (
 )
 
 
+@pytest.mark.parametrize(
+    "builder",
+    [
+        build_organization_hierarchy_change_review_packet,
+        review_module.build_organization_hierarchy_change_review_packet,
+    ],
+)
 def test_builder_does_not_trust_mutable_module_packet_class_binding(
     monkeypatch: pytest.MonkeyPatch,
+    builder: object,
 ) -> None:
-    """Keep the public builder bound to the governed packet type after import."""
+    """Keep every public builder bound to the governed packet type after import."""
 
     class UnvalidatedPacket:
         """Accept arbitrary evidence without the governed packet invariants."""
@@ -30,7 +38,7 @@ def test_builder_does_not_trust_mutable_module_packet_class_binding(
 
     requester_reference = f"actor:{uuid4()}"
     with pytest.raises(ValueError, match="different accountable actor"):
-        build_organization_hierarchy_change_review_packet(
+        builder(
             tenant_record_id="0195c23d-9f00-7000-8000-000000000001",
             organization_hierarchy_change_reference=f"organization_hierarchy_change:{uuid4()}",
             organization_unit_reference="organization_unit:0195c23d-9f00-7000-8000-000000000002",
