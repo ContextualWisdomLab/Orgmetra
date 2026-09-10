@@ -42,11 +42,20 @@ _DENIAL_NEXT_ACTION = {
 
 
 def _validate_uuid(field_name: str, value: object) -> None:
-    """Require a real UUID and reject protocol-reserved Nil/Max sentinels."""
-    if not isinstance(value, UUID):
-        raise ValueError(f"{field_name} must be a UUID.")
-    if value.int in (0, _MAX_UUID_INT):
-        raise ValueError(f"{field_name} must not use a reserved UUID sentinel.")
+    """Require an exact operational UUID with an intact 128-bit integer payload.
+
+    Authorization identities are durable trust-boundary attributes. An exact
+    ``uuid.UUID`` can still have its internal ``int`` slot rewritten with
+    ``object.__setattr__``; validate the retained payload before any sentinel or
+    tenant comparison so malformed identity cannot enter policy/request state.
+    """
+    if type(value) is not UUID:
+        raise ValueError(f"{field_name} must be an operational UUID.")
+    identity = value.int
+    if type(identity) is not int or not 0 <= identity <= _MAX_UUID_INT:
+        raise ValueError(f"{field_name} must be an operational UUID.")
+    if identity in (0, _MAX_UUID_INT):
+        raise ValueError(f"{field_name} must be an operational UUID.")
 
 
 def _validate_code(field_name: str, value: object) -> None:
@@ -236,21 +245,13 @@ def _decision(
 
 
 def evaluate_purpose_bound_access(
-    *,
-    request: PurposeBoundAccessRequest,
-    policy: PurposeBoundAccessPolicy,
+    *, request: PurposeBoundAccessRequest, policy: PurposeBoundAccessPolicy
 ) -> AuthorizationDecision:
-    """Evaluate tenant, resource, purpose, operation, scope, and field attributes.
-
-    The order deliberately checks tenant isolation before policy detail and then
-    requires every narrowing attribute. Possessing a broad identity or a valid
-    purpose header is insufficient when the operation scope or requested field
-    set is not explicitly authorized.
-    """
+    """Evaluate tenant, purpose, resource, operation, scope, and field subset."""
     if (
         request.tenant_record_id != policy.tenant_record_id
-        or request.actor_tenant_record_id != policy.tenant_record_id
-        or request.resource_tenant_record_id != policy.tenant_record_id
+        or request.actor_tenant_record_id != request.tenant_record_id
+        or request.resource_tenant_record_id != request.tenant_record_id
     ):
         return _decision(
             request=request,
@@ -258,27 +259,12 @@ def evaluate_purpose_bound_access(
             allowed=False,
             reason_code="tenant_scope_mismatch",
         )
-    if request.resource_kind != policy.resource_kind:
-        return _decision(
-            request=request,
-            policy=policy,
-            allowed=False,
-            reason_code="resource_not_allowed",
-        )
     if request.purpose_code != policy.purpose_code:
-        return _decision(
-            request=request,
-            policy=policy,
-            allowed=False,
-            reason_code="purpose_not_allowed",
-        )
+        return _decision(request=request, policy=policy, allowed=False, reason_code="purpose_not_allowed")
     if request.operation_code != policy.operation_code:
-        return _decision(
-            request=request,
-            policy=policy,
-            allowed=False,
-            reason_code="operation_not_allowed",
-        )
+        return _decision(request=request, policy=policy, allowed=False, reason_code="operation_not_allowed")
+    if request.resource_kind != policy.resource_kind:
+        return _decision(request=request, policy=policy, allowed=False, reason_code="resource_not_allowed")
     if policy.required_scope_code not in request.granted_scope_codes:
         return _decision(
             request=request,
@@ -287,27 +273,15 @@ def evaluate_purpose_bound_access(
             reason_code="required_scope_missing",
         )
     if not request.requested_fields.issubset(policy.permitted_fields):
-        return _decision(
-            request=request,
-            policy=policy,
-            allowed=False,
-            reason_code="field_not_allowed",
-        )
-    return _decision(
-        request=request,
-        policy=policy,
-        allowed=True,
-        reason_code="access_permitted",
-    )
+        return _decision(request=request, policy=policy, allowed=False, reason_code="field_not_allowed")
+    return _decision(request=request, policy=policy, allowed=True, reason_code="access_permitted")
 
 
 def require_purpose_bound_access(
-    *,
-    request: PurposeBoundAccessRequest,
-    policy: PurposeBoundAccessPolicy,
+    *, request: PurposeBoundAccessRequest, policy: PurposeBoundAccessPolicy
 ) -> AuthorizationDecision:
-    """Return the allow decision or raise an actionable, PII-minimized denial."""
+    """Return an allow decision or raise a bounded denial with recovery guidance."""
     decision = evaluate_purpose_bound_access(request=request, policy=policy)
-    if not decision.allowed:
-        raise AuthorizationDeniedError(decision)
-    return decision
+    if decision.allowed:
+        return decision
+    raise AuthorizationDeniedError(decision)
