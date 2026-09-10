@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Never
 from uuid import UUID
 
@@ -97,29 +96,62 @@ def _validate_extra_claim_names(extra_claims: object) -> tuple[str, ...]:
     return tuple(names)
 
 
-@dataclass(frozen=True, slots=True)
-class ExternalIdentityBindingCandidate:
-    """Validated identity candidate that carries no persistence authority.
+class ExternalIdentityBindingCandidate(tuple):
+    """Validated, structurally immutable identity candidate with no persistence authority.
 
     Tenant and person identities are exact operational UUIDs detached from
-    caller-owned objects. Issuer and subject are canonical exact text. This value
-    proves only local input integrity: it does not prove that Keyverse authenticated
-    the subject, verified the issuer, or authorized a durable Orgmetra binding.
+    caller-owned objects. Issuer and subject are canonical exact text. Tuple-backed
+    storage prevents post-validation attribute replacement from changing the live
+    candidate. This value still proves only local input integrity: low-level tuple
+    construction can bypass the public constructor, so any consequential consumer
+    must reconstruct or revalidate the evidence rather than treat this Python value
+    as authentication or authorization authority.
     """
 
-    tenant_record_id: UUID
-    person_record_id: UUID
-    identity_issuer: str
-    identity_subject: str
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        """Reject invalid identity and detach caller-owned UUIDs before returning candidate data."""
-        tenant_identity = _validate_operational_uuid("tenant_record_id", self.tenant_record_id)
-        person_identity = _validate_operational_uuid("person_record_id", self.person_record_id)
-        _validate_canonical_text("identity_issuer", self.identity_issuer)
-        _validate_canonical_text("identity_subject", self.identity_subject)
-        object.__setattr__(self, "tenant_record_id", UUID(int=tenant_identity))
-        object.__setattr__(self, "person_record_id", UUID(int=person_identity))
+    def __new__(
+        cls,
+        *,
+        tenant_record_id: UUID,
+        person_record_id: UUID,
+        identity_issuer: str,
+        identity_subject: str,
+    ) -> ExternalIdentityBindingCandidate:
+        """Validate and detach candidate evidence into immutable tuple storage."""
+        tenant_identity = _validate_operational_uuid("tenant_record_id", tenant_record_id)
+        person_identity = _validate_operational_uuid("person_record_id", person_record_id)
+        issuer = _validate_canonical_text("identity_issuer", identity_issuer)
+        subject = _validate_canonical_text("identity_subject", identity_subject)
+        return tuple.__new__(
+            cls,
+            (
+                UUID(int=tenant_identity),
+                UUID(int=person_identity),
+                issuer,
+                subject,
+            ),
+        )
+
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return the detached tenant identity."""
+        return self[0]
+
+    @property
+    def person_record_id(self) -> UUID:
+        """Return the detached Person identity."""
+        return self[1]
+
+    @property
+    def identity_issuer(self) -> str:
+        """Return the canonical issuer text retained at validation."""
+        return self[2]
+
+    @property
+    def identity_subject(self) -> str:
+        """Return the canonical opaque subject retained at validation."""
+        return self[3]
 
     @property
     def persistence_authorized(self) -> bool:
