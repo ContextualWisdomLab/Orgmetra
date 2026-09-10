@@ -11,8 +11,14 @@ International Organization for Standardization. (2016). *ISO 30409:2016 Human re
 
 International Organization for Standardization. (2020). *ISO 10667-2:2020 Assessment service delivery—Procedures and methods to assess people in work and organizational settings—Part 2: Requirements for service providers*. https://www.iso.org/standard/74717.html
 
-- ISO currently lists Edition 2 as Published but “to be revised” (stage 90.92); an Edition 3 work item is under development. Re-check status before any later standards-conformance claim.
+- ISO currently lists Edition 2 as Published but “to be revised” (stage 90.92). Its lifecycle records systematic-review closure on 2026-03-05 and stage 90.92 on 2026-05-27.
 - Architectural relevance: the published scope includes work-related assessment for promotion, succession planning, and reassignment. That supports an assessment-evidence interface for Talent workflows, not transfer of assessment or employment-decision authority into a score field.
+
+International Organization for Standardization. (n.d.). *ISO/AWI 10667-2 Assessment service delivery—Procedures and methods to assess people in work and organizational settings—Part 2: Requirements for service providers* (Edition 3 work item). https://www.iso.org/standard/94564.html
+
+- ISO currently lists the Edition 3 successor work item as **Under development**, stage 20.00 (new project registered in the TC/SC work programme), under ISO/TC 260.
+- Traceability rule: this AWI is evidence that revision work exists, not normative authority for an implementation or conformance claim. Until a successor edition is published, cite ISO 10667-2:2020 for current published scope and record its “to be revised” lifecycle status.
+- Re-check both the 2020 edition and the Edition 3 work item before ADR acceptance, assessment-contract changes, or release/compliance claims; do not silently import draft/work-item language into Orgmetra contracts.
 
 International Organization for Standardization. (2023). *ISO 30405:2023 Human resource management—Guidelines on recruitment*. https://www.iso.org/standard/79488.html
 
@@ -47,5 +53,5 @@ Gallardo-Gallardo, E., Dries, N., & González-Cruz, T. F. (2013). What is the me
 
 - These references constrain terminology, scope, measurement claims, and interfaces. They do not replace Orgmetra's protected PRD/TRD/ARCHITECTURE or an accepted owner ADR.
 - ISO public abstracts are sufficient to support the scope statements recorded here, but implementation must not claim full conformance to normative requirements that have not been reviewed from licensed/current standard text.
-- Re-check current ISO lifecycle/edition status when ADR 0292 is proposed for acceptance or when release/compliance documentation is produced.
+- Re-check current ISO lifecycle/edition status when ADR 0292 is proposed for acceptance or when release/compliance documentation is produced. For ISO 10667-2, inspect both the current published 2020 edition and the active Edition 3 work item.
 - Psychometric or predictive claims require study-specific evidence. Conceptual talent-management papers do not establish validity, fairness, utility, or transportability of any particular Orgmetra decision rule.
