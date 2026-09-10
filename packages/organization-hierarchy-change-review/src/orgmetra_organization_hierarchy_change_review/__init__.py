@@ -2,13 +2,15 @@
 
 from datetime import date, datetime
 
-from .review import OrganizationHierarchyChangeReviewPacket
+from . import review as _review
+
+OrganizationHierarchyChangeReviewPacket = _review.OrganizationHierarchyChangeReviewPacket
 
 
 def _bind_public_builder(
     packet_type: type[OrganizationHierarchyChangeReviewPacket],
 ):
-    """Bind the package builder to the governed packet type once at import."""
+    """Bind every public builder path to the governed packet type once at import."""
 
     def build_organization_hierarchy_change_review_packet(
         *,
@@ -51,7 +53,10 @@ def _bind_public_builder(
 build_organization_hierarchy_change_review_packet = _bind_public_builder(
     OrganizationHierarchyChangeReviewPacket
 )
-del _bind_public_builder
+_review.build_organization_hierarchy_change_review_packet = (
+    build_organization_hierarchy_change_review_packet
+)
+del _bind_public_builder, _review
 
 __all__ = [
     "OrganizationHierarchyChangeReviewPacket",
