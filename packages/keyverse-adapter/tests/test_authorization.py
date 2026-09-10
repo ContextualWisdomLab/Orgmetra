@@ -180,6 +180,37 @@ def test_request_rejects_untrusted_or_ambiguous_authorization_attributes(
         replace(REQUEST, **{field_name: invalid_value})
 
 
+def test_authorization_rejects_forged_uuid_internal_payloads() -> None:
+    """Reject exact UUID objects whose retained integer payload was forged after construction."""
+    forged_policy_tenant = UUID("10000000-0000-7000-8000-000000000501")
+    object.__setattr__(forged_policy_tenant, "int", -1)
+    with pytest.raises(ValueError, match="tenant_record_id must be an operational UUID"):
+        replace(POLICY, tenant_record_id=forged_policy_tenant)
+
+    forged_actor_tenant = UUID("10000000-0000-7000-8000-000000000501")
+    object.__setattr__(forged_actor_tenant, "int", 1 << 128)
+    with pytest.raises(ValueError, match="actor_tenant_record_id must be an operational UUID"):
+        replace(REQUEST, actor_tenant_record_id=forged_actor_tenant)
+
+    forged_resource_tenant = UUID("10000000-0000-7000-8000-000000000501")
+    object.__setattr__(forged_resource_tenant, "int", "not-an-int")
+    with pytest.raises(ValueError, match="resource_tenant_record_id must be an operational UUID"):
+        replace(REQUEST, resource_tenant_record_id=forged_resource_tenant)
+
+
+def test_authorization_rejects_uuid_subtype_identity() -> None:
+    """Do not let executable UUID subtypes enter durable policy or request identity state."""
+
+    class UUIDSubtype(UUID):
+        pass
+
+    subtype = UUIDSubtype("10000000-0000-7000-8000-000000000501")
+    with pytest.raises(ValueError, match="tenant_record_id must be an operational UUID"):
+        replace(POLICY, tenant_record_id=subtype)
+    with pytest.raises(ValueError, match="actor_tenant_record_id must be an operational UUID"):
+        replace(REQUEST, actor_tenant_record_id=subtype)
+
+
 def test_authorization_decision_exposes_only_governance_metadata() -> None:
     """The decision is auditable without copying person-field values into the adapter."""
     decision = evaluate_purpose_bound_access(request=REQUEST, policy=POLICY)
