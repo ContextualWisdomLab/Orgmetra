@@ -18,9 +18,9 @@ All notable changes to Orgmetra will be documented in this file.
 - `employment_record_version.employment_concurrency_code` constrained to `exclusive` or `concurrent`.
 - ADR 0005 for exclusive employment and staffable seats.
 - `orgmetra_hris_kernel` 0.3.0 with identity-scoped bitemporal resolution, assignment-employment coverage, allocation-portfolio checks, and a Memorial Hospital RN correction case at 100% statement and branch coverage.
-- `employment_record_version` and `position_record_version` so employment and position identity stay stable across retroactive corrections.
+- `employment_record_version` and `position_record_version` so corrections no longer mint a new employment or position identifier.
 - `assignment_record.employment_record_id` bound to the same person as the covering employment.
-- `orgmetra_keyverse_adapter` that binds an opaque Keyverse subject to a person and rejects passwords, passkeys, and tokens.
+- `orgmetra_keyverse_adapter` now validates exact opaque issuer/subject input only as non-authorizing identity candidate data; it rejects credential material and cannot create a persistence-authorizing person binding until an immutable released/versioned Keyverse subject-assertion trust contract is available through the Orgmetra ACL.
 - Design tokens for the repeating HR actions: approve, review, correct, request evidence, compare, export, and escalate.
 - ADR 0004 for employment/position versions and assignment-employment binding.
 - Foundation product baseline for Orgmetra as an evidence-centered HRIS/HCM.
@@ -59,7 +59,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 - Predictive-validity cases fail closed when selection evidence, Job scope, study criterion, converted worker, or system-recorded visibility does not match; the normalized case relation is tenant-qualified, append-only, TRUNCATE-protected, and forced through row-level security.
 - Purpose-bound PII authorization now fails closed across active tenant, authenticated actor tenant, resource tenant, resource kind, purpose, operation, operation-specific Keyverse scope, and requested-field subset; malformed/wildcard-like attributes, mutable field/scope collections, reserved UUID sentinels, and cross-tenant confused-deputy contexts are rejected before protected values are returned. Authorization requests and allow/deny evidence now also require and preserve one namespaced opaque target-resource reference, so immutable audit correlation identifies the exact HR record without copying its protected values. Authorization evidence otherwise contains governance metadata and field names only, with stable denial reasons and actionable next steps rather than PII.
-- Keyverse identity-subject bindings now reject forged, non-canonical identity before persistence: both the tenant and person identities must be exact operational UUIDs with an exact in-range integer payload outside the reserved Nil/Max sentinels, and the issuer and opaque subject must be exact built-in text that is non-blank and already canonical, so an executable text subtype, a `strip`-shaped impostor, or a whitespace-padded audited value cannot key a stored person link.
+- Keyverse identity candidates now reject forged or non-canonical input before any trust transition: tenant/person identifiers must be detached exact operational UUIDs with in-range integer payloads outside Nil/Max, and issuer/subject must be exact non-blank canonical text. These checks establish input integrity only; raw issuer/subject syntax is never authentication evidence, `ExternalIdentityBindingCandidate` is explicitly non-authorizing, and durable binding fails closed until a released/versioned Keyverse subject-assertion trust contract can be consumed through the Orgmetra ACL.
 - LLM output constrained to draft evidence.
 - No direct cross-service application-table access.
 - Service-owned database schemas and roles inside the initially shared physical PostgreSQL cluster.
