@@ -88,6 +88,8 @@ def _validate_extra_claim_names(extra_claims: object) -> tuple[str, ...]:
 
     names: list[str] = []
     for name in extra_claims:
+        if type(name) is not str:
+            raise ValueError("extra claim names must be exact text.")
         names.append(_validate_canonical_text("extra claim name", name))
     return tuple(names)
 
