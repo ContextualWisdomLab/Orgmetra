@@ -99,7 +99,7 @@ These are domain/product journeys, not authorization to implement UI before the 
 4. The partner reviews proposed membership with exact evidence versions, reasons, uncertainty where relevant, and multiple-membership context. A worker may legitimately belong to multiple pools when the domain permits it.
 5. Human confirmation publishes a new pool/membership version and immutable provenance. A retry with the same idempotency key cannot duplicate membership history.
 
-Empty state means that no membership has been confirmed for the current criteria/version; it does not mean that the workforce contains no qualified people. Permission state must not leak names or counts from a restricted pool.
+Empty state means that no membership has been confirmed for the current criteria/version; it does not mean that the workforce contains no qualified people. Permission-denied behavior must not reveal whether a restricted `TalentPool` exists: for the same unauthorized actor/purpose/resource relation, an existing restricted pool identifier and a nonexistent identifier must produce the same externally observable status, body schema, empty-result semantics, and metadata envelope, with no pool name or count side channel. Before any Talent API implementation, a RED API contract must prove that indistinguishability rather than encoding resource existence in `not found` versus `forbidden` behavior.
 
 ### Succession planning
 
@@ -162,7 +162,7 @@ Sampling and outcome evidence must preserve design/error/failure denominators an
 
 ## Persistence and operability requirements if accepted
 
-Use a service-owned `talent_management` PostgreSQL schema and `talent_management_role`; shared physical-cluster deployment does not permit cross-service application SQL. Normalize anchors, versions, memberships/slates/evidence links, and immutable decision/audit references in 3NF. FORCE RLS and NOBYPASSRLS application roles are mandatory. Tenant-qualified foreign identifiers, append-only/finalized evidence membership, exclusion/uniqueness constraints only where the domain is single-valued, and concurrent correction tests are required.
+Use a service-owned `talent_management` PostgreSQL schema and keep schema/migration ownership separate from runtime application principals; shared physical-cluster deployment does not permit cross-service application SQL. Normalize anchors, versions, memberships/slates/evidence links, and immutable decision/audit references in 3NF. Every tenant-bearing `talent_management` table must have row-level security enabled and `FORCE ROW LEVEL SECURITY` applied. Runtime application roles, including `talent_management_role`, must be `NOSUPERUSER NOBYPASSRLS`; superusers are excluded from application traffic and must never be used as the runtime principal. Tenant-qualified foreign identifiers, append-only/finalized evidence membership, exclusion/uniqueness constraints only where the domain is single-valued, and concurrent correction tests are required. PostgreSQL acceptance must prove both FORCE-RLS owner behavior and cross-tenant denial under a non-superuser, NOBYPASSRLS application role.
 
 Mutations are idempotent and safe under retry. Locks must have a documented aggregate/tenant scope; no table-wide lock is acceptable for routine buyer paths. Hot partitions, query plans, connection cleanup, and contention are measured with production-shaped data. Applicable buyer-facing API paths require realistic async/E2E/k6 p95 ≤20 ms; sample shrinking, unrepresentative warm-cache exclusions, or omitted failing requests are not accepted evidence.
 
@@ -186,9 +186,11 @@ The main cost is coordination: internal mobility depends on authoritative Person
 - Revalidate the selected option C against then-current protected product scope and independent review. If protected scope has contracted, reopen the C/D decision explicitly rather than silently deleting or broadening ownership.
 - Add a versioned UL/Context Map and exact aggregate/invariant model before schema/API work.
 - Convert the buyer journeys above into RED domain/API/security contracts, including stale evidence, empty, permission, conflict/recovery, and human-confirmation cases before production implementation.
+- Add a TalentPool enumeration-resistance RED contract proving an unauthorized existing restricted pool identifier and a nonexistent identifier are indistinguishable in externally observable status, body schema, empty-result semantics, and metadata, with no name/count disclosure.
 - Define assessment/validation evidence contracts without moving psychometric numerical or validity authority into Talent.
 - Define PII purpose/retention/export/legal-hold policy and threat model before exposing sensitive Talent views.
 - Add RED tests for cross-tenant references, stale evidence, unauthorized succession/mobility access, conflicting bitemporal corrections, duplicate/idempotent commands, Position/Assignment non-authority, and multiple legitimate pool membership.
+- Add PostgreSQL RED acceptance proving every tenant-bearing Talent table uses FORCE RLS and the runtime application role is NOSUPERUSER/NOBYPASSRLS, with cross-tenant access denied and no superuser application path.
 - If production code is added, satisfy owned 100% statement/branch/docstring/edge coverage, realistic PostgreSQL concurrency, and applicable p95 ≤20 ms buyer-path evidence.
 - Update PRD/TRD/ARCHITECTURE/ERD/UML/API_CONTRACT/SECURITY/THREAT_MODEL/TEST_STRATEGY/OPERABILITY/TRACEABILITY/CHANGELOG through canonical writer paths.
 - Release only after normal protected integration with exact-head required workflows, governance, SBOM/provenance/reproducibility, and rollback evidence.

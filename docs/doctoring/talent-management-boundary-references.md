@@ -25,7 +25,7 @@ International Organization for Standardization. (2023). *ISO 30405:2023 Human re
 - ISO lists Edition 2 as the current published recruitment standard.
 - Architectural relevance: its recruitment-specific scope supports retaining `talent_acquisition` as the pre-hire acquisition/recruitment boundary instead of extending it by name alone into all post-hire Talent concerns.
 
-International Organization for Standardization. (2025). *ISO 30414:2025 Human resource management—Requirements and recommendations for human capital reporting and disclosure*. https://www.iso.org/standard/30414.html
+International Organization for Standardization. (2025). *ISO 30414:2025 Human resource management—Requirements and recommendations for human capital reporting and disclosure*. https://www.iso.org/standard/30414
 
 - Edition 2 was published in August 2025 and replaces the withdrawn 2018 edition.
 - ISO's public abstract lists mobility and succession planning, workforce composition, recruitment, turnover, and skills/capabilities/development among the human-capital reporting areas.
