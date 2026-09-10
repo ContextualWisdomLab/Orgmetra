@@ -2,7 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import fields
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 import sys
 from threading import Event
 from uuid import uuid4
@@ -54,6 +54,23 @@ class _ForgedText(str):
 
 class _ForgedInt(int):
     """Retain caller-owned behavior while preserving serialized integer value."""
+
+
+class _ExecutableTimezone(tzinfo):
+    """Expose execution if export compares a nested caller-owned timezone."""
+
+    def __init__(self) -> None:
+        self.utcoffset_calls = 0
+
+    def utcoffset(self, _value: datetime | None) -> timedelta:
+        self.utcoffset_calls += 1
+        raise AssertionError("caller-owned timezone behavior executed")
+
+    def dst(self, _value: datetime | None) -> timedelta:
+        return timedelta(0)
+
+    def tzname(self, _value: datetime | None) -> str:
+        return "ExecutableTimezone"
 
 
 def _build_packet() -> OrganizationHierarchyChangeReviewPacket:
@@ -112,6 +129,21 @@ def test_rejects_representation_preserving_runtime_substitution_after_issuance(
     object.__setattr__(packet, field_name, forged_value)
     with pytest.raises(ValueError, match="runtime types changed after issuance|evidence changed after issuance"):
         packet.canonical_json()
+
+
+def test_export_rejects_nested_timezone_substitution_before_datetime_comparison() -> None:
+    """Fail closed before nested caller-owned timezone behavior can execute during export."""
+    packet = _build_packet()
+    executable_timezone = _ExecutableTimezone()
+    object.__setattr__(
+        packet,
+        "recorded_at",
+        datetime(2026, 8, 23, 7, 0, tzinfo=executable_timezone),
+    )
+
+    with pytest.raises(ValueError, match="evidence changed after issuance"):
+        packet.canonical_json()
+    assert executable_timezone.utcoffset_calls == 0
 
 
 def test_rejects_manual_reissuance_after_reference_retargeting() -> None:
