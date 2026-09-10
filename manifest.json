@@ -29,8 +29,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "eaf3a0bbd26edddbc1abe9e9dd7874f8d0e218a4ff8cf3bb116ea9fd648bd284",
-      "bytes": 18018,
+      "sha256": "a1c283260fe0194aaeb5e806fc6e325262e19062b6c229792dfd405aae596d6c",
+      "bytes": 18331,
       "lines": 78
     },
     {
@@ -83,7 +83,7 @@
     },
     {
       "path": "database/migrations/0005_outbox_delivery_finalization.sql",
-      "sha256": "b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5b7a3a25fa60016b6a4961",
+      "sha256": "b7e8790595b288f752d6ef5cc6cbfe4e1b6712248f5ef9e8a92abba5c3cf182",
       "bytes": 6125,
       "lines": 170
     },
