@@ -23,6 +23,14 @@ The scientific literature also cautions against treating “talent” as a self-
 6. Keyverse remains the identity/authentication backend. Authorization remains tenant-, actor-, purpose-, resource-, and lifetime-scoped.
 7. No source schema, API, event, or UI is authorized by this Proposed ADR until its ownership decision is reviewed against then-current protected truth.
 
+## Product scope decision in this Proposed ADR
+
+Against the current protected PRD/TRD/ARCHITECTURE, **option C, a dedicated `talent_management` bounded context, is selected as the product-scope direction.** This selects the domain owner to design and test; it does **not** change this ADR from Proposed to Accepted and does not create protected schema/API/event/UI authority.
+
+The choice follows the current product truth rather than service-count convenience. The protected PRD describes an HRIS/HCM spanning the employment lifecycle and explicitly asks which evidence justified a hiring **or promotion** decision, while the protected TRD and Architecture stop `talent_acquisition` at recruitment and selection. Choosing option D would therefore require an explicit product-scope contraction and corresponding PRD/positioning change. No such contraction is currently supported by protected product truth. Options A and B would preserve the broad product promise only by moving post-hire planning into contexts whose lifecycle, aggregate invariants, privacy boundary, and mutation authority are different.
+
+This decision must be revalidated before acceptance if protected product scope or owner contracts change. A later scope contraction is an explicit ADR/product decision, not a silent deletion of the Talent boundary.
+
 ## Alternatives
 
 ### A. Expand `talent_acquisition`
@@ -31,7 +39,7 @@ Use one context for candidate acquisition and post-hire talent management.
 
 **Advantages:** fewer deployable units and fewer integration edges.
 
-**Rejected as the provisional direction:** the lifecycle, actor set, privacy profile, and invariants change after employment. Acquisition evidence should not become post-hire talent authority, and a recruitment-focused context would accumulate unrelated succession, career, and internal-mobility semantics.
+**Rejected for the selected product direction:** the lifecycle, actor set, privacy profile, and invariants change after employment. Acquisition evidence should not become post-hire talent authority, and a recruitment-focused context would accumulate unrelated succession, career, and internal-mobility semantics.
 
 ### B. Put post-hire planning in `people_core`
 
@@ -39,19 +47,19 @@ Treat talent planning as another property of people/employment.
 
 **Advantages:** easy access to Worker, Employment, and Assignment truth.
 
-**Rejected as the provisional direction:** convenience of co-location is not domain ownership. Talent pools, succession slates, and mobility decisions have versioning, evidence, fairness, expiry, and review lifecycles different from Person/Employment identity facts. Expanding `people_core` would increase aggregate and transaction scope and encourage direct coupling to HRIS identity records.
+**Rejected for the selected product direction:** convenience of co-location is not domain ownership. Talent pools, succession slates, and mobility decisions have versioning, evidence, fairness, expiry, and review lifecycles different from Person/Employment identity facts. Expanding `people_core` would increase aggregate and transaction scope and encourage direct coupling to HRIS identity records.
 
 ### C. Add a dedicated `talent_management` bounded context
 
 Own post-hire talent-planning and talent-decision truth while consuming released references and events from existing owners.
 
-**Proposed direction.** This preserves acquisition, employment, organization, job, performance, and validation authorities while giving post-hire Talent a coherent lifecycle and audit boundary.
+**Selected product direction; ADR remains Proposed.** This preserves acquisition, employment, organization, job, performance, and validation authorities while giving post-hire Talent a coherent lifecycle and audit boundary.
 
 ### D. Declare post-hire Talent Management out of scope
 
 Keep Orgmetra limited to acquisition, employment, performance, and workforce validation.
 
-**Viable product alternative.** If selected, PRD/positioning must stop implying a broader HCM Talent capability. The product must not expose succession/talent-pool UI backed only by analytics or generic records.
+**Not selected under current protected product scope.** It remains a valid future scope-contraction alternative, but adopting it requires the PRD and positioning to stop implying a broader employment-lifecycle HCM capability. The product must not expose succession/talent-pool UI backed only by analytics or generic records.
 
 ## Proposed bounded context
 
@@ -78,6 +86,50 @@ A `CareerPreference`/`CareerInterest` record may become an owned aggregate only 
 ### Value objects and references
 
 At minimum, tenant-qualified opaque references, purpose code, evidence-set reference/version/digest, lifecycle state, business-effective interval, system-recorded interval, actor reference, reason code, and provenance reference must be modeled explicitly. A “readiness” or “potential” classification is not a primitive value object until its construct, scale, intended decision use, evidence requirements, expiry, uncertainty, and fairness semantics are versioned.
+
+## Buyer journeys required by the selected scope
+
+These are domain/product journeys, not authorization to implement UI before the ADR and contracts are accepted. Each journey must expose normal, loading, empty, stale/unavailable-evidence, permission-denied, validation/conflict, and terminal decision states where applicable. A failed prerequisite remains visible and non-authorizing rather than being converted into a generic recommendation.
+
+### Talent pool planning
+
+1. An authorized Talent/HR partner opens a purpose-scoped pool for an explicit workforce objective and selects released Organization/Job/Position references rather than copying those records.
+2. The partner defines and versions membership criteria and the allowed evidence policy. Criteria identify construct/qualification meaning; they are not free-form aliases for a hidden model score.
+3. The system resolves purpose-authorized worker/evidence references and distinguishes `eligible`, `not_evaluable`, stale/missing evidence, and authorization failure. `unknown` is not converted to `not eligible`.
+4. The partner reviews proposed membership with exact evidence versions, reasons, uncertainty where relevant, and multiple-membership context. A worker may legitimately belong to multiple pools when the domain permits it.
+5. Human confirmation publishes a new pool/membership version and immutable provenance. A retry with the same idempotency key cannot duplicate membership history.
+
+Empty state means that no membership has been confirmed for the current criteria/version; it does not mean that the workforce contains no qualified people. Permission state must not leak names or counts from a restricted pool.
+
+### Succession planning
+
+1. An authorized planner selects a released target Position and planning horizon. Talent does not create or alter the Position.
+2. The system assembles purpose-bound references to Job/FJA/KSAO requirements, current worker/Assignment context, approved performance evidence, and Workforce Validation evidence where a construct claim is intended.
+3. Candidate/slate evidence is presented without a universal `potential_score` or automatic ordinal ranking. Any readiness classification identifies construct, policy version, evidence version, uncertainty, validity/generalizability limits, and fairness evidence.
+4. Missing, stale, inaccessible, or unverifiable required evidence blocks confirmation and identifies the missing authority. A zero-person slate remains a legitimate empty state.
+5. An accountable human records slate decisions, reasons, evidence versions, and confirmation. Publication creates immutable succession-plan history; it does not reserve Position capacity or mutate Assignment truth.
+6. Later corrections append system-recorded history rather than rewriting the earlier planning state.
+
+A manager who can view a worker profile is not thereby allowed to inspect a succession slate. Restricted slate existence/counts are not disclosed through unauthorized empty/error responses.
+
+### Internal mobility
+
+1. The case begins from an explicit employee interest, an authorized nomination, or another versioned policy-allowed source. The origin and visibility of the case are recorded.
+2. Talent resolves the current Employment/Assignment, target Position/opportunity, Job/FJA/KSAO requirements, and allowed evidence through released owner contracts.
+3. The system presents evidence gaps and conflicts before a human decision. A stale target Position, inaccessible evidence, changed Assignment, or capacity uncertainty yields a refresh/conflict state, not an inferred approval or rejection.
+4. An accountable human records the mobility decision and exact evidence versions. LLM text may summarize or draft rationale but cannot confirm the decision.
+5. A confirmed mobility case emits an idempotent intent/result contract to the authoritative coordination path. `talent_management` does not decrement Position capacity and does not write Assignment rows.
+6. If authoritative downstream mutation rejects the request because capacity, Assignment, policy, or protected truth changed, the Talent case records the rejection/reference and returns to a reviewable conflict state. It does not fabricate success or replay indefinitely.
+7. Completion binds the downstream authoritative result reference and immutable audit/provenance so the planning decision and actual employment change can be distinguished later.
+
+### Employee career interest and preference
+
+1. An employee explicitly records, edits, limits visibility of, or withdraws a career interest under a declared purpose and retention policy.
+2. The system does not infer the interest from private communications, assessment responses, browsing behavior, or model output by default.
+3. Withdrawal/correction preserves required audit history while removing the interest from active decision use according to retention/legal-hold policy.
+4. A planner who lacks purpose/resource authorization receives no hidden interest content or inference that an interest exists.
+
+Career interest is employee-controlled evidence, not a promise of mobility, a qualification fact, or a validated latent trait.
 
 ## Invariants
 
@@ -131,9 +183,9 @@ The main cost is coordination: internal mobility depends on authoritative Person
 ## Acceptance before status can become Accepted
 
 - Re-read then-protected PRD/TRD/ARCHITECTURE, open owner PR/issues, ADR numbers, and Context Map; resolve conflicts by ordinary integration rather than source copying.
-- Decide C versus D explicitly. If C is selected, show why A/B are rejected using current domain invariants and buyer journeys.
+- Revalidate the selected option C against then-current protected product scope and independent review. If protected scope has contracted, reopen the C/D decision explicitly rather than silently deleting or broadening ownership.
 - Add a versioned UL/Context Map and exact aggregate/invariant model before schema/API work.
-- Define real buyer journeys for succession, talent pools, and internal mobility, including failure/permission/empty states and human confirmation.
+- Convert the buyer journeys above into RED domain/API/security contracts, including stale evidence, empty, permission, conflict/recovery, and human-confirmation cases before production implementation.
 - Define assessment/validation evidence contracts without moving psychometric numerical or validity authority into Talent.
 - Define PII purpose/retention/export/legal-hold policy and threat model before exposing sensitive Talent views.
 - Add RED tests for cross-tenant references, stale evidence, unauthorized succession/mobility access, conflicting bitemporal corrections, duplicate/idempotent commands, Position/Assignment non-authority, and multiple legitimate pool membership.
