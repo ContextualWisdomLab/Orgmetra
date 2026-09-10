@@ -55,15 +55,21 @@ class _LiveReferenceBinding:
         self.evidence_digest = evidence_digest
 
 
-def _validate_operational_uuid_text(value: object, field_name: str) -> None:
+def _validate_operational_uuid_text(
+    value: object,
+    field_name: str,
+    *,
+    _uuid_type: type[UUID] = UUID,
+    _max_uuid_int: int = _MAX_UUID_INT,
+) -> None:
     """Require exact canonical non-sentinel UUID text owned by the HRIS boundary."""
     if type(value) is not str:
         raise ValueError(f"{field_name} must be canonical UUID text")
     try:
-        parsed = UUID(value)
+        parsed = _uuid_type(value)
     except (ValueError, AttributeError, TypeError) as exc:
         raise ValueError(f"{field_name} must be canonical UUID text") from exc
-    if str(parsed) != value or parsed.int in (0, _MAX_UUID_INT):
+    if str(parsed) != value or parsed.int in (0, _max_uuid_int):
         raise ValueError(f"{field_name} must be a canonical operational UUID")
 
 
@@ -73,6 +79,8 @@ def _validate_reference(
     field_name: str,
     *,
     require_uuid4: bool,
+    _uuid_type: type[UUID] = UUID,
+    _max_uuid_int: int = _MAX_UUID_INT,
 ) -> None:
     """Require one bounded namespaced canonical UUID reference."""
     error = f"{field_name} must be a canonical {prefix}: reference"
@@ -80,31 +88,46 @@ def _validate_reference(
         raise ValueError(error)
     suffix = value[len(prefix) + 1 :]
     try:
-        parsed = UUID(suffix)
+        parsed = _uuid_type(suffix)
     except (ValueError, AttributeError, TypeError) as exc:
         raise ValueError(error) from exc
-    if str(parsed) != suffix or parsed.int in (0, _MAX_UUID_INT):
+    if str(parsed) != suffix or parsed.int in (0, _max_uuid_int):
         raise ValueError(error)
     if require_uuid4 and parsed.version != 4:
         raise ValueError(error)
 
 
-def _validate_optional_organization_reference(value: object, field_name: str) -> None:
+def _validate_optional_organization_reference(
+    value: object,
+    field_name: str,
+    *,
+    _validate_reference_once: object = _validate_reference,
+) -> None:
     """Accept absence or one authoritative Organization Unit reference."""
     if value is None:
         return
-    _validate_reference(value, "organization_unit", field_name, require_uuid4=False)
+    _validate_reference_once(value, "organization_unit", field_name, require_uuid4=False)
 
 
-def _validate_digest(value: object, field_name: str) -> None:
+def _validate_digest(
+    value: object,
+    field_name: str,
+    *,
+    _digest_pattern: object = _DIGEST_PATTERN,
+) -> None:
     """Require exact built-in lowercase SHA-256 hexadecimal evidence."""
-    if type(value) is not str or not _DIGEST_PATTERN.fullmatch(value):
+    if type(value) is not str or not _digest_pattern.fullmatch(value):
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
-def _validate_code(value: object, field_name: str) -> None:
+def _validate_code(
+    value: object,
+    field_name: str,
+    *,
+    _code_pattern: object = _CODE_PATTERN,
+) -> None:
     """Require exact bounded two-or-more-word lower snake_case governance text."""
-    if type(value) is not str or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
+    if type(value) is not str or len(value) > 64 or not _code_pattern.fullmatch(value):
         raise ValueError(f"{field_name} must be bounded lower snake_case governance text")
 
 
@@ -114,27 +137,39 @@ def _validate_positive_int(value: object, field_name: str) -> None:
         raise ValueError(f"{field_name} must be a positive 32-bit integer")
 
 
-def _canonical_date(value: object) -> str:
+def _canonical_date(value: object, *, _date_type: type[date] = date) -> str:
     """Render one exact built-in business date."""
-    if type(value) is not date:
+    if type(value) is not _date_type:
         raise ValueError("effective_on must be an exact date")
     return value.isoformat()
 
 
-def _canonical_timestamp(value: object) -> str:
+def _canonical_timestamp(
+    value: object,
+    *,
+    _datetime_type: type[datetime] = datetime,
+    _timezone_type: type[timezone] = _TIMEZONE_TYPE,
+    _utc_timezone: timezone = timezone.utc,
+) -> str:
     """Render one exact datetime with a built-in fixed offset as UTC RFC 3339 text."""
-    if type(value) is not datetime or type(value.tzinfo) is not _TIMEZONE_TYPE:
+    if type(value) is not _datetime_type or type(value.tzinfo) is not _timezone_type:
         raise ValueError("recorded_at must use a built-in fixed-offset timezone")
     try:
-        return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        return value.astimezone(_utc_timezone).isoformat().replace("+00:00", "Z")
     except (OverflowError, ValueError) as exc:
         raise ValueError("recorded_at must be representable as a UTC datetime") from exc
 
 
-def _validate_issuance_timestamp(value: object) -> None:
+def _validate_issuance_timestamp(
+    value: object,
+    *,
+    _canonical_timestamp_once: object = _canonical_timestamp,
+    _datetime_type: type[datetime] = datetime,
+    _utc_timezone: timezone = timezone.utc,
+) -> None:
     """Require a canonical review-evidence timestamp that has already occurred."""
-    _canonical_timestamp(value)
-    if value > datetime.now(timezone.utc):
+    _canonical_timestamp_once(value)
+    if value > _datetime_type.now(_utc_timezone):
         raise ValueError("recorded_at must not be in the future")
 
 
@@ -167,7 +202,12 @@ def _snapshot(packet: OrganizationHierarchyChangeReviewPacket) -> dict[str, obje
     }
 
 
-def _validate_payload_runtime_types(snapshot: dict[str, object]) -> None:
+def _validate_payload_runtime_types(
+    snapshot: dict[str, object],
+    *,
+    _date_type: type[date] = date,
+    _datetime_type: type[datetime] = datetime,
+) -> None:
     """Reject caller-owned scalar behavior in the exact snapshot chosen for export."""
     current_parent = snapshot["current_parent_organization_unit_reference"]
     proposed_parent = snapshot["proposed_parent_organization_unit_reference"]
@@ -177,14 +217,14 @@ def _validate_payload_runtime_types(snapshot: dict[str, object]) -> None:
         and type(snapshot["organization_unit_reference"]) is str
         and (current_parent is None or type(current_parent) is str)
         and (proposed_parent is None or type(proposed_parent) is str)
-        and type(snapshot["effective_on"]) is date
+        and type(snapshot["effective_on"]) is _date_type
         and type(snapshot["organization_unit_snapshot_digest"]) is str
         and type(snapshot["hierarchy_snapshot_digest"]) is str
         and type(snapshot["requester_reference"]) is str
         and type(snapshot["reviewer_reference"]) is str
         and type(snapshot["purpose_code"]) is str
         and type(snapshot["reason_code"]) is str
-        and type(snapshot["recorded_at"]) is datetime
+        and type(snapshot["recorded_at"]) is _datetime_type
         and type(snapshot["evidence_version"]) is int
         and type(snapshot["contains_person_identifier"]) is bool
         and type(snapshot["contains_worker_value"]) is bool
@@ -199,7 +239,30 @@ def _validate_payload_runtime_types(snapshot: dict[str, object]) -> None:
         raise ValueError("organization hierarchy-change evidence runtime types changed after issuance")
 
 
-def _validate_issuance_snapshot(snapshot: dict[str, object]) -> None:
+_ISSUANCE_VALIDATION_AUTHORITY = (
+    _validate_operational_uuid_text,
+    _validate_reference,
+    _validate_optional_organization_reference,
+    _canonical_date,
+    _validate_digest,
+    _validate_code,
+    _validate_issuance_timestamp,
+    _validate_positive_int,
+    _PURPOSE_CODE,
+    _ALLOWED_REASON_CODES,
+    _REVIEW_STATE,
+    _SCOPE_STATE,
+    _MUTATION_STATE,
+    _DECISION_AUTHORITY,
+    _NEXT_ACTION,
+)
+
+
+def _validate_issuance_snapshot(
+    snapshot: dict[str, object],
+    *,
+    _authority: tuple[object, ...] = _ISSUANCE_VALIDATION_AUTHORITY,
+) -> None:
     """Validate exactly the snapshot that will be sealed as creation evidence."""
     tenant_record_id = snapshot["tenant_record_id"]
     change_reference = snapshot["organization_hierarchy_change_reference"]
@@ -214,25 +277,42 @@ def _validate_issuance_snapshot(snapshot: dict[str, object]) -> None:
     scope_verification_state = snapshot["scope_verification_state"]
     mutation_state = snapshot["mutation_state"]
     decision_authority = snapshot["decision_authority"]
+    (
+        validate_operational_uuid_text,
+        validate_reference,
+        validate_optional_organization_reference,
+        canonical_date,
+        validate_digest,
+        validate_code,
+        validate_issuance_timestamp,
+        validate_positive_int,
+        purpose_code_required,
+        allowed_reason_codes,
+        review_state_required,
+        scope_state_required,
+        mutation_state_required,
+        decision_authority_required,
+        next_action_required,
+    ) = _authority
 
-    _validate_operational_uuid_text(tenant_record_id, "tenant_record_id")
-    _validate_reference(
+    validate_operational_uuid_text(tenant_record_id, "tenant_record_id")
+    validate_reference(
         change_reference,
         "organization_hierarchy_change",
         "organization_hierarchy_change_reference",
         require_uuid4=True,
     )
-    _validate_reference(
+    validate_reference(
         organization_unit_reference,
         "organization_unit",
         "organization_unit_reference",
         require_uuid4=False,
     )
-    _validate_optional_organization_reference(
+    validate_optional_organization_reference(
         current_parent,
         "current_parent_organization_unit_reference",
     )
-    _validate_optional_organization_reference(
+    validate_optional_organization_reference(
         proposed_parent,
         "proposed_parent_organization_unit_reference",
     )
@@ -242,21 +322,21 @@ def _validate_issuance_snapshot(snapshot: dict[str, object]) -> None:
         raise ValueError("organization unit cannot be its own current parent")
     if proposed_parent == organization_unit_reference:
         raise ValueError("organization unit cannot be its own proposed parent")
-    _canonical_date(snapshot["effective_on"])
-    _validate_digest(snapshot["organization_unit_snapshot_digest"], "organization_unit_snapshot_digest")
-    _validate_digest(snapshot["hierarchy_snapshot_digest"], "hierarchy_snapshot_digest")
-    _validate_reference(requester_reference, "actor", "requester_reference", require_uuid4=True)
-    _validate_reference(reviewer_reference, "actor", "reviewer_reference", require_uuid4=True)
+    canonical_date(snapshot["effective_on"])
+    validate_digest(snapshot["organization_unit_snapshot_digest"], "organization_unit_snapshot_digest")
+    validate_digest(snapshot["hierarchy_snapshot_digest"], "hierarchy_snapshot_digest")
+    validate_reference(requester_reference, "actor", "requester_reference", require_uuid4=True)
+    validate_reference(reviewer_reference, "actor", "reviewer_reference", require_uuid4=True)
     if requester_reference == reviewer_reference:
         raise ValueError("reviewer_reference must identify a different accountable actor")
-    _validate_code(purpose_code, "purpose_code")
-    if purpose_code != _PURPOSE_CODE:
+    validate_code(purpose_code, "purpose_code")
+    if purpose_code != purpose_code_required:
         raise ValueError("purpose_code must remain organization_hierarchy_change_review")
-    _validate_code(reason_code, "reason_code")
-    if reason_code not in _ALLOWED_REASON_CODES:
+    validate_code(reason_code, "reason_code")
+    if reason_code not in allowed_reason_codes:
         raise ValueError("reason_code must use the reviewed hierarchy-change vocabulary")
-    _validate_issuance_timestamp(snapshot["recorded_at"])
-    _validate_positive_int(snapshot["evidence_version"], "evidence_version")
+    validate_issuance_timestamp(snapshot["recorded_at"])
+    validate_positive_int(snapshot["evidence_version"], "evidence_version")
     if snapshot["contains_person_identifier"] is not False:
         raise ValueError("hierarchy-change evidence must not contain a person identifier")
     if snapshot["contains_worker_value"] is not False:
@@ -265,25 +345,37 @@ def _validate_issuance_snapshot(snapshot: dict[str, object]) -> None:
         raise ValueError("hierarchy-change evidence must not contain an employment decision")
     if snapshot["human_review_required"] is not True:
         raise ValueError("human review is mandatory before organization-hierarchy mutation")
-    _validate_code(review_state, "review_state")
-    if review_state != _REVIEW_STATE:
+    validate_code(review_state, "review_state")
+    if review_state != review_state_required:
         raise ValueError("review_state must remain requires_human_review")
-    _validate_code(scope_verification_state, "scope_verification_state")
-    if scope_verification_state != _SCOPE_STATE:
+    validate_code(scope_verification_state, "scope_verification_state")
+    if scope_verification_state != scope_state_required:
         raise ValueError("scope_verification_state must remain requires_authoritative_resolution")
-    _validate_code(mutation_state, "mutation_state")
-    if mutation_state != _MUTATION_STATE:
+    validate_code(mutation_state, "mutation_state")
+    if mutation_state != mutation_state_required:
         raise ValueError("mutation_state must remain not_authorized_to_apply")
-    _validate_code(decision_authority, "decision_authority")
-    if decision_authority != _DECISION_AUTHORITY:
+    validate_code(decision_authority, "decision_authority")
+    if decision_authority != decision_authority_required:
         raise ValueError("decision_authority must remain human_review_only")
-    if type(snapshot["next_action"]) is not str or snapshot["next_action"] != _NEXT_ACTION:
+    if type(snapshot["next_action"]) is not str or snapshot["next_action"] != next_action_required:
         raise ValueError("next_action must remain the governed hierarchy-change instruction")
 
 
-def _payload_from_snapshot(snapshot: dict[str, object]) -> dict[str, object]:
+_PAYLOAD_AUTHORITY = (
+    _validate_payload_runtime_types,
+    _canonical_date,
+    _canonical_timestamp,
+)
+
+
+def _payload_from_snapshot(
+    snapshot: dict[str, object],
+    *,
+    _authority: tuple[object, ...] = _PAYLOAD_AUTHORITY,
+) -> dict[str, object]:
     """Validate runtime representation and canonicalize only the supplied snapshot."""
-    _validate_payload_runtime_types(snapshot)
+    validate_payload_runtime_types, canonical_date, canonical_timestamp = _authority
+    validate_payload_runtime_types(snapshot)
     return {
         "contains_employment_decision": snapshot["contains_employment_decision"],
         "contains_person_identifier": snapshot["contains_person_identifier"],
@@ -292,7 +384,7 @@ def _payload_from_snapshot(snapshot: dict[str, object]) -> dict[str, object]:
             "current_parent_organization_unit_reference"
         ],
         "decision_authority": snapshot["decision_authority"],
-        "effective_on": _canonical_date(snapshot["effective_on"]),
+        "effective_on": canonical_date(snapshot["effective_on"]),
         "evidence_version": snapshot["evidence_version"],
         "hierarchy_snapshot_digest": snapshot["hierarchy_snapshot_digest"],
         "human_review_required": snapshot["human_review_required"],
@@ -308,7 +400,7 @@ def _payload_from_snapshot(snapshot: dict[str, object]) -> dict[str, object]:
         ],
         "purpose_code": snapshot["purpose_code"],
         "reason_code": snapshot["reason_code"],
-        "recorded_at": _canonical_timestamp(snapshot["recorded_at"]),
+        "recorded_at": canonical_timestamp(snapshot["recorded_at"]),
         "requester_reference": snapshot["requester_reference"],
         "review_state": snapshot["review_state"],
         "reviewer_reference": snapshot["reviewer_reference"],
@@ -322,9 +414,13 @@ def _payload(packet: OrganizationHierarchyChangeReviewPacket) -> dict[str, objec
     return _payload_from_snapshot(_snapshot(packet))
 
 
-def _canonical_payload_json(payload: dict[str, object]) -> str:
+def _canonical_payload_json(
+    payload: dict[str, object],
+    *,
+    _dumps: object = json.dumps,
+) -> str:
     """Serialize one already-snapshotted payload deterministically."""
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return _dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
 def _build_packet_runtime() -> tuple[object, object, object]:
