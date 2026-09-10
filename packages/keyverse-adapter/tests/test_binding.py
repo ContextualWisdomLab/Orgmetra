@@ -109,6 +109,28 @@ def test_binding_rejects_forged_uuid_internal_integer_payload() -> None:
         _binding(person_record_id=out_of_range)
 
 
+def test_binding_detaches_caller_owned_uuid_before_store_ready_return() -> None:
+    """Caller mutation after construction cannot rewrite the validated binding identity."""
+    tenant = UUID("10000000-0000-7000-8000-000000000411")
+    person = UUID("10000000-0000-7000-8000-000000000412")
+    expected_tenant = UUID(int=tenant.int)
+    expected_person = UUID(int=person.int)
+
+    binding = ExternalIdentityBinding(
+        tenant_record_id=tenant,
+        person_record_id=person,
+        identity_issuer=ISSUER,
+        identity_subject=SUBJECT,
+    )
+
+    assert binding.tenant_record_id is not tenant
+    assert binding.person_record_id is not person
+    object.__setattr__(tenant, "int", -1)
+    object.__setattr__(person, "int", 1 << 128)
+    assert binding.tenant_record_id == expected_tenant
+    assert binding.person_record_id == expected_person
+
+
 def test_binding_rejects_text_subtypes_and_non_text_issuer_or_subject() -> None:
     """Require exact built-in text for the durable issuer and subject."""
 
