@@ -74,12 +74,12 @@ def _validate_canonical_text(field_name: str, value: object) -> str:
 
 
 def _validate_extra_claim_names(extra_claims: object) -> tuple[str, ...]:
-    """Detach only inert claim names needed for credential-field screening.
+    """Detach only inert canonical claim names needed for credential screening.
 
     Claim values are intentionally ignored because candidate validation does not
-    retain or interpret them. Requiring an exact built-in ``dict`` and exact
-    built-in string keys avoids invoking caller-defined container truthiness,
-    iteration, or ``str.lower`` behavior before the trust gate.
+    retain or interpret them. Requiring an exact built-in ``dict`` and canonical
+    exact built-in string keys avoids invoking caller-defined behavior and prevents
+    surrounding whitespace from disguising a credential-shaped claim name.
     """
     if extra_claims is None:
         return ()
@@ -88,9 +88,7 @@ def _validate_extra_claim_names(extra_claims: object) -> tuple[str, ...]:
 
     names: list[str] = []
     for name in extra_claims:
-        if type(name) is not str:
-            raise ValueError("extra claim names must be exact text.")
-        names.append(name)
+        names.append(_validate_canonical_text("extra claim name", name))
     return tuple(names)
 
 
