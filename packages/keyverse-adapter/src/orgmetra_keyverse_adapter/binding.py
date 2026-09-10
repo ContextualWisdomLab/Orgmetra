@@ -73,6 +73,27 @@ def _validate_canonical_text(field_name: str, value: object) -> str:
     return value
 
 
+def _validate_extra_claim_names(extra_claims: object) -> tuple[str, ...]:
+    """Detach only inert claim names needed for credential-field screening.
+
+    Claim values are intentionally ignored because candidate validation does not
+    retain or interpret them. Requiring an exact built-in ``dict`` and exact
+    built-in string keys avoids invoking caller-defined container truthiness,
+    iteration, or ``str.lower`` behavior before the trust gate.
+    """
+    if extra_claims is None:
+        return ()
+    if type(extra_claims) is not dict:
+        raise ValueError("extra_claims must be an exact dict.")
+
+    names: list[str] = []
+    for name in extra_claims:
+        if type(name) is not str:
+            raise ValueError("extra claim names must be exact text.")
+        names.append(name)
+    return tuple(names)
+
+
 @dataclass(frozen=True, slots=True)
 class ExternalIdentityBindingCandidate:
     """Validated identity candidate that carries no persistence authority.
@@ -107,7 +128,7 @@ def _reject_missing_or_credential_input(
     *,
     identity_issuer: object,
     identity_subject: object,
-    extra_claims: dict[str, str] | None,
+    extra_claims: object,
 ) -> None:
     """Reject absent identity and credential-shaped claim names before candidate construction."""
     if type(identity_issuer) is not str:
@@ -119,8 +140,8 @@ def _reject_missing_or_credential_input(
             "Identity issuer and subject are required.",
             next_action="Send the Keyverse issuer and opaque subject, then retry validation.",
         )
-    claims = extra_claims or {}
-    forbidden = _FORBIDDEN_FIELD_NAMES.intersection(name.lower() for name in claims)
+    claim_names = _validate_extra_claim_names(extra_claims)
+    forbidden = _FORBIDDEN_FIELD_NAMES.intersection(name.lower() for name in claim_names)
     if forbidden:
         raise CredentialRejectedError(
             "Identity validation cannot accept credentials or tokens.",
