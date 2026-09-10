@@ -216,3 +216,45 @@ def test_bind_identity_subject_rejects_untrusted_runtime_types_before_trust_gate
             identity_issuer=ISSUER,
             identity_subject=f" {SUBJECT} ",
         )
+
+
+def test_extra_claims_reject_executable_container_or_key_before_use() -> None:
+    """Do not execute caller-defined claim container or key behavior while rejecting credentials."""
+
+    class ClaimsDict(dict[str, str]):
+        def __len__(self) -> int:
+            raise AssertionError("claim-container truthiness executed")
+
+    class ClaimName(str):
+        def lower(self) -> str:
+            raise AssertionError("claim-name lower executed")
+
+    with pytest.raises(ValueError, match="extra_claims must be an exact dict"):
+        validate_identity_subject_candidate(
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            identity_issuer=ISSUER,
+            identity_subject=SUBJECT,
+            extra_claims=ClaimsDict({"purpose": "hr_operations"}),
+        )
+
+    with pytest.raises(ValueError, match="extra claim names must be exact text"):
+        validate_identity_subject_candidate(
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            identity_issuer=ISSUER,
+            identity_subject=SUBJECT,
+            extra_claims={ClaimName("password"): "not-retained"},
+        )
+
+
+def test_extra_claims_reject_non_text_claim_name_with_bounded_error() -> None:
+    """Malformed claim names fail closed without leaking an incidental AttributeError."""
+    with pytest.raises(ValueError, match="extra claim names must be exact text"):
+        validate_identity_subject_candidate(
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            identity_issuer=ISSUER,
+            identity_subject=SUBJECT,
+            extra_claims={object(): "not-retained"},  # type: ignore[dict-item]
+        )
