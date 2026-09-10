@@ -28,13 +28,14 @@ class CredentialRejectedError(ValueError):
         self.next_action = next_action
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require an exact UUID whose internal integer is a real operational identity.
+def _validate_operational_uuid(field_name: str, value: object) -> int:
+    """Return the detached integer of one exact operational UUID.
 
     An exact ``uuid.UUID`` can still have its internal ``int`` slot rewritten with
     ``object.__setattr__``, so the retained payload must be proven to be an exact
     built-in integer inside the 128-bit construction range before the reserved
-    Nil/Max sentinels are compared.
+    Nil/Max sentinels are compared. Returning only the checked scalar lets the
+    binding reconstruct its own UUID instead of retaining a caller-owned alias.
     """
     if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
@@ -43,6 +44,7 @@ def _validate_operational_uuid(field_name: str, value: object) -> None:
         raise ValueError(f"{field_name} must be an operational UUID.")
     if identity in (0, _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
+    return identity
 
 
 def _validate_canonical_text(field_name: str, value: object) -> str:
@@ -66,9 +68,9 @@ class ExternalIdentityBinding:
     """Durable link from a Keyverse subject to an Orgmetra person.
 
     The persisted link is only useful if it addresses real, operational records.
-    Both identities are validated as exact operational UUIDs and the issuer and
-    subject as canonical exact text, so a store-ready binding can never key a
-    person link on a sentinel, a non-UUID, or a credential-shaped value.
+    Both identities are validated as exact operational UUIDs and detached from
+    caller-owned UUID objects; issuer and subject are canonical exact text. The
+    value object is validation data, not an unforgeable same-process capability.
     """
 
     tenant_record_id: UUID
@@ -77,11 +79,13 @@ class ExternalIdentityBinding:
     identity_subject: str
 
     def __post_init__(self) -> None:
-        """Reject forged, sentinel, or non-canonical identity before persistence."""
-        _validate_operational_uuid("tenant_record_id", self.tenant_record_id)
-        _validate_operational_uuid("person_record_id", self.person_record_id)
+        """Reject invalid identity and detach caller-owned UUIDs before persistence."""
+        tenant_identity = _validate_operational_uuid("tenant_record_id", self.tenant_record_id)
+        person_identity = _validate_operational_uuid("person_record_id", self.person_record_id)
         _validate_canonical_text("identity_issuer", self.identity_issuer)
         _validate_canonical_text("identity_subject", self.identity_subject)
+        object.__setattr__(self, "tenant_record_id", UUID(int=tenant_identity))
+        object.__setattr__(self, "person_record_id", UUID(int=person_identity))
 
 
 def bind_identity_subject(
