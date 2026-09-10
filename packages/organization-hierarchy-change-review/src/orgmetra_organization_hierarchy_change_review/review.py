@@ -426,11 +426,13 @@ def _canonical_payload_json(
 def _build_packet_runtime() -> tuple[object, object, object]:
     """Build packet methods around private process-local issuance and evidence state."""
     trusted_canonical_payload_json = _canonical_payload_json
+    trusted_datetime_type = datetime
     trusted_getattribute = object.__getattribute__
     trusted_live_reference_binding = _LiveReferenceBinding
     trusted_payload_from_snapshot = _payload_from_snapshot
     trusted_sha256 = sha256
     trusted_snapshot = _snapshot
+    trusted_timezone_type = _TIMEZONE_TYPE
     trusted_validate_issuance_snapshot = _validate_issuance_snapshot
     trusted_type = type
     trusted_zip = zip
@@ -481,12 +483,17 @@ def _build_packet_runtime() -> tuple[object, object, object]:
         current_state: tuple[object, ...],
         issuance_state: tuple[object, ...],
     ) -> bool:
-        """Compare exact built-in issuance values without invoking subtype behavior."""
+        """Compare exact built-in issuance values without invoking nested caller behavior."""
         for current_value, issuance_value in trusted_zip(current_state, issuance_state, strict=True):
-            if (
-                trusted_type(current_value) is not trusted_type(issuance_value)
-                or current_value != issuance_value
+            current_type = trusted_type(current_value)
+            if current_type is not trusted_type(issuance_value):
+                return False
+            if current_type is trusted_datetime_type and (
+                trusted_type(trusted_getattribute(current_value, "tzinfo")) is not trusted_timezone_type
+                or trusted_type(trusted_getattribute(issuance_value, "tzinfo")) is not trusted_timezone_type
             ):
+                return False
+            if current_value != issuance_value:
                 return False
         return True
 
