@@ -16,6 +16,9 @@ _FORBIDDEN_FIELD_NAMES = frozenset(
         "credential",
         "refresh_token",
         "access_token",
+        "id_token",
+        "client_secret",
+        "api_key",
     }
 )
 
