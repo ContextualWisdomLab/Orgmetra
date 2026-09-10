@@ -112,9 +112,10 @@ test('PostgreSQL CI service image is pinned to the approved immutable PostgreSQL
   );
   assert.match(
     workflow,
-    /image: postgres:16\.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20/
+    /ORGMETRA_POSTGRES_IMAGE: postgres:16\.14@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20/
   );
-  assert.doesNotMatch(workflow, /^\s*image:\s*postgres:16\s*$/m);
+  assert.match(workflow, /docker run[\s\S]*"\$ORGMETRA_POSTGRES_IMAGE"/);
+  assert.doesNotMatch(workflow, /postgres:16(?:\s|$)/m);
 });
 
 test('Python and Node require the identical foundation artifact set', () => {
