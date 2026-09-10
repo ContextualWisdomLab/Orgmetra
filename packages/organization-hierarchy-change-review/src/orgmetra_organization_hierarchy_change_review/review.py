@@ -488,9 +488,10 @@ def _build_packet_runtime() -> tuple[object, object, object]:
             current_type = trusted_type(current_value)
             if current_type is not trusted_type(issuance_value):
                 return False
-            if current_type is trusted_datetime_type and (
-                trusted_type(trusted_getattribute(current_value, "tzinfo")) is not trusted_timezone_type
-                or trusted_type(trusted_getattribute(issuance_value, "tzinfo")) is not trusted_timezone_type
+            if (
+                current_type is trusted_datetime_type
+                and trusted_type(trusted_getattribute(current_value, "tzinfo"))
+                is not trusted_timezone_type
             ):
                 return False
             if current_value != issuance_value:
