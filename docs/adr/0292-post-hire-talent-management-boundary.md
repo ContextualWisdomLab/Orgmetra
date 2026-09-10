@@ -22,6 +22,8 @@ The scientific literature also cautions against treating “talent” as a self-
 5. High-impact post-hire decisions require accountable human actors, purpose, reason, exact evidence versions, explicit confirmation, and immutable audit/provenance. LLM output is draft evidence only.
 6. Keyverse remains the identity/authentication backend. Authorization remains tenant-, actor-, purpose-, resource-, and lifetime-scoped.
 7. No source schema, API, event, or UI is authorized by this Proposed ADR until its ownership decision is reviewed against then-current protected truth.
+8. A high-impact Talent decision must preserve its actual decision-production mode as immutable provenance. Provisional values are `human_decision`, `ai_assisted_human_decision`, and `fully_automated_decision`; the value records how the outcome was produced and is not itself a legal conclusion. Presence of a human actor, confirmation button, or signature is not proof that substantive human intervention occurred.
+9. Jurisdictional notice, explanation, refusal/review, correction, and response-time obligations are resolved from a versioned tenant/policy/compliance contract and then-current law. `talent_management` preserves the evidence needed to discharge applicable rights but does not hard-code a blanket legal applicability conclusion into domain truth.
 
 ## Product scope decision in this Proposed ADR
 
@@ -131,12 +133,25 @@ A manager who can view a worker profile is not thereby allowed to inspect a succ
 
 Career interest is employee-controlled evidence, not a promise of mobility, a qualification fact, or a validated latent trait.
 
+### Decision explanation, review, and correction
+
+This is a cross-cutting journey for high-impact Talent outcomes. It is activated by the applicable tenant policy and jurisdictional/legal contract; the ADR does not assume that every human-assisted or automated workflow creates the same statutory right.
+
+1. Before finalization, the decision record binds the exact policy/evidence versions, accountable actors, `decision_production_mode`, model/tool references when used, recorded human intervention when present, outcome, reason, and downstream authority references. A later label change cannot rewrite how the decision was actually produced.
+2. Where an applicable policy requires notice, explanation, refusal/review, or correction rights, the system resolves the then-current versioned policy before finalization. Missing, stale, or unverifiable required policy evidence fails closed rather than silently treating the decision as unregulated.
+3. An affected worker can request the applicable explanation, review/reprocessing, correction, or other configured recourse through a purpose-scoped request. The response explains the worker's decision evidence and process without disclosing another worker's succession-slate position, assessment result, career interest, or other protected evidence.
+4. Human reprocessing or reconsideration creates a new decision version linked to the original decision and rights request. It never overwrites the earlier outcome or provenance. If the earlier outcome has already changed Assignment or Position truth, any corrective employment mutation is issued through the authoritative People/Organization contract rather than written by Talent.
+5. Statutory or policy response periods, refusal grounds, notice contents, and jurisdictional applicability are versioned policy data, not universal Talent-domain constants. Operational timers may enforce the resolved policy version but may not invent or silently extend legal deadlines.
+6. Current primary-source drivers include Korea's Personal Information Protection Act automated-decision provisions and the EU AI Act's employment/high-risk explanation regime. Both are conditional in scope and timing; implementation must re-check then-current law and must not infer compliance merely from a `human_decision` label or the presence of a reviewer click.
+
 ## Invariants
 
 - A Talent record never becomes the authoritative source for Person, Employment, Assignment, Organization, Position, Job/KSAO, performance, or assessment truth.
 - Cross-context references are validated through released/versioned owner contracts or immutable owner events; mutable branch APIs and direct cross-schema reads are forbidden.
 - Where historical reconstruction matters, membership/slate/case facts are bitemporal. Retroactive correction closes recorded history and appends replacement truth rather than overwriting protected records.
 - Final talent-review, succession, or mobility decisions require an accountable human actor and immutable evidence/provenance. Model-generated text or scores cannot self-authorize a final decision.
+- Decision-production provenance is immutable: the recorded mode, model/tool references, human-intervention evidence, policy version, evidence versions, and outcome lineage cannot be relabeled after the outcome merely to change legal or governance classification. A human identifier or confirmation event alone does not prove substantive human intervention.
+- Rights requests, explanations, and reconsidered decisions are append-only linked records. They preserve the original outcome while minimizing third-party worker information and keeping any employment correction under its authoritative owner.
 - Assessment and performance evidence is purpose-bound and version-pinned. Stale, missing, inaccessible, or unverifiable evidence fails closed for decisions that require it.
 - Multiple legitimate pool memberships are allowed; uniqueness rules apply only to semantically single-valued relations. Database constraints must not erase valid multiple membership.
 - Internal mobility does not reserve or consume Position capacity unless a released Position-capacity contract explicitly grants that operation. It does not write Assignment truth directly.
@@ -156,9 +171,10 @@ Sampling and outcome evidence must preserve design/error/failure denominators an
 - `job_architecture` → `talent_management`: released Job/FJA/KSAO/qualification versions; no source copying.
 - `performance_management` → `talent_management`: purpose-authorized criterion/observation references or versioned summaries; no raw-table access.
 - `workforce_validation` → `talent_management`: versioned validity/fairness/uncertainty evidence and assessment-result references; Talent does not re-label model scores as validated constructs.
-- `talent_management` → `audit_provenance`: immutable high-impact decision evidence.
+- `talent_management` → `audit_provenance`: immutable high-impact decision evidence, including decision-production mode and rights/reconsideration lineage where applicable.
 - `talent_management` ↔ `integration_hub`: versioned external adapters, inbox/outbox, migration/CDC contracts.
 - Keyverse supplies identity/authentication and policy identity; it does not own Talent domain truth.
+- Any future legal/compliance-policy owner is consumed through a released/versioned policy contract or immutable tenant policy artifact. This Proposed ADR creates no mutable cross-repository dependency and does not assign legal applicability authority to Talent.
 
 ## Persistence and operability requirements if accepted
 
@@ -168,17 +184,19 @@ Mutations are idempotent and safe under retry. Locks must have a documented aggr
 
 ## UX requirements if accepted
 
-The product journey must distinguish evidence, recommendation, human review, confirmed decision, and authoritative downstream application. A generic “talent score” dashboard is not an acceptable substitute. Material UI requires reusable objects/page composition, design-token/Figma identifiers, normal/loading/empty/error/permission/responsive/interaction states, keyboard/a11y evidence, and locale-specific KO/EN/JA/ZH/VI/ES/DE/FR Storybook/E2E including CJK and text expansion/fallback.
+The product journey must distinguish evidence, recommendation, human review, confirmed decision, and authoritative downstream application. A generic “talent score” dashboard is not an acceptable substitute. Where the resolved policy grants an explanation/review/correction path, the affected-worker experience must show request state, applicable decision/process evidence, missing or redacted third-party information, review/reprocessing status, corrected outcome linkage, and terminal response without implying rights that do not apply. Material UI requires reusable objects/page composition, design-token/Figma identifiers, normal/loading/empty/error/permission/responsive/interaction states, keyboard/a11y evidence, and locale-specific KO/EN/JA/ZH/VI/ES/DE/FR Storybook/E2E including CJK and text expansion/fallback.
 
 ## Security and privacy
 
-Succession, mobility, performance, assessment, and career-interest data can be highly sensitive employment information. Every field group must declare classification, purpose, permitted actor/resource relation, retention, export/delete/legal-hold behavior, and audit requirements. Bulk export and manager views require explicit authorization; “HR role” is not sufficient as a universal permission. Logs and telemetry carry opaque references and operational metadata, not evidence payloads or credentials.
+Succession, mobility, performance, assessment, career-interest, decision-production, and rights-request data can be highly sensitive employment information. Every field group must declare classification, purpose, permitted actor/resource relation, retention, export/delete/legal-hold behavior, and audit requirements. Bulk export and manager views require explicit authorization; “HR role” is not sufficient as a universal permission. Explanation/review responses are purpose-scoped and minimize or redact evidence about other workers; a rights path must not become a succession-slate enumeration or assessment-data exfiltration channel. Logs and telemetry carry opaque references and operational metadata, not evidence payloads or credentials.
 
 ## Consequences
 
 A dedicated context adds API/event coordination and operational overhead, but keeps post-hire planning separate from employment facts and acquisition. It also creates an explicit place to implement buyer-visible Talent workflows without inflating `people_core` or misusing `talent_acquisition`.
 
 The main cost is coordination: internal mobility depends on authoritative Person/Assignment, Position, Job/KSAO, and evidence contexts. That is intentional. The context must consume released contracts and accept temporary unavailability rather than collapse ownership boundaries for local convenience.
+
+Decision-rights provenance adds another coordination boundary: Talent must retain enough immutable process/evidence data to support an applicable explanation or reconsideration without becoming the legal-policy authority or duplicating authoritative employment truth. That cost is preferable to losing the ability to reconstruct whether an adverse outcome was human, AI-assisted, or fully automated and what evidence governed it.
 
 ## Acceptance before status can become Accepted
 
@@ -187,6 +205,9 @@ The main cost is coordination: internal mobility depends on authoritative Person
 - Add a versioned UL/Context Map and exact aggregate/invariant model before schema/API work.
 - Convert the buyer journeys above into RED domain/API/security contracts, including stale evidence, empty, permission, conflict/recovery, and human-confirmation cases before production implementation.
 - Add a TalentPool enumeration-resistance RED contract proving an unauthorized existing restricted pool identifier and a nonexistent identifier are indistinguishable in externally observable status, body schema, empty-result semantics, and metadata, with no name/count disclosure.
+- Add RED decision-provenance contracts that distinguish `human_decision`, `ai_assisted_human_decision`, and `fully_automated_decision`; reject relabeling after finalization; and prove that an actor/confirmation field alone cannot substitute for recorded substantive human intervention.
+- Resolve a canonical versioned legal/compliance-policy contract before implementation. For a configured regulated automated-decision path, RED tests must fail closed on missing/stale applicable policy, prove purpose-scoped explanation/review/correction requests, prevent third-party worker leakage, and append reconsidered decisions without overwriting the original outcome.
+- Re-check current Korean PIPA automated-decision provisions and EU AI Act employment/high-risk explanation scope and application dates before ADR acceptance, implementation, or release/compliance claims; do not hard-code current statutory timing as permanent Talent-domain semantics.
 - Define assessment/validation evidence contracts without moving psychometric numerical or validity authority into Talent.
 - Define PII purpose/retention/export/legal-hold policy and threat model before exposing sensitive Talent views.
 - Add RED tests for cross-tenant references, stale evidence, unauthorized succession/mobility access, conflicting bitemporal corrections, duplicate/idempotent commands, Position/Assignment non-authority, and multiple legitimate pool membership.
