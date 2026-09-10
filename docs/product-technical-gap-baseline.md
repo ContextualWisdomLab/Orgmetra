@@ -1,6 +1,6 @@
 # Product and technical gap baseline
 
-Verified: 2026-09-04 (Asia/Seoul) for Orgmetra protected/product refs. External owner-repository evidence is treated as dependency context and must be re-fetched in its canonical owner lane before mutation or release claims.
+Verified: 2026-09-10 (Asia/Seoul) for Orgmetra protected/product refs. External owner-repository evidence is treated as dependency context and must be re-fetched in its canonical owner lane before mutation or release claims.
 
 This is Orgmetra’s durable commercialization baseline, not merge authorization and not a frozen PR inventory. Volatile PR heads, workflow-run IDs, queue states, reviews, mergeability and base tips are live GitHub truth and must be fetched again before every material action.
 
@@ -44,19 +44,15 @@ Orgmetra owns authoritative HR domain truth. Specialist CWL systems are consumed
 
 One physical PostgreSQL cluster may host multiple bounded contexts initially, but each context keeps an owned schema/role/migrations/access layer/contract. A shared physical database is not a Shared Kernel license.
 
+Post-hire Talent Management is not yet protected architecture. Active Proposed ADR 0292 selects a dedicated `talent_management` bounded context as the current design direction for talent pools, succession, internal mobility and employee-controlled career interests/preferences. Until that ADR is accepted and normally integrated, `people_core`, `organization_core`, `job_architecture`, `performance_management` and `workforce_validation` retain their existing protected truth; the proposed Talent owner may reference released/versioned evidence but may not copy or mutate those owners' Person, Employment, Assignment, Position, Job/KSAO, performance, assessment or validity/fairness truth.
+
 ## 4. Current protected truth and owner stack
 
 Protected `develop` is `eb9757f8649aaad026a9865508d9aad50c1a7a4f`, produced by normal integration of PR #161. #161 is therefore no longer a mutable prerequisite. Its protected delta consolidates repository-owned quality workflows and pins repository runner selection to explicit `ubuntu-24.04` without weakening domain, PostgreSQL or repository validation gates.
 
-The selector repair did not resolve the wider Actions admission incident: exact-current-head #63/#64/#65 jobs still materialize with the intended `ubuntu-24.04` label but remain queued before checkout with no runner assigned. Treat this as runner admission evidence, not as evidence that the selector repair failed and not as justification for no-op retriggers or copying workflow bytes into feature branches.
+Runner admission, queue state and hosted workflow progress are intentionally not frozen in this baseline. Any current execution failure must be established from the unchanged exact candidate head and current workflow identity; no-op retriggers, copied workflow bytes or predecessor evidence are not substitutes for a materially executed exact-head gate.
 
-Current canonical owner order is:
-
-1. **#63 shared HRIS-kernel audit/runtime evidence** — Draft and mechanically mergeable over current protected `develop`. A current CodeRabbit suggestion to add Job Analysis source/test files to `manifest.json` was verified against `tests/validate_repository.py` and rejected: the canonical manifest requires exact equality to its `REQUIRED` path set, which intentionally excludes those two files. Adding them would create `extra_entries` and make validation fail. The review thread was resolved without source change.
-2. **#64 generic People mutation runtime integrity** — Draft and mechanically mergeable over current protected `develop`; current product/security checks remain non-terminal.
-3. **#65 purpose-bound authorization plus Job Analysis durable/runtime integrity** — Draft and mechanically mergeable over current protected `develop`. Its #210 request-edge invariant is retained after #161 adoption: exact built-in Authorization text → header length at most 8,199 → Bearer parsing → token length at most 8,192. #65 must consume #63 only after #63 reaches protected truth, then reacquire exact-head evidence.
-4. **#163 explicit Assignment category** — valid buyer/domain delta retained, but still based on predecessor protected truth and currently non-mergeable against current `develop`. This is a repair/restack finding, not a close condition. After #63 and applicable #64/#65 integrations, #163 must non-force adopt resulting protected truth and reacquire every exact-head gate.
-5. **#165 Assignment category correction/supersession** — Draft child of #163. Preserve its close → replacement → predecessor/replacement provenance delta until #163 integrates, then non-force restack/adopt protected truth and rerun all exact-head gates.
+The durable People/Assignment dependency order remains #63 → #64 → #65 → #141 → #163 → #165. Each dependent lane must normally integrate its prerequisite to protected truth, then non-force adopt that protected delta and reacquire exact-head product/PostgreSQL/security/review evidence. The independent `workforce_validation` owner path remains #235 → #248 → later scientific/API increments. Proposed Talent Management #293 is a separate documentation/ownership-decision lane and is not a source dependency or shipped bounded context.
 
 Protected `develop` still does not make explicit primary-vs-concurrent-secondary Assignment classification shipped truth. Allocation, row order, Position identity and graph topology are not classification authority.
 
@@ -64,7 +60,7 @@ There are no published Orgmetra GitHub releases as of this verification. Do not 
 
 ## 5. Effective GitHub governance
 
-Orgmetra’s effective default-branch control plane is inherited organization ruleset **18156473 — `CWL Central required workflows`**, active as of 2026-09-04. Current live parameters are:
+Orgmetra’s effective default-branch control plane is inherited organization ruleset **18156473 — `CWL Central required workflows`**, re-verified on 2026-09-10. Current live parameters are:
 
 - one approving review required;
 - stale reviews dismissed after push;
@@ -82,12 +78,13 @@ Routine bypass, self-approval, synthetic reviewer identity, gate weakening or tr
 | Gap | Current evidence | Buyer consequence | Owner / next acceptance evidence | Priority |
 | --- | --- | --- | --- | --- |
 | **GOV-01 satisfiable protected admission** | inherited ruleset still requires one approval and exposes routine admin bypass | otherwise-GREEN work may be unable to progress normally, while bypass weakens auditability | canonical `.github` owner repair → live ruleset convergence → unchanged Orgmetra canary through ordinary path | **P0** |
-| **RUN-01 Actions runner admission** | #161 selector/workflow consolidation is protected truth; current #63/#64/#65 jobs carry `ubuntu-24.04` yet remain pre-checkout with no runner | exact-head product/security evidence remains unavailable | central/repository Actions admission RCA; unchanged candidate must materially execute rather than no-op retrigger | **P0 evidence** |
+| **REV-01 authoritative model-review settlement** | central OpenCode/Noema control-plane paths can admit the correct source head yet fail before an authoritative exact-head verdict/receipt is durably published or consumed; route readiness alone is not terminal verdict evidence | a product-correct head can remain non-mergeable, or a superficially successful model stage can be mistaken for review authority | canonical `.github`/contextual-orchestrator repair → authenticated exact-head terminal receipt → consumer wake/re-evaluation → unchanged Orgmetra canary; no provider pinning, predecessor verdict transfer or synthetic status | **P0 evidence** |
 | **SEC-01 authoritative Dependency Review** | required central workflow remains owner-controlled; substitutes cannot prove dependency diff | merge evidence can be incomplete or misleading | immutable released central workflow + authenticated exact comparison + material pinned action execution | **P0** |
 | **REL-01 integrated release evidence** | no published release and no single integrated protected head proves the full buyer/security/operability gate set | buyers cannot install/deploy a supported release | causal owner integration → protected-head release checklist → version/CHANGELOG/tag/package/SBOM/provenance/reproducibility/rollback | **P0** |
 | **AUTH-01 purpose-bound authorization/durable trust boundary** | #65 retains exact tenant/resource/purpose/operation/scope/field narrowing, exact runtime validation, decision revalidation, durable Job Analysis integrity and #210 request budget; still Active PR | remote/request/plugin-controlled data must not become HR policy authority or executable evidence before validation | #63 protected integration → #65 non-force protected adoption → exact-head product/PostgreSQL/security/review evidence → normal integration | **P1 security foundation** |
-| **ASG-01 explicit Assignment authority** | #162/#163 retain explicit `primary | concurrent_secondary`; `legacy_unspecified` is historical/restoration provenance; #163 is currently behind/conflicting with current protected truth | employee profile/reporting/authorization/graph consumers otherwise have to guess authoritative membership | integrate #63/#64/#65 as applicable → non-force adopt protected truth into #163 → PostgreSQL/API/OpenAPI/idempotency/bitemporal evidence → ordinary integration | **P1 buyer truth** |
+| **ASG-01 explicit Assignment authority** | #162/#163 retain explicit `primary | concurrent_secondary`; `legacy_unspecified` is historical/restoration provenance; #163 remains downstream of the People owner chain | employee profile/reporting/authorization/graph consumers otherwise have to guess authoritative membership | integrate #63/#64/#65/#141 as applicable → non-force adopt protected truth into #163 → PostgreSQL/API/OpenAPI/idempotency/bitemporal evidence → ordinary integration | **P1 buyer truth** |
 | **ASG-02 auditable Assignment correction** | #164/#165 retain immutable predecessor closure, replacement and normalized supersession provenance | HR operations cannot safely correct misclassification without rewriting history or losing provenance | #163 protected integration → #165 non-force restack/adoption → exact-head People/PostgreSQL/idempotency/security/review evidence → ordinary integration | **P1 buyer truth** |
+| **TAL-01 post-hire Talent ownership** | protected PRD/TRD/ARCHITECTURE stop Talent ownership at acquisition; Proposed ADR 0292/active PR #293 selects a dedicated post-hire owner but contains documentation only | internal mobility, succession, talent pools and career-interest workflows otherwise risk being wedged into People or Acquisition truth, duplicating authority and obscuring high-impact decision provenance | review/accept ADR 0292 without premature status promotion → normal protected integration → canonical context/schema/role/API/events/UI implementation → current-head security/PostgreSQL/E2E/a11y/i18n/recovery/performance evidence | **P1 buyer truth** |
 | **UX-01 role workspaces** | PRD/wireframe/design foundations exist; buyer-facing executable workspace evidence is not yet sufficient for a release claim | buyer lifecycle is not yet proven end-to-end through a coherent UI | Job Architecture → Candidate Evidence → Hiring Decision → Employee Profile → Validation vertical slice; Storybook/current-head E2E/a11y/i18n/edge-state evidence | **P1** |
 | **API-01 deployable gateway/composition** | service/package contracts exist but no released integrated application boundary is available | integrations lack one supported deployment contract | async gateway, generated OpenAPI validation, purpose/idempotency, service-owned persistence, contract/load/recovery tests | **P1** |
 | **VAL-01 governed validation workflow** | normalized validity/evidence architecture exists and scientific compute ownership remains external | people-analytics buyer cannot yet run the complete predictor→criterion→fairness workflow | exact immutable snapshots through released fast-mlsirm/TEPP/Psychometrics Commons contracts; reproducibility/error evidence | **P1** |
@@ -111,6 +108,8 @@ Minimum acceptance:
 7. material UI evidence for normal/loading/empty/error/permission/responsive/keyboard/touch/focus/i18n states in KO/EN/JA/ZH/VI/ES/DE/FR, including CJK/text expansion/font fallback;
 8. operability/recovery/load evidence against production-equivalent PostgreSQL and real buyer paths rather than reduced samples or unrealistic warm-cache exclusions.
 
+Post-hire Talent Management is the next distinct product-ownership lane if ADR 0292 survives review and reaches protected truth. It must not be implemented by broadening `talent_acquisition`, turning `people_core` into a generic planning aggregate or copying owner data into an analytics table for convenience.
+
 UI work must use reusable objects/page composition and product design evidence rather than template filler. Keyverse remains identity backend; authentication journey remains product form. Translation resources are versioned DB resources with screen-key cache and remain separate from ontology-label truth.
 
 ## 8. Data, scientific and AI invariants
@@ -122,6 +121,9 @@ UI work must use reusable objects/page composition and product design evidence r
 - Material mathematical/psychometric/EDA/vector/linear/matrix/token-size computation is Rust-first with bounded CPU parallelism and justified GPU parity.
 - Psychometric acceptance uses true-parameter recovery, RMSE, bias, coverage and reproducibility. Synthetic data is unit-test evidence, not real-world acceptance.
 - LLM output is draft/supporting evidence only. LLM work consumes released contextual-orchestrator API/client/schema contracts; GitHub Actions request only `orchestrator/free` through the gateway token and do not hard-code provider/model/group/paid fallback policy. Capability absence fails closed and is repaired in the canonical orchestrator owner.
+- Under Proposed ADR 0292, post-hire Talent planning consumes released owner evidence rather than duplicating Person/Employment/Assignment/Position/Job/KSAO/performance/assessment/validation truth. This remains proposed until normally integrated.
+- No universal `potential`, `readiness`, `fit`, `talent_score` or “high-potential” scalar becomes HRIS truth without an explicit construct, intended use, versioned evidence, uncertainty, validity/generalizability limits and fairness/adverse-impact analysis.
+- Under the current Proposed Talent contract, `fully_automated_decision` is non-authorizing provenance for imported/historical/external high-impact outcomes; Orgmetra does not use that mode to finalize a high-impact Talent decision. `ai_assisted_human_decision` requires substantive human-intervention evidence plus accountable-human confirmation. Jurisdiction-specific applicability and rights remain versioned legal/compliance-policy determinations rather than implications of the mode label alone.
 
 ## 9. Security, privacy and compliance posture
 
@@ -133,13 +135,17 @@ Customer-facing language describes the user’s next action and evidence state, 
 
 These sources define design/audit constraints; they do not certify Orgmetra or establish legal compliance by citation alone. Implementation-specific citations and invariants belong in `docs/doctoring/`, ADRs and traceability records beside the code/test they constrain.
 
+- International Organization for Standardization. (2016). *ISO 30409:2016 Human resource management—Workforce planning*. https://www.iso.org/standard/64150.html
 - International Organization for Standardization. (2023). *ISO 30405:2023 Human resource management—Guidelines on recruitment* (2nd ed.). https://www.iso.org/standard/79488.html
+- International Organization for Standardization. (2025). *ISO 30414:2025 Human resource management—Requirements and recommendations for human capital reporting and disclosure*. https://www.iso.org/standard/30414
 - International Organization for Standardization, & International Electrotechnical Commission. (2025). *ISO/IEC 40500:2025 Information technology—W3C Web Content Accessibility Guidelines (WCAG) 2.2* (2nd ed.). https://www.iso.org/standard/91029.html
 - World Wide Web Consortium. (2023). *Web Content Accessibility Guidelines (WCAG) 2.2*. https://www.w3.org/TR/WCAG22/
 - Joint Task Force. (2020). *Security and privacy controls for information systems and organizations* (NIST Special Publication 800-53 Rev. 5). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-53r5
 - National Institute of Standards and Technology. (2025, August 27). *NIST releases revision to SP 800-53 security and privacy controls (Release 5.2.0)*. https://csrc.nist.gov/news/2025/nist-releases-revision-to-sp-800-53-controls
 - Autio, C., Schwartz, R., Dunietz, J., Jain, S., Stanley, M., Tabassi, E., Hall, P., & Roberts, K. (2024). *Artificial Intelligence Risk Management Framework: Generative Artificial Intelligence Profile* (NIST AI 600-1). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.AI.600-1
 - American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association.
+- Collings, D. G., & Mellahi, K. (2009). Strategic talent management: A review and research agenda. *Human Resource Management Review, 19*(4), 304–313. https://doi.org/10.1016/j.hrmr.2009.04.001
+- Dries, N. (2013). The psychology of talent management: A review and research agenda. *Human Resource Management Review, 23*(4), 272–285. https://doi.org/10.1016/j.hrmr.2013.05.001
 
 A source citation without an executable invariant/test is documentation evidence only.
 
