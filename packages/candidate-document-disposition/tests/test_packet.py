@@ -154,6 +154,8 @@ class TestConstruction:
         evidence = {}
         if state == "return_claim_window_open":
             evidence["claim_window_end"] = datetime(2026, 10, 11, 12, 0, 0, tzinfo=timezone.utc)
+        if state == "legal_hold_suspended":
+            evidence["legal_hold"] = True
         if state in {
             "return_requested",
             "return_request_verified",
