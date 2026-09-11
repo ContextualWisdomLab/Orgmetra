@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -30,6 +30,43 @@ def _build(**overrides):
     kwargs = _kwargs()
     kwargs.update(overrides)
     return build_candidate_document_disposition(**kwargs)
+
+
+class _MutableTimezone(tzinfo):
+    def __init__(self, offset_hours: int) -> None:
+        self.offset_hours = offset_hours
+
+    def utcoffset(self, dt):
+        return timedelta(hours=self.offset_hours)
+
+    def dst(self, dt):
+        return timedelta(0)
+
+
+def test_timestamp_runtime_alias_cannot_change_digest_after_construction():
+    caller_timezone = _MutableTimezone(0)
+    packet = _build(
+        hiring_decision_finalized_at=datetime(
+            2026,
+            9,
+            11,
+            12,
+            0,
+            0,
+            tzinfo=caller_timezone,
+        )
+    )
+    original_digest = packet.sha256_digest()
+
+    caller_timezone.offset_hours = 9
+
+    assert packet.sha256_digest() == original_digest
+    assert packet.hiring_decision_finalized_at.tzinfo is not caller_timezone
+
+
+def test_legal_hold_must_be_exact_boolean():
+    with pytest.raises(ValueError, match="legal_hold"):
+        _build(legal_hold=1)
 
 
 @pytest.mark.parametrize("offset", [timedelta(0), -timedelta(seconds=1)])
