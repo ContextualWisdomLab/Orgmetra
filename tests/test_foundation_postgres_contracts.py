@@ -247,6 +247,32 @@ class FoundationPostgresContractInventoryTests(unittest.TestCase):
         self._write_registry(self.registry)
         self._assert_invalid("no PostgreSQL root contracts discovered")
 
+    def test_workflow_binds_executed_bytes_to_pre_execution_snapshot(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[1]
+            / ".github"
+            / "workflows"
+            / "foundation-ci.yml"
+        ).read_text(encoding="utf-8")
+        start = workflow.index("      - name: Run PostgreSQL contracts in isolated containers")
+        end = workflow.index("      - name: Prove compatibility toolchain provenance", start)
+        execution = workflow[start:end]
+
+        snapshot = 'python .github/scripts/foundation-postgres-contracts.py evidence > "$evidence_file"'
+        root_execution = 'DATABASE_URL="$database_url" bash "$contract"'
+        self.assertIn(snapshot, execution)
+        self.assertLess(execution.index(snapshot), execution.index(root_execution))
+        self.assertNotIn(
+            'foundation-postgres-contracts.py companions "$contract"',
+            execution,
+        )
+        self.assertIn('verify_contract_bytes "$contract"', execution)
+        self.assertIn('verify_contract_bytes "$companion"', execution)
+        self.assertIn(
+            'for bound_script in "${!expected_sha256[@]}"',
+            execution,
+        )
+
     def test_cli_list_and_companions_return_validated_paths(self) -> None:
         self.assertEqual(
             MODULE.main(["--root", str(self.root), "list"]),
