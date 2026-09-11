@@ -117,7 +117,7 @@ def _runner_declarations(workflow: str) -> list[tuple[int, str]]:
 
 
 def _action_declarations(workflow: str) -> list[tuple[int, str]]:
-    """Return remote action/reusable-workflow ``uses`` declarations."""
+    """Return non-local action/reusable-workflow ``uses`` declarations."""
     declarations: list[tuple[int, str]] = []
     for line_number, line in enumerate(workflow.splitlines(), start=1):
         entry = _mapping_entry(line)
@@ -126,10 +126,17 @@ def _action_declarations(workflow: str) -> list[tuple[int, str]]:
         _indent, _sequence, key, value = entry
         if key != "uses":
             continue
-        if value.startswith("./") or value.startswith("docker://"):
+        if value.startswith("./"):
             continue
         declarations.append((line_number, value))
     return declarations
+
+
+def _action_reference_is_immutable(value: str) -> bool:
+    """Require repository actions to pin commits and Docker actions to pin digests."""
+    if value.startswith("docker://"):
+        return _PINNED_IMAGE_PATTERN.fullmatch(value.removeprefix("docker://")) is not None
+    return _PINNED_ACTION_PATTERN.fullmatch(value) is not None
 
 
 def _image_declarations(workflow: str) -> list[tuple[int, str]]:
@@ -313,19 +320,19 @@ class GitHubActionsRunnerImageContractTest(unittest.TestCase):
 class GitHubActionsActionPinningContractTest(unittest.TestCase):
     """Keep remote action and image dependencies immutable."""
 
-    def test_all_remote_action_references_are_commit_pinned(self) -> None:
-        """Reject mutable tags and branches such as ``@v4`` or ``@main``."""
+    def test_all_remote_action_references_are_immutable(self) -> None:
+        """Reject mutable repository refs and mutable Docker action tags."""
         unpinned: list[str] = []
         for workflow_path in _workflow_paths():
             for line_number, value in _action_declarations(
                 workflow_path.read_text(encoding="utf-8")
             ):
-                if not _PINNED_ACTION_PATTERN.match(value):
+                if not _action_reference_is_immutable(value):
                     unpinned.append(f"{workflow_path.name}:{line_number}={value!r}")
         self.assertEqual(
             [],
             unpinned,
-            "remote action references must pin a full 40-character commit SHA: "
+            "remote actions must pin a full commit SHA or Docker image sha256 digest: "
             f"{unpinned}",
         )
 
@@ -354,6 +361,7 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
                 "actions/checkout@main",
                 "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
                 "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+                "docker://alpine:3.20",
                 "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
                 "ContextualWisdomLab/Orgmetra/.github/workflows/ci.yml@3d3c42e5aac5ba805825da76410c181273ba90b1",
                 "owner/repo/sub/dir@5fda3b95a4ea91299a34e894583c3862153e4b97",
@@ -366,12 +374,13 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
                 "actions/checkout@v4",
                 "actions/checkout@v4",
                 "actions/checkout@main",
+                "docker://alpine:3.20",
                 "owner/repo/.github/workflows/ci.yml@v1",
             ],
             [
                 value
                 for _, value in declarations
-                if not _PINNED_ACTION_PATTERN.match(value)
+                if not _action_reference_is_immutable(value)
             ],
         )
 
@@ -395,8 +404,31 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
             [
                 value
                 for _, value in declarations
-                if not _PINNED_ACTION_PATTERN.match(value)
+                if not _action_reference_is_immutable(value)
             ],
+        )
+
+    def test_docker_action_references_require_digest(self) -> None:
+        """Treat Docker ``uses`` as remote executable dependencies, not local actions."""
+        digest = "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+        untagged = f"docker://alpine@sha256:{digest}"
+        tagged = f"docker://alpine:3.20@sha256:{digest}"
+        sample = "\n".join(
+            (
+                "uses: docker://alpine:3.20",
+                f'"uses": {untagged}',
+                f"- 'uses': {tagged}",
+                "uses: ./local-action",
+            )
+        )
+        declarations = _action_declarations(sample)
+        self.assertEqual(
+            ["docker://alpine:3.20", untagged, tagged],
+            [value for _, value in declarations],
+        )
+        self.assertEqual(
+            [False, True, True],
+            [_action_reference_is_immutable(value) for _, value in declarations],
         )
 
     def test_all_container_images_are_digest_pinned(self) -> None:
