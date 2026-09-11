@@ -117,6 +117,32 @@ def test_legal_hold_rejects_every_destruction_state(state):
         _build(legal_hold=True, state=state)
 
 
+@pytest.mark.parametrize("state", ["return_dispatched", "return_destroyed"])
+def test_return_dispatch_states_require_dispatch_timestamp(state):
+    with pytest.raises(ValueError, match="return_dispatched_at"):
+        _build(state=state, return_dispatched_at=None)
+
+
+@pytest.mark.parametrize("offset", [timedelta(0), -timedelta(seconds=1)])
+def test_return_dispatch_timestamp_must_follow_hiring_decision(offset):
+    hiring_decision = _kwargs()["hiring_decision_finalized_at"]
+    with pytest.raises(ValueError, match="return_dispatched_at"):
+        _build(
+            state="return_dispatched",
+            return_dispatched_at=hiring_decision + offset,
+        )
+
+
+def test_return_destroyed_accepts_prior_dispatch_evidence():
+    hiring_decision = _kwargs()["hiring_decision_finalized_at"]
+    packet = _build(
+        state="return_destroyed",
+        return_dispatched_at=hiring_decision + timedelta(days=1),
+    )
+
+    assert packet.return_dispatched_at == hiring_decision + timedelta(days=1)
+
+
 def test_packet_state_cannot_be_rewritten_after_validation():
     packet = _build(legal_hold=True)
 
