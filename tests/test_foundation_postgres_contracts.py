@@ -268,6 +268,14 @@ class FoundationPostgresContractInventoryTests(unittest.TestCase):
         )
         self.assertIn('verify_contract_bytes "$contract"', execution)
         self.assertIn('verify_contract_bytes "$companion"', execution)
+        self.assertIn("verify_contract_path_identity() {", execution)
+        self.assertIn("for component in relative.parts:", execution)
+        self.assertIn("if current.is_symlink():", execution)
+        self.assertIn("current.resolve(strict=True).relative_to(root)", execution)
+        self.assertIn(
+            'verify_contract_path_identity "$script"',
+            execution,
+        )
         self.assertIn(
             'for bound_script in "${!expected_sha256[@]}"',
             execution,
