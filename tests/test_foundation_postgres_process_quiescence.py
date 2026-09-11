@@ -42,10 +42,7 @@ class FoundationPostgresProcessQuiescenceTests(unittest.TestCase):
         self.assertIn('sudo -n pkill -KILL -u "$contract_user"', execution)
         self.assertIn('run_contract_snapshot "$contract" "$database_url"', execution)
         self.assertIn('run_contract_snapshot "$companion" "$database_url"', execution)
-        self.assertNotIn(
-            'sudo -n -u "$contract_user" env \\\n              DATABASE_URL="$database_url"',
-            execution,
-        )
+        self.assertEqual(execution.count('sudo -n -u "$contract_user" env'), 1)
 
 
 if __name__ == "__main__":
