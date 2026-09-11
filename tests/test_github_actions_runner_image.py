@@ -15,6 +15,10 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 _RUNS_ON_PATTERN = re.compile(r"^\s*runs-on\s*:\s*(.*?)\s*$")
+_USES_PATTERN = re.compile(r"^\s*uses\s*:\s*(.*?)\s*$")
+_PINNED_ACTION_PATTERN = re.compile(
+    r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+@[0-9a-f]{40}$"
+)
 _EXPECTED_RUNNER = "ubuntu-24.04"
 _CENTRAL_WORKFLOW_NAMES = {
     "close-empty-pr.yml",
@@ -74,6 +78,27 @@ def _runner_declarations(workflow: str) -> list[tuple[int, str]]:
         value = _strip_yaml_comment(match.group(1))
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
             value = value[1:-1]
+        declarations.append((line_number, value))
+    return declarations
+
+
+def _action_declarations(workflow: str) -> list[tuple[int, str]]:
+    """Return line-numbered scalar ``uses`` declarations for remote actions.
+
+    Local composite actions (``./…``) and Docker references (``docker://…``) are
+    exempt because they do not resolve a remote Git ref. YAML comments are
+    stripped so an inline version comment cannot mask the resolved ref.
+    """
+    declarations: list[tuple[int, str]] = []
+    for line_number, line in enumerate(workflow.splitlines(), start=1):
+        match = _USES_PATTERN.match(line)
+        if match is None:
+            continue
+        value = _strip_yaml_comment(match.group(1))
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        if value.startswith("./") or value.startswith("docker://"):
+            continue
         declarations.append((line_number, value))
     return declarations
 
@@ -147,6 +172,53 @@ class GitHubActionsRunnerImageContractTest(unittest.TestCase):
                 "ubuntu-24.04#not-a-comment",
             ],
             [value for _, value in _runner_declarations(sample)],
+        )
+
+
+class GitHubActionsActionPinningContractTest(unittest.TestCase):
+    """Keep every remote action reference pinned to an immutable commit."""
+
+    def test_all_remote_action_references_are_commit_pinned(self) -> None:
+        """Reject mutable tags and branches such as ``@v4`` or ``@main``."""
+        unpinned: list[str] = []
+        for workflow_path in _workflow_paths():
+            for line_number, value in _action_declarations(
+                workflow_path.read_text(encoding="utf-8")
+            ):
+                if not _PINNED_ACTION_PATTERN.match(value):
+                    unpinned.append(f"{workflow_path.name}:{line_number}={value!r}")
+        self.assertEqual(
+            [],
+            unpinned,
+            "remote action references must pin a full 40-character commit SHA: "
+            f"{unpinned}",
+        )
+
+    def test_action_parser_rejects_mutable_and_pins_commit_sha(self) -> None:
+        """Keep the validator sensitive to tags, branches, and local/Docker refs."""
+        sample = "\n".join(
+            (
+                "uses: actions/checkout@v4",
+                "uses: actions/checkout@main",
+                "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+                "uses: ./local-action",
+                "uses: docker://alpine:3.20",
+                "uses: 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97'",
+            )
+        )
+        declarations = _action_declarations(sample)
+        self.assertEqual(
+            [
+                "actions/checkout@v4",
+                "actions/checkout@main",
+                "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+            ],
+            [value for _, value in declarations],
+        )
+        self.assertEqual(
+            2,
+            sum(bool(_PINNED_ACTION_PATTERN.match(value)) for _, value in declarations),
         )
 
 
