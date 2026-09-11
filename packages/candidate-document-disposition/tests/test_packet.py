@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 
 import pytest
@@ -38,10 +38,12 @@ def _build(**overrides) -> CandidateDocumentDisposition:
 
 
 def _return_request_evidence() -> dict:
+    verified_at = datetime(2026, 9, 11, 14, 0, 0, tzinfo=timezone.utc)
     return {
         "return_request_reference": "candidate_return_request:00000000-0000-4000-a000-000000000050",
         "return_requested_at": datetime(2026, 9, 11, 13, 0, 0, tzinfo=timezone.utc),
-        "return_request_verified_at": datetime(2026, 9, 11, 14, 0, 0, tzinfo=timezone.utc),
+        "return_request_verified_at": verified_at,
+        "return_due_at": verified_at + timedelta(days=14),
     }
 
 
@@ -166,7 +168,9 @@ class TestConstruction:
             "return_delivered",
             "return_destroyed",
         }:
-            evidence["return_request_verified_at"] = _return_request_evidence()["return_request_verified_at"]
+            request_evidence = _return_request_evidence()
+            evidence["return_request_verified_at"] = request_evidence["return_request_verified_at"]
+            evidence["return_due_at"] = request_evidence["return_due_at"]
         if state in {"return_dispatched", "return_delivered", "return_destroyed"}:
             evidence["return_dispatched_at"] = dispatch_at
         if state in {"return_delivered", "return_destroyed"}:
@@ -331,6 +335,7 @@ class TestCanonicalJson:
             return_request_reference=None,
             return_requested_at=None,
             return_request_verified_at=None,
+            return_due_at=None,
             return_dispatched_at=None,
             return_delivered_at=None,
             statutory_retain_until=None,
@@ -341,6 +346,7 @@ class TestCanonicalJson:
         assert doc["return_request_reference"] is None
         assert doc["return_requested_at"] is None
         assert doc["return_request_verified_at"] is None
+        assert doc["return_due_at"] is None
         assert doc["return_dispatched_at"] is None
         assert doc["return_delivered_at"] is None
         assert doc["statutory_retain_until"] is None
@@ -364,6 +370,7 @@ class TestCanonicalJson:
         assert doc["return_request_reference"] is not None
         assert doc["return_requested_at"] is not None
         assert doc["return_request_verified_at"] is not None
+        assert doc["return_due_at"] is not None
         assert doc["return_dispatched_at"] is not None
         assert doc["return_delivered_at"] is not None
         assert doc["statutory_retain_until"] is not None
