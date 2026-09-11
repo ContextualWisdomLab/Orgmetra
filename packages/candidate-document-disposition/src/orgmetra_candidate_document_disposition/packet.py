@@ -311,6 +311,8 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             statutory_retain_until = _normalize_timestamp(statutory_retain_until)
         if type(legal_hold) is not bool:
             raise ValueError("legal_hold must be an exact boolean")
+        if state == "legal_hold_suspended" and not legal_hold:
+            raise ValueError("legal_hold_suspended requires an active legal_hold")
         _validate_code(purpose_code, "purpose_code")
         if purpose_code != _DISPOSITION_PURPOSE:
             raise ValueError("purpose_code must remain candidate_document_disposition")
