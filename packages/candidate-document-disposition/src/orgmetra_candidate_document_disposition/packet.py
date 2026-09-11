@@ -103,6 +103,7 @@ _PACKET_FIELDS = (
     "return_request_reference",
     "return_requested_at",
     "return_request_verified_at",
+    "return_due_at",
     "return_dispatched_at",
     "return_delivered_at",
     "statutory_retain_until",
@@ -201,6 +202,7 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
         return_request_reference: str | None = None,
         return_requested_at: datetime | None = None,
         return_request_verified_at: datetime | None = None,
+        return_due_at: datetime | None = None,
         return_dispatched_at: datetime | None = None,
         return_delivered_at: datetime | None = None,
         statutory_retain_until: datetime | None = None,
@@ -234,6 +236,8 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             claim_window_end = _normalize_timestamp(claim_window_end)
             if claim_window_end <= hiring_decision_finalized_at:
                 raise ValueError("claim_window_end must be after hiring_decision_finalized_at")
+        if state == "return_claim_window_open" and claim_window_end is None:
+            raise ValueError("claim_window_end is required while the return claim window is open")
         if return_request_reference is not None:
             _validate_reference(
                 return_request_reference,
@@ -261,6 +265,14 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             raise ValueError(
                 "return_request_verified_at is required once return-request verification has completed"
             )
+        if return_due_at is not None:
+            return_due_at = _normalize_timestamp(return_due_at)
+            if return_request_verified_at is None:
+                raise ValueError("return_due_at requires return_request_verified_at")
+            if return_due_at < return_request_verified_at:
+                raise ValueError("return_due_at cannot precede return_request_verified_at")
+        if state in _RETURN_VERIFIED_EVIDENCE_STATES and return_due_at is None:
+            raise ValueError("return_due_at is required once a return request is verified")
         if return_dispatched_at is not None:
             return_dispatched_at = _normalize_timestamp(return_dispatched_at)
             if return_dispatched_at <= hiring_decision_finalized_at:
@@ -332,6 +344,7 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             return_request_reference,
             return_requested_at,
             return_request_verified_at,
+            return_due_at,
             return_dispatched_at,
             return_delivered_at,
             statutory_retain_until,
@@ -371,6 +384,7 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             "retention_policy_version": self.retention_policy_version,
             "return_delivered_at": _canonical_timestamp(self.return_delivered_at) if self.return_delivered_at is not None else None,
             "return_dispatched_at": _canonical_timestamp(self.return_dispatched_at) if self.return_dispatched_at is not None else None,
+            "return_due_at": _canonical_timestamp(self.return_due_at) if self.return_due_at is not None else None,
             "return_eligibility": self.return_eligibility,
             "return_request_reference": self.return_request_reference,
             "return_request_verified_at": _canonical_timestamp(self.return_request_verified_at) if self.return_request_verified_at is not None else None,
@@ -415,6 +429,7 @@ def build_candidate_document_disposition(
     return_request_reference: str | None = None,
     return_requested_at: datetime | None = None,
     return_request_verified_at: datetime | None = None,
+    return_due_at: datetime | None = None,
     return_dispatched_at: datetime | None = None,
     return_delivered_at: datetime | None = None,
     statutory_retain_until: datetime | None = None,
@@ -449,6 +464,7 @@ def build_candidate_document_disposition(
         return_request_reference=return_request_reference,
         return_requested_at=return_requested_at,
         return_request_verified_at=return_request_verified_at,
+        return_due_at=return_due_at,
         return_dispatched_at=return_dispatched_at,
         return_delivered_at=return_delivered_at,
         statutory_retain_until=statutory_retain_until,
