@@ -47,7 +47,7 @@ jobs:
         env:
           ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
           ORGMETRA_POSTGRES_RUNNER_SHA256: 1470628f8265d2dc39fff1db80379c9395bac416ab6afcc7f4bc78cea49dcf72
-          ORGMETRA_POSTGRES_TEST_SHA256: 11f256efdfdd951daeb5605e2cfee444eb864f203cf820e9c2bfc360c5691272
+          ORGMETRA_POSTGRES_TEST_SHA256: a3ef84822363878cfe08f3664c1ff33a21acf77e65bc373fb261f8e12f247c85
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
@@ -139,13 +139,42 @@ jobs:
             exit 1
           fi
 
+          verify_contract_path_identity() {
+            local script="$1"
+            python - "$script" <<'PY'
+          import sys
+          from pathlib import Path
+
+          root = Path.cwd().resolve(strict=True)
+          relative = Path(sys.argv[1])
+          current = root
+          for component in relative.parts:
+              current /= component
+              if current.is_symlink():
+                  raise SystemExit(
+                      f"PostgreSQL contract path gained symlink indirection before use: {relative}"
+                  )
+          if not current.is_file():
+              raise SystemExit(
+                  f"PostgreSQL contract path is not a regular file before use: {relative}"
+              )
+          try:
+              current.resolve(strict=True).relative_to(root)
+          except (OSError, ValueError) as error:
+              raise SystemExit(
+                  f"PostgreSQL contract path escaped repository before use: {relative}"
+              ) from error
+          PY
+          }
+
           verify_contract_bytes() {
             local script="$1"
             local expected="${expected_sha256[$script]:-}"
-            if [[ -z "$expected" || ! -f "$script" || -L "$script" ]]; then
-              printf 'PostgreSQL contract path lost reviewed identity before use: %s\n' "$script" >&2
+            if [[ -z "$expected" ]]; then
+              printf 'PostgreSQL contract lost reviewed digest binding before use: %s\n' "$script" >&2
               return 1
             fi
+            verify_contract_path_identity "$script"
             local observed
             observed="$(sha256sum "$script" | awk '{print $1}')"
             if [[ "$observed" != "$expected" ]]; then
