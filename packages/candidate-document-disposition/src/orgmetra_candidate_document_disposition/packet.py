@@ -31,6 +31,7 @@ _ALLOWED_STATES = frozenset({
     "return_requested",
     "return_request_verified",
     "return_dispatched",
+    "return_delivered",
     "return_destroyed",
     "talent_pool_retained",
     "confirmed_hire_transitioned",
@@ -54,6 +55,11 @@ _DESTRUCTION_STATES = frozenset({
 })
 _RETURN_DISPATCH_EVIDENCE_STATES = frozenset({
     "return_dispatched",
+    "return_delivered",
+    "return_destroyed",
+})
+_RETURN_DELIVERY_EVIDENCE_STATES = frozenset({
+    "return_delivered",
     "return_destroyed",
 })
 _REVIEW_STATE = "requires_human_disposition_review"
@@ -82,6 +88,7 @@ _PACKET_FIELDS = (
     "previous_disposition_reference",
     "claim_window_end",
     "return_dispatched_at",
+    "return_delivered_at",
     "statutory_retain_until",
     "human_confirmation_required",
     "review_state",
@@ -176,6 +183,7 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
         previous_disposition_reference: str | None = None,
         claim_window_end: datetime | None = None,
         return_dispatched_at: datetime | None = None,
+        return_delivered_at: datetime | None = None,
         statutory_retain_until: datetime | None = None,
         human_confirmation_required: bool = True,
         review_state: str = _REVIEW_STATE,
@@ -213,6 +221,14 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
                 raise ValueError("return_dispatched_at must be after hiring_decision_finalized_at")
         if state in _RETURN_DISPATCH_EVIDENCE_STATES and return_dispatched_at is None:
             raise ValueError("return_dispatched_at is required once return dispatch has completed")
+        if return_delivered_at is not None:
+            return_delivered_at = _normalize_timestamp(return_delivered_at)
+            if return_dispatched_at is None:
+                raise ValueError("return_delivered_at requires return_dispatched_at")
+            if return_delivered_at < return_dispatched_at:
+                raise ValueError("return_delivered_at cannot precede return_dispatched_at")
+        if state in _RETURN_DELIVERY_EVIDENCE_STATES and return_delivered_at is None:
+            raise ValueError("return_delivered_at is required once return delivery has completed")
         if statutory_retain_until is not None:
             statutory_retain_until = _normalize_timestamp(statutory_retain_until)
         if type(legal_hold) is not bool:
@@ -266,6 +282,7 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             previous_disposition_reference,
             claim_window_end,
             return_dispatched_at,
+            return_delivered_at,
             statutory_retain_until,
             human_confirmation_required,
             review_state,
@@ -301,6 +318,7 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             "retention_anchor_event": self.retention_anchor_event,
             "retention_policy_digest": self.retention_policy_digest,
             "retention_policy_version": self.retention_policy_version,
+            "return_delivered_at": _canonical_timestamp(self.return_delivered_at) if self.return_delivered_at is not None else None,
             "return_dispatched_at": _canonical_timestamp(self.return_dispatched_at) if self.return_dispatched_at is not None else None,
             "return_eligibility": self.return_eligibility,
             "review_state": self.review_state,
@@ -341,6 +359,7 @@ def build_candidate_document_disposition(
     previous_disposition_reference: str | None = None,
     claim_window_end: datetime | None = None,
     return_dispatched_at: datetime | None = None,
+    return_delivered_at: datetime | None = None,
     statutory_retain_until: datetime | None = None,
 ) -> CandidateDocumentDisposition:
     """Validate lifecycle evidence and return an immutable disposition packet.
@@ -371,5 +390,6 @@ def build_candidate_document_disposition(
         previous_disposition_reference=previous_disposition_reference,
         claim_window_end=claim_window_end,
         return_dispatched_at=return_dispatched_at,
+        return_delivered_at=return_delivered_at,
         statutory_retain_until=statutory_retain_until,
     )
