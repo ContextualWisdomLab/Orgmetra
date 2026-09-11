@@ -91,6 +91,8 @@ _CandidateDocumentDispositionTuple = namedtuple(
 
 
 def _validate_operational_uuid(value: str, field_name: str) -> None:
+    if type(value) is not str:
+        raise ValueError(f"{field_name} must be canonical UUID text")
     try:
         parsed = UUID(value)
     except (ValueError, AttributeError, TypeError) as exc:
@@ -100,19 +102,19 @@ def _validate_operational_uuid(value: str, field_name: str) -> None:
 
 
 def _validate_code(value: str, field_name: str) -> None:
-    if not isinstance(value, str) or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
+    if type(value) is not str or len(value) > 64 or not _CODE_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be bounded two-or-more-word lower snake_case")
 
 
 def _validate_digest(value: str, field_name: str) -> None:
-    if not isinstance(value, str) or not _DIGEST_PATTERN.fullmatch(value):
+    if type(value) is not str or not _DIGEST_PATTERN.fullmatch(value):
         raise ValueError(f"{field_name} must be lowercase SHA-256 hex")
 
 
 def _validate_reference(value: str, prefix: str, field_name: str) -> None:
     message = f"{field_name} must be an opaque {prefix}: reference"
     if (
-        not isinstance(value, str)
+        type(value) is not str
         or len(value) > 160
         or not _REFERENCE_PATTERN.fullmatch(value)
         or not value.startswith(f"{prefix}:")
@@ -224,8 +226,12 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             )
         if human_confirmation_required is not True:
             raise ValueError("human confirmation is mandatory for document disposition")
+        if type(review_state) is not str:
+            raise ValueError("review_state must be an exact string")
         if review_state != _REVIEW_STATE:
             raise ValueError("review_state must remain requires_human_disposition_review")
+        if type(next_action) is not str:
+            raise ValueError("next_action must be an exact string")
         if next_action != _NEXT_ACTION:
             raise ValueError("next_action must remain the governed disposition instruction")
         if legal_hold and state in _DESTRUCTION_STATES:
