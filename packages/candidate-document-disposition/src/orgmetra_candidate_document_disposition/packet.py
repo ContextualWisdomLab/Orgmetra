@@ -1,6 +1,6 @@
 import json
 import re
-from dataclasses import dataclass
+from collections import namedtuple
 from datetime import datetime, timezone
 from hashlib import sha256
 from uuid import UUID
@@ -47,11 +47,46 @@ _ALLOWED_RETENTION_ANCHOR_EVENTS = frozenset({
     "talent_pool_expired",
     "statutory_period_start",
 })
+_DESTRUCTION_STATES = frozenset({
+    "return_destroyed",
+    "statutory_retention_expired_destroyed",
+    "destroyed",
+})
 _REVIEW_STATE = "requires_human_disposition_review"
 _NEXT_ACTION = (
     "Within tenant_record_id, verify the disposition event against the authoritative "
     "talent_acquisition or people_core record; confirm no conflicting legal hold, "
     "then request artifact lifecycle disposition from document_records."
+)
+_PACKET_FIELDS = (
+    "tenant_record_id",
+    "disposition_reference",
+    "document_reference",
+    "candidate_reference",
+    "hiring_decision_finalized_at",
+    "return_eligibility",
+    "state",
+    "retention_policy_version",
+    "retention_policy_digest",
+    "retention_anchor_event",
+    "retain_until",
+    "legal_hold",
+    "purpose_code",
+    "reason_code",
+    "evidence_version",
+    "actor_reference",
+    "previous_disposition_reference",
+    "claim_window_end",
+    "return_dispatched_at",
+    "statutory_retain_until",
+    "human_confirmation_required",
+    "review_state",
+    "next_action",
+)
+_CandidateDocumentDispositionTuple = namedtuple(
+    "_CandidateDocumentDispositionTuple",
+    _PACKET_FIELDS,
+    module=__name__,
 )
 
 
@@ -98,91 +133,135 @@ def _canonical_timestamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-@dataclass(frozen=True, slots=True, repr=False)
-class CandidateDocumentDisposition:
-    """Immutable, PII-minimized candidate-document disposition packet.
+class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
+    """Structurally immutable, PII-minimized candidate-document disposition packet.
 
-    Carries the disposition intent for a candidate document across the
-    talent_acquisition, people_core, and document_records boundaries.
+    Construction validates bounded lifecycle evidence before storing it in
+    tuple-backed immutable slots. The packet carries disposition intent across
+    talent_acquisition, people_core, and document_records without granting
+    artifact-lifecycle authority by itself.
     """
 
-    tenant_record_id: str
-    disposition_reference: str
-    document_reference: str
-    candidate_reference: str
-    hiring_decision_finalized_at: datetime
-    return_eligibility: str
-    state: str
-    retention_policy_version: str
-    retention_policy_digest: str
-    retention_anchor_event: str
-    retain_until: datetime | None
-    legal_hold: bool
-    purpose_code: str
-    reason_code: str
-    evidence_version: int
-    actor_reference: str
-    previous_disposition_reference: str | None = None
-    claim_window_end: datetime | None = None
-    return_dispatched_at: datetime | None = None
-    statutory_retain_until: datetime | None = None
-    human_confirmation_required: bool = True
-    review_state: str = _REVIEW_STATE
-    next_action: str = _NEXT_ACTION
+    __slots__ = ()
+
+    def __new__(
+        cls,
+        tenant_record_id: str,
+        disposition_reference: str,
+        document_reference: str,
+        candidate_reference: str,
+        hiring_decision_finalized_at: datetime,
+        return_eligibility: str,
+        state: str,
+        retention_policy_version: str,
+        retention_policy_digest: str,
+        retention_anchor_event: str,
+        retain_until: datetime | None,
+        legal_hold: bool,
+        purpose_code: str,
+        reason_code: str,
+        evidence_version: int,
+        actor_reference: str,
+        previous_disposition_reference: str | None = None,
+        claim_window_end: datetime | None = None,
+        return_dispatched_at: datetime | None = None,
+        statutory_retain_until: datetime | None = None,
+        human_confirmation_required: bool = True,
+        review_state: str = _REVIEW_STATE,
+        next_action: str = _NEXT_ACTION,
+    ):
+        _validate_operational_uuid(tenant_record_id, "tenant_record_id")
+        _validate_reference(
+            disposition_reference,
+            "candidate_document_disposition",
+            "disposition_reference",
+        )
+        _validate_reference(document_reference, "document", "document_reference")
+        _validate_reference(candidate_reference, "candidate_profile", "candidate_reference")
+        _canonical_timestamp(hiring_decision_finalized_at)
+        _validate_code(return_eligibility, "return_eligibility")
+        if return_eligibility not in _ALLOWED_RETURN_ELIGIBILITY_CODES:
+            raise ValueError("return_eligibility must be an authorized disposition return code")
+        _validate_code(state, "state")
+        if state not in _ALLOWED_STATES:
+            raise ValueError("state must be an authorized disposition state")
+        _validate_code(retention_policy_version, "retention_policy_version")
+        _validate_digest(retention_policy_digest, "retention_policy_digest")
+        _validate_code(retention_anchor_event, "retention_anchor_event")
+        if retention_anchor_event not in _ALLOWED_RETENTION_ANCHOR_EVENTS:
+            raise ValueError("retention_anchor_event must be an authorized anchor event")
+        if retain_until is not None:
+            _canonical_timestamp(retain_until)
+        if claim_window_end is not None:
+            _canonical_timestamp(claim_window_end)
+            if claim_window_end <= hiring_decision_finalized_at:
+                raise ValueError("claim_window_end must be after hiring_decision_finalized_at")
+        if return_dispatched_at is not None:
+            _canonical_timestamp(return_dispatched_at)
+        if statutory_retain_until is not None:
+            _canonical_timestamp(statutory_retain_until)
+        _validate_code(purpose_code, "purpose_code")
+        if purpose_code != _DISPOSITION_PURPOSE:
+            raise ValueError("purpose_code must remain candidate_document_disposition")
+        _validate_code(reason_code, "reason_code")
+        if reason_code not in _ALLOWED_REASON_CODES:
+            raise ValueError("reason_code must be an authorized disposition reason")
+        if type(evidence_version) is not int or not 1 <= evidence_version <= 2_147_483_647:
+            raise ValueError("evidence_version must be an integer from 1 through 2147483647")
+        _validate_reference(actor_reference, "actor", "actor_reference")
+        if previous_disposition_reference is not None:
+            _validate_reference(
+                previous_disposition_reference,
+                "candidate_document_disposition",
+                "previous_disposition_reference",
+            )
+        if human_confirmation_required is not True:
+            raise ValueError("human confirmation is mandatory for document disposition")
+        if review_state != _REVIEW_STATE:
+            raise ValueError("review_state must remain requires_human_disposition_review")
+        if next_action != _NEXT_ACTION:
+            raise ValueError("next_action must remain the governed disposition instruction")
+        if legal_hold and state in _DESTRUCTION_STATES:
+            raise ValueError("a document under legal hold cannot be destroyed")
+
+        return super().__new__(
+            cls,
+            tenant_record_id,
+            disposition_reference,
+            document_reference,
+            candidate_reference,
+            hiring_decision_finalized_at,
+            return_eligibility,
+            state,
+            retention_policy_version,
+            retention_policy_digest,
+            retention_anchor_event,
+            retain_until,
+            legal_hold,
+            purpose_code,
+            reason_code,
+            evidence_version,
+            actor_reference,
+            previous_disposition_reference,
+            claim_window_end,
+            return_dispatched_at,
+            statutory_retain_until,
+            human_confirmation_required,
+            review_state,
+            next_action,
+        )
 
     def __repr__(self) -> str:
         return "CandidateDocumentDisposition(<redacted>)"
 
-    def __post_init__(self) -> None:
-        _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
-        _validate_reference(self.disposition_reference, "candidate_document_disposition", "disposition_reference")
-        _validate_reference(self.document_reference, "document", "document_reference")
-        _validate_reference(self.candidate_reference, "candidate_profile", "candidate_reference")
-        _canonical_timestamp(self.hiring_decision_finalized_at)
-        _validate_code(self.return_eligibility, "return_eligibility")
-        if self.return_eligibility not in _ALLOWED_RETURN_ELIGIBILITY_CODES:
-            raise ValueError("return_eligibility must be an authorized disposition return code")
-        _validate_code(self.state, "state")
-        if self.state not in _ALLOWED_STATES:
-            raise ValueError("state must be an authorized disposition state")
-        _validate_code(self.retention_policy_version, "retention_policy_version")
-        _validate_digest(self.retention_policy_digest, "retention_policy_digest")
-        _validate_code(self.retention_anchor_event, "retention_anchor_event")
-        if self.retention_anchor_event not in _ALLOWED_RETENTION_ANCHOR_EVENTS:
-            raise ValueError("retention_anchor_event must be an authorized anchor event")
-        if self.retain_until is not None:
-            _canonical_timestamp(self.retain_until)
-        if self.claim_window_end is not None:
-            _canonical_timestamp(self.claim_window_end)
-        if self.return_dispatched_at is not None:
-            _canonical_timestamp(self.return_dispatched_at)
-        if self.statutory_retain_until is not None:
-            _canonical_timestamp(self.statutory_retain_until)
-        _validate_code(self.purpose_code, "purpose_code")
-        if self.purpose_code != _DISPOSITION_PURPOSE:
-            raise ValueError("purpose_code must remain candidate_document_disposition")
-        _validate_code(self.reason_code, "reason_code")
-        if self.reason_code not in _ALLOWED_REASON_CODES:
-            raise ValueError("reason_code must be an authorized disposition reason")
-        if type(self.evidence_version) is not int or not 1 <= self.evidence_version <= 2_147_483_647:
-            raise ValueError("evidence_version must be an integer from 1 through 2147483647")
-        _validate_reference(self.actor_reference, "actor", "actor_reference")
-        if self.previous_disposition_reference is not None:
-            _validate_reference(
-                self.previous_disposition_reference,
-                "candidate_document_disposition",
-                "previous_disposition_reference",
-            )
-        if self.human_confirmation_required is not True:
-            raise ValueError("human confirmation is mandatory for document disposition")
-        if self.review_state != _REVIEW_STATE:
-            raise ValueError("review_state must remain requires_human_disposition_review")
-        if self.next_action != _NEXT_ACTION:
-            raise ValueError("next_action must remain the governed disposition instruction")
-        if self.legal_hold and self.state == "destroyed":
-            raise ValueError("a document under legal hold cannot be destroyed")
-
     def canonical_json(self) -> str:
+        """Return deterministic canonical JSON for the already validated packet.
+
+        Construction performs all input validation and raises ``ValueError`` for
+        invalid lifecycle evidence. This method serializes that immutable state
+        with stable key ordering and UTC timestamps; it does not re-authorize a
+        disposition or execute a document lifecycle operation.
+        """
         payload = {
             "actor_reference": self.actor_reference,
             "candidate_reference": self.candidate_reference,
@@ -211,6 +290,12 @@ class CandidateDocumentDisposition:
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
     def sha256_digest(self) -> str:
+        """Return the lowercase SHA-256 digest of ``canonical_json()``.
+
+        The digest is content-addressing evidence only. Invalid construction
+        inputs have already raised ``ValueError``; this method does not turn the
+        packet into authentication or authorization authority.
+        """
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
@@ -237,6 +322,13 @@ def build_candidate_document_disposition(
     return_dispatched_at: datetime | None = None,
     statutory_retain_until: datetime | None = None,
 ) -> CandidateDocumentDisposition:
+    """Validate lifecycle evidence and return an immutable disposition packet.
+
+    The same constructor validation used by ``CandidateDocumentDisposition`` is
+    applied to every argument. ``ValueError`` is raised when an identifier,
+    controlled code, timestamp, lifecycle ordering rule, legal-hold rule, or
+    governed constant is invalid.
+    """
     return CandidateDocumentDisposition(
         tenant_record_id=tenant_record_id,
         disposition_reference=disposition_reference,
