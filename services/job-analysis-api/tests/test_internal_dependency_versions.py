@@ -41,12 +41,17 @@ def _expected_owned_dependencies() -> set[str]:
 def _assert_owned_dependency_pins(
     declared_dependencies: list[str], expected_dependencies: set[str]
 ) -> None:
-    """Require every expected owned package while preserving the existing contract."""
-    assert expected_dependencies <= set(declared_dependencies)
+    """Require declared internal dependencies to equal the canonical owned pins."""
+    declared_owned_dependencies = {
+        dependency
+        for dependency in declared_dependencies
+        if dependency.startswith("orgmetra-")
+    }
+    assert declared_owned_dependencies == expected_dependencies
 
 
 def test_owned_dependency_contract_rejects_extra_internal_pin() -> None:
-    """Reject an unknown or stale internal package that the subset check would miss."""
+    """Reject an unknown or stale internal package that a subset check would miss."""
     expected_dependencies = {"orgmetra-hris-kernel==0.4.0"}
     with pytest.raises(AssertionError):
         _assert_owned_dependency_pins(
