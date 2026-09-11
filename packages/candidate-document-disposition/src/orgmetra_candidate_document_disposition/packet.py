@@ -295,7 +295,12 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
         if state in _RETURN_DELIVERY_EVIDENCE_STATES and return_delivered_at is None:
             raise ValueError("return_delivered_at is required once return delivery has completed")
         if state in _RETURN_PRE_REQUEST_STATES and (
-            return_request_reference is not None or return_requested_at is not None
+            return_request_reference is not None
+            or return_requested_at is not None
+            or return_request_verified_at is not None
+            or return_due_at is not None
+            or return_dispatched_at is not None
+            or return_delivered_at is not None
         ):
             raise ValueError("return request evidence cannot precede return_requested state")
         if state == "return_requested" and (
