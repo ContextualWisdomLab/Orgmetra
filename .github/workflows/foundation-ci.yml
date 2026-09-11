@@ -46,8 +46,8 @@ jobs:
       - name: Prove PostgreSQL contract inventory provenance
         env:
           ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
-          ORGMETRA_POSTGRES_RUNNER_SHA256: 1470628f8265d2dc39fff1db80379c9395bac416ab6afcc7f4bc78cea49dcf72
-          ORGMETRA_POSTGRES_TEST_SHA256: a3ef84822363878cfe08f3664c1ff33a21acf77e65bc373fb261f8e12f247c85
+          ORGMETRA_POSTGRES_RUNNER_SHA256: bb84ea602542585d5c4d1156ea765d3dcdd7756da9d2ef7438096eed72364286
+          ORGMETRA_POSTGRES_TEST_SHA256: 77964f54112a75da48914087e954ebbd2e15518ba7601e1a1b6677bf06a42dd1
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
@@ -90,95 +90,106 @@ jobs:
           PGPASSWORD: orgmetra
         run: |
           set -euo pipefail
-          evidence_file="$(mktemp)"
-          plan_file="$(mktemp)"
-          python .github/scripts/foundation-postgres-contracts.py evidence > "$evidence_file"
-          python - "$evidence_file" > "$plan_file" <<'PY'
+          snapshot_parent="$(mktemp -d)"
+          snapshot_dir="$snapshot_parent/contracts"
+          plan_file="$snapshot_parent/plan.json"
+          current_container=""
+
+          cleanup_postgres_contracts() {
+            if [[ -n "$current_container" ]]; then
+              docker rm --force "$current_container" >/dev/null 2>&1 || true
+            fi
+            chmod -R u+w "$snapshot_parent" >/dev/null 2>&1 || true
+            rm -rf "$snapshot_parent"
+          }
+          trap cleanup_postgres_contracts EXIT
+
+          python .github/scripts/foundation-postgres-contracts.py \
+            snapshot --destination "$snapshot_dir" > "$plan_file"
+          plan_tsv="$snapshot_parent/plan.tsv"
+          python - "$plan_file" > "$plan_tsv" <<'PY'
           import json
           import sys
           from pathlib import Path
 
-          evidence = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          for contract in evidence["active"]:
+          snapshot = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          for contract in snapshot["active"]:
               root = contract["script"]
-              print("root", root, root, contract["sha256"], sep="\t")
+              print(
+                  "root",
+                  root,
+                  root,
+                  contract["snapshot_script"],
+                  contract["sha256"],
+                  sep="\t",
+              )
               for companion in contract["companions"]:
                   print(
                       "companion",
                       root,
                       companion["script"],
+                      companion["snapshot_script"],
                       companion["sha256"],
                       sep="\t",
                   )
           PY
-          rm -f "$evidence_file"
+          rm -f "$plan_file"
 
           declare -a contracts=()
           declare -A expected_sha256=()
+          declare -A snapshot_by_script=()
           declare -A companions_by_root=()
-          while IFS=$'\t' read -r kind root script sha256; do
+          while IFS=$'\t' read -r kind root script snapshot_script sha256; do
             if [[ "$kind" == "root" ]]; then
               contracts+=("$script")
-              expected_sha256["$script"]="$sha256"
-              continue
-            fi
-            if [[ "$kind" != "companion" ]]; then
-              printf 'Unexpected PostgreSQL execution-plan record: %s\n' "$kind" >&2
+            elif [[ "$kind" != "companion" ]]; then
+              printf 'Unexpected PostgreSQL execution-snapshot record: %s\n' "$kind" >&2
               exit 1
             fi
             expected_sha256["$script"]="$sha256"
-            if [[ -n "${companions_by_root[$root]:-}" ]]; then
-              companions_by_root["$root"]+=$'\n'
+            snapshot_by_script["$script"]="$snapshot_script"
+            if [[ "$kind" == "companion" ]]; then
+              if [[ -n "${companions_by_root[$root]:-}" ]]; then
+                companions_by_root["$root"]+=$'\n'
+              fi
+              companions_by_root["$root"]+="$script"
             fi
-            companions_by_root["$root"]+="$script"
-          done < "$plan_file"
-          rm -f "$plan_file"
+          done < "$plan_tsv"
+          rm -f "$plan_tsv"
 
           if [[ "${#contracts[@]}" -eq 0 ]]; then
             printf 'No active PostgreSQL contracts discovered; Foundation evidence would be vacuous.\n' >&2
             exit 1
           fi
 
-          verify_contract_path_identity() {
-            local script="$1"
-            python - "$script" <<'PY'
-          import sys
-          from pathlib import Path
-
-          root = Path.cwd().resolve(strict=True)
-          relative = Path(sys.argv[1])
-          current = root
-          for component in relative.parts:
-              current /= component
-              if current.is_symlink():
-                  raise SystemExit(
-                      f"PostgreSQL contract path gained symlink indirection before use: {relative}"
-                  )
-          if not current.is_file():
-              raise SystemExit(
-                  f"PostgreSQL contract path is not a regular file before use: {relative}"
-              )
-          try:
-              current.resolve(strict=True).relative_to(root)
-          except (OSError, ValueError) as error:
-              raise SystemExit(
-                  f"PostgreSQL contract path escaped repository before use: {relative}"
-              ) from error
-          PY
-          }
-
-          verify_contract_bytes() {
+          snapshot_root_real="$(realpath -- "$snapshot_dir")"
+          verify_snapshot_bytes() {
             local script="$1"
             local expected="${expected_sha256[$script]:-}"
-            if [[ -z "$expected" ]]; then
-              printf 'PostgreSQL contract lost reviewed digest binding before use: %s\n' "$script" >&2
+            local snapshot_script="${snapshot_by_script[$script]:-}"
+            if [[ -z "$expected" || -z "$snapshot_script" ]]; then
+              printf 'PostgreSQL contract lost execution-snapshot binding: %s\n' "$script" >&2
               return 1
             fi
-            verify_contract_path_identity "$script"
+            if [[ -L "$snapshot_script" || ! -f "$snapshot_script" ]]; then
+              printf 'PostgreSQL execution snapshot is not a regular file: %s -> %s\n' \
+                "$script" "$snapshot_script" >&2
+              return 1
+            fi
+            local snapshot_real
+            snapshot_real="$(realpath -- "$snapshot_script")"
+            case "$snapshot_real" in
+              "$snapshot_root_real"/*) ;;
+              *)
+                printf 'PostgreSQL execution snapshot escaped its private root: %s -> %s\n' \
+                  "$script" "$snapshot_real" >&2
+                return 1
+                ;;
+            esac
             local observed
-            observed="$(sha256sum "$script" | awk '{print $1}')"
+            observed="$(sha256sum "$snapshot_script" | awk '{print $1}')"
             if [[ "$observed" != "$expected" ]]; then
-              printf 'PostgreSQL contract bytes changed after inventory validation: %s expected=%s observed=%s\n' \
+              printf 'PostgreSQL execution snapshot digest changed: %s expected=%s observed=%s\n' \
                 "$script" "$expected" "$observed" >&2
               return 1
             fi
@@ -186,16 +197,16 @@ jobs:
 
           executed=()
           for contract in "${contracts[@]}"; do
-            verify_contract_bytes "$contract"
+            verify_snapshot_bytes "$contract"
             contract_name="$(basename "$contract" .sh)"
             container_name="orgmetra-${GITHUB_RUN_ID}-${contract_name}"
+            current_container="$container_name"
             docker run --detach --name "$container_name" \
               --env POSTGRES_USER=orgmetra \
               --env POSTGRES_PASSWORD=orgmetra \
               --env POSTGRES_DB=orgmetra \
               --publish 127.0.0.1::5432 \
               "$ORGMETRA_POSTGRES_IMAGE"
-            trap 'docker rm --force "$container_name" >/dev/null 2>&1 || true' EXIT
             postgres_binding="$(docker port "$container_name" 5432/tcp)"
             postgres_port="${postgres_binding##*:}"
             database_url="postgresql://orgmetra:orgmetra@127.0.0.1:$postgres_port/orgmetra"
@@ -209,20 +220,27 @@ jobs:
               fi
               sleep 1
             done
-            printf 'Executing PostgreSQL Foundation contract: %s\n' "$contract"
-            verify_contract_bytes "$contract"
-            DATABASE_URL="$database_url" bash "$contract"
+
+            snapshot_script="${snapshot_by_script[$contract]}"
+            verify_snapshot_bytes "$contract"
+            printf 'Executing PostgreSQL Foundation contract snapshot: %s -> %s\n' \
+              "$contract" "$snapshot_script"
+            DATABASE_URL="$database_url" bash "$snapshot_script"
+
             companions_text="${companions_by_root[$contract]:-}"
             if [[ -n "$companions_text" ]]; then
               while IFS= read -r companion; do
-                verify_contract_bytes "$companion"
-                printf 'Executing PostgreSQL Foundation companion: %s -> %s\n' "$contract" "$companion"
-                DATABASE_URL="$database_url" bash "$companion"
+                snapshot_script="${snapshot_by_script[$companion]}"
+                verify_snapshot_bytes "$companion"
+                printf 'Executing PostgreSQL Foundation companion snapshot: %s -> %s\n' \
+                  "$companion" "$snapshot_script"
+                DATABASE_URL="$database_url" bash "$snapshot_script"
               done <<< "$companions_text"
             fi
+
             executed+=("$contract")
             docker rm --force "$container_name" >/dev/null
-            trap - EXIT
+            current_container=""
           done
 
           if [[ "${executed[*]}" != "${contracts[*]}" ]]; then
@@ -230,10 +248,12 @@ jobs:
             exit 1
           fi
           for bound_script in "${!expected_sha256[@]}"; do
-            verify_contract_bytes "$bound_script"
+            verify_snapshot_bytes "$bound_script"
           done
-          printf 'Executed PostgreSQL Foundation roots (%d):\n' "${#executed[@]}"
+          printf 'Executed PostgreSQL Foundation roots from private snapshot (%d):\n' "${#executed[@]}"
           printf '%s\n' "${executed[@]}"
+          cleanup_postgres_contracts
+          trap - EXIT
       - name: Prove compatibility toolchain provenance
         run: |
           expected_sha256=cebb36181e8ac995a36d73a02a45094a204ff5adb3cbcdc0c9eccff309ac6aab
