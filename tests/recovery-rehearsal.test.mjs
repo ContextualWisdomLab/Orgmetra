@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
@@ -137,4 +137,39 @@ test('restore rehearsal fails closed on malformed PostgreSQL administrator URLs'
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /administrator URL must use the postgres or postgresql scheme/);
   assert.doesNotMatch(result.stderr, /psql:/, 'URL validation must fail before connecting to PostgreSQL');
+});
+
+test('restore rehearsal applies every protected-main migration from the directory in order', () => {
+  const rehearsal = readFileSync(rehearsalPath, 'utf8');
+
+  assert.equal(
+    [...rehearsal.matchAll(/database\/migrations\/\d{4}_[a-z0-9_]+\.sql/g)].length,
+    0,
+    'the rehearsal must not hardcode a frozen migration filename list'
+  );
+  assert.match(
+    rehearsal,
+    /find database\/migrations[\s\S]*?\[0-9\]\[0-9\]\[0-9\]\[0-9\]_\*\.sql[\s\S]*?\|\s*sort/,
+    'the rehearsal must enumerate database/migrations in numeric order'
+  );
+
+  const entries = readdirSync('database/migrations');
+  const matched = entries
+    .filter((entryName) => /^\d{4}_[a-z0-9_]+\.sql$/.test(entryName))
+    .sort();
+  const everySql = entries.filter((entryName) => entryName.endsWith('.sql')).sort();
+
+  assert.ok(matched.length > 0, 'the migration directory must not be empty');
+  assert.deepEqual(
+    everySql,
+    matched,
+    'every database/migrations .sql file must match the rehearsal pattern or it would be silently skipped'
+  );
+
+  const prefixes = matched.map((entryName) => entryName.slice(0, 4));
+  assert.equal(
+    new Set(prefixes).size,
+    prefixes.length,
+    'migration numeric prefixes must be unique for deterministic ordering'
+  );
 });

@@ -128,16 +128,7 @@ psql "${POSTGRES_RESTORE_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
     "DROP DATABASE IF EXISTS ${RESTORE_DATABASE_NAME} WITH (FORCE);" >/dev/null
 drop_recovery_roles "${POSTGRES_RESTORE_ADMIN_URL}"
 
-for migration in \
-    database/migrations/0001_foundation_schema.sql \
-    database/migrations/0002_sealed_evidence_digest.sql \
-    database/migrations/0003_audit_outbox_persistence.sql \
-    database/migrations/0004_outbox_delivery_claim.sql \
-    database/migrations/0005_outbox_delivery_finalization.sql \
-    database/migrations/0006_outbox_delivery_dead_letter.sql \
-    database/migrations/0007_outbox_retry_exhaustion.sql \
-    database/migrations/0008_audit_outbox_review_hardening.sql \
-    database/migrations/0009_candidate_worker_conversion_governance.sql; do
+for migration in $(find database/migrations -maxdepth 1 -name '[0-9][0-9][0-9][0-9]_*.sql' | sort); do
     psql "${SOURCE_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
 done
 
