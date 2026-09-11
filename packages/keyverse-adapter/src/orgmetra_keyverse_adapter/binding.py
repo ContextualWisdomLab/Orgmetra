@@ -99,13 +99,13 @@ def _validate_extra_claim_names(extra_claims: object) -> tuple[str, ...]:
 class ExternalIdentityBindingCandidate(tuple):
     """Validated, structurally immutable identity candidate with no persistence authority.
 
-    Tenant and person identities are exact operational UUIDs detached from
-    caller-owned objects. Issuer and subject are canonical exact text. Tuple-backed
-    storage prevents post-validation attribute replacement from changing the live
-    candidate. This value still proves only local input integrity: low-level tuple
-    construction can bypass the public constructor, so any consequential consumer
-    must reconstruct or revalidate the evidence rather than treat this Python value
-    as authentication or authorization authority.
+    Tenant and person identities are stored as checked integer scalars and exposed
+    only through freshly constructed UUID views, so a caller cannot mutate retained
+    candidate identity through a returned ``UUID`` object. Issuer and subject are
+    canonical exact text. This value still proves only local input integrity:
+    low-level tuple construction can bypass the public constructor, so any
+    consequential consumer must reconstruct or revalidate the evidence rather than
+    treat this Python value as authentication or authorization authority.
     """
 
     __slots__ = ()
@@ -126,8 +126,8 @@ class ExternalIdentityBindingCandidate(tuple):
         return tuple.__new__(
             cls,
             (
-                UUID(int=tenant_identity),
-                UUID(int=person_identity),
+                tenant_identity,
+                person_identity,
                 issuer,
                 subject,
             ),
@@ -135,13 +135,13 @@ class ExternalIdentityBindingCandidate(tuple):
 
     @property
     def tenant_record_id(self) -> UUID:
-        """Return the detached tenant identity."""
-        return self[0]
+        """Return a fresh UUID view of the retained tenant identity scalar."""
+        return UUID(int=self[0])
 
     @property
     def person_record_id(self) -> UUID:
-        """Return the detached Person identity."""
-        return self[1]
+        """Return a fresh UUID view of the retained Person identity scalar."""
+        return UUID(int=self[1])
 
     @property
     def identity_issuer(self) -> str:
