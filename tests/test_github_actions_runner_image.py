@@ -324,6 +324,8 @@ def _declared_permissions(workflow: str) -> dict[str, str]:
     scopes: dict[str, str] = {}
     lines = workflow.splitlines()
     for index, line in enumerate(lines):
+        if line != line.lstrip():
+            continue
         if _PERMISSIONS_BLOCK_PATTERN.match(_strip_yaml_comment(line)) is None:
             continue
         for child in lines[index + 1 :]:
