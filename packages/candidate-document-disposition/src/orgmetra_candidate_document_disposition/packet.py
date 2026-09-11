@@ -130,8 +130,8 @@ def _validate_reference(value: str, prefix: str, field_name: str) -> None:
 
 
 def _normalize_timestamp(value: datetime) -> datetime:
-    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("timestamp must be timezone-aware")
+    if type(value) is not datetime or type(value.tzinfo) is not timezone:
+        raise ValueError("timestamp must use built-in datetime.timezone")
     return value.astimezone(timezone.utc)
 
 
