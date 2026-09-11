@@ -95,7 +95,7 @@ SQL
 status=$?
 set -e
 
-if [[ ${status} -eq 0 || "${output}" != *"unique keys"* ]]; then
+if [[ ${status} -eq 0 || "${output}" != *"document_canonical_evidence_unique_keys_check"* ]]; then
     echo "document-record persistence accepted duplicate canonical evidence keys: ${output}" >&2
     exit 1
 fi
