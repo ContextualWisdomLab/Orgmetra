@@ -125,6 +125,7 @@ class TestConstruction:
         "return_requested",
         "return_request_verified",
         "return_dispatched",
+        "return_delivered",
         "return_destroyed",
         "talent_pool_retained",
         "confirmed_hire_transitioned",
@@ -134,7 +135,14 @@ class TestConstruction:
         "destroyed",
     ])
     def test_various_states(self, state):
-        p = _build(state=state)
+        dispatch_at = datetime(2026, 9, 20, 12, 0, 0, tzinfo=timezone.utc)
+        delivery_at = datetime(2026, 9, 21, 12, 0, 0, tzinfo=timezone.utc)
+        evidence = {}
+        if state in {"return_dispatched", "return_delivered", "return_destroyed"}:
+            evidence["return_dispatched_at"] = dispatch_at
+        if state in {"return_delivered", "return_destroyed"}:
+            evidence["return_delivered_at"] = delivery_at
+        p = _build(state=state, **evidence)
         assert p.state == state
 
     @pytest.mark.parametrize("event", [
@@ -289,11 +297,13 @@ class TestCanonicalJson:
 
     def test_omits_none_optional_fields(self):
         p = _build(previous_disposition_reference=None, claim_window_end=None,
-                   return_dispatched_at=None, statutory_retain_until=None)
+                   return_dispatched_at=None, return_delivered_at=None,
+                   statutory_retain_until=None)
         doc = json.loads(p.canonical_json())
         assert doc["previous_disposition_reference"] is None
         assert doc["claim_window_end"] is None
         assert doc["return_dispatched_at"] is None
+        assert doc["return_delivered_at"] is None
         assert doc["statutory_retain_until"] is None
 
     def test_includes_set_optional_fields(self):
@@ -302,12 +312,14 @@ class TestCanonicalJson:
             previous_disposition_reference="candidate_document_disposition:00000000-0000-4000-a000-000000000099",
             claim_window_end=ts,
             return_dispatched_at=ts,
+            return_delivered_at=ts,
             statutory_retain_until=ts,
         )
         doc = json.loads(p.canonical_json())
         assert doc["previous_disposition_reference"] is not None
         assert doc["claim_window_end"] is not None
         assert doc["return_dispatched_at"] is not None
+        assert doc["return_delivered_at"] is not None
         assert doc["statutory_retain_until"] is not None
 
     def test_sort_keys(self):
