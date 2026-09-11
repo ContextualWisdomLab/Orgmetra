@@ -16,9 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 _RUNS_ON_PATTERN = re.compile(r"^\s*runs-on\s*:\s*(.*?)\s*$")
 _USES_PATTERN = re.compile(r"^\s*(?:-\s+)?uses\s*:\s*(.*?)\s*$")
+_IMAGE_PATTERN = re.compile(r"^\s*image\s*:\s*(.*?)\s*$")
 _PINNED_ACTION_PATTERN = re.compile(
     r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._/-]+)?@[0-9a-f]{40}$"
 )
+_PINNED_IMAGE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[0-9a-f]{64}$")
 _EXPECTED_RUNNER = "ubuntu-24.04"
 _CENTRAL_WORKFLOW_NAMES = {
     "close-empty-pr.yml",
@@ -99,6 +101,25 @@ def _action_declarations(workflow: str) -> list[tuple[int, str]]:
             value = value[1:-1]
         if value.startswith("./") or value.startswith("docker://"):
             continue
+        declarations.append((line_number, value))
+    return declarations
+
+
+def _image_declarations(workflow: str) -> list[tuple[int, str]]:
+    """Return line-numbered ``image`` declarations for job/service containers.
+
+    Container and service images must resolve a registry digest rather than a
+    mutable tag. YAML comments are stripped so an inline tag comment cannot mask
+    the resolved reference.
+    """
+    declarations: list[tuple[int, str]] = []
+    for line_number, line in enumerate(workflow.splitlines(), start=1):
+        match = _IMAGE_PATTERN.match(line)
+        if match is None:
+            continue
+        value = _strip_yaml_comment(match.group(1))
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
         declarations.append((line_number, value))
     return declarations
 
@@ -238,6 +259,54 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
                 "actions/checkout@main",
                 "owner/repo/.github/workflows/ci.yml@v1",
             ],
+            unpinned,
+        )
+
+    def test_all_container_images_are_digest_pinned(self) -> None:
+        """Reject mutable container/service tags such as ``postgres:16``."""
+        unpinned: list[str] = []
+        for workflow_path in _workflow_paths():
+            for line_number, value in _image_declarations(
+                workflow_path.read_text(encoding="utf-8")
+            ):
+                if not _PINNED_IMAGE_PATTERN.match(value):
+                    unpinned.append(f"{workflow_path.name}:{line_number}={value!r}")
+        self.assertEqual(
+            [],
+            unpinned,
+            "container and service images must pin an immutable sha256 digest: "
+            f"{unpinned}",
+        )
+
+    def test_image_parser_rejects_mutable_tags_and_pins_digest(self) -> None:
+        """Keep the validator sensitive to tags, expressions, and pinned digests."""
+        sample = "\n".join(
+            (
+                "image: postgres:17.6-alpine",
+                "image: postgres:17.6-alpine@sha256:"
+                "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+                "image: ${{ matrix.image }}",
+                "image: 'postgres:17.6-alpine@sha256:"
+                "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94' # latest",
+            )
+        )
+        declarations = _image_declarations(sample)
+        self.assertEqual(
+            [
+                "postgres:17.6-alpine",
+                "postgres:17.6-alpine@sha256:"
+                "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+                "${{ matrix.image }}",
+                "postgres:17.6-alpine@sha256:"
+                "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+            ],
+            [value for _, value in declarations],
+        )
+        unpinned = [
+            value for _, value in declarations if not _PINNED_IMAGE_PATTERN.match(value)
+        ]
+        self.assertEqual(
+            ["postgres:17.6-alpine", "${{ matrix.image }}"],
             unpinned,
         )
 
