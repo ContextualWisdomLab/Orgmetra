@@ -39,7 +39,7 @@ def _build(**overrides) -> CandidateDocumentDisposition:
 
 def _return_request_evidence() -> dict:
     return {
-        "return_request_reference": "candidate_document_return_request:00000000-0000-4000-a000-000000000050",
+        "return_request_reference": "candidate_return_request:00000000-0000-4000-a000-000000000050",
         "return_requested_at": datetime(2026, 9, 11, 13, 0, 0, tzinfo=timezone.utc),
         "return_request_verified_at": datetime(2026, 9, 11, 14, 0, 0, tzinfo=timezone.utc),
     }
