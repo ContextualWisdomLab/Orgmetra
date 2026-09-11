@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 import sys
@@ -29,7 +33,7 @@ def _digest(path: Path) -> str:
 
 
 class FoundationPostgresContractInventoryTests(unittest.TestCase):
-    """Exercise discovery, provenance, exclusions, and generic companions."""
+    """Exercise discovery, provenance, exclusions, snapshots, and generic companions."""
 
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
@@ -247,6 +251,94 @@ class FoundationPostgresContractInventoryTests(unittest.TestCase):
         self._write_registry(self.registry)
         self._assert_invalid("no PostgreSQL root contracts discovered")
 
+    def test_execution_snapshot_runs_reviewed_root_and_companion_after_source_mutation(self) -> None:
+        marker = self.root / "snapshot-result.txt"
+        self.beta.write_text(
+            '#!/usr/bin/env bash\nprintf "root-reviewed\\n" > "$ORGMETRA_SNAPSHOT_MARKER"\n',
+            encoding="utf-8",
+        )
+        self.companion.write_text(
+            '#!/usr/bin/env bash\nprintf "companion-reviewed\\n" >> "$ORGMETRA_SNAPSHOT_MARKER"\n',
+            encoding="utf-8",
+        )
+        self.registry = self._valid_registry()
+        self._write_registry(self.registry)
+        inventory = MODULE.load_inventory(self.root)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            snapshot_root = Path(tempdir) / "contracts"
+            snapshot = MODULE.materialize_execution_snapshot(
+                self.root,
+                inventory,
+                snapshot_root,
+            )
+            self.beta.write_text(
+                '#!/usr/bin/env bash\nprintf "root-mutated\\n" > "$ORGMETRA_SNAPSHOT_MARKER"\n',
+                encoding="utf-8",
+            )
+            self.companion.write_text(
+                '#!/usr/bin/env bash\nprintf "companion-mutated\\n" >> "$ORGMETRA_SNAPSHOT_MARKER"\n',
+                encoding="utf-8",
+            )
+
+            beta = next(
+                item
+                for item in snapshot["active"]
+                if item["script"] == "tests/test_beta_postgres.sh"
+            )
+            env = os.environ | {"ORGMETRA_SNAPSHOT_MARKER": str(marker)}
+            subprocess.run(
+                ["bash", beta["snapshot_script"]],
+                cwd=self.root,
+                env=env,
+                check=True,
+            )
+            subprocess.run(
+                ["bash", beta["companions"][0]["snapshot_script"]],
+                cwd=self.root,
+                env=env,
+                check=True,
+            )
+
+        self.assertEqual(
+            marker.read_text(encoding="utf-8").splitlines(),
+            ["root-reviewed", "companion-reviewed"],
+        )
+
+    def test_execution_snapshot_rejects_source_drift_after_inventory_validation(self) -> None:
+        inventory = MODULE.load_inventory(self.root)
+        self.beta.write_text("#!/usr/bin/env bash\nexit 9\n", encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tempdir:
+            with self.assertRaisesRegex(
+                MODULE.ContractInventoryError,
+                "changed before execution snapshot",
+            ):
+                MODULE.materialize_execution_snapshot(
+                    self.root,
+                    inventory,
+                    Path(tempdir) / "contracts",
+                )
+
+    def test_snapshot_cli_materializes_private_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            snapshot_root = Path(tempdir) / "contracts"
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                status = MODULE.main(
+                    [
+                        "--root",
+                        str(self.root),
+                        "snapshot",
+                        "--destination",
+                        str(snapshot_root),
+                    ]
+                )
+            self.assertEqual(status, 0)
+            document = json.loads(output.getvalue())
+            self.assertEqual(document["active"][0]["script"], "tests/test_alpha_postgres.sh")
+            self.assertTrue(Path(document["active"][0]["snapshot_script"]).is_file())
+            self.assertEqual(snapshot_root.stat().st_mode & 0o777, 0o500)
+
     def test_workflow_binds_executed_bytes_to_pre_execution_snapshot(self) -> None:
         workflow = (
             Path(__file__).resolve().parents[1]
@@ -258,22 +350,16 @@ class FoundationPostgresContractInventoryTests(unittest.TestCase):
         end = workflow.index("      - name: Prove compatibility toolchain provenance", start)
         execution = workflow[start:end]
 
-        snapshot = 'python .github/scripts/foundation-postgres-contracts.py evidence > "$evidence_file"'
-        root_execution = 'DATABASE_URL="$database_url" bash "$contract"'
+        snapshot = 'snapshot --destination "$snapshot_dir"'
         self.assertIn(snapshot, execution)
-        self.assertLess(execution.index(snapshot), execution.index(root_execution))
+        self.assertIn('snapshot_by_script["$script"]="$snapshot_script"', execution)
+        self.assertIn('verify_snapshot_bytes "$contract"', execution)
+        self.assertIn('verify_snapshot_bytes "$companion"', execution)
+        self.assertIn('DATABASE_URL="$database_url" bash "$snapshot_script"', execution)
+        self.assertNotIn('DATABASE_URL="$database_url" bash "$contract"', execution)
+        self.assertNotIn('DATABASE_URL="$database_url" bash "$companion"', execution)
         self.assertNotIn(
             'foundation-postgres-contracts.py companions "$contract"',
-            execution,
-        )
-        self.assertIn('verify_contract_bytes "$contract"', execution)
-        self.assertIn('verify_contract_bytes "$companion"', execution)
-        self.assertIn("verify_contract_path_identity() {", execution)
-        self.assertIn("for component in relative.parts:", execution)
-        self.assertIn("if current.is_symlink():", execution)
-        self.assertIn("current.resolve(strict=True).relative_to(root)", execution)
-        self.assertIn(
-            'verify_contract_path_identity "$script"',
             execution,
         )
         self.assertIn(
