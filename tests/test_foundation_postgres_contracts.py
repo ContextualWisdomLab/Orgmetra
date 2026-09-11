@@ -8,6 +8,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -305,6 +306,102 @@ class FoundationPostgresContractInventoryTests(unittest.TestCase):
             ["root-reviewed", "companion-reviewed"],
         )
 
+    def test_non_owner_contract_cannot_replace_later_snapshot_entries(self) -> None:
+        if shutil.which("sudo") is None:
+            self.skipTest("sudo is required to exercise the Foundation non-owner boundary")
+        probe = subprocess.run(
+            ["sudo", "-n", "-u", "nobody", "true"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if probe.returncode != 0:
+            self.skipTest("passwordless sudo to nobody is unavailable outside canonical CI")
+
+        marker_fd, marker_name = tempfile.mkstemp(prefix="orgmetra-snapshot-result-", dir="/tmp")
+        os.close(marker_fd)
+        marker = Path(marker_name)
+        marker.chmod(0o666)
+        self.alpha.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "if chmod u+w \"$ORGMETRA_ATTACK_ROOT\" 2>/dev/null; then exit 41; fi\n"
+            "if printf 'root-mutated\\n' > \"$ORGMETRA_ATTACK_ROOT\" 2>/dev/null; then exit 42; fi\n"
+            "if mv \"$ORGMETRA_ATTACK_SNAPSHOT_ROOT\" \"${ORGMETRA_ATTACK_SNAPSHOT_ROOT}.moved\" 2>/dev/null; then exit 43; fi\n"
+            "if rm -f \"$ORGMETRA_ATTACK_COMPANION\" 2>/dev/null; then exit 44; fi\n",
+            encoding="utf-8",
+        )
+        self.beta.write_text(
+            '#!/usr/bin/env bash\nprintf "root-reviewed\\n" > "$ORGMETRA_SNAPSHOT_MARKER"\n',
+            encoding="utf-8",
+        )
+        self.companion.write_text(
+            '#!/usr/bin/env bash\nprintf "companion-reviewed\\n" >> "$ORGMETRA_SNAPSHOT_MARKER"\n',
+            encoding="utf-8",
+        )
+        self.registry = self._valid_registry()
+        self._write_registry(self.registry)
+        inventory = MODULE.load_inventory(self.root)
+
+        try:
+            with tempfile.TemporaryDirectory() as tempdir:
+                snapshot_parent = Path(tempdir)
+                snapshot_root = snapshot_parent / "contracts"
+                snapshot = MODULE.materialize_execution_snapshot(
+                    self.root,
+                    inventory,
+                    snapshot_root,
+                )
+                for path in sorted(snapshot_root.rglob("*")):
+                    path.chmod(0o555 if path.is_dir() else 0o444)
+                snapshot_root.chmod(0o555)
+                snapshot_parent.chmod(0o555)
+
+                alpha = next(item for item in snapshot["active"] if item["id"] == "alpha")
+                beta = next(item for item in snapshot["active"] if item["id"] == "beta")
+                attack_env = [
+                    f"ORGMETRA_ATTACK_ROOT={beta['snapshot_script']}",
+                    f"ORGMETRA_ATTACK_COMPANION={beta['companions'][0]['snapshot_script']}",
+                    f"ORGMETRA_ATTACK_SNAPSHOT_ROOT={snapshot_root}",
+                ]
+                subprocess.run(
+                    ["sudo", "-n", "-u", "nobody", "env", *attack_env, "bash", alpha["snapshot_script"]],
+                    cwd="/",
+                    check=True,
+                )
+                runtime_env = [f"ORGMETRA_SNAPSHOT_MARKER={marker}"]
+                subprocess.run(
+                    ["sudo", "-n", "-u", "nobody", "env", *runtime_env, "bash", beta["snapshot_script"]],
+                    cwd="/",
+                    check=True,
+                )
+                subprocess.run(
+                    [
+                        "sudo",
+                        "-n",
+                        "-u",
+                        "nobody",
+                        "env",
+                        *runtime_env,
+                        "bash",
+                        beta["companions"][0]["snapshot_script"],
+                    ],
+                    cwd="/",
+                    check=True,
+                )
+
+                snapshot_parent.chmod(0o700)
+                snapshot_root.chmod(0o700)
+                for path in sorted(snapshot_root.rglob("*")):
+                    path.chmod(0o700 if path.is_dir() else 0o600)
+
+            self.assertEqual(
+                marker.read_text(encoding="utf-8").splitlines(),
+                ["root-reviewed", "companion-reviewed"],
+            )
+        finally:
+            marker.unlink(missing_ok=True)
+
     def test_execution_snapshot_rejects_source_drift_after_inventory_validation(self) -> None:
         inventory = MODULE.load_inventory(self.root)
         self.beta.write_text("#!/usr/bin/env bash\nexit 9\n", encoding="utf-8")
@@ -355,7 +452,10 @@ class FoundationPostgresContractInventoryTests(unittest.TestCase):
         self.assertIn('snapshot_by_script["$script"]="$snapshot_script"', execution)
         self.assertIn('verify_snapshot_bytes "$contract"', execution)
         self.assertIn('verify_snapshot_bytes "$companion"', execution)
-        self.assertIn('DATABASE_URL="$database_url" bash "$snapshot_script"', execution)
+        self.assertIn('chmod 0555 "$snapshot_parent"', execution)
+        self.assertIn('sudo -n -u nobody true', execution)
+        self.assertIn('sudo -n -u nobody env', execution)
+        self.assertIn('bash "$snapshot_script"', execution)
         self.assertNotIn('DATABASE_URL="$database_url" bash "$contract"', execution)
         self.assertNotIn('DATABASE_URL="$database_url" bash "$companion"', execution)
         self.assertNotIn(
