@@ -237,7 +237,7 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
         if return_request_reference is not None:
             _validate_reference(
                 return_request_reference,
-                "candidate_document_return_request",
+                "candidate_return_request",
                 "return_request_reference",
             )
         if return_requested_at is not None:
