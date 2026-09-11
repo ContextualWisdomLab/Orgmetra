@@ -10,7 +10,7 @@ import pytest
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _OWNED_PACKAGE_PATHS = ("packages/hris-kernel", "packages/keyverse-adapter")
 _DEPENDENCY_NAME_PATTERN = re.compile(
-    r"^\s*([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)(?=\s*(?:\[|@|[<>=!~;]|$))"
+    r"^\s*([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)"
 )
 
 
