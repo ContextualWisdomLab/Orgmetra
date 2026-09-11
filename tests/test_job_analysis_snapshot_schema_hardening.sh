@@ -27,7 +27,8 @@ if [[ ${delete_status} -eq 0 || "${delete_output}" != *"append-only"* ]]; then
 fi
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
-CREATE ROLE orgmetra_rls_probe NOLOGIN;
+CREATE ROLE orgmetra_rls_probe
+    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 GRANT SELECT ON job_analysis_snapshot TO orgmetra_rls_probe;
 SQL
 
@@ -78,9 +79,9 @@ child_tables=(
 )
 
 # Catalog proof first: a missing FORCE-RLS policy would also return zero rows to
-# another tenant. Require one and only one permissive policy, command ALL, and
-# exact normalized USING/WITH CHECK expressions; substring matching would let
-# an expression such as "... OR true" masquerade as tenant isolation.
+# another tenant. Require one and only one PUBLIC permissive policy, command ALL,
+# and exact normalized USING/WITH CHECK expressions; a role-scoped policy could
+# otherwise default-deny the probe role and produce a false-green isolation test.
 for child_table in "${child_tables[@]}"; do
     child_rls_state="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT c.relrowsecurity::text || ':' || c.relforcerowsecurity::text
@@ -98,6 +99,7 @@ SELECT
     count(*) FILTER (
         WHERE polpermissive
           AND polcmd = '*'
+          AND polroles = ARRAY[0::oid]
           AND regexp_replace(
               coalesce(pg_get_expr(polqual, polrelid), ''),
               '[[:space:]()]', '', 'g'
@@ -111,7 +113,7 @@ FROM pg_policy
 WHERE polrelid = '${child_table}'::regclass;
 ")"
     if [[ "${child_policy_state}" != "1:1" ]]; then
-        echo "${child_table} must have exactly one permissive ALL tenant policy with exact USING/WITH CHECK expressions: ${child_policy_state}" >&2
+        echo "${child_table} must have exactly one PUBLIC permissive ALL tenant policy with exact USING/WITH CHECK expressions: ${child_policy_state}" >&2
         exit 1
     fi
 done
