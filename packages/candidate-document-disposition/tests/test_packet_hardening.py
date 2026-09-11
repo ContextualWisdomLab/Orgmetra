@@ -146,6 +146,10 @@ def test_legal_hold_rejects_every_destruction_state(state):
         evidence.update(_verified_return_evidence())
         evidence["return_dispatched_at"] = hiring_decision + timedelta(days=1)
         evidence["return_delivered_at"] = hiring_decision + timedelta(days=2)
+    if state == "statutory_retention_expired_destroyed":
+        evidence["statutory_retain_until"] = (
+            _kwargs()["hiring_decision_finalized_at"] + timedelta(days=30)
+        )
     with pytest.raises(ValueError, match="legal hold"):
         _build(legal_hold=True, state=state, **evidence)
 
