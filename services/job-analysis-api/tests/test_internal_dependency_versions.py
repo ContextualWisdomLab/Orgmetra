@@ -9,6 +9,9 @@ import pytest
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _OWNED_PACKAGE_PATHS = ("packages/hris-kernel", "packages/keyverse-adapter")
+_DEPENDENCY_NAME_PATTERN = re.compile(
+    r"^\s*([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)(?=\s*(?:\[|@|[<>=!~;]|$))"
+)
 
 
 def _project_metadata(relative_path: str) -> dict[str, object]:
@@ -25,6 +28,13 @@ def _minimum_python_version(project: dict[str, object]) -> tuple[int, int]:
     match = re.fullmatch(r">=(\d+)\.(\d+)", requires_python)
     assert match is not None, "requires-python must remain an explicit >=major.minor floor"
     return int(match.group(1)), int(match.group(2))
+
+
+def _normalized_dependency_name(dependency: str) -> str:
+    """Return the standards-normalized distribution name from one dependency string."""
+    match = _DEPENDENCY_NAME_PATTERN.match(dependency)
+    assert match is not None, f"dependency must start with a valid distribution name: {dependency!r}"
+    return re.sub(r"[-_.]+", "-", match.group(1)).lower()
 
 
 def _expected_owned_dependencies() -> set[str]:
@@ -45,7 +55,7 @@ def _assert_owned_dependency_pins(
     declared_owned_dependencies = {
         dependency
         for dependency in declared_dependencies
-        if dependency.startswith("orgmetra-")
+        if _normalized_dependency_name(dependency).startswith("orgmetra-")
     }
     assert declared_owned_dependencies == expected_dependencies
 
