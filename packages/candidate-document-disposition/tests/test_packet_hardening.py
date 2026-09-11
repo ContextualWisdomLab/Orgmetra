@@ -117,7 +117,10 @@ def test_legal_hold_rejects_every_destruction_state(state):
         _build(legal_hold=True, state=state)
 
 
-@pytest.mark.parametrize("state", ["return_dispatched", "return_destroyed"])
+@pytest.mark.parametrize(
+    "state",
+    ["return_dispatched", "return_delivered", "return_destroyed"],
+)
 def test_return_dispatch_states_require_dispatch_timestamp(state):
     with pytest.raises(ValueError, match="return_dispatched_at"):
         _build(state=state, return_dispatched_at=None)
@@ -133,14 +136,40 @@ def test_return_dispatch_timestamp_must_follow_hiring_decision(offset):
         )
 
 
-def test_return_destroyed_accepts_prior_dispatch_evidence():
+@pytest.mark.parametrize("state", ["return_delivered", "return_destroyed"])
+def test_return_completion_states_require_delivery_receipt(state):
     hiring_decision = _kwargs()["hiring_decision_finalized_at"]
+    with pytest.raises(ValueError, match="return_delivered_at"):
+        _build(
+            state=state,
+            return_dispatched_at=hiring_decision + timedelta(days=1),
+            return_delivered_at=None,
+        )
+
+
+def test_return_delivery_cannot_precede_dispatch():
+    hiring_decision = _kwargs()["hiring_decision_finalized_at"]
+    dispatched_at = hiring_decision + timedelta(days=2)
+    with pytest.raises(ValueError, match="return_delivered_at"):
+        _build(
+            state="return_delivered",
+            return_dispatched_at=dispatched_at,
+            return_delivered_at=dispatched_at - timedelta(seconds=1),
+        )
+
+
+def test_return_destroyed_accepts_prior_delivery_receipt():
+    hiring_decision = _kwargs()["hiring_decision_finalized_at"]
+    dispatched_at = hiring_decision + timedelta(days=1)
+    delivered_at = dispatched_at + timedelta(days=1)
     packet = _build(
         state="return_destroyed",
-        return_dispatched_at=hiring_decision + timedelta(days=1),
+        return_dispatched_at=dispatched_at,
+        return_delivered_at=delivered_at,
     )
 
-    assert packet.return_dispatched_at == hiring_decision + timedelta(days=1)
+    assert packet.return_dispatched_at == dispatched_at
+    assert packet.return_delivered_at == delivered_at
 
 
 def test_packet_state_cannot_be_rewritten_after_validation():
