@@ -52,6 +52,26 @@ def test_pre_request_state_rejects_return_request_evidence(state):
         )
 
 
+@pytest.mark.parametrize("state", ["created", "return_claim_window_open"])
+@pytest.mark.parametrize(
+    "future_evidence",
+    [
+        {"return_dispatched_at": _DISPATCHED_AT},
+        {
+            "return_dispatched_at": _DISPATCHED_AT,
+            "return_delivered_at": _DELIVERED_AT,
+        },
+    ],
+)
+def test_pre_request_state_rejects_dispatch_or_delivery_evidence(state, future_evidence):
+    extra = dict(future_evidence)
+    if state == "return_claim_window_open":
+        extra["claim_window_end"] = _HIRING_DECISION + timedelta(days=30)
+
+    with pytest.raises(ValueError, match="return request evidence"):
+        _build(state, **extra)
+
+
 def test_return_requested_state_rejects_verification_evidence():
     with pytest.raises(ValueError, match="verification evidence"):
         _build(
@@ -60,6 +80,27 @@ def test_return_requested_state_rejects_verification_evidence():
             return_requested_at=_REQUESTED_AT,
             return_request_verified_at=_VERIFIED_AT,
             return_due_at=_DUE_AT,
+        )
+
+
+def test_return_requested_state_rejects_dispatch_evidence():
+    with pytest.raises(ValueError, match="verification evidence"):
+        _build(
+            "return_requested",
+            return_request_reference=_REQUEST_REFERENCE,
+            return_requested_at=_REQUESTED_AT,
+            return_dispatched_at=_DISPATCHED_AT,
+        )
+
+
+def test_return_requested_state_rejects_delivery_evidence():
+    with pytest.raises(ValueError, match="verification evidence"):
+        _build(
+            "return_requested",
+            return_request_reference=_REQUEST_REFERENCE,
+            return_requested_at=_REQUESTED_AT,
+            return_dispatched_at=_DISPATCHED_AT,
+            return_delivered_at=_DELIVERED_AT,
         )
 
 
