@@ -100,14 +100,28 @@ def _validate_path(
     pattern: re.Pattern[str],
     context: str,
 ) -> str:
-    """Return a safe repository-relative script path whose file exists."""
+    """Return a repository-contained regular script path without symlink indirection."""
 
     script = _require_string(value, context)
     if pattern.fullmatch(script) is None:
         raise ContractInventoryError(f"{context} has unsupported path: {script}")
-    candidate = root / script
+
+    candidate = root
+    for component in Path(script).parts:
+        candidate = candidate / component
+        if candidate.is_symlink():
+            raise ContractInventoryError(
+                f"{context} must not use filesystem symlinks: {script}"
+            )
     if not candidate.is_file():
         raise ContractInventoryError(f"{context} is missing: {script}")
+
+    try:
+        candidate.resolve(strict=True).relative_to(root.resolve(strict=True))
+    except (OSError, ValueError) as error:
+        raise ContractInventoryError(
+            f"{context} must resolve inside the repository root: {script}"
+        ) from error
     return script
 
 
@@ -133,16 +147,24 @@ def _validate_binding(
 
 
 def discover_root_scripts(root: Path) -> tuple[str, ...]:
-    """Discover every root PostgreSQL contract in stable lexical order."""
+    """Discover every regular root PostgreSQL contract in stable lexical order."""
 
     tests_dir = root / "tests"
     if not tests_dir.is_dir():
         return ()
-    return tuple(
-        path.relative_to(root).as_posix()
-        for path in sorted(tests_dir.glob("test_*_postgres.sh"))
-        if path.is_file()
-    )
+    discovered: list[str] = []
+    for path in sorted(tests_dir.glob("test_*_postgres.sh")):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            raise ContractInventoryError(
+                f"discovered PostgreSQL root must not use filesystem symlinks: {relative}"
+            )
+        if not path.is_file():
+            raise ContractInventoryError(
+                f"discovered PostgreSQL root is not a regular file: {relative}"
+            )
+        discovered.append(relative)
+    return tuple(discovered)
 
 
 def load_inventory(
