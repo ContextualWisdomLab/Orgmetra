@@ -52,6 +52,10 @@ _DESTRUCTION_STATES = frozenset({
     "statutory_retention_expired_destroyed",
     "destroyed",
 })
+_RETURN_DISPATCH_EVIDENCE_STATES = frozenset({
+    "return_dispatched",
+    "return_destroyed",
+})
 _REVIEW_STATE = "requires_human_disposition_review"
 _NEXT_ACTION = (
     "Within tenant_record_id, verify the disposition event against the authoritative "
@@ -205,6 +209,10 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
                 raise ValueError("claim_window_end must be after hiring_decision_finalized_at")
         if return_dispatched_at is not None:
             return_dispatched_at = _normalize_timestamp(return_dispatched_at)
+            if return_dispatched_at <= hiring_decision_finalized_at:
+                raise ValueError("return_dispatched_at must be after hiring_decision_finalized_at")
+        if state in _RETURN_DISPATCH_EVIDENCE_STATES and return_dispatched_at is None:
+            raise ValueError("return_dispatched_at is required once return dispatch has completed")
         if statutory_retain_until is not None:
             statutory_retain_until = _normalize_timestamp(statutory_retain_until)
         if type(legal_hold) is not bool:
