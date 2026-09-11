@@ -48,13 +48,16 @@ jobs:
           ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
           ORGMETRA_POSTGRES_RUNNER_SHA256: bb84ea602542585d5c4d1156ea765d3dcdd7756da9d2ef7438096eed72364286
           ORGMETRA_POSTGRES_TEST_SHA256: de98d839891fc7d396ccc4275b2d69821a8a682ec9153cb5f191b026cbbdc31d
+          ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256: dba93f27e9f629abb4680d9e4e6be60dbf4a854d5537432b233387ba83293637
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_RUNNER_SHA256" .github/scripts/foundation-postgres-contracts.py | sha256sum --check --strict
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_TEST_SHA256" tests/test_foundation_postgres_contracts.py | sha256sum --check --strict
-          python -m py_compile .github/scripts/foundation-postgres-contracts.py tests/test_foundation_postgres_contracts.py
+          printf '%s  %s\n' "$ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256" tests/test_foundation_postgres_process_quiescence.py | sha256sum --check --strict
+          python -m py_compile .github/scripts/foundation-postgres-contracts.py tests/test_foundation_postgres_contracts.py tests/test_foundation_postgres_process_quiescence.py
           python tests/test_foundation_postgres_contracts.py
+          python tests/test_foundation_postgres_process_quiescence.py
           python .github/scripts/foundation-postgres-contracts.py validate
           python .github/scripts/foundation-postgres-contracts.py evidence
       - name: Compile owned Python boundaries
@@ -94,10 +97,19 @@ jobs:
           snapshot_dir="$snapshot_parent/contracts"
           plan_file="$snapshot_parent/plan.json"
           current_container=""
+          contract_user="orgmetra_pg_contract"
+          contract_user_created=0
 
           cleanup_postgres_contracts() {
+            if [[ "$contract_user_created" -eq 1 ]]; then
+              sudo -n pkill -KILL -u "$contract_user" >/dev/null 2>&1 || true
+            fi
             if [[ -n "$current_container" ]]; then
               docker rm --force "$current_container" >/dev/null 2>&1 || true
+            fi
+            if [[ "$contract_user_created" -eq 1 ]]; then
+              sudo -n userdel "$contract_user" >/dev/null 2>&1 || true
+              contract_user_created=0
             fi
             chmod -R u+w "$snapshot_parent" >/dev/null 2>&1 || true
             rm -rf "$snapshot_parent"
@@ -166,8 +178,17 @@ jobs:
           find "$snapshot_dir" -type d -exec chmod 0555 {} +
           chmod 0555 "$snapshot_dir" "$snapshot_parent"
           command -v sudo >/dev/null
-          id nobody >/dev/null
-          sudo -n -u nobody true
+          command -v useradd >/dev/null
+          command -v userdel >/dev/null
+          command -v pgrep >/dev/null
+          command -v pkill >/dev/null
+          if id "$contract_user" >/dev/null 2>&1; then
+            printf 'Dedicated PostgreSQL contract identity already exists: %s\n' "$contract_user" >&2
+            exit 1
+          fi
+          sudo -n useradd --system --no-create-home --shell /usr/sbin/nologin "$contract_user"
+          contract_user_created=1
+          sudo -n -u "$contract_user" true
 
           snapshot_root_real="$(realpath -- "$snapshot_dir")"
           verify_snapshot_bytes() {
@@ -202,6 +223,41 @@ jobs:
             fi
           }
 
+          assert_contract_process_quiescence() {
+            local leaked_pids
+            leaked_pids="$(pgrep -u "$contract_user" || true)"
+            if [[ -z "$leaked_pids" ]]; then
+              return 0
+            fi
+            printf 'PostgreSQL contract leaked background processes as %s: %s\n' \
+              "$contract_user" "$(tr '\n' ' ' <<< "$leaked_pids")" >&2
+            ps -o pid=,ppid=,stat=,cmd= -p "$(paste -sd, <<< "$leaked_pids")" >&2 || true
+            sudo -n pkill -KILL -u "$contract_user" >/dev/null 2>&1 || true
+            return 1
+          }
+
+          run_contract_snapshot() {
+            local script="$1"
+            local database_url="$2"
+            local snapshot_script="${snapshot_by_script[$script]}"
+            local contract_status
+            verify_snapshot_bytes "$script"
+            printf 'Executing PostgreSQL Foundation snapshot as dedicated non-owner: %s -> %s\n' \
+              "$script" "$snapshot_script"
+            set +e
+            sudo -n -u "$contract_user" env \
+              DATABASE_URL="$database_url" \
+              PGPASSWORD="$PGPASSWORD" \
+              HOME=/tmp \
+              bash "$snapshot_script"
+            contract_status=$?
+            set -e
+            if ! assert_contract_process_quiescence; then
+              return 1
+            fi
+            return "$contract_status"
+          }
+
           executed=()
           for contract in "${contracts[@]}"; do
             verify_snapshot_bytes "$contract"
@@ -228,28 +284,12 @@ jobs:
               sleep 1
             done
 
-            snapshot_script="${snapshot_by_script[$contract]}"
-            verify_snapshot_bytes "$contract"
-            printf 'Executing PostgreSQL Foundation contract snapshot as non-owner: %s -> %s\n' \
-              "$contract" "$snapshot_script"
-            sudo -n -u nobody env \
-              DATABASE_URL="$database_url" \
-              PGPASSWORD="$PGPASSWORD" \
-              HOME=/tmp \
-              bash "$snapshot_script"
+            run_contract_snapshot "$contract" "$database_url"
 
             companions_text="${companions_by_root[$contract]:-}"
             if [[ -n "$companions_text" ]]; then
               while IFS= read -r companion; do
-                snapshot_script="${snapshot_by_script[$companion]}"
-                verify_snapshot_bytes "$companion"
-                printf 'Executing PostgreSQL Foundation companion snapshot as non-owner: %s -> %s\n' \
-                  "$companion" "$snapshot_script"
-                sudo -n -u nobody env \
-                  DATABASE_URL="$database_url" \
-                  PGPASSWORD="$PGPASSWORD" \
-                  HOME=/tmp \
-                  bash "$snapshot_script"
+                run_contract_snapshot "$companion" "$database_url"
               done <<< "$companions_text"
             fi
 
