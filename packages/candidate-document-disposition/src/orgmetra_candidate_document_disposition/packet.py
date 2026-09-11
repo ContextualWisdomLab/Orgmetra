@@ -75,6 +75,7 @@ _RETURN_DELIVERY_EVIDENCE_STATES = frozenset({
     "return_delivered",
     "return_destroyed",
 })
+_RETURN_PRE_REQUEST_STATES = frozenset({"created", "return_claim_window_open"})
 _REVIEW_STATE = "requires_human_disposition_review"
 _NEXT_ACTION = (
     "Within tenant_record_id, verify the disposition event against the authoritative "
@@ -289,6 +290,23 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
                 raise ValueError("return_delivered_at cannot precede return_dispatched_at")
         if state in _RETURN_DELIVERY_EVIDENCE_STATES and return_delivered_at is None:
             raise ValueError("return_delivered_at is required once return delivery has completed")
+        if state in _RETURN_PRE_REQUEST_STATES and (
+            return_request_reference is not None or return_requested_at is not None
+        ):
+            raise ValueError("return request evidence cannot precede return_requested state")
+        if state == "return_requested" and (
+            return_request_verified_at is not None
+            or return_due_at is not None
+            or return_dispatched_at is not None
+            or return_delivered_at is not None
+        ):
+            raise ValueError("verification evidence cannot precede return_request_verified state")
+        if state == "return_request_verified" and (
+            return_dispatched_at is not None or return_delivered_at is not None
+        ):
+            raise ValueError("dispatch evidence cannot precede return_dispatched state")
+        if state == "return_dispatched" and return_delivered_at is not None:
+            raise ValueError("delivery evidence cannot precede return_delivered state")
         if statutory_retain_until is not None:
             statutory_retain_until = _normalize_timestamp(statutory_retain_until)
         if type(legal_hold) is not bool:
