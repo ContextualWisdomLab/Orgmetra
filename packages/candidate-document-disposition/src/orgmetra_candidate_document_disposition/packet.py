@@ -127,19 +127,24 @@ def _validate_reference(value: str, prefix: str, field_name: str) -> None:
         raise ValueError(message)
 
 
-def _canonical_timestamp(value: datetime) -> str:
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+def _normalize_timestamp(value: datetime) -> datetime:
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("timestamp must be timezone-aware")
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(timezone.utc)
+
+
+def _canonical_timestamp(value: datetime) -> str:
+    return _normalize_timestamp(value).isoformat().replace("+00:00", "Z")
 
 
 class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
     """Structurally immutable, PII-minimized candidate-document disposition packet.
 
-    Construction validates bounded lifecycle evidence before storing it in
-    tuple-backed immutable slots. The packet carries disposition intent across
-    talent_acquisition, people_core, and document_records without granting
-    artifact-lifecycle authority by itself.
+    Construction validates bounded lifecycle evidence, detaches timestamp inputs
+    into built-in UTC datetimes, and stores the result in tuple-backed immutable
+    slots. The packet carries disposition intent across talent_acquisition,
+    people_core, and document_records without granting artifact-lifecycle
+    authority by itself.
     """
 
     __slots__ = ()
@@ -178,7 +183,7 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
         )
         _validate_reference(document_reference, "document", "document_reference")
         _validate_reference(candidate_reference, "candidate_profile", "candidate_reference")
-        _canonical_timestamp(hiring_decision_finalized_at)
+        hiring_decision_finalized_at = _normalize_timestamp(hiring_decision_finalized_at)
         _validate_code(return_eligibility, "return_eligibility")
         if return_eligibility not in _ALLOWED_RETURN_ELIGIBILITY_CODES:
             raise ValueError("return_eligibility must be an authorized disposition return code")
@@ -191,15 +196,17 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
         if retention_anchor_event not in _ALLOWED_RETENTION_ANCHOR_EVENTS:
             raise ValueError("retention_anchor_event must be an authorized anchor event")
         if retain_until is not None:
-            _canonical_timestamp(retain_until)
+            retain_until = _normalize_timestamp(retain_until)
         if claim_window_end is not None:
-            _canonical_timestamp(claim_window_end)
+            claim_window_end = _normalize_timestamp(claim_window_end)
             if claim_window_end <= hiring_decision_finalized_at:
                 raise ValueError("claim_window_end must be after hiring_decision_finalized_at")
         if return_dispatched_at is not None:
-            _canonical_timestamp(return_dispatched_at)
+            return_dispatched_at = _normalize_timestamp(return_dispatched_at)
         if statutory_retain_until is not None:
-            _canonical_timestamp(statutory_retain_until)
+            statutory_retain_until = _normalize_timestamp(statutory_retain_until)
+        if type(legal_hold) is not bool:
+            raise ValueError("legal_hold must be an exact boolean")
         _validate_code(purpose_code, "purpose_code")
         if purpose_code != _DISPOSITION_PURPOSE:
             raise ValueError("purpose_code must remain candidate_document_disposition")
@@ -258,9 +265,9 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
         """Return deterministic canonical JSON for the already validated packet.
 
         Construction performs all input validation and raises ``ValueError`` for
-        invalid lifecycle evidence. This method serializes that immutable state
-        with stable key ordering and UTC timestamps; it does not re-authorize a
-        disposition or execute a document lifecycle operation.
+        invalid lifecycle evidence. This method serializes the detached immutable
+        state with stable key ordering and UTC timestamps; it does not re-authorize
+        a disposition or execute a document lifecycle operation.
         """
         payload = {
             "actor_reference": self.actor_reference,
@@ -327,7 +334,8 @@ def build_candidate_document_disposition(
     The same constructor validation used by ``CandidateDocumentDisposition`` is
     applied to every argument. ``ValueError`` is raised when an identifier,
     controlled code, timestamp, lifecycle ordering rule, legal-hold rule, or
-    governed constant is invalid.
+    governed constant is invalid. Valid timestamps are detached into built-in
+    UTC datetimes before retention.
     """
     return CandidateDocumentDisposition(
         tenant_record_id=tenant_record_id,
