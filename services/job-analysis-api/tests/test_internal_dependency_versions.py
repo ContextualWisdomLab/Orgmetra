@@ -80,6 +80,14 @@ def test_owned_dependency_contract_rejects_normalized_internal_alias() -> None:
         )
 
 
+def test_owned_dependency_classifier_accepts_parenthesized_third_party_specifier() -> None:
+    """Preserve valid PEP 508 parenthesized version syntax outside the owned namespace."""
+    _assert_owned_dependency_pins(
+        ["orgmetra-hris-kernel==0.4.0", "requests (>=2.0)"],
+        {"orgmetra-hris-kernel==0.4.0"},
+    )
+
+
 def test_job_analysis_api_internal_dependencies_match_owned_package_versions() -> None:
     """Reject stale internal distribution pins hidden by source-tree PYTHONPATH tests."""
     service_project = _project_metadata("services/job-analysis-api")
