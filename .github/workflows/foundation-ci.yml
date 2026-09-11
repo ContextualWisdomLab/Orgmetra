@@ -47,7 +47,7 @@ jobs:
         env:
           ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
           ORGMETRA_POSTGRES_RUNNER_SHA256: bb84ea602542585d5c4d1156ea765d3dcdd7756da9d2ef7438096eed72364286
-          ORGMETRA_POSTGRES_TEST_SHA256: 77964f54112a75da48914087e954ebbd2e15518ba7601e1a1b6677bf06a42dd1
+          ORGMETRA_POSTGRES_TEST_SHA256: de98d839891fc7d396ccc4275b2d69821a8a682ec9153cb5f191b026cbbdc31d
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
@@ -162,6 +162,13 @@ jobs:
             exit 1
           fi
 
+          find "$snapshot_dir" -type f -exec chmod 0444 {} +
+          find "$snapshot_dir" -type d -exec chmod 0555 {} +
+          chmod 0555 "$snapshot_dir" "$snapshot_parent"
+          command -v sudo >/dev/null
+          id nobody >/dev/null
+          sudo -n -u nobody true
+
           snapshot_root_real="$(realpath -- "$snapshot_dir")"
           verify_snapshot_bytes() {
             local script="$1"
@@ -223,18 +230,26 @@ jobs:
 
             snapshot_script="${snapshot_by_script[$contract]}"
             verify_snapshot_bytes "$contract"
-            printf 'Executing PostgreSQL Foundation contract snapshot: %s -> %s\n' \
+            printf 'Executing PostgreSQL Foundation contract snapshot as non-owner: %s -> %s\n' \
               "$contract" "$snapshot_script"
-            DATABASE_URL="$database_url" bash "$snapshot_script"
+            sudo -n -u nobody env \
+              DATABASE_URL="$database_url" \
+              PGPASSWORD="$PGPASSWORD" \
+              HOME=/tmp \
+              bash "$snapshot_script"
 
             companions_text="${companions_by_root[$contract]:-}"
             if [[ -n "$companions_text" ]]; then
               while IFS= read -r companion; do
                 snapshot_script="${snapshot_by_script[$companion]}"
                 verify_snapshot_bytes "$companion"
-                printf 'Executing PostgreSQL Foundation companion snapshot: %s -> %s\n' \
+                printf 'Executing PostgreSQL Foundation companion snapshot as non-owner: %s -> %s\n' \
                   "$companion" "$snapshot_script"
-                DATABASE_URL="$database_url" bash "$snapshot_script"
+                sudo -n -u nobody env \
+                  DATABASE_URL="$database_url" \
+                  PGPASSWORD="$PGPASSWORD" \
+                  HOME=/tmp \
+                  bash "$snapshot_script"
               done <<< "$companions_text"
             fi
 
@@ -250,7 +265,7 @@ jobs:
           for bound_script in "${!expected_sha256[@]}"; do
             verify_snapshot_bytes "$bound_script"
           done
-          printf 'Executed PostgreSQL Foundation roots from private snapshot (%d):\n' "${#executed[@]}"
+          printf 'Executed PostgreSQL Foundation roots from non-owner snapshot boundary (%d):\n' "${#executed[@]}"
           printf '%s\n' "${executed[@]}"
           cleanup_postgres_contracts
           trap - EXIT
