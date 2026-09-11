@@ -60,6 +60,16 @@ def test_owned_dependency_contract_rejects_extra_internal_pin() -> None:
         )
 
 
+def test_owned_dependency_contract_rejects_normalized_internal_alias() -> None:
+    """Reject internal names whose underscore spelling normalizes into Orgmetra."""
+    expected_dependencies = {"orgmetra-hris-kernel==0.4.0"}
+    with pytest.raises(AssertionError):
+        _assert_owned_dependency_pins(
+            ["orgmetra-hris-kernel==0.4.0", "orgmetra_stale_package==0.1.0"],
+            expected_dependencies,
+        )
+
+
 def test_job_analysis_api_internal_dependencies_match_owned_package_versions() -> None:
     """Reject stale internal distribution pins hidden by source-tree PYTHONPATH tests."""
     service_project = _project_metadata("services/job-analysis-api")
