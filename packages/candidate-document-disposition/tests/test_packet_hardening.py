@@ -37,10 +37,12 @@ def _build(**overrides):
 
 def _verified_return_evidence() -> dict:
     hiring_decision = _kwargs()["hiring_decision_finalized_at"]
+    verified_at = hiring_decision + timedelta(hours=2)
     return {
         "return_request_reference": "candidate_return_request:00000000-0000-4000-a000-000000000050",
         "return_requested_at": hiring_decision + timedelta(hours=1),
-        "return_request_verified_at": hiring_decision + timedelta(hours=2),
+        "return_request_verified_at": verified_at,
+        "return_due_at": verified_at + timedelta(days=14),
     }
 
 
@@ -117,6 +119,22 @@ def test_claim_window_must_follow_hiring_decision(offset):
         _build(claim_window_end=hiring_decision + offset)
 
 
+def test_claim_window_open_state_requires_window_end():
+    with pytest.raises(ValueError, match="claim_window_end"):
+        _build(state="return_claim_window_open", claim_window_end=None)
+
+
+def test_return_request_cannot_exceed_claim_window():
+    hiring_decision = _kwargs()["hiring_decision_finalized_at"]
+    evidence = _verified_return_evidence()
+    with pytest.raises(ValueError, match="return_requested_at"):
+        _build(
+            state="return_requested",
+            claim_window_end=hiring_decision + timedelta(minutes=30),
+            **evidence,
+        )
+
+
 @pytest.mark.parametrize(
     "state",
     ["return_destroyed", "statutory_retention_expired_destroyed", "destroyed"],
@@ -188,10 +206,25 @@ def test_return_verification_cannot_precede_request():
         _build(state="return_request_verified", **evidence)
 
 
+def test_verified_return_requires_policy_computed_due_at():
+    evidence = _verified_return_evidence()
+    evidence["return_due_at"] = None
+    with pytest.raises(ValueError, match="return_due_at"):
+        _build(state="return_request_verified", **evidence)
+
+
+def test_return_due_at_cannot_precede_verification():
+    evidence = _verified_return_evidence()
+    evidence["return_due_at"] = evidence["return_request_verified_at"] - timedelta(seconds=1)
+    with pytest.raises(ValueError, match="return_due_at"):
+        _build(state="return_request_verified", **evidence)
+
+
 def test_dispatch_cannot_precede_verified_request():
     hiring_decision = _kwargs()["hiring_decision_finalized_at"]
     evidence = _verified_return_evidence()
     evidence["return_request_verified_at"] = hiring_decision + timedelta(days=2)
+    evidence["return_due_at"] = hiring_decision + timedelta(days=16)
     with pytest.raises(ValueError, match="return_dispatched_at"):
         _build(
             state="return_dispatched",
@@ -262,6 +295,7 @@ def test_return_destroyed_accepts_verified_request_and_delivery_receipt():
 
     assert packet.return_request_reference == evidence["return_request_reference"]
     assert packet.return_request_verified_at == evidence["return_request_verified_at"]
+    assert packet.return_due_at == evidence["return_due_at"]
     assert packet.return_dispatched_at == dispatched_at
     assert packet.return_delivered_at == delivered_at
 
