@@ -43,6 +43,47 @@ PY
 
 require_disposable_role_cleanup
 
+MIGRATION_BASENAME_PATTERN='^[0-9]{4}_[a-z0-9_]+\.sql$'
+MIGRATION_FILES=""
+
+# Enumerate the checked-in migration set before any cluster connection or
+# destructive DDL. A discovery failure or an empty directory must fail closed
+# instead of collapsing into a skipped application loop. Validate the canonical
+# basename form and reject duplicate numeric prefixes before applying anything.
+discover_migration_files() {
+    local discovered
+    if ! discovered="$(find database/migrations -maxdepth 1 -type f -name '[0-9][0-9][0-9][0-9]_*.sql' | sort)"; then
+        echo "recovery rehearsal failed to enumerate database/migrations" >&2
+        return 1
+    fi
+    if [[ -z "${discovered}" ]]; then
+        echo "recovery rehearsal discovered no migration files in database/migrations" >&2
+        return 1
+    fi
+
+    local migration
+    local basename
+    local prefix
+    local previous_prefix=""
+    while IFS= read -r migration; do
+        basename="${migration##*/}"
+        if [[ ! "${basename}" =~ ${MIGRATION_BASENAME_PATTERN} ]]; then
+            echo "recovery rehearsal found a non-canonical migration filename: ${basename}" >&2
+            return 1
+        fi
+        prefix="${basename:0:4}"
+        if [[ "${prefix}" == "${previous_prefix}" ]]; then
+            echo "recovery rehearsal found a duplicate migration numeric prefix: ${prefix}" >&2
+            return 1
+        fi
+        previous_prefix="${prefix}"
+    done <<< "${discovered}"
+
+    MIGRATION_FILES="${discovered}"
+}
+
+discover_migration_files
+
 SOURCE_DATABASE_NAME="orgmetra_recovery_source"
 RESTORE_DATABASE_NAME="orgmetra_recovery_target"
 SOURCE_DATABASE_URL="$(replace_database_name "${POSTGRES_SOURCE_ADMIN_URL}" "${SOURCE_DATABASE_NAME}")"
@@ -128,18 +169,9 @@ psql "${POSTGRES_RESTORE_ADMIN_URL}" -v ON_ERROR_STOP=1 -c \
     "DROP DATABASE IF EXISTS ${RESTORE_DATABASE_NAME} WITH (FORCE);" >/dev/null
 drop_recovery_roles "${POSTGRES_RESTORE_ADMIN_URL}"
 
-for migration in \
-    database/migrations/0001_foundation_schema.sql \
-    database/migrations/0002_sealed_evidence_digest.sql \
-    database/migrations/0003_audit_outbox_persistence.sql \
-    database/migrations/0004_outbox_delivery_claim.sql \
-    database/migrations/0005_outbox_delivery_finalization.sql \
-    database/migrations/0006_outbox_delivery_dead_letter.sql \
-    database/migrations/0007_outbox_retry_exhaustion.sql \
-    database/migrations/0008_audit_outbox_review_hardening.sql \
-    database/migrations/0009_candidate_worker_conversion_governance.sql; do
+while IFS= read -r migration; do
     psql "${SOURCE_DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
-done
+done <<< "${MIGRATION_FILES}"
 
 canonical_event='{"data":{"high_impact":false,"result_code":"rehearsal_seeded"},"datacontenttype":"application/json","id":"00000000-0000-7000-8000-000000000103","orgmetraactor":"operator_subject:restore_rehearsal","orgmetraevidence":"recovery_rehearsal:v1","orgmetrapurpose":"business_continuity","orgmetrareason":"restore_rehearsal","orgmetratenant":"10000000-0000-7000-8000-000000000001","source":"urn:orgmetra:recovery_evidence","specversion":"1.0","subject":"person_record:00000000-0000-7000-8000-000000000101","time":"2026-08-18T00:00:00Z","type":"orgmetra.recovery.restore_rehearsed"}'
 
