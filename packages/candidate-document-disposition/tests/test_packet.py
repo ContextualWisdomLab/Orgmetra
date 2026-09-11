@@ -37,6 +37,14 @@ def _build(**overrides) -> CandidateDocumentDisposition:
     return build_candidate_document_disposition(**kwargs)
 
 
+def _return_request_evidence() -> dict:
+    return {
+        "return_request_reference": "candidate_document_return_request:00000000-0000-4000-a000-000000000050",
+        "return_requested_at": datetime(2026, 9, 11, 13, 0, 0, tzinfo=timezone.utc),
+        "return_request_verified_at": datetime(2026, 9, 11, 14, 0, 0, tzinfo=timezone.utc),
+    }
+
+
 class TestConstruction:
     def test_default_packet(self):
         p = _build()
@@ -58,7 +66,11 @@ class TestConstruction:
 
     def test_optional_return_dispatched(self):
         ts = datetime(2026, 9, 20, 12, 0, 0, tzinfo=timezone.utc)
-        p = _build(state="return_dispatched", return_dispatched_at=ts)
+        p = _build(
+            state="return_dispatched",
+            return_dispatched_at=ts,
+            **_return_request_evidence(),
+        )
         assert p.return_dispatched_at == ts
 
     def test_optional_statutory_retain_until(self):
@@ -138,6 +150,23 @@ class TestConstruction:
         dispatch_at = datetime(2026, 9, 20, 12, 0, 0, tzinfo=timezone.utc)
         delivery_at = datetime(2026, 9, 21, 12, 0, 0, tzinfo=timezone.utc)
         evidence = {}
+        if state in {
+            "return_requested",
+            "return_request_verified",
+            "return_dispatched",
+            "return_delivered",
+            "return_destroyed",
+        }:
+            request_evidence = _return_request_evidence()
+            evidence["return_request_reference"] = request_evidence["return_request_reference"]
+            evidence["return_requested_at"] = request_evidence["return_requested_at"]
+        if state in {
+            "return_request_verified",
+            "return_dispatched",
+            "return_delivered",
+            "return_destroyed",
+        }:
+            evidence["return_request_verified_at"] = _return_request_evidence()["return_request_verified_at"]
         if state in {"return_dispatched", "return_delivered", "return_destroyed"}:
             evidence["return_dispatched_at"] = dispatch_at
         if state in {"return_delivered", "return_destroyed"}:
@@ -296,28 +325,45 @@ class TestCanonicalJson:
         assert doc["legal_hold"] is False
 
     def test_omits_none_optional_fields(self):
-        p = _build(previous_disposition_reference=None, claim_window_end=None,
-                   return_dispatched_at=None, return_delivered_at=None,
-                   statutory_retain_until=None)
+        p = _build(
+            previous_disposition_reference=None,
+            claim_window_end=None,
+            return_request_reference=None,
+            return_requested_at=None,
+            return_request_verified_at=None,
+            return_dispatched_at=None,
+            return_delivered_at=None,
+            statutory_retain_until=None,
+        )
         doc = json.loads(p.canonical_json())
         assert doc["previous_disposition_reference"] is None
         assert doc["claim_window_end"] is None
+        assert doc["return_request_reference"] is None
+        assert doc["return_requested_at"] is None
+        assert doc["return_request_verified_at"] is None
         assert doc["return_dispatched_at"] is None
         assert doc["return_delivered_at"] is None
         assert doc["statutory_retain_until"] is None
 
     def test_includes_set_optional_fields(self):
-        ts = datetime(2026, 10, 11, 12, 0, 0, tzinfo=timezone.utc)
+        request_evidence = _return_request_evidence()
+        dispatch_at = datetime(2026, 9, 20, 12, 0, 0, tzinfo=timezone.utc)
+        delivery_at = datetime(2026, 9, 21, 12, 0, 0, tzinfo=timezone.utc)
         p = _build(
+            state="return_delivered",
             previous_disposition_reference="candidate_document_disposition:00000000-0000-4000-a000-000000000099",
-            claim_window_end=ts,
-            return_dispatched_at=ts,
-            return_delivered_at=ts,
-            statutory_retain_until=ts,
+            claim_window_end=datetime(2026, 10, 11, 12, 0, 0, tzinfo=timezone.utc),
+            return_dispatched_at=dispatch_at,
+            return_delivered_at=delivery_at,
+            statutory_retain_until=datetime(2031, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+            **request_evidence,
         )
         doc = json.loads(p.canonical_json())
         assert doc["previous_disposition_reference"] is not None
         assert doc["claim_window_end"] is not None
+        assert doc["return_request_reference"] is not None
+        assert doc["return_requested_at"] is not None
+        assert doc["return_request_verified_at"] is not None
         assert doc["return_dispatched_at"] is not None
         assert doc["return_delivered_at"] is not None
         assert doc["statutory_retain_until"] is not None
