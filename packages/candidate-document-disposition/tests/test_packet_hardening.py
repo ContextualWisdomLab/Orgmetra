@@ -38,7 +38,7 @@ def _build(**overrides):
 def _verified_return_evidence() -> dict:
     hiring_decision = _kwargs()["hiring_decision_finalized_at"]
     return {
-        "return_request_reference": "candidate_document_return_request:00000000-0000-4000-a000-000000000050",
+        "return_request_reference": "candidate_return_request:00000000-0000-4000-a000-000000000050",
         "return_requested_at": hiring_decision + timedelta(hours=1),
         "return_request_verified_at": hiring_decision + timedelta(hours=2),
     }
@@ -205,8 +205,9 @@ def test_dispatch_cannot_precede_verified_request():
     ["return_dispatched", "return_delivered", "return_destroyed"],
 )
 def test_return_dispatch_states_require_dispatch_timestamp(state):
-    with pytest.raises(ValueError, match="return_request_reference"):
-        _build(state=state, return_dispatched_at=None)
+    evidence = _verified_return_evidence()
+    with pytest.raises(ValueError, match="return_dispatched_at"):
+        _build(state=state, return_dispatched_at=None, **evidence)
 
 
 @pytest.mark.parametrize("offset", [timedelta(0), -timedelta(seconds=1)])
