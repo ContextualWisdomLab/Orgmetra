@@ -367,6 +367,98 @@ def evidence_document(inventory: ContractInventory) -> dict[str, Any]:
     }
 
 
+def _snapshot_binding(
+    root: Path,
+    destination: Path,
+    binding: ScriptBinding,
+    context: str,
+) -> dict[str, str]:
+    """Copy one validated binding into the private pre-execution byte snapshot."""
+
+    _validate_path(
+        root,
+        binding.script,
+        COMPANION_SCRIPT_PATTERN,
+        f"{context}.source",
+    )
+    payload = (root / binding.script).read_bytes()
+    observed = hashlib.sha256(payload).hexdigest()
+    if observed != binding.sha256:
+        raise ContractInventoryError(
+            f"{binding.script} changed before execution snapshot: "
+            f"expected {binding.sha256}, observed {observed}"
+        )
+
+    target = destination / binding.script
+    target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    target.write_bytes(payload)
+    target.chmod(0o400)
+    snapshot_digest = _sha256(target)
+    if snapshot_digest != binding.sha256:
+        raise ContractInventoryError(
+            f"execution snapshot digest mismatch for {binding.script}: "
+            f"expected {binding.sha256}, observed {snapshot_digest}"
+        )
+    return {
+        "script": binding.script,
+        "snapshot_script": str(target.resolve(strict=True)),
+        "sha256": binding.sha256,
+    }
+
+
+def materialize_execution_snapshot(
+    root: Path,
+    inventory: ContractInventory,
+    destination: Path,
+) -> dict[str, Any]:
+    """Freeze every active contract byte sequence before any contract is executed."""
+
+    if destination.exists():
+        raise ContractInventoryError(
+            f"execution snapshot destination must not already exist: {destination}"
+        )
+    if not destination.parent.is_dir():
+        raise ContractInventoryError(
+            f"execution snapshot parent directory is missing: {destination.parent}"
+        )
+    destination.mkdir(mode=0o700)
+
+    active: list[dict[str, Any]] = []
+    for contract in inventory.contracts:
+        root_snapshot = _snapshot_binding(
+            root,
+            destination,
+            contract.root,
+            f"snapshot.{contract.contract_id}.root",
+        )
+        companion_snapshots = [
+            _snapshot_binding(
+                root,
+                destination,
+                companion,
+                f"snapshot.{contract.contract_id}.companions[{index}]",
+            )
+            for index, companion in enumerate(contract.companions)
+        ]
+        active.append(
+            {
+                "id": contract.contract_id,
+                **root_snapshot,
+                "companions": companion_snapshots,
+            }
+        )
+
+    for path in sorted(destination.rglob("*"), reverse=True):
+        if path.is_dir():
+            path.chmod(0o500)
+    destination.chmod(0o500)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "snapshot_root": str(destination.resolve(strict=True)),
+        "active": active,
+    }
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     """Parse the operator-facing inventory command."""
 
@@ -383,6 +475,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     companions = subparsers.add_parser("companions")
     companions.add_argument("script")
     subparsers.add_parser("evidence")
+    snapshot = subparsers.add_parser("snapshot")
+    snapshot.add_argument("--destination", type=Path, required=True)
     return parser.parse_args(argv)
 
 
@@ -420,6 +514,19 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 json.dumps(
                     evidence_document(inventory),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "snapshot":
+            print(
+                json.dumps(
+                    materialize_execution_snapshot(
+                        root,
+                        inventory,
+                        args.destination.resolve(),
+                    ),
                     indent=2,
                     sort_keys=True,
                 )
