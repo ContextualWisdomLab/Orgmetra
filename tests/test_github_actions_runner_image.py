@@ -15,18 +15,14 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 
-_RUNS_ON_PATTERN = re.compile(r"^\s*runs-on\s*:\s*(.*?)\s*$")
-_USES_PATTERN = re.compile(r"^\s*(?:-\s+)?uses\s*:\s*(.*?)\s*$")
-_IMAGE_PATTERN = re.compile(r"^\s*image\s*:\s*(.*?)\s*$")
-_CONTAINER_PATTERN = re.compile(r"^\s*container\s*:\s*(.*?)\s*$")
-_PERMISSIONS_BLOCK_PATTERN = re.compile(r"^permissions\s*:\s*(.*?)\s*$")
-_PERMISSION_SCOPE_PATTERN = re.compile(r"^([A-Za-z0-9-]+)\s*:\s*(read|write|none)\s*$")
-_ON_PATTERN = re.compile(r"^on\s*:\s*(.*?)\s*$")
-_PRIVILEGED_TRIGGER_KEY_PATTERN = re.compile(r"^(pull_request_target|workflow_run)\s*:")
+_MAPPING_ENTRY_PATTERN = re.compile(
+    r"^(?P<sequence>-\s+)?"
+    r"(?P<key>[A-Za-z0-9_-]+|'(?:[^']|'')*'|\"(?:[^\"\\]|\\.)*\")"
+    r"\s*:\s*(?P<value>.*?)\s*$"
+)
 _PRIVILEGED_EVENT_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_-])(pull_request_target|workflow_run)(?![A-Za-z0-9_-])"
 )
-_WRITE_ALL_PATTERN = re.compile(r"permissions\s*:\s*write-all\b")
 
 _PINNED_ACTION_PATTERN = re.compile(
     r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._/-]+)?@[0-9a-f]{40}$"
@@ -92,15 +88,31 @@ def _unquote_scalar(value: str) -> str:
     return value
 
 
+def _mapping_entry(line: str) -> tuple[int, bool, str, str] | None:
+    """Return indentation, sequence form, key, and scalar for one YAML mapping entry."""
+    indent = len(line) - len(line.lstrip())
+    candidate = _strip_yaml_comment(line.lstrip())
+    match = _MAPPING_ENTRY_PATTERN.match(candidate)
+    if match is None:
+        return None
+    return (
+        indent,
+        match.group("sequence") is not None,
+        _unquote_scalar(match.group("key")),
+        _unquote_scalar(match.group("value")),
+    )
+
+
 def _runner_declarations(workflow: str) -> list[tuple[int, str]]:
     """Return line-numbered scalar ``runs-on`` declarations."""
     declarations: list[tuple[int, str]] = []
     for line_number, line in enumerate(workflow.splitlines(), start=1):
-        match = _RUNS_ON_PATTERN.match(line)
-        if match is not None:
-            declarations.append(
-                (line_number, _unquote_scalar(_strip_yaml_comment(match.group(1))))
-            )
+        entry = _mapping_entry(line)
+        if entry is None:
+            continue
+        _indent, sequence, key, value = entry
+        if not sequence and key == "runs-on":
+            declarations.append((line_number, value))
     return declarations
 
 
@@ -108,10 +120,12 @@ def _action_declarations(workflow: str) -> list[tuple[int, str]]:
     """Return remote action/reusable-workflow ``uses`` declarations."""
     declarations: list[tuple[int, str]] = []
     for line_number, line in enumerate(workflow.splitlines(), start=1):
-        match = _USES_PATTERN.match(line)
-        if match is None:
+        entry = _mapping_entry(line)
+        if entry is None:
             continue
-        value = _unquote_scalar(_strip_yaml_comment(match.group(1)))
+        _indent, _sequence, key, value = entry
+        if key != "uses":
+            continue
         if value.startswith("./") or value.startswith("docker://"):
             continue
         declarations.append((line_number, value))
@@ -122,13 +136,13 @@ def _image_declarations(workflow: str) -> list[tuple[int, str]]:
     """Return image references from ``image:`` and scalar ``container:`` forms."""
     declarations: list[tuple[int, str]] = []
     for line_number, line in enumerate(workflow.splitlines(), start=1):
-        match = _IMAGE_PATTERN.match(line)
-        if match is None:
-            match = _CONTAINER_PATTERN.match(line)
-        if match is None:
+        entry = _mapping_entry(line)
+        if entry is None:
+            continue
+        _indent, _sequence, key, value = entry
+        if key not in {"image", "container"}:
             continue
 
-        value = _unquote_scalar(_strip_yaml_comment(match.group(1)))
         # ``container:`` with no scalar value starts the object form; its nested
         # ``image:`` member is collected on its own line.
         if not value:
@@ -145,27 +159,30 @@ def _permission_blocks(
     blocks: list[tuple[int, int, str, dict[str, str]]] = []
 
     for index, line in enumerate(lines):
-        candidate = _strip_yaml_comment(line)
-        match = _PERMISSIONS_BLOCK_PATTERN.match(candidate)
-        if match is None:
+        entry = _mapping_entry(line)
+        if entry is None:
+            continue
+        indent, sequence, key, scalar = entry
+        if sequence or key != "permissions":
             continue
 
-        indent = len(line) - len(line.lstrip())
-        scalar = _unquote_scalar(match.group(1))
         scopes: dict[str, str] = {}
         if not scalar:
             for child in lines[index + 1 :]:
                 if child.strip() == "" or child.lstrip().startswith("#"):
                     continue
+                child_entry = _mapping_entry(child)
                 child_indent = len(child) - len(child.lstrip())
                 if child_indent <= indent:
                     break
-                child_candidate = _strip_yaml_comment(child)
-                scope_match = _PERMISSION_SCOPE_PATTERN.match(child_candidate)
-                if scope_match is None:
-                    scopes["<invalid>"] = child_candidate
+                if child_entry is None:
+                    scopes["<invalid>"] = _strip_yaml_comment(child)
                     break
-                scopes[scope_match.group(1)] = scope_match.group(2)
+                _child_indent, child_sequence, child_key, child_value = child_entry
+                if child_sequence or child_value not in {"read", "write", "none"}:
+                    scopes["<invalid>"] = _strip_yaml_comment(child)
+                    break
+                scopes[child_key] = child_value
         blocks.append((index + 1, indent, scalar, scopes))
 
     return blocks
@@ -201,25 +218,22 @@ def _privileged_trigger_declarations(workflow: str) -> list[tuple[int, str]]:
         if line.strip() == "" or line.lstrip().startswith("#"):
             continue
 
-        indent = len(line) - len(line.lstrip())
-        candidate = _strip_yaml_comment(line)
+        entry = _mapping_entry(line)
+        if entry is None:
+            continue
+        indent, sequence, key, value = entry
 
-        if indent == 0:
-            on_match = _ON_PATTERN.match(candidate)
-            if on_match is not None:
-                value = _unquote_scalar(on_match.group(1))
-                on_block_indent = 0 if not value else None
-                if value and _PRIVILEGED_EVENT_PATTERN.search(value):
-                    declarations.append((line_number, value))
-                continue
+        if indent == 0 and not sequence and key == "on":
+            on_block_indent = 0 if not value else None
+            if value and _PRIVILEGED_EVENT_PATTERN.search(value):
+                declarations.append((line_number, value))
+            continue
 
         if on_block_indent is not None:
             if indent <= on_block_indent:
                 on_block_indent = None
-            else:
-                trigger_match = _PRIVILEGED_TRIGGER_KEY_PATTERN.match(candidate)
-                if trigger_match is not None:
-                    declarations.append((line_number, trigger_match.group(1)))
+            elif not sequence and key in {"pull_request_target", "workflow_run"}:
+                declarations.append((line_number, key))
 
     return declarations
 
@@ -361,6 +375,30 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
             ],
         )
 
+    def test_action_parser_normalizes_quoted_mapping_keys(self) -> None:
+        """Treat bare and quoted ``uses`` keys as the same security declaration."""
+        pinned = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+        sample = "\n".join(
+            (
+                '"uses": actions/checkout@v4',
+                "- 'uses': actions/checkout@main",
+                f"'uses': {pinned}",
+            )
+        )
+        declarations = _action_declarations(sample)
+        self.assertEqual(
+            ["actions/checkout@v4", "actions/checkout@main", pinned],
+            [value for _, value in declarations],
+        )
+        self.assertEqual(
+            ["actions/checkout@v4", "actions/checkout@main"],
+            [
+                value
+                for _, value in declarations
+                if not _PINNED_ACTION_PATTERN.match(value)
+            ],
+        )
+
     def test_all_container_images_are_digest_pinned(self) -> None:
         """Reject mutable job-container and service-image tags."""
         unpinned: list[str] = []
@@ -417,6 +455,24 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
             ],
         )
 
+    def test_image_parser_normalizes_quoted_mapping_keys(self) -> None:
+        """Treat quoted image/container keys as equivalent immutable inputs."""
+        pinned_image = (
+            "postgres:17.6-alpine@sha256:"
+            "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+        )
+        sample = "\n".join(
+            (
+                '"image": postgres:latest',
+                "'container': ghcr.io/example/app:latest",
+                f"  'image': '{pinned_image}'",
+            )
+        )
+        self.assertEqual(
+            ["postgres:latest", "ghcr.io/example/app:latest", pinned_image],
+            [value for _, value in _image_declarations(sample)],
+        )
+
 
 class GitHubActionsLeastPrivilegeContractTest(unittest.TestCase):
     """Keep repository-owned workflows read-only and off privileged triggers."""
@@ -452,11 +508,10 @@ class GitHubActionsLeastPrivilegeContractTest(unittest.TestCase):
                 violations.append(
                     f"{workflow_path.name}:{line_number}=privileged trigger {value!r}"
                 )
-            for line_number, line in enumerate(workflow.splitlines(), start=1):
-                candidate = _strip_yaml_comment(line)
-                if _WRITE_ALL_PATTERN.search(candidate):
+            for line_number, _indent, scalar, _scopes in _permission_blocks(workflow):
+                if scalar == "write-all":
                     violations.append(
-                        f"{workflow_path.name}:{line_number}={line.strip()!r}"
+                        f"{workflow_path.name}:{line_number}=permissions: write-all"
                     )
         self.assertEqual(
             [],
@@ -503,6 +558,22 @@ class GitHubActionsLeastPrivilegeContractTest(unittest.TestCase):
             _permission_violations("permissions: write-all\n"),
         )
 
+    def test_permission_parser_normalizes_quoted_mapping_keys(self) -> None:
+        """Reject quoted job escalation while accepting quoted read-only defaults."""
+        workflow = (
+            '"permissions":\n'
+            '  "contents": read\n'
+            "jobs:\n"
+            "  test:\n"
+            "    'permissions':\n"
+            "      'contents': write\n"
+        )
+        self.assertEqual({"contents": "read"}, _declared_permissions(workflow))
+        self.assertEqual(
+            ["line 5: scopes={'contents': 'write'}"],
+            _permission_violations(workflow),
+        )
+
     def test_trigger_parser_covers_mapping_scalar_and_flow_forms(self) -> None:
         """Detect privileged events in every GitHub-supported ``on`` shorthand."""
         self.assertEqual(
@@ -520,6 +591,17 @@ class GitHubActionsLeastPrivilegeContractTest(unittest.TestCase):
         self.assertEqual(
             [],
             _privileged_trigger_declarations("on: [push, pull_request]\n"),
+        )
+
+    def test_trigger_parser_normalizes_quoted_mapping_keys(self) -> None:
+        """Detect privileged scalar and mapping events when YAML keys are quoted."""
+        self.assertEqual(
+            [(1, "pull_request_target")],
+            _privileged_trigger_declarations('"on": pull_request_target\n'),
+        )
+        self.assertEqual(
+            [(2, "workflow_run")],
+            _privileged_trigger_declarations("'on':\n  'workflow_run':\n"),
         )
 
 
