@@ -2,7 +2,10 @@ from datetime import datetime, timedelta, timezone, tzinfo
 
 import pytest
 
-from orgmetra_candidate_document_disposition import build_candidate_document_disposition
+from orgmetra_candidate_document_disposition import (
+    CandidateDocumentDisposition,
+    build_candidate_document_disposition,
+)
 
 
 def _kwargs() -> dict:
@@ -41,6 +44,10 @@ class _MutableTimezone(tzinfo):
 
     def dst(self, dt):
         return timedelta(0)
+
+
+class _TextSubtype(str):
+    pass
 
 
 def test_timestamp_runtime_alias_cannot_change_digest_after_construction():
@@ -92,3 +99,40 @@ def test_packet_state_cannot_be_rewritten_after_validation():
         object.__setattr__(packet, "state", "destroyed")
 
     assert packet.state == "created"
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("tenant_record_id", "00000000-0000-4000-a000-000000000001"),
+        ("document_reference", "document:00000000-0000-4000-a000-000000000020"),
+        ("retention_policy_version", "v2026_09"),
+        (
+            "retention_policy_digest",
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        ),
+    ],
+)
+def test_trust_bearing_text_rejects_string_subtypes(field_name, value):
+    with pytest.raises(ValueError, match=field_name):
+        _build(**{field_name: _TextSubtype(value)})
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("review_state", "requires_human_disposition_review"),
+        (
+            "next_action",
+            "Within tenant_record_id, verify the disposition event against the authoritative "
+            "talent_acquisition or people_core record; confirm no conflicting legal hold, "
+            "then request artifact lifecycle disposition from document_records.",
+        ),
+    ],
+)
+def test_governed_constant_text_rejects_string_subtypes(field_name, value):
+    kwargs = _kwargs()
+    kwargs[field_name] = _TextSubtype(value)
+
+    with pytest.raises(ValueError, match=field_name):
+        CandidateDocumentDisposition(**kwargs)
