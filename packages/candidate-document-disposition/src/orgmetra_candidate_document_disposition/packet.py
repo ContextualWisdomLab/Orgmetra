@@ -53,6 +53,19 @@ _DESTRUCTION_STATES = frozenset({
     "statutory_retention_expired_destroyed",
     "destroyed",
 })
+_RETURN_REQUEST_EVIDENCE_STATES = frozenset({
+    "return_requested",
+    "return_request_verified",
+    "return_dispatched",
+    "return_delivered",
+    "return_destroyed",
+})
+_RETURN_VERIFIED_EVIDENCE_STATES = frozenset({
+    "return_request_verified",
+    "return_dispatched",
+    "return_delivered",
+    "return_destroyed",
+})
 _RETURN_DISPATCH_EVIDENCE_STATES = frozenset({
     "return_dispatched",
     "return_delivered",
@@ -87,6 +100,9 @@ _PACKET_FIELDS = (
     "actor_reference",
     "previous_disposition_reference",
     "claim_window_end",
+    "return_request_reference",
+    "return_requested_at",
+    "return_request_verified_at",
     "return_dispatched_at",
     "return_delivered_at",
     "statutory_retain_until",
@@ -182,6 +198,9 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
         actor_reference: str,
         previous_disposition_reference: str | None = None,
         claim_window_end: datetime | None = None,
+        return_request_reference: str | None = None,
+        return_requested_at: datetime | None = None,
+        return_request_verified_at: datetime | None = None,
         return_dispatched_at: datetime | None = None,
         return_delivered_at: datetime | None = None,
         statutory_retain_until: datetime | None = None,
@@ -215,10 +234,39 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             claim_window_end = _normalize_timestamp(claim_window_end)
             if claim_window_end <= hiring_decision_finalized_at:
                 raise ValueError("claim_window_end must be after hiring_decision_finalized_at")
+        if return_request_reference is not None:
+            _validate_reference(
+                return_request_reference,
+                "candidate_document_return_request",
+                "return_request_reference",
+            )
+        if return_requested_at is not None:
+            return_requested_at = _normalize_timestamp(return_requested_at)
+            if return_requested_at < hiring_decision_finalized_at:
+                raise ValueError("return_requested_at cannot precede hiring_decision_finalized_at")
+            if claim_window_end is not None and return_requested_at > claim_window_end:
+                raise ValueError("return_requested_at cannot exceed claim_window_end")
+        if state in _RETURN_REQUEST_EVIDENCE_STATES:
+            if return_request_reference is None:
+                raise ValueError("return_request_reference is required once a return request exists")
+            if return_requested_at is None:
+                raise ValueError("return_requested_at is required once a return request exists")
+        if return_request_verified_at is not None:
+            return_request_verified_at = _normalize_timestamp(return_request_verified_at)
+            if return_requested_at is None:
+                raise ValueError("return_request_verified_at requires return_requested_at")
+            if return_request_verified_at < return_requested_at:
+                raise ValueError("return_request_verified_at cannot precede return_requested_at")
+        if state in _RETURN_VERIFIED_EVIDENCE_STATES and return_request_verified_at is None:
+            raise ValueError(
+                "return_request_verified_at is required once return-request verification has completed"
+            )
         if return_dispatched_at is not None:
             return_dispatched_at = _normalize_timestamp(return_dispatched_at)
             if return_dispatched_at <= hiring_decision_finalized_at:
                 raise ValueError("return_dispatched_at must be after hiring_decision_finalized_at")
+            if return_request_verified_at is not None and return_dispatched_at < return_request_verified_at:
+                raise ValueError("return_dispatched_at cannot precede return_request_verified_at")
         if state in _RETURN_DISPATCH_EVIDENCE_STATES and return_dispatched_at is None:
             raise ValueError("return_dispatched_at is required once return dispatch has completed")
         if return_delivered_at is not None:
@@ -281,6 +329,9 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             actor_reference,
             previous_disposition_reference,
             claim_window_end,
+            return_request_reference,
+            return_requested_at,
+            return_request_verified_at,
             return_dispatched_at,
             return_delivered_at,
             statutory_retain_until,
@@ -321,6 +372,9 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             "return_delivered_at": _canonical_timestamp(self.return_delivered_at) if self.return_delivered_at is not None else None,
             "return_dispatched_at": _canonical_timestamp(self.return_dispatched_at) if self.return_dispatched_at is not None else None,
             "return_eligibility": self.return_eligibility,
+            "return_request_reference": self.return_request_reference,
+            "return_request_verified_at": _canonical_timestamp(self.return_request_verified_at) if self.return_request_verified_at is not None else None,
+            "return_requested_at": _canonical_timestamp(self.return_requested_at) if self.return_requested_at is not None else None,
             "review_state": self.review_state,
             "state": self.state,
             "statutory_retain_until": _canonical_timestamp(self.statutory_retain_until) if self.statutory_retain_until is not None else None,
@@ -358,6 +412,9 @@ def build_candidate_document_disposition(
     actor_reference: str,
     previous_disposition_reference: str | None = None,
     claim_window_end: datetime | None = None,
+    return_request_reference: str | None = None,
+    return_requested_at: datetime | None = None,
+    return_request_verified_at: datetime | None = None,
     return_dispatched_at: datetime | None = None,
     return_delivered_at: datetime | None = None,
     statutory_retain_until: datetime | None = None,
@@ -389,6 +446,9 @@ def build_candidate_document_disposition(
         actor_reference=actor_reference,
         previous_disposition_reference=previous_disposition_reference,
         claim_window_end=claim_window_end,
+        return_request_reference=return_request_reference,
+        return_requested_at=return_requested_at,
+        return_request_verified_at=return_request_verified_at,
         return_dispatched_at=return_dispatched_at,
         return_delivered_at=return_delivered_at,
         statutory_retain_until=statutory_retain_until,
