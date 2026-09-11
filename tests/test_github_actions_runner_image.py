@@ -315,11 +315,36 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
         )
 
 
-def _declared_permissions(workflow: str) -> dict[str, str]:
-    """Return top-level ``permissions`` scopes as a scope→level mapping.
+def _declared_permission_blocks(workflow: str) -> list[dict[str, str]]:
+    """Return every ``permissions`` block, workflow-level and job-level.
 
-    Only the top-level block is inspected: a job-level override cannot loosen
-    the repository-wide default that gates the whole workflow run.
+    GitHub replaces rather than merges the workflow default when a job declares
+    its own ``permissions:`` block, so a read-only workflow default can be
+    escalated per job; every block is inspected.
+    """
+    blocks: list[dict[str, str]] = []
+    lines = workflow.splitlines()
+    for index, line in enumerate(lines):
+        if _PERMISSIONS_BLOCK_PATTERN.match(_strip_yaml_comment(line)) is None:
+            continue
+        scopes: dict[str, str] = {}
+        for child in lines[index + 1 :]:
+            if child.strip() == "" or child.lstrip().startswith("#"):
+                continue
+            match = _PERMISSION_SCOPE_PATTERN.match(_strip_yaml_comment(child))
+            if match is None:
+                break
+            scopes[match.group(1)] = match.group(2)
+        blocks.append(scopes)
+    return blocks
+
+
+def _declared_permissions(workflow: str) -> dict[str, str]:
+    """Return the workflow-level ``permissions`` block as a scope→level mapping.
+
+    A job-level override cannot loosen the repository-wide default that gates
+    the whole workflow run, so only the unindented top-level block is returned
+    here; ``_declared_permission_blocks`` inspects job-level blocks too.
     """
     scopes: dict[str, str] = {}
     lines = workflow.splitlines()
@@ -343,23 +368,23 @@ class GitHubActionsLeastPrivilegeContractTest(unittest.TestCase):
     """Keep repository-owned workflows read-only and off privileged triggers."""
 
     def test_local_workflows_declare_only_read_scoped_contents_permission(self) -> None:
-        """Reject missing, write-scoped, or broadened top-level permissions."""
+        """Reject missing, write-scoped, or broadened workflow and job permissions."""
         missing: list[str] = []
         violations: list[str] = []
         for workflow_path in _workflow_paths():
             workflow = workflow_path.read_text(encoding="utf-8")
-            scopes = _declared_permissions(workflow)
-            if not scopes:
+            if not _declared_permissions(workflow):
                 missing.append(workflow_path.name)
                 continue
-            for scope, level in scopes.items():
-                if scope != "contents" or level.lower() != "read":
-                    violations.append(f"{workflow_path.name}: {scope}={level}")
-        self.assertEqual([], missing, f"top-level permissions block is missing from: {missing}")
+            for scopes in _declared_permission_blocks(workflow):
+                for scope, level in scopes.items():
+                    if scope != "contents" or level.lower() != "read":
+                        violations.append(f"{workflow_path.name}: {scope}={level}")
+        self.assertEqual([], missing, f"workflow-level permissions block is missing from: {missing}")
         self.assertEqual(
             [],
             violations,
-            f"local workflows must grant only contents: read: {violations}",
+            f"local workflows must grant only contents: read in every block: {violations}",
         )
 
     def test_local_workflows_reject_privileged_triggers_and_write_all(self) -> None:
@@ -391,6 +416,17 @@ class GitHubActionsLeastPrivilegeContractTest(unittest.TestCase):
             {},
             _declared_permissions("jobs:\n  test:\n    permissions:\n      contents: read\n"),
         )
+        self.assertEqual(
+            [{"contents": "read"}],
+            _declared_permission_blocks("permissions:\n  contents: read\n"),
+        )
+        self.assertEqual(
+            [{"contents": "read"}, {"contents": "write"}],
+            _declared_permission_blocks(
+                "permissions:\n  contents: read\njobs:\n  build:\n    permissions:\n      contents: write\n"
+            ),
+        )
+        self.assertEqual([], _declared_permission_blocks("name: no permissions here\n"))
         self.assertIsNotNone(_PRIVILEGED_TRIGGER_PATTERN.match("pull_request_target:"))
         self.assertIsNotNone(_PRIVILEGED_TRIGGER_PATTERN.match("  pull_request_target:"))
         self.assertIsNotNone(_PRIVILEGED_TRIGGER_PATTERN.match("workflow_run:"))
