@@ -21,6 +21,10 @@ _PINNED_ACTION_PATTERN = re.compile(
     r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._/-]+)?@[0-9a-f]{40}$"
 )
 _PINNED_IMAGE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[0-9a-f]{64}$")
+_PERMISSIONS_BLOCK_PATTERN = re.compile(r"^permissions\s*:\s*(.*?)\s*$")
+_PERMISSION_SCOPE_PATTERN = re.compile(r"^\s*([A-Za-z0-9-]+)\s*:\s*(read|write|none)\s*$")
+_PRIVILEGED_TRIGGER_PATTERN = re.compile(r"^\s*(pull_request_target|workflow_run)\s*:")
+_WRITE_ALL_PATTERN = re.compile(r"permissions\s*:\s*write-all\b")
 _EXPECTED_RUNNER = "ubuntu-24.04"
 _CENTRAL_WORKFLOW_NAMES = {
     "close-empty-pr.yml",
@@ -309,6 +313,84 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
             ["postgres:17.6-alpine", "${{ matrix.image }}"],
             unpinned,
         )
+
+
+def _declared_permissions(workflow: str) -> dict[str, str]:
+    """Return top-level ``permissions`` scopes as a scope→level mapping.
+
+    Only the top-level block is inspected: a job-level override cannot loosen
+    the repository-wide default that gates the whole workflow run.
+    """
+    scopes: dict[str, str] = {}
+    lines = workflow.splitlines()
+    for index, line in enumerate(lines):
+        if _PERMISSIONS_BLOCK_PATTERN.match(_strip_yaml_comment(line)) is None:
+            continue
+        for child in lines[index + 1 :]:
+            if child.strip() == "" or child.lstrip().startswith("#"):
+                continue
+            match = _PERMISSION_SCOPE_PATTERN.match(_strip_yaml_comment(child))
+            if match is None:
+                break
+            scopes[match.group(1)] = match.group(2)
+        break
+    return scopes
+
+
+class GitHubActionsLeastPrivilegeContractTest(unittest.TestCase):
+    """Keep repository-owned workflows read-only and off privileged triggers."""
+
+    def test_local_workflows_declare_only_read_scoped_contents_permission(self) -> None:
+        """Reject missing, write-scoped, or broadened top-level permissions."""
+        missing: list[str] = []
+        violations: list[str] = []
+        for workflow_path in _workflow_paths():
+            workflow = workflow_path.read_text(encoding="utf-8")
+            scopes = _declared_permissions(workflow)
+            if not scopes:
+                missing.append(workflow_path.name)
+                continue
+            for scope, level in scopes.items():
+                if scope != "contents" or level.lower() != "read":
+                    violations.append(f"{workflow_path.name}: {scope}={level}")
+        self.assertEqual([], missing, f"top-level permissions block is missing from: {missing}")
+        self.assertEqual(
+            [],
+            violations,
+            f"local workflows must grant only contents: read: {violations}",
+        )
+
+    def test_local_workflows_reject_privileged_triggers_and_write_all(self) -> None:
+        """Reject pull_request_target, workflow_run, and write-all escalation."""
+        violations: list[str] = []
+        for workflow_path in _workflow_paths():
+            workflow = workflow_path.read_text(encoding="utf-8")
+            for line_number, line in enumerate(workflow.splitlines(), start=1):
+                candidate = _strip_yaml_comment(line)
+                if _PRIVILEGED_TRIGGER_PATTERN.match(candidate):
+                    violations.append(f"{workflow_path.name}:{line_number}={line.strip()!r}")
+                if _WRITE_ALL_PATTERN.search(candidate):
+                    violations.append(f"{workflow_path.name}:{line_number}={line.strip()!r}")
+        self.assertEqual(
+            [],
+            violations,
+            f"privileged triggers and write-all permissions are forbidden: {violations}",
+        )
+
+    def test_least_privilege_parser_is_sensitive_to_unsafe_workflows(self) -> None:
+        """Keep the permission parser and trigger guard fail-closed."""
+        self.assertEqual({"contents": "read"}, _declared_permissions("permissions:\n  contents: read\n"))
+        self.assertEqual(
+            {"contents": "write", "id-token": "write"},
+            _declared_permissions("permissions:\n  contents: write\n  id-token: write\n"),
+        )
+        self.assertEqual({}, _declared_permissions("name: no permissions here\n"))
+        self.assertIsNotNone(_PRIVILEGED_TRIGGER_PATTERN.match("pull_request_target:"))
+        self.assertIsNotNone(_PRIVILEGED_TRIGGER_PATTERN.match("  pull_request_target:"))
+        self.assertIsNotNone(_PRIVILEGED_TRIGGER_PATTERN.match("workflow_run:"))
+        self.assertIsNone(_PRIVILEGED_TRIGGER_PATTERN.match("pull_request:"))
+        self.assertIsNotNone(_WRITE_ALL_PATTERN.search("permissions: write-all"))
+        self.assertIsNone(_WRITE_ALL_PATTERN.search("permissions:\n  contents: read"))
 
 
 class GitHubActionsQueueContractTest(unittest.TestCase):
