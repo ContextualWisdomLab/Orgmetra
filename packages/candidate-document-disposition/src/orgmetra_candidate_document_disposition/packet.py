@@ -53,6 +53,10 @@ _DESTRUCTION_STATES = frozenset({
     "statutory_retention_expired_destroyed",
     "destroyed",
 })
+_STATUTORY_RETENTION_STATES = frozenset({
+    "statutory_retained",
+    "statutory_retention_expired_destroyed",
+})
 _RETURN_REQUEST_EVIDENCE_STATES = frozenset({
     "return_requested",
     "return_request_verified",
@@ -309,6 +313,10 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
             raise ValueError("delivery evidence cannot precede return_delivered state")
         if statutory_retain_until is not None:
             statutory_retain_until = _normalize_timestamp(statutory_retain_until)
+        if state in _STATUTORY_RETENTION_STATES and statutory_retain_until is None:
+            raise ValueError(
+                "statutory_retain_until is required for statutory-retention states"
+            )
         if type(legal_hold) is not bool:
             raise ValueError("legal_hold must be an exact boolean")
         if state == "legal_hold_suspended" and not legal_hold:
