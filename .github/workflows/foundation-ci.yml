@@ -47,7 +47,7 @@ jobs:
         env:
           ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
           ORGMETRA_POSTGRES_RUNNER_SHA256: 1470628f8265d2dc39fff1db80379c9395bac416ab6afcc7f4bc78cea49dcf72
-          ORGMETRA_POSTGRES_TEST_SHA256: c41f60972a8f1adf9eb46bf504f074532a97a1fd965b1009e32ddc8bb5d5ca75
+          ORGMETRA_POSTGRES_TEST_SHA256: 11f256efdfdd951daeb5605e2cfee444eb864f203cf820e9c2bfc360c5691272
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
@@ -90,17 +90,74 @@ jobs:
           PGPASSWORD: orgmetra
         run: |
           set -euo pipefail
-          inventory_file="$(mktemp)"
-          python .github/scripts/foundation-postgres-contracts.py list > "$inventory_file"
-          mapfile -t contracts < "$inventory_file"
-          rm -f "$inventory_file"
+          evidence_file="$(mktemp)"
+          plan_file="$(mktemp)"
+          python .github/scripts/foundation-postgres-contracts.py evidence > "$evidence_file"
+          python - "$evidence_file" > "$plan_file" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          evidence = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          for contract in evidence["active"]:
+              root = contract["script"]
+              print("root", root, root, contract["sha256"], sep="\t")
+              for companion in contract["companions"]:
+                  print(
+                      "companion",
+                      root,
+                      companion["script"],
+                      companion["sha256"],
+                      sep="\t",
+                  )
+          PY
+          rm -f "$evidence_file"
+
+          declare -a contracts=()
+          declare -A expected_sha256=()
+          declare -A companions_by_root=()
+          while IFS=$'\t' read -r kind root script sha256; do
+            if [[ "$kind" == "root" ]]; then
+              contracts+=("$script")
+              expected_sha256["$script"]="$sha256"
+              continue
+            fi
+            if [[ "$kind" != "companion" ]]; then
+              printf 'Unexpected PostgreSQL execution-plan record: %s\n' "$kind" >&2
+              exit 1
+            fi
+            expected_sha256["$script"]="$sha256"
+            if [[ -n "${companions_by_root[$root]:-}" ]]; then
+              companions_by_root["$root"]+=$'\n'
+            fi
+            companions_by_root["$root"]+="$script"
+          done < "$plan_file"
+          rm -f "$plan_file"
+
           if [[ "${#contracts[@]}" -eq 0 ]]; then
             printf 'No active PostgreSQL contracts discovered; Foundation evidence would be vacuous.\n' >&2
             exit 1
           fi
-          python .github/scripts/foundation-postgres-contracts.py evidence
+
+          verify_contract_bytes() {
+            local script="$1"
+            local expected="${expected_sha256[$script]:-}"
+            if [[ -z "$expected" || ! -f "$script" || -L "$script" ]]; then
+              printf 'PostgreSQL contract path lost reviewed identity before use: %s\n' "$script" >&2
+              return 1
+            fi
+            local observed
+            observed="$(sha256sum "$script" | awk '{print $1}')"
+            if [[ "$observed" != "$expected" ]]; then
+              printf 'PostgreSQL contract bytes changed after inventory validation: %s expected=%s observed=%s\n' \
+                "$script" "$expected" "$observed" >&2
+              return 1
+            fi
+          }
+
           executed=()
           for contract in "${contracts[@]}"; do
+            verify_contract_bytes "$contract"
             contract_name="$(basename "$contract" .sh)"
             container_name="orgmetra-${GITHUB_RUN_ID}-${contract_name}"
             docker run --detach --name "$container_name" \
@@ -124,23 +181,28 @@ jobs:
               sleep 1
             done
             printf 'Executing PostgreSQL Foundation contract: %s\n' "$contract"
+            verify_contract_bytes "$contract"
             DATABASE_URL="$database_url" bash "$contract"
-            companion_file="$(mktemp)"
-            python .github/scripts/foundation-postgres-contracts.py companions "$contract" > "$companion_file"
-            mapfile -t companions < "$companion_file"
-            rm -f "$companion_file"
-            for companion in "${companions[@]}"; do
-              printf 'Executing PostgreSQL Foundation companion: %s -> %s\n' "$contract" "$companion"
-              DATABASE_URL="$database_url" bash "$companion"
-            done
+            companions_text="${companions_by_root[$contract]:-}"
+            if [[ -n "$companions_text" ]]; then
+              while IFS= read -r companion; do
+                verify_contract_bytes "$companion"
+                printf 'Executing PostgreSQL Foundation companion: %s -> %s\n' "$contract" "$companion"
+                DATABASE_URL="$database_url" bash "$companion"
+              done <<< "$companions_text"
+            fi
             executed+=("$contract")
             docker rm --force "$container_name" >/dev/null
             trap - EXIT
           done
+
           if [[ "${executed[*]}" != "${contracts[*]}" ]]; then
             printf 'Executed PostgreSQL contract set diverged from validated inventory.\n' >&2
             exit 1
           fi
+          for bound_script in "${!expected_sha256[@]}"; do
+            verify_contract_bytes "$bound_script"
+          done
           printf 'Executed PostgreSQL Foundation roots (%d):\n' "${#executed[@]}"
           printf '%s\n' "${executed[@]}"
       - name: Prove compatibility toolchain provenance
