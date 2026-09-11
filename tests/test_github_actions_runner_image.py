@@ -284,25 +284,25 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
 
     def test_image_parser_rejects_mutable_tags_and_pins_digest(self) -> None:
         """Keep the validator sensitive to tags, expressions, and pinned digests."""
+        pinned_image = (
+            "postgres:17.6-alpine@sha256:"
+            "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+        )
         sample = "\n".join(
             (
                 "image: postgres:17.6-alpine",
-                "image: postgres:17.6-alpine@sha256:"
-                "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+                f"image: {pinned_image}",
                 "image: ${{ matrix.image }}",
-                "image: 'postgres:17.6-alpine@sha256:"
-                "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94' # latest",
+                f"image: '{pinned_image}' # latest",
             )
         )
         declarations = _image_declarations(sample)
         self.assertEqual(
             [
                 "postgres:17.6-alpine",
-                "postgres:17.6-alpine@sha256:"
-                "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+                pinned_image,
                 "${{ matrix.image }}",
-                "postgres:17.6-alpine@sha256:"
-                "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+                pinned_image,
             ],
             [value for _, value in declarations],
         )
