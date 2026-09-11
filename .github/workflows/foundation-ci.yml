@@ -46,8 +46,8 @@ jobs:
       - name: Prove PostgreSQL contract inventory provenance
         env:
           ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
-          ORGMETRA_POSTGRES_RUNNER_SHA256: 3c5dff0578d46a3559c493bad53bc24aa413eacf3bb3af872e811c9c5d0d9e41
-          ORGMETRA_POSTGRES_TEST_SHA256: 89f4df556cbd4202e9f3d73829890221eda69cccee474fe234644afbc900539c
+          ORGMETRA_POSTGRES_RUNNER_SHA256: 1470628f8265d2dc39fff1db80379c9395bac416ab6afcc7f4bc78cea49dcf72
+          ORGMETRA_POSTGRES_TEST_SHA256: c41f60972a8f1adf9eb46bf504f074532a97a1fd965b1009e32ddc8bb5d5ca75
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
