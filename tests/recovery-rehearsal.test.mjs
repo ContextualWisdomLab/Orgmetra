@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 
 const workflowPath = '.github/workflows/recovery-rehearsal-quality.yml';
@@ -172,4 +182,59 @@ test('restore rehearsal applies every protected-main migration from the director
     prefixes.length,
     'migration numeric prefixes must be unique for deterministic ordering'
   );
+});
+
+function runRehearsalInDirectory(directory) {
+  return spawnSync('bash', [resolve(rehearsalPath)], {
+    cwd: directory,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      RECOVERY_REHEARSAL_ALLOW_ROLE_DROP: '1',
+      POSTGRES_SOURCE_ADMIN_URL: 'postgresql://orgmetra:orgmetra@localhost:5432/postgres',
+      POSTGRES_RESTORE_ADMIN_URL: 'postgresql://orgmetra:orgmetra@localhost:5433/postgres',
+      POSTGRES_SOURCE_CONTAINER: 'source-container',
+      POSTGRES_RESTORE_CONTAINER: 'restore-container'
+    }
+  });
+}
+
+test('rehearsal fails closed before applying anything when migrations cannot be discovered', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'orgmetra-recovery-discovery-'));
+  try {
+    const result = runRehearsalInDirectory(directory);
+    assert.notEqual(result.status, 0, 'missing migration directory must fail the rehearsal');
+    assert.match(result.stderr, /discovered no migration files in database\/migrations|failed to enumerate database\/migrations/);
+    assert.doesNotMatch(result.stderr, /psql:/, 'discovery must fail closed before any cluster connection');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('rehearsal fails closed on empty, non-canonical, and duplicate-prefix migration sets', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'orgmetra-recovery-canonical-'));
+  const migrationsDir = join(directory, 'database', 'migrations');
+  mkdirSync(migrationsDir, { recursive: true });
+  try {
+    const empty = runRehearsalInDirectory(directory);
+    assert.notEqual(empty.status, 0, 'an empty migration directory must fail the rehearsal');
+    assert.match(empty.stderr, /discovered no migration files in database\/migrations/);
+    assert.doesNotMatch(empty.stderr, /psql:/, 'empty discovery must fail closed before any cluster connection');
+
+    writeFileSync(join(migrationsDir, '0001_bad!.sql'), 'SELECT 1;\n');
+    const nonCanonical = runRehearsalInDirectory(directory);
+    assert.notEqual(nonCanonical.status, 0, 'a non-canonical migration filename must fail the rehearsal');
+    assert.match(nonCanonical.stderr, /non-canonical migration filename: 0001_bad!\.sql/);
+    assert.doesNotMatch(nonCanonical.stderr, /psql:/, 'filename validation must fail closed before any cluster connection');
+
+    rmSync(join(migrationsDir, '0001_bad!.sql'));
+    writeFileSync(join(migrationsDir, '0001_first.sql'), 'SELECT 1;\n');
+    writeFileSync(join(migrationsDir, '0001_second.sql'), 'SELECT 1;\n');
+    const duplicate = runRehearsalInDirectory(directory);
+    assert.notEqual(duplicate.status, 0, 'duplicate migration numeric prefixes must fail the rehearsal');
+    assert.match(duplicate.stderr, /duplicate migration numeric prefix: 0001/);
+    assert.doesNotMatch(duplicate.stderr, /psql:/, 'prefix validation must fail closed before any cluster connection');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
