@@ -66,6 +66,8 @@ def _validate_digest(value: str, field_name: str) -> None:
 
 def _validate_received_at(value: datetime, recorded_at: datetime) -> None:
     """Require detached UTC event time no later than system-recorded issuance."""
+    if type(recorded_at) is not datetime or recorded_at.tzinfo is not timezone.utc:
+        raise ValueError("recorded_at must be an exact built-in UTC datetime")
     if type(value) is not datetime or value.tzinfo is not timezone.utc:
         raise ValueError("received_at must be an exact built-in UTC datetime")
     if value > recorded_at:

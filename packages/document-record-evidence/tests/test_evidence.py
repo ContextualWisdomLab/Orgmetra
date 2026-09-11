@@ -110,6 +110,23 @@ def test_rejects_valid_value_rewrite_after_issuance() -> None:
         evidence.canonical_json()
 
 
+def test_rejects_forged_recorded_time_before_seal_verification() -> None:
+    """Require the system-recorded time type before canonical output can verify its seal."""
+    evidence = build_document_record_evidence(**values())
+    original = evidence.recorded_at
+
+    class ForgedDateTime(datetime):
+        """Pretend to serialize a different datetime as the original system time."""
+
+        def isoformat(self, sep: str = "T", timespec: str = "auto") -> str:
+            """Return the original text while retaining a different underlying datetime."""
+            return original.isoformat(sep=sep, timespec=timespec)
+
+    object.__setattr__(evidence, "recorded_at", ForgedDateTime(2099, 1, 1, tzinfo=timezone.utc))
+    with pytest.raises(ValueError, match="recorded_at must be an exact built-in UTC datetime"):
+        evidence.canonical_json()
+
+
 def test_quality_workflow_watches_governance_adr() -> None:
     """Ensure an ADR-only contract edit cannot bypass the dedicated package gate."""
     repository_root = Path(__file__).resolve().parents[3]
