@@ -15,7 +15,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 _RUNS_ON_PATTERN = re.compile(r"^\s*runs-on\s*:\s*(.*?)\s*$")
-_USES_PATTERN = re.compile(r"^\s*uses\s*:\s*(.*?)\s*$")
+_USES_PATTERN = re.compile(r"^\s*(?:-\s+)?uses\s*:\s*(.*?)\s*$")
 _PINNED_ACTION_PATTERN = re.compile(
     r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._/-]+)?@[0-9a-f]{40}$"
 )
@@ -198,9 +198,11 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
         """Keep the validator sensitive to tags, branches, and local/Docker refs."""
         sample = "\n".join(
             (
+                "- uses: actions/checkout@v4",
                 "uses: actions/checkout@v4",
                 "uses: actions/checkout@main",
                 "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+                "    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
                 "uses: ./local-action",
                 "uses: docker://alpine:3.20",
                 "uses: 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97'",
@@ -213,8 +215,10 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
         self.assertEqual(
             [
                 "actions/checkout@v4",
+                "actions/checkout@v4",
                 "actions/checkout@main",
                 "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
                 "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
                 "ContextualWisdomLab/Orgmetra/.github/workflows/ci.yml@3d3c42e5aac5ba805825da76410c181273ba90b1",
                 "owner/repo/sub/dir@5fda3b95a4ea91299a34e894583c3862153e4b97",
@@ -229,6 +233,7 @@ class GitHubActionsActionPinningContractTest(unittest.TestCase):
         ]
         self.assertEqual(
             [
+                "actions/checkout@v4",
                 "actions/checkout@v4",
                 "actions/checkout@main",
                 "owner/repo/.github/workflows/ci.yml@v1",
