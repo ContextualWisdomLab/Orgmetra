@@ -142,6 +142,32 @@ class FoundationPostgresContractInventoryTests(unittest.TestCase):
         self._write_registry(self.registry)
         self._assert_invalid("unsupported path")
 
+    def test_symlinked_root_contract_fails_closed(self) -> None:
+        alias = self.root / "tests/test_alias_postgres.sh"
+        alias.symlink_to(self.alpha.name)
+        contracts = self.registry["contracts"]
+        assert isinstance(contracts, list)
+        contracts.append(
+            {
+                "id": "alias",
+                **self._binding(alias),
+                "companions": [],
+            }
+        )
+        self._write_registry(self.registry)
+        self._assert_invalid("must not use filesystem symlinks")
+
+    def test_symlinked_companion_fails_closed(self) -> None:
+        alias = self.root / "tests/test_beta_alias_hardening.sh"
+        alias.symlink_to(self.companion.name)
+        contracts = self.registry["contracts"]
+        assert isinstance(contracts, list)
+        beta = contracts[1]
+        assert isinstance(beta, dict)
+        beta["companions"] = [self._binding(alias)]
+        self._write_registry(self.registry)
+        self._assert_invalid("must not use filesystem symlinks")
+
     def test_discoverable_root_cannot_be_hidden_as_companion(self) -> None:
         contracts = self.registry["contracts"]
         assert isinstance(contracts, list)
