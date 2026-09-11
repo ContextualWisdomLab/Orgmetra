@@ -21,7 +21,6 @@ export const REQUIRED_FILES = Object.freeze([
   'manifest.json',
   'package.json',
   '.github/workflows/foundation-ci.yml',
-  '.github/workflows/job-analysis-api-quality.yml',
   'docs/PRD.md',
   'docs/TRD.md',
   'docs/USER_STORIES.md',
