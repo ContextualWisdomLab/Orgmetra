@@ -309,7 +309,42 @@ if [[ "${trusted_search_path_count}" != "4" ]]; then
     exit 1
 fi
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+CURRENT_DATABASE="$(psql "${DATABASE_URL}" -Atqc 'SELECT pg_catalog.current_database();')"
+if [[ -z "${CURRENT_DATABASE}" ]]; then
+    echo "document-record RLS fixture could not resolve current_database()" >&2
+    exit 1
+fi
+
+READER_DATABASE_URL="$(DATABASE_URL="${DATABASE_URL}" python3 - <<'PY'
+import os
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
+
+reader = "orgmetra_document_reader"
+parts = urlsplit(os.environ["DATABASE_URL"])
+if parts.scheme not in {"postgres", "postgresql"}:
+    raise SystemExit("DATABASE_URL must use postgres or postgresql URI syntax")
+
+query = [
+    (key, value)
+    for key, value in parse_qsl(parts.query, keep_blank_values=True)
+    if key not in {"user", "password"}
+]
+if parts.netloc:
+    endpoint = parts.netloc.rsplit("@", 1)[-1]
+    netloc = f"{quote(reader, safe='')}:{quote(reader, safe='')}@{endpoint}"
+    print(urlunsplit((parts.scheme, netloc, parts.path, urlencode(query, doseq=True), parts.fragment)))
+else:
+    query = [("user", reader), ("password", reader), *query]
+    result = f"{parts.scheme}://{parts.path}"
+    if query:
+        result += "?" + urlencode(query, doseq=True)
+    if parts.fragment:
+        result += "#" + parts.fragment
+    print(result)
+PY
+)"
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v current_database="${CURRENT_DATABASE}" <<'SQL'
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orgmetra_document_reader') THEN
@@ -317,17 +352,22 @@ BEGIN
     END IF;
 END
 $$;
-GRANT CONNECT ON DATABASE orgmetra TO orgmetra_document_reader;
+GRANT CONNECT ON DATABASE :"current_database" TO orgmetra_document_reader;
 GRANT USAGE ON SCHEMA public TO orgmetra_document_reader;
 GRANT SELECT ON document_record TO orgmetra_document_reader;
 SQL
 
-alpha_count="$(PGPASSWORD=orgmetra_document_reader PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" \
-    psql -h localhost -U orgmetra_document_reader -d orgmetra -Atqc 'SELECT count(*) FROM document_record;')"
-beta_count="$(PGPASSWORD=orgmetra_document_reader PGOPTIONS="-c orgmetra.tenant_record_id=${OTHER_TENANT_ID}" \
-    psql -h localhost -U orgmetra_document_reader -d orgmetra -Atqc 'SELECT count(*) FROM document_record;')"
-missing_count="$(PGPASSWORD=orgmetra_document_reader \
-    psql -h localhost -U orgmetra_document_reader -d orgmetra -Atqc 'SELECT count(*) FROM document_record;')"
+reader_database="$(psql "${READER_DATABASE_URL}" -Atqc 'SELECT pg_catalog.current_database();')"
+if [[ "${reader_database}" != "${CURRENT_DATABASE}" ]]; then
+    echo "document-record reader changed the DATABASE_URL database target: owner=${CURRENT_DATABASE} reader=${reader_database}" >&2
+    exit 1
+fi
+
+alpha_count="$(PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID}" \
+    psql "${READER_DATABASE_URL}" -Atqc 'SELECT count(*) FROM document_record;')"
+beta_count="$(PGOPTIONS="-c orgmetra.tenant_record_id=${OTHER_TENANT_ID}" \
+    psql "${READER_DATABASE_URL}" -Atqc 'SELECT count(*) FROM document_record;')"
+missing_count="$(psql "${READER_DATABASE_URL}" -Atqc 'SELECT count(*) FROM document_record;')"
 if [[ "${alpha_count}" != "1" || "${beta_count}" != "0" || "${missing_count}" != "0" ]]; then
     echo "document-record RLS isolation failed: alpha=${alpha_count} beta=${beta_count} missing=${missing_count}" >&2
     exit 1
