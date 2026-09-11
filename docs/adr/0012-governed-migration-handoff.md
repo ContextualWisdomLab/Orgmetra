@@ -56,4 +56,4 @@ This slice does not authenticate an operator, authorize access to the underlying
 
 `packages/migration-adapter/tests/test_handoff.py` requires exact 100% owned statement and branch coverage. It covers deterministic canonicalization, exact SHA-256 derivation from canonical JSON, all supported HRIS object families, malformed or reserved tenant IDs, malformed governance references/codes, non-boolean human confirmation, digest/proposal errors, bounded-record enforcement, duplicate/unsupported targets, dependency-revision drift, direct-constructor invariant bypass attempts, immutability, and safe failure messages.
 
-`.github/workflows/migration-adapter-quality.yml` checks out the exact candidate SHA, installs the repository's reviewed hashed Python test toolchain, compiles the package, runs the full package test suite with 100% statement/branch thresholds, and requires a clean checkout.
+`.github/workflows/foundation-ci.yml` checks out the exact candidate SHA, installs the repository's reviewed hashed Python test toolchain once, compiles the package, runs the full package test suite with 100% statement/branch thresholds, and requires a clean checkout.
