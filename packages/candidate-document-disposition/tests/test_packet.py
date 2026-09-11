@@ -152,6 +152,8 @@ class TestConstruction:
         dispatch_at = datetime(2026, 9, 20, 12, 0, 0, tzinfo=timezone.utc)
         delivery_at = datetime(2026, 9, 21, 12, 0, 0, tzinfo=timezone.utc)
         evidence = {}
+        if state == "return_claim_window_open":
+            evidence["claim_window_end"] = datetime(2026, 10, 11, 12, 0, 0, tzinfo=timezone.utc)
         if state in {
             "return_requested",
             "return_request_verified",
