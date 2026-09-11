@@ -35,12 +35,13 @@ def _build(**overrides):
     return build_candidate_document_disposition(**kwargs)
 
 
-class _MutableTimezone(tzinfo):
-    def __init__(self, offset_hours: int) -> None:
-        self.offset_hours = offset_hours
+class _ExecutableTimezone(tzinfo):
+    def __init__(self) -> None:
+        self.utcoffset_calls = 0
 
     def utcoffset(self, dt):
-        return timedelta(hours=self.offset_hours)
+        self.utcoffset_calls += 1
+        return timedelta(0)
 
     def dst(self, dt):
         return timedelta(0)
@@ -50,25 +51,49 @@ class _TextSubtype(str):
     pass
 
 
-def test_timestamp_runtime_alias_cannot_change_digest_after_construction():
-    caller_timezone = _MutableTimezone(0)
+def test_custom_timezone_is_rejected_before_callback_execution():
+    caller_timezone = _ExecutableTimezone()
+
+    with pytest.raises(ValueError, match="timestamp"):
+        _build(
+            hiring_decision_finalized_at=datetime(
+                2026,
+                9,
+                11,
+                12,
+                0,
+                0,
+                tzinfo=caller_timezone,
+            )
+        )
+
+    assert caller_timezone.utcoffset_calls == 0
+
+
+def test_builtin_fixed_offset_timezone_is_detached_to_utc():
+    fixed_offset = timezone(timedelta(hours=9))
     packet = _build(
         hiring_decision_finalized_at=datetime(
             2026,
             9,
             11,
-            12,
+            21,
             0,
             0,
-            tzinfo=caller_timezone,
+            tzinfo=fixed_offset,
         )
     )
-    original_digest = packet.sha256_digest()
 
-    caller_timezone.offset_hours = 9
-
-    assert packet.sha256_digest() == original_digest
-    assert packet.hiring_decision_finalized_at.tzinfo is not caller_timezone
+    assert packet.hiring_decision_finalized_at == datetime(
+        2026,
+        9,
+        11,
+        12,
+        0,
+        0,
+        tzinfo=timezone.utc,
+    )
+    assert packet.hiring_decision_finalized_at.tzinfo is timezone.utc
 
 
 def test_legal_hold_must_be_exact_boolean():
