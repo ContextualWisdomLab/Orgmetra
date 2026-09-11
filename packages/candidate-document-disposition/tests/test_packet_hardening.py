@@ -113,8 +113,13 @@ def test_claim_window_must_follow_hiring_decision(offset):
     ["return_destroyed", "statutory_retention_expired_destroyed", "destroyed"],
 )
 def test_legal_hold_rejects_every_destruction_state(state):
+    evidence = {}
+    if state == "return_destroyed":
+        hiring_decision = _kwargs()["hiring_decision_finalized_at"]
+        evidence["return_dispatched_at"] = hiring_decision + timedelta(days=1)
+        evidence["return_delivered_at"] = hiring_decision + timedelta(days=2)
     with pytest.raises(ValueError, match="legal hold"):
-        _build(legal_hold=True, state=state)
+        _build(legal_hold=True, state=state, **evidence)
 
 
 @pytest.mark.parametrize(
