@@ -7,7 +7,8 @@ for migration in \
     database/migrations/0001_foundation_schema.sql \
     database/migrations/0002_sealed_evidence_digest.sql \
     database/migrations/0021_document_record_persistence.sql \
-    database/migrations/0022_document_record_evidence_unique_keys.sql; do
+    database/migrations/0022_document_record_evidence_unique_keys.sql \
+    database/migrations/0023_document_record_canonical_encoding.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
