@@ -385,6 +385,10 @@ class GitHubActionsLeastPrivilegeContractTest(unittest.TestCase):
             _declared_permissions("permissions:\n  contents: write\n  id-token: write\n"),
         )
         self.assertEqual({}, _declared_permissions("name: no permissions here\n"))
+        self.assertEqual(
+            {},
+            _declared_permissions("jobs:\n  test:\n    permissions:\n      contents: read\n"),
+        )
         self.assertIsNotNone(_PRIVILEGED_TRIGGER_PATTERN.match("pull_request_target:"))
         self.assertIsNotNone(_PRIVILEGED_TRIGGER_PATTERN.match("  pull_request_target:"))
         self.assertIsNotNone(_PRIVILEGED_TRIGGER_PATTERN.match("workflow_run:"))
