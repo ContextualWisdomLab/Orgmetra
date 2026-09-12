@@ -1,0 +1,89 @@
+{
+  "schema_version": "orgmetra.foundation_postgres_contracts.v1",
+  "contracts": [
+    {
+      "id": "audit_outbox_hardening",
+      "script": "tests/test_audit_outbox_hardening_postgres.sh",
+      "sha256": "518ba2f37ba6292943e5abe22c2599452b2f031a42e453b2493aedf8714421a0",
+      "companions": []
+    },
+    {
+      "id": "audit_outbox",
+      "script": "tests/test_audit_outbox_postgres.sh",
+      "sha256": "e57a04920a0ba97fa6a06752d15ea150016ab8d44099e998c5c4f4067592b4d2",
+      "companions": []
+    },
+    {
+      "id": "bitemporal",
+      "script": "tests/test_bitemporal_postgres.sh",
+      "sha256": "7684b8c2ff52c044c081135515bd5aabbfd00e2daad0d471b0868701af2df6cc",
+      "companions": []
+    },
+    {
+      "id": "candidate_worker_conversion",
+      "script": "tests/test_candidate_worker_conversion_postgres.sh",
+      "sha256": "681cb74d6cfa859ed92c6c2439881ea20c430ef8df94ec662e2807761a377f90",
+      "companions": []
+    },
+    {
+      "id": "criterion_observation_scope",
+      "script": "tests/test_criterion_observation_scope_postgres.sh",
+      "sha256": "0ee9539ee57f840c27d08009f7868cdc8662669df78a01dbc8be39216b8f1a3d",
+      "companions": []
+    },
+    {
+      "id": "evidence_sealing",
+      "script": "tests/test_evidence_sealing_postgres.sh",
+      "sha256": "57d16b632a0c60ffdcb4842ceb1cfe25d19c54cefeeefb622ff4fa6e83441ad7",
+      "companions": []
+    },
+    {
+      "id": "job_analysis_snapshot",
+      "script": "tests/test_job_analysis_snapshot_postgres.sh",
+      "sha256": "ca9c323a1dd68cfc520277efbbb7495e37fb3ca027890928c8624e5b4f57403f",
+      "companions": [
+        {
+          "script": "tests/test_job_analysis_snapshot_schema_hardening.sh",
+          "sha256": "09bd05799a9bc59f26f5c415a9712368b452e973d88777605b6bb573ac9eda31"
+        }
+      ]
+    },
+    {
+      "id": "operational_uuid",
+      "script": "tests/test_operational_uuid_postgres.sh",
+      "sha256": "7378f98f0d4b3000e8ea641d8701f1540dbad71410b3637d81d799969e0f6ff7",
+      "companions": []
+    },
+    {
+      "id": "outbox_claim",
+      "script": "tests/test_outbox_claim_postgres.sh",
+      "sha256": "1027806d436ebfe34e108c25b6a4001f43b9550f1d70057c6c0d7974323b0c9b",
+      "companions": []
+    },
+    {
+      "id": "outbox_dead_letter",
+      "script": "tests/test_outbox_dead_letter_postgres.sh",
+      "sha256": "0d728d578e64252e6079f2d141ddaa7fa9cfbf9784e625832273596d69a6e13d",
+      "companions": []
+    },
+    {
+      "id": "people_mutation_idempotency",
+      "script": "tests/test_people_mutation_idempotency_postgres.sh",
+      "sha256": "3f57e12f80bd1b034c9aac54b669d8530106e3e26b3795689671fb53807b3cd5",
+      "companions": []
+    },
+    {
+      "id": "tenant_isolation",
+      "script": "tests/test_tenant_isolation_postgres.sh",
+      "sha256": "dd649435ef8ab9e57f0609c101917e36656a6d40d63de9bcdbdac23d764f6c3a",
+      "companions": []
+    },
+    {
+      "id": "validity_study_case",
+      "script": "tests/test_validity_study_case_postgres.sh",
+      "sha256": "0070ad58300323c7f9900c5645e0df3106b36ccd245ae686e982c2fd6fa4dc02",
+      "companions": []
+    }
+  ],
+  "exclusions": []
+}

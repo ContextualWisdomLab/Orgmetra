@@ -43,6 +43,23 @@ jobs:
         with:
           node-version: "24"
           check-latest: false
+      - name: Prove PostgreSQL contract inventory provenance
+        env:
+          ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
+          ORGMETRA_POSTGRES_RUNNER_SHA256: bb84ea602542585d5c4d1156ea765d3dcdd7756da9d2ef7438096eed72364286
+          ORGMETRA_POSTGRES_TEST_SHA256: 7b96082acb24f5a49cb6015be620b7ef675a6fda7943eb1c73816db8d832c3d3
+          ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256: 4778a536275c768677a25cd46fcb833d278f7fe627a762ad70fc7f2ec9828e1f
+        run: |
+          set -euo pipefail
+          printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
+          printf '%s  %s\n' "$ORGMETRA_POSTGRES_RUNNER_SHA256" .github/scripts/foundation-postgres-contracts.py | sha256sum --check --strict
+          printf '%s  %s\n' "$ORGMETRA_POSTGRES_TEST_SHA256" tests/test_foundation_postgres_contracts.py | sha256sum --check --strict
+          printf '%s  %s\n' "$ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256" tests/test_foundation_postgres_process_quiescence.py | sha256sum --check --strict
+          python -m py_compile .github/scripts/foundation-postgres-contracts.py tests/test_foundation_postgres_contracts.py tests/test_foundation_postgres_process_quiescence.py
+          python tests/test_foundation_postgres_contracts.py
+          python tests/test_foundation_postgres_process_quiescence.py
+          python .github/scripts/foundation-postgres-contracts.py validate
+          python .github/scripts/foundation-postgres-contracts.py evidence
       - name: Compile owned Python boundaries
         run: >-
           python -m compileall -q tests packages services
@@ -73,32 +90,272 @@ jobs:
           PYTHONPATH=services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-people-api.coverage python -m pytest -c services/people-api/pyproject.toml services/people-api/tests
       - name: Run PostgreSQL contracts in isolated containers
         env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           PGPASSWORD: orgmetra
         run: |
-          contracts=(
-            test_bitemporal_postgres.sh
-            test_tenant_isolation_postgres.sh
-            test_evidence_sealing_postgres.sh
-            test_operational_uuid_postgres.sh
-            test_audit_outbox_postgres.sh
-            test_outbox_claim_postgres.sh
-            test_outbox_dead_letter_postgres.sh
-            test_audit_outbox_hardening_postgres.sh
-            test_candidate_worker_conversion_postgres.sh
-            test_validity_study_case_postgres.sh
-            test_criterion_observation_scope_postgres.sh
-            test_people_mutation_idempotency_postgres.sh
-            test_job_analysis_snapshot_postgres.sh
-          )
+          set -euo pipefail
+          snapshot_parent="$(mktemp -d)"
+          snapshot_dir="$snapshot_parent/contracts"
+          candidate_snapshot_dir="$snapshot_parent/candidate"
+          plan_file="$snapshot_parent/plan.json"
+          current_container=""
+          contract_user="orgmetra_pg_contract"
+          contract_user_created=0
+          runtime_parent=""
+          workspace_mode=""
+          workspace_locked=0
+
+          cleanup_postgres_contracts() {
+            if [[ "$contract_user_created" -eq 1 ]]; then
+              sudo -n pkill -KILL -u "$contract_user" >/dev/null 2>&1 || true
+            fi
+            if [[ -n "$current_container" ]]; then
+              docker rm --force "$current_container" >/dev/null 2>&1 || true
+            fi
+            if [[ -n "$runtime_parent" ]]; then
+              sudo -n rm -rf -- "$runtime_parent" >/dev/null 2>&1 || true
+              runtime_parent=""
+            fi
+            if [[ "$contract_user_created" -eq 1 ]]; then
+              sudo -n userdel "$contract_user" >/dev/null 2>&1 || true
+              contract_user_created=0
+            fi
+            if [[ "$workspace_locked" -eq 1 ]]; then
+              chmod "$workspace_mode" .
+              workspace_locked=0
+            fi
+            chmod -R u+w "$snapshot_parent" >/dev/null 2>&1 || true
+            rm -rf "$snapshot_parent"
+          }
+          trap cleanup_postgres_contracts EXIT
+
+          test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
+          python .github/scripts/foundation-postgres-contracts.py \
+            snapshot --destination "$snapshot_dir" > "$plan_file"
+          mkdir -m 0755 "$candidate_snapshot_dir"
+          git archive --format=tar "$ORGMETRA_EXPECTED_HEAD_SHA" | tar -xf - -C "$candidate_snapshot_dir"
+          if [[ -e "$candidate_snapshot_dir/.git" ]]; then
+            printf 'Exact-candidate execution tree unexpectedly contains Git metadata.\n' >&2
+            exit 1
+          fi
+          if find "$candidate_snapshot_dir" -type l -print -quit | grep -q .; then
+            printf 'Exact-candidate execution tree contains a symbolic link; transitive provenance would be ambiguous.\n' >&2
+            exit 1
+          fi
+          chmod -R a-w "$candidate_snapshot_dir"
+
+          plan_tsv="$snapshot_parent/plan.tsv"
+          python - "$plan_file" > "$plan_tsv" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          snapshot = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          for contract in snapshot["active"]:
+              root = contract["script"]
+              print(
+                  "root",
+                  root,
+                  root,
+                  contract["snapshot_script"],
+                  contract["sha256"],
+                  sep="\t",
+              )
+              for companion in contract["companions"]:
+                  print(
+                      "companion",
+                      root,
+                      companion["script"],
+                      companion["snapshot_script"],
+                      companion["sha256"],
+                      sep="\t",
+                  )
+          PY
+          rm -f "$plan_file"
+
+          declare -a contracts=()
+          declare -A expected_sha256=()
+          declare -A snapshot_by_script=()
+          declare -A companions_by_root=()
+          while IFS=$'\t' read -r kind root script snapshot_script sha256; do
+            if [[ "$kind" == "root" ]]; then
+              contracts+=("$script")
+            elif [[ "$kind" != "companion" ]]; then
+              printf 'Unexpected PostgreSQL execution-snapshot record: %s\n' "$kind" >&2
+              exit 1
+            fi
+            expected_sha256["$script"]="$sha256"
+            snapshot_by_script["$script"]="$snapshot_script"
+            if [[ "$kind" == "companion" ]]; then
+              if [[ -n "${companions_by_root[$root]:-}" ]]; then
+                companions_by_root["$root"]+=$'\n'
+              fi
+              companions_by_root["$root"]+="$script"
+            fi
+          done < "$plan_tsv"
+          rm -f "$plan_tsv"
+
+          if [[ "${#contracts[@]}" -eq 0 ]]; then
+            printf 'No active PostgreSQL contracts discovered; Foundation evidence would be vacuous.\n' >&2
+            exit 1
+          fi
+
+          find "$snapshot_dir" -type f -exec chmod 0444 {} +
+          find "$snapshot_dir" -type d -exec chmod 0555 {} +
+          find "$candidate_snapshot_dir" -type d -exec chmod a+rx {} +
+          chmod 0555 "$snapshot_dir" "$candidate_snapshot_dir" "$snapshot_parent"
+          command -v sudo >/dev/null
+          command -v useradd >/dev/null
+          command -v userdel >/dev/null
+          command -v pgrep >/dev/null
+          command -v pkill >/dev/null
+          if id "$contract_user" >/dev/null 2>&1; then
+            printf 'Dedicated PostgreSQL contract identity already exists: %s\n' "$contract_user" >&2
+            exit 1
+          fi
+          sudo -n useradd --system --no-create-home --shell /usr/sbin/nologin "$contract_user"
+          contract_user_created=1
+          sudo -n -u "$contract_user" true
+          runtime_parent="$(mktemp -d)"
+          chmod 0711 "$runtime_parent"
+
+          snapshot_root_real="$(realpath -- "$snapshot_dir")"
+          candidate_root_real="$(realpath -- "$candidate_snapshot_dir")"
+          verify_snapshot_bytes() {
+            local script="$1"
+            local expected="${expected_sha256[$script]:-}"
+            local snapshot_script="${snapshot_by_script[$script]:-}"
+            if [[ -z "$expected" || -z "$snapshot_script" ]]; then
+              printf 'PostgreSQL contract lost execution-snapshot binding: %s\n' "$script" >&2
+              return 1
+            fi
+            if [[ -L "$snapshot_script" || ! -f "$snapshot_script" ]]; then
+              printf 'PostgreSQL execution snapshot is not a regular file: %s -> %s\n' \
+                "$script" "$snapshot_script" >&2
+              return 1
+            fi
+            local snapshot_real
+            snapshot_real="$(realpath -- "$snapshot_script")"
+            case "$snapshot_real" in
+              "$snapshot_root_real"/*) ;;
+              *)
+                printf 'PostgreSQL execution snapshot escaped its private root: %s -> %s\n' \
+                  "$script" "$snapshot_real" >&2
+                return 1
+                ;;
+            esac
+            local observed
+            observed="$(sha256sum "$snapshot_script" | awk '{print $1}')"
+            if [[ "$observed" != "$expected" ]]; then
+              printf 'PostgreSQL execution snapshot digest changed: %s expected=%s observed=%s\n' \
+                "$script" "$expected" "$observed" >&2
+              return 1
+            fi
+          }
+
+          verify_candidate_bytes() {
+            local script="$1"
+            local expected="${expected_sha256[$script]:-}"
+            local execution_script="$candidate_snapshot_dir/$script"
+            if [[ -z "$expected" ]]; then
+              printf 'PostgreSQL contract lost candidate-tree digest binding: %s\n' "$script" >&2
+              return 1
+            fi
+            if [[ -L "$execution_script" || ! -f "$execution_script" ]]; then
+              printf 'PostgreSQL candidate-tree executable is not a regular file: %s -> %s\n' \
+                "$script" "$execution_script" >&2
+              return 1
+            fi
+            local execution_real
+            execution_real="$(realpath -- "$execution_script")"
+            case "$execution_real" in
+              "$candidate_root_real"/*) ;;
+              *)
+                printf 'PostgreSQL candidate-tree executable escaped its exact tree: %s -> %s\n' \
+                  "$script" "$execution_real" >&2
+                return 1
+                ;;
+            esac
+            local observed
+            observed="$(sha256sum "$execution_script" | awk '{print $1}')"
+            if [[ "$observed" != "$expected" ]]; then
+              printf 'PostgreSQL candidate-tree executable digest changed: %s expected=%s observed=%s\n' \
+                "$script" "$expected" "$observed" >&2
+              return 1
+            fi
+          }
+
+          assert_contract_process_quiescence() {
+            local leaked_pids
+            leaked_pids="$(pgrep -u "$contract_user" || true)"
+            if [[ -z "$leaked_pids" ]]; then
+              return 0
+            fi
+            printf 'PostgreSQL contract leaked background processes as %s: %s\n' \
+              "$contract_user" "$(tr '\n' ' ' <<< "$leaked_pids")" >&2
+            ps -o pid=,ppid=,stat=,cmd= -p "$(paste -sd, <<< "$leaked_pids")" >&2 || true
+            sudo -n pkill -KILL -u "$contract_user" >/dev/null 2>&1 || true
+            return 1
+          }
+
+          run_contract_snapshot() {
+            local script="$1"
+            local database_url="$2"
+            local snapshot_script="${snapshot_by_script[$script]}"
+            local execution_script="$candidate_snapshot_dir/$script"
+            local contract_runtime
+            local contract_status
+            local quiescence_status=0
+            verify_snapshot_bytes "$script"
+            verify_candidate_bytes "$script"
+            contract_runtime="$(mktemp -d "$runtime_parent/run.XXXXXX")"
+            sudo -n chown "$contract_user" "$contract_runtime"
+            sudo -n -u "$contract_user" /usr/bin/install -d -m 0700 "$contract_runtime/.runtime"
+            printf 'Executing PostgreSQL Foundation exact-tree contract as dedicated non-owner: %s -> %s\n' \
+              "$script" "$execution_script"
+            set +e
+            sudo -n -u "$contract_user" env -i \
+              PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+              DATABASE_URL="$database_url" \
+              PGPASSWORD="$PGPASSWORD" \
+              HOME="$contract_runtime" \
+              TMPDIR="$contract_runtime" \
+              XDG_CACHE_HOME="$contract_runtime/.cache" \
+              XDG_CONFIG_HOME="$contract_runtime/.config" \
+              XDG_STATE_HOME="$contract_runtime/.local/state" \
+              XDG_DATA_HOME="$contract_runtime/.local/share" \
+              XDG_RUNTIME_DIR="$contract_runtime/.runtime" \
+              bash -c 'cd -- "$1" && exec bash "$2"' _ \
+              "$candidate_snapshot_dir" "$execution_script"
+            contract_status=$?
+            set -e
+            if ! assert_contract_process_quiescence; then
+              quiescence_status=1
+            fi
+            sudo -n rm -rf -- "$contract_runtime"
+            if [[ "$quiescence_status" -ne 0 ]]; then
+              return 1
+            fi
+            return "$contract_status"
+          }
+
+          workspace_mode="$(stat -c '%a' .)"
+          chmod 0700 .
+          workspace_locked=1
+
+          executed=()
           for contract in "${contracts[@]}"; do
-            container_name="orgmetra-${GITHUB_RUN_ID}-${contract%.sh}"
+            verify_snapshot_bytes "$contract"
+            verify_candidate_bytes "$contract"
+            contract_name="$(basename "$contract" .sh)"
+            container_name="orgmetra-${GITHUB_RUN_ID}-${contract_name}"
+            current_container="$container_name"
             docker run --detach --name "$container_name" \
               --env POSTGRES_USER=orgmetra \
               --env POSTGRES_PASSWORD=orgmetra \
               --env POSTGRES_DB=orgmetra \
               --publish 127.0.0.1::5432 \
               "$ORGMETRA_POSTGRES_IMAGE"
-            trap 'docker rm --force "$container_name" >/dev/null 2>&1 || true' EXIT
             postgres_binding="$(docker port "$container_name" 5432/tcp)"
             postgres_port="${postgres_binding##*:}"
             database_url="postgresql://orgmetra:orgmetra@127.0.0.1:$postgres_port/orgmetra"
@@ -112,13 +369,33 @@ jobs:
               fi
               sleep 1
             done
-            DATABASE_URL="$database_url" bash "tests/$contract"
-            if [[ "$contract" == "test_job_analysis_snapshot_postgres.sh" ]]; then
-              DATABASE_URL="$database_url" bash tests/test_job_analysis_snapshot_schema_hardening.sh
+
+            run_contract_snapshot "$contract" "$database_url"
+
+            companions_text="${companions_by_root[$contract]:-}"
+            if [[ -n "$companions_text" ]]; then
+              while IFS= read -r companion; do
+                run_contract_snapshot "$companion" "$database_url"
+              done <<< "$companions_text"
             fi
+
+            executed+=("$contract")
             docker rm --force "$container_name" >/dev/null
-            trap - EXIT
+            current_container=""
           done
+
+          if [[ "${executed[*]}" != "${contracts[*]}" ]]; then
+            printf 'Executed PostgreSQL contract set diverged from validated inventory.\n' >&2
+            exit 1
+          fi
+          for bound_script in "${!expected_sha256[@]}"; do
+            verify_snapshot_bytes "$bound_script"
+            verify_candidate_bytes "$bound_script"
+          done
+          printf 'Executed PostgreSQL Foundation roots from immutable exact-candidate tree (%d):\n' "${#executed[@]}"
+          printf '%s\n' "${executed[@]}"
+          cleanup_postgres_contracts
+          trap - EXIT
       - name: Prove compatibility toolchain provenance
         run: |
           expected_sha256=cebb36181e8ac995a36d73a02a45094a204ff5adb3cbcdc0c9eccff309ac6aab
