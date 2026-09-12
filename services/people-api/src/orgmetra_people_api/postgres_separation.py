@@ -12,6 +12,7 @@ from orgmetra_people_api.mutations import PeopleMutationNotFound
 from orgmetra_people_api.separation import (
     EmploymentSeparationCommand,
     EmploymentSeparationIntegrityError,
+    EmploymentSeparationPersistenceIntegrityError,
     EmploymentSeparationResult,
 )
 
@@ -39,7 +40,9 @@ def _require_authorization(
 ) -> AuthorizationDecision:
     """Require exact allow evidence for the governed separation operation."""
     if type(authorization) is not AuthorizationDecision:
-        raise EmploymentSeparationIntegrityError("Employment separation requires typed authorization evidence")
+        raise EmploymentSeparationPersistenceIntegrityError(
+            "Employment separation requires typed authorization evidence"
+        )
     if (
         not authorization.allowed
         or authorization.tenant_record_id != command.tenant_record_id
@@ -50,7 +53,9 @@ def _require_authorization(
         or authorization.requested_fields != _EMPLOYMENT_FIELDS
         or authorization.authorized_fields != _EMPLOYMENT_FIELDS
     ):
-        raise EmploymentSeparationIntegrityError("Employment separation authorization does not match the exact record")
+        raise EmploymentSeparationPersistenceIntegrityError(
+            "Employment separation authorization does not match the exact record"
+        )
     return authorization
 
 
@@ -58,10 +63,14 @@ def _one_result_row(cursor: Any) -> tuple[object, object, object, object]:
     """Detach exactly one built-in database row before validating result evidence."""
     rows = cursor.fetchmany(2)
     if type(rows) not in (list, tuple) or len(rows) != 1:
-        raise EmploymentSeparationIntegrityError("Employment separation database result is invalid")
+        raise EmploymentSeparationPersistenceIntegrityError(
+            "Employment separation database result is invalid"
+        )
     row = rows[0]
     if type(row) not in (list, tuple) or len(row) != 4:
-        raise EmploymentSeparationIntegrityError("Employment separation database result is invalid")
+        raise EmploymentSeparationPersistenceIntegrityError(
+            "Employment separation database result is invalid"
+        )
     return row[0], row[1], row[2], row[3]
 
 
@@ -79,9 +88,13 @@ def _validated_result(
             replayed=row[3],  # type: ignore[arg-type]
         )
     except (TypeError, ValueError) as error:
-        raise EmploymentSeparationIntegrityError("Employment separation database result is invalid") from error
+        raise EmploymentSeparationPersistenceIntegrityError(
+            "Employment separation database result is invalid"
+        ) from error
     if result.employment_record_id != expected_employment_record_id:
-        raise EmploymentSeparationIntegrityError("Employment separation database identity does not match command")
+        raise EmploymentSeparationPersistenceIntegrityError(
+            "Employment separation database identity does not match command"
+        )
     return result
 
 
