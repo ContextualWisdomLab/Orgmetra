@@ -25,7 +25,7 @@ erDiagram
     position_record ||--o{ assignment_record : assigned_through
     candidate_profile ||--o| candidate_worker_link : may_become
     person_record ||--o{ candidate_worker_link : links_worker
-    document_record ||--|| document_record_persist_receipt : first_commit_receipt
+    document_record ||--o| document_record_persist_receipt : may_have_first_commit_receipt
     job_profile ||--o{ criterion_blueprint : requires
     performance_cycle ||--o{ criterion_observation : schedules
     criterion_blueprint ||--o{ criterion_observation : produces
@@ -56,7 +56,7 @@ Every owned HRIS fact carries `tenant_record_id`. Relationships that cross table
 
 A candidate profile can be linked to at most one worker identity within its tenant. A person identity can have multiple candidate-worker links across reapplications or historical candidate profiles, so the person-side cardinality is one-to-many.
 
-A `document_record` is one immutable document-metadata fact owned by `document_records`. It deliberately keeps Person, Employment, artifact, audit, and outbox correlations as opaque owner-contract references rather than cross-context foreign keys. One first committed document persistence command creates exactly one `document_record_persist_receipt`: the receipt has tenant-qualified uniqueness on both `(tenant_record_id, idempotency_key)` and `(tenant_record_id, document_record_id)`, and the latter pair is a foreign key to the document fact. The receipt stores only replay identity/digests and database-owned time; it does not duplicate document bytes or free-form HR data.
+A `document_record` is one immutable document-metadata fact owned by `document_records`. It deliberately keeps Person, Employment, artifact, audit, and outbox correlations as opaque owner-contract references rather than cross-context foreign keys. A persistence command executed through `persist_document_record_once(...)` creates exactly one `document_record_persist_receipt` with its first committed document fact. The receipt has tenant-qualified uniqueness on both `(tenant_record_id, idempotency_key)` and `(tenant_record_id, document_record_id)`, and the latter pair is a foreign key to the document fact, so each receipt identifies exactly one document and each document can have at most one receipt. Migration 0024 does not backfill or require receipts for document rows that already existed before the idempotent write port, so the dataset-level document-to-receipt cardinality is zero-or-one. The receipt stores only replay identity/digests and database-owned time; it does not duplicate document bytes or free-form HR data.
 
 Each criterion observation belongs to one effective-dated performance cycle so reporting periods remain reconstructable across effective and system time.
 
