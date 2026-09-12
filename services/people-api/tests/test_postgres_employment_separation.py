@@ -13,6 +13,7 @@ from orgmetra_people_api.postgres_separation import PostgresEmploymentSeparation
 from orgmetra_people_api.separation import (
     EmploymentSeparationCommand,
     EmploymentSeparationIntegrityError,
+    EmploymentSeparationPersistenceIntegrityError,
 )
 
 TENANT = UUID("0198a412-8000-7000-8000-000000000001")
@@ -189,7 +190,7 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
             authorization(authorized_fields=frozenset({"assignment_record"})),
         )
         for decision in cases:
-            with self.subTest(decision=decision), self.assertRaises(EmploymentSeparationIntegrityError):
+            with self.subTest(decision=decision), self.assertRaises(EmploymentSeparationPersistenceIntegrityError):
                 port.separate_employment(command=command(), authorization=decision)  # type: ignore[arg-type]
 
     def test_rejects_malformed_database_result_before_transaction_commit_boundary(self) -> None:
@@ -205,16 +206,16 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
         )
         for row in rows:
             connection = FakeConnection(FakeCursor(row=row))
-            with self.subTest(row=row), self.assertRaises(EmploymentSeparationIntegrityError):
+            with self.subTest(row=row), self.assertRaises(EmploymentSeparationPersistenceIntegrityError):
                 port = PostgresEmploymentSeparationPort(ConnectionFactory(connection))
                 port.separate_employment(command=command(), authorization=authorization())
-            self.assertIs(connection.exit_exception_type, EmploymentSeparationIntegrityError)
+            self.assertIs(connection.exit_exception_type, EmploymentSeparationPersistenceIntegrityError)
 
         connection = FakeConnection(InvalidBatchCursor())
-        with self.assertRaises(EmploymentSeparationIntegrityError):
+        with self.assertRaises(EmploymentSeparationPersistenceIntegrityError):
             port = PostgresEmploymentSeparationPort(ConnectionFactory(connection))
             port.separate_employment(command=command(), authorization=authorization())
-        self.assertIs(connection.exit_exception_type, EmploymentSeparationIntegrityError)
+        self.assertIs(connection.exit_exception_type, EmploymentSeparationPersistenceIntegrityError)
 
     def test_maps_governed_conflicts_but_not_permission_failures(self) -> None:
         cases = (
