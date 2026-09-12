@@ -354,8 +354,8 @@
     {
       "path": "schemas/openapi.yaml",
       "sha256": "c37522504d1f6ac6410eaac833dddbf09aacc85572da38a1cf7539541833ea8e",
-      "bytes": 29511,
-      "lines": 1020
+      "bytes": 33668,
+      "lines": 1150
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
