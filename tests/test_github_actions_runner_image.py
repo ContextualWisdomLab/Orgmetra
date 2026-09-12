@@ -1,8 +1,8 @@
-"""Regression contract for deterministic GitHub-hosted runner image selection.
+"""Regression contracts for repository-owned GitHub Actions execution.
 
-Orgmetra uses an explicit supported Ubuntu image instead of moving aliases,
-other image versions, or expression-driven selectors. Queued evidence remains
-non-passing; this test only protects the repository-owned runner contract.
+The tests keep runner selection, remote dependencies, container images, token
+permissions, trigger semantics, and queue behavior explicit. A queued workflow
+is never treated as passing evidence.
 """
 
 from __future__ import annotations
@@ -14,7 +14,23 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
-_RUNS_ON_PATTERN = re.compile(r"^\s*runs-on\s*:\s*(.*?)\s*$")
+
+_MAPPING_ENTRY_PATTERN = re.compile(
+    r"^(?P<sequence>-\s+)?"
+    r"(?P<key>[A-Za-z0-9_-]+|'(?:[^']|'')*'|\"(?:[^\"\\]|\\.)*\")"
+    r"\s*:\s*(?P<value>.*?)\s*$"
+)
+_PRIVILEGED_EVENT_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_-])(pull_request_target|workflow_run)(?![A-Za-z0-9_-])"
+)
+
+_PINNED_ACTION_PATTERN = re.compile(
+    r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._/-]+)?@[0-9a-f]{40}$"
+)
+_PINNED_IMAGE_PATTERN = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._:/-]*@sha256:[0-9a-f]{64}$"
+)
+
 _EXPECTED_RUNNER = "ubuntu-24.04"
 _CENTRAL_WORKFLOW_NAMES = {
     "close-empty-pr.yml",
@@ -39,7 +55,7 @@ def _workflow_paths() -> list[Path]:
 
 
 def _strip_yaml_comment(value: str) -> str:
-    """Strip only YAML comments, preserving hash characters inside scalar text."""
+    """Strip a YAML comment without treating a quoted hash as a comment."""
     quote: str | None = None
     index = 0
     while index < len(value):
@@ -64,17 +80,187 @@ def _strip_yaml_comment(value: str) -> str:
     return value.strip()
 
 
+def _unquote_scalar(value: str) -> str:
+    """Remove one matching YAML scalar quote pair."""
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _mapping_entry(line: str) -> tuple[int, bool, str, str] | None:
+    """Return indentation, sequence form, key, and scalar for one YAML mapping entry."""
+    indent = len(line) - len(line.lstrip())
+    candidate = _strip_yaml_comment(line.lstrip())
+    match = _MAPPING_ENTRY_PATTERN.match(candidate)
+    if match is None:
+        return None
+    return (
+        indent,
+        match.group("sequence") is not None,
+        _unquote_scalar(match.group("key")),
+        _unquote_scalar(match.group("value")),
+    )
+
+
 def _runner_declarations(workflow: str) -> list[tuple[int, str]]:
-    """Return line-numbered scalar ``runs-on`` declarations without YAML comments."""
+    """Return line-numbered scalar ``runs-on`` declarations."""
     declarations: list[tuple[int, str]] = []
     for line_number, line in enumerate(workflow.splitlines(), start=1):
-        match = _RUNS_ON_PATTERN.match(line)
-        if match is None:
+        entry = _mapping_entry(line)
+        if entry is None:
             continue
-        value = _strip_yaml_comment(match.group(1))
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-            value = value[1:-1]
+        _indent, sequence, key, value = entry
+        if not sequence and key == "runs-on":
+            declarations.append((line_number, value))
+    return declarations
+
+
+def _action_declarations(workflow: str) -> list[tuple[int, str]]:
+    """Return non-local action/reusable-workflow ``uses`` declarations."""
+    declarations: list[tuple[int, str]] = []
+    for line_number, line in enumerate(workflow.splitlines(), start=1):
+        entry = _mapping_entry(line)
+        if entry is None:
+            continue
+        _indent, _sequence, key, value = entry
+        if key != "uses":
+            continue
+        if value.startswith("./"):
+            continue
         declarations.append((line_number, value))
+    return declarations
+
+
+def _action_reference_is_immutable(value: str) -> bool:
+    """Require repository actions to pin commits and Docker actions to pin digests."""
+    if value.startswith("docker://"):
+        return _PINNED_IMAGE_PATTERN.fullmatch(value.removeprefix("docker://")) is not None
+    return _PINNED_ACTION_PATTERN.fullmatch(value) is not None
+
+
+def _image_declarations(workflow: str) -> list[tuple[int, str]]:
+    """Return image references from ``image:`` and scalar ``container:`` forms."""
+    declarations: list[tuple[int, str]] = []
+    for line_number, line in enumerate(workflow.splitlines(), start=1):
+        entry = _mapping_entry(line)
+        if entry is None:
+            continue
+        _indent, _sequence, key, value = entry
+        if key not in {"image", "container"}:
+            continue
+
+        # ``container:`` with no scalar value starts the object form; its nested
+        # ``image:`` member is collected on its own line.
+        if not value:
+            continue
+        declarations.append((line_number, value))
+    return declarations
+
+
+def _permission_blocks(
+    workflow: str,
+) -> list[tuple[int, int, str, dict[str, str]]]:
+    """Return every permissions block with line, indentation, scalar, and scopes."""
+    lines = workflow.splitlines()
+    blocks: list[tuple[int, int, str, dict[str, str]]] = []
+
+    for index, line in enumerate(lines):
+        entry = _mapping_entry(line)
+        if entry is None:
+            continue
+        indent, sequence, key, scalar = entry
+        if sequence or key != "permissions":
+            continue
+
+        scopes: dict[str, str] = {}
+        if not scalar:
+            for child in lines[index + 1 :]:
+                if child.strip() == "" or child.lstrip().startswith("#"):
+                    continue
+                child_entry = _mapping_entry(child)
+                child_indent = len(child) - len(child.lstrip())
+                if child_indent <= indent:
+                    break
+                if child_entry is None:
+                    scopes["<invalid>"] = _strip_yaml_comment(child)
+                    break
+                _child_indent, child_sequence, child_key, child_value = child_entry
+                if child_sequence or child_value not in {"read", "write", "none"}:
+                    scopes["<invalid>"] = _strip_yaml_comment(child)
+                    break
+                scopes[child_key] = child_value
+        blocks.append((index + 1, indent, scalar, scopes))
+
+    return blocks
+
+
+def _declared_permissions(workflow: str) -> dict[str, str]:
+    """Return the workflow-level permission mapping, excluding job overrides."""
+    for _line_number, indent, scalar, scopes in _permission_blocks(workflow):
+        if indent == 0 and not scalar:
+            return scopes
+    return {}
+
+
+def _permission_violations(workflow: str) -> list[str]:
+    """Return unsafe workflow- or job-level permission declarations."""
+    violations: list[str] = []
+    for line_number, _indent, scalar, scopes in _permission_blocks(workflow):
+        if scalar:
+            violations.append(f"line {line_number}: scalar={scalar}")
+            continue
+        if scopes != {"contents": "read"}:
+            violations.append(f"line {line_number}: scopes={scopes}")
+    return violations
+
+
+def _privileged_trigger_declarations(workflow: str) -> list[tuple[int, str]]:
+    """Return privileged events from mapping, scalar, and flow-sequence ``on`` forms."""
+    lines = workflow.splitlines()
+    declarations: list[tuple[int, str]] = []
+    on_block_indent: int | None = None
+    on_child_indent: int | None = None
+
+    for line_number, line in enumerate(lines, start=1):
+        if line.strip() == "" or line.lstrip().startswith("#"):
+            continue
+
+        indent = len(line) - len(line.lstrip())
+        if on_block_indent is not None:
+            if indent <= on_block_indent:
+                on_block_indent = None
+                on_child_indent = None
+            else:
+                if on_child_indent is None:
+                    on_child_indent = indent
+                if indent == on_child_indent:
+                    item = _strip_yaml_comment(line.lstrip())
+                    if item.startswith("- "):
+                        event = _unquote_scalar(item[2:])
+                        if _PRIVILEGED_EVENT_PATTERN.fullmatch(event):
+                            declarations.append((line_number, event))
+
+        entry = _mapping_entry(line)
+        if entry is None:
+            continue
+        indent, sequence, key, value = entry
+
+        if indent == 0 and not sequence and key == "on":
+            on_block_indent = 0 if not value else None
+            on_child_indent = None
+            if value and _PRIVILEGED_EVENT_PATTERN.search(value):
+                declarations.append((line_number, value))
+            continue
+
+        if on_block_indent is not None:
+            if (
+                indent == on_child_indent
+                and not sequence
+                and key in {"pull_request_target", "workflow_run"}
+            ):
+                declarations.append((line_number, key))
+
     return declarations
 
 
@@ -82,7 +268,7 @@ class GitHubActionsRunnerImageContractTest(unittest.TestCase):
     """Keep every repository-owned runner declaration on one explicit image."""
 
     def test_all_repository_workflow_runner_selectors_are_exact(self) -> None:
-        """Reject aliases, expressions, other versions, and missing runner declarations."""
+        """Reject aliases, expressions, other versions, and missing declarations."""
         workflow_paths = _workflow_paths()
         self.assertTrue(workflow_paths, "Orgmetra must keep repository-owned workflows")
 
@@ -105,7 +291,7 @@ class GitHubActionsRunnerImageContractTest(unittest.TestCase):
         )
 
     def test_runner_parser_rejects_dynamic_and_noncanonical_values(self) -> None:
-        """Keep the validator sensitive to aliases, expressions, lists, and other images."""
+        """Keep the validator sensitive to aliases, expressions, lists, and versions."""
         sample = "\n".join(
             (
                 "runs-on: ubuntu-latest",
@@ -132,7 +318,7 @@ class GitHubActionsRunnerImageContractTest(unittest.TestCase):
         )
 
     def test_runner_parser_only_strips_yaml_comment_tokens(self) -> None:
-        """Do not mistake a hash inside a plain or quoted scalar for a YAML comment."""
+        """Do not mistake a hash inside a plain or quoted scalar for a comment."""
         sample = "\n".join(
             (
                 "runs-on: ubuntu-24.04 # supported image",
@@ -147,6 +333,338 @@ class GitHubActionsRunnerImageContractTest(unittest.TestCase):
                 "ubuntu-24.04#not-a-comment",
             ],
             [value for _, value in _runner_declarations(sample)],
+        )
+
+
+class GitHubActionsActionPinningContractTest(unittest.TestCase):
+    """Keep remote action and image dependencies immutable."""
+
+    def test_all_remote_action_references_are_immutable(self) -> None:
+        """Reject mutable repository refs and mutable Docker action tags."""
+        unpinned: list[str] = []
+        for workflow_path in _workflow_paths():
+            for line_number, value in _action_declarations(
+                workflow_path.read_text(encoding="utf-8")
+            ):
+                if not _action_reference_is_immutable(value):
+                    unpinned.append(f"{workflow_path.name}:{line_number}={value!r}")
+        self.assertEqual(
+            [],
+            unpinned,
+            "remote actions must pin a full commit SHA or Docker image sha256 digest: "
+            f"{unpinned}",
+        )
+
+    def test_action_parser_rejects_mutable_and_pins_commit_sha(self) -> None:
+        """Cover standalone/list uses, repository subpaths, and local exemptions."""
+        sample = "\n".join(
+            (
+                "- uses: actions/checkout@v4",
+                "uses: actions/checkout@v4",
+                "uses: actions/checkout@main",
+                "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+                "    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+                "uses: ./local-action",
+                "uses: docker://alpine:3.20",
+                "uses: 'actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97'",
+                "uses: ContextualWisdomLab/Orgmetra/.github/workflows/ci.yml@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                "uses: owner/repo/sub/dir@5fda3b95a4ea91299a34e894583c3862153e4b97 # v1",
+                "uses: owner/repo/.github/workflows/ci.yml@v1",
+            )
+        )
+        declarations = _action_declarations(sample)
+        self.assertEqual(
+            [
+                "actions/checkout@v4",
+                "actions/checkout@v4",
+                "actions/checkout@main",
+                "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+                "docker://alpine:3.20",
+                "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+                "ContextualWisdomLab/Orgmetra/.github/workflows/ci.yml@3d3c42e5aac5ba805825da76410c181273ba90b1",
+                "owner/repo/sub/dir@5fda3b95a4ea91299a34e894583c3862153e4b97",
+                "owner/repo/.github/workflows/ci.yml@v1",
+            ],
+            [value for _, value in declarations],
+        )
+        self.assertEqual(
+            [
+                "actions/checkout@v4",
+                "actions/checkout@v4",
+                "actions/checkout@main",
+                "docker://alpine:3.20",
+                "owner/repo/.github/workflows/ci.yml@v1",
+            ],
+            [
+                value
+                for _, value in declarations
+                if not _action_reference_is_immutable(value)
+            ],
+        )
+
+    def test_action_parser_normalizes_quoted_mapping_keys(self) -> None:
+        """Treat bare and quoted ``uses`` keys as the same security declaration."""
+        pinned = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+        sample = "\n".join(
+            (
+                '"uses": actions/checkout@v4',
+                "- 'uses': actions/checkout@main",
+                f"'uses': {pinned}",
+            )
+        )
+        declarations = _action_declarations(sample)
+        self.assertEqual(
+            ["actions/checkout@v4", "actions/checkout@main", pinned],
+            [value for _, value in declarations],
+        )
+        self.assertEqual(
+            ["actions/checkout@v4", "actions/checkout@main"],
+            [
+                value
+                for _, value in declarations
+                if not _action_reference_is_immutable(value)
+            ],
+        )
+
+    def test_docker_action_references_require_digest(self) -> None:
+        """Treat Docker ``uses`` as remote executable dependencies, not local actions."""
+        digest = "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+        untagged = f"docker://alpine@sha256:{digest}"
+        tagged = f"docker://alpine:3.20@sha256:{digest}"
+        sample = "\n".join(
+            (
+                "uses: docker://alpine:3.20",
+                f'"uses": {untagged}',
+                f"- 'uses': {tagged}",
+                "uses: ./local-action",
+            )
+        )
+        declarations = _action_declarations(sample)
+        self.assertEqual(
+            ["docker://alpine:3.20", untagged, tagged],
+            [value for _, value in declarations],
+        )
+        self.assertEqual(
+            [False, True, True],
+            [_action_reference_is_immutable(value) for _, value in declarations],
+        )
+
+    def test_all_container_images_are_digest_pinned(self) -> None:
+        """Reject mutable job-container and service-image tags."""
+        unpinned: list[str] = []
+        for workflow_path in _workflow_paths():
+            for line_number, value in _image_declarations(
+                workflow_path.read_text(encoding="utf-8")
+            ):
+                if not _PINNED_IMAGE_PATTERN.match(value):
+                    unpinned.append(f"{workflow_path.name}:{line_number}={value!r}")
+        self.assertEqual(
+            [],
+            unpinned,
+            "container and service images must pin an immutable sha256 digest: "
+            f"{unpinned}",
+        )
+
+    def test_image_parser_rejects_mutable_tags_and_pins_digest(self) -> None:
+        """Cover object images, scalar job containers, expressions, and digests."""
+        pinned_image = (
+            "postgres:17.6-alpine@sha256:"
+            "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+        )
+        sample = "\n".join(
+            (
+                "image: postgres:17.6-alpine",
+                f"image: {pinned_image}",
+                "image: ${{ matrix.image }}",
+                f"image: '{pinned_image}' # latest",
+                "container: ghcr.io/example/app:latest",
+                f"container: {pinned_image}",
+                "container:",
+                f"  image: {pinned_image}",
+            )
+        )
+        declarations = _image_declarations(sample)
+        self.assertEqual(
+            [
+                "postgres:17.6-alpine",
+                pinned_image,
+                "${{ matrix.image }}",
+                pinned_image,
+                "ghcr.io/example/app:latest",
+                pinned_image,
+                pinned_image,
+            ],
+            [value for _, value in declarations],
+        )
+        self.assertEqual(
+            ["postgres:17.6-alpine", "${{ matrix.image }}", "ghcr.io/example/app:latest"],
+            [
+                value
+                for _, value in declarations
+                if not _PINNED_IMAGE_PATTERN.match(value)
+            ],
+        )
+
+    def test_image_parser_normalizes_quoted_mapping_keys(self) -> None:
+        """Treat quoted image/container keys as equivalent immutable inputs."""
+        pinned_image = (
+            "postgres:17.6-alpine@sha256:"
+            "ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+        )
+        sample = "\n".join(
+            (
+                '"image": postgres:latest',
+                "'container': ghcr.io/example/app:latest",
+                f"  'image': '{pinned_image}'",
+            )
+        )
+        self.assertEqual(
+            ["postgres:latest", "ghcr.io/example/app:latest", pinned_image],
+            [value for _, value in _image_declarations(sample)],
+        )
+
+
+class GitHubActionsLeastPrivilegeContractTest(unittest.TestCase):
+    """Keep repository-owned workflows read-only and off privileged triggers."""
+
+    def test_local_workflows_declare_only_read_scoped_contents_permission(self) -> None:
+        """Require safe workflow defaults and reject unsafe job overrides."""
+        missing: list[str] = []
+        violations: list[str] = []
+        for workflow_path in _workflow_paths():
+            workflow = workflow_path.read_text(encoding="utf-8")
+            if _declared_permissions(workflow) != {"contents": "read"}:
+                missing.append(workflow_path.name)
+            for violation in _permission_violations(workflow):
+                violations.append(f"{workflow_path.name}: {violation}")
+
+        self.assertEqual(
+            [],
+            missing,
+            f"top-level permissions must declare only contents: read: {missing}",
+        )
+        self.assertEqual(
+            [],
+            violations,
+            f"workflow/job permissions must grant only contents: read: {violations}",
+        )
+
+    def test_local_workflows_reject_privileged_triggers_and_write_all(self) -> None:
+        """Reject privileged events in mapping/shorthand syntax and write-all."""
+        violations: list[str] = []
+        for workflow_path in _workflow_paths():
+            workflow = workflow_path.read_text(encoding="utf-8")
+            for line_number, value in _privileged_trigger_declarations(workflow):
+                violations.append(
+                    f"{workflow_path.name}:{line_number}=privileged trigger {value!r}"
+                )
+            for line_number, _indent, scalar, _scopes in _permission_blocks(workflow):
+                if scalar == "write-all":
+                    violations.append(
+                        f"{workflow_path.name}:{line_number}=permissions: write-all"
+                    )
+        self.assertEqual(
+            [],
+            violations,
+            f"privileged triggers and write-all permissions are forbidden: {violations}",
+        )
+
+    def test_permission_parser_preserves_scope_and_rejects_job_escalation(self) -> None:
+        """Do not confuse job-level permissions with a workflow-level default."""
+        self.assertEqual(
+            {"contents": "read"},
+            _declared_permissions("permissions:\n  contents: read\n"),
+        )
+        self.assertEqual(
+            {"contents": "write", "id-token": "write"},
+            _declared_permissions(
+                "permissions:\n  contents: write\n  id-token: write\n"
+            ),
+        )
+        self.assertEqual({}, _declared_permissions("name: no permissions here\n"))
+        self.assertEqual(
+            {},
+            _declared_permissions(
+                "jobs:\n  test:\n    permissions:\n      contents: read\n"
+            ),
+        )
+
+        safe = (
+            "permissions:\n"
+            "  contents: read\n"
+            "jobs:\n"
+            "  test:\n"
+            "    permissions:\n"
+            "      contents: read\n"
+        )
+        unsafe = safe.replace(
+            "      contents: read\n",
+            "      contents: write\n      id-token: write\n",
+        )
+        self.assertEqual([], _permission_violations(safe))
+        self.assertNotEqual([], _permission_violations(unsafe))
+        self.assertNotEqual(
+            [],
+            _permission_violations("permissions: write-all\n"),
+        )
+
+    def test_permission_parser_normalizes_quoted_mapping_keys(self) -> None:
+        """Reject quoted job escalation while accepting quoted read-only defaults."""
+        workflow = (
+            '"permissions":\n'
+            '  "contents": read\n'
+            "jobs:\n"
+            "  test:\n"
+            "    'permissions':\n"
+            "      'contents': write\n"
+        )
+        self.assertEqual({"contents": "read"}, _declared_permissions(workflow))
+        self.assertEqual(
+            ["line 5: scopes={'contents': 'write'}"],
+            _permission_violations(workflow),
+        )
+
+    def test_trigger_parser_covers_mapping_scalar_and_flow_forms(self) -> None:
+        """Detect privileged events in every GitHub-supported ``on`` shorthand."""
+        self.assertEqual(
+            [(2, "pull_request_target")],
+            _privileged_trigger_declarations("on:\n  pull_request_target:\n"),
+        )
+        self.assertEqual(
+            [(1, "pull_request_target")],
+            _privileged_trigger_declarations("on: pull_request_target\n"),
+        )
+        self.assertEqual(
+            [(1, "[push, workflow_run]")],
+            _privileged_trigger_declarations("on: [push, workflow_run]\n"),
+        )
+        self.assertEqual(
+            [],
+            _privileged_trigger_declarations("on: [push, pull_request]\n"),
+        )
+        self.assertEqual(
+            [(3, "pull_request_target")],
+            _privileged_trigger_declarations(
+                "on:\n  - push\n  - pull_request_target\n"
+            ),
+        )
+        self.assertEqual(
+            [],
+            _privileged_trigger_declarations(
+                "on:\n  pull_request:\n    branches:\n      - workflow_run\n"
+            ),
+        )
+
+    def test_trigger_parser_normalizes_quoted_mapping_keys(self) -> None:
+        """Detect privileged scalar and mapping events when YAML keys are quoted."""
+        self.assertEqual(
+            [(1, "pull_request_target")],
+            _privileged_trigger_declarations('"on": pull_request_target\n'),
+        )
+        self.assertEqual(
+            [(2, "workflow_run")],
+            _privileged_trigger_declarations("'on':\n  'workflow_run':\n"),
         )
 
 
@@ -183,7 +701,7 @@ class GitHubActionsQueueContractTest(unittest.TestCase):
         self.assertNotIn("matrix:", jobs)
 
     def test_postgres_contracts_wait_on_the_dynamic_host_port(self) -> None:
-        """Prove Docker port forwarding is usable before running each database contract."""
+        """Prove Docker port forwarding is usable before each database contract."""
         workflow = (WORKFLOWS / "foundation-ci.yml").read_text(encoding="utf-8")
         dynamic_publish = "--publish 127.0.0.1::5432"
         port_lookup = 'postgres_binding="$(docker port "$container_name" 5432/tcp)"'
@@ -200,5 +718,5 @@ class GitHubActionsQueueContractTest(unittest.TestCase):
         self.assertLess(workflow.index(host_probe), workflow.index(contract_run))
 
 
-if __name__ == "__main__":  # pragma: no cover - normal execution is via unittest discovery.
+if __name__ == "__main__":  # pragma: no cover
     unittest.main()
