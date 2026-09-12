@@ -1,19 +1,20 @@
-"""Regression contract for exact candidate-conversion Employment provenance."""
+"""Regression contract for candidate-conversion versus People mutation authority."""
 
 from __future__ import annotations
 
+import inspect
 import unittest
 
-from orgmetra_people_api.postgres_mutations import _CONVERSION_SQL
+from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
 
 
 class ConversionEmploymentBindingRegressionTests(unittest.TestCase):
-    """Keep candidate conversion authority bound to the exact Employment aggregate."""
+    """Keep recruiting provenance out of generic Employment authorization."""
 
-    def test_conversion_lookup_binds_exact_employment_identity(self) -> None:
-        """Reject a Person-only conversion lookup that can authorize a different Employment."""
-        self.assertIn("AND conversion.employment_record_id = %s", _CONVERSION_SQL)
-        self.assertEqual(_CONVERSION_SQL.count("%s"), 3)
+    def test_generic_employment_creation_does_not_require_candidate_conversion(self) -> None:
+        """A future Employment cannot depend on a conversion whose FK already needs it."""
+        source = inspect.getsource(PostgresPeopleMutationPort.create_employment)
+        self.assertNotIn("_CONVERSION_SQL", source)
 
 
 if __name__ == "__main__":  # pragma: no cover - direct local invocation only
