@@ -8,7 +8,11 @@ import json
 import unittest
 from uuid import UUID
 
-from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
+from orgmetra_keyverse_adapter import (
+    AuthorizationDecision,
+    AuthorizationDeniedError,
+    PurposeBoundAccessPolicy,
+)
 from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed
 from orgmetra_people_api.separation import (
     EmploymentSeparationCommand,
@@ -257,7 +261,23 @@ class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(status, 400)
                 self.assertEqual(payload["error_code"], "invalid_request")
 
-        denied_port = RecordingSeparationPort(error=AuthorizationDeniedError("denied"))
+        denied_decision = AuthorizationDecision(
+            allowed=False,
+            tenant_record_id=TENANT,
+            actor_reference="keyverse_subject:people-operator-17",
+            resource_reference=f"employment_record:{EMPLOYMENT}",
+            policy_version_code="people-access-v1",
+            purpose_code="workforce_admin",
+            operation_code="employment_separation",
+            resource_kind="employment_record",
+            requested_fields=frozenset(),
+            authorized_fields=frozenset(),
+            reason_code="denied",
+            next_action="Request workforce administrator access.",
+        )
+        denied_port = RecordingSeparationPort(
+            error=AuthorizationDeniedError(denied_decision)
+        )
         status, _, payload = await self._request(self._app(separation_port=denied_port))
         self.assertEqual(status, 403)
         self.assertEqual(payload["error_code"], "access_denied")
