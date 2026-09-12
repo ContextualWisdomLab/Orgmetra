@@ -35,7 +35,13 @@ APPLICATION_DIGEST="eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
 AUDIT_REFERENCE="audit_event:00000000-0000-4000-8000-000000000271"
 OUTBOX_REFERENCE="outbox_event:00000000-0000-4000-8000-000000000272"
 IDEMPOTENCY_KEY="document-record-persist-00000000-0000-4000-8000-000000000201"
-APPLICATION_NAME="orgmetra_document_idempotency_lost_response"
+APPLICATION_SUFFIX="$(python3 - <<'PY'
+import uuid
+
+print(uuid.uuid4().hex[:24])
+PY
+)"
+APPLICATION_NAME="orgmetra_document_idempotency_lost_${APPLICATION_SUFFIX}"
 
 IFS='|' read -r RECEIVED_AT EVIDENCE_RECORDED_AT < <(psql "${DATABASE_URL}" -Atqc "
 SELECT
@@ -118,12 +124,30 @@ RECOVERY_DIR="$(mktemp -d)"
 CLIENT_ERROR="${RECOVERY_DIR}/lost-response-client.err"
 client_pid=""
 backend_pid=""
+backend_start_epoch=""
+
+terminate_captured_backend() {
+    local termination_receipt
+
+    if [[ ! "${backend_pid}" =~ ^[0-9]+$ || ! "${backend_start_epoch}" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+        return 1
+    fi
+
+    termination_receipt="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -c "
+SELECT count(*)::text || '|' ||
+       COALESCE(pg_catalog.bool_and(pg_catalog.pg_terminate_backend(pid)), false)::text
+FROM pg_catalog.pg_stat_activity
+WHERE pid = ${backend_pid}
+  AND application_name = '${APPLICATION_NAME}'
+  AND extract(epoch FROM backend_start)::text = '${backend_start_epoch}';
+")" || return 1
+
+    [[ "${termination_receipt}" == "1|true" ]]
+}
 
 cleanup() {
-    if [[ "${backend_pid}" =~ ^[0-9]+$ ]]; then
-        psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 \
-            -c "SELECT pg_catalog.pg_terminate_backend(${backend_pid}) WHERE EXISTS (SELECT 1 FROM pg_catalog.pg_stat_activity WHERE pid = ${backend_pid});" \
-            >/dev/null 2>&1 || true
+    if [[ "${backend_pid}" =~ ^[0-9]+$ && "${backend_start_epoch}" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+        terminate_captured_backend >/dev/null 2>&1 || true
     fi
     if [[ -n "${client_pid}" ]] && kill -0 "${client_pid}" 2>/dev/null; then
         kill "${client_pid}" 2>/dev/null || true
@@ -151,7 +175,8 @@ recovery_deadline=$((SECONDS + 10))
 while (( SECONDS < recovery_deadline )); do
     activity_row="$(psql "${DATABASE_URL}" -Atqc "
 SELECT
-    activity.pid::text || '|' || activity.state || '|' || COALESCE(activity.wait_event, '') || '|' ||
+    activity.pid::text || '|' || extract(epoch FROM activity.backend_start)::text || '|' ||
+    activity.state || '|' || COALESCE(activity.wait_event, '') || '|' ||
     (
         SELECT count(*)::text
         FROM public.document_record_persist_receipt AS receipt
@@ -162,14 +187,16 @@ FROM pg_catalog.pg_stat_activity AS activity
 WHERE activity.application_name = '${APPLICATION_NAME}';
 " | head -n 1)"
     observed_pid=""
+    observed_backend_start_epoch=""
     observed_state=""
     observed_wait=""
     receipt_count=""
     if [[ -n "${activity_row}" ]]; then
-        IFS='|' read -r observed_pid observed_state observed_wait receipt_count <<<"${activity_row}"
+        IFS='|' read -r observed_pid observed_backend_start_epoch observed_state observed_wait receipt_count <<<"${activity_row}"
     fi
-    if [[ "${observed_pid}" =~ ^[0-9]+$ && "${observed_state}" == "active" && "${observed_wait}" == "PgSleep" && "${receipt_count}" == "1" ]]; then
+    if [[ "${observed_pid}" =~ ^[0-9]+$ && "${observed_backend_start_epoch}" =~ ^[0-9]+([.][0-9]+)?$ && "${observed_state}" == "active" && "${observed_wait}" == "PgSleep" && "${receipt_count}" == "1" ]]; then
         backend_pid="${observed_pid}"
+        backend_start_epoch="${observed_backend_start_epoch}"
         first_result_durable=true
         break
     fi
@@ -185,13 +212,12 @@ if [[ "${first_result_durable}" != "true" ]]; then
     exit 1
 fi
 
-terminate_result="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 \
-    -c "SELECT pg_catalog.pg_terminate_backend(${backend_pid});")"
-if [[ "${terminate_result}" != "t" ]]; then
-    echo "could not terminate the committed original persistence connection: ${terminate_result}" >&2
+if ! terminate_captured_backend; then
+    echo "captured persistence backend identity changed or could not be terminated safely" >&2
     exit 1
 fi
 backend_pid=""
+backend_start_epoch=""
 
 set +e
 wait "${client_pid}"
