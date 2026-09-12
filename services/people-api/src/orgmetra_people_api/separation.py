@@ -23,7 +23,11 @@ _EMPLOYMENT_FIELDS = frozenset({"employment_record"})
 
 
 class EmploymentSeparationIntegrityError(RuntimeError):
-    """Indicate that separation evidence cannot be trusted as the requested result."""
+    """Indicate that authoritative Employment state conflicts with the requested transition."""
+
+
+class EmploymentSeparationPersistenceIntegrityError(EmploymentSeparationIntegrityError):
+    """Indicate that trusted persistence evidence or authorization wiring is internally invalid."""
 
 
 def _operational_uuid(field_name: str, value: object) -> UUID:
@@ -191,5 +195,5 @@ def separate_employment_record(
         raise TypeError("separation_port must return EmploymentSeparationResult")
     detached_result = replace(result)
     if detached_result.employment_record_id != expected_employment_record_id:
-        raise EmploymentSeparationIntegrityError("separation result identity does not match command")
+        raise EmploymentSeparationPersistenceIntegrityError("separation result identity does not match command")
     return detached_result
