@@ -98,7 +98,8 @@ persist_sql() {
 SELECT
     document_record_id::text || '|' || document_record_reference || '|' ||
     audit_event_reference || '|' || outbox_event_reference || '|' ||
-    semantic_command_digest_sha256 || '|' || receipt_digest_sha256
+    semantic_command_digest_sha256 || '|' || receipt_digest_sha256 || '|' ||
+    extract(epoch FROM recorded_at)::text
 FROM public.persist_document_record_once(
     '${TENANT_ID}'::uuid,
     '${key}',
@@ -149,6 +150,20 @@ SELECT
 ")"
 if [[ "${counts}" != "1|1" ]]; then
     echo "same semantic retry duplicated durable document or receipt state: ${counts}" >&2
+    exit 1
+fi
+
+recorded_at_binding="$(psql "${DATABASE_URL}" -Atqc "
+SELECT (persisted.recorded_at = receipt.recorded_at)::text
+FROM document_record AS persisted
+JOIN document_record_persist_receipt AS receipt
+  ON receipt.tenant_record_id = persisted.tenant_record_id
+ AND receipt.document_record_id = persisted.document_record_id
+WHERE receipt.tenant_record_id = '${TENANT_ID}'::uuid
+  AND receipt.idempotency_key = '${IDEMPOTENCY_KEY}';
+")"
+if [[ "${recorded_at_binding}" != "true" ]]; then
+    echo "replay receipt database time diverged from the original committed document time: ${recorded_at_binding}" >&2
     exit 1
 fi
 
