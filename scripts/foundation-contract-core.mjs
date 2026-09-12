@@ -142,7 +142,7 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'compensation_decision', 'validation_study', 'study_population_snapshot',
   'study_predictor_link', 'study_criterion_link', 'analysis_manifest',
   'analysis_artifact', 'policy_recommendation', 'policy_review_decision',
-  'document_record', 'document_version', 'document_segment', 'image_artifact',
+  'document_record', 'document_record_persist_receipt', 'document_version', 'document_segment', 'image_artifact',
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
   'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
   'outbox_event', 'outbox_delivery_record', 'outbox_delivery_escalation_record',
@@ -156,7 +156,8 @@ export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
   'job_analysis_task_item',
   'job_analysis_ksao_item',
   'job_analysis_task_ksao_link',
-  'job_analysis_write_command'
+  'job_analysis_write_command',
+  'document_record_persist_receipt'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
