@@ -383,9 +383,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "ee8d988efe848e57f4fbaf30112d262a84e9e230fe8e8d41ece6b525943b19c2",
-      "bytes": 28452,
-      "lines": 693
+      "sha256": "40fd2811107590e72a251a5863d100c0c98d0dea57c0a89b4530ee5caa258a46",
+      "bytes": 28597,
+      "lines": 695
     },
     {
       "path": "scripts/foundation-contract.mjs",
