@@ -18,13 +18,12 @@ for migration in \
     database/migrations/0012_people_mutation_idempotency.sql \
     database/migrations/0013_job_analysis_snapshot.sql \
     database/migrations/0014_employment_separation_transition.sql \
-    database/migrations/0015_employment_separation_capability_hardening.sql; do
+    database/migrations/0015_employment_separation_capability_hardening.sql \
+    database/migrations/0016_employment_separation_executor_capability.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
-separation_signature='public.separate_employment_record_once(uuid,uuid,uuid,uuid,date,text,text,text,text,text,text,text,uuid,uuid)'
-
-public_execute_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v signature="${separation_signature}" -Atqc "
+public_execute_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT count(*)
 FROM pg_catalog.pg_proc AS function_record
 CROSS JOIN LATERAL pg_catalog.aclexplode(
@@ -33,7 +32,7 @@ CROSS JOIN LATERAL pg_catalog.aclexplode(
         pg_catalog.acldefault('f', function_record.proowner)
     )
 ) AS function_acl
-WHERE function_record.oid = :'signature'::regprocedure
+WHERE function_record.oid = 'public.separate_employment_record_once(uuid,uuid,uuid,uuid,date,text,text,text,text,text,text,text,uuid,uuid)'::regprocedure
   AND function_acl.grantee = 0
   AND function_acl.privilege_type = 'EXECUTE';
 ")"
@@ -80,22 +79,22 @@ if [[ "${capability_role_contract}" != "${expected_role_contract}" ]]; then
     exit 1
 fi
 
-function_security_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v signature="${separation_signature}" -Atqc "
+function_security_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT function_record.prosecdef::text || '|' || owner_role.rolname
 FROM pg_catalog.pg_proc AS function_record
 JOIN pg_catalog.pg_roles AS owner_role
   ON owner_role.oid = function_record.proowner
-WHERE function_record.oid = :'signature'::regprocedure;
+WHERE function_record.oid = 'public.separate_employment_record_once(uuid,uuid,uuid,uuid,date,text,text,text,text,text,text,text,uuid,uuid)'::regprocedure;
 ")"
 if [[ "${function_security_contract}" != "true|orgmetra_employment_separation_owner" ]]; then
     echo "Employment separation function is not owned by the dedicated SECURITY DEFINER authority: ${function_security_contract}" >&2
     exit 1
 fi
 
-executor_execute="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v signature="${separation_signature}" -Atqc "
+executor_execute="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT pg_catalog.has_function_privilege(
     'orgmetra_employment_separation_executor',
-    :'signature',
+    'public.separate_employment_record_once(uuid,uuid,uuid,uuid,date,text,text,text,text,text,text,text,uuid,uuid)',
     'EXECUTE'
 )::text;
 ")"
