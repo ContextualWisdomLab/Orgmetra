@@ -44,6 +44,19 @@ class FoundationPostgresProcessQuiescenceTests(unittest.TestCase):
         self.assertIn('run_contract_snapshot "$companion" "$database_url"', execution)
         self.assertEqual(execution.count('sudo -n -u "$contract_user" env'), 1)
 
+    def test_uses_fresh_non_shared_runtime_workspace_per_executable(self) -> None:
+        execution = self._execution_step()
+
+        self.assertIn('runtime_parent="$(mktemp -d)"', execution)
+        self.assertIn('chmod 0711 "$runtime_parent"', execution)
+        self.assertIn('contract_runtime="$(mktemp -d "$runtime_parent/run.XXXXXX")"', execution)
+        self.assertIn('sudo -n chown "$contract_user" "$contract_runtime"', execution)
+        self.assertIn('HOME="$contract_runtime"', execution)
+        self.assertIn('TMPDIR="$contract_runtime"', execution)
+        self.assertIn('sudo -n rm -rf -- "$contract_runtime"', execution)
+        self.assertIn('sudo -n rm -rf -- "$runtime_parent"', execution)
+        self.assertNotIn('HOME=/tmp', execution)
+
 
 if __name__ == "__main__":
     unittest.main()
