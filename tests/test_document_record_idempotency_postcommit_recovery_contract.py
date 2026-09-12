@@ -22,13 +22,23 @@ def test_recovery_termination_binds_checked_backend_identity() -> None:
     """Termination must consume the same backend identity that observation accepted."""
 
     source = _companion_source()
+    termination = _shell_function(
+        source,
+        "terminate_captured_backend",
+        "\n}\n\ncleanup()",
+    )
 
-    assert "backend_start_epoch" in source
+    assert "WHERE pid = ${backend_pid}" in termination
+    assert "application_name = '${APPLICATION_NAME}'" in termination
+    assert (
+        "extract(epoch FROM backend_start)::text = '${backend_start_epoch}'"
+        in termination
+    )
+    assert termination.count("pg_catalog.pg_terminate_backend(pid)") == 1
+    assert "pg_terminate_backend(${backend_pid})" not in termination
+    assert '[[ "${termination_receipt}" == "1|true" ]]' in termination
+
     assert "extract(epoch FROM activity.backend_start)::text" in source
-    assert "terminate_captured_backend" in source
-    assert "application_name = '${APPLICATION_NAME}'" in source
-    assert "extract(epoch FROM backend_start)::text = '${backend_start_epoch}'" in source
-    assert '[[ "${termination_receipt}" == "1|true" ]]' in source
 
 
 def test_exit_cleanup_uses_the_same_guarded_backend_identity() -> None:
