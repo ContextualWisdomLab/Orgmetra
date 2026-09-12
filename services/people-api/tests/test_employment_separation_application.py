@@ -94,14 +94,23 @@ class WrongIdentityPort(RecordingSeparationPort):
         )
 
 
+class InvalidResultPort(RecordingSeparationPort):
+    """Satisfy the protocol while returning an untrusted implementation result."""
+
+    def separate_employment(self, *, command: EmploymentSeparationCommand, authorization: object) -> object:
+        del command, authorization
+        return object()
+
+
 class EmploymentSeparationApplicationTests(unittest.TestCase):
     """Prove authorization and typed result binding before exposing separation truth."""
 
     def test_authorizes_exact_employment_before_persistence(self) -> None:
         port = RecordingSeparationPort()
+        submitted_command = command()
         result = separate_employment_record(
             principal=PRINCIPAL,
-            command=command(),
+            command=submitted_command,
             purpose_code="workforce_admin",
             policy=policy(),
             separation_port=port,
@@ -113,7 +122,7 @@ class EmploymentSeparationApplicationTests(unittest.TestCase):
         self.assertEqual(result.recorded_at, RECORDED_AT)
         self.assertFalse(result.replayed)
         recorded_command, authorization = port.calls[0]
-        self.assertIsNot(recorded_command, command())
+        self.assertIsNot(recorded_command, submitted_command)
         self.assertEqual(authorization.resource_reference, f"employment_record:{EMPLOYMENT.hex}")
         self.assertEqual(authorization.operation_code, "separate_record")
         self.assertEqual(authorization.purpose_code, "workforce_admin")
@@ -214,6 +223,14 @@ class EmploymentSeparationApplicationTests(unittest.TestCase):
                 purpose_code="workforce_admin",
                 policy=policy(),
                 separation_port=object(),  # type: ignore[arg-type]
+            )
+        with self.assertRaisesRegex(TypeError, "EmploymentSeparationResult"):
+            separate_employment_record(
+                principal=PRINCIPAL,
+                command=command(),
+                purpose_code="workforce_admin",
+                policy=policy(),
+                separation_port=InvalidResultPort(),  # type: ignore[arg-type]
             )
 
 
