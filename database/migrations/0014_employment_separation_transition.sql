@@ -172,7 +172,6 @@ DECLARE
     v_replay_record_id uuid;
     v_replay_digest text;
     v_anchor_person_id uuid;
-    v_current_count integer;
     v_current_status text;
     v_current_concurrency text;
     v_current_effective_from date;
@@ -312,17 +311,6 @@ BEGIN
             USING ERRCODE = '23503';
     END IF;
 
-    SELECT count(*)
-    INTO v_current_count
-    FROM public.employment_record_version AS version
-    WHERE version.tenant_record_id = p_tenant_record_id
-      AND version.employment_record_id = p_employment_record_id
-      AND version.recorded_to IS NULL;
-    IF v_current_count <> 1 THEN
-        RAISE EXCEPTION 'employment separation requires exactly one current recorded employment version'
-            USING ERRCODE = '55000';
-    END IF;
-
     SELECT
         version.employment_status_code,
         version.employment_concurrency_code,
@@ -348,9 +336,23 @@ BEGIN
             USING ERRCODE = '55000';
     END IF;
     IF p_separation_effective_on < v_current_effective_from
-       OR (v_current_effective_to IS NOT NULL AND p_separation_effective_on > v_current_effective_to) THEN
-        RAISE EXCEPTION 'employment separation date is outside the current business interval'
+       OR (v_current_effective_to IS NOT NULL AND p_separation_effective_on >= v_current_effective_to) THEN
+        RAISE EXCEPTION 'employment separation date is outside the expected current business interval'
             USING ERRCODE = '22023';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM public.employment_record_version AS other_version
+        WHERE other_version.tenant_record_id = p_tenant_record_id
+          AND other_version.employment_record_id = p_employment_record_id
+          AND other_version.employment_record_version_id <> p_expected_employment_record_version_id
+          AND other_version.recorded_to IS NULL
+          AND daterange(other_version.effective_from, other_version.effective_to, '[)')
+              && daterange(p_separation_effective_on, NULL, '[)')
+    ) THEN
+        RAISE EXCEPTION 'employment separation requires future Employment version coordination'
+            USING ERRCODE = '55000';
     END IF;
 
     IF EXISTS (
