@@ -53,6 +53,11 @@ function writeMigrationBackedTables(root) {
       'CREATE TABLE job_analysis_write_command (tenant_record_id uuid NOT NULL);'
     ].join('\n') + '\n'
   );
+  write(
+    root,
+    'database/migrations/0024_document_record_idempotent_persistence.sql',
+    'CREATE TABLE document_record_persist_receipt (tenant_record_id uuid NOT NULL);\n'
+  );
 }
 
 function makeMinimalValidFoundation(root) {
@@ -129,6 +134,8 @@ test('required constants are frozen and use accepted values', () => {
   assert.ok(REQUIRED_FILES.length > 20);
   assert.ok(DATABASE_OBJECT_NAMES.every(isValidDatabaseObjectName));
   assert.ok(DATABASE_OBJECT_NAMES.includes('people_mutation_idempotency_record'));
+  assert.ok(DATABASE_OBJECT_NAMES.includes('document_record_persist_receipt'));
+  assert.ok(MIGRATION_BACKED_DATABASE_OBJECT_NAMES.includes('document_record_persist_receipt'));
   assert.ok(MATURITY_VALUES.has('accepted_architecture'));
 });
 
@@ -176,6 +183,32 @@ test('migration-backed validation ignores fake CREATE TABLE text in comments and
     writeMigrationBackedTables(root);
     assert.deepEqual(validateMigrationBackedDatabaseObjectNames(root), [
       'Migration-backed database object is missing from migrations: people_mutation_idempotency_record'
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('document receipt migration identity requires executable CREATE TABLE evidence', () => {
+  const root = temporaryDirectory();
+  try {
+    write(
+      root,
+      'database/migrations/0012_people_mutation_idempotency.sql',
+      'CREATE TABLE people_mutation_idempotency_record (tenant_record_id uuid NOT NULL);\n'
+    );
+    writeMigrationBackedTables(root);
+    write(
+      root,
+      'database/migrations/0024_document_record_idempotent_persistence.sql',
+      [
+        '-- CREATE TABLE document_record_persist_receipt (tenant_record_id uuid);',
+        "SELECT 'CREATE TABLE document_record_persist_receipt (tenant_record_id uuid);';",
+        'SELECT $receipt$CREATE TABLE document_record_persist_receipt (tenant_record_id uuid);$receipt$;'
+      ].join('\n')
+    );
+    assert.deepEqual(validateMigrationBackedDatabaseObjectNames(root), [
+      'Migration-backed database object is missing from migrations: document_record_persist_receipt'
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });

@@ -19,6 +19,8 @@
 | `candidate_worker_link` | Legacy append-only candidate-to-worker linkage retained for historical reads; new writes use `candidate_worker_conversion_record`. |
 | `candidate_worker_conversion_record` | Governed bitemporal candidate-to-worker conversion bound to the hire decision, person, employment, immutable audit event, and outbox evidence. |
 | `people_mutation_idempotency_record` | Append-only tenant/route/idempotency-key binding to the canonical command digest and first committed created-record identity for governed People writes. |
+| `document_record` | Immutable, tenant-scoped document metadata/evidence snapshot with opaque Person/Employment, artifact, audit, and outbox references; it never stores raw document bytes or free-form HR content. |
+| `document_record_persist_receipt` | Append-only tenant-scoped idempotency receipt binding one persistence key and semantic-command digest to the first committed `document_record` identity, receipt digest, and database-owned recorded time. |
 | `criterion_blueprint` | Job-related performance criterion definition. |
 | `criterion_observation` | Observed criterion result. |
 | `decision_evidence_set` | Versioned evidence-set header whose database-computed digest and membership are sealed by one accountable selection decision. |
@@ -65,6 +67,16 @@ New predictive-validity membership uses `validity_study_case_record` rather than
 `people_mutation_idempotency_record` is the durable retry boundary for governed candidate-worker conversion, Employment, Position, and Assignment mutations. Its unique business key is `(tenant_record_id, command_route, idempotency_key)`; the row stores the canonical semantic-command SHA-256 digest and the first committed created-record identity. Matching retries replay that identity, while a changed command under the same tenant/route/key fails closed instead of creating another HRIS fact.
 
 The owning write port acquires an exact-key transaction-scoped advisory lock and writes the HRIS fact, immutable audit/outbox evidence, and idempotency row inside one PostgreSQL transaction. A rolled-back mutation therefore cannot leave a false replay marker. The relation is append-only, TRUNCATE-protected, tenant-RLS isolated, and uses opaque operational UUIDs. The idempotency key is transport correlation, not HR data or authorization evidence; actor, purpose, human-confirmation and resource authorization remain independently required.
+
+## Document-record persistence and idempotency
+
+`document_record` is the immutable document-metadata system of record for the `document_records` bounded context. It stores only governed metadata and evidence: tenant identity, opaque Person/Employment references, category, uploader/persisting actor references, artifact/source/retention/evidence/application SHA-256 digests, the exact bounded canonical evidence JSON, opaque audit/outbox correlations, business `received_at`, and PostgreSQL-owned `recorded_at`. Raw document bytes, title/free-form HR text, compensation, ratings, credentials, and employment-decision output are excluded from this relation.
+
+`document_record_persist_receipt` is the append-only uncertain-retry authority for that persistence command. Its tenant-qualified business key is `(tenant_record_id, idempotency_key)`. The row binds the opaque idempotency key to the canonical semantic-command digest, the first committed `document_record_id`, the immutable document/audit/outbox references returned by that command, a receipt digest, and the database-owned `recorded_at`. The receipt does not duplicate document bytes, Person/Employment attributes, or other free-form HR content.
+
+First execution writes one `document_record` and one receipt in the same PostgreSQL transaction. A same-key/same-semantic retry returns the original committed identity and original database-owned recorded time without creating another document fact. Reusing the key for a different semantic command fails closed before another document write. Concurrent first attempts serialize on a tenant-qualified transaction-scoped advisory lock. The owner function requires exact tenant context before acquiring that coordination state, runs only under `READ COMMITTED`, canonicalizes digest timestamps in UTC, and is exposed to the application executor as an EXECUTE-only `SECURITY DEFINER` capability; the executor has no direct document/receipt table DML authority.
+
+Both relations are tenant-scoped with forced row-level security and tenant-qualified referential integrity. Receipt UPDATE, DELETE, and TRUNCATE are rejected. This receipt proves creation/retry convergence only; return/destruction completion and recovery-aware deletion remain separate `document_records` lifecycle authority and must not be inferred from a persistence receipt.
 
 ## Audit and outbox normalization
 

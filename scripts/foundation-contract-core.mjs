@@ -52,9 +52,11 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0013-governed-requisition-review-packet.md',
   'docs/adr/0014-job-analysis-snapshot-persistence.md',
   'docs/adr/0107-document-record-persistence.md',
+  'docs/adr/0309-document-record-idempotent-persistence.md',
   'docs/doctoring/REFERENCES.md',
   'docs/doctoring/document-record-persistence-references.md',
   'docs/traceability/document-record-persistence.md',
+  'docs/traceability/document-record-idempotent-persistence.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
   'database/migrations/0001_foundation_schema.sql',
@@ -73,6 +75,7 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0021_document_record_persistence.sql',
   'database/migrations/0022_document_record_evidence_unique_keys.sql',
   'database/migrations/0023_document_record_canonical_encoding.sql',
+  'database/migrations/0024_document_record_idempotent_persistence.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -97,6 +100,12 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_document_record_canonical_bytes_postgres.sh',
   'tests/test_document_record_evidence_unique_keys_postgres.sh',
   'tests/test_document_record_persistence_postgres.sh',
+  'tests/test_document_record_idempotency_postgres.sh',
+  'tests/test_document_record_idempotency_function_acl_postgres.sh',
+  'tests/test_document_record_idempotency_isolation_postgres.sh',
+  'tests/test_document_record_idempotency_tenant_context_postgres.sh',
+  'tests/document_record_idempotency_postcommit_recovery_companion.sh',
+  'tests/test_document_record_idempotency_postcommit_recovery_contract.py',
   'tests/validate_repository.py'
 ]);
 
@@ -133,7 +142,7 @@ export const DATABASE_OBJECT_NAMES = Object.freeze([
   'compensation_decision', 'validation_study', 'study_population_snapshot',
   'study_predictor_link', 'study_criterion_link', 'analysis_manifest',
   'analysis_artifact', 'policy_recommendation', 'policy_review_decision',
-  'document_record', 'document_version', 'document_segment', 'image_artifact',
+  'document_record', 'document_record_persist_receipt', 'document_version', 'document_segment', 'image_artifact',
   'evidence_record', 'evidence_source_segment', 'authorization_policy',
   'authorization_decision', 'audit_event', 'audit_event_record', 'data_rights_request',
   'outbox_event', 'outbox_delivery_record', 'outbox_delivery_escalation_record',
@@ -147,7 +156,8 @@ export const MIGRATION_BACKED_DATABASE_OBJECT_NAMES = Object.freeze([
   'job_analysis_task_item',
   'job_analysis_ksao_item',
   'job_analysis_task_ksao_link',
-  'job_analysis_write_command'
+  'job_analysis_write_command',
+  'document_record_persist_receipt'
 ]);
 
 const UNFINISHED_MARKER_LINE_PATTERN = /^\s*(?:#{1,6}\s+|[-*+]\s+)?(?:\[(?:TODO|TBD|FIXME)\]|\{\{(?:TODO|TBD|FIXME)\}\}|<(?:TODO|TBD|FIXME)>|(?:TODO|TBD|FIXME)(?:\s*:\s*.*)?\s*)$/i;
