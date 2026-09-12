@@ -65,6 +65,26 @@ def _one_result_row(cursor: Any) -> tuple[object, object, object, object]:
     return row[0], row[1], row[2], row[3]
 
 
+def _validated_result(
+    *,
+    row: tuple[object, object, object, object],
+    expected_employment_record_id: object,
+) -> EmploymentSeparationResult:
+    """Validate persistence evidence while the transaction can still roll back."""
+    try:
+        result = EmploymentSeparationResult(
+            employment_record_id=row[0],  # type: ignore[arg-type]
+            separated_employment_record_version_id=row[1],  # type: ignore[arg-type]
+            recorded_at=row[2],  # type: ignore[arg-type]
+            replayed=row[3],  # type: ignore[arg-type]
+        )
+    except (TypeError, ValueError) as error:
+        raise EmploymentSeparationIntegrityError("Employment separation database result is invalid") from error
+    if result.employment_record_id != expected_employment_record_id:
+        raise EmploymentSeparationIntegrityError("Employment separation database identity does not match command")
+    return result
+
+
 def _translate_database_error(error: Exception) -> NoReturn:
     """Translate only reviewed business SQLSTATEs; permission failures remain operational errors."""
     sqlstate = getattr(error, "sqlstate", None)
@@ -133,18 +153,11 @@ class PostgresEmploymentSeparationPort(tuple):
                         ),
                     )
                     row = _one_result_row(cursor)
+                    result = _validated_result(
+                        row=row,
+                        expected_employment_record_id=detached_command.employment_record_id,
+                    )
         except Exception as error:
             _translate_database_error(error)
 
-        try:
-            result = EmploymentSeparationResult(
-                employment_record_id=row[0],  # type: ignore[arg-type]
-                separated_employment_record_version_id=row[1],  # type: ignore[arg-type]
-                recorded_at=row[2],  # type: ignore[arg-type]
-                replayed=row[3],  # type: ignore[arg-type]
-            )
-        except (TypeError, ValueError) as error:
-            raise EmploymentSeparationIntegrityError("Employment separation database result is invalid") from error
-        if result.employment_record_id != detached_command.employment_record_id:
-            raise EmploymentSeparationIntegrityError("Employment separation database identity does not match command")
         return result
