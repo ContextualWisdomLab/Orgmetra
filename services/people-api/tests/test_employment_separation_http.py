@@ -1,0 +1,265 @@
+"""Executable HTTP contracts for governed Employment separation."""
+
+from __future__ import annotations
+
+from datetime import date, datetime, timezone
+import json
+import unittest
+from uuid import UUID
+
+from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
+from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed
+from orgmetra_people_api.separation import (
+    EmploymentSeparationCommand,
+    EmploymentSeparationIntegrityError,
+    EmploymentSeparationResult,
+)
+from orgmetra_people_api.separation_http import EmploymentSeparationAsgiApp
+
+TENANT = UUID("0198a412-9000-7000-8000-000000000001")
+PERSON = UUID("0198a412-9000-7000-8000-000000000020")
+EMPLOYMENT = UUID("0198a412-9000-7000-8000-000000000030")
+EXPECTED_VERSION = UUID("0198a412-9000-7000-8000-000000000031")
+TERMINAL_VERSION = UUID("0198a412-9000-7000-8000-000000000032")
+AUDIT_EVENT = UUID("0198a412-9000-7000-8000-000000000080")
+OUTBOX = UUID("0198a412-9000-7000-8000-000000000081")
+RECORDED_AT = datetime(2026, 9, 12, 14, 45, tzinfo=timezone.utc)
+ROUTE = "/v1/employment-separations"
+IDEMPOTENCY_KEY = b"employment-separation-http-17"
+
+
+def valid_headers(*, purpose: bytes = b"workforce_admin") -> list[tuple[bytes, bytes]]:
+    """Return the authenticated command headers for one separation request."""
+    return [
+        (b"authorization", b"Bearer opaque-token"),
+        (b"content-type", b"application/json"),
+        (b"idempotency-key", IDEMPOTENCY_KEY),
+        (b"x-tenant-reference", str(TENANT).encode("ascii")),
+        (b"x-actor-reference", b"keyverse_subject:people-operator-17"),
+        (b"x-purpose-code", purpose),
+    ]
+
+
+def request_body(**overrides: object) -> bytes:
+    """Return one PII-minimized separation command body."""
+    payload: dict[str, object] = {
+        "person_record_id": str(PERSON),
+        "employment_record_id": str(EMPLOYMENT),
+        "expected_employment_record_version_id": str(EXPECTED_VERSION),
+        "separation_effective_on": "2026-10-01",
+        "separation_reason_code": "voluntary_resignation",
+        "evidence_reference": "separation_packet:case-17",
+        "evidence_version_code": "v1",
+        "confirmation_reference": "human_confirmation:case-17",
+    }
+    payload.update(overrides)
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+class FakeAuthenticator:
+    """Return one principal while retaining no bearer-token material in results."""
+
+    def __init__(self, principal: AuthenticatedPrincipal, *, error: Exception | None = None) -> None:
+        self.principal = principal
+        self.error = error
+        self.tokens: list[str] = []
+
+    async def authenticate(self, bearer_token: str) -> AuthenticatedPrincipal:
+        self.tokens.append(bearer_token)
+        if self.error is not None:
+            raise self.error
+        return self.principal
+
+
+class RecordingSeparationPort:
+    """Capture authorized separation calls or raise a configured persistence error."""
+
+    def __init__(self, *, error: Exception | None = None, replayed: bool = False) -> None:
+        self.error = error
+        self.replayed = replayed
+        self.calls: list[tuple[EmploymentSeparationCommand, object]] = []
+
+    def separate_employment(self, *, command: EmploymentSeparationCommand, authorization: object) -> EmploymentSeparationResult:
+        self.calls.append((command, authorization))
+        if self.error is not None:
+            raise self.error
+        return EmploymentSeparationResult(
+            employment_record_id=command.employment_record_id,
+            separated_employment_record_version_id=TERMINAL_VERSION,
+            recorded_at=RECORDED_AT,
+            replayed=self.replayed,
+        )
+
+
+class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
+    """Prove the buyer route preserves authorization, evidence, replay, and error boundaries."""
+
+    def setUp(self) -> None:
+        self.principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse_subject:people-operator-17",
+            granted_scope_codes=frozenset({"orgmetra.people.write"}),
+        )
+        self.policy = PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="employment-separation-v1",
+            resource_kind="employment_record",
+            purpose_code="workforce_admin",
+            operation_code="separate_record",
+            required_scope_code="orgmetra.people.write",
+            permitted_fields=frozenset({"employment_record"}),
+        )
+
+    def _app(
+        self,
+        *,
+        authenticator: object | None = None,
+        policy: object | None = None,
+        separation_port: object | None = None,
+    ) -> EmploymentSeparationAsgiApp:
+        generated = iter((AUDIT_EVENT, OUTBOX))
+        return EmploymentSeparationAsgiApp(
+            authenticator=authenticator if authenticator is not None else FakeAuthenticator(self.principal),
+            policy=policy if policy is not None else self.policy,
+            separation_port=separation_port if separation_port is not None else RecordingSeparationPort(),
+            id_factory=generated.__next__,
+        )
+
+    async def _request(
+        self,
+        app: EmploymentSeparationAsgiApp,
+        *,
+        method: str = "POST",
+        path: object = ROUTE,
+        headers: object | None = None,
+        body: object | None = None,
+    ) -> tuple[int, dict[bytes, bytes], dict[str, object]]:
+        scope = {
+            "type": "http",
+            "method": method,
+            "path": path,
+            "query_string": b"",
+            "headers": headers if headers is not None else valid_headers(),
+        }
+        messages: list[dict[str, object]] = []
+        received = False
+
+        async def receive() -> dict[str, object]:
+            nonlocal received
+            if received:
+                return {"type": "http.disconnect"}
+            received = True
+            return {
+                "type": "http.request",
+                "body": body if body is not None else request_body(),
+                "more_body": False,
+            }
+
+        async def send(message: dict[str, object]) -> None:
+            messages.append(message)
+
+        await app(scope, receive, send)
+        start, response_body = messages
+        return int(start["status"]), dict(start["headers"]), json.loads(bytes(response_body["body"]))
+
+    def test_constructor_requires_governed_dependencies(self) -> None:
+        with self.assertRaisesRegex(TypeError, "authenticator"):
+            self._app(authenticator=object())
+        with self.assertRaisesRegex(TypeError, "policy"):
+            self._app(policy=object())
+        with self.assertRaisesRegex(TypeError, "separation_port"):
+            self._app(separation_port=object())
+
+    async def test_success_returns_database_owned_terminal_version_and_replay_evidence(self) -> None:
+        authenticator = FakeAuthenticator(self.principal)
+        port = RecordingSeparationPort(replayed=True)
+        status, headers, payload = await self._request(
+            self._app(authenticator=authenticator, separation_port=port)
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers[b"content-type"], b"application/json")
+        self.assertEqual(headers[b"cache-control"], b"no-store")
+        self.assertEqual(headers[b"vary"], b"Authorization")
+        self.assertEqual(
+            payload,
+            {
+                "employment_record_id": str(EMPLOYMENT),
+                "separated_employment_record_version_id": str(TERMINAL_VERSION),
+                "recorded_at": "2026-09-12T14:45:00Z",
+                "replayed": True,
+            },
+        )
+        self.assertEqual(authenticator.tokens, ["opaque-token"])
+        command, authorization = port.calls[0]
+        self.assertEqual(command.person_record_id, PERSON)
+        self.assertEqual(command.employment_record_id, EMPLOYMENT)
+        self.assertEqual(command.expected_employment_record_version_id, EXPECTED_VERSION)
+        self.assertEqual(command.separation_effective_on, date(2026, 10, 1))
+        self.assertEqual(command.audit_event_record_id, AUDIT_EVENT)
+        self.assertEqual(command.outbox_delivery_record_id, OUTBOX)
+        self.assertEqual(command.idempotency_key, IDEMPOTENCY_KEY.decode("ascii"))
+        self.assertEqual(authorization.resource_reference, f"employment_record:{EMPLOYMENT.hex}")
+
+    async def test_route_method_and_purpose_fail_without_persistence(self) -> None:
+        port = RecordingSeparationPort()
+        app = self._app(separation_port=port)
+        cases = (
+            {"method": "GET", "expected": 405},
+            {"path": "/v1/unknown", "expected": 404},
+            {"headers": valid_headers(purpose=b"benefits_admin"), "expected": 403},
+        )
+        for case in cases:
+            with self.subTest(case=case):
+                expected = int(case.pop("expected"))
+                status, _, payload = await self._request(app, **case)
+                self.assertEqual(status, expected)
+                self.assertIn("error_code", payload)
+        self.assertEqual(port.calls, [])
+
+    async def test_authentication_and_tenant_actor_binding_fail_closed(self) -> None:
+        denied = self._app(
+            authenticator=FakeAuthenticator(self.principal, error=AuthenticationFailed("bad token"))
+        )
+        status, headers, _ = await self._request(denied)
+        self.assertEqual(status, 401)
+        self.assertEqual(headers[b"www-authenticate"], b"Bearer")
+
+        other_principal = AuthenticatedPrincipal(
+            tenant_record_id=UUID("0198a412-9000-7000-8000-000000000099"),
+            actor_reference=self.principal.actor_reference,
+            granted_scope_codes=self.principal.granted_scope_codes,
+        )
+        status, _, payload = await self._request(
+            self._app(authenticator=FakeAuthenticator(other_principal))
+        )
+        self.assertEqual(status, 403)
+        self.assertEqual(payload["error_code"], "access_denied")
+
+    async def test_exact_body_and_domain_failures_are_client_safe(self) -> None:
+        malformed_cases = (
+            request_body(extra="forbidden"),
+            request_body(employment_record_id="not-a-uuid"),
+            request_body(separation_effective_on="2026-10-01T00:00:00Z"),
+            request_body(separation_reason_code="Voluntary resignation"),
+        )
+        for body in malformed_cases:
+            with self.subTest(body=body):
+                status, _, payload = await self._request(self._app(), body=body)
+                self.assertEqual(status, 400)
+                self.assertEqual(payload["error_code"], "invalid_request")
+
+        denied_port = RecordingSeparationPort(error=AuthorizationDeniedError("denied"))
+        status, _, payload = await self._request(self._app(separation_port=denied_port))
+        self.assertEqual(status, 403)
+        self.assertEqual(payload["error_code"], "access_denied")
+
+        conflict_port = RecordingSeparationPort(error=EmploymentSeparationIntegrityError("sensitive backend detail"))
+        status, _, payload = await self._request(self._app(separation_port=conflict_port))
+        self.assertEqual(status, 409)
+        self.assertEqual(payload["error_code"], "separation_conflict")
+        self.assertNotIn("sensitive backend detail", json.dumps(payload))
+
+
+if __name__ == "__main__":  # pragma: no cover
+    unittest.main()
