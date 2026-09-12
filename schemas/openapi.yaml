@@ -179,6 +179,49 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/IdempotencyConflict'
+  /employment-separations:
+    post:
+      operationId: separateEmploymentRecord
+      summary: Record an authoritative bitemporal Employment separation
+      tags:
+        - people-core
+      security:
+        - keyverse_oidc:
+            - orgmetra.people.write
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TenantReference'
+        - $ref: '#/components/parameters/ActorReference'
+        - $ref: '#/components/parameters/PurposeCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeparateEmploymentRecordCommand'
+      responses:
+        '200':
+          description: Separated or exact replay of the first committed separation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmploymentSeparationResult'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/RecordNotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /position-records:
     post:
       operationId: createPositionRecord
@@ -569,6 +612,63 @@ components:
         employment_record_id:
           type: string
           format: uuid
+    SeparateEmploymentRecordCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - person_record_id
+        - employment_record_id
+        - expected_employment_record_version_id
+        - separation_effective_on
+        - separation_reason_code
+        - evidence_reference
+        - evidence_version_code
+        - confirmation_reference
+      properties:
+        person_record_id:
+          type: string
+          format: uuid
+        employment_record_id:
+          type: string
+          format: uuid
+        expected_employment_record_version_id:
+          type: string
+          format: uuid
+        separation_effective_on:
+          type: string
+          format: date
+        separation_reason_code:
+          type: string
+          pattern: '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$'
+        evidence_reference:
+          type: string
+          pattern: '^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$'
+        evidence_version_code:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+        confirmation_reference:
+          type: string
+          pattern: '^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$'
+    EmploymentSeparationResult:
+      type: object
+      additionalProperties: false
+      required:
+        - employment_record_id
+        - separated_employment_record_version_id
+        - recorded_at
+        - replayed
+      properties:
+        employment_record_id:
+          type: string
+          format: uuid
+        separated_employment_record_version_id:
+          type: string
+          format: uuid
+        recorded_at:
+          type: string
+          format: date-time
+        replayed:
+          type: boolean
     CreatePositionRecordCommand:
       type: object
       additionalProperties: false
@@ -1012,8 +1112,26 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    RecordNotFound:
+      description: The authorized Person, Employment, or expected current version does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    PayloadTooLarge:
+      description: The request body exceeds the bounded command size.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     UnsupportedMediaType:
-      description: The job-analysis POST body is missing application/json media type.
+      description: The POST body is missing application/json media type.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: An operational dependency failed without exposing internal diagnostics.
       content:
         application/json:
           schema:
