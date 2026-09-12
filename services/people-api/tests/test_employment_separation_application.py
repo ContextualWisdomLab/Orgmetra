@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone, tzinfo
 import unittest
 from uuid import UUID
 
@@ -63,6 +63,18 @@ def policy(*, purpose_code: str = "workforce_admin") -> PurposeBoundAccessPolicy
         required_scope_code="orgmetra.people.write",
         permitted_fields=frozenset({"employment_record"}),
     )
+
+
+class UnsafeTimezone(tzinfo):
+    """Behave like UTC while remaining executable caller-defined timezone code."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta:
+        del dt
+        return timedelta(0)
+
+    def dst(self, dt: datetime | None) -> timedelta:
+        del dt
+        return timedelta(0)
 
 
 class RecordingSeparationPort:
@@ -140,24 +152,32 @@ class EmploymentSeparationApplicationTests(unittest.TestCase):
         self.assertEqual(port.calls, [])
 
     def test_requires_workforce_admin_purpose(self) -> None:
-        port = RecordingSeparationPort()
-        with self.assertRaisesRegex(ValueError, "workforce_admin"):
-            separate_employment_record(
-                principal=PRINCIPAL,
-                command=command(),
-                purpose_code="benefits_admin",
-                policy=policy(purpose_code="benefits_admin"),
-                separation_port=port,
-            )
-        self.assertEqual(port.calls, [])
+        for purpose_code in ("benefits_admin", 17):
+            with self.subTest(purpose_code=purpose_code):
+                port = RecordingSeparationPort()
+                with self.assertRaisesRegex(ValueError, "workforce_admin"):
+                    separate_employment_record(
+                        principal=PRINCIPAL,
+                        command=command(),
+                        purpose_code=purpose_code,  # type: ignore[arg-type]
+                        policy=policy(purpose_code="benefits_admin"),
+                        separation_port=port,
+                    )
+                self.assertEqual(port.calls, [])
 
     def test_command_rejects_malformed_high_impact_evidence(self) -> None:
         cases = (
+            lambda: command(tenant_record_id="not-a-uuid"),
             lambda: command(tenant_record_id=UUID(int=0)),
+            lambda: command(tenant_record_id=UUID(int=(1 << 128) - 1)),
             lambda: command(separation_effective_on="2026-10-01"),
+            lambda: command(separation_reason_code=17),
             lambda: command(separation_reason_code="Voluntary resignation"),
+            lambda: command(evidence_reference=17),
             lambda: command(evidence_reference="not-namespaced"),
+            lambda: command(evidence_version_code=17),
             lambda: command(evidence_version_code="has space"),
+            lambda: command(confirmation_reference=17),
             lambda: command(confirmation_reference="not-namespaced"),
             lambda: command(idempotency_key="short"),
             lambda: command(idempotency_key="x" * 201),
@@ -168,6 +188,12 @@ class EmploymentSeparationApplicationTests(unittest.TestCase):
 
     def test_result_rejects_malformed_database_evidence(self) -> None:
         cases = (
+            lambda: EmploymentSeparationResult(
+                employment_record_id="not-a-uuid",  # type: ignore[arg-type]
+                separated_employment_record_version_id=TERMINAL_VERSION,
+                recorded_at=RECORDED_AT,
+                replayed=False,
+            ),
             lambda: EmploymentSeparationResult(
                 employment_record_id=UUID(int=0),
                 separated_employment_record_version_id=TERMINAL_VERSION,
@@ -183,7 +209,19 @@ class EmploymentSeparationApplicationTests(unittest.TestCase):
             lambda: EmploymentSeparationResult(
                 employment_record_id=EMPLOYMENT,
                 separated_employment_record_version_id=TERMINAL_VERSION,
+                recorded_at="2026-09-12T14:45:00Z",  # type: ignore[arg-type]
+                replayed=False,
+            ),
+            lambda: EmploymentSeparationResult(
+                employment_record_id=EMPLOYMENT,
+                separated_employment_record_version_id=TERMINAL_VERSION,
                 recorded_at=datetime(2026, 9, 12, 14, 45),
+                replayed=False,
+            ),
+            lambda: EmploymentSeparationResult(
+                employment_record_id=EMPLOYMENT,
+                separated_employment_record_version_id=TERMINAL_VERSION,
+                recorded_at=datetime(2026, 9, 12, 14, 45, tzinfo=UnsafeTimezone()),
                 replayed=False,
             ),
             lambda: EmploymentSeparationResult(
