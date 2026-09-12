@@ -1,9 +1,10 @@
 """Atomic PostgreSQL adapter for governed People employment, position, and assignment writes.
 
-The adapter writes only Orgmetra-owned canonical HRIS relations. Employment and
-assignment paths require a current ``candidate_worker_conversion_record`` and
-never insert ``candidate_worker_link``. Every accepted write calls
-``record_audit_outbox_event`` in the same tenant-bound transaction.
+The adapter writes only Orgmetra-owned canonical HRIS relations. Generic Employment
+creation serializes on its current Person aggregate; Assignment still requires a
+current ``candidate_worker_conversion_record`` and never inserts
+``candidate_worker_link``. Every accepted write calls ``record_audit_outbox_event``
+in the same tenant-bound transaction.
 """
 
 from __future__ import annotations
@@ -53,6 +54,18 @@ _MAX_UUID_INT = (1 << 128) - 1
 _EMPLOYMENT_FIELDS = frozenset({"employment_record"})
 _POSITION_FIELDS = frozenset({"position_record"})
 _ASSIGNMENT_FIELDS = frozenset({"assignment_record"})
+
+_PERSON_EMPLOYMENT_ANCHOR_SQL = """
+SELECT
+    person.person_record_id,
+    pg_catalog.transaction_timestamp()
+FROM public.person_record AS person
+WHERE person.tenant_record_id = %s
+  AND person.person_record_id = %s
+  AND person.recorded_to IS NULL
+LIMIT 2
+FOR UPDATE OF person
+""".strip()
 
 _CONVERSION_SQL = """
 SELECT
@@ -514,6 +527,30 @@ def _assignment_from_row(tenant_record_id: UUID, row: tuple[object, ...]) -> Ass
     )
 
 
+def _require_one_person_employment_anchor(
+    rows: object,
+    *,
+    expected_person_record_id: UUID,
+) -> None:
+    """Require and verify the current Person row that serializes Employment creation."""
+    detached = _unpack_fixed_rows(
+        rows,
+        row_width=2,
+        error_message="person employment anchor row has an invalid shape",
+    )
+    if not detached:
+        raise PeopleMutationNotFound("person record was not found")
+    if len(detached) != 1:
+        raise PeopleMutationIntegrityError("multiple person employment anchors matched the person")
+    person_record_id, anchor_time = detached[0]
+    if (
+        not _is_operational_uuid(person_record_id)
+        or person_record_id != expected_person_record_id
+        or not _is_aware_datetime(anchor_time)
+    ):
+        raise PeopleMutationIntegrityError("person employment anchor identity is invalid")
+
+
 def _require_one_conversion(rows: object) -> tuple[UUID, datetime]:
     """Require exactly one current conversion row and a usable transaction timestamp."""
     detached = _unpack_fixed_rows(
@@ -577,7 +614,7 @@ class PostgresPeopleMutationPort(tuple):
         command: EmploymentMutationCommand,
         authorization: AuthorizationDecision,
     ) -> EmploymentMutationResult:
-        """Persist one employment after conversion and exclusivity checks."""
+        """Persist one Employment after Person serialization and exclusivity checks."""
         if type(command) is not EmploymentMutationCommand:
             raise TypeError("command must be an EmploymentMutationCommand")
         command = replace(command)
@@ -600,8 +637,14 @@ class PostgresPeopleMutationPort(tuple):
                         employment_record_id=replayed_record_id,
                         replay_command_digest=replay_digest,
                     )
-                cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
-                _require_one_conversion(cursor.fetchmany(2))
+                cursor.execute(
+                    _PERSON_EMPLOYMENT_ANCHOR_SQL,
+                    (command.tenant_record_id, command.person_record_id),
+                )
+                _require_one_person_employment_anchor(
+                    cursor.fetchmany(2),
+                    expected_person_record_id=command.person_record_id,
+                )
                 recorded_at = _post_lock_recorded_at(cursor)
                 cursor.execute(
                     _EMPLOYMENT_VERSIONS_SQL,

@@ -189,7 +189,7 @@ PRINCIPAL = AuthenticatedPrincipal(
 
 
 class PostgresPeopleMutationTests(unittest.TestCase):
-    """Prove one tenant-bound transaction owns HRIS, conversion, and audit writes."""
+    """Prove tenant-bound HRIS conflict anchors, provenance, and audit writes."""
 
     def _port(
         self,
@@ -207,8 +207,8 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         connection = FakeConnection(cursor)
         return PostgresPeopleMutationPort(lambda: connection), cursor
 
-    def test_employment_requires_conversion_and_records_audit_atomically(self) -> None:
-        port, cursor = self._port([[(CONVERSION, RECORDED_AT)]], [[]])
+    def test_employment_serializes_on_person_and_records_audit_atomically(self) -> None:
+        port, cursor = self._port([[(PERSON, RECORDED_AT)]], [[]])
         result = create_employment_record(
             principal=PRINCIPAL,
             command=employment_command(),
@@ -218,11 +218,11 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         )
         self.assertEqual(result.employment_record_id, EMPLOYMENT)
         sql_text = "\n".join(sql for sql, _parameters in cursor.executions)
-        self.assertIn("public.candidate_worker_conversion_record", sql_text)
-        conversion_sql = next(
-            sql for sql, _parameters in cursor.executions if "candidate_worker_conversion_record" in sql
-        )
-        self.assertIn("conversion.recorded_to IS NULL", conversion_sql)
+        self.assertIn("public.person_record", sql_text)
+        person_lock_sql = next(sql for sql, _parameters in cursor.executions if "public.person_record" in sql)
+        self.assertIn("person.recorded_to IS NULL", person_lock_sql)
+        self.assertIn("FOR UPDATE OF person", person_lock_sql)
+        self.assertNotIn("public.candidate_worker_conversion_record", sql_text)
         self.assertIn("public.employment_record", sql_text)
         self.assertIn("employment_concurrency_code", sql_text)
         self.assertIn("public.record_audit_outbox_event", sql_text)
@@ -290,17 +290,18 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self.assertIn("public.people_mutation_idempotency_record", sql_text)
         self.assertNotIn("candidate_worker_link", sql_text)
 
-    def test_missing_or_invalid_conversion_fails_before_insert(self) -> None:
+    def test_employment_missing_or_invalid_person_anchor_fails_before_insert(self) -> None:
         scenarios = (
             [[]],
-            [[(CONVERSION, RECORDED_AT), (CONVERSION, RECORDED_AT)]],
-            [[(CONVERSION,)]],
+            [[(PERSON, RECORDED_AT), (PERSON, RECORDED_AT)]],
+            [[(PERSON,)]],
             [[(UUID(int=0), RECORDED_AT)]],
+            [[(CONVERSION, RECORDED_AT)]],
         )
         for rows in scenarios:
             with self.subTest(rows=rows):
                 port, cursor = self._port(rows)
-                with self.assertRaises(PeopleMutationIntegrityError):
+                with self.assertRaises((PeopleMutationIntegrityError, PeopleMutationNotFound)):
                     create_employment_record(
                         principal=PRINCIPAL,
                         command=employment_command(),
@@ -310,8 +311,20 @@ class PostgresPeopleMutationTests(unittest.TestCase):
                     )
                 self.assertFalse(any("INSERT INTO public.employment_record" in sql for sql, _parameters in cursor.executions))
 
+    def test_assignment_missing_conversion_fails_before_insert(self) -> None:
+        port, cursor = self._port([[]], [[], [], []])
+        with self.assertRaisesRegex(PeopleMutationIntegrityError, "candidate-worker conversion"):
+            create_assignment_record(
+                principal=PRINCIPAL,
+                command=assignment_command(),
+                purpose_code="workforce_admin",
+                policy=assignment_policy(),
+                mutation_port=port,
+            )
+        self.assertFalse(any("INSERT INTO public.assignment_record" in sql for sql, _parameters in cursor.executions))
+
     def test_invalid_existing_employment_row_fails_closed(self) -> None:
-        port, _cursor = self._port([[(CONVERSION, RECORDED_AT)]], [[("bad",)]])
+        port, _cursor = self._port([[(PERSON, RECORDED_AT)]], [[("bad",)]])
         with self.assertRaisesRegex(PeopleMutationIntegrityError, "invalid shape"):
             create_employment_record(
                 principal=PRINCIPAL,
@@ -333,7 +346,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             RECORDED_AT,
             None,
         )
-        port, cursor = self._port([[(CONVERSION, RECORDED_AT)]], [[existing]])
+        port, cursor = self._port([[(PERSON, RECORDED_AT)]], [[existing]])
         with self.assertRaises(PeopleMutationIntegrityError):
             create_employment_record(
                 principal=PRINCIPAL,
@@ -427,7 +440,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         def factory() -> FakeConnection:
             nonlocal calls
             calls += 1
-            return FakeConnection(ScriptedCursor([[(CONVERSION, RECORDED_AT)]], [[]]))
+            return FakeConnection(ScriptedCursor([[(PERSON, RECORDED_AT)]], [[]]))
 
         port = PostgresPeopleMutationPort(factory)
         with self.assertRaisesRegex(PeopleMutationIntegrityError, "authorization"):
@@ -470,7 +483,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             RECORDED_AT,
             None,
         )
-        port, _cursor = self._port([[(CONVERSION, RECORDED_AT)]], [[bad_employment]])
+        port, _cursor = self._port([[(PERSON, RECORDED_AT)]], [[bad_employment]])
         with self.assertRaisesRegex(PeopleMutationIntegrityError, "invalid"):
             create_employment_record(
                 principal=PRINCIPAL,
@@ -594,7 +607,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         other_audit = UUID("0198a412-8200-7000-8000-00000000008a")
         other_outbox = UUID("0198a412-8200-7000-8000-00000000008b")
         cursor = ScriptedCursor(
-            [[], [(CONVERSION, RECORDED_AT)], [], [(CONVERSION, RECORDED_AT)]],
+            [[], [(PERSON, RECORDED_AT)], [], [(PERSON, RECORDED_AT)]],
             [[], []],
         )
         connection = FakeConnection(cursor)
