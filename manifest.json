@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2d2e0b488c0440533effa821808f2f17e37d92f8fb586174c2fdb594f760ca5",
-      "bytes": 17539,
-      "lines": 77
+      "sha256": "321c43f388dd561b8867684daac74b0c21f3676d66e15f941feed28d5cf02459",
+      "bytes": 17829,
+      "lines": 78
     },
     {
       "path": "CLAUDE.md",
@@ -376,16 +376,16 @@
       "lines": 187
     },
     {
-      "path": "docs/traceability/document-record-persistence.md",
-      "sha256": "3849ab6642f8b171aae6b379781fb19028635996428fbc37788334bd1feb167a",
-      "bytes": 4120,
-      "lines": 30
-    },
-    {
       "path": "docs/traceability/document-record-idempotent-persistence.md",
       "sha256": "310068058910f921109c295730e0fd41fa3cccde4d403b8610cbed0a82d9947e",
       "bytes": 12809,
       "lines": 65
+    },
+    {
+      "path": "docs/traceability/document-record-persistence.md",
+      "sha256": "3849ab6642f8b171aae6b379781fb19028635996428fbc37788334bd1feb167a",
+      "bytes": 4120,
+      "lines": 30
     },
     {
       "path": "package.json",
@@ -415,7 +415,7 @@
       "path": "scripts/foundation-contract-core.mjs",
       "sha256": "aa1965c7101551570a64c9e679c2f9042eb449173fa82face5e94e9c72ded8d1",
       "bytes": 29278,
-      "lines": 705
+      "lines": 706
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -424,16 +424,16 @@
       "lines": 6
     },
     {
-      "path": "tests/document_record_idempotency_postcommit_recovery_companion.sh",
-      "sha256": "ecbde2131fc5341dc11017305d0bb114136dd1289a05ece14e7c3080a8a52e93",
-      "bytes": 11193,
-      "lines": 277
-    },
-    {
       "path": "tests/dispatcher-inventory.test.mjs",
       "sha256": "09f5e64410e6b7a26bf8d6ce61c50b737da2ea85d955f91eba63aa21f1537261",
       "bytes": 1597,
       "lines": 34
+    },
+    {
+      "path": "tests/document_record_idempotency_postcommit_recovery_companion.sh",
+      "sha256": "ecbde2131fc5341dc11017305d0bb114136dd1289a05ece14e7c3080a8a52e93",
+      "bytes": 11193,
+      "lines": 277
     },
     {
       "path": "tests/foundation-contract.test.mjs",
