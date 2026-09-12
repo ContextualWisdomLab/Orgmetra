@@ -178,6 +178,20 @@ SECOND_OUTPUT="${CONCURRENCY_DIR}/second-output"
 mkfifo "${FIRST_INPUT}"
 first_client_pid=""
 second_client_pid=""
+PROBE_ROLE="orgmetra_document_receipt_probe_${BASHPID}"
+
+cleanup_probe_role() {
+    local role_exists
+    role_exists="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -c \
+        "SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = '${PROBE_ROLE}';" 2>/dev/null || true)"
+    if [[ "${role_exists}" == "1" ]]; then
+        psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<SQL || true
+DROP OWNED BY ${PROBE_ROLE};
+DROP ROLE ${PROBE_ROLE};
+SQL
+    fi
+}
+
 cleanup() {
     exec 3>&- 2>/dev/null || true
     if [[ -n "${second_client_pid}" ]] && kill -0 "${second_client_pid}" 2>/dev/null; then
@@ -186,6 +200,7 @@ cleanup() {
     if [[ -n "${first_client_pid}" ]] && kill -0 "${first_client_pid}" 2>/dev/null; then
         kill "${first_client_pid}" 2>/dev/null || true
     fi
+    cleanup_probe_role
     rm -rf "${CONCURRENCY_DIR}"
 }
 trap cleanup EXIT
@@ -300,7 +315,6 @@ if [[ "${rls_state}" != "true|true" ]]; then
     exit 1
 fi
 
-PROBE_ROLE="orgmetra_document_receipt_probe"
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
 CREATE ROLE ${PROBE_ROLE}
     NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
@@ -344,10 +358,7 @@ if [[ -n "${cross_tenant_update}" ]]; then
     exit 1
 fi
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
-DROP OWNED BY ${PROBE_ROLE};
-DROP ROLE ${PROBE_ROLE};
-SQL
+cleanup_probe_role
 
 set +e
 mutation_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
