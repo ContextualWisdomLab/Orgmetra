@@ -215,7 +215,7 @@ paths:
         '404':
           $ref: '#/components/responses/RecordNotFound'
         '409':
-          $ref: '#/components/responses/IdempotencyConflict'
+          $ref: '#/components/responses/SeparationConflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
         '415':
@@ -1096,6 +1096,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     IdempotencyConflict:
       description: The idempotency key is already bound to different command content.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    SeparationConflict:
+      description: The separation conflicts with current Employment or Assignment state, the expected version, or prior semantics bound to the idempotency key.
       content:
         application/json:
           schema:
