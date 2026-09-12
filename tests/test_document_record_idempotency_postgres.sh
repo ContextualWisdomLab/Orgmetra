@@ -43,6 +43,12 @@ INSERT INTO tenant_record (tenant_record_id, tenant_reference)
 VALUES ('${TENANT_ID}', 'tenant_alpha'), ('${OTHER_TENANT_ID}', 'tenant_beta');
 SQL
 
+with_tenant() {
+    local tenant="$1"
+    shift
+    PGOPTIONS="-c orgmetra.tenant_record_id=${tenant} ${PGOPTIONS:-}" command psql "$@"
+}
+
 build_evidence() {
     local document_reference="$1"
     local artifact_reference="$2"
@@ -128,8 +134,8 @@ CANONICAL_EVIDENCE="${evidence_parts[0]}"
 EVIDENCE_DIGEST="${evidence_parts[1]}"
 SQL_TEXT="$(persist_sql "${IDEMPOTENCY_KEY}" "${DOCUMENT_ID}" "${DOCUMENT_REFERENCE}" "${ARTIFACT_REFERENCE}" "${AUDIT_REFERENCE}" "${OUTBOX_REFERENCE}" "${APPLICATION_DIGEST}" "${CANONICAL_EVIDENCE}" "${EVIDENCE_DIGEST}")"
 
-first_result="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -v canonical_evidence="${CANONICAL_EVIDENCE}" -c "SET TIME ZONE 'UTC'; ${SQL_TEXT}")"
-retry_result="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -v canonical_evidence="${CANONICAL_EVIDENCE}" -c "SET TIME ZONE 'Asia/Seoul'; ${SQL_TEXT}")"
+first_result="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -v canonical_evidence="${CANONICAL_EVIDENCE}" -c "SET TIME ZONE 'UTC'; ${SQL_TEXT}")"
+retry_result="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -v canonical_evidence="${CANONICAL_EVIDENCE}" -c "SET TIME ZONE 'Asia/Seoul'; ${SQL_TEXT}")"
 if [[ "${first_result}" != "${retry_result}" ]]; then
     echo "same semantic retry changed across session time zones instead of returning the original receipt" >&2
     exit 1
@@ -147,7 +153,7 @@ if [[ "${counts}" != "1|1" ]]; then
 fi
 
 set +e
-conflict_output="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -v canonical_evidence="${CANONICAL_EVIDENCE}" \
+conflict_output="$(with_tenant "${TENANT_ID}" "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -v canonical_evidence="${CANONICAL_EVIDENCE}" \
     -c "$(persist_sql "${IDEMPOTENCY_KEY}" "${DOCUMENT_ID}" "${DOCUMENT_REFERENCE}" "${ARTIFACT_REFERENCE}" "${AUDIT_REFERENCE}" "${OUTBOX_REFERENCE}" "${CONFLICTING_APPLICATION_DIGEST}" "${CANONICAL_EVIDENCE}" "${EVIDENCE_DIGEST}")" 2>&1)"
 conflict_status=$?
 set -e
@@ -170,7 +176,9 @@ SECOND_OUTPUT="$(mktemp)"
 cleanup() { rm -f "${FIRST_OUTPUT}" "${SECOND_OUTPUT}"; }
 trap cleanup EXIT
 
-PGAPPNAME=orgmetra_document_idempotency_first psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 \
+PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID} ${PGOPTIONS:-}" \
+PGAPPNAME=orgmetra_document_idempotency_first \
+psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 \
     -v canonical_evidence="${CONCURRENT_EVIDENCE}" >"${FIRST_OUTPUT}" <<SQL &
 BEGIN;
 ${CONCURRENT_SQL}
@@ -179,7 +187,9 @@ COMMIT;
 SQL
 first_pid=$!
 sleep 0.25
-PGAPPNAME=orgmetra_document_idempotency_second psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 \
+PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID} ${PGOPTIONS:-}" \
+PGAPPNAME=orgmetra_document_idempotency_second \
+psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 \
     -v canonical_evidence="${CONCURRENT_EVIDENCE}" -c "${CONCURRENT_SQL}" >"${SECOND_OUTPUT}" &
 second_pid=$!
 wait "${first_pid}"
