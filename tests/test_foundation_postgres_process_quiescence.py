@@ -69,6 +69,22 @@ class FoundationPostgresProcessQuiescenceTests(unittest.TestCase):
         self.assertIn('PATH="$PATH" \\', execution)
         self.assertNotIn('sudo -n -u "$contract_user" env \\', execution)
 
+    def test_executes_against_immutable_exact_candidate_tree(self) -> None:
+        execution = self._execution_step()
+
+        self.assertIn('candidate_snapshot_dir="$snapshot_parent/candidate"', execution)
+        self.assertIn(
+            'git archive --format=tar "$ORGMETRA_EXPECTED_HEAD_SHA" | tar -xf - -C "$candidate_snapshot_dir"',
+            execution,
+        )
+        self.assertIn('chmod -R a-w "$candidate_snapshot_dir"', execution)
+        self.assertIn('execution_script="$candidate_snapshot_dir/$script"', execution)
+        self.assertIn("cd -- \"$1\" && exec bash \"$2\"", execution)
+        self.assertIn('workspace_mode="$(stat -c \'%a\' .)"', execution)
+        self.assertIn('chmod 0700 .', execution)
+        self.assertIn('chmod "$workspace_mode" .', execution)
+        self.assertNotIn('exec bash "$snapshot_script"', execution)
+
 
 if __name__ == "__main__":
     unittest.main()
