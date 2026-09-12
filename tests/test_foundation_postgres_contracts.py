@@ -457,7 +457,9 @@ class FoundationPostgresContractInventoryTests(unittest.TestCase):
         self.assertIn('sudo -n -u "$contract_user" true', execution)
         self.assertIn('sudo -n -u "$contract_user" env', execution)
         self.assertNotIn('sudo -n -u nobody', execution)
-        self.assertIn('bash "$snapshot_script"', execution)
+        self.assertIn('execution_script="$candidate_snapshot_dir/$script"', execution)
+        self.assertIn('exec bash "$2"', execution)
+        self.assertNotIn('bash "$snapshot_script"', execution)
         self.assertNotIn('DATABASE_URL="$database_url" bash "$contract"', execution)
         self.assertNotIn('DATABASE_URL="$database_url" bash "$companion"', execution)
         self.assertNotIn(
