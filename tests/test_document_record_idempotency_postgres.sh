@@ -178,7 +178,12 @@ SECOND_OUTPUT="${CONCURRENCY_DIR}/second-output"
 mkfifo "${FIRST_INPUT}"
 first_client_pid=""
 second_client_pid=""
-PROBE_ROLE="orgmetra_document_receipt_probe_${BASHPID}"
+PROBE_ROLE_SUFFIX="$(python3 - <<'PY'
+import uuid
+print(uuid.uuid4().hex[:24])
+PY
+)"
+PROBE_ROLE="orgmetra_document_receipt_probe_${PROBE_ROLE_SUFFIX}"
 
 cleanup_probe_role() {
     local mode="${1:-strict}"
