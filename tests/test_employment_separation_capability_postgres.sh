@@ -22,7 +22,9 @@ for migration in \
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
-public_execute_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+separation_signature='public.separate_employment_record_once(uuid,uuid,uuid,uuid,date,text,text,text,text,text,text,text,uuid,uuid)'
+
+public_execute_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v signature="${separation_signature}" -Atqc "
 SELECT count(*)
 FROM pg_catalog.pg_proc AS function_record
 CROSS JOIN LATERAL pg_catalog.aclexplode(
@@ -31,7 +33,7 @@ CROSS JOIN LATERAL pg_catalog.aclexplode(
         pg_catalog.acldefault('f', function_record.proowner)
     )
 ) AS function_acl
-WHERE function_record.oid = 'public.separate_employment_record_once(uuid,uuid,uuid,uuid,date,text,text,text,text,text,text,text,uuid,uuid)'::regprocedure
+WHERE function_record.oid = :'signature'::regprocedure
   AND function_acl.grantee = 0
   AND function_acl.privilege_type = 'EXECUTE';
 ")"
@@ -58,13 +60,106 @@ if [[ "${trigger_execute_count}" != "0" ]]; then
     exit 1
 fi
 
-security_invoker="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
-SELECT (NOT prosecdef)::text
-FROM pg_catalog.pg_proc
-WHERE oid = 'public.separate_employment_record_once(uuid,uuid,uuid,uuid,date,text,text,text,text,text,text,text,uuid,uuid)'::regprocedure;
+capability_role_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT pg_catalog.coalesce(
+    pg_catalog.string_agg(
+        role.rolname || '|' || role.rolcanlogin::text || '|' || role.rolsuper::text || '|' || role.rolcreatedb::text || '|' || role.rolcreaterole::text || '|' || role.rolreplication::text || '|' || role.rolbypassrls::text,
+        E'\\n' ORDER BY role.rolname
+    ),
+    ''
+)
+FROM pg_catalog.pg_roles AS role
+WHERE role.rolname IN (
+    'orgmetra_employment_separation_executor',
+    'orgmetra_employment_separation_owner'
+);
 ")"
-if [[ "${security_invoker}" != "true" ]]; then
-    echo "Employment separation function unexpectedly runs as SECURITY DEFINER" >&2
+expected_role_contract=$'orgmetra_employment_separation_executor|false|false|false|false|false|false\norgmetra_employment_separation_owner|false|false|false|false|false|false'
+if [[ "${capability_role_contract}" != "${expected_role_contract}" ]]; then
+    echo "Employment separation capability roles are absent or over-privileged: ${capability_role_contract}" >&2
+    exit 1
+fi
+
+function_security_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v signature="${separation_signature}" -Atqc "
+SELECT function_record.prosecdef::text || '|' || owner_role.rolname
+FROM pg_catalog.pg_proc AS function_record
+JOIN pg_catalog.pg_roles AS owner_role
+  ON owner_role.oid = function_record.proowner
+WHERE function_record.oid = :'signature'::regprocedure;
+")"
+if [[ "${function_security_contract}" != "true|orgmetra_employment_separation_owner" ]]; then
+    echo "Employment separation function is not owned by the dedicated SECURITY DEFINER authority: ${function_security_contract}" >&2
+    exit 1
+fi
+
+executor_execute="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v signature="${separation_signature}" -Atqc "
+SELECT pg_catalog.has_function_privilege(
+    'orgmetra_employment_separation_executor',
+    :'signature',
+    'EXECUTE'
+)::text;
+")"
+if [[ "${executor_execute}" != "true" ]]; then
+    echo "Employment separation executor lacks the reviewed function capability" >&2
+    exit 1
+fi
+
+executor_direct_dml="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+WITH relation(name) AS (
+    VALUES
+        ('public.employment_record'),
+        ('public.employment_record_version'),
+        ('public.assignment_record'),
+        ('public.employment_separation_record'),
+        ('public.people_mutation_idempotency_record'),
+        ('public.audit_event_record'),
+        ('public.outbox_delivery_record')
+)
+SELECT pg_catalog.bool_or(
+    pg_catalog.has_table_privilege('orgmetra_employment_separation_executor', name, 'SELECT')
+    OR pg_catalog.has_table_privilege('orgmetra_employment_separation_executor', name, 'INSERT')
+    OR pg_catalog.has_table_privilege('orgmetra_employment_separation_executor', name, 'UPDATE')
+    OR pg_catalog.has_table_privilege('orgmetra_employment_separation_executor', name, 'DELETE')
+    OR pg_catalog.has_table_privilege('orgmetra_employment_separation_executor', name, 'TRUNCATE')
+)::text
+FROM relation;
+")"
+if [[ "${executor_direct_dml}" != "false" ]]; then
+    echo "Employment separation executor unexpectedly has direct HR/audit table DML capability" >&2
+    exit 1
+fi
+
+set +e
+executor_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE orgmetra_employment_separation_executor;
+SET orgmetra.tenant_record_id = '10000000-0000-7000-8000-000000000001';
+SELECT *
+FROM public.separate_employment_record_once(
+    '10000000-0000-7000-8000-000000000001'::uuid,
+    '00000000-0000-7000-8000-000000000001'::uuid,
+    '00000000-0000-7000-8000-000000000101'::uuid,
+    '00000000-0000-7000-8000-000000000201'::uuid,
+    DATE '2026-06-01',
+    'voluntary_resignation',
+    'separation_packet:executor_probe',
+    'v1',
+    'keyverse_subject:executor_probe',
+    'workforce_admin',
+    'human_confirmation:executor_probe',
+    'employment-separation-executor-probe',
+    '00000000-0000-4000-8000-000000000501'::uuid,
+    '00000000-0000-4000-8000-000000000601'::uuid
+);
+SQL
+} 2>&1)"
+executor_status=$?
+set -e
+if [[ ${executor_status} -eq 0 ]]; then
+    echo "executor probe unexpectedly found a target Employment" >&2
+    exit 1
+fi
+if [[ "${executor_output}" != *"employment separation target does not match tenant person and employment"* ]]; then
+    echo "executor did not cross the reviewed function boundary with deny-default table privileges: ${executor_output}" >&2
     exit 1
 fi
 
