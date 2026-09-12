@@ -48,7 +48,7 @@ jobs:
           ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
           ORGMETRA_POSTGRES_RUNNER_SHA256: bb84ea602542585d5c4d1156ea765d3dcdd7756da9d2ef7438096eed72364286
           ORGMETRA_POSTGRES_TEST_SHA256: 9c90ed386248961640aeeddabfefb9c98d96bf3c550474ffb50ec2705775c92b
-          ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256: dba93f27e9f629abb4680d9e4e6be60dbf4a854d5537432b233387ba83293637
+          ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256: abd48ed1ceea5da8fe1890962dc2ad90a82f88f16306352ffa9105a2f23684a2
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
@@ -99,6 +99,7 @@ jobs:
           current_container=""
           contract_user="orgmetra_pg_contract"
           contract_user_created=0
+          runtime_parent=""
 
           cleanup_postgres_contracts() {
             if [[ "$contract_user_created" -eq 1 ]]; then
@@ -106,6 +107,10 @@ jobs:
             fi
             if [[ -n "$current_container" ]]; then
               docker rm --force "$current_container" >/dev/null 2>&1 || true
+            fi
+            if [[ -n "$runtime_parent" ]]; then
+              sudo -n rm -rf -- "$runtime_parent" >/dev/null 2>&1 || true
+              runtime_parent=""
             fi
             if [[ "$contract_user_created" -eq 1 ]]; then
               sudo -n userdel "$contract_user" >/dev/null 2>&1 || true
@@ -189,6 +194,8 @@ jobs:
           sudo -n useradd --system --no-create-home --shell /usr/sbin/nologin "$contract_user"
           contract_user_created=1
           sudo -n -u "$contract_user" true
+          runtime_parent="$(mktemp -d)"
+          chmod 0711 "$runtime_parent"
 
           snapshot_root_real="$(realpath -- "$snapshot_dir")"
           verify_snapshot_bytes() {
@@ -240,19 +247,31 @@ jobs:
             local script="$1"
             local database_url="$2"
             local snapshot_script="${snapshot_by_script[$script]}"
+            local contract_runtime
             local contract_status
+            local quiescence_status=0
             verify_snapshot_bytes "$script"
+            contract_runtime="$(mktemp -d "$runtime_parent/run.XXXXXX")"
+            sudo -n chown "$contract_user" "$contract_runtime"
             printf 'Executing PostgreSQL Foundation snapshot as dedicated non-owner: %s -> %s\n' \
               "$script" "$snapshot_script"
             set +e
             sudo -n -u "$contract_user" env \
               DATABASE_URL="$database_url" \
               PGPASSWORD="$PGPASSWORD" \
-              HOME=/tmp \
+              HOME="$contract_runtime" \
+              TMPDIR="$contract_runtime" \
+              XDG_CACHE_HOME="$contract_runtime/.cache" \
+              XDG_CONFIG_HOME="$contract_runtime/.config" \
+              XDG_STATE_HOME="$contract_runtime/.local/state" \
               bash "$snapshot_script"
             contract_status=$?
             set -e
             if ! assert_contract_process_quiescence; then
+              quiescence_status=1
+            fi
+            sudo -n rm -rf -- "$contract_runtime"
+            if [[ "$quiescence_status" -ne 0 ]]; then
               return 1
             fi
             return "$contract_status"
