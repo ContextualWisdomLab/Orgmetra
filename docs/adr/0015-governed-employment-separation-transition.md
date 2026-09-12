@@ -11,6 +11,8 @@ Orgmetra already rejects in-place business mutation of `employment_record_versio
 
 Two fields could otherwise become competing termination truths: `effective_to` on a surviving active/leave version and a separate `terminated` status. A separation command also has to survive retries, concurrent submissions, stale version references, tenant confusion, future-scheduled Employment facts, open Assignments, and audit/outbox failure without leaving partial history.
 
+The persistence function is also a high-impact database capability. Revoking PUBLIC execution while leaving it `SECURITY INVOKER` is not a complete runtime boundary: a service principal would need the underlying People and audit/outbox DML rights merely to invoke the function, which would let that principal bypass the governed transition with direct SQL.
+
 ## Constraints
 
 - Person identity and prior Employment identity/history must remain immutable.
@@ -20,6 +22,7 @@ Two fields could otherwise become competing termination truths: `effective_to` o
 - Tenant context must be bound before acquiring database-global advisory coordination state.
 - Assignment lifecycle is owned by the Assignment boundary. Separation may not silently rewrite or close Assignment facts.
 - Rehire uses a new Employment identity unless a later, separately reviewed contract explicitly establishes another rule.
+- The externally assignable separation capability must not carry direct People/audit/outbox table DML or RLS-bypass authority.
 
 ## Considered alternatives
 
@@ -39,6 +42,14 @@ Rejected. Overlapping business intervals would make the current Employment state
 
 Rejected. It crosses aggregate ownership and makes one Employment transaction responsible for Assignment policy and recovery. Open or future-effective Assignments instead cause the separation command to fail closed until their owner coordinates them.
 
+### Keep the separation function as SECURITY INVOKER and grant the service its table privileges
+
+Rejected. The application would then hold direct `employment_record_version`, separation/idempotency and audit/outbox mutation capabilities outside the reviewed function contract. Revoking PUBLIC function execution would not prevent bypass of its tenant, replay, evidence and history rules.
+
+### Make the runtime application own the SECURITY DEFINER function
+
+Rejected. A login/runtime identity must not become the privileged function owner. Ownership and invocation are separate capabilities.
+
 ## Decision
 
 A separation is one governed correction of an exact current-known Employment version.
@@ -52,6 +63,8 @@ A separation is one governed correction of an exact current-known Employment ver
 7. The continuation `effective_to` is therefore a structural interval boundary, not an independent termination truth. The terminal successor status plus `employment_separation_record` is the authoritative separation fact.
 8. The database generates the CloudEvents-compatible `employment_separated` audit envelope from the same command and post-lock timestamp, persists audit/outbox state, append-only separation provenance and the People idempotency binding in the same transaction.
 9. Rehire, when implemented under #302, must create a new Employment for the existing Person and cite a successfully separated prior Employment. It must not reopen the terminated Employment or infer authority from an old candidate-worker conversion.
+10. The database execution boundary is capability-separated. `orgmetra_employment_separation_owner` is a dedicated `NOLOGIN`/`NOBYPASSRLS` owner of the `SECURITY DEFINER` function and receives only the reviewed People/audit/outbox privileges needed by that transaction. `orgmetra_employment_separation_executor` is a distinct `NOLOGIN`/`NOBYPASSRLS` role with schema `USAGE` and function `EXECUTE` only. An application login may be granted the executor capability operationally; it must not be granted the owner role or direct table DML as a substitute.
+11. The SECURITY DEFINER boundary retains the fixed `pg_catalog, public, pg_temp` search path, explicit tenant-context check and FORCE RLS. Ownership transfer receives `CREATE` on `public` only inside the atomic migration and revokes it before commit.
 
 ## Data ownership
 
@@ -59,18 +72,25 @@ A separation is one governed correction of an exact current-known Employment ver
 
 No cross-service SQL or copied HR truth is introduced. Keyverse remains the identity/policy backend; external workflow, payroll, identity deprovisioning and notification work belongs after the transaction through owned contracts/events.
 
+The separation owner/executor roles are database capabilities, not HR identities. They do not replace Keyverse authentication/authorization, Person identity, Employment truth or human confirmation.
+
 ## Failure and concurrency semantics
 
 A stale expected version, wrong Person/Employment binding, wrong tenant context, semantic idempotency conflict, future Employment version, or Assignment requiring coordination fails before any durable separation state commits. Exact-key concurrent requests serialize on PostgreSQL advisory transaction state and converge on one first result plus replay. A test is acceptable only when the second backend is observed waiting on the first through PostgreSQL's lock graph; elapsed time alone is not serialization evidence.
 
+Capability migration fails before project-object elevation if either reserved separation role name already exists. This prevents an existing role with undisclosed membership/ACL state from being silently reused as the privileged owner or executor.
+
 ## Evidence required before Accepted
 
-- PostgreSQL contract applies migrations through `0014_employment_separation_transition.sql` on PostgreSQL 16.
+- PostgreSQL contract applies migrations through `0016_employment_separation_executor_capability.sql` on PostgreSQL 16.
 - Current knowledge contains one pre-separation continuation and one terminal version without effective overlap, while an earlier knowledge coordinate still returns the pre-correction active/leave fact.
 - Audit event `time` equals the database-owned separation `recorded_at` and audit/outbox/idempotency/separation facts are one-transaction durable.
 - Same-key replay returns the first terminal version and timestamp; changed semantics under the key are rejected.
 - Cross-tenant, stale-version, future-version and open-Assignment hostile cases fail closed.
 - Concurrent exact-key first attempts expose the real PostgreSQL advisory-lock blocker relationship and converge on one durable separation.
-- Canonical Foundation owner registers the focused PostgreSQL contract without duplicating workflow ownership and exact-head hosted evidence is green.
+- PUBLIC and an unrelated `NOLOGIN`/`NOBYPASSRLS` probe cannot execute the function.
+- The dedicated executor can cross the function boundary but has no direct SELECT/INSERT/UPDATE/DELETE/TRUNCATE capability on the governed People/audit/outbox relations.
+- The function is owned by the dedicated `NOLOGIN`/`NOBYPASSRLS` owner and executes as SECURITY DEFINER while FORCE RLS remains effective under the caller-supplied tenant context.
+- Canonical Foundation owner registers both focused PostgreSQL contracts without duplicating workflow ownership and exact-head hosted evidence is green.
 
 Until those conditions are present on the protected stack, this ADR remains Proposed.
