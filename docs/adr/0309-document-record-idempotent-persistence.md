@@ -42,11 +42,11 @@ The implementation adds a tenant-qualified unique key to `document_record` so th
 
 ## Evidence and acceptance
 
-`tests/test_document_record_idempotency_postgres.sh` exercises real PostgreSQL sessions. It proves same-key/same-semantic retry convergence, same-key/different-semantic rejection, concurrent same-semantic convergence while the first transaction remains open, one durable document + one receipt, connection cleanup, receipt FORCE RLS, and append-only mutation rejection.
+`tests/test_document_record_idempotency_postgres.sh` exercises real PostgreSQL sessions. It proves same-key/same-semantic retry convergence, same-key/different-semantic rejection, concurrent same-semantic convergence while the first transaction remains open, one durable document + one receipt, connection cleanup, receipt FORCE RLS, and append-only mutation rejection. The same command is also executed first under UTC and then under Asia/Seoul; digest identity must remain unchanged because the owner function canonicalizes its temporal serialization to UTC.
 
 PostgreSQL 16 documents `pg_advisory_xact_lock` as an exclusive transaction-level advisory lock that waits when necessary and is automatically released at transaction end. The function is explicitly `VOLATILE`; PostgreSQL's function-volatility contract gives volatile functions a fresh snapshot for each query they execute under the ordinary Read Committed transaction model. That fresh post-lock lookup is what lets a waiting retry observe the first transaction's committed receipt rather than reinterpret a uniqueness error as success.
 
-The future service adapter must keep this owner operation at PostgreSQL's ordinary Read Committed isolation unless a later migration supplies equivalent replay semantics for stronger isolation levels. Repeatable Read/Serializable establish longer-lived transaction snapshots; they must not be assumed to provide the same post-wait visibility. This is a contract constraint, not a reason to hold transactions open longer.
+The owner function now checks `transaction_isolation` before validating or mutating command state and fails closed unless it is `read committed`. `tests/test_document_record_idempotency_isolation_postgres.sh` enters a real `REPEATABLE READ` transaction and requires that isolation error before any command-field validation. Stronger isolation levels therefore cannot silently inherit semantics that depend on a fresh post-lock statement snapshot; a future successor must supply an explicit equivalent algorithm before relaxing this guard.
 
 The expired IETF HTTPAPI `Idempotency-Key` Internet-Draft is non-normative background only. Its key principles—one client-generated key for retries and no key reuse with a different payload—are compatible with this design, but the draft expired on 2026-04-18 and is not cited as an active standard.
 
@@ -58,12 +58,12 @@ The semantic digest is versioned as `orgmetra.document_record_persist_command.v1
 
 A caller that abandons a connection mid-transaction relies on PostgreSQL rollback/connection cleanup. Acceptance therefore checks that concurrent test sessions terminate; production pooling/TLS/connection-recovery policy remains an operability concern at the future document-record service adapter.
 
-A service that silently changes the transaction isolation level could invalidate the fresh-post-lock visibility assumption. Adapter acceptance must assert the supported isolation level before claiming retry convergence; stronger isolation requires an explicit successor design rather than accidental behavior.
+The explicit Read Committed guard intentionally rejects a caller that promotes this one operation to Repeatable Read or Serializable without a successor design. That is a compatibility boundary, not an invitation to weaken isolation elsewhere: the future adapter must scope transaction policy to this documented write contract.
 
 ## Follow-up
 
-- Admit `tests/test_document_record_idempotency_postgres.sh` through the owner-neutral PostgreSQL Foundation registry once #310/#311 is reconciled with the document-record stack; do not add a feature-local workflow.
-- Add the application/service adapter only after the `document_records` service boundary exists; it must map one external retry key to this transaction without reimplementing replay logic and must assert the supported transaction isolation.
+- Admit both `tests/test_document_record_idempotency_postgres.sh` and `tests/test_document_record_idempotency_isolation_postgres.sh` through the owner-neutral PostgreSQL Foundation registry once #310/#311 is reconciled with the document-record stack; do not add a feature-local workflow.
+- Add the application/service adapter only after the `document_records` service boundary exists; it must map one external retry key to this transaction without reimplementing replay logic.
 - Re-run the full PostgreSQL acceptance on the exact protected-base head before changing this ADR from Proposed.
 - Keep #308 return/destruction completion receipts separate: persistence idempotency proves creation/retry identity, not later retention or destruction completion.
 
