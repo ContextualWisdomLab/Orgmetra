@@ -1,10 +1,14 @@
 """Regression contracts for post-commit document-record recovery acceptance."""
 
 from pathlib import Path
+import re
 
 
 COMPANION = Path(__file__).with_name(
     "document_record_idempotency_postcommit_recovery_companion.sh"
+)
+TERMINATE_BACKEND_CALL = re.compile(
+    r"\b(?:pg_catalog\.)?pg_terminate_backend\s*\(\s*([^()]+?)\s*\)"
 )
 
 
@@ -16,6 +20,10 @@ def _shell_function(source: str, name: str, following_marker: str) -> str:
     start = source.index(f"{name}() {{")
     end = source.index(following_marker, start)
     return source[start:end]
+
+
+def _termination_arguments(source: str) -> list[str]:
+    return [argument.strip() for argument in TERMINATE_BACKEND_CALL.findall(source)]
 
 
 def test_recovery_termination_binds_checked_backend_identity() -> None:
@@ -34,21 +42,22 @@ def test_recovery_termination_binds_checked_backend_identity() -> None:
         "extract(epoch FROM backend_start)::text = '${backend_start_epoch}'"
         in termination
     )
-    assert termination.count("pg_catalog.pg_terminate_backend(pid)") == 1
-    assert "pg_terminate_backend(${backend_pid})" not in termination
+    assert _termination_arguments(source) == ["pid"]
+    assert _termination_arguments(termination) == ["pid"]
+    assert "pg_catalog.pg_terminate_backend" in termination
     assert '[[ "${termination_receipt}" == "1|true" ]]' in termination
 
     assert "extract(epoch FROM activity.backend_start)::text" in source
 
 
 def test_exit_cleanup_uses_the_same_guarded_backend_identity() -> None:
-    """Abort cleanup must not regress to PID-only backend termination."""
+    """Abort cleanup must not introduce another backend-termination path."""
 
     source = _companion_source()
     cleanup = _shell_function(source, "cleanup", "\n}\ntrap cleanup EXIT")
 
     assert "terminate_captured_backend" in cleanup
-    assert "pg_terminate_backend" not in cleanup
+    assert _termination_arguments(cleanup) == []
     assert "backend_start_epoch" in cleanup
     assert "|| true" in cleanup
 
