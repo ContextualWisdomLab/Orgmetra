@@ -1,10 +1,11 @@
 """Atomic PostgreSQL adapter for governed People employment, position, and assignment writes.
 
 The adapter writes only Orgmetra-owned canonical HRIS relations. Generic Employment
-creation serializes on its current Person aggregate; Assignment still requires a
-current ``candidate_worker_conversion_record`` and never inserts
-``candidate_worker_link``. Every accepted write calls ``record_audit_outbox_event``
-in the same tenant-bound transaction.
+creation serializes on its current Person aggregate; generic Assignment creation
+serializes on its named Employment and Position aggregates rather than recruiting
+provenance. Neither path writes the legacy ``candidate_worker_link`` relation.
+Every accepted write calls ``record_audit_outbox_event`` in the same tenant-bound
+transaction.
 """
 
 from __future__ import annotations
@@ -67,16 +68,15 @@ LIMIT 2
 FOR UPDATE OF person
 """.strip()
 
-_CONVERSION_SQL = """
+_ASSIGNMENT_EMPLOYMENT_ANCHOR_SQL = """
 SELECT
-    conversion.candidate_worker_conversion_record_id,
-    pg_catalog.transaction_timestamp()
-FROM public.candidate_worker_conversion_record AS conversion
-WHERE conversion.tenant_record_id = %s
-  AND conversion.person_record_id = %s
-  AND conversion.recorded_to IS NULL
+    employment.employment_record_id,
+    employment.person_record_id
+FROM public.employment_record AS employment
+WHERE employment.tenant_record_id = %s
+  AND employment.employment_record_id = %s
 LIMIT 2
-FOR UPDATE OF conversion
+FOR UPDATE OF employment
 """.strip()
 
 _EMPLOYMENT_VERSIONS_SQL = """
@@ -551,23 +551,30 @@ def _require_one_person_employment_anchor(
         raise PeopleMutationIntegrityError("person employment anchor identity is invalid")
 
 
-def _require_one_conversion(rows: object) -> tuple[UUID, datetime]:
-    """Require exactly one current conversion row and a usable transaction timestamp."""
+def _require_one_assignment_employment_anchor(
+    rows: object,
+    *,
+    expected_employment_record_id: UUID,
+    expected_person_record_id: UUID,
+) -> None:
+    """Require the exact Employment root that serializes Assignment eligibility and capacity."""
     detached = _unpack_fixed_rows(
         rows,
         row_width=2,
-        error_message="conversion row has an invalid shape",
+        error_message="assignment employment anchor row has an invalid shape",
     )
     if not detached:
-        raise PeopleMutationIntegrityError("person has no governed candidate-worker conversion")
+        raise PeopleMutationNotFound("assignment employment record was not found")
     if len(detached) != 1:
-        raise PeopleMutationIntegrityError("multiple candidate-worker conversions matched the person")
-    conversion_id, recorded_at = detached[0]
-    if not _is_operational_uuid(conversion_id) or not _is_aware_datetime(recorded_at):
-        raise PeopleMutationIntegrityError("conversion identity or transaction time is invalid")
-    assert isinstance(conversion_id, UUID)
-    assert isinstance(recorded_at, datetime)
-    return conversion_id, recorded_at
+        raise PeopleMutationIntegrityError("multiple assignment employment anchors matched the record")
+    employment_record_id, person_record_id = detached[0]
+    if (
+        not _is_operational_uuid(employment_record_id)
+        or not _is_operational_uuid(person_record_id)
+        or employment_record_id != expected_employment_record_id
+        or person_record_id != expected_person_record_id
+    ):
+        raise PeopleMutationIntegrityError("assignment employment anchor identity is invalid")
 
 
 def _post_lock_recorded_at(cursor: Any) -> datetime:
@@ -836,7 +843,7 @@ class PostgresPeopleMutationPort(tuple):
         command: AssignmentMutationCommand,
         authorization: AuthorizationDecision,
     ) -> AssignmentMutationResult:
-        """Persist one assignment after conversion and kernel coverage checks."""
+        """Persist one Assignment after Employment/Position serialization and kernel checks."""
         if type(command) is not AssignmentMutationCommand:
             raise TypeError("command must be an AssignmentMutationCommand")
         command = replace(command)
@@ -859,8 +866,15 @@ class PostgresPeopleMutationPort(tuple):
                         assignment_record_id=replayed_record_id,
                         replay_command_digest=replay_digest,
                     )
-                cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
-                _require_one_conversion(cursor.fetchmany(2))
+                cursor.execute(
+                    _ASSIGNMENT_EMPLOYMENT_ANCHOR_SQL,
+                    (command.tenant_record_id, command.employment_record_id),
+                )
+                _require_one_assignment_employment_anchor(
+                    cursor.fetchmany(2),
+                    expected_employment_record_id=command.employment_record_id,
+                    expected_person_record_id=command.person_record_id,
+                )
                 cursor.execute(
                     _NAMED_EMPLOYMENT_VERSIONS_SQL,
                     (command.tenant_record_id, command.employment_record_id),
