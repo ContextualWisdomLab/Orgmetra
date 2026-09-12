@@ -10,11 +10,12 @@ Status: active stacked evidence for #309/#312. This file is not protected-`devel
 | Same key + changed semantics fails closed | server-side `orgmetra.document_record_persist_command.v1` SHA-256 | PostgreSQL contract changes only `application_evidence_digest_sha256` and requires the explicit semantic-conflict error | Implemented; hosted execution pending |
 | Retry identity is independent of caller session timezone | function-local `SET TimeZone = 'UTC'` for digest construction | same semantic command executes first under UTC, then under Asia/Seoul; result/digest identity must remain identical | Implemented; hosted execution pending |
 | Unsupported transaction isolation fails closed | `current_setting('transaction_isolation')` guard before command validation/write | `tests/test_document_record_idempotency_isolation_postgres.sh` invokes the owner inside a real `REPEATABLE READ` transaction and requires the explicit isolation error first | Implemented; hosted execution pending |
-| Concurrent first attempts serialize | transaction-scoped `pg_advisory_xact_lock` over tenant + owner namespace + key | two real PostgreSQL sessions with explicit tenant context; first keeps its transaction open after persistence while the second invokes the same command | Implemented; hosted execution pending |
+| Concurrent first attempts demonstrably serialize on the owner advisory lock | transaction-scoped `pg_advisory_xact_lock` over tenant + owner namespace + key | the first real PostgreSQL session remains `idle in transaction` after persistence; the second must expose an ungranted `advisory` lock in `pg_locks` and `pg_blocking_pids(...)` must name the first backend before the test permits the first transaction to commit | Implemented acceptance; hosted execution pending |
 | Replay visibility is explicit | `VOLATILE` function + Read Committed guard | ADR 0309 ties post-lock receipt visibility to PostgreSQL statement snapshots and rejects stronger isolation until a successor algorithm exists | Implemented contract |
 | No long external operation is inside the lock | ADR 0309 + database-only function body | source inspection: function performs digesting, replay lookup, local inserts, and receipt derivation only | Implemented; service adapter not yet present |
-| Receipt cannot bind to another tenant's document | tenant-qualified UNIQUE on `document_record`; composite FK from receipt | migration DDL plus FORCE-RLS acceptance | Implemented; hosted execution pending |
-| Receipt state is append-only | append-only row trigger + TRUNCATE trigger | PostgreSQL contract requires UPDATE rejection; table is FORCE RLS | Implemented; hosted execution pending |
+| Receipt cannot bind to another tenant's document | tenant-qualified UNIQUE on `document_record`; composite FK from receipt | migration DDL plus PostgreSQL acceptance | Implemented; hosted execution pending |
+| Receipt RLS is behavioral, not metadata-only | FORCE RLS policy on `document_record_persist_receipt` | a temporary `NOBYPASSRLS`/non-superuser role granted only receipt SELECT/UPDATE can read its own tenant's receipts, sees zero rows under another tenant context, and cannot update hidden cross-tenant rows | Implemented acceptance; hosted execution pending |
+| Receipt state is append-only | append-only row trigger + TRUNCATE trigger | PostgreSQL contract requires same-tenant UPDATE rejection in addition to cross-tenant RLS invisibility | Implemented; hosted execution pending |
 | Replay state is PII-minimized | receipt stores tenant, opaque key, digests, document identity, database time only | schema inspection; no document bytes, free-form HR values, credentials, compensation, rating, or duplicated Person/Employment columns | Implemented |
 | Lost-response retry can recover authoritative identity | receipt persists in the same transaction as the document write | first committed result is followed by a separate retry that must return the same stored receipt/result | Implemented; hosted execution pending |
 | Acceptance connections are closed | test sessions set dedicated `PGAPPNAME` values and are waited before inspection | `pg_stat_activity` must contain zero matching sessions after concurrent acceptance | Implemented; hosted execution pending |
@@ -38,9 +39,12 @@ Status: active stacked evidence for #309/#312. This file is not protected-`devel
 - Pre-lock tenant-context causal fix: `147973ef2709dcaffefffa9f40c00f1a49d464d1`.
 - Existing idempotency acceptance repaired to provide tenant context: `4ba85c535626f81468c74f4a5584385b1ad1a883`.
 - ADR currentization for tenant-bound retry coordination: `db226ed24c00e692340922afb9150721581fe2ab`.
+- Deterministic concurrency/RLS acceptance repair after review finding: `262122bfe0f959d5225e57bf8de9f9e54018af13`.
 
 ## Evidence limits
 
 No hosted PostgreSQL execution is claimed on the current stacked branch. #312 targets #107, while the canonical PostgreSQL Foundation implementation is separately stacked under #259/#311. Exact-head GREEN requires ordinary-forward reconciliation of those histories and a fresh run that discovers all three contracts without filename-specific workflow logic.
+
+The bounded observation loops in the concurrency test only wait for PostgreSQL's explicit `pg_stat_activity`/`pg_locks` state. They do not use elapsed time as evidence that serialization happened: the acceptance fails unless the second backend is actually shown waiting on the first backend's advisory lock.
 
 CodeRabbit/Devin status is review evidence only. It is not a substitute for the PostgreSQL runtime contracts, required protected-branch gates, or a qualifying independent approval.
