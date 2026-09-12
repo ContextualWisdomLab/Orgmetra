@@ -171,29 +171,95 @@ mapfile -t concurrent_evidence_parts < <(build_evidence "${CONCURRENT_DOCUMENT_R
 CONCURRENT_EVIDENCE="${concurrent_evidence_parts[0]}"
 CONCURRENT_EVIDENCE_DIGEST="${concurrent_evidence_parts[1]}"
 CONCURRENT_SQL="$(persist_sql "${CONCURRENT_KEY}" "${CONCURRENT_DOCUMENT_ID}" "${CONCURRENT_DOCUMENT_REFERENCE}" "${CONCURRENT_ARTIFACT_REFERENCE}" "${CONCURRENT_AUDIT_REFERENCE}" "${CONCURRENT_OUTBOX_REFERENCE}" "${APPLICATION_DIGEST}" "${CONCURRENT_EVIDENCE}" "${CONCURRENT_EVIDENCE_DIGEST}")"
+FIRST_INPUT="$(mktemp -u)"
 FIRST_OUTPUT="$(mktemp)"
 SECOND_OUTPUT="$(mktemp)"
-cleanup() { rm -f "${FIRST_OUTPUT}" "${SECOND_OUTPUT}"; }
+mkfifo "${FIRST_INPUT}"
+first_client_pid=""
+second_client_pid=""
+cleanup() {
+    exec 3>&- 2>/dev/null || true
+    if [[ -n "${second_client_pid}" ]] && kill -0 "${second_client_pid}" 2>/dev/null; then
+        kill "${second_client_pid}" 2>/dev/null || true
+    fi
+    if [[ -n "${first_client_pid}" ]] && kill -0 "${first_client_pid}" 2>/dev/null; then
+        kill "${first_client_pid}" 2>/dev/null || true
+    fi
+    rm -f "${FIRST_INPUT}" "${FIRST_OUTPUT}" "${SECOND_OUTPUT}"
+}
 trap cleanup EXIT
 
 PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID} ${PGOPTIONS:-}" \
 PGAPPNAME=orgmetra_document_idempotency_first \
 psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 \
-    -v canonical_evidence="${CONCURRENT_EVIDENCE}" >"${FIRST_OUTPUT}" <<SQL &
-BEGIN;
-${CONCURRENT_SQL}
-SELECT pg_sleep(2);
-COMMIT;
-SQL
-first_pid=$!
-sleep 0.25
+    -v canonical_evidence="${CONCURRENT_EVIDENCE}" <"${FIRST_INPUT}" >"${FIRST_OUTPUT}" 2>&1 &
+first_client_pid=$!
+exec 3>"${FIRST_INPUT}"
+printf 'BEGIN;\nSELECT '\''FIRST_BACKEND|''' || pg_backend_pid()::text;\n%s\nSELECT '\''FIRST_LOCK_HELD''';\n' "${CONCURRENT_SQL}" >&3
+
+first_ready=false
+first_deadline=$((SECONDS + 10))
+while (( SECONDS < first_deadline )); do
+    if grep -q '^FIRST_LOCK_HELD$' "${FIRST_OUTPUT}"; then
+        first_ready=true
+        break
+    fi
+    if ! kill -0 "${first_client_pid}" 2>/dev/null; then
+        break
+    fi
+    sleep 0.05
+done
+if [[ "${first_ready}" != "true" ]]; then
+    echo "first concurrent session did not reach the held transaction boundary" >&2
+    cat "${FIRST_OUTPUT}" >&2
+    exit 1
+fi
+FIRST_BACKEND_PID="$(sed -n 's/^FIRST_BACKEND|//p' "${FIRST_OUTPUT}" | head -n 1)"
+if [[ ! "${FIRST_BACKEND_PID}" =~ ^[0-9]+$ ]]; then
+    echo "could not capture first PostgreSQL backend pid: ${FIRST_BACKEND_PID}" >&2
+    exit 1
+fi
+
 PGOPTIONS="-c orgmetra.tenant_record_id=${TENANT_ID} ${PGOPTIONS:-}" \
 PGAPPNAME=orgmetra_document_idempotency_second \
 psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 \
-    -v canonical_evidence="${CONCURRENT_EVIDENCE}" -c "${CONCURRENT_SQL}" >"${SECOND_OUTPUT}" &
-second_pid=$!
-wait "${first_pid}"
-wait "${second_pid}"
+    -v canonical_evidence="${CONCURRENT_EVIDENCE}" -c "${CONCURRENT_SQL}" >"${SECOND_OUTPUT}" 2>&1 &
+second_client_pid=$!
+
+advisory_wait_observed=false
+second_deadline=$((SECONDS + 10))
+while (( SECONDS < second_deadline )); do
+    advisory_wait_count="$(psql "${DATABASE_URL}" -Atqc "
+SELECT count(*)
+FROM pg_catalog.pg_stat_activity AS activity
+JOIN pg_catalog.pg_locks AS lock_state
+  ON lock_state.pid = activity.pid
+WHERE activity.application_name = 'orgmetra_document_idempotency_second'
+  AND lock_state.locktype = 'advisory'
+  AND NOT lock_state.granted
+  AND ${FIRST_BACKEND_PID} = ANY(pg_catalog.pg_blocking_pids(activity.pid));
+")"
+    if [[ "${advisory_wait_count}" == "1" ]]; then
+        advisory_wait_observed=true
+        break
+    fi
+    if ! kill -0 "${second_client_pid}" 2>/dev/null; then
+        break
+    fi
+    sleep 0.05
+done
+if [[ "${advisory_wait_observed}" != "true" ]]; then
+    echo "second concurrent session did not demonstrably wait on the first session's advisory lock" >&2
+    cat "${SECOND_OUTPUT}" >&2
+    exit 1
+fi
+
+printf 'COMMIT;\n\\q\n' >&3
+exec 3>&-
+wait "${first_client_pid}"
+first_client_pid=""
+wait "${second_client_pid}"
+second_client_pid=""
 first_concurrent_result="$(grep -F 'document_record:' "${FIRST_OUTPUT}" | head -n 1)"
 second_concurrent_result="$(grep -F 'document_record:' "${SECOND_OUTPUT}" | head -n 1)"
 if [[ -z "${first_concurrent_result}" || "${first_concurrent_result}" != "${second_concurrent_result}" ]]; then
@@ -229,6 +295,55 @@ if [[ "${rls_state}" != "true|true" ]]; then
     echo "document-record idempotency receipt is not FORCE-RLS protected: ${rls_state}" >&2
     exit 1
 fi
+
+PROBE_ROLE="orgmetra_document_receipt_probe"
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
+CREATE ROLE ${PROBE_ROLE}
+    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+GRANT USAGE ON SCHEMA public TO ${PROBE_ROLE};
+GRANT SELECT, UPDATE ON TABLE public.document_record_persist_receipt TO ${PROBE_ROLE};
+SQL
+
+same_tenant_receipts="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 <<SQL
+SET ROLE ${PROBE_ROLE};
+SET orgmetra.tenant_record_id = '${TENANT_ID}';
+SELECT count(*) FROM public.document_record_persist_receipt;
+SQL
+)"
+if [[ "${same_tenant_receipts}" != "2" ]]; then
+    echo "NOBYPASSRLS receipt probe could not read its own tenant rows: ${same_tenant_receipts}" >&2
+    exit 1
+fi
+
+other_tenant_receipts="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 <<SQL
+SET ROLE ${PROBE_ROLE};
+SET orgmetra.tenant_record_id = '${OTHER_TENANT_ID}';
+SELECT count(*) FROM public.document_record_persist_receipt;
+SQL
+)"
+if [[ "${other_tenant_receipts}" != "0" ]]; then
+    echo "NOBYPASSRLS receipt probe could read another tenant's rows: ${other_tenant_receipts}" >&2
+    exit 1
+fi
+
+cross_tenant_update="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 <<SQL
+SET ROLE ${PROBE_ROLE};
+SET orgmetra.tenant_record_id = '${OTHER_TENANT_ID}';
+UPDATE public.document_record_persist_receipt
+SET semantic_command_digest_sha256 = '${CONFLICTING_APPLICATION_DIGEST}'
+WHERE tenant_record_id = '${TENANT_ID}'::uuid
+RETURNING 1;
+SQL
+)"
+if [[ -n "${cross_tenant_update}" ]]; then
+    echo "NOBYPASSRLS receipt probe could update another tenant's row: ${cross_tenant_update}" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<SQL
+DROP OWNED BY ${PROBE_ROLE};
+DROP ROLE ${PROBE_ROLE};
+SQL
 
 set +e
 mutation_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
