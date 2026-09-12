@@ -105,6 +105,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 VOLATILE
 SET search_path = pg_catalog, public, pg_temp
+SET TimeZone = 'UTC'
 AS $$
 DECLARE
     v_semantic_command_digest text;
@@ -315,6 +316,6 @@ COMMENT ON FUNCTION public.persist_document_record_once(
     uuid, text, uuid, text, text, text, text, text, text, text, text, text,
     text, text, timestamptz, text, text, text, text, text
 ) IS
-    'Persists one immutable document-record fact and replay receipt under a tenant-scoped transaction advisory lock. Same-key same-semantic retries return the first committed result; changed semantics fail closed before any second document write.';
+    'Persists one immutable document-record fact and replay receipt under a tenant-scoped transaction advisory lock. Same-key same-semantic retries return the first committed result; changed semantics fail closed before any second document write. Digest serialization executes with function-local UTC TimeZone so equivalent timestamptz values do not change replay identity across caller sessions.';
 
 COMMIT;
