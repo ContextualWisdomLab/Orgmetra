@@ -181,15 +181,32 @@ second_client_pid=""
 PROBE_ROLE="orgmetra_document_receipt_probe_${BASHPID}"
 
 cleanup_probe_role() {
+    local mode="${1:-strict}"
     local role_exists
-    role_exists="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -c \
-        "SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = '${PROBE_ROLE}';" 2>/dev/null || true)"
-    if [[ "${role_exists}" == "1" ]]; then
-        psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<SQL || true
+
+    if ! role_exists="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -c \
+        "SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = '${PROBE_ROLE}';" 2>/dev/null)"; then
+        if [[ "${mode}" == "best-effort" ]]; then
+            return 0
+        fi
+        echo "could not verify temporary RLS probe-role cleanup" >&2
+        return 1
+    fi
+    if [[ "${role_exists}" != "1" ]]; then
+        return 0
+    fi
+    if psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<SQL
 DROP OWNED BY ${PROBE_ROLE};
 DROP ROLE ${PROBE_ROLE};
 SQL
+    then
+        return 0
     fi
+    if [[ "${mode}" == "best-effort" ]]; then
+        return 0
+    fi
+    echo "could not remove temporary RLS probe role ${PROBE_ROLE}" >&2
+    return 1
 }
 
 cleanup() {
@@ -200,7 +217,7 @@ cleanup() {
     if [[ -n "${first_client_pid}" ]] && kill -0 "${first_client_pid}" 2>/dev/null; then
         kill "${first_client_pid}" 2>/dev/null || true
     fi
-    cleanup_probe_role
+    cleanup_probe_role best-effort
     rm -rf "${CONCURRENCY_DIR}"
 }
 trap cleanup EXIT
@@ -358,7 +375,7 @@ if [[ -n "${cross_tenant_update}" ]]; then
     exit 1
 fi
 
-cleanup_probe_role
+cleanup_probe_role strict
 
 set +e
 mutation_output="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "
