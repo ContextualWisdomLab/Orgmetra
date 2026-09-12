@@ -32,6 +32,7 @@ from orgmetra_people_api.mutations import PeopleMutationNotFound
 from orgmetra_people_api.separation import (
     EmploymentSeparationCommand,
     EmploymentSeparationIntegrityError,
+    EmploymentSeparationPersistenceIntegrityError,
     EmploymentSeparationPort,
     separate_employment_record,
 )
@@ -307,6 +308,28 @@ class EmploymentSeparationAsgiApp:
                 send,
                 status=404,
                 payload={"error": "record_not_found", "message": "Verify the Person, Employment, and expected version, then retry."},
+            )
+            return
+        except EmploymentSeparationPersistenceIntegrityError as error:
+            support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+            _LOGGER.error(
+                "Employment separation persistence integrity failed",
+                extra={
+                    "tenant_record_id": str(headers.tenant_record_id),
+                    "employment_record_id": str(command.employment_record_id),
+                    "correlation_reference": f"audit_event_record:{command.audit_event_record_id.hex}",
+                    "exception_type": type(error).__name__,
+                    "support_reference": support_reference,
+                },
+            )
+            await _send_error(
+                send,
+                status=500,
+                payload={
+                    "error": "internal_error",
+                    "message": "Retry later or contact an Orgmetra operator with the support reference.",
+                },
+                support_reference=support_reference,
             )
             return
         except EmploymentSeparationIntegrityError:
