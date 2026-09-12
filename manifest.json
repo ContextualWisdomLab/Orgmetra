@@ -275,9 +275,9 @@
     },
     {
       "path": "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
-      "sha256": "10f0eb409f4fa32d2c5bed2d583d8b43be8e61b5cbef0e927e5bebb5f5c8f85b",
-      "bytes": 2091,
-      "lines": 34
+      "sha256": "a575f8bde53b2e7ce88f64607d96b0005c4d67f780a9bc95b612770b13e8ce09",
+      "bytes": 4053,
+      "lines": 42
     },
     {
       "path": "docs/adr/0006-governed-audit-outbox-envelope.md",
