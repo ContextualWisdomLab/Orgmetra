@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from dataclasses import replace
-from typing import Any, Callable
+from typing import Any, Callable, NoReturn
 
 from orgmetra_keyverse_adapter import AuthorizationDecision
 
@@ -65,7 +65,7 @@ def _one_result_row(cursor: Any) -> tuple[object, object, object, object]:
     return row[0], row[1], row[2], row[3]
 
 
-def _translate_database_error(error: Exception) -> None:
+def _translate_database_error(error: Exception) -> NoReturn:
     """Translate only reviewed business SQLSTATEs; permission failures remain operational errors."""
     sqlstate = getattr(error, "sqlstate", None)
     if sqlstate == "23503":
@@ -135,7 +135,6 @@ class PostgresEmploymentSeparationPort(tuple):
                     row = _one_result_row(cursor)
         except Exception as error:
             _translate_database_error(error)
-            raise AssertionError("unreachable") from error
 
         try:
             result = EmploymentSeparationResult(
