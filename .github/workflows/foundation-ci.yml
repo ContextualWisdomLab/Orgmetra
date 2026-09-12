@@ -48,7 +48,7 @@ jobs:
           ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
           ORGMETRA_POSTGRES_RUNNER_SHA256: bb84ea602542585d5c4d1156ea765d3dcdd7756da9d2ef7438096eed72364286
           ORGMETRA_POSTGRES_TEST_SHA256: 9c90ed386248961640aeeddabfefb9c98d96bf3c550474ffb50ec2705775c92b
-          ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256: 8d53ced7aa23df2a9896aad3cfe312852f40e5016df95f0478418a8b8bc522e5
+          ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256: 6814ecb6a6cf983aad935c8a022ed05cb19759ca502d6fc24c6e47e0a7ef720d
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
@@ -256,7 +256,8 @@ jobs:
             printf 'Executing PostgreSQL Foundation snapshot as dedicated non-owner: %s -> %s\n' \
               "$script" "$snapshot_script"
             set +e
-            sudo -n -u "$contract_user" env \
+            sudo -n -u "$contract_user" env -i \
+              PATH="$PATH" \
               DATABASE_URL="$database_url" \
               PGPASSWORD="$PGPASSWORD" \
               HOME="$contract_runtime" \
