@@ -255,7 +255,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self.assertIn("public.people_mutation_idempotency_record", sql_text)
         self.assertNotIn("candidate_worker_link", sql_text)
 
-    def test_assignment_reuses_kernel_and_conversion_then_audits(self) -> None:
+    def test_assignment_serializes_on_employment_then_position_and_audits(self) -> None:
         prior_assignment = (
             UUID("0198a412-8200-7000-8000-000000000071"),
             EMPLOYMENT,
@@ -268,7 +268,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             None,
         )
         port, cursor = self._port(
-            [[(CONVERSION, RECORDED_AT)]],
+            [[(EMPLOYMENT, PERSON)]],
             [[covering_employment_row()], [covering_position_row()], [prior_assignment]],
         )
         result = create_assignment_record(
@@ -280,11 +280,11 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         )
         self.assertEqual(result.assignment_record_id, ASSIGNMENT)
         sql_text = "\n".join(sql for sql, _parameters in cursor.executions)
-        self.assertIn("public.candidate_worker_conversion_record", sql_text)
-        conversion_sql = next(
-            sql for sql, _parameters in cursor.executions if "candidate_worker_conversion_record" in sql
+        self.assertNotIn("public.candidate_worker_conversion_record", sql_text)
+        employment_lock_sql = next(
+            sql for sql, _parameters in cursor.executions if "FOR UPDATE OF employment" in sql
         )
-        self.assertIn("conversion.recorded_to IS NULL", conversion_sql)
+        self.assertIn("public.employment_record", employment_lock_sql)
         self.assertIn("public.assignment_record", sql_text)
         self.assertIn("public.record_audit_outbox_event", sql_text)
         self.assertIn("public.people_mutation_idempotency_record", sql_text)
@@ -311,17 +311,26 @@ class PostgresPeopleMutationTests(unittest.TestCase):
                     )
                 self.assertFalse(any("INSERT INTO public.employment_record" in sql for sql, _parameters in cursor.executions))
 
-    def test_assignment_missing_conversion_fails_before_insert(self) -> None:
-        port, cursor = self._port([[]], [[], [], []])
-        with self.assertRaisesRegex(PeopleMutationIntegrityError, "candidate-worker conversion"):
-            create_assignment_record(
-                principal=PRINCIPAL,
-                command=assignment_command(),
-                purpose_code="workforce_admin",
-                policy=assignment_policy(),
-                mutation_port=port,
-            )
-        self.assertFalse(any("INSERT INTO public.assignment_record" in sql for sql, _parameters in cursor.executions))
+    def test_assignment_missing_or_invalid_employment_anchor_fails_before_insert(self) -> None:
+        scenarios = (
+            [[]],
+            [[(EMPLOYMENT, PERSON), (EMPLOYMENT, PERSON)]],
+            [[(EMPLOYMENT,)]],
+            [[(UUID(int=0), PERSON)]],
+            [[(EMPLOYMENT, POSITION)]],
+        )
+        for rows in scenarios:
+            with self.subTest(rows=rows):
+                port, cursor = self._port(rows)
+                with self.assertRaises((PeopleMutationIntegrityError, PeopleMutationNotFound)):
+                    create_assignment_record(
+                        principal=PRINCIPAL,
+                        command=assignment_command(),
+                        purpose_code="workforce_admin",
+                        policy=assignment_policy(),
+                        mutation_port=port,
+                    )
+                self.assertFalse(any("INSERT INTO public.assignment_record" in sql for sql, _parameters in cursor.executions))
 
     def test_invalid_existing_employment_row_fails_closed(self) -> None:
         port, _cursor = self._port([[(PERSON, RECORDED_AT)]], [[("bad",)]])
@@ -387,7 +396,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
                     )
 
     def test_assignment_kernel_rejection_and_invalid_rows_fail_closed(self) -> None:
-        port, cursor = self._port([[(CONVERSION, RECORDED_AT)]], [[], [], []])
+        port, cursor = self._port([[(EMPLOYMENT, PERSON)]], [[], [], []])
         with self.assertRaises(PeopleMutationIntegrityError):
             create_assignment_record(
                 principal=PRINCIPAL,
@@ -398,7 +407,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             )
         self.assertFalse(any("INSERT INTO public.assignment_record" in sql for sql, _parameters in cursor.executions))
 
-        port, _cursor = self._port([[(CONVERSION, RECORDED_AT)]], [[("bad",)], [], []])
+        port, _cursor = self._port([[(EMPLOYMENT, PERSON)]], [[("bad",)], [], []])
         with self.assertRaises(PeopleMutationIntegrityError):
             create_assignment_record(
                 principal=PRINCIPAL,
@@ -409,7 +418,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             )
 
         port, _cursor = self._port(
-            [[(CONVERSION, RECORDED_AT)]],
+            [[(EMPLOYMENT, PERSON)]],
             [[covering_employment_row()], [("bad",)], []],
         )
         with self.assertRaises(PeopleMutationIntegrityError):
@@ -422,7 +431,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             )
 
         port, _cursor = self._port(
-            [[(CONVERSION, RECORDED_AT)]],
+            [[(EMPLOYMENT, PERSON)]],
             [[covering_employment_row()], [covering_position_row()], [("bad",)]],
         )
         with self.assertRaises(PeopleMutationIntegrityError):
@@ -494,7 +503,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             )
         bad_position = (POSITION, POSITION_VERSION, "open", "2026-08-01", None, RECORDED_AT, None)
         port, _cursor = self._port(
-            [[(CONVERSION, RECORDED_AT)]],
+            [[(EMPLOYMENT, PERSON)]],
             [[covering_employment_row()], [bad_position], []],
         )
         with self.assertRaisesRegex(PeopleMutationIntegrityError, "invalid"):
@@ -517,7 +526,7 @@ class PostgresPeopleMutationTests(unittest.TestCase):
             None,
         )
         port, _cursor = self._port(
-            [[(CONVERSION, RECORDED_AT)]],
+            [[(EMPLOYMENT, PERSON)]],
             [[covering_employment_row()], [covering_position_row()], [bad_assignment]],
         )
         with self.assertRaisesRegex(PeopleMutationIntegrityError, "invalid"):
