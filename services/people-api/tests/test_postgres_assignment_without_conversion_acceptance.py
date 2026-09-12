@@ -35,27 +35,27 @@ def test_generic_assignment_does_not_require_candidate_worker_conversion() -> No
             INSERT INTO tenant_record (tenant_record_id, tenant_reference)
             VALUES ('{tenant}', 'assignment_without_conversion');
             INSERT INTO person_record (tenant_record_id, person_record_id, recorded_from)
-            VALUES ('{tenant}', '{person}', TIMESTAMPTZ '2026-09-13 00:00:00+00');
+            VALUES ('{tenant}', '{person}', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
             INSERT INTO employment_record
                 (tenant_record_id, employment_record_id, person_record_id, recorded_from)
-            VALUES ('{tenant}', '{employment}', '{person}', TIMESTAMPTZ '2026-09-13 00:01:00+00');
+            VALUES ('{tenant}', '{employment}', '{person}', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
             INSERT INTO employment_record_version
                 (tenant_record_id, employment_record_version_id, employment_record_id,
                  employment_status_code, employment_concurrency_code, effective_from, recorded_from)
             VALUES ('{tenant}', '10000000-0000-7000-8004-000000000003', '{employment}',
-                    'active', 'exclusive', DATE '2026-09-01', TIMESTAMPTZ '2026-09-13 00:01:00+00');
+                    'active', 'exclusive', DATE '2026-09-01', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
             INSERT INTO organization_unit (tenant_record_id, organization_unit_id, recorded_from)
-            VALUES ('{tenant}', '{organization}', TIMESTAMPTZ '2026-09-13 00:00:00+00');
+            VALUES ('{tenant}', '{organization}', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
             INSERT INTO job_profile (tenant_record_id, job_profile_id, recorded_from)
-            VALUES ('{tenant}', '{job}', TIMESTAMPTZ '2026-09-13 00:00:00+00');
+            VALUES ('{tenant}', '{job}', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
             INSERT INTO position_record
                 (tenant_record_id, position_record_id, organization_unit_id, job_profile_id, recorded_from)
-            VALUES ('{tenant}', '{position}', '{organization}', '{job}', TIMESTAMPTZ '2026-09-13 00:01:00+00');
+            VALUES ('{tenant}', '{position}', '{organization}', '{job}', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
             INSERT INTO position_record_version
                 (tenant_record_id, position_record_version_id, position_record_id,
                  position_status_code, effective_from, recorded_from)
             VALUES ('{tenant}', '10000000-0000-7000-8004-000000000004', '{position}',
-                    'open', DATE '2026-09-01', TIMESTAMPTZ '2026-09-13 00:01:00+00');
+                    'open', DATE '2026-09-01', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
             """,
         )
         assert psql(
