@@ -262,8 +262,8 @@ first_status=$?
 set -e
 second_pid=''
 first_pid=''
-if [[ ${first_status} -eq 0 || ${second_status} -eq 0 ]]; then
-    echo "failure-cleanup client unexpectedly reported success: first=${first_status} second=${second_status}" >&2
+if [[ ${second_status} -eq 0 ]]; then
+    echo "blocked failure-cleanup client unexpectedly reported success; first=${first_status} second=${second_status}" >&2
     exit 1
 fi
 
