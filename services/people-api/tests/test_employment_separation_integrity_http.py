@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from datetime import datetime, timezone
 import json
 import unittest
 from uuid import UUID
