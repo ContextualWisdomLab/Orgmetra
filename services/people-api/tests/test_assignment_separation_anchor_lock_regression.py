@@ -2,47 +2,21 @@
 
 from __future__ import annotations
 
-from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
-from test_people_mutations import assignment_command
-from test_postgres_people_mutations import (
-    CONVERSION,
-    RECORDED_AT,
-    FakeConnection,
-    ScriptedCursor,
-    assignment_authorization,
-    covering_employment_row,
-    covering_position_row,
-)
+from pathlib import Path
 
 
-def test_assignment_locks_employment_anchor_before_reading_versions() -> None:
-    """Acquire the separation-shared anchor lock in its own READ COMMITTED statement."""
-    cursor = ScriptedCursor(
-        [[], [(CONVERSION, RECORDED_AT)]],
-        [[covering_employment_row()], [covering_position_row()], []],
-    )
-    connection = FakeConnection(cursor)
-    port = PostgresPeopleMutationPort(lambda: connection)
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_MIGRATION = _REPO_ROOT / "database/migrations/0017_assignment_employment_separation_serialization.sql"
 
-    port.create_assignment(
-        command=assignment_command(),
-        authorization=assignment_authorization(),
-    )
 
-    statements = [sql for sql, _parameters in cursor.executions]
-    lock_indexes = [
-        index
-        for index, sql in enumerate(statements)
-        if "FROM public.employment_record AS employment" in sql
-        and "FOR UPDATE OF employment" in sql
-        and "employment_record_version" not in sql
-    ]
-    version_index = next(
-        index
-        for index, sql in enumerate(statements)
-        if "JOIN public.employment_record_version AS version" in sql
-        and "employment.employment_record_id = %s" in sql
-    )
+def test_assignment_insert_uses_employment_anchor_as_shared_conflict_boundary() -> None:
+    """Keep the Assignment/Employment race guard at the authoritative PostgreSQL boundary."""
+    sql = _MIGRATION.read_text(encoding="utf-8")
 
-    assert len(lock_indexes) == 1
-    assert lock_indexes[0] < version_index
+    assert "CREATE FUNCTION public.guard_assignment_employment_coverage()" in sql
+    assert "FOR UPDATE OF employment" in sql
+    assert "CREATE TRIGGER assignment_employment_coverage_guard" in sql
+    assert "BEFORE INSERT ON public.assignment_record" in sql
+    assert "version.recorded_to IS NULL" in sql
+    assert "version.employment_status_code IN ('active', 'leave')" in sql
+    assert "NEW.effective_to <= version.effective_to" in sql
