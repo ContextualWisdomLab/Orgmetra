@@ -61,7 +61,6 @@ SELECT
 FROM public.candidate_worker_conversion_record AS conversion
 WHERE conversion.tenant_record_id = %s
   AND conversion.person_record_id = %s
-  AND conversion.employment_record_id = %s
   AND conversion.recorded_to IS NULL
 LIMIT 2
 FOR UPDATE OF conversion
@@ -601,14 +600,7 @@ class PostgresPeopleMutationPort(tuple):
                         employment_record_id=replayed_record_id,
                         replay_command_digest=replay_digest,
                     )
-                cursor.execute(
-                    _CONVERSION_SQL,
-                    (
-                        command.tenant_record_id,
-                        command.person_record_id,
-                        command.employment_record_id,
-                    ),
-                )
+                cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
                 _require_one_conversion(cursor.fetchmany(2))
                 recorded_at = _post_lock_recorded_at(cursor)
                 cursor.execute(
@@ -824,14 +816,7 @@ class PostgresPeopleMutationPort(tuple):
                         assignment_record_id=replayed_record_id,
                         replay_command_digest=replay_digest,
                     )
-                cursor.execute(
-                    _CONVERSION_SQL,
-                    (
-                        command.tenant_record_id,
-                        command.person_record_id,
-                        command.employment_record_id,
-                    ),
-                )
+                cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
                 _require_one_conversion(cursor.fetchmany(2))
                 cursor.execute(
                     _NAMED_EMPLOYMENT_VERSIONS_SQL,
