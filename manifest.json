@@ -467,9 +467,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "091836b2f68600a30b08f7da2cea8b3bef10201a123da720a7369bf10985eec2",
-      "bytes": 27237,
-      "lines": 637
+      "sha256": "709cb7298ca6dfce3b2a4b0199c390e9d87227560085874bf3738a5827096a26",
+      "bytes": 27516,
+      "lines": 644
     }
   ]
 }
