@@ -30,31 +30,36 @@ def _operational_uuid(field_name: str, value: object) -> UUID:
     """Validate one operational UUID and detach any retained identity alias."""
     if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
-    identity = value.int
-    if type(identity) is not int or not (0 < identity < _MAX_UUID_INT):
+    if not (0 < value.int < _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
-    return UUID(int=identity)
+    return UUID(int=value.int)
 
 
 def _namespaced_reference(field_name: str, value: object) -> str:
     """Validate one bounded opaque namespaced reference."""
-    if type(value) is not str or _REFERENCE_PATTERN.fullmatch(value) is None:
+    if type(value) is not str:
+        raise ValueError(f"{field_name} must be a namespaced opaque reference.")
+    if _REFERENCE_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field_name} must be a namespaced opaque reference.")
     return value
 
 
 def _version_code(value: object) -> str:
     """Validate one whitespace-free evidence version token."""
-    if type(value) is not str or _VERSION_PATTERN.fullmatch(value) is None:
+    if type(value) is not str:
+        raise ValueError("evidence_version_code must be a whitespace-free version token.")
+    if _VERSION_PATTERN.fullmatch(value) is None:
         raise ValueError("evidence_version_code must be a whitespace-free version token.")
     return value
 
 
 def _aware_datetime(field_name: str, value: object) -> datetime:
-    """Validate database-owned time without retaining executable timezone aliases."""
-    if type(value) is not datetime or value.tzinfo is None:
+    """Validate database-owned time without accepting executable custom timezone objects."""
+    if type(value) is not datetime:
         raise ValueError(f"{field_name} must be an aware datetime.")
-    if type(value.tzinfo) not in (timezone, ZoneInfo) or value.utcoffset() is None:
+    if value.tzinfo is None:
+        raise ValueError(f"{field_name} must be an aware datetime.")
+    if type(value.tzinfo) not in (timezone, ZoneInfo):
         raise ValueError(f"{field_name} must use a standard aware timezone provider.")
     return value
 
@@ -89,7 +94,9 @@ class EmploymentSeparationCommand:
             object.__setattr__(self, field_name, _operational_uuid(field_name, getattr(self, field_name)))
         if type(self.separation_effective_on) is not date:
             raise ValueError("separation_effective_on must be a business date.")
-        if type(self.separation_reason_code) is not str or _REASON_PATTERN.fullmatch(self.separation_reason_code) is None:
+        if type(self.separation_reason_code) is not str:
+            raise ValueError("separation_reason_code must be a lower snake_case code.")
+        if _REASON_PATTERN.fullmatch(self.separation_reason_code) is None:
             raise ValueError("separation_reason_code must be a lower snake_case code.")
         _namespaced_reference("evidence_reference", self.evidence_reference)
         _version_code(self.evidence_version_code)
@@ -157,7 +164,9 @@ def separate_employment_record(
     """Authorize one exact Employment separation before crossing persistence."""
     if type(command) is not EmploymentSeparationCommand:
         raise TypeError("command must be an EmploymentSeparationCommand")
-    if type(purpose_code) is not str or purpose_code != "workforce_admin":
+    if type(purpose_code) is not str:
+        raise ValueError("Employment separation requires workforce_admin purpose.")
+    if purpose_code != "workforce_admin":
         raise ValueError("Employment separation requires workforce_admin purpose.")
 
     detached_command = replace(command)
