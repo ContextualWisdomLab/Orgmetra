@@ -226,12 +226,19 @@ def _validate_database_contract() -> None:
         _fail("No CREATE TABLE statement found")
 
     for match in matches:
-        for identifier in filter(None, (match.group("schema"), match.group("table"))):
-            if "_" not in identifier or identifier != identifier.lower():
+        schema_name = match.group("schema")
+        if schema_name is not None and schema_name != "public":
+            if "_" not in schema_name or schema_name != schema_name.lower():
                 _fail(
-                    "Database object name is not two-word lowercase snake_case: "
-                    f"{identifier}"
+                    "Database schema name is not two-word lowercase snake_case: "
+                    f"{schema_name}"
                 )
+        table_name = match.group("table")
+        if "_" not in table_name or table_name != table_name.lower():
+            _fail(
+                "Database table name is not two-word lowercase snake_case: "
+                f"{table_name}"
+            )
 
     for guard in (
         "effective_to IS NULL OR effective_to > effective_from",
