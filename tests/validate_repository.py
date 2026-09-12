@@ -386,7 +386,10 @@ def _validate_database_contract() -> None:
         table_block = table_sql[block_start:block_end]
         if "tenant_record_id uuid NOT NULL" not in table_block:
             _fail(f"Tenant binding is missing from table: {table_name}")
-        if f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in sql:
+        if (
+            f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in sql
+            and f"ALTER TABLE public.{table_name} FORCE ROW LEVEL SECURITY" not in sql
+        ):
             _fail(f"Forced row-level security is missing from table: {table_name}")
 
     if len(tenant_matches) != len(matches) - 1:
