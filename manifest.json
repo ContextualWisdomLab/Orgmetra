@@ -154,6 +154,12 @@
       "lines": 87
     },
     {
+      "path": "database/migrations/0024_document_record_idempotent_persistence.sql",
+      "sha256": "502637f43b166f16be355a3f159f10151c61dfdd9b2849d4a5d38cc73404589f",
+      "bytes": 14343,
+      "lines": 340
+    },
+    {
       "path": "docs/API_CONTRACT.md",
       "sha256": "63533dff785da62b89e585d742a158e2aeb05913644f2bf9fb6486f281c2e589",
       "bytes": 4555,
@@ -173,9 +179,9 @@
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "82b2d3e70cec371ef35e9e0f982ac40fef84351976bc04b863b81d27023d5a62",
-      "bytes": 11189,
-      "lines": 71
+      "sha256": "591c765b107f84e76b3f380adfafc3fec67c0735e6d3f33431369659f4f28c15",
+      "bytes": 14597,
+      "lines": 85
     },
     {
       "path": "docs/PRD.md",
@@ -203,9 +209,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "d0a0bc3b54ed0fc7973747987f1afb117d6144c390b51ed9370eb571972a33f8",
-      "bytes": 16534,
-      "lines": 135
+      "sha256": "48596f3258300feedaa42bedc89ac59ef8775a321d323243c1d29ef52e5db37e",
+      "bytes": 19089,
+      "lines": 139
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -334,6 +340,12 @@
       "lines": 48
     },
     {
+      "path": "docs/adr/0309-document-record-idempotent-persistence.md",
+      "sha256": "910b544a3be0f9c6f41893e1e78f7362ff53e36b053f26112a96a4e7bcb2ad11",
+      "bytes": 13534,
+      "lines": 94
+    },
+    {
       "path": "docs/adr/README.md",
       "sha256": "f3b3b5ed3b3b31a40a0a3696abf0065e3c25879b6be50077f38ffae742b9d002",
       "bytes": 1838,
@@ -370,6 +382,12 @@
       "lines": 30
     },
     {
+      "path": "docs/traceability/document-record-idempotent-persistence.md",
+      "sha256": "310068058910f921109c295730e0fd41fa3cccde4d403b8610cbed0a82d9947e",
+      "bytes": 12809,
+      "lines": 65
+    },
+    {
       "path": "package.json",
       "sha256": "59ae9e3e67c3fba9320cb18439692395cdfd16ae5c24e3c4cf30d77d63ebabb5",
       "bytes": 388,
@@ -395,15 +413,21 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "2305e1a6efff8b0dc47b40d517ac49b2a86f780899ae03c83d4063ed30d169e5",
-      "bytes": 28670,
-      "lines": 697
+      "sha256": "aa1965c7101551570a64c9e679c2f9042eb449173fa82face5e94e9c72ded8d1",
+      "bytes": 29278,
+      "lines": 705
     },
     {
       "path": "scripts/foundation-contract.mjs",
       "sha256": "5242dcdbe0935775edf074462c82600e9bc4927d9fdc50c47727af915fd4b23a",
       "bytes": 218,
       "lines": 6
+    },
+    {
+      "path": "tests/document_record_idempotency_postcommit_recovery_companion.sh",
+      "sha256": "ecbde2131fc5341dc11017305d0bb114136dd1289a05ece14e7c3080a8a52e93",
+      "bytes": 11193,
+      "lines": 277
     },
     {
       "path": "tests/dispatcher-inventory.test.mjs",
@@ -466,6 +490,36 @@
       "lines": 103
     },
     {
+      "path": "tests/test_document_record_idempotency_function_acl_postgres.sh",
+      "sha256": "ba2f60295d1cbed7eb773ece4a79e11b6b186df4301a440d0c96e407663e3999",
+      "bytes": 3500,
+      "lines": 123
+    },
+    {
+      "path": "tests/test_document_record_idempotency_isolation_postgres.sh",
+      "sha256": "a8e7a099e9b046753591167ddfe4e4206bccd2f00f182925720fa3c15b880a32",
+      "bytes": 1873,
+      "lines": 62
+    },
+    {
+      "path": "tests/test_document_record_idempotency_postcommit_recovery_contract.py",
+      "sha256": "69cea86ef064c7bc8135d1e28f8dfd6eb893fdd6ee8b314045492971adc95aa1",
+      "bytes": 2318,
+      "lines": 68
+    },
+    {
+      "path": "tests/test_document_record_idempotency_postgres.sh",
+      "sha256": "db078f2d5876e844d455915d3446dc8c25ca8ba95cac87481c26911f839e246d",
+      "bytes": 17324,
+      "lines": 413
+    },
+    {
+      "path": "tests/test_document_record_idempotency_tenant_context_postgres.sh",
+      "sha256": "171f35d16891ac58d67a54504ce051a4bff0fedbf7ab43bed2f9ef3f3765b945",
+      "bytes": 5830,
+      "lines": 140
+    },
+    {
       "path": "tests/test_document_record_persistence_postgres.sh",
       "sha256": "f3d5fcb83a406ac202986f0272f673a8f3c6349752119d27b4d42e4c6bbe7072",
       "bytes": 17015,
@@ -521,9 +575,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "0692bfa17ebed3ba6594bc30e75bfeb8e93784ae381af3801457f4fe6cf41529",
-      "bytes": 27804,
-      "lines": 646
+      "sha256": "6c39b7e25ed127b34a74532ae5e607943b1f73b964bc931f256dc99df75f6b54",
+      "bytes": 28431,
+      "lines": 655
     }
   ]
 }
