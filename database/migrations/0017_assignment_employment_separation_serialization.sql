@@ -4,10 +4,50 @@
 -- creation must acquire the same anchor lock before INSERT and then re-read current Employment
 -- versions under READ COMMITTED. This closes the check/insert race in both directions without
 -- holding an external workflow or broad table lock inside the transaction.
+--
+-- PostgreSQL requires UPDATE privilege for SELECT ... FOR UPDATE. Do not widen the ordinary
+-- Assignment writer merely to obtain the conflict lock: a dedicated NOLOGIN/NOBYPASSRLS owner
+-- executes the trigger with only the reviewed read/anchor-lock capabilities, while FORCE RLS
+-- continues to bind every lookup to the caller's transaction-local tenant context.
+
+DO $orgmetra_assignment_employment_guard_role_preflight$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles
+        WHERE rolname = 'orgmetra_assignment_employment_guard_owner'
+    ) THEN
+        RAISE EXCEPTION 'pre-existing Assignment Employment guard capability role is not accepted'
+            USING ERRCODE = '42710';
+    END IF;
+END;
+$orgmetra_assignment_employment_guard_role_preflight$;
 
 BEGIN;
 
-SET LOCAL search_path = public, pg_catalog;
+SET LOCAL search_path = pg_catalog, public;
+
+CREATE ROLE orgmetra_assignment_employment_guard_owner
+    NOLOGIN
+    NOSUPERUSER
+    NOCREATEDB
+    NOCREATEROLE
+    NOINHERIT
+    NOREPLICATION
+    NOBYPASSRLS;
+
+GRANT USAGE ON SCHEMA public TO orgmetra_assignment_employment_guard_owner;
+GRANT SELECT ON TABLE
+    public.employment_record,
+    public.employment_record_version
+TO orgmetra_assignment_employment_guard_owner;
+
+-- SELECT ... FOR UPDATE requires an UPDATE privilege. Grant only one inert anchor
+-- column; the trigger never mutates employment_record and the role is not a login.
+GRANT UPDATE (recorded_from) ON TABLE public.employment_record
+    TO orgmetra_assignment_employment_guard_owner;
+GRANT EXECUTE ON FUNCTION public.current_tenant_record_id()
+    TO orgmetra_assignment_employment_guard_owner;
 
 CREATE FUNCTION public.guard_assignment_employment_coverage()
 RETURNS trigger
@@ -57,9 +97,20 @@ BEGIN
 END;
 $$;
 
+GRANT CREATE ON SCHEMA public TO orgmetra_assignment_employment_guard_owner;
+ALTER FUNCTION public.guard_assignment_employment_coverage()
+    OWNER TO orgmetra_assignment_employment_guard_owner;
+ALTER FUNCTION public.guard_assignment_employment_coverage()
+    SECURITY DEFINER;
+REVOKE CREATE ON SCHEMA public FROM orgmetra_assignment_employment_guard_owner;
+REVOKE ALL ON FUNCTION public.guard_assignment_employment_coverage() FROM PUBLIC;
+
 CREATE TRIGGER assignment_employment_coverage_guard
 BEFORE INSERT ON public.assignment_record
 FOR EACH ROW
 EXECUTE FUNCTION public.guard_assignment_employment_coverage();
+
+COMMENT ON FUNCTION public.guard_assignment_employment_coverage() IS
+    'Serializes Assignment INSERT against Employment separation using the shared Employment anchor, then proves the inserted Assignment interval remains fully covered by a current active/leave Employment version. The SECURITY DEFINER owner is a dedicated NOLOGIN/NOBYPASSRLS role with only tenant-scoped read and anchor-lock capability.';
 
 COMMIT;
