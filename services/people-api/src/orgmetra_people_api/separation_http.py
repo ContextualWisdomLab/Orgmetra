@@ -69,6 +69,14 @@ def _operational_uuid(field_name: str, value: object) -> UUID:
     return parsed
 
 
+def _generated_operational_uuid(field_name: str, id_factory: Callable[[], UUID]) -> UUID:
+    """Treat malformed server-generated identities as operational failure, never caller error."""
+    value = id_factory()
+    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
+        raise RuntimeError(f"{field_name} factory did not return an operational UUID")
+    return UUID(int=value.int)
+
+
 def _business_date(value: object) -> date:
     """Parse the published full-date representation without datetime coercion."""
     if type(value) is not str or _RFC3339_FULL_DATE.fullmatch(value) is None:
@@ -84,7 +92,8 @@ def _command_from_payload(
     tenant_record_id: UUID,
     idempotency_key: str,
     payload: Mapping[str, object],
-    id_factory: Callable[[], UUID],
+    audit_event_record_id: UUID,
+    outbox_delivery_record_id: UUID,
 ) -> EmploymentSeparationCommand:
     """Build one exact separation command without admitting extra body fields."""
     if frozenset(payload) != _BODY_KEYS:
@@ -103,8 +112,8 @@ def _command_from_payload(
         evidence_version_code=payload["evidence_version_code"],  # type: ignore[arg-type]
         confirmation_reference=payload["confirmation_reference"],  # type: ignore[arg-type]
         idempotency_key=idempotency_key,
-        audit_event_record_id=id_factory(),
-        outbox_delivery_record_id=id_factory(),
+        audit_event_record_id=audit_event_record_id,
+        outbox_delivery_record_id=outbox_delivery_record_id,
     )
 
 
@@ -222,12 +231,6 @@ class EmploymentSeparationAsgiApp:
 
         try:
             payload = await _read_json_object(receive)
-            command = _command_from_payload(
-                tenant_record_id=headers.tenant_record_id,
-                idempotency_key=headers.idempotency_key,
-                payload=payload,
-                id_factory=self.id_factory,
-            )
         except _PayloadTooLarge:
             await _send_error(
                 send,
@@ -235,7 +238,47 @@ class EmploymentSeparationAsgiApp:
                 payload={"error": "payload_too_large", "message": "Send one bounded JSON separation command and retry."},
             )
             return
-        except (_InvalidHttpRequest, ValueError, TypeError, StopIteration):
+        except (_InvalidHttpRequest, ValueError, TypeError):
+            await _send_error(
+                send,
+                status=400,
+                payload={"error": "invalid_request", "message": "Correct the separation command and retry."},
+            )
+            return
+
+        try:
+            audit_event_record_id = _generated_operational_uuid("audit_event_record_id", self.id_factory)
+            outbox_delivery_record_id = _generated_operational_uuid("outbox_delivery_record_id", self.id_factory)
+        except Exception as error:  # noqa: BLE001 - server identity generation is an operational dependency.
+            support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+            _LOGGER.error(
+                "Employment separation server identity generation failed",
+                extra={
+                    "tenant_record_id": str(headers.tenant_record_id),
+                    "exception_type": type(error).__name__,
+                    "support_reference": support_reference,
+                },
+            )
+            await _send_error(
+                send,
+                status=500,
+                payload={
+                    "error": "internal_error",
+                    "message": "Retry later or contact an Orgmetra operator with the support reference.",
+                },
+                support_reference=support_reference,
+            )
+            return
+
+        try:
+            command = _command_from_payload(
+                tenant_record_id=headers.tenant_record_id,
+                idempotency_key=headers.idempotency_key,
+                payload=payload,
+                audit_event_record_id=audit_event_record_id,
+                outbox_delivery_record_id=outbox_delivery_record_id,
+            )
+        except (_InvalidHttpRequest, ValueError, TypeError):
             await _send_error(
                 send,
                 status=400,
