@@ -48,7 +48,7 @@ jobs:
           ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
           ORGMETRA_POSTGRES_RUNNER_SHA256: bb84ea602542585d5c4d1156ea765d3dcdd7756da9d2ef7438096eed72364286
           ORGMETRA_POSTGRES_TEST_SHA256: 9c90ed386248961640aeeddabfefb9c98d96bf3c550474ffb50ec2705775c92b
-          ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256: 82a1bf78a15d70dce17a0550f8b48d4ece0b0e9adb75ac56ce4de0befd493bcc
+          ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256: 4778a536275c768677a25cd46fcb833d278f7fe627a762ad70fc7f2ec9828e1f
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
@@ -310,11 +310,12 @@ jobs:
             verify_candidate_bytes "$script"
             contract_runtime="$(mktemp -d "$runtime_parent/run.XXXXXX")"
             sudo -n chown "$contract_user" "$contract_runtime"
+            sudo -n -u "$contract_user" /usr/bin/install -d -m 0700 "$contract_runtime/.runtime"
             printf 'Executing PostgreSQL Foundation exact-tree contract as dedicated non-owner: %s -> %s\n' \
               "$script" "$execution_script"
             set +e
             sudo -n -u "$contract_user" env -i \
-              PATH="$PATH" \
+              PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
               DATABASE_URL="$database_url" \
               PGPASSWORD="$PGPASSWORD" \
               HOME="$contract_runtime" \
