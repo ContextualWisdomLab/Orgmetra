@@ -171,9 +171,10 @@ mapfile -t concurrent_evidence_parts < <(build_evidence "${CONCURRENT_DOCUMENT_R
 CONCURRENT_EVIDENCE="${concurrent_evidence_parts[0]}"
 CONCURRENT_EVIDENCE_DIGEST="${concurrent_evidence_parts[1]}"
 CONCURRENT_SQL="$(persist_sql "${CONCURRENT_KEY}" "${CONCURRENT_DOCUMENT_ID}" "${CONCURRENT_DOCUMENT_REFERENCE}" "${CONCURRENT_ARTIFACT_REFERENCE}" "${CONCURRENT_AUDIT_REFERENCE}" "${CONCURRENT_OUTBOX_REFERENCE}" "${APPLICATION_DIGEST}" "${CONCURRENT_EVIDENCE}" "${CONCURRENT_EVIDENCE_DIGEST}")"
-FIRST_INPUT="$(mktemp -u)"
-FIRST_OUTPUT="$(mktemp)"
-SECOND_OUTPUT="$(mktemp)"
+CONCURRENCY_DIR="$(mktemp -d)"
+FIRST_INPUT="${CONCURRENCY_DIR}/first-input"
+FIRST_OUTPUT="${CONCURRENCY_DIR}/first-output"
+SECOND_OUTPUT="${CONCURRENCY_DIR}/second-output"
 mkfifo "${FIRST_INPUT}"
 first_client_pid=""
 second_client_pid=""
@@ -185,7 +186,7 @@ cleanup() {
     if [[ -n "${first_client_pid}" ]] && kill -0 "${first_client_pid}" 2>/dev/null; then
         kill "${first_client_pid}" 2>/dev/null || true
     fi
-    rm -f "${FIRST_INPUT}" "${FIRST_OUTPUT}" "${SECOND_OUTPUT}"
+    rm -rf "${CONCURRENCY_DIR}"
 }
 trap cleanup EXIT
 
@@ -195,13 +196,21 @@ psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 \
     -v canonical_evidence="${CONCURRENT_EVIDENCE}" <"${FIRST_INPUT}" >"${FIRST_OUTPUT}" 2>&1 &
 first_client_pid=$!
 exec 3>"${FIRST_INPUT}"
-printf 'BEGIN;\nSELECT '\''FIRST_BACKEND|''' || pg_backend_pid()::text;\n%s\nSELECT '\''FIRST_LOCK_HELD''';\n' "${CONCURRENT_SQL}" >&3
+cat >&3 <<SQL
+BEGIN;
+${CONCURRENT_SQL}
+SQL
 
-first_ready=false
+FIRST_BACKEND_PID=""
 first_deadline=$((SECONDS + 10))
 while (( SECONDS < first_deadline )); do
-    if grep -q '^FIRST_LOCK_HELD$' "${FIRST_OUTPUT}"; then
-        first_ready=true
+    FIRST_BACKEND_PID="$(psql "${DATABASE_URL}" -Atqc "
+SELECT pid::text
+FROM pg_catalog.pg_stat_activity
+WHERE application_name = 'orgmetra_document_idempotency_first'
+  AND state = 'idle in transaction';
+" | head -n 1)"
+    if [[ "${FIRST_BACKEND_PID}" =~ ^[0-9]+$ ]]; then
         break
     fi
     if ! kill -0 "${first_client_pid}" 2>/dev/null; then
@@ -209,14 +218,9 @@ while (( SECONDS < first_deadline )); do
     fi
     sleep 0.05
 done
-if [[ "${first_ready}" != "true" ]]; then
-    echo "first concurrent session did not reach the held transaction boundary" >&2
-    cat "${FIRST_OUTPUT}" >&2
-    exit 1
-fi
-FIRST_BACKEND_PID="$(sed -n 's/^FIRST_BACKEND|//p' "${FIRST_OUTPUT}" | head -n 1)"
 if [[ ! "${FIRST_BACKEND_PID}" =~ ^[0-9]+$ ]]; then
-    echo "could not capture first PostgreSQL backend pid: ${FIRST_BACKEND_PID}" >&2
+    echo "first concurrent session did not reach an observable held transaction boundary" >&2
+    cat "${FIRST_OUTPUT}" >&2
     exit 1
 fi
 
