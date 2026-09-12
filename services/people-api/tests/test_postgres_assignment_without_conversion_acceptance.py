@@ -43,7 +43,7 @@ def test_generic_assignment_does_not_require_candidate_worker_conversion() -> No
                 (tenant_record_id, employment_record_version_id, employment_record_id,
                  employment_status_code, employment_concurrency_code, effective_from, recorded_from)
             VALUES ('{tenant}', '10000000-0000-7000-8004-000000000003', '{employment}',
-                    'active', 'exclusive', DATE '2026-09-01', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
+                    'active', 'exclusive', DATE '2026-08-17', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
             INSERT INTO organization_unit (tenant_record_id, organization_unit_id, recorded_from)
             VALUES ('{tenant}', '{organization}', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
             INSERT INTO job_profile (tenant_record_id, job_profile_id, recorded_from)
@@ -55,7 +55,7 @@ def test_generic_assignment_does_not_require_candidate_worker_conversion() -> No
                 (tenant_record_id, position_record_version_id, position_record_id,
                  position_status_code, effective_from, recorded_from)
             VALUES ('{tenant}', '10000000-0000-7000-8004-000000000004', '{position}',
-                    'open', DATE '2026-09-01', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
+                    'open', DATE '2026-08-17', pg_catalog.clock_timestamp() - INTERVAL '5 minutes');
             """,
         )
         assert psql(
