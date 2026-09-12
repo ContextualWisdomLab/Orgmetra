@@ -1,6 +1,6 @@
 # Product and technical gap baseline
 
-Verified: 2026-09-10 (Asia/Seoul) for Orgmetra protected/product refs. External owner-repository evidence is treated as dependency context and must be re-fetched in its canonical owner lane before mutation or release claims.
+Verified: 2026-09-12 (Asia/Seoul) for Orgmetra protected/product refs. External owner-repository evidence is treated as dependency context and must be re-fetched in its canonical owner lane before mutation or release claims.
 
 This is Orgmetra’s durable commercialization baseline, not merge authorization and not a frozen PR inventory. Volatile PR heads, workflow-run IDs, queue states, reviews, mergeability and base tips are live GitHub truth and must be fetched again before every material action.
 
@@ -117,6 +117,10 @@ UI work must use reusable objects/page composition and product design evidence r
 - DDD subdomains, bounded contexts, UL, aggregates, entities, value objects, domain services, repositories, events and invariants must agree across code/API/DB/tests.
 - Relational authoritative truth remains normalized; read models are separated explicitly when measured need justifies them.
 - Tenant, bitemporal, lock/partition and item-level UPSERT/idempotency contracts are tested at database boundaries.
+- Tenant authority is bound before acquiring advisory locks, leases or other database-global coordination state; eventual RLS rejection is not a substitute for the owning domain check, including for privileged maintenance and test principals.
+- Idempotent replay binds every server-owned result field, including the original database timestamp, and canonicalizes session-sensitive temporal input inside the owner boundary. A uniqueness violation or presentation-equivalent timestamp is not replay evidence.
+- Database/security acceptance runs temporary principals with collision-resistant per-execution identities. Failure cleanup remains best-effort so it cannot mask the causal assertion, while normal completion fails closed unless cleanup is verified.
+- Acceptance executables consume an immutable exact-candidate tree covering transitive migrations, helpers and configuration, not only hashed root scripts. They start from an empty or explicit allowlisted environment with a reviewed executable path and principal-owned disposable HOME, TMPDIR and XDG directories; ambient CI variables and mutable-worktree paths are not execution authority.
 - Multiple assignments/memberships and time-varying context remain representable; person-level inference must not silently commit atomistic fallacy.
 - Material mathematical/psychometric/EDA/vector/linear/matrix/token-size computation is Rust-first with bounded CPU parallelism and justified GPU parity.
 - Psychometric acceptance uses true-parameter recovery, RMSE, bias, coverage and reproducibility. Synthetic data is unit-test evidence, not real-world acceptance.
