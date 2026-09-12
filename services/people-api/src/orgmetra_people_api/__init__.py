@@ -51,6 +51,7 @@ from orgmetra_people_api.separation import (
     EmploymentSeparationResult,
     separate_employment_record,
 )
+from orgmetra_people_api.separation_http import EmploymentSeparationAsgiApp
 
 __all__ = [
     "AuthenticatedPrincipal",
@@ -80,6 +81,7 @@ __all__ = [
     "AssignmentMutationResult",
     "EmploymentMutationCommand",
     "EmploymentMutationResult",
+    "EmploymentSeparationAsgiApp",
     "EmploymentSeparationCommand",
     "EmploymentSeparationIntegrityError",
     "EmploymentSeparationPort",
