@@ -181,8 +181,8 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
             authorization(purpose_code="benefits_admin"),
             authorization(operation_code="create_record"),
             authorization(resource_kind="assignment_record"),
-            authorization(requested_fields=frozenset({"assignment_record")),
-            authorization(authorized_fields=frozenset({"assignment_record")),
+            authorization(requested_fields=frozenset({"assignment_record"})),
+            authorization(authorized_fields=frozenset({"assignment_record"})),
         )
         for decision in cases:
             with self.subTest(decision=decision), self.assertRaises(EmploymentSeparationIntegrityError):
