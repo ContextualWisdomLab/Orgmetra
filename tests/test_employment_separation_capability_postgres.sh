@@ -68,8 +68,27 @@ if [[ "${security_invoker}" != "true" ]]; then
     exit 1
 fi
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
-CREATE ROLE orgmetra_employment_separation_probe
+probe_suffix="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "SELECT substr(replace(gen_random_uuid()::text, '-', ''), 1, 24);")"
+if [[ ! "${probe_suffix}" =~ ^[0-9a-f]{24}$ ]]; then
+    echo "failed to generate collision-resistant Employment separation probe identity" >&2
+    exit 1
+fi
+probe_role="orgmetra_employment_separation_probe_${probe_suffix}"
+probe_role_created=false
+
+cleanup_probe_role_best_effort() {
+    if [[ "${probe_role_created}" != "true" ]]; then
+        return
+    fi
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v probe_role="${probe_role}" >/dev/null 2>&1 <<'SQL' || true
+DROP OWNED BY :"probe_role";
+DROP ROLE :"probe_role";
+SQL
+}
+trap cleanup_probe_role_best_effort EXIT
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v probe_role="${probe_role}" <<'SQL'
+CREATE ROLE :"probe_role"
     NOLOGIN
     NOSUPERUSER
     NOCREATEDB
@@ -77,10 +96,11 @@ CREATE ROLE orgmetra_employment_separation_probe
     NOINHERIT
     NOBYPASSRLS;
 SQL
+probe_role_created=true
 
 set +e
-probe_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
-SET ROLE orgmetra_employment_separation_probe;
+probe_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v probe_role="${probe_role}" <<'SQL'
+SET ROLE :"probe_role";
 SET orgmetra.tenant_record_id = '10000000-0000-7000-8000-000000000001';
 SELECT *
 FROM public.separate_employment_record_once(
@@ -104,9 +124,16 @@ SQL
 probe_status=$?
 set -e
 
-psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
-DROP ROLE orgmetra_employment_separation_probe;
+if ! psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v probe_role="${probe_role}" <<'SQL'
+DROP OWNED BY :"probe_role";
+DROP ROLE :"probe_role";
 SQL
+then
+    echo "failed to clean Employment separation probe role after successful acceptance path" >&2
+    exit 1
+fi
+probe_role_created=false
+trap - EXIT
 
 if [[ ${probe_status} -eq 0 ]]; then
     echo "ungranted probe role unexpectedly executed Employment separation" >&2
