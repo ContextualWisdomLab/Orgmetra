@@ -153,8 +153,11 @@ if [[ "${counts}" != "1|1" ]]; then
     exit 1
 fi
 
-recorded_at_binding="$(psql "${DATABASE_URL}" -Atqc "
-SELECT (persisted.recorded_at = receipt.recorded_at)::text
+returned_recorded_at_epoch="${first_result##*|}"
+durable_recorded_at_epochs="$(psql "${DATABASE_URL}" -Atqc "
+SELECT
+    extract(epoch FROM persisted.recorded_at)::text || '|' ||
+    extract(epoch FROM receipt.recorded_at)::text
 FROM document_record AS persisted
 JOIN document_record_persist_receipt AS receipt
   ON receipt.tenant_record_id = persisted.tenant_record_id
@@ -162,8 +165,8 @@ JOIN document_record_persist_receipt AS receipt
 WHERE receipt.tenant_record_id = '${TENANT_ID}'::uuid
   AND receipt.idempotency_key = '${IDEMPOTENCY_KEY}';
 ")"
-if [[ "${recorded_at_binding}" != "true" ]]; then
-    echo "replay receipt database time diverged from the original committed document time: ${recorded_at_binding}" >&2
+if [[ -z "${returned_recorded_at_epoch}" || "${durable_recorded_at_epochs}" != "${returned_recorded_at_epoch}|${returned_recorded_at_epoch}" ]]; then
+    echo "replay result database time is not bound to the original durable document and receipt time: returned=${returned_recorded_at_epoch} durable=${durable_recorded_at_epochs}" >&2
     exit 1
 fi
 
