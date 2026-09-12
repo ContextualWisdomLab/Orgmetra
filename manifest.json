@@ -154,6 +154,12 @@
       "lines": 179
     },
     {
+      "path": "database/migrations/0017_assignment_employment_separation_serialization.sql",
+      "sha256": "115e19bd6fa83d5715ed64b40790543723a5f588b1563b0b6c8ccc1310779848",
+      "bytes": 4703,
+      "lines": 116
+    },
+    {
       "path": "docs/API_CONTRACT.md",
       "sha256": "63533dff785da62b89e585d742a158e2aeb05913644f2bf9fb6486f281c2e589",
       "bytes": 4555,
@@ -406,6 +412,12 @@
       "lines": 210
     },
     {
+      "path": "tests/test_assignment_separation_serialization_postgres.sh",
+      "sha256": "899b21b5472176b79c0651d39ebcaccf7d0374ddc38f2172191172df2f44b638",
+      "bytes": 16002,
+      "lines": 380
+    },
+    {
       "path": "tests/test_audit_outbox_hardening_postgres.sh",
       "sha256": "518ba2f37ba6292943e5abe22c2599452b2f031a42e453b2493aedf8714421a0",
       "bytes": 13396,
@@ -497,9 +509,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "e6dd1cd0684f9e4b4118335ae353aeba6fe205e414080eccb6a6ffce52fb36a1",
-      "bytes": 28048,
-      "lines": 654
+      "sha256": "50370ee20344d412682101c1eedb300876f7299fa6b2b5536cb6db38aee1b710",
+      "bytes": 28197,
+      "lines": 656
     }
   ]
 }
