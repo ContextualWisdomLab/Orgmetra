@@ -128,10 +128,10 @@ CANONICAL_EVIDENCE="${evidence_parts[0]}"
 EVIDENCE_DIGEST="${evidence_parts[1]}"
 SQL_TEXT="$(persist_sql "${IDEMPOTENCY_KEY}" "${DOCUMENT_ID}" "${DOCUMENT_REFERENCE}" "${ARTIFACT_REFERENCE}" "${AUDIT_REFERENCE}" "${OUTBOX_REFERENCE}" "${APPLICATION_DIGEST}" "${CANONICAL_EVIDENCE}" "${EVIDENCE_DIGEST}")"
 
-first_result="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -v canonical_evidence="${CANONICAL_EVIDENCE}" -c "${SQL_TEXT}")"
-retry_result="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -v canonical_evidence="${CANONICAL_EVIDENCE}" -c "${SQL_TEXT}")"
+first_result="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -v canonical_evidence="${CANONICAL_EVIDENCE}" -c "SET TIME ZONE 'UTC'; ${SQL_TEXT}")"
+retry_result="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -v canonical_evidence="${CANONICAL_EVIDENCE}" -c "SET TIME ZONE 'Asia/Seoul'; ${SQL_TEXT}")"
 if [[ "${first_result}" != "${retry_result}" ]]; then
-    echo "same semantic retry did not converge to the original receipt" >&2
+    echo "same semantic retry changed across session time zones instead of returning the original receipt" >&2
     exit 1
 fi
 
