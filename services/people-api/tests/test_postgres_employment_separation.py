@@ -74,7 +74,7 @@ class DatabaseFailure(RuntimeError):
 class FakeCursor(AbstractContextManager["FakeCursor"]):
     """Record SQL calls and supply one fixed database result or failure."""
 
-    def __init__(self, *, row: tuple[object, ...] | None = None, failure: Exception | None = None) -> None:
+    def __init__(self, *, row: object | None = None, failure: Exception | None = None) -> None:
         self.row = row
         self.failure = failure
         self.calls: list[tuple[str, object | None]] = []
@@ -90,10 +90,18 @@ class FakeCursor(AbstractContextManager["FakeCursor"]):
         if "separate_employment_record_once" in sql and self.failure is not None:
             raise self.failure
 
-    def fetchmany(self, size: int) -> list[tuple[object, ...]]:
+    def fetchmany(self, size: int) -> object:
         if size != 2 or self.row is None:
             return []
         return [self.row]
+
+
+class InvalidBatchCursor(FakeCursor):
+    """Return a non-container fetch batch to exercise the DB trust boundary."""
+
+    def fetchmany(self, size: int) -> object:
+        del size
+        return object()
 
 
 class FakeConnection(AbstractContextManager["FakeConnection"]):
@@ -165,7 +173,8 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
 
     def test_rejects_authorization_that_does_not_match_exact_operation(self) -> None:
         port = PostgresEmploymentSeparationPort(ConnectionFactory(FakeConnection(FakeCursor())))
-        cases = (
+        cases: tuple[object, ...] = (
+            object(),
             authorization(allowed=False, authorized_fields=frozenset()),
             authorization(tenant_record_id=UUID("0198a412-8000-7000-8000-000000000099")),
             authorization(resource_reference="employment_record:0198a412800070008000000000000099"),
@@ -177,21 +186,27 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
         )
         for decision in cases:
             with self.subTest(decision=decision), self.assertRaises(EmploymentSeparationIntegrityError):
-                port.separate_employment(command=command(), authorization=decision)
+                port.separate_employment(command=command(), authorization=decision)  # type: ignore[arg-type]
 
     def test_rejects_malformed_database_result(self) -> None:
         rows = (
             None,
+            "not-a-row",
             (EMPLOYMENT, TERMINAL_VERSION, RECORDED_AT),
             (EMPLOYMENT, TERMINAL_VERSION, RECORDED_AT, False, "extra"),
             (UUID(int=0), TERMINAL_VERSION, RECORDED_AT, False),
             (EMPLOYMENT, TERMINAL_VERSION, datetime(2026, 9, 12, 15, 0), False),
             (EMPLOYMENT, TERMINAL_VERSION, RECORDED_AT, 1),
+            (UUID("0198a412-8000-7000-8000-000000000099"), TERMINAL_VERSION, RECORDED_AT, False),
         )
         for row in rows:
-            with self.subTest(row=row), self.assertRaises((EmploymentSeparationIntegrityError, ValueError)):
+            with self.subTest(row=row), self.assertRaises(EmploymentSeparationIntegrityError):
                 port = PostgresEmploymentSeparationPort(ConnectionFactory(FakeConnection(FakeCursor(row=row))))
                 port.separate_employment(command=command(), authorization=authorization())
+
+        with self.assertRaises(EmploymentSeparationIntegrityError):
+            port = PostgresEmploymentSeparationPort(ConnectionFactory(FakeConnection(InvalidBatchCursor())))
+            port.separate_employment(command=command(), authorization=authorization())
 
     def test_maps_governed_conflicts_but_not_permission_failures(self) -> None:
         cases = (
@@ -214,6 +229,14 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
                 ConnectionFactory(FakeConnection(FakeCursor(failure=permission_failure)))
             )
             port.separate_employment(command=command(), authorization=authorization())
+
+    def test_requires_typed_command_and_callable_factory(self) -> None:
+        with self.assertRaisesRegex(TypeError, "connection_factory"):
+            PostgresEmploymentSeparationPort(object())  # type: ignore[arg-type]
+
+        port = PostgresEmploymentSeparationPort(ConnectionFactory(FakeConnection(FakeCursor())))
+        with self.assertRaisesRegex(TypeError, "EmploymentSeparationCommand"):
+            port.separate_employment(command=object(), authorization=authorization())  # type: ignore[arg-type]
 
     def test_structurally_binds_connection_factory(self) -> None:
         factory = ConnectionFactory(FakeConnection(FakeCursor(row=(EMPLOYMENT, TERMINAL_VERSION, RECORDED_AT, True))))
