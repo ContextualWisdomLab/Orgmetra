@@ -322,6 +322,15 @@ BEGIN
 END;
 $$;
 
+-- PostgreSQL grants EXECUTE on newly created functions to PUBLIC by default.
+-- This persistence port is an application capability, not a cluster-wide API;
+-- keep owner execution implicit and require any future service role to receive
+-- an explicit purpose-bound grant in its owning provisioning boundary.
+REVOKE EXECUTE ON FUNCTION public.persist_document_record_once(
+    uuid, text, uuid, text, text, text, text, text, text, text, text, text,
+    text, text, timestamptz, text, text, text, text, text
+) FROM PUBLIC;
+
 COMMENT ON FUNCTION public.persist_document_record_once(
     uuid, text, uuid, text, text, text, text, text, text, text, text, text,
     text, text, timestamptz, text, text, text, text, text
