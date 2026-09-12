@@ -113,6 +113,11 @@ DECLARE
     v_document_recorded_at timestamptz;
     v_receipt_digest text;
 BEGIN
+    IF pg_catalog.current_setting('transaction_isolation') IS DISTINCT FROM 'read committed' THEN
+        RAISE EXCEPTION 'document persistence idempotency requires read committed transaction isolation'
+            USING ERRCODE = '25000';
+    END IF;
+
     IF p_tenant_record_id IS NULL
        OR p_idempotency_key IS NULL
        OR p_document_record_id IS NULL
@@ -316,6 +321,6 @@ COMMENT ON FUNCTION public.persist_document_record_once(
     uuid, text, uuid, text, text, text, text, text, text, text, text, text,
     text, text, timestamptz, text, text, text, text, text
 ) IS
-    'Persists one immutable document-record fact and replay receipt under a tenant-scoped transaction advisory lock. Same-key same-semantic retries return the first committed result; changed semantics fail closed before any second document write. Digest serialization executes with function-local UTC TimeZone so equivalent timestamptz values do not change replay identity across caller sessions.';
+    'Persists one immutable document-record fact and replay receipt under a tenant-scoped transaction advisory lock. The owner fails closed outside Read Committed because replay visibility relies on a fresh post-lock statement snapshot. Same-key same-semantic retries return the first committed result; changed semantics fail closed. Digest serialization uses function-local UTC so equivalent timestamptz values do not change replay identity across caller sessions.';
 
 COMMIT;
