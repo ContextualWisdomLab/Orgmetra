@@ -62,6 +62,13 @@ class FoundationPostgresProcessQuiescenceTests(unittest.TestCase):
         self.assertIn('sudo -n rm -rf -- "$runtime_parent"', execution)
         self.assertNotIn('HOME=/tmp', execution)
 
+    def test_scrubs_inherited_environment_before_each_executable(self) -> None:
+        execution = self._execution_step()
+
+        self.assertIn('sudo -n -u "$contract_user" env -i \\', execution)
+        self.assertIn('PATH="$PATH" \\', execution)
+        self.assertNotIn('sudo -n -u "$contract_user" env \\', execution)
+
 
 if __name__ == "__main__":
     unittest.main()
