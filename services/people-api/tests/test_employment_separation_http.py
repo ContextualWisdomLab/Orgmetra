@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date, datetime, timezone
 import json
 import unittest
@@ -116,13 +117,14 @@ class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
         authenticator: object | None = None,
         policy: object | None = None,
         separation_port: object | None = None,
+        id_factory: Callable[[], UUID] | None = None,
     ) -> EmploymentSeparationAsgiApp:
         generated = iter((AUDIT_EVENT, OUTBOX))
         return EmploymentSeparationAsgiApp(
             authenticator=authenticator if authenticator is not None else FakeAuthenticator(self.principal),
             policy=policy if policy is not None else self.policy,
             separation_port=separation_port if separation_port is not None else RecordingSeparationPort(),
-            id_factory=generated.__next__,
+            id_factory=id_factory if id_factory is not None else generated.__next__,
         )
 
     async def _request(
@@ -169,6 +171,13 @@ class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
             self._app(policy=object())
         with self.assertRaisesRegex(TypeError, "separation_port"):
             self._app(separation_port=object())
+        with self.assertRaisesRegex(TypeError, "id_factory"):
+            EmploymentSeparationAsgiApp(
+                authenticator=FakeAuthenticator(self.principal),
+                policy=self.policy,
+                separation_port=RecordingSeparationPort(),
+                id_factory=17,  # type: ignore[arg-type]
+            )
 
     async def test_success_returns_database_owned_terminal_version_and_replay_evidence(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
@@ -205,14 +214,13 @@ class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
         port = RecordingSeparationPort()
         app = self._app(separation_port=port)
         cases = (
-            {"method": "GET", "expected": 405},
-            {"path": "/v1/unknown", "expected": 404},
-            {"headers": valid_headers(purpose=b"benefits_admin"), "expected": 403},
+            ({"method": "GET"}, 405),
+            ({"path": "/v1/unknown"}, 404),
+            ({"headers": valid_headers(purpose=b"benefits_admin")}, 403),
         )
-        for case in cases:
-            with self.subTest(case=case):
-                expected = int(case.pop("expected"))
-                status, _, payload = await self._request(app, **case)
+        for request, expected in cases:
+            with self.subTest(request=request):
+                status, _, payload = await self._request(app, **request)
                 self.assertEqual(status, expected)
                 self.assertIn("error_code", payload)
         self.assertEqual(port.calls, [])
@@ -259,6 +267,21 @@ class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, 409)
         self.assertEqual(payload["error_code"], "separation_conflict")
         self.assertNotIn("sensitive backend detail", json.dumps(payload))
+
+    async def test_server_generated_identity_failure_is_internal_not_client_error(self) -> None:
+        port = RecordingSeparationPort()
+
+        def unavailable_id_factory() -> UUID:
+            raise RuntimeError("entropy source unavailable")
+
+        status, _, payload = await self._request(
+            self._app(separation_port=port, id_factory=unavailable_id_factory)
+        )
+
+        self.assertEqual(status, 500)
+        self.assertEqual(payload["error_code"], "internal_error")
+        self.assertNotIn("entropy source unavailable", json.dumps(payload))
+        self.assertEqual(port.calls, [])
 
 
 if __name__ == "__main__":  # pragma: no cover
