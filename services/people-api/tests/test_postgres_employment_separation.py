@@ -105,15 +105,17 @@ class InvalidBatchCursor(FakeCursor):
 
 
 class FakeConnection(AbstractContextManager["FakeConnection"]):
-    """Expose one cursor through the DB-API context-manager shape."""
+    """Expose one cursor and capture whether the transaction exits with an error."""
 
     def __init__(self, cursor: FakeCursor) -> None:
         self._cursor = cursor
+        self.exit_exception_type: object | None = None
 
     def __enter__(self) -> "FakeConnection":
         return self
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        self.exit_exception_type = exc_type
         return None
 
     def cursor(self) -> FakeCursor:
@@ -137,12 +139,14 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
 
     def test_calls_governed_function_in_one_tenant_bound_transaction(self) -> None:
         cursor = FakeCursor(row=(EMPLOYMENT, TERMINAL_VERSION, RECORDED_AT, False))
-        factory = ConnectionFactory(FakeConnection(cursor))
+        connection = FakeConnection(cursor)
+        factory = ConnectionFactory(connection)
         port = PostgresEmploymentSeparationPort(factory)
 
         result = port.separate_employment(command=command(), authorization=authorization())
 
         self.assertEqual(factory.calls, 1)
+        self.assertIsNone(connection.exit_exception_type)
         self.assertEqual(result.employment_record_id, EMPLOYMENT)
         self.assertEqual(result.separated_employment_record_version_id, TERMINAL_VERSION)
         self.assertEqual(result.recorded_at, RECORDED_AT)
@@ -188,7 +192,7 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
             with self.subTest(decision=decision), self.assertRaises(EmploymentSeparationIntegrityError):
                 port.separate_employment(command=command(), authorization=decision)  # type: ignore[arg-type]
 
-    def test_rejects_malformed_database_result(self) -> None:
+    def test_rejects_malformed_database_result_before_transaction_commit_boundary(self) -> None:
         rows = (
             None,
             "not-a-row",
@@ -200,13 +204,17 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
             (UUID("0198a412-8000-7000-8000-000000000099"), TERMINAL_VERSION, RECORDED_AT, False),
         )
         for row in rows:
+            connection = FakeConnection(FakeCursor(row=row))
             with self.subTest(row=row), self.assertRaises(EmploymentSeparationIntegrityError):
-                port = PostgresEmploymentSeparationPort(ConnectionFactory(FakeConnection(FakeCursor(row=row))))
+                port = PostgresEmploymentSeparationPort(ConnectionFactory(connection))
                 port.separate_employment(command=command(), authorization=authorization())
+            self.assertIs(connection.exit_exception_type, EmploymentSeparationIntegrityError)
 
+        connection = FakeConnection(InvalidBatchCursor())
         with self.assertRaises(EmploymentSeparationIntegrityError):
-            port = PostgresEmploymentSeparationPort(ConnectionFactory(FakeConnection(InvalidBatchCursor())))
+            port = PostgresEmploymentSeparationPort(ConnectionFactory(connection))
             port.separate_employment(command=command(), authorization=authorization())
+        self.assertIs(connection.exit_exception_type, EmploymentSeparationIntegrityError)
 
     def test_maps_governed_conflicts_but_not_permission_failures(self) -> None:
         cases = (
