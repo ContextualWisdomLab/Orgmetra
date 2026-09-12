@@ -3,6 +3,26 @@
 -- database transaction that checks replay state and writes the immutable fact;
 -- no external computation or network work occurs while it is held.
 
+-- Capability-role names are security boundaries. Reusing an existing cluster
+-- role could retain memberships or object ACLs that CREATE ROLE cannot erase.
+-- Fail before changing any project object so a collision cannot leave partial
+-- persistence migration state behind.
+DO $orgmetra_document_persistence_role_preflight$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles
+        WHERE rolname IN (
+            'orgmetra_document_persistence_owner',
+            'orgmetra_document_persistence_executor'
+        )
+    ) THEN
+        RAISE EXCEPTION 'pre-existing document persistence capability role is not accepted'
+            USING ERRCODE = '42710';
+    END IF;
+END;
+$orgmetra_document_persistence_role_preflight$;
+
 BEGIN;
 
 SET LOCAL search_path = public, pg_catalog;
@@ -323,18 +343,52 @@ END;
 $$;
 
 -- PostgreSQL grants EXECUTE on newly created functions to PUBLIC by default.
--- This persistence port is an application capability, not a cluster-wide API;
--- keep owner execution implicit and require any future service role to receive
--- an explicit purpose-bound grant in its owning provisioning boundary.
+-- Revoke that ambient capability before transferring this write boundary to a
+-- dedicated NOLOGIN owner. The externally assignable executor gets only
+-- schema USAGE + function EXECUTE and therefore cannot bypass replay semantics
+-- through direct table DML.
 REVOKE EXECUTE ON FUNCTION public.persist_document_record_once(
     uuid, text, uuid, text, text, text, text, text, text, text, text, text,
     text, text, timestamptz, text, text, text, text, text
 ) FROM PUBLIC;
 
+CREATE ROLE orgmetra_document_persistence_owner
+    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+CREATE ROLE orgmetra_document_persistence_executor
+    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+
+GRANT USAGE ON SCHEMA public
+    TO orgmetra_document_persistence_owner, orgmetra_document_persistence_executor;
+GRANT SELECT, INSERT ON TABLE public.document_record
+    TO orgmetra_document_persistence_owner;
+GRANT SELECT, INSERT ON TABLE public.document_record_persist_receipt
+    TO orgmetra_document_persistence_owner;
+GRANT EXECUTE ON FUNCTION public.current_tenant_record_id()
+    TO orgmetra_document_persistence_owner;
+GRANT EXECUTE ON FUNCTION public.digest(bytea, text)
+    TO orgmetra_document_persistence_owner;
+
+-- ALTER FUNCTION OWNER requires CREATE on the containing schema for the target
+-- owner. Grant it only for this ownership handoff, then revoke it before commit.
+GRANT CREATE ON SCHEMA public TO orgmetra_document_persistence_owner;
+ALTER FUNCTION public.persist_document_record_once(
+    uuid, text, uuid, text, text, text, text, text, text, text, text, text,
+    text, text, timestamptz, text, text, text, text, text
+) OWNER TO orgmetra_document_persistence_owner;
+ALTER FUNCTION public.persist_document_record_once(
+    uuid, text, uuid, text, text, text, text, text, text, text, text, text,
+    text, text, timestamptz, text, text, text, text, text
+) SECURITY DEFINER;
+REVOKE CREATE ON SCHEMA public FROM orgmetra_document_persistence_owner;
+GRANT EXECUTE ON FUNCTION public.persist_document_record_once(
+    uuid, text, uuid, text, text, text, text, text, text, text, text, text,
+    text, text, timestamptz, text, text, text, text, text
+) TO orgmetra_document_persistence_executor;
+
 COMMENT ON FUNCTION public.persist_document_record_once(
     uuid, text, uuid, text, text, text, text, text, text, text, text, text,
     text, text, timestamptz, text, text, text, text, text
 ) IS
-    'Persists one immutable document-record fact and replay receipt under a tenant-scoped transaction advisory lock. The caller tenant context must match the requested tenant before any replay lock or durable write. The owner fails closed outside Read Committed because replay visibility relies on a fresh post-lock statement snapshot. Same-key same-semantic retries return the first committed result; changed semantics fail closed. Digest serialization uses function-local UTC so equivalent timestamptz values do not change replay identity across caller sessions.';
+    'Persists one immutable document-record fact and replay receipt under a tenant-scoped transaction advisory lock. The SECURITY DEFINER function is owned by a dedicated NOLOGIN/NOBYPASSRLS role with only SELECT/INSERT on document persistence tables; the externally assignable executor role has EXECUTE only and cannot bypass replay semantics with direct DML. The caller tenant context must match the requested tenant before any replay lock or durable write. The owner fails closed outside Read Committed because replay visibility relies on a fresh post-lock statement snapshot. Same-key same-semantic retries return the first committed result; changed semantics fail closed. Digest serialization uses function-local UTC so equivalent timestamptz values do not change replay identity across caller sessions.';
 
 COMMIT;
