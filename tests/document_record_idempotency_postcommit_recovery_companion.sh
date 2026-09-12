@@ -3,19 +3,21 @@ set -euo pipefail
 
 : "${DATABASE_URL:=postgresql://orgmetra:orgmetra@localhost:5432/orgmetra}"
 
-for migration in \
-    database/migrations/0001_foundation_schema.sql \
-    database/migrations/0002_sealed_evidence_digest.sql \
-    database/migrations/0021_document_record_persistence.sql \
-    database/migrations/0022_document_record_evidence_unique_keys.sql \
-    database/migrations/0023_document_record_canonical_encoding.sql \
-    database/migrations/0024_document_record_idempotent_persistence.sql; do
-    if [[ ! -f "${migration}" ]]; then
-        echo "required document-record post-commit recovery migration is missing: ${migration}" >&2
-        exit 1
-    fi
-    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
-done
+required_owner_state="$(psql "${DATABASE_URL}" -Atq -v ON_ERROR_STOP=1 -c "
+SELECT (
+    pg_catalog.to_regclass('public.document_record_persist_receipt') IS NOT NULL
+    AND EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_proc
+        WHERE pronamespace = 'public'::pg_catalog.regnamespace
+          AND proname = 'persist_document_record_once'
+    )
+)::text;
+")"
+if [[ "${required_owner_state}" != "true" ]]; then
+    echo "post-commit recovery companion requires the document-record idempotency root contract to run first" >&2
+    exit 1
+fi
 
 TENANT_ID="30000000-0000-7000-8000-000000000003"
 DOCUMENT_ID="00000000-0000-7000-8000-000000000231"
