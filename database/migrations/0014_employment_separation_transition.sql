@@ -154,9 +154,7 @@ CREATE FUNCTION public.separate_employment_record_once(
     p_confirmation_reference text,
     p_idempotency_key text,
     p_audit_event_record_id uuid,
-    p_outbox_delivery_record_id uuid,
-    p_canonical_event_json text,
-    p_event_envelope_digest text
+    p_outbox_delivery_record_id uuid
 )
 RETURNS TABLE (
     employment_record_id uuid,
@@ -184,7 +182,9 @@ DECLARE
     v_separated_version_id uuid;
     v_separation_record_id uuid;
     v_idempotency_record_id uuid;
-    v_event jsonb;
+    v_event_time text;
+    v_canonical_event_json text;
+    v_event_envelope_digest text;
 BEGIN
     v_current_tenant := public.current_tenant_record_id();
     IF v_current_tenant IS DISTINCT FROM p_tenant_record_id THEN
@@ -423,32 +423,36 @@ BEGIN
         v_recorded_at
     );
 
-    BEGIN
-        v_event := p_canonical_event_json::jsonb;
-    EXCEPTION WHEN others THEN
-        RAISE EXCEPTION 'employment separation audit event is invalid JSON'
-            USING ERRCODE = '22023';
-    END;
-    IF v_event ->> 'type' IS DISTINCT FROM 'orgmetra.people.employment_separated'
-       OR v_event ->> 'subject' IS DISTINCT FROM 'employment_record:' || p_employment_record_id::text
-       OR v_event ->> 'orgmetratenant' IS DISTINCT FROM p_tenant_record_id::text
-       OR v_event ->> 'orgmetraactor' IS DISTINCT FROM p_actor_reference
-       OR v_event ->> 'orgmetrapurpose' IS DISTINCT FROM p_purpose_code
-       OR v_event ->> 'orgmetrareason' IS DISTINCT FROM p_separation_reason_code
-       OR v_event ->> 'orgmetraevidence' IS DISTINCT FROM p_evidence_version_code
-       OR v_event ->> 'orgmetraconfirmation' IS DISTINCT FROM p_confirmation_reference
-       OR v_event #>> '{data,result_code}' IS DISTINCT FROM 'employment_separated'
-       OR v_event #>> '{data,high_impact}' IS DISTINCT FROM 'true' THEN
-        RAISE EXCEPTION 'employment separation audit event does not match command semantics'
-            USING ERRCODE = '22023';
-    END IF;
+    v_event_time := pg_catalog.to_char(
+        v_recorded_at AT TIME ZONE 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+    );
+    v_canonical_event_json :=
+        '{"data":{"high_impact":true,"result_code":"employment_separated"},'
+        || '"datacontenttype":"application/json",'
+        || '"id":' || pg_catalog.to_json(p_audit_event_record_id::text)::text || ','
+        || '"orgmetraactor":' || pg_catalog.to_json(p_actor_reference)::text || ','
+        || '"orgmetraconfirmation":' || pg_catalog.to_json(p_confirmation_reference)::text || ','
+        || '"orgmetraevidence":' || pg_catalog.to_json(p_evidence_version_code)::text || ','
+        || '"orgmetrapurpose":' || pg_catalog.to_json(p_purpose_code)::text || ','
+        || '"orgmetrareason":' || pg_catalog.to_json(p_separation_reason_code)::text || ','
+        || '"orgmetratenant":' || pg_catalog.to_json(p_tenant_record_id::text)::text || ','
+        || '"source":"urn:orgmetra:people_api",'
+        || '"specversion":"1.0",'
+        || '"subject":' || pg_catalog.to_json('employment_record:' || p_employment_record_id::text)::text || ','
+        || '"time":' || pg_catalog.to_json(v_event_time)::text || ','
+        || '"type":"orgmetra.people.employment_separated"}';
+    v_event_envelope_digest := encode(
+        digest(convert_to(v_canonical_event_json, 'UTF8'), 'sha256'),
+        'hex'
+    );
 
     PERFORM public.record_audit_outbox_event(
         p_tenant_record_id,
         p_audit_event_record_id,
         p_outbox_delivery_record_id,
-        p_canonical_event_json,
-        p_event_envelope_digest,
+        v_canonical_event_json,
+        v_event_envelope_digest,
         'orgmetra_domain_events'
     );
 
