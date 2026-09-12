@@ -48,7 +48,7 @@ jobs:
           ORGMETRA_POSTGRES_REGISTRY_SHA256: 66e27b4dfcd730ca4ea0cdf136e0e7e6dd6244f6abb91262671a8a95b9bc1d64
           ORGMETRA_POSTGRES_RUNNER_SHA256: bb84ea602542585d5c4d1156ea765d3dcdd7756da9d2ef7438096eed72364286
           ORGMETRA_POSTGRES_TEST_SHA256: 9c90ed386248961640aeeddabfefb9c98d96bf3c550474ffb50ec2705775c92b
-          ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256: 6814ecb6a6cf983aad935c8a022ed05cb19759ca502d6fc24c6e47e0a7ef720d
+          ORGMETRA_POSTGRES_QUIESCENCE_TEST_SHA256: 82a1bf78a15d70dce17a0550f8b48d4ece0b0e9adb75ac56ce4de0befd493bcc
         run: |
           set -euo pipefail
           printf '%s  %s\n' "$ORGMETRA_POSTGRES_REGISTRY_SHA256" .github/foundation-postgres-contracts.json | sha256sum --check --strict
@@ -90,16 +90,20 @@ jobs:
           PYTHONPATH=services/people-api/src:packages/hris-kernel/src:packages/keyverse-adapter/src COVERAGE_FILE=/tmp/orgmetra-people-api.coverage python -m pytest -c services/people-api/pyproject.toml services/people-api/tests
       - name: Run PostgreSQL contracts in isolated containers
         env:
+          ORGMETRA_EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           PGPASSWORD: orgmetra
         run: |
           set -euo pipefail
           snapshot_parent="$(mktemp -d)"
           snapshot_dir="$snapshot_parent/contracts"
+          candidate_snapshot_dir="$snapshot_parent/candidate"
           plan_file="$snapshot_parent/plan.json"
           current_container=""
           contract_user="orgmetra_pg_contract"
           contract_user_created=0
           runtime_parent=""
+          workspace_mode=""
+          workspace_locked=0
 
           cleanup_postgres_contracts() {
             if [[ "$contract_user_created" -eq 1 ]]; then
@@ -116,13 +120,30 @@ jobs:
               sudo -n userdel "$contract_user" >/dev/null 2>&1 || true
               contract_user_created=0
             fi
+            if [[ "$workspace_locked" -eq 1 ]]; then
+              chmod "$workspace_mode" .
+              workspace_locked=0
+            fi
             chmod -R u+w "$snapshot_parent" >/dev/null 2>&1 || true
             rm -rf "$snapshot_parent"
           }
           trap cleanup_postgres_contracts EXIT
 
+          test "$(git rev-parse HEAD)" = "$ORGMETRA_EXPECTED_HEAD_SHA"
           python .github/scripts/foundation-postgres-contracts.py \
             snapshot --destination "$snapshot_dir" > "$plan_file"
+          mkdir -m 0755 "$candidate_snapshot_dir"
+          git archive --format=tar "$ORGMETRA_EXPECTED_HEAD_SHA" | tar -xf - -C "$candidate_snapshot_dir"
+          if [[ -e "$candidate_snapshot_dir/.git" ]]; then
+            printf 'Exact-candidate execution tree unexpectedly contains Git metadata.\n' >&2
+            exit 1
+          fi
+          if find "$candidate_snapshot_dir" -type l -print -quit | grep -q .; then
+            printf 'Exact-candidate execution tree contains a symbolic link; transitive provenance would be ambiguous.\n' >&2
+            exit 1
+          fi
+          chmod -R a-w "$candidate_snapshot_dir"
+
           plan_tsv="$snapshot_parent/plan.tsv"
           python - "$plan_file" > "$plan_tsv" <<'PY'
           import json
@@ -181,7 +202,8 @@ jobs:
 
           find "$snapshot_dir" -type f -exec chmod 0444 {} +
           find "$snapshot_dir" -type d -exec chmod 0555 {} +
-          chmod 0555 "$snapshot_dir" "$snapshot_parent"
+          find "$candidate_snapshot_dir" -type d -exec chmod a+rx {} +
+          chmod 0555 "$snapshot_dir" "$candidate_snapshot_dir" "$snapshot_parent"
           command -v sudo >/dev/null
           command -v useradd >/dev/null
           command -v userdel >/dev/null
@@ -198,6 +220,7 @@ jobs:
           chmod 0711 "$runtime_parent"
 
           snapshot_root_real="$(realpath -- "$snapshot_dir")"
+          candidate_root_real="$(realpath -- "$candidate_snapshot_dir")"
           verify_snapshot_bytes() {
             local script="$1"
             local expected="${expected_sha256[$script]:-}"
@@ -230,6 +253,38 @@ jobs:
             fi
           }
 
+          verify_candidate_bytes() {
+            local script="$1"
+            local expected="${expected_sha256[$script]:-}"
+            local execution_script="$candidate_snapshot_dir/$script"
+            if [[ -z "$expected" ]]; then
+              printf 'PostgreSQL contract lost candidate-tree digest binding: %s\n' "$script" >&2
+              return 1
+            fi
+            if [[ -L "$execution_script" || ! -f "$execution_script" ]]; then
+              printf 'PostgreSQL candidate-tree executable is not a regular file: %s -> %s\n' \
+                "$script" "$execution_script" >&2
+              return 1
+            fi
+            local execution_real
+            execution_real="$(realpath -- "$execution_script")"
+            case "$execution_real" in
+              "$candidate_root_real"/*) ;;
+              *)
+                printf 'PostgreSQL candidate-tree executable escaped its exact tree: %s -> %s\n' \
+                  "$script" "$execution_real" >&2
+                return 1
+                ;;
+            esac
+            local observed
+            observed="$(sha256sum "$execution_script" | awk '{print $1}')"
+            if [[ "$observed" != "$expected" ]]; then
+              printf 'PostgreSQL candidate-tree executable digest changed: %s expected=%s observed=%s\n' \
+                "$script" "$expected" "$observed" >&2
+              return 1
+            fi
+          }
+
           assert_contract_process_quiescence() {
             local leaked_pids
             leaked_pids="$(pgrep -u "$contract_user" || true)"
@@ -247,14 +302,16 @@ jobs:
             local script="$1"
             local database_url="$2"
             local snapshot_script="${snapshot_by_script[$script]}"
+            local execution_script="$candidate_snapshot_dir/$script"
             local contract_runtime
             local contract_status
             local quiescence_status=0
             verify_snapshot_bytes "$script"
+            verify_candidate_bytes "$script"
             contract_runtime="$(mktemp -d "$runtime_parent/run.XXXXXX")"
             sudo -n chown "$contract_user" "$contract_runtime"
-            printf 'Executing PostgreSQL Foundation snapshot as dedicated non-owner: %s -> %s\n' \
-              "$script" "$snapshot_script"
+            printf 'Executing PostgreSQL Foundation exact-tree contract as dedicated non-owner: %s -> %s\n' \
+              "$script" "$execution_script"
             set +e
             sudo -n -u "$contract_user" env -i \
               PATH="$PATH" \
@@ -267,7 +324,8 @@ jobs:
               XDG_STATE_HOME="$contract_runtime/.local/state" \
               XDG_DATA_HOME="$contract_runtime/.local/share" \
               XDG_RUNTIME_DIR="$contract_runtime/.runtime" \
-              bash "$snapshot_script"
+              bash -c 'cd -- "$1" && exec bash "$2"' _ \
+              "$candidate_snapshot_dir" "$execution_script"
             contract_status=$?
             set -e
             if ! assert_contract_process_quiescence; then
@@ -280,9 +338,14 @@ jobs:
             return "$contract_status"
           }
 
+          workspace_mode="$(stat -c '%a' .)"
+          chmod 0700 .
+          workspace_locked=1
+
           executed=()
           for contract in "${contracts[@]}"; do
             verify_snapshot_bytes "$contract"
+            verify_candidate_bytes "$contract"
             contract_name="$(basename "$contract" .sh)"
             container_name="orgmetra-${GITHUB_RUN_ID}-${contract_name}"
             current_container="$container_name"
@@ -326,8 +389,9 @@ jobs:
           fi
           for bound_script in "${!expected_sha256[@]}"; do
             verify_snapshot_bytes "$bound_script"
+            verify_candidate_bytes "$bound_script"
           done
-          printf 'Executed PostgreSQL Foundation roots from non-owner snapshot boundary (%d):\n' "${#executed[@]}"
+          printf 'Executed PostgreSQL Foundation roots from immutable exact-candidate tree (%d):\n' "${#executed[@]}"
           printf '%s\n' "${executed[@]}"
           cleanup_postgres_contracts
           trap - EXIT
