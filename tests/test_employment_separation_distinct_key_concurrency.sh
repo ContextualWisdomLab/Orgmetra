@@ -98,12 +98,19 @@ FROM public.separate_employment_record_once(
     '00000000-0000-4000-8000-000000000510'::uuid,
     '00000000-0000-4000-8000-000000000610'::uuid
 );
-\echo ORGMETRA_DISTINCT_FIRST_READY
 SQL
 
 first_ready=false
 for _ in $(seq 1 100); do
-    if grep -q '^ORGMETRA_DISTINCT_FIRST_READY$' "${first_output}" 2>/dev/null; then
+    first_state="$(psql "${DATABASE_URL}" -Atqc "
+        SELECT count(*)
+        FROM pg_catalog.pg_stat_activity
+        WHERE application_name = 'orgmetra_employment_separation_distinct_first'
+          AND state = 'idle in transaction'
+          AND wait_event_type = 'Client'
+          AND wait_event = 'ClientRead';
+    ")"
+    if [[ "${first_state}" == "1" ]]; then
         first_ready=true
         break
     fi
@@ -114,7 +121,7 @@ for _ in $(seq 1 100); do
 done
 if [[ "${first_ready}" != "true" ]]; then
     cat "${first_output}" >&2 || true
-    echo "first distinct-key separation transaction did not reach the controlled pre-commit boundary" >&2
+    echo "first distinct-key separation transaction did not reach the observable pre-commit ClientRead boundary" >&2
     exit 1
 fi
 
