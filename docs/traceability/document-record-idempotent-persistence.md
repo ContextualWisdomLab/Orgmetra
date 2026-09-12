@@ -15,6 +15,7 @@ Status: active stacked evidence for #309/#312. This file is not protected-`devel
 | No long external operation is inside the lock | ADR 0309 + database-only function body | source inspection: function performs digesting, replay lookup, local inserts, and receipt derivation only | Implemented; service adapter not yet present |
 | Receipt cannot bind to another tenant's document | tenant-qualified UNIQUE on `document_record`; composite FK from receipt | migration DDL plus PostgreSQL acceptance | Implemented; hosted execution pending |
 | Receipt RLS is behavioral, not metadata-only | FORCE RLS policy on `document_record_persist_receipt` | a temporary `NOBYPASSRLS`/non-superuser role granted only receipt SELECT/UPDATE can read its own tenant's receipts, sees zero rows under another tenant context, and cannot update hidden cross-tenant rows | Implemented acceptance; hosted execution pending |
+| RLS acceptance cannot leak its probe principal on assertion failure | run-unique probe role plus shared `cleanup_probe_role(...)` and the test's existing EXIT trap | failure/abort cleanup is best-effort so it preserves the original assertion failure; the normal success path invokes the same cleanup strictly and fails if role discovery or `DROP OWNED`/`DROP ROLE` fails | Implemented after current-head review finding; exact-head re-review and hosted execution pending |
 | Receipt state is append-only | append-only row trigger + TRUNCATE trigger | PostgreSQL contract requires same-tenant UPDATE rejection in addition to cross-tenant RLS invisibility | Implemented; hosted execution pending |
 | Replay state is PII-minimized | receipt stores tenant, opaque key, digests, document identity, database time only | schema inspection; no document bytes, free-form HR values, credentials, compensation, rating, or duplicated Person/Employment columns | Implemented |
 | Lost-response retry can recover authoritative identity | receipt persists in the same transaction as the document write | first committed result is followed by a separate retry that must return the same stored receipt/result | Implemented; hosted execution pending |
@@ -40,6 +41,8 @@ Status: active stacked evidence for #309/#312. This file is not protected-`devel
 - Existing idempotency acceptance repaired to provide tenant context: `4ba85c535626f81468c74f4a5584385b1ad1a883`.
 - ADR currentization for tenant-bound retry coordination: `db226ed24c00e692340922afb9150721581fe2ab`.
 - Deterministic concurrency/RLS acceptance repair after review finding: `262122bfe0f959d5225e57bf8de9f9e54018af13`.
+- Failure-path RLS probe-role cleanup repair: `4757e24ae03db08c10d93ccf07f6ddbf9fe73a85`.
+- Success-path cleanup made fail-closed rather than best-effort: `be064e24280375c7eecb4b9e910f65d1145d434b`.
 
 ## Evidence limits
 
