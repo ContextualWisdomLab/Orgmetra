@@ -140,19 +140,30 @@ class EmploymentMutationCommand:
     idempotency_key: str
 
     def __post_init__(self) -> None:
-        """Reject ambiguous or mutable command identity before authorization or persistence."""
-        _validate_operational_uuid("tenant_record_id", self.tenant_record_id)
-        _validate_operational_uuid("person_record_id", self.person_record_id)
-        _validate_operational_uuid("employment_record_id", self.employment_record_id)
-        _validate_operational_uuid("employment_record_version_id", self.employment_record_version_id)
-        _validate_operational_uuid("audit_event_record_id", self.audit_event_record_id)
-        _validate_operational_uuid("outbox_delivery_record_id", self.outbox_delivery_record_id)
+        """Reject ambiguous input and retain a detached immutable command snapshot."""
+        object.__setattr__(self, "tenant_record_id", _clone_uuid("tenant_record_id", self.tenant_record_id))
+        object.__setattr__(self, "person_record_id", _clone_uuid("person_record_id", self.person_record_id))
+        object.__setattr__(
+            self, "employment_record_id", _clone_uuid("employment_record_id", self.employment_record_id)
+        )
+        object.__setattr__(
+            self,
+            "employment_record_version_id",
+            _clone_uuid("employment_record_version_id", self.employment_record_version_id),
+        )
+        object.__setattr__(
+            self, "audit_event_record_id", _clone_uuid("audit_event_record_id", self.audit_event_record_id)
+        )
+        object.__setattr__(
+            self,
+            "outbox_delivery_record_id",
+            _clone_uuid("outbox_delivery_record_id", self.outbox_delivery_record_id),
+        )
         _validate_semantic_text("employment_status_code", self.employment_status_code, _EMPLOYMENT_STATUSES)
         _validate_semantic_text(
             "employment_concurrency_code", self.employment_concurrency_code, _CONCURRENCY_CODES
         )
-        if type(self.effective_from) is not date:
-            raise ValueError("effective_from must be a date.")
+        object.__setattr__(self, "effective_from", _clone_date("effective_from", self.effective_from))
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
         validate_idempotency_key(self.idempotency_key)
@@ -176,17 +187,30 @@ class PositionMutationCommand:
     idempotency_key: str
 
     def __post_init__(self) -> None:
-        """Reject ambiguous or mutable command identity before authorization or persistence."""
-        _validate_operational_uuid("tenant_record_id", self.tenant_record_id)
-        _validate_operational_uuid("position_record_id", self.position_record_id)
-        _validate_operational_uuid("position_record_version_id", self.position_record_version_id)
-        _validate_operational_uuid("organization_unit_id", self.organization_unit_id)
-        _validate_operational_uuid("job_profile_id", self.job_profile_id)
-        _validate_operational_uuid("audit_event_record_id", self.audit_event_record_id)
-        _validate_operational_uuid("outbox_delivery_record_id", self.outbox_delivery_record_id)
+        """Reject ambiguous input and retain a detached immutable command snapshot."""
+        object.__setattr__(self, "tenant_record_id", _clone_uuid("tenant_record_id", self.tenant_record_id))
+        object.__setattr__(
+            self, "position_record_id", _clone_uuid("position_record_id", self.position_record_id)
+        )
+        object.__setattr__(
+            self,
+            "position_record_version_id",
+            _clone_uuid("position_record_version_id", self.position_record_version_id),
+        )
+        object.__setattr__(
+            self, "organization_unit_id", _clone_uuid("organization_unit_id", self.organization_unit_id)
+        )
+        object.__setattr__(self, "job_profile_id", _clone_uuid("job_profile_id", self.job_profile_id))
+        object.__setattr__(
+            self, "audit_event_record_id", _clone_uuid("audit_event_record_id", self.audit_event_record_id)
+        )
+        object.__setattr__(
+            self,
+            "outbox_delivery_record_id",
+            _clone_uuid("outbox_delivery_record_id", self.outbox_delivery_record_id),
+        )
         _validate_semantic_text("position_status_code", self.position_status_code, _POSITION_STATUSES)
-        if type(self.effective_from) is not date:
-            raise ValueError("effective_from must be a date.")
+        object.__setattr__(self, "effective_from", _clone_date("effective_from", self.effective_from))
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
         validate_idempotency_key(self.idempotency_key)
@@ -210,17 +234,27 @@ class AssignmentMutationCommand:
     idempotency_key: str
 
     def __post_init__(self) -> None:
-        """Reject ambiguous or mutable command identity before authorization or persistence."""
-        _validate_operational_uuid("tenant_record_id", self.tenant_record_id)
-        _validate_operational_uuid("employment_record_id", self.employment_record_id)
-        _validate_operational_uuid("person_record_id", self.person_record_id)
-        _validate_operational_uuid("position_record_id", self.position_record_id)
-        _validate_operational_uuid("assignment_record_id", self.assignment_record_id)
-        _validate_operational_uuid("audit_event_record_id", self.audit_event_record_id)
-        _validate_operational_uuid("outbox_delivery_record_id", self.outbox_delivery_record_id)
-        _validate_allocation_ratio(self.allocation_ratio)
-        if type(self.effective_from) is not date:
-            raise ValueError("effective_from must be a date.")
+        """Reject ambiguous input and retain a detached immutable command snapshot."""
+        object.__setattr__(self, "tenant_record_id", _clone_uuid("tenant_record_id", self.tenant_record_id))
+        object.__setattr__(
+            self, "employment_record_id", _clone_uuid("employment_record_id", self.employment_record_id)
+        )
+        object.__setattr__(self, "person_record_id", _clone_uuid("person_record_id", self.person_record_id))
+        object.__setattr__(self, "position_record_id", _clone_uuid("position_record_id", self.position_record_id))
+        object.__setattr__(
+            self, "assignment_record_id", _clone_uuid("assignment_record_id", self.assignment_record_id)
+        )
+        object.__setattr__(
+            self, "audit_event_record_id", _clone_uuid("audit_event_record_id", self.audit_event_record_id)
+        )
+        object.__setattr__(
+            self,
+            "outbox_delivery_record_id",
+            _clone_uuid("outbox_delivery_record_id", self.outbox_delivery_record_id),
+        )
+        ratio = _validate_allocation_ratio(self.allocation_ratio)
+        object.__setattr__(self, "allocation_ratio", Decimal(ratio.as_tuple()))
+        object.__setattr__(self, "effective_from", _clone_date("effective_from", self.effective_from))
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
         validate_idempotency_key(self.idempotency_key)
@@ -234,8 +268,10 @@ class EmploymentMutationResult:
     replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Reject executable or sentinel result identities crossing the service boundary."""
-        _validate_operational_uuid("employment_record_id", self.employment_record_id)
+        """Detach and validate durable Employment receipt identity."""
+        object.__setattr__(
+            self, "employment_record_id", _clone_uuid("employment_record_id", self.employment_record_id)
+        )
         if self.replay_command_digest is not None and type(self.replay_command_digest) is not str:
             raise ValueError("replay_command_digest must be a string when present.")
 
@@ -248,8 +284,10 @@ class PositionMutationResult:
     replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Reject executable or sentinel result identities crossing the service boundary."""
-        _validate_operational_uuid("position_record_id", self.position_record_id)
+        """Detach and validate durable Position receipt identity."""
+        object.__setattr__(
+            self, "position_record_id", _clone_uuid("position_record_id", self.position_record_id)
+        )
         if self.replay_command_digest is not None and type(self.replay_command_digest) is not str:
             raise ValueError("replay_command_digest must be a string when present.")
 
@@ -262,8 +300,10 @@ class AssignmentMutationResult:
     replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Reject executable or sentinel result identities crossing the service boundary."""
-        _validate_operational_uuid("assignment_record_id", self.assignment_record_id)
+        """Detach and validate durable Assignment receipt identity."""
+        object.__setattr__(
+            self, "assignment_record_id", _clone_uuid("assignment_record_id", self.assignment_record_id)
+        )
         if self.replay_command_digest is not None and type(self.replay_command_digest) is not str:
             raise ValueError("replay_command_digest must be a string when present.")
 
