@@ -51,6 +51,10 @@ class FoundationPostgresProcessQuiescenceTests(unittest.TestCase):
         self.assertIn('chmod 0711 "$runtime_parent"', execution)
         self.assertIn('contract_runtime="$(mktemp -d "$runtime_parent/run.XXXXXX")"', execution)
         self.assertIn('sudo -n chown "$contract_user" "$contract_runtime"', execution)
+        self.assertIn(
+            'sudo -n -u "$contract_user" /usr/bin/install -d -m 0700 "$contract_runtime/.runtime"',
+            execution,
+        )
         self.assertIn('HOME="$contract_runtime"', execution)
         self.assertIn('TMPDIR="$contract_runtime"', execution)
         self.assertIn('XDG_CACHE_HOME="$contract_runtime/.cache"', execution)
@@ -66,7 +70,11 @@ class FoundationPostgresProcessQuiescenceTests(unittest.TestCase):
         execution = self._execution_step()
 
         self.assertIn('sudo -n -u "$contract_user" env -i \\', execution)
-        self.assertIn('PATH="$PATH" \\', execution)
+        self.assertIn(
+            'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \\',
+            execution,
+        )
+        self.assertNotIn('PATH="$PATH" \\', execution)
         self.assertNotIn('sudo -n -u "$contract_user" env \\', execution)
 
     def test_executes_against_immutable_exact_candidate_tree(self) -> None:
@@ -79,7 +87,7 @@ class FoundationPostgresProcessQuiescenceTests(unittest.TestCase):
         )
         self.assertIn('chmod -R a-w "$candidate_snapshot_dir"', execution)
         self.assertIn('execution_script="$candidate_snapshot_dir/$script"', execution)
-        self.assertIn("cd -- \"$1\" && exec bash \"$2\"", execution)
+        self.assertIn('cd -- "$1" && exec bash "$2"', execution)
         self.assertIn('workspace_mode="$(stat -c \'%a\' .)"', execution)
         self.assertIn('chmod 0700 .', execution)
         self.assertIn('chmod "$workspace_mode" .', execution)
