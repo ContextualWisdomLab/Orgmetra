@@ -38,7 +38,7 @@ class ClockRowsCursor(ScriptedCursor):
     """Allow malformed database-clock rows without changing the shared happy-path fake."""
 
     def __init__(self, clock_rows: list[tuple[object, ...]]) -> None:
-        super().__init__([[], [(CONVERSION, RECORDED_AT)]], [[]])
+        super().__init__([[], [(PERSON, RECORDED_AT)]], [[]])
         self.clock_rows = list(clock_rows)
 
     def fetchmany(self, size: int) -> list[tuple[object, ...]]:
@@ -52,7 +52,7 @@ class PostLockRecordedTimeRegressionTests(unittest.TestCase):
     """Prevent lock wait order from hiding the winner at the validation cutoff."""
 
     def test_employment_rejects_winner_recorded_after_waiter_transaction_started(self) -> None:
-        """A later lock winner must be visible after the converted-person lock is acquired."""
+        """A later lock winner must be visible after the Person conflict lock is acquired."""
         winner_recorded_at = RECORDED_AT + timedelta(seconds=1)
         winner = (
             UUID("0198a412-8200-7000-8000-000000000099"),
@@ -66,7 +66,7 @@ class PostLockRecordedTimeRegressionTests(unittest.TestCase):
             None,
         )
         cursor = ScriptedCursor(
-            [[], [(CONVERSION, RECORDED_AT)]],
+            [[], [(PERSON, RECORDED_AT)]],
             [[winner]],
             clock_timestamp=winner_recorded_at,
         )
@@ -82,14 +82,14 @@ class PostLockRecordedTimeRegressionTests(unittest.TestCase):
             )
 
         sql = [statement for statement, _parameters in cursor.executions]
-        conversion_index = next(
-            index for index, statement in enumerate(sql) if "candidate_worker_conversion_record" in statement
+        person_lock_index = next(
+            index for index, statement in enumerate(sql) if "FOR UPDATE OF person" in statement
         )
         clock_index = sql.index(_POST_LOCK_CLOCK_SQL)
         employment_snapshot_index = next(
             index for index, statement in enumerate(sql) if "JOIN public.employment_record_version" in statement
         )
-        self.assertLess(conversion_index, clock_index)
+        self.assertLess(person_lock_index, clock_index)
         self.assertLess(clock_index, employment_snapshot_index)
 
     def test_assignment_rejects_capacity_winner_recorded_after_waiter_transaction_started(self) -> None:
