@@ -243,6 +243,12 @@ class CandidateDocumentDisposition(_CandidateDocumentDispositionTuple):
                 raise ValueError("claim_window_end must be after hiring_decision_finalized_at")
         if state == "return_claim_window_open" and claim_window_end is None:
             raise ValueError("claim_window_end is required while the return claim window is open")
+        if (
+            return_eligibility == "eligible"
+            and state in _RETURN_REQUEST_EVIDENCE_STATES
+            and claim_window_end is None
+        ):
+            raise ValueError("claim_window_end is required for an eligible return request")
         if return_request_reference is not None:
             _validate_reference(
                 return_request_reference,

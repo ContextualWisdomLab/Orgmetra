@@ -32,6 +32,20 @@ def _kwargs() -> dict:
 def _build(**overrides):
     kwargs = _kwargs()
     kwargs.update(overrides)
+    if (
+        kwargs["return_eligibility"] == "eligible"
+        and kwargs["state"] in {
+            "return_requested",
+            "return_request_verified",
+            "return_dispatched",
+            "return_delivered",
+            "return_destroyed",
+        }
+        and "claim_window_end" not in overrides
+    ):
+        kwargs["claim_window_end"] = kwargs[
+            "hiring_decision_finalized_at"
+        ] + timedelta(days=30)
     return build_candidate_document_disposition(**kwargs)
 
 

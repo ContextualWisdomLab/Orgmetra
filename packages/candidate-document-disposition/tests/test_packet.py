@@ -34,6 +34,20 @@ def _default_kwargs() -> dict:
 def _build(**overrides) -> CandidateDocumentDisposition:
     kwargs = _default_kwargs()
     kwargs.update(overrides)
+    if (
+        kwargs["return_eligibility"] == "eligible"
+        and kwargs["state"] in {
+            "return_requested",
+            "return_request_verified",
+            "return_dispatched",
+            "return_delivered",
+            "return_destroyed",
+        }
+        and "claim_window_end" not in overrides
+    ):
+        kwargs["claim_window_end"] = datetime(
+            2026, 10, 11, 12, 0, 0, tzinfo=timezone.utc
+        )
     return build_candidate_document_disposition(**kwargs)
 
 

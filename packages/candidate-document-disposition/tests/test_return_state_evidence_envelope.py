@@ -7,6 +7,7 @@ from orgmetra_candidate_document_disposition import build_candidate_document_dis
 
 _HIRING_DECISION = datetime(2026, 9, 11, 12, 0, 0, tzinfo=timezone.utc)
 _REQUESTED_AT = _HIRING_DECISION + timedelta(hours=1)
+_CLAIM_WINDOW_END = _HIRING_DECISION + timedelta(days=30)
 _VERIFIED_AT = _HIRING_DECISION + timedelta(hours=2)
 _DUE_AT = _VERIFIED_AT + timedelta(days=14)
 _DISPATCHED_AT = _HIRING_DECISION + timedelta(days=1)
@@ -76,6 +77,7 @@ def test_return_requested_state_rejects_verification_evidence():
     with pytest.raises(ValueError, match="verification evidence"):
         _build(
             "return_requested",
+            claim_window_end=_CLAIM_WINDOW_END,
             return_request_reference=_REQUEST_REFERENCE,
             return_requested_at=_REQUESTED_AT,
             return_request_verified_at=_VERIFIED_AT,
@@ -87,6 +89,7 @@ def test_return_requested_state_rejects_dispatch_evidence():
     with pytest.raises(ValueError, match="verification evidence"):
         _build(
             "return_requested",
+            claim_window_end=_CLAIM_WINDOW_END,
             return_request_reference=_REQUEST_REFERENCE,
             return_requested_at=_REQUESTED_AT,
             return_dispatched_at=_DISPATCHED_AT,
@@ -97,6 +100,7 @@ def test_return_requested_state_rejects_delivery_evidence():
     with pytest.raises(ValueError, match="verification evidence"):
         _build(
             "return_requested",
+            claim_window_end=_CLAIM_WINDOW_END,
             return_request_reference=_REQUEST_REFERENCE,
             return_requested_at=_REQUESTED_AT,
             return_dispatched_at=_DISPATCHED_AT,
@@ -108,6 +112,7 @@ def test_return_verified_state_rejects_dispatch_evidence():
     with pytest.raises(ValueError, match="dispatch evidence"):
         _build(
             "return_request_verified",
+            claim_window_end=_CLAIM_WINDOW_END,
             return_request_reference=_REQUEST_REFERENCE,
             return_requested_at=_REQUESTED_AT,
             return_request_verified_at=_VERIFIED_AT,
@@ -120,10 +125,44 @@ def test_return_dispatched_state_rejects_delivery_evidence():
     with pytest.raises(ValueError, match="delivery evidence"):
         _build(
             "return_dispatched",
+            claim_window_end=_CLAIM_WINDOW_END,
             return_request_reference=_REQUEST_REFERENCE,
             return_requested_at=_REQUESTED_AT,
             return_request_verified_at=_VERIFIED_AT,
             return_due_at=_DUE_AT,
             return_dispatched_at=_DISPATCHED_AT,
+            return_delivered_at=_DELIVERED_AT,
+        )
+
+
+def test_eligible_return_request_requires_claim_window_evidence():
+    with pytest.raises(ValueError, match="claim_window_end"):
+        _build(
+            "return_requested",
+            return_request_reference=_REQUEST_REFERENCE,
+            return_requested_at=_REQUESTED_AT,
+        )
+
+
+def test_return_verification_timestamp_requires_request_timestamp():
+    with pytest.raises(ValueError, match="requires return_requested_at"):
+        _build(
+            "talent_pool_retained",
+            return_request_verified_at=_VERIFIED_AT,
+        )
+
+
+def test_return_due_timestamp_requires_verification_timestamp():
+    with pytest.raises(ValueError, match="requires return_request_verified_at"):
+        _build(
+            "talent_pool_retained",
+            return_due_at=_DUE_AT,
+        )
+
+
+def test_return_delivery_timestamp_requires_dispatch_timestamp():
+    with pytest.raises(ValueError, match="requires return_dispatched_at"):
+        _build(
+            "talent_pool_retained",
             return_delivered_at=_DELIVERED_AT,
         )
