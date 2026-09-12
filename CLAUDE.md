@@ -11,9 +11,10 @@ Do not treat Orgmetra as a resume parser, ATS-only system, psychometric engine, 
 - Psychometrics Commons owns assessment operations and immutable assessment result snapshots.
 - fast-mlsirm owns psychometric numerical kernels.
 - TEPP owns temporal/event/multilevel analysis artifacts.
-- Semantic Data Portal owns occupation/skill/ability ontology and semantic catalog.
+- ConceptWeave owns ontology and semantic-layer observe/discover/propose/align/validate/review/publish workflows and immutable semantic releases.
+- semantic-data-portal owns catalog, governance, search, serving, and consumption of released semantic resources; it does not author Orgmetra domain truth.
 - Naruon owns mail/calendar/file control-plane integrations.
-- Contextual Orchestrator owns bounded LLM orchestration traces.
+- contextual-orchestrator owns bounded LLM orchestration traces, provider discovery, capability-aware routing, and gateway contracts; Orgmetra consumes only released APIs and schemas.
 
 ## Writing guidance
 

@@ -1,6 +1,6 @@
 # ADR 0025: Govern candidate evidence intake as reference-only evidence
 
-- **Status:** Proposed — active PR only
+- **Status:** Accepted on protected `develop`
 - **Date:** 2026-08-19
 
 ## Context
@@ -40,7 +40,7 @@ Canonical JSON plus SHA-256 provide immutable audit correlation but do not estab
 - The packet does not store raw candidate evidence, decide whether an item is lawfully usable, or prove the referenced policy was followed.
 - UUID-backed tenant and candidate references are still sensitive correlating metadata and require least-privilege handling.
 - Evidence sealing, authoritative selection decisions, immutable audit/outbox, deletion/retention execution, export controls, accommodations, adverse-impact monitoring, and jurisdiction-specific legal review remain separate obligations.
-- This ADR remains proposed until its exact PR head merges into protected `develop`.
+- This ADR records the accepted protected-`develop` candidate-evidence intake boundary; later sealing, selection, retention, and legal-use obligations remain separate authorities.
 
 ## References
 

@@ -1,6 +1,6 @@
 # ADR 0007: Governed job-analysis evidence snapshots
 
-- Status: Accepted on stacked implementation branch
+- Status: Accepted on protected `develop`
 - Date: 2026-08-17
 - Owners: Orgmetra Job Analysis / Workforce Validation
 
