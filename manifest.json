@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2d2e0b488c0440533effa821808f2f17e37d92f8fb586174c2fdb594f760ca5",
-      "bytes": 17539,
-      "lines": 77
+      "sha256": "321c43f388dd561b8867684daac74b0c21f3676d66e15f941feed28d5cf02459",
+      "bytes": 17829,
+      "lines": 78
     },
     {
       "path": "CLAUDE.md",
@@ -134,6 +134,24 @@
       "sha256": "b6553a5a4c94c4aa9f341a474e13bbe34db63044eda2446b3ebee178995977ee",
       "bytes": 12713,
       "lines": 260
+    },
+    {
+      "path": "database/migrations/0021_document_record_persistence.sql",
+      "sha256": "e2dd9ca0c17141c2b3e06f64726f3ac0fa7cb1cd02798564cef72a12455a1286",
+      "bytes": 14001,
+      "lines": 334
+    },
+    {
+      "path": "database/migrations/0022_document_record_evidence_unique_keys.sql",
+      "sha256": "716960d224f1d2feabebc9302db93d7c2dd945978bbc806663eacc27f8606d73",
+      "bytes": 631,
+      "lines": 15
+    },
+    {
+      "path": "database/migrations/0023_document_record_canonical_encoding.sql",
+      "sha256": "9600bd071c39d904c041cf8037add92e582af577b2edc0de0f39801095dca195",
+      "bytes": 4364,
+      "lines": 87
     },
     {
       "path": "docs/API_CONTRACT.md",
@@ -310,6 +328,12 @@
       "lines": 49
     },
     {
+      "path": "docs/adr/0107-document-record-persistence.md",
+      "sha256": "04dcfa124d8cfcb2dc1527fbafaf82a217a0471f5aa27392e52ce5dfcea54810",
+      "bytes": 6448,
+      "lines": 48
+    },
+    {
       "path": "docs/adr/README.md",
       "sha256": "f3b3b5ed3b3b31a40a0a3696abf0065e3c25879b6be50077f38ffae742b9d002",
       "bytes": 1838,
@@ -322,6 +346,12 @@
       "lines": 69
     },
     {
+      "path": "docs/doctoring/document-record-persistence-references.md",
+      "sha256": "e371afc5b15351682b66477e48654554704a62fa9db5fd134767d47ce8d88b36",
+      "bytes": 2038,
+      "lines": 23
+    },
+    {
       "path": "docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md",
       "sha256": "b64f21abb19373e780db8b9e64deb8ba9a6219ccf9625a651f25407b8691fcbd",
       "bytes": 8227,
@@ -332,6 +362,12 @@
       "sha256": "4a0e1a7943e40d12bd3082db3757045b4085e5a089fea7bc0d8a1565ffcbcf1d",
       "bytes": 6237,
       "lines": 187
+    },
+    {
+      "path": "docs/traceability/document-record-persistence.md",
+      "sha256": "3849ab6642f8b171aae6b379781fb19028635996428fbc37788334bd1feb167a",
+      "bytes": 4120,
+      "lines": 30
     },
     {
       "path": "package.json",
@@ -359,9 +395,9 @@
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "9b03efbbdffa60a05f5924e8a61b1cbc3cd75c502df428a5920085e8d0bf3603",
-      "bytes": 28121,
-      "lines": 688
+      "sha256": "2305e1a6efff8b0dc47b40d517ac49b2a86f780899ae03c83d4063ed30d169e5",
+      "bytes": 28670,
+      "lines": 697
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -418,6 +454,24 @@
       "lines": 469
     },
     {
+      "path": "tests/test_document_record_canonical_bytes_postgres.sh",
+      "sha256": "10b12f2f7afeb04fc04182170d2d00bca69b4f0f51c604ee565308b906d8c550",
+      "bytes": 8394,
+      "lines": 177
+    },
+    {
+      "path": "tests/test_document_record_evidence_unique_keys_postgres.sh",
+      "sha256": "d678b4ee7f1c69c16632f188ae8f7b5c717ecc55e49dc09d7889ebe02ed7212a",
+      "bytes": 5058,
+      "lines": 103
+    },
+    {
+      "path": "tests/test_document_record_persistence_postgres.sh",
+      "sha256": "f3d5fcb83a406ac202986f0272f673a8f3c6349752119d27b4d42e4c6bbe7072",
+      "bytes": 17015,
+      "lines": 376
+    },
+    {
       "path": "tests/test_evidence_sealing_postgres.sh",
       "sha256": "57d16b632a0c60ffdcb4842ceb1cfe25d19c54cefeeefb622ff4fa6e83441ad7",
       "bytes": 11349,
@@ -467,9 +521,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "091836b2f68600a30b08f7da2cea8b3bef10201a123da720a7369bf10985eec2",
-      "bytes": 27237,
-      "lines": 637
+      "sha256": "0692bfa17ebed3ba6594bc30e75bfeb8e93784ae381af3801457f4fe6cf41529",
+      "bytes": 27804,
+      "lines": 646
     }
   ]
 }
