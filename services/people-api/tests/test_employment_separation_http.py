@@ -20,6 +20,7 @@ from orgmetra_people_api.separation import (
     EmploymentSeparationResult,
 )
 from orgmetra_people_api.separation_http import EmploymentSeparationAsgiApp
+from orgmetra_people_api.mutations import PeopleMutationNotFound
 
 TENANT = UUID("0198a412-9000-7000-8000-000000000001")
 PERSON = UUID("0198a412-9000-7000-8000-000000000020")
@@ -64,12 +65,12 @@ def request_body(**overrides: object) -> bytes:
 class FakeAuthenticator:
     """Return one principal while retaining no bearer-token material in results."""
 
-    def __init__(self, principal: AuthenticatedPrincipal, *, error: Exception | None = None) -> None:
+    def __init__(self, principal: object, *, error: Exception | None = None) -> None:
         self.principal = principal
         self.error = error
         self.tokens: list[str] = []
 
-    async def authenticate(self, bearer_token: str) -> AuthenticatedPrincipal:
+    async def authenticate(self, bearer_token: str) -> object:
         self.tokens.append(bearer_token)
         if self.error is not None:
             raise self.error
@@ -214,6 +215,16 @@ class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(command.idempotency_key, IDEMPOTENCY_KEY.decode("ascii"))
         self.assertEqual(authorization.resource_reference, f"employment_record:{EMPLOYMENT.hex}")
 
+    async def test_non_http_scope_is_rejected_before_receive(self) -> None:
+        async def receive() -> dict[str, object]:
+            raise AssertionError("non-HTTP scope must not read a request body")
+
+        async def send(message: dict[str, object]) -> None:
+            raise AssertionError(f"non-HTTP scope must not send a response: {message!r}")
+
+        with self.assertRaisesRegex(ValueError, "only HTTP"):
+            await self._app()({"type": "lifespan"}, receive, send)
+
     async def test_route_method_and_purpose_fail_without_persistence(self) -> None:
         port = RecordingSeparationPort()
         app = self._app(separation_port=port)
@@ -228,6 +239,18 @@ class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(status, expected)
                 self.assertIn("error_code", payload)
         self.assertEqual(port.calls, [])
+
+    async def test_command_header_failures_are_bounded_before_authentication(self) -> None:
+        cases: tuple[tuple[list[tuple[bytes, bytes]], int], ...] = (
+            ([item for item in valid_headers() if item[0] != b"content-type"], 415),
+            ([(name, b"text/plain") if name == b"content-type" else (name, value) for name, value in valid_headers()], 415),
+            ([(name, b"not namespaced") if name == b"x-actor-reference" else (name, value) for name, value in valid_headers()], 400),
+        )
+        for headers, expected in cases:
+            with self.subTest(expected=expected):
+                status, _, payload = await self._request(self._app(), headers=headers)
+                self.assertEqual(status, expected)
+                self.assertIn("error_code", payload)
 
     async def test_authentication_and_tenant_actor_binding_fail_closed(self) -> None:
         denied = self._app(
@@ -248,11 +271,47 @@ class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, 403)
         self.assertEqual(payload["error_code"], "access_denied")
 
+        other_actor = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse_subject:other-operator",
+            granted_scope_codes=self.principal.granted_scope_codes,
+        )
+        status, _, payload = await self._request(
+            self._app(authenticator=FakeAuthenticator(other_actor))
+        )
+        self.assertEqual(status, 403)
+        self.assertEqual(payload["error_code"], "access_denied")
+
+    async def test_authentication_dependency_and_invalid_principal_are_internal_errors(self) -> None:
+        cases = (
+            FakeAuthenticator(self.principal, error=RuntimeError("identity backend offline")),
+            FakeAuthenticator(object()),
+        )
+        for authenticator in cases:
+            with self.subTest(authenticator=authenticator):
+                status, _, payload = await self._request(self._app(authenticator=authenticator))
+                self.assertEqual(status, 500)
+                self.assertEqual(payload["error_code"], "internal_error")
+                self.assertNotIn("identity backend offline", json.dumps(payload))
+
+    async def test_body_reader_rejects_oversize_and_invalid_json(self) -> None:
+        status, _, payload = await self._request(self._app(), body=b"x" * 65537)
+        self.assertEqual(status, 413)
+        self.assertEqual(payload["error_code"], "payload_too_large")
+
+        status, _, payload = await self._request(self._app(), body=b"{")
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error_code"], "invalid_request")
+
     async def test_exact_body_and_domain_failures_are_client_safe(self) -> None:
         malformed_cases = (
             request_body(extra="forbidden"),
+            request_body(person_record_id=17),
+            request_body(person_record_id="00000000-0000-0000-0000-000000000000"),
             request_body(employment_record_id="not-a-uuid"),
+            request_body(separation_effective_on=20261001),
             request_body(separation_effective_on="2026-10-01T00:00:00Z"),
+            request_body(separation_effective_on="2026-02-30"),
             request_body(separation_reason_code="Voluntary resignation"),
         )
         for body in malformed_cases:
@@ -282,11 +341,23 @@ class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status, 403)
         self.assertEqual(payload["error_code"], "access_denied")
 
+        not_found_port = RecordingSeparationPort(error=PeopleMutationNotFound("sensitive missing detail"))
+        status, _, payload = await self._request(self._app(separation_port=not_found_port))
+        self.assertEqual(status, 404)
+        self.assertEqual(payload["error_code"], "record_not_found")
+        self.assertNotIn("sensitive missing detail", json.dumps(payload))
+
         conflict_port = RecordingSeparationPort(error=EmploymentSeparationIntegrityError("sensitive backend detail"))
         status, _, payload = await self._request(self._app(separation_port=conflict_port))
         self.assertEqual(status, 409)
         self.assertEqual(payload["error_code"], "separation_conflict")
         self.assertNotIn("sensitive backend detail", json.dumps(payload))
+
+        failure_port = RecordingSeparationPort(error=RuntimeError("database credential leaked"))
+        status, _, payload = await self._request(self._app(separation_port=failure_port))
+        self.assertEqual(status, 500)
+        self.assertEqual(payload["error_code"], "internal_error")
+        self.assertNotIn("database credential leaked", json.dumps(payload))
 
     async def test_server_generated_identity_failure_is_internal_not_client_error(self) -> None:
         port = RecordingSeparationPort()
@@ -297,10 +368,22 @@ class EmploymentSeparationHttpTests(unittest.IsolatedAsyncioTestCase):
         status, _, payload = await self._request(
             self._app(separation_port=port, id_factory=unavailable_id_factory)
         )
-
         self.assertEqual(status, 500)
         self.assertEqual(payload["error_code"], "internal_error")
         self.assertNotIn("entropy source unavailable", json.dumps(payload))
+        self.assertEqual(port.calls, [])
+
+        invalid_values: tuple[object, ...] = (object(), UUID(int=0))
+        for invalid_value in invalid_values:
+            with self.subTest(invalid_value=invalid_value):
+                status, _, payload = await self._request(
+                    self._app(
+                        separation_port=port,
+                        id_factory=lambda invalid_value=invalid_value: invalid_value,  # type: ignore[arg-type,return-value]
+                    )
+                )
+                self.assertEqual(status, 500)
+                self.assertEqual(payload["error_code"], "internal_error")
         self.assertEqual(port.calls, [])
 
 
