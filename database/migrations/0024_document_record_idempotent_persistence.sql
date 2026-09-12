@@ -142,6 +142,11 @@ BEGIN
             USING ERRCODE = '22004';
     END IF;
 
+    IF public.current_tenant_record_id() IS DISTINCT FROM p_tenant_record_id THEN
+        RAISE EXCEPTION 'document persistence tenant context does not match requested tenant'
+            USING ERRCODE = '42501';
+    END IF;
+
     IF p_idempotency_key !~
        '^document-record-persist-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' THEN
         RAISE EXCEPTION 'document persistence idempotency key must be one opaque purpose-bound UUID reference'
@@ -321,6 +326,6 @@ COMMENT ON FUNCTION public.persist_document_record_once(
     uuid, text, uuid, text, text, text, text, text, text, text, text, text,
     text, text, timestamptz, text, text, text, text, text
 ) IS
-    'Persists one immutable document-record fact and replay receipt under a tenant-scoped transaction advisory lock. The owner fails closed outside Read Committed because replay visibility relies on a fresh post-lock statement snapshot. Same-key same-semantic retries return the first committed result; changed semantics fail closed. Digest serialization uses function-local UTC so equivalent timestamptz values do not change replay identity across caller sessions.';
+    'Persists one immutable document-record fact and replay receipt under a tenant-scoped transaction advisory lock. The caller tenant context must match the requested tenant before any replay lock or durable write. The owner fails closed outside Read Committed because replay visibility relies on a fresh post-lock statement snapshot. Same-key same-semantic retries return the first committed result; changed semantics fail closed. Digest serialization uses function-local UTC so equivalent timestamptz values do not change replay identity across caller sessions.';
 
 COMMIT;
