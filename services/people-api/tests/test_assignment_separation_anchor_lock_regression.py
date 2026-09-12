@@ -13,7 +13,12 @@ def test_assignment_insert_uses_employment_anchor_as_shared_conflict_boundary() 
     """Keep the Assignment/Employment race guard at the authoritative PostgreSQL boundary."""
     sql = _MIGRATION.read_text(encoding="utf-8")
 
+    assert "CREATE ROLE orgmetra_assignment_employment_guard_owner" in sql
+    assert "NOLOGIN" in sql
+    assert "NOBYPASSRLS" in sql
+    assert "GRANT UPDATE (recorded_from) ON TABLE public.employment_record" in sql
     assert "CREATE FUNCTION public.guard_assignment_employment_coverage()" in sql
+    assert "SECURITY DEFINER" in sql
     assert "FOR UPDATE OF employment" in sql
     assert "CREATE TRIGGER assignment_employment_coverage_guard" in sql
     assert "BEFORE INSERT ON public.assignment_record" in sql
