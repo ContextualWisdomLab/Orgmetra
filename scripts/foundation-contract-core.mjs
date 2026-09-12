@@ -51,7 +51,10 @@ export const REQUIRED_FILES = Object.freeze([
   'docs/adr/0012-governed-migration-handoff.md',
   'docs/adr/0013-governed-requisition-review-packet.md',
   'docs/adr/0014-job-analysis-snapshot-persistence.md',
+  'docs/adr/0107-document-record-persistence.md',
   'docs/doctoring/REFERENCES.md',
+  'docs/doctoring/document-record-persistence-references.md',
+  'docs/traceability/document-record-persistence.md',
   'docs/superpowers/specs/2026-08-15-orgmetra-foundation-design.md',
   'docs/superpowers/plans/2026-08-15-orgmetra-foundation-implementation-plan.md',
   'database/migrations/0001_foundation_schema.sql',
@@ -67,6 +70,9 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
   'database/migrations/0013_job_analysis_snapshot.sql',
+  'database/migrations/0021_document_record_persistence.sql',
+  'database/migrations/0022_document_record_evidence_unique_keys.sql',
+  'database/migrations/0023_document_record_canonical_encoding.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -88,6 +94,9 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/test_job_analysis_snapshot_postgres.sh',
+  'tests/test_document_record_canonical_bytes_postgres.sh',
+  'tests/test_document_record_evidence_unique_keys_postgres.sh',
+  'tests/test_document_record_persistence_postgres.sh',
   'tests/validate_repository.py'
 ]);
 
