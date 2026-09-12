@@ -220,10 +220,26 @@ def _privileged_trigger_declarations(workflow: str) -> list[tuple[int, str]]:
     lines = workflow.splitlines()
     declarations: list[tuple[int, str]] = []
     on_block_indent: int | None = None
+    on_child_indent: int | None = None
 
     for line_number, line in enumerate(lines, start=1):
         if line.strip() == "" or line.lstrip().startswith("#"):
             continue
+
+        indent = len(line) - len(line.lstrip())
+        if on_block_indent is not None:
+            if indent <= on_block_indent:
+                on_block_indent = None
+                on_child_indent = None
+            else:
+                if on_child_indent is None:
+                    on_child_indent = indent
+                if indent == on_child_indent:
+                    item = _strip_yaml_comment(line.lstrip())
+                    if item.startswith("- "):
+                        event = _unquote_scalar(item[2:])
+                        if _PRIVILEGED_EVENT_PATTERN.fullmatch(event):
+                            declarations.append((line_number, event))
 
         entry = _mapping_entry(line)
         if entry is None:
@@ -232,14 +248,17 @@ def _privileged_trigger_declarations(workflow: str) -> list[tuple[int, str]]:
 
         if indent == 0 and not sequence and key == "on":
             on_block_indent = 0 if not value else None
+            on_child_indent = None
             if value and _PRIVILEGED_EVENT_PATTERN.search(value):
                 declarations.append((line_number, value))
             continue
 
         if on_block_indent is not None:
-            if indent <= on_block_indent:
-                on_block_indent = None
-            elif not sequence and key in {"pull_request_target", "workflow_run"}:
+            if (
+                indent == on_child_indent
+                and not sequence
+                and key in {"pull_request_target", "workflow_run"}
+            ):
                 declarations.append((line_number, key))
 
     return declarations
@@ -623,6 +642,18 @@ class GitHubActionsLeastPrivilegeContractTest(unittest.TestCase):
         self.assertEqual(
             [],
             _privileged_trigger_declarations("on: [push, pull_request]\n"),
+        )
+        self.assertEqual(
+            [(3, "pull_request_target")],
+            _privileged_trigger_declarations(
+                "on:\n  - push\n  - pull_request_target\n"
+            ),
+        )
+        self.assertEqual(
+            [],
+            _privileged_trigger_declarations(
+                "on:\n  pull_request:\n    branches:\n      - workflow_run\n"
+            ),
         )
 
     def test_trigger_parser_normalizes_quoted_mapping_keys(self) -> None:
