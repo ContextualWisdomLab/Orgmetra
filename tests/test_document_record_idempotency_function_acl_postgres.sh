@@ -74,7 +74,7 @@ SELECT
         'EXECUTE'
     )::text || '|' ||
     pg_catalog.has_function_privilege(
-        pg_catalog.current_user,
+        current_user,
         '${FUNCTION_SIGNATURE}',
         'EXECUTE'
     )::text;
