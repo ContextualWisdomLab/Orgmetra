@@ -70,6 +70,9 @@ REQUIRED = [
     "database/migrations/0011_criterion_observation_scope.sql",
     "database/migrations/0012_people_mutation_idempotency.sql",
     "database/migrations/0013_job_analysis_snapshot.sql",
+    "database/migrations/0014_employment_separation_transition.sql",
+    "database/migrations/0015_employment_separation_capability_hardening.sql",
+    "database/migrations/0016_employment_separation_executor_capability.sql",
     "packages/hris-kernel/src/orgmetra_hris_kernel/audit.py",
     "packages/hris-kernel/tests/test_audit_outbox.py",
     "schemas/openapi.yaml",
@@ -91,6 +94,8 @@ REQUIRED = [
     "tests/test_criterion_observation_scope_postgres.sh",
     "tests/test_people_mutation_idempotency_postgres.sh",
     "tests/test_job_analysis_snapshot_postgres.sh",
+    "tests/test_employment_separation_postgres.sh",
+    "tests/test_employment_separation_capability_postgres.sh",
     "tests/validate_repository.py",
 ]
 
@@ -386,10 +391,12 @@ def _validate_database_contract() -> None:
         table_block = table_sql[block_start:block_end]
         if "tenant_record_id uuid NOT NULL" not in table_block:
             _fail(f"Tenant binding is missing from table: {table_name}")
-        if (
-            f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY" not in sql
-            and f"ALTER TABLE public.{table_name} FORCE ROW LEVEL SECURITY" not in sql
-        ):
+        force_rls_pattern = re.compile(
+            rf"\bALTER\s+TABLE\s+(?:[a-z_][a-z0-9_]*\.)?"
+            rf"{re.escape(table_name)}\s+FORCE\s+ROW\s+LEVEL\s+SECURITY\b",
+            flags=re.IGNORECASE,
+        )
+        if force_rls_pattern.search(sql) is None:
             _fail(f"Forced row-level security is missing from table: {table_name}")
 
     if len(tenant_matches) != len(matches) - 1:
