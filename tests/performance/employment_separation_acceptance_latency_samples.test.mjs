@@ -49,13 +49,17 @@ function performanceResult(latencySamples = 1000, trendSamples = latencySamples)
   };
 }
 
-function runtimeEvidence(resultText) {
+function render(value) {
+  return Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function runtimeEvidence(resultArtifact) {
   return {
     schema_version: "orgmetra.employment_separation.runtime_evidence.v1",
     candidate_sha: candidateSha,
     observed_service_sha: candidateSha,
     selected_profile: "first_commit",
-    performance_result_sha256: createHash("sha256").update(resultText, "utf8").digest("hex"),
+    performance_result_sha256: createHash("sha256").update(resultArtifact).digest("hex"),
     fixture_sha256: FIXTURE_SHA256,
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
@@ -79,27 +83,24 @@ function runtimeEvidence(resultText) {
 }
 
 test("rejects a complete iteration count with an incomplete latency counter", () => {
-  const value = performanceResult(999, 1000);
-  const resultText = `${JSON.stringify(value, null, 2)}\n`;
+  const artifact = render(performanceResult(999, 1000));
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_BYTES),
+    () => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES),
     /latency sample count/,
   );
 });
 
 test("rejects a complete counter when the measured Trend itself is truncated", () => {
-  const value = performanceResult(1000, 999);
-  const resultText = `${JSON.stringify(value, null, 2)}\n`;
+  const artifact = render(performanceResult(1000, 999));
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_BYTES),
+    () => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES),
     /Trend sample count/,
   );
 });
 
 test("accepts latency evidence only when every expected request contributed to the measured Trend", () => {
-  const value = performanceResult(1000, 1000);
-  const resultText = `${JSON.stringify(value, null, 2)}\n`;
-  const accepted = validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_BYTES);
+  const artifact = render(performanceResult(1000, 1000));
+  const accepted = validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES);
   assert.equal(accepted.accepted, true);
   assert.equal(accepted.p95_ms, 18);
 });
