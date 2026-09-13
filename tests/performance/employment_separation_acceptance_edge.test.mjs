@@ -10,6 +10,12 @@ const TREND_BY_PROFILE = {
   rejection: "employment_separation_rejection_duration_ms",
   contention: "employment_separation_contention_duration_ms",
 };
+const PROFILE_PRECONDITIONS = Object.freeze({
+  first_commit: "active_current_expected_version",
+  replay: "same_key_same_semantics_already_committed",
+  rejection: "expected_version_stale_or_semantic_conflict",
+  contention: "active_current_expected_version",
+});
 
 function result(profile = "first_commit") {
   const iterations = profile === "contention" ? 100 : 1000;
@@ -24,7 +30,12 @@ function result(profile = "first_commit") {
     completed_iterations: iterations,
     sample_complete: true,
     completed_at: "2026-09-13T04:10:00Z",
+    dataset_id: "dataset:employment-separation-perf-1",
+    clearance_reference: "data_clearance:perf-2026-09",
+    preparation_protocol_reference: "protocol:employment-separation-perf-v1",
+    prepared_state_evidence_reference: "evidence:prepared-state-perf-1",
     resource_evidence_reference: "metrics:employment-separation-perf-1",
+    profile_preconditions: { ...PROFILE_PRECONDITIONS },
     minimum_non_contending_records: 1000,
     minimum_contention_pairs: 100,
     k6: {
