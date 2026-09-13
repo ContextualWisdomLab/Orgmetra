@@ -9,6 +9,7 @@ import {
   requestHeaders,
   validatePerformanceFixture,
 } from "./employment_separation_fixture_contract.mjs";
+import { requirePinnedK6Version } from "./employment_separation_k6_runtime_contract.mjs";
 import {
   isGovernedSeparationConflict,
   isGovernedSeparationSuccess,
@@ -31,6 +32,7 @@ const bearerToken = __ENV.ORGMETRA_PERFORMANCE_BEARER_TOKEN || "";
 const targetSha = (__ENV.ORGMETRA_PERFORMANCE_TARGET_SHA || "").toLowerCase();
 const selectedProfile = requirePerformanceProfile(__ENV.ORGMETRA_PERFORMANCE_PROFILE || "");
 const clientNetworkTopology = requireDirectPerformanceClientNetwork(__ENV);
+const k6Version = requirePinnedK6Version(__ENV.ORGMETRA_PERFORMANCE_K6_VERSION || "");
 
 if (!fixturePath) fail("ORGMETRA_PERFORMANCE_DATA_FILE is required");
 if (!baseUrl) fail("ORGMETRA_PERFORMANCE_BASE_URL is required");
@@ -188,6 +190,7 @@ export function handleSummary(data) {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: targetSha,
     fixture_sha256: fixtureSha256,
+    k6_version: k6Version,
     selected_profile: selectedProfile,
     expected_iterations: selectedRecords.length,
     completed_iterations: completedIterations,
