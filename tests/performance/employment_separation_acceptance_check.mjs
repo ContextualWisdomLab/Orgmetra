@@ -3,13 +3,14 @@ import { readFile } from "node:fs/promises";
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
 
 async function main() {
-  const [resultPath, runtimeEvidencePath] = process.argv.slice(2);
-  if (!resultPath || !runtimeEvidencePath || process.argv.length !== 4) {
-    throw new Error("usage: node employment_separation_acceptance_check.mjs <performance-result.json> <runtime-evidence.json>");
+  const [resultPath, runtimeEvidencePath, fixturePath] = process.argv.slice(2);
+  if (!resultPath || !runtimeEvidencePath || !fixturePath || process.argv.length !== 5) {
+    throw new Error("usage: node employment_separation_acceptance_check.mjs <performance-result.json> <runtime-evidence.json> <performance-fixture.json>");
   }
-  const [resultText, runtimeText] = await Promise.all([
+  const [resultText, runtimeText, fixtureText] = await Promise.all([
     readFile(resultPath, "utf8"),
     readFile(runtimeEvidencePath, "utf8"),
+    readFile(fixturePath, "utf8"),
   ]);
   let runtimeEvidence;
   try {
@@ -17,7 +18,7 @@ async function main() {
   } catch (error) {
     throw new Error("runtime evidence must be valid JSON", { cause: error });
   }
-  const acceptance = validateEmploymentSeparationAcceptance(resultText, runtimeEvidence);
+  const acceptance = validateEmploymentSeparationAcceptance(resultText, runtimeEvidence, fixtureText);
   process.stdout.write(`${JSON.stringify(acceptance, null, 2)}\n`);
 }
 
