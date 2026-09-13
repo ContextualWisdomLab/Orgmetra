@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 
-import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
+import {
+  validateEmploymentSeparationAcceptance,
+  validateRunnerResultDigest,
+} from "./employment_separation_acceptance_contract.mjs";
 import {
   acceptanceFixtureBytes,
   acceptanceFixtureSha256,
@@ -117,4 +120,24 @@ test("requires exact open-load and direct-network provenance", () => {
   reject((value) => { delete value.load_model; }, /load_model must be an object/);
   reject((value) => { value.load_model.executor = "shared-iterations"; }, /constant-arrival-rate/);
   reject((value) => { value.load_model.client_network_topology = "https_mitm_proxy"; }, /client_network_topology/);
+});
+
+test("binds later acceptance to the exact digest emitted by the benchmark runner", () => {
+  const artifact = render(result());
+  const digest = createHash("sha256").update(artifact).digest("hex");
+  assert.equal(validateRunnerResultDigest(artifact, digest), digest);
+
+  const substituted = Buffer.concat([artifact, Buffer.from(" ", "utf8")]);
+  assert.throws(
+    () => validateRunnerResultDigest(substituted, digest),
+    /runner result digest does not bind the supplied performance result/,
+  );
+});
+
+test("rejects malformed runner result digests before acceptance", () => {
+  const artifact = render(result());
+  assert.throws(
+    () => validateRunnerResultDigest(artifact, "not-a-sha256"),
+    /runner result digest must be a SHA-256 digest/,
+  );
 });
