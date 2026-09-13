@@ -7,6 +7,10 @@ readonly PINNED_K6_IMAGE_DIGEST="sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2a
 readonly PINNED_K6_RUNNER_IDENTITY="${PINNED_K6_IMAGE}@${PINNED_K6_IMAGE_DIGEST}"
 readonly WORKLOAD="/workspace/tests/performance/employment_separation_buyer_path.js"
 
+if (( $# != 0 )); then
+  printf 'commercial Employment separation benchmark does not accept caller-supplied k6 CLI options\n' >&2
+  exit 64
+fi
 if ! command -v podman >/dev/null 2>&1; then
   printf 'podman is required for the pinned commercial k6 runner\n' >&2
   exit 1
@@ -64,4 +68,4 @@ podman run --rm --pull=never --network=host --read-only \
   --env ORGMETRA_PERFORMANCE_K6_RUNNER_IDENTITY \
   --env ORGMETRA_PERFORMANCE_DATA_FILE=/evidence/fixture.json \
   --env "ORGMETRA_PERFORMANCE_SUMMARY_FILE=/output/${summary_name}" \
-  "${PINNED_K6_RUNNER_IDENTITY}" run "${WORKLOAD}" "$@"
+  "${PINNED_K6_RUNNER_IDENTITY}" run "${WORKLOAD}"
