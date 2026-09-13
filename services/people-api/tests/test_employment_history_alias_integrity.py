@@ -151,3 +151,30 @@ def test_low_level_invalid_tuple_reconstruction_fails_runtime_integrity() -> Non
             policy=policy,
             read_port=AliasHoldingPort(forged),
         )
+
+
+def test_low_level_non_integer_identity_scalar_fails_before_uuid_reconstruction() -> None:
+    """Forged tuple scalars must fail as integrity errors before UUID reconstruction."""
+    record = _record()
+    raw_values = list(record)
+    raw_values[0] = object()
+    forged = tuple.__new__(
+        employment_history_module.EmploymentHistoryRecord,
+        tuple(raw_values),
+    )
+    policy = _policy("employment_status_code")
+
+    with pytest.raises(
+        employment_history_module.EmploymentHistoryIntegrityError,
+        match="runtime integrity",
+    ):
+        employment_history_module.read_employment_history(
+            principal=_principal(),
+            tenant_record_id=TENANT,
+            person_record_id=PERSON,
+            known_at=KNOWN_AT,
+            purpose_code="employee_profile_review",
+            requested_fields=policy.permitted_fields,
+            policy=policy,
+            read_port=AliasHoldingPort(forged),
+        )
