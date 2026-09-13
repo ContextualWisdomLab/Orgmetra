@@ -455,9 +455,9 @@
     },
     {
       "path": "tests/test_employment_separation_postgres.sh",
-      "sha256": "703a7080f241ee3e4961d391c38365b5e4080b561d5f53dbedf4ffffb182dbca",
-      "bytes": 20835,
-      "lines": 536
+      "sha256": "b70680e69aa8115435601ffa664860723a44fe68cdccf8d3d23197205abc4fce",
+      "bytes": 21800,
+      "lines": 561
     },
     {
       "path": "tests/test_evidence_sealing_postgres.sh",
