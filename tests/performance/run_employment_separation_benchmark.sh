@@ -142,3 +142,8 @@ if [[ -z "${summary_source_identity_after}" || -z "${summary_source_digest_after
   printf 'benchmark summary changed during publication; refusing unbound result evidence\n' >&2
   exit 1
 fi
+
+# The caller-visible pathname remains mutable after this process exits. Treat this
+# digest as the immutable handoff token: downstream acceptance must re-hash the
+# bytes it consumes and require this exact value rather than trusting the path.
+printf 'ORGMETRA_PERFORMANCE_RESULT_SHA256=%s\n' "${summary_source_digest}"
