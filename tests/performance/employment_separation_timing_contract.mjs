@@ -15,14 +15,13 @@ export function buyerPathElapsedMs(timings) {
   }
 
   const blocked = finiteNonNegative(timings.blocked, "response.timings.blocked");
-  const connecting = finiteNonNegative(timings.connecting, "response.timings.connecting");
-  const tlsHandshaking = finiteNonNegative(timings.tls_handshaking, "response.timings.tls_handshaking");
+  finiteNonNegative(timings.connecting, "response.timings.connecting");
+  finiteNonNegative(timings.tls_handshaking, "response.timings.tls_handshaking");
   const duration = finiteNonNegative(timings.duration, "response.timings.duration");
 
-  // k6 documents duration as sending + waiting + receiving. TCP setup and TLS
-  // negotiation are separate phases, while blocked also carries pre-request wait
-  // such as connection-slot/DNS work. Final commercial acceptance disallows a
-  // client-side HTTPS MITM proxy because k6 can overlap these phases in the
-  // unusual double-TLS topology documented upstream.
-  return blocked + connecting + tlsHandshaking + duration;
+  // k6 v2.2 computes blocked from GetConn to GotConn, so TCP connect and TLS
+  // handshake are nested inside blocked for a new direct connection. Duration is
+  // the later sending + waiting + receiving interval. Adding connecting/TLS again
+  // would double-count cold-connection latency and could create a false RED.
+  return blocked + duration;
 }
