@@ -9,7 +9,7 @@ import {
   requestHeaders,
   validatePerformanceFixture,
 } from "./employment_separation_fixture_contract.mjs";
-import { requirePinnedK6Version } from "./employment_separation_k6_runtime_contract.mjs";
+import { requirePinnedK6Runtime } from "./employment_separation_k6_runtime_contract.mjs";
 import {
   isGovernedSeparationConflict,
   isGovernedSeparationSuccess,
@@ -32,7 +32,13 @@ const bearerToken = __ENV.ORGMETRA_PERFORMANCE_BEARER_TOKEN || "";
 const targetSha = (__ENV.ORGMETRA_PERFORMANCE_TARGET_SHA || "").toLowerCase();
 const selectedProfile = requirePerformanceProfile(__ENV.ORGMETRA_PERFORMANCE_PROFILE || "");
 const clientNetworkTopology = requireDirectPerformanceClientNetwork(__ENV);
-const k6Version = requirePinnedK6Version(__ENV.ORGMETRA_PERFORMANCE_K6_VERSION || "");
+const k6Runtime = requirePinnedK6Runtime({
+  version: __ENV.ORGMETRA_PERFORMANCE_K6_VERSION || "",
+  releaseAsset: __ENV.ORGMETRA_PERFORMANCE_K6_RELEASE_ASSET || "",
+  releaseAssetSha256: __ENV.ORGMETRA_PERFORMANCE_K6_RELEASE_ASSET_SHA256 || "",
+  runnerIdentity: __ENV.ORGMETRA_PERFORMANCE_K6_RUNNER_IDENTITY || "",
+  executableSha256: __ENV.ORGMETRA_PERFORMANCE_K6_EXECUTABLE_SHA256 || "",
+});
 
 if (!fixturePath) fail("ORGMETRA_PERFORMANCE_DATA_FILE is required");
 if (!baseUrl) fail("ORGMETRA_PERFORMANCE_BASE_URL is required");
@@ -190,7 +196,11 @@ export function handleSummary(data) {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: targetSha,
     fixture_sha256: fixtureSha256,
-    k6_version: k6Version,
+    k6_version: k6Runtime.version,
+    k6_release_asset: k6Runtime.release_asset,
+    k6_release_asset_sha256: k6Runtime.release_asset_sha256,
+    k6_runner_identity: k6Runtime.runner_identity,
+    k6_executable_sha256: k6Runtime.executable_sha256,
     selected_profile: selectedProfile,
     expected_iterations: selectedRecords.length,
     completed_iterations: completedIterations,

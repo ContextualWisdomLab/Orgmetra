@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
+import { validatePinnedK6AcceptanceEvidence } from "./employment_separation_k6_evidence_contract.mjs";
 import { parseRuntimeEvidenceArtifact } from "./employment_separation_runtime_evidence_artifact.mjs";
 
 async function main() {
@@ -14,6 +15,7 @@ async function main() {
     readFile(fixturePath),
   ]);
   const runtimeDocument = parseRuntimeEvidenceArtifact(runtimeBytes);
+  const k6Evidence = validatePinnedK6AcceptanceEvidence(resultBytes, runtimeDocument.parsed);
   const acceptance = validateEmploymentSeparationAcceptance(
     resultBytes,
     runtimeDocument.parsed,
@@ -21,6 +23,7 @@ async function main() {
   );
   process.stdout.write(`${JSON.stringify({
     ...acceptance,
+    ...k6Evidence,
     runtime_evidence_sha256: runtimeDocument.sha256,
   }, null, 2)}\n`);
 }
