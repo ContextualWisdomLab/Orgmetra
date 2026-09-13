@@ -21,6 +21,12 @@ const EXEC_BY_PROFILE = Object.freeze({
   rejection: "rejection",
   contention: "contention",
 });
+const APPROVED_LOAD_BY_PROFILE = Object.freeze({
+  first_commit: Object.freeze({ target_rps: 20, duration_seconds: 50, preallocated_vus: 20, max_vus: 80 }),
+  replay: Object.freeze({ target_rps: 20, duration_seconds: 50, preallocated_vus: 20, max_vus: 80 }),
+  rejection: Object.freeze({ target_rps: 20, duration_seconds: 50, preallocated_vus: 20, max_vus: 80 }),
+  contention: Object.freeze({ target_rps: 10, duration_seconds: 10, preallocated_vus: 20, max_vus: 80 }),
+});
 const PROXY_ENVIRONMENT_KEYS = Object.freeze([
   "HTTP_PROXY",
   "HTTPS_PROXY",
@@ -44,6 +50,19 @@ function positiveInteger(value, label) {
   return value;
 }
 
+export function approvedPerformanceLoadModel(profile) {
+  const selectedProfile = requirePerformanceProfile(profile);
+  const approved = APPROVED_LOAD_BY_PROFILE[selectedProfile];
+  return Object.freeze({
+    executor: "constant-arrival-rate",
+    target_rps: approved.target_rps,
+    duration_seconds: approved.duration_seconds,
+    preallocated_vus: approved.preallocated_vus,
+    max_vus: approved.max_vus,
+    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
+  });
+}
+
 export function requireDirectPerformanceClientNetwork(environment) {
   if (environment === null || typeof environment !== "object" || Array.isArray(environment)) {
     throw new Error("performance client environment must be an object");
@@ -57,7 +76,7 @@ export function requireDirectPerformanceClientNetwork(environment) {
   return PERFORMANCE_CLIENT_NETWORK_TOPOLOGY;
 }
 
-export function validatePerformanceLoadModel(value, expectedIterations) {
+export function validatePerformanceLoadModel(value, expectedIterations, profile) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("load_model must be an object");
   }
@@ -79,6 +98,7 @@ export function validatePerformanceLoadModel(value, expectedIterations) {
   if (value.client_network_topology !== PERFORMANCE_CLIENT_NETWORK_TOPOLOGY) {
     throw new Error(`load_model.client_network_topology must be ${PERFORMANCE_CLIENT_NETWORK_TOPOLOGY}`);
   }
+  const selectedProfile = requirePerformanceProfile(profile);
   const iterations = positiveInteger(expectedIterations, "expectedIterations");
   const rate = positiveInteger(value.target_rps, "load_model.target_rps");
   const duration = positiveInteger(value.duration_seconds, "load_model.duration_seconds");
@@ -87,39 +107,26 @@ export function validatePerformanceLoadModel(value, expectedIterations) {
   if (maximum < preAllocated) {
     throw new Error("load_model.max_vus must be greater than or equal to load_model.preallocated_vus");
   }
+  const approved = approvedPerformanceLoadModel(selectedProfile);
+  for (const field of ["target_rps", "duration_seconds", "preallocated_vus", "max_vus"]) {
+    if (value[field] !== approved[field]) {
+      throw new Error(`load_model.${field} must match the approved ${selectedProfile} load model`);
+    }
+  }
   const scheduledIterations = rate * duration;
   if (!Number.isSafeInteger(scheduledIterations) || scheduledIterations !== iterations) {
     throw new Error("load_model target_rps * duration_seconds must equal expectedIterations exactly");
   }
-  return Object.freeze({
-    executor: value.executor,
-    target_rps: rate,
-    duration_seconds: duration,
-    preallocated_vus: preAllocated,
-    max_vus: maximum,
-    client_network_topology: value.client_network_topology,
-  });
+  return approved;
 }
 
-export function arrivalRateScenarioForPerformanceProfile(profile, {
-  expectedIterations,
-  targetRps,
-  durationSeconds,
-  preAllocatedVUs,
-  maxVUs,
-}) {
-  requirePerformanceProfile(profile);
-  const loadModel = validatePerformanceLoadModel({
-    executor: "constant-arrival-rate",
-    target_rps: targetRps,
-    duration_seconds: durationSeconds,
-    preallocated_vus: preAllocatedVUs,
-    max_vus: maxVUs,
-    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
-  }, expectedIterations);
+export function arrivalRateScenarioForPerformanceProfile(profile, { expectedIterations }) {
+  const selectedProfile = requirePerformanceProfile(profile);
+  const approved = approvedPerformanceLoadModel(selectedProfile);
+  const loadModel = validatePerformanceLoadModel(approved, expectedIterations, selectedProfile);
   return {
     executor: loadModel.executor,
-    exec: EXEC_BY_PROFILE[profile],
+    exec: EXEC_BY_PROFILE[selectedProfile],
     rate: loadModel.target_rps,
     timeUnit: "1s",
     duration: `${loadModel.duration_seconds}s`,
