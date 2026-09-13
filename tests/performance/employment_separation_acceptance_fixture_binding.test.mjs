@@ -6,8 +6,8 @@ import { validateEmploymentSeparationAcceptance } from "./employment_separation_
 import {
   ACCEPTANCE_CANDIDATE_SHA,
   ACCEPTANCE_PROFILE_PRECONDITIONS,
+  acceptanceFixtureBytes,
   acceptanceFixtureSha256,
-  acceptanceFixtureText,
 } from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 function performanceResult(fixtureSha256, { includeFixtureDigest = true } = {}) {
@@ -77,47 +77,47 @@ function render(value) {
 }
 
 test("rejects acceptance without an exact fixture digest", () => {
-  const fixtureText = acceptanceFixtureText();
-  const fixtureSha256 = acceptanceFixtureSha256(fixtureText);
+  const fixtureBytes = acceptanceFixtureBytes();
+  const fixtureSha256 = acceptanceFixtureSha256(fixtureBytes);
   const resultText = render(performanceResult(fixtureSha256, { includeFixtureDigest: false }));
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText, fixtureSha256), fixtureText),
+    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText, fixtureSha256), fixtureBytes),
     /fixture_sha256/,
   );
 });
 
 test("rejects runtime evidence bound to a different fixture digest", () => {
-  const fixtureText = acceptanceFixtureText();
-  const fixtureSha256 = acceptanceFixtureSha256(fixtureText);
+  const fixtureBytes = acceptanceFixtureBytes();
+  const fixtureSha256 = acceptanceFixtureSha256(fixtureBytes);
   const resultText = render(performanceResult(fixtureSha256));
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText, "0".repeat(64)), fixtureText),
+    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText, "0".repeat(64)), fixtureBytes),
     /fixture_sha256/,
   );
 });
 
 test("rejects a fixture whose exact bytes are not right-cleared", () => {
-  const fixtureText = acceptanceFixtureText({ rightCleared: false });
-  const fixtureSha256 = acceptanceFixtureSha256(fixtureText);
+  const fixtureBytes = acceptanceFixtureBytes({ rightCleared: false });
+  const fixtureSha256 = acceptanceFixtureSha256(fixtureBytes);
   const resultText = render(performanceResult(fixtureSha256));
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText, fixtureSha256), fixtureText),
+    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText, fixtureSha256), fixtureBytes),
     /right_cleared/,
   );
 });
 
 test("rejects a fixture whose exact bytes are synthetic", () => {
-  const fixtureText = acceptanceFixtureText({ synthetic: true });
-  const fixtureSha256 = acceptanceFixtureSha256(fixtureText);
+  const fixtureBytes = acceptanceFixtureBytes({ synthetic: true });
+  const fixtureSha256 = acceptanceFixtureSha256(fixtureBytes);
   const resultText = render(performanceResult(fixtureSha256));
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText, fixtureSha256), fixtureText),
+    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText, fixtureSha256), fixtureBytes),
     /synthetic/,
   );
 });
 
 test("rejects byte-distinct fixture artifacts that collide after lossy UTF-8 decoding", () => {
-  const fixtureBytes = Buffer.from(acceptanceFixtureText(), "utf8");
+  const fixtureBytes = acceptanceFixtureBytes();
   const malformedA = Buffer.concat([Buffer.from([0x80]), fixtureBytes]);
   const malformedB = Buffer.concat([Buffer.from([0x81]), fixtureBytes]);
   assert.equal(malformedA.toString("utf8"), malformedB.toString("utf8"));
