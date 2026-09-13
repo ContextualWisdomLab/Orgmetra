@@ -24,8 +24,13 @@ export function thresholdsForPerformanceProfile(profile, expectedIterations) {
   if (!Number.isSafeInteger(expectedIterations) || expectedIterations < 1) {
     throw new Error("expectedIterations must be a positive safe integer");
   }
+  const expectedLatencySamples = profile === "contention" ? expectedIterations * 2 : expectedIterations;
+  if (!Number.isSafeInteger(expectedLatencySamples)) {
+    throw new Error("expected latency sample count must be a positive safe integer");
+  }
   const thresholds = {
     employment_separation_unexpected_response: ["rate==0"],
+    employment_separation_latency_samples: [`count>=${expectedLatencySamples}`],
     checks: ["rate==1"],
     iterations: [`count>=${expectedIterations}`],
   };
