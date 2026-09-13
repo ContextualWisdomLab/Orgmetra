@@ -6,6 +6,7 @@ import { validateEmploymentSeparationAcceptance } from "./employment_separation_
 import {
   acceptanceFixtureBytes,
   acceptanceFixtureSha256,
+  acceptanceLoadModel,
 } from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const PROFILE_PRECONDITIONS = Object.freeze({
@@ -31,6 +32,7 @@ function performanceResult(profile, iterations) {
     completed_iterations: iterations,
     sample_complete: true,
     completed_at: "2026-09-13T04:10:00Z",
+    load_model: acceptanceLoadModel(iterations),
     dataset_id: "dataset:employment-separation-perf-1",
     clearance_reference: "data_clearance:perf-2026-09",
     preparation_protocol_reference: "protocol:employment-separation-perf-v1",
@@ -42,6 +44,7 @@ function performanceResult(profile, iterations) {
     k6: {
       metrics: {
         iterations: { values: { count: iterations } },
+        dropped_iterations: { values: { count: 0 } },
         checks: { values: { rate: 1 } },
         employment_separation_unexpected_response: { values: { rate: 0 } },
         employment_separation_latency_samples: { values: { count: latencySamples } },
