@@ -6,17 +6,34 @@
 - High-impact command audit append success: 99.99% within accepted maintenance windows.
 - Integration adapter error visibility: every failed outbound command produces an operator-safe event.
 
+No buyer-facing Employment-separation latency SLO is asserted on the active branch. The `POST /v1/employment-separations` path must first be measured under the repository performance contract on a production-representative capability; test-fixture elapsed time is not a substitute for p95 evidence.
+
 ## Degraded modes
 
 ### Keyverse unavailable
 
 - An already authenticated session may perform only low-risk, non-PII reads for at most 15 minutes after its last successfully verified authorization snapshot.
 - The 15-minute authorization lifetime is a hard upper bound. It cannot be renewed from a cached token, local clock extension, or an unavailable Keyverse response.
-- PII reads, exports, role changes, identity provisioning, identity deprovisioning, and every high-risk command fail closed whenever current authorization cannot be verified.
+- PII reads, exports, role changes, identity provisioning, identity deprovisioning, and every high-risk command, including Employment separation, fail closed whenever current authorization cannot be verified.
 - New sessions, new grants, and privilege elevation are rejected.
 - Revocation and deprovisioning requests are durably queued with idempotency keys, but the affected subject is denied Orgmetra access immediately until Keyverse confirms completion.
 - Every denied or deferred action records an `authorization_verification_unavailable` audit event with tenant, actor, purpose, resource, policy-snapshot time, and correlation reference.
 - Recovery requires a fresh Keyverse verification before a session regains PII or mutation capability; queued revocation and deprovisioning commands are reconciled before normal provisioning resumes.
+
+### Governed Employment separation
+
+The active #64 separation path is a short PostgreSQL transaction. It must not wait inside the Employment lock for payroll, identity deprovisioning, document processing, notification delivery, an LLM, or any other external workflow. Those consumers start only from the committed versioned contract/event after authoritative People truth exists.
+
+- A failed transaction before commit must leave the prior current Employment version intact and leave no `employment_separation_record`, separation audit/outbox row, or successful idempotency marker.
+- Exact-key retries are recovery behavior, not a reason to keep a transaction open. If the caller loses the outcome after the database commit is already durable, a fresh same-semantic request must replay the first terminal result without creating retry-only separation/audit/outbox facts.
+- Distinct separation keys and Assignment INSERTs that target the same Employment serialize on the minimal durable `employment_record` aggregate anchor. Operators must diagnose lock waits with PostgreSQL session/lock state rather than elapsed-time heuristics. Broad table locks are not an accepted recovery measure.
+- After a lock wait, the owning function re-reads current Employment/Assignment coverage in a new statement. A stale expected version or newly conflicting Assignment is a governed conflict, not an instruction to retry blindly.
+- Separation never repairs a conflict by changing Assignment-owned rows. An active/future Assignment that crosses the proposed separation boundary is coordinated through the Assignment owner contract before a new separation command is attempted.
+- Client cancellation or a failed concurrent attempt is not considered cleaned up until both the local client process and its PostgreSQL server session have quiesced. Teardown must not race a still-running waiter that could acquire a released lock and commit after the test/operator assumes failure.
+- The dedicated separation executor capability must remain narrowly provisioned. A role collision, missing FORCE RLS/NOBYPASSRLS guarantee, or unexpected direct People/audit/outbox DML privilege is a deployment failure requiring operator review, not an automatic role reuse or privilege expansion.
+- Rehire #302 is downstream of protected separation truth. Operators must not reactivate/reopen a terminated Employment or reuse an old candidate-worker conversion as an operational workaround.
+
+Recovery evidence for this path consists of the exact terminal/current Employment versions, `employment_separation_record`, People idempotency row, immutable audit/outbox evidence, and the database-owned recorded timestamp. Free-form termination narratives or copied employee documents are not operational evidence.
 
 ### Audit/outbox persistence
 
@@ -52,15 +69,20 @@
 
 - HRIS PostgreSQL requires encrypted backups, point-in-time recovery, and restore rehearsals.
 - Audit/provenance records require immutability and tamper evidence; restored audit rows must recompute to their stored SHA-256 digests before they are treated as review evidence.
+- Employment separation recovery must restore the Employment version chain, `employment_separation_record`, People idempotency row, and its immutable audit/outbox evidence to one consistent recovery point. A restore that exposes a terminal Employment without its governed separation provenance, or separation provenance without its referenced terminal/prior versions, is not serviceable.
 - Outbox delivery state and escalation evidence must be restored together with the corresponding audit records. Recovery may retry non-terminal work but must not mutate or reopen a terminal delivered/dead-lettered record or invent a successful delivery receipt.
 - Object-store artifacts require tenant-scoped retention and deletion policy.
-- Restored data is not serviceable until tenant isolation, temporal interval, append-only/TRUNCATE guards, evidence-reference, audit-envelope digest, outbox-state/escalation, trusted search-path, and manifest integrity checks pass.
+- Restored data is not serviceable until tenant isolation, temporal interval, append-only/TRUNCATE guards, evidence-reference, separation-version/provenance binding, audit-envelope digest, outbox-state/escalation, trusted search-path, and manifest integrity checks pass.
 
 ## Incident classes
 
 - authorization verification or revocation failure
 - cross-tenant access attempt
 - evidence or audit-envelope integrity failure
+- Employment-separation version/provenance inconsistency
+- Employment-separation/Assignment concurrency inconsistency
+- lingering separation client/server session or unexpected aggregate lock retention
+- separation uncertain-outcome replay divergence or duplicate terminal side effect
 - outbox lease/retry/dead-letter or delivery-state corruption
 - missing or tampered outbox escalation evidence
 - lost final-attempt dispatcher identity requiring audited operator recovery
@@ -69,3 +91,5 @@
 - LLM draft hallucination detected
 - validation study discrepancy
 - migration reconciliation failure
+
+ADR 0015 remains Proposed. The separation operating contract above describes active PR #64 and must not be represented as protected/released service behavior until canonical PostgreSQL acceptance and the remaining security/review gates pass.
