@@ -44,7 +44,6 @@ function performanceResult(profile, iterations) {
     k6: {
       metrics: {
         iterations: { values: { count: iterations } },
-        dropped_iterations: { values: { count: 0 } },
         checks: { values: { rate: 1 } },
         employment_separation_unexpected_response: { values: { rate: 0 } },
         employment_separation_latency_samples: { values: { count: latencySamples } },
@@ -58,7 +57,7 @@ function performanceResult(profile, iterations) {
   };
 }
 
-function runtimeEvidence(resultArtifact, profile) {
+function runtimeEvidence(resultArtifact, profile, iterations) {
   return {
     schema_version: "orgmetra.employment_separation.runtime_evidence.v1",
     candidate_sha: "a".repeat(40),
@@ -69,6 +68,8 @@ function runtimeEvidence(resultArtifact, profile) {
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
     observer_reference: "observer:perf-runtime-1",
+    load_observation_reference: "evidence:perf-load-observation-1",
+    observed_load_model: acceptanceLoadModel(iterations),
     resource_evidence_reference: "metrics:employment-separation-perf-1",
     observed_at: "2026-09-13T04:10:01Z",
     host_cpu_percent_p95: 42.5,
@@ -90,7 +91,11 @@ function runtimeEvidence(resultArtifact, profile) {
 function assertRejected(result, pattern) {
   const artifact = Buffer.from(`${JSON.stringify(result, null, 2)}\n`, "utf8");
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact, result.selected_profile), FIXTURE_BYTES),
+    () => validateEmploymentSeparationAcceptance(
+      artifact,
+      runtimeEvidence(artifact, result.selected_profile, result.expected_iterations),
+      FIXTURE_BYTES,
+    ),
     pattern,
   );
 }
