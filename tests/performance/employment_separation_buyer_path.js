@@ -33,9 +33,21 @@ if (!baseUrl) fail("ORGMETRA_PERFORMANCE_BASE_URL is required");
 if (!bearerToken) fail("ORGMETRA_PERFORMANCE_BEARER_TOKEN is required and must not be stored in the fixture");
 if (!/^[0-9a-f]{40}$/.test(targetSha)) fail("ORGMETRA_PERFORMANCE_TARGET_SHA must be a full Git commit SHA");
 
-const fixtureText = open(fixturePath);
-const fixtureSha256 = crypto.sha256(fixtureText, "hex");
-const fixture = validatePerformanceFixture(JSON.parse(fixtureText), {
+const fixtureBytes = open(fixturePath, "b");
+const fixtureSha256 = crypto.sha256(fixtureBytes, "hex");
+let fixtureText;
+try {
+  fixtureText = new TextDecoder("utf-8", { fatal: true }).decode(fixtureBytes);
+} catch (_) {
+  fail("performance fixture must be valid UTF-8");
+}
+let fixtureDocument;
+try {
+  fixtureDocument = JSON.parse(fixtureText);
+} catch (_) {
+  fail("performance fixture must be valid JSON");
+}
+const fixture = validatePerformanceFixture(fixtureDocument, {
   minimumNonContendingRecords: MINIMUM_NON_CONTENDING_RECORDS,
   minimumContentionPairs: MINIMUM_CONTENTION_PAIRS,
 });
