@@ -1,7 +1,7 @@
 import http from "k6/http";
 import { check, fail } from "k6";
 import exec from "k6/execution";
-import { Rate, Trend } from "k6/metrics";
+import { Counter, Rate, Trend } from "k6/metrics";
 
 import {
   requestBody,
@@ -62,6 +62,7 @@ const firstCommitDuration = new Trend("employment_separation_first_commit_durati
 const replayDuration = new Trend("employment_separation_replay_duration_ms", true);
 const rejectionDuration = new Trend("employment_separation_rejection_duration_ms", true);
 const contentionDuration = new Trend("employment_separation_contention_duration_ms", true);
+const latencySamples = new Counter("employment_separation_latency_samples");
 const unexpectedResponse = new Rate("employment_separation_unexpected_response");
 
 const scenarioByProfile = {
@@ -130,6 +131,7 @@ function post(command, profile) {
 
 function observe(response, trend, profile, predicate) {
   trend.add(response.timings.duration, { profile });
+  latencySamples.add(1, { profile });
   const passed = check(response, {
     [`${profile} returned the governed result`]: predicate,
   });
@@ -171,7 +173,10 @@ export function contention() {
     ["POST", `${baseUrl}${ROUTE}`, requestBody(pair.left), { headers: requestHeaders(pair.left, bearerToken), tags: { profile: "contention" } }],
     ["POST", `${baseUrl}${ROUTE}`, requestBody(pair.right), { headers: requestHeaders(pair.right, bearerToken), tags: { profile: "contention" } }],
   ]);
-  for (const response of responses) contentionDuration.add(response.timings.duration, { profile: "contention" });
+  for (const response of responses) {
+    contentionDuration.add(response.timings.duration, { profile: "contention" });
+    latencySamples.add(1, { profile: "contention" });
+  }
   const parsed = responses.map((response) => ({ status: response.status, body: parseJson(response) }));
   const successes = parsed.filter(({ status, body }) => (
     isGovernedSeparationSuccess(status, body, {
