@@ -61,6 +61,7 @@ function result(profile = "first_commit") {
 }
 
 function runtime(resultArtifact, profile = "first_commit") {
+  const iterations = profile === "contention" ? 100 : 1000;
   return {
     schema_version: "orgmetra.employment_separation.runtime_evidence.v1",
     candidate_sha: "a".repeat(40),
@@ -71,6 +72,8 @@ function runtime(resultArtifact, profile = "first_commit") {
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
     observer_reference: "observer:perf-runtime-1",
+    load_observation_reference: "evidence:perf-load-observation-1",
+    observed_load_model: acceptanceLoadModel(iterations),
     resource_evidence_reference: "metrics:employment-separation-perf-1",
     observed_at: "2026-09-13T04:10:01Z",
     host_cpu_percent_p95: 42,
@@ -211,6 +214,16 @@ test("rejects malformed runtime authority and artifact binding", () => {
   rejectRuntime((value) => { value.performance_result_sha256 = "0".repeat(64); }, /does not bind/);
   rejectRuntime((value) => { value.fixture_sha256 = "bad"; }, /SHA-256 digest/);
   rejectRuntime((value) => { value.fixture_sha256 = "0".repeat(64); }, /exact validated performance fixture/);
+});
+
+test("rejects invalid runtime load observation", () => {
+  rejectRuntime((value) => { value.load_observation_reference = "bad"; }, /load_observation_reference/);
+  rejectRuntime((value) => { delete value.observed_load_model; }, /load_model must be an object/);
+  rejectRuntime((value) => { value.observed_load_model.executor = "shared-iterations"; }, /constant-arrival-rate/);
+  rejectRuntime((value) => {
+    value.observed_load_model.target_rps = 2;
+    value.observed_load_model.duration_seconds = 500;
+  }, /observed_load_model.target_rps must match/);
 });
 
 test("rejects invalid runtime references and observation time", () => {
