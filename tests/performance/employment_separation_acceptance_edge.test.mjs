@@ -3,6 +3,10 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
+import {
+  acceptanceFixtureSha256,
+  acceptanceFixtureText,
+} from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const TREND_BY_PROFILE = {
   first_commit: "employment_separation_first_commit_duration_ms",
@@ -16,6 +20,8 @@ const PROFILE_PRECONDITIONS = Object.freeze({
   rejection: "expected_version_stale_or_semantic_conflict",
   contention: "active_current_expected_version",
 });
+const FIXTURE_TEXT = acceptanceFixtureText();
+const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_TEXT);
 
 function result(profile = "first_commit") {
   const iterations = profile === "contention" ? 100 : 1000;
@@ -26,6 +32,7 @@ function result(profile = "first_commit") {
   return {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: "a".repeat(40),
+    fixture_sha256: FIXTURE_SHA256,
     selected_profile: profile,
     expected_iterations: iterations,
     completed_iterations: iterations,
@@ -58,6 +65,7 @@ function runtime(resultText, profile = "first_commit") {
     observed_service_sha: "a".repeat(40),
     selected_profile: profile,
     performance_result_sha256: createHash("sha256").update(resultText, "utf8").digest("hex"),
+    fixture_sha256: FIXTURE_SHA256,
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
     observer_reference: "observer:perf-runtime-1",
@@ -87,7 +95,7 @@ function rejectResult(mutate, pattern = /./, profile = "first_commit") {
   const value = result(profile);
   mutate(value);
   const text = render(value);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime(text, profile)), pattern);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime(text, profile), FIXTURE_TEXT), pattern);
 }
 
 function rejectRuntime(mutate, pattern = /./, profile = "first_commit") {
@@ -95,23 +103,24 @@ function rejectRuntime(mutate, pattern = /./, profile = "first_commit") {
   const text = render(value);
   const evidence = runtime(text, profile);
   mutate(evidence);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, evidence), pattern);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, evidence, FIXTURE_TEXT), pattern);
 }
 
 test("rejects malformed result and runtime containers", () => {
-  assert.throws(() => validateEmploymentSeparationAcceptance("", {}), /non-empty JSON text/);
-  assert.throws(() => validateEmploymentSeparationAcceptance(4, {}), /non-empty JSON text/);
-  assert.throws(() => validateEmploymentSeparationAcceptance("not json", {}), /valid JSON/);
-  assert.throws(() => validateEmploymentSeparationAcceptance("[]", {}), /result must be an object/);
+  assert.throws(() => validateEmploymentSeparationAcceptance("", {}, FIXTURE_TEXT), /non-empty JSON text/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(4, {}, FIXTURE_TEXT), /non-empty JSON text/);
+  assert.throws(() => validateEmploymentSeparationAcceptance("not json", {}, FIXTURE_TEXT), /valid JSON/);
+  assert.throws(() => validateEmploymentSeparationAcceptance("[]", {}, FIXTURE_TEXT), /result must be an object/);
   const text = render(result());
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, []), /runtime must be an object/);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, null), /runtime must be an object/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, [], FIXTURE_TEXT), /runtime must be an object/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, null, FIXTURE_TEXT), /runtime must be an object/);
 });
 
 test("rejects invalid result authority and cardinality metadata", () => {
   rejectResult((value) => { value.schema_version = "v0"; }, /schema_version/);
   rejectResult((value) => { value.candidate_sha = ""; }, /non-empty string/);
   rejectResult((value) => { value.candidate_sha = "z".repeat(40); }, /full Git commit SHA/);
+  rejectResult((value) => { value.fixture_sha256 = "bad"; }, /SHA-256 digest/);
   rejectResult((value) => { value.selected_profile = null; }, /non-empty string/);
   rejectResult((value) => { value.selected_profile = "unknown"; }, /unsupported/);
   rejectResult((value) => { value.minimum_non_contending_records = 999; }, /must equal 1000/);
@@ -174,7 +183,7 @@ test("accepts non-first profiles without applying the first-commit latency targe
   for (const profile of ["replay", "rejection", "contention"]) {
     const value = result(profile);
     const text = render(value);
-    const accepted = validateEmploymentSeparationAcceptance(text, runtime(text, profile));
+    const accepted = validateEmploymentSeparationAcceptance(text, runtime(text, profile), FIXTURE_TEXT);
     assert.equal(accepted.selected_profile, profile);
     assert.equal(accepted.p95_ms, 80);
   }
@@ -189,6 +198,8 @@ test("rejects malformed runtime authority and artifact binding", () => {
   rejectRuntime((value) => { value.selected_profile = "replay"; }, /selected_profile/);
   rejectRuntime((value) => { value.performance_result_sha256 = "bad"; }, /SHA-256 digest/);
   rejectRuntime((value) => { value.performance_result_sha256 = "0".repeat(64); }, /does not bind/);
+  rejectRuntime((value) => { value.fixture_sha256 = "bad"; }, /SHA-256 digest/);
+  rejectRuntime((value) => { value.fixture_sha256 = "0".repeat(64); }, /exact validated performance fixture/);
 });
 
 test("rejects invalid runtime references and observation time", () => {
