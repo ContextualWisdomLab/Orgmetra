@@ -68,6 +68,10 @@ export function acceptanceFixtureText(options) {
   return `${JSON.stringify(acceptanceFixture(options), null, 2)}\n`;
 }
 
-export function acceptanceFixtureSha256(text) {
-  return createHash("sha256").update(text, "utf8").digest("hex");
+export function acceptanceFixtureBytes(options) {
+  return Buffer.from(acceptanceFixtureText(options), "utf8");
+}
+
+export function acceptanceFixtureSha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
