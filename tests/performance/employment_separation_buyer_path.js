@@ -16,6 +16,7 @@ import {
 } from "./employment_separation_response_contract.mjs";
 import {
   PERFORMANCE_SUMMARY_TREND_STATS,
+  approvedPerformanceLoadModel,
   arrivalRateScenarioForPerformanceProfile,
   requireDirectPerformanceClientNetwork,
   requirePerformanceProfile,
@@ -58,21 +59,10 @@ const fixture = validatePerformanceFixture(fixtureDocument, {
 });
 if (fixture.candidate_sha.toLowerCase() !== targetSha) fail("performance fixture candidate_sha does not match ORGMETRA_PERFORMANCE_TARGET_SHA");
 
-function requiredPositiveIntegerSetting(name) {
-  const raw = __ENV[name];
-  if (raw === undefined || raw === "" || !/^\d+$/.test(raw)) fail(`${name} must be an explicit positive integer`);
-  const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < 1) fail(`${name} must be an explicit positive safe integer`);
-  return value;
-}
-
 const selectedRecords = fixture.profiles[selectedProfile];
-const targetRps = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_TARGET_RPS");
-const durationSeconds = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_DURATION_SECONDS");
-const preAllocatedVUs = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_PREALLOCATED_VUS");
-const maxVUs = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_MAX_VUS");
+const approvedLoadModel = approvedPerformanceLoadModel(selectedProfile);
 const selectedScenario = arrivalRateScenarioForPerformanceProfile(selectedProfile, {
-  expectedIterations: selectedRecords.length, targetRps, durationSeconds, preAllocatedVUs, maxVUs,
+  expectedIterations: selectedRecords.length,
 });
 
 const firstCommitDuration = new Trend("employment_separation_first_commit_duration_ms", true);
@@ -149,7 +139,7 @@ export function handleSummary(data) {
     completed_iterations: completedIterations,
     sample_complete: completedIterations === selectedRecords.length,
     completed_at: new Date().toISOString(),
-    load_model: { executor: selectedScenario.executor, target_rps: targetRps, duration_seconds: durationSeconds, preallocated_vus: preAllocatedVUs, max_vus: maxVUs, client_network_topology: clientNetworkTopology },
+    load_model: { ...approvedLoadModel, client_network_topology: clientNetworkTopology },
     dataset_id: fixture.dataset_id,
     clearance_reference: fixture.clearance_reference,
     preparation_protocol_reference: fixture.preparation_protocol_reference,
