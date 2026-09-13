@@ -195,6 +195,7 @@ export function handleSummary(data) {
     expected_iterations: selectedRecords.length,
     completed_iterations: completedIterations,
     sample_complete: completedIterations === selectedRecords.length,
+    completed_at: new Date().toISOString(),
     dataset_id: fixture.dataset_id,
     clearance_reference: fixture.clearance_reference,
     preparation_protocol_reference: fixture.preparation_protocol_reference,
