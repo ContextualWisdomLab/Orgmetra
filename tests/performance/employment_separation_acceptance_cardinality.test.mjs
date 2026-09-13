@@ -4,8 +4,8 @@ import test from "node:test";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
 import {
+  acceptanceFixtureBytes,
   acceptanceFixtureSha256,
-  acceptanceFixtureText,
 } from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const PROFILE_PRECONDITIONS = Object.freeze({
@@ -14,8 +14,8 @@ const PROFILE_PRECONDITIONS = Object.freeze({
   rejection: "expected_version_stale_or_semantic_conflict",
   contention: "active_current_expected_version",
 });
-const FIXTURE_TEXT = acceptanceFixtureText();
-const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_TEXT);
+const FIXTURE_BYTES = acceptanceFixtureBytes();
+const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_BYTES);
 
 function performanceResult(profile, iterations) {
   const trendName = profile === "contention"
@@ -87,7 +87,7 @@ function runtimeEvidence(resultText, profile) {
 function assertRejected(result, pattern) {
   const text = `${JSON.stringify(result, null, 2)}\n`;
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text, result.selected_profile), FIXTURE_TEXT),
+    () => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text, result.selected_profile), FIXTURE_BYTES),
     pattern,
   );
 }
