@@ -68,6 +68,25 @@ test("canonical benchmark runner does not forward caller-controlled load-model e
   }
 });
 
+test("canonical benchmark runner binds the mounted workload to the exact clean candidate checkout", () => {
+  const runner = readFileSync(new URL("./run_employment_separation_benchmark.sh", import.meta.url), "utf8");
+  assert.match(
+    runner,
+    /git -C "\$\{repo_root\}" rev-parse --verify HEAD/,
+    "the mounted workload must be bound to an exact repository HEAD",
+  );
+  assert.match(
+    runner,
+    /repository_head.*ORGMETRA_PERFORMANCE_TARGET_SHA|ORGMETRA_PERFORMANCE_TARGET_SHA.*repository_head/s,
+    "the exact mounted checkout must match the measured candidate SHA",
+  );
+  assert.match(
+    runner,
+    /git -C "\$\{repo_root\}" status --porcelain=v1 --untracked-files=all/,
+    "commercial evidence must reject modified, staged, or untracked workload bytes",
+  );
+});
+
 test("canonical benchmark runner rejects CLI overrides before any Podman dependency is needed", () => {
   const runnerPath = fileURLToPath(new URL("./run_employment_separation_benchmark.sh", import.meta.url));
   const result = spawnSync("bash", [runnerPath, "--duration", "1s"], {
