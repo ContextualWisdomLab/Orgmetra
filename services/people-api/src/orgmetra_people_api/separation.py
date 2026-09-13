@@ -19,6 +19,15 @@ _MAX_UUID_INT = (1 << 128) - 1
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 _REASON_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+_ALLOWED_SEPARATION_REASON_CODES = frozenset(
+    {
+        "voluntary_resignation",
+        "retirement_transition",
+        "fixed_term_completion",
+        "position_elimination",
+        "employer_initiated_separation",
+    }
+)
 _EMPLOYMENT_FIELDS = frozenset({"employment_record"})
 
 
@@ -102,6 +111,8 @@ class EmploymentSeparationCommand:
             raise ValueError("separation_reason_code must be a lower snake_case code.")
         if _REASON_PATTERN.fullmatch(self.separation_reason_code) is None:
             raise ValueError("separation_reason_code must be a lower snake_case code.")
+        if self.separation_reason_code not in _ALLOWED_SEPARATION_REASON_CODES:
+            raise ValueError("separation_reason_code must be an approved separation reason.")
         _namespaced_reference("evidence_reference", self.evidence_reference)
         _version_code(self.evidence_version_code)
         _namespaced_reference("confirmation_reference", self.confirmation_reference)
