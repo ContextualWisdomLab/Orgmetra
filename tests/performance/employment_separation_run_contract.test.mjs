@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
   PERFORMANCE_SUMMARY_TREND_STATS,
+  approvedPerformanceLoadModel,
   arrivalRateScenarioForPerformanceProfile,
   requireDirectPerformanceClientNetwork,
   requirePerformanceProfile,
@@ -19,13 +20,25 @@ test("requires one explicit performance profile per run", () => {
   assert.throws(() => requirePerformanceProfile("all"), /must be exactly one of/);
 });
 
-test("uses an open arrival-rate model whose schedule is independent of response time", () => {
+test("uses one version-controlled open arrival-rate model per profile", () => {
+  assert.deepEqual(approvedPerformanceLoadModel("first_commit"), {
+    executor: "constant-arrival-rate",
+    target_rps: 20,
+    duration_seconds: 50,
+    preallocated_vus: 20,
+    max_vus: 80,
+    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
+  });
+  assert.deepEqual(approvedPerformanceLoadModel("contention"), {
+    executor: "constant-arrival-rate",
+    target_rps: 10,
+    duration_seconds: 10,
+    preallocated_vus: 20,
+    max_vus: 80,
+    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
+  });
   assert.deepEqual(arrivalRateScenarioForPerformanceProfile("first_commit", {
     expectedIterations: 1000,
-    targetRps: 20,
-    durationSeconds: 50,
-    preAllocatedVUs: 20,
-    maxVUs: 80,
   }), {
     executor: "constant-arrival-rate",
     exec: "firstCommit",
@@ -38,47 +51,29 @@ test("uses an open arrival-rate model whose schedule is independent of response 
   });
 });
 
-test("refuses arrival schedules that can hide load or outrun fixture cardinality", () => {
+test("refuses fixture cardinality that does not exactly fit the approved schedule", () => {
   assert.throws(() => arrivalRateScenarioForPerformanceProfile("first_commit", {
-    expectedIterations: 1000,
-    targetRps: 20,
-    durationSeconds: 49,
-    preAllocatedVUs: 20,
-    maxVUs: 80,
+    expectedIterations: 999,
   }), /must equal expectedIterations exactly/);
   assert.throws(() => arrivalRateScenarioForPerformanceProfile("contention", {
-    expectedIterations: 100,
-    targetRps: 10,
-    durationSeconds: 10,
-    preAllocatedVUs: 20,
-    maxVUs: 10,
-  }), /greater than or equal/);
+    expectedIterations: 99,
+  }), /must equal expectedIterations exactly/);
 });
 
-test("binds result evidence to the exact open load model", () => {
-  assert.deepEqual(validatePerformanceLoadModel({
-    executor: "constant-arrival-rate",
-    target_rps: 20,
-    duration_seconds: 50,
-    preallocated_vus: 20,
-    max_vus: 80,
-    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
-  }, 1000), {
-    executor: "constant-arrival-rate",
-    target_rps: 20,
-    duration_seconds: 50,
-    preallocated_vus: 20,
-    max_vus: 80,
-    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
-  });
+test("binds result evidence to the exact approved profile load model", () => {
+  const approved = approvedPerformanceLoadModel("first_commit");
+  assert.deepEqual(validatePerformanceLoadModel(approved, 1000, "first_commit"), approved);
   assert.throws(() => validatePerformanceLoadModel({
+    ...approved,
+    target_rps: 1,
+    duration_seconds: 1000,
+    preallocated_vus: 1,
+    max_vus: 1,
+  }, 1000, "first_commit"), /approved first_commit load model/);
+  assert.throws(() => validatePerformanceLoadModel({
+    ...approved,
     executor: "shared-iterations",
-    target_rps: 20,
-    duration_seconds: 50,
-    preallocated_vus: 20,
-    max_vus: 80,
-    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
-  }, 1000), /constant-arrival-rate/);
+  }, 1000, "first_commit"), /constant-arrival-rate/);
 });
 
 test("fails closed when the k6 client is routed through an ambient proxy", () => {
