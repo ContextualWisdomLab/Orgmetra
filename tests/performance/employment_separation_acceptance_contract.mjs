@@ -145,6 +145,21 @@ function metricValues(data, name) {
   return plainObject(metric(data, name).values, `result.k6.metrics.${name}.values`);
 }
 
+function sameLoadModel(observed, declared) {
+  for (const field of [
+    "executor",
+    "target_rps",
+    "duration_seconds",
+    "preallocated_vus",
+    "max_vus",
+    "client_network_topology",
+  ]) {
+    if (observed[field] !== declared[field]) {
+      fail(`runtime.observed_load_model.${field} must match result.load_model.${field}`);
+    }
+  }
+}
+
 function validateResult(result) {
   if (result.schema_version !== RESULT_SCHEMA) fail("result.schema_version is unsupported");
   const candidateSha = sha(result.candidate_sha, "result.candidate_sha");
@@ -178,7 +193,7 @@ function validateResult(result) {
   if (expectedIterations < minimumIterations) {
     fail(`${profile} requires at least ${minimumIterations} iterations`);
   }
-  validatePerformanceLoadModel(result.load_model, expectedIterations);
+  const loadModel = validatePerformanceLoadModel(result.load_model, expectedIterations);
   const completedIterations = nonNegativeInteger(result.completed_iterations, "result.completed_iterations");
   if (result.sample_complete !== true || completedIterations !== expectedIterations) {
     fail("result sample must be complete");
@@ -223,7 +238,7 @@ function validateResult(result) {
   }
   if (profile === "first_commit" && p95 > 20) fail("first_commit p95 must be <= 20 ms");
 
-  return { candidateSha, fixtureSha256, profile, p95, completedAt };
+  return { candidateSha, fixtureSha256, profile, p95, completedAt, expectedIterations, loadModel };
 }
 
 function parseAndValidateFixture(fixtureArtifact, result, validatedResult) {
@@ -278,6 +293,12 @@ function validateRuntimeEvidence(runtime, resultDigest, result, validatedResult,
   reference(runtime.environment_reference, "runtime.environment_reference");
   reference(runtime.deployment_reference, "runtime.deployment_reference");
   reference(runtime.observer_reference, "runtime.observer_reference");
+  reference(runtime.load_observation_reference, "runtime.load_observation_reference");
+  const observedLoadModel = validatePerformanceLoadModel(
+    runtime.observed_load_model,
+    validatedResult.expectedIterations,
+  );
+  sameLoadModel(observedLoadModel, validatedResult.loadModel);
   const resourceReference = reference(runtime.resource_evidence_reference, "runtime.resource_evidence_reference");
   if (resourceReference !== result.resource_evidence_reference) {
     fail("runtime.resource_evidence_reference must match result.resource_evidence_reference");
