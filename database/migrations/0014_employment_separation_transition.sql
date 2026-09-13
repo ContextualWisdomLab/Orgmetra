@@ -90,7 +90,15 @@ CREATE TABLE public.employment_separation_record (
     CONSTRAINT employment_separation_status_check
         CHECK (separation_status_code = 'terminated'),
     CONSTRAINT employment_separation_reason_check
-        CHECK (separation_reason_code ~ '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$'),
+        CHECK (
+            separation_reason_code IN (
+                'voluntary_resignation',
+                'retirement_transition',
+                'fixed_term_completion',
+                'position_elimination',
+                'employer_initiated_separation'
+            )
+        ),
     CONSTRAINT employment_separation_evidence_reference_check
         CHECK (evidence_reference ~ '^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$'),
     CONSTRAINT employment_separation_evidence_version_check
@@ -205,7 +213,13 @@ BEGIN
             USING ERRCODE = '22023';
     END IF;
     IF p_separation_reason_code IS NULL
-       OR p_separation_reason_code !~ '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$' THEN
+       OR p_separation_reason_code NOT IN (
+            'voluntary_resignation',
+            'retirement_transition',
+            'fixed_term_completion',
+            'position_elimination',
+            'employer_initiated_separation'
+       ) THEN
         RAISE EXCEPTION 'employment separation reason code is invalid'
             USING ERRCODE = '22023';
     END IF;
