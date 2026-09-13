@@ -2,10 +2,8 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 
-import {
-  validateEmploymentSeparationAcceptance,
-  validateRunnerResultDigest,
-} from "./employment_separation_acceptance_contract.mjs";
+import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
+import { validateRunnerResultDigest } from "./employment_separation_runner_result_digest.mjs";
 import {
   acceptanceFixtureBytes,
   acceptanceFixtureSha256,
