@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
@@ -52,4 +54,14 @@ test("canonical benchmark runner does not accept ungoverned k6 CLI overrides", (
     /"\$\{PINNED_K6_RUNNER_IDENTITY\}" run "\$\{WORKLOAD\}"\s*$/m,
     "commercial measurement must end at the version-controlled workload without caller-supplied k6 flags",
   );
+});
+
+test("canonical benchmark runner rejects CLI overrides before any Podman dependency is needed", () => {
+  const runnerPath = fileURLToPath(new URL("./run_employment_separation_benchmark.sh", import.meta.url));
+  const result = spawnSync("bash", [runnerPath, "--duration", "1s"], {
+    encoding: "utf8",
+    env: { PATH: process.env.PATH ?? "" },
+  });
+  assert.equal(result.status, 64);
+  assert.match(result.stderr, /does not accept caller-supplied k6 CLI options/);
 });
