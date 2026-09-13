@@ -45,9 +45,13 @@ if [[ "${version_token}" != "v${PINNED_K6_VERSION}" ]]; then
 fi
 
 workload_image_id=""
+summary_run_dir=""
 cleanup() {
   if [[ -n "${workload_image_id}" ]]; then
     podman image rm --force "${workload_image_id}" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${summary_run_dir}" ]]; then
+    rm -rf -- "${summary_run_dir}"
   fi
 }
 trap cleanup EXIT
@@ -74,6 +78,13 @@ fixture_path="$(realpath "${fixture_path}")"
 summary_dir="$(realpath -m "$(dirname "${summary_path}")")"
 summary_name="$(basename "${summary_path}")"
 mkdir -p "${summary_dir}"
+summary_target="${summary_dir}/${summary_name}"
+if [[ -e "${summary_target}" || -L "${summary_target}" ]]; then
+  printf 'ORGMETRA_PERFORMANCE_SUMMARY_FILE must not already exist; refusing stale-result reuse: %s\n' "${summary_target}" >&2
+  exit 1
+fi
+summary_run_dir="$(mktemp -d "${summary_dir}/.orgmetra-employment-separation-performance.XXXXXX")"
+summary_run_file="${summary_run_dir}/${summary_name}"
 
 export ORGMETRA_PERFORMANCE_K6_VERSION="${PINNED_K6_VERSION}"
 export ORGMETRA_PERFORMANCE_K6_IMAGE="${PINNED_K6_IMAGE}"
@@ -85,7 +96,7 @@ podman run --rm --pull=never --network=host --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,noexec \
   --mount "type=image,source=${workload_image_id},destination=/workspace" \
   --volume "${fixture_path}:/evidence/fixture.json:ro" \
-  --volume "${summary_dir}:/output:rw" \
+  --volume "${summary_run_dir}:/output:rw" \
   --workdir /workspace \
   --env ORGMETRA_PERFORMANCE_BASE_URL \
   --env ORGMETRA_PERFORMANCE_BEARER_TOKEN \
@@ -98,3 +109,12 @@ podman run --rm --pull=never --network=host --read-only \
   --env ORGMETRA_PERFORMANCE_DATA_FILE=/evidence/fixture.json \
   --env "ORGMETRA_PERFORMANCE_SUMMARY_FILE=/output/${summary_name}" \
   "${PINNED_K6_RUNNER_IDENTITY}" run "${WORKLOAD}"
+
+if [[ ! -f "${summary_run_file}" || -L "${summary_run_file}" || ! -s "${summary_run_file}" ]]; then
+  printf 'successful k6 execution did not produce one non-empty regular summary artifact\n' >&2
+  exit 1
+fi
+if ! ln "${summary_run_file}" "${summary_target}"; then
+  printf 'failed to publish benchmark summary without clobbering an existing artifact: %s\n' "${summary_target}" >&2
+  exit 1
+fi
