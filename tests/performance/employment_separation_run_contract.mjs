@@ -5,6 +5,13 @@ export const PERFORMANCE_PROFILES = Object.freeze([
   "contention",
 ]);
 
+export const PERFORMANCE_SUMMARY_TREND_STATS = Object.freeze([
+  "p(50)",
+  "p(95)",
+  "p(99)",
+  "max",
+]);
+
 export function requirePerformanceProfile(value) {
   if (typeof value !== "string" || !PERFORMANCE_PROFILES.includes(value)) {
     throw new Error(`ORGMETRA_PERFORMANCE_PROFILE must be exactly one of: ${PERFORMANCE_PROFILES.join(", ")}`);
