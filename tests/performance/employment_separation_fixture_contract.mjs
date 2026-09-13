@@ -21,6 +21,12 @@ const REASON_CODES = new Set([
   "employer_initiated_separation",
 ]);
 const PROFILE_NAMES = Object.freeze(["first_commit", "replay", "rejection", "contention"]);
+const PROFILE_PRECONDITIONS = Object.freeze({
+  first_commit: "active_current_expected_version",
+  replay: "same_key_same_semantics_already_committed",
+  rejection: "expected_version_stale_or_semantic_conflict",
+  contention: "active_current_expected_version",
+});
 
 function fail(message) {
   throw new Error(message);
@@ -48,6 +54,12 @@ function requireString(value, label) {
   return value;
 }
 
+function requireNamespacedReference(value, label) {
+  const text = requireString(value, label);
+  if (text.length > 200 || !ACTOR_PATTERN.test(text)) fail(`${label} must be a namespaced opaque reference`);
+  return text;
+}
+
 function requireFullDate(value, label) {
   const text = requireString(value, label);
   if (!DATE_PATTERN.test(text)) fail(`${label} must be an RFC 3339 full-date`);
@@ -73,8 +85,7 @@ function requireCommand(command, label) {
   const value = requirePlainObject(command, label);
   requireExactKeys(value, ["actor_reference", "idempotency_key", "payload", "tenant_record_id"], label);
   requireUuid(value.tenant_record_id, `${label}.tenant_record_id`);
-  const actor = requireString(value.actor_reference, `${label}.actor_reference`);
-  if (actor.length > 200 || !ACTOR_PATTERN.test(actor)) fail(`${label}.actor_reference must be a namespaced opaque reference`);
+  requireNamespacedReference(value.actor_reference, `${label}.actor_reference`);
   const key = requireString(value.idempotency_key, `${label}.idempotency_key`);
   if (key.length < 16 || key.length > 200 || [...key].some((character) => {
     const code = character.charCodeAt(0);
@@ -92,12 +103,10 @@ function requireCommand(command, label) {
   if (!REASON_CODES.has(payload.separation_reason_code)) {
     fail(`${label}.payload.separation_reason_code must use the governed vocabulary`);
   }
-  const evidenceReference = requireString(payload.evidence_reference, `${label}.payload.evidence_reference`);
-  if (!ACTOR_PATTERN.test(evidenceReference)) fail(`${label}.payload.evidence_reference must be a namespaced opaque reference`);
+  requireNamespacedReference(payload.evidence_reference, `${label}.payload.evidence_reference`);
   const evidenceVersion = requireString(payload.evidence_version_code, `${label}.payload.evidence_version_code`);
   if (!VERSION_PATTERN.test(evidenceVersion)) fail(`${label}.payload.evidence_version_code must be a whitespace-free version token`);
-  const confirmationReference = requireString(payload.confirmation_reference, `${label}.payload.confirmation_reference`);
-  if (!ACTOR_PATTERN.test(confirmationReference)) fail(`${label}.payload.confirmation_reference must be a namespaced opaque reference`);
+  requireNamespacedReference(payload.confirmation_reference, `${label}.payload.confirmation_reference`);
   return value;
 }
 
@@ -133,6 +142,9 @@ export function validatePerformanceFixture(
       "clearance_reference",
       "dataset_id",
       "prepared_at",
+      "prepared_state_evidence_reference",
+      "preparation_protocol_reference",
+      "profile_preconditions",
       "profiles",
       "resource_evidence_reference",
       "right_cleared",
@@ -144,15 +156,25 @@ export function validatePerformanceFixture(
   if (fixture.schema_version !== PERFORMANCE_FIXTURE_SCHEMA) fail("fixture.schema_version is unsupported");
   if (fixture.right_cleared !== true) fail("fixture.right_cleared must be true for commercial acceptance");
   if (fixture.synthetic !== false) fail("fixture.synthetic must be false for commercial acceptance");
-  requireString(fixture.clearance_reference, "fixture.clearance_reference");
-  requireString(fixture.dataset_id, "fixture.dataset_id");
+  requireNamespacedReference(fixture.clearance_reference, "fixture.clearance_reference");
+  requireNamespacedReference(fixture.dataset_id, "fixture.dataset_id");
+  requireNamespacedReference(fixture.preparation_protocol_reference, "fixture.preparation_protocol_reference");
+  requireNamespacedReference(fixture.prepared_state_evidence_reference, "fixture.prepared_state_evidence_reference");
+  requireNamespacedReference(fixture.resource_evidence_reference, "fixture.resource_evidence_reference");
   const preparedAt = requireString(fixture.prepared_at, "fixture.prepared_at");
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(preparedAt) || Number.isNaN(Date.parse(preparedAt))) {
     fail("fixture.prepared_at must be an RFC 3339 UTC timestamp");
   }
-  requireString(fixture.resource_evidence_reference, "fixture.resource_evidence_reference");
   const candidateSha = requireString(fixture.candidate_sha, "fixture.candidate_sha").toLowerCase();
   if (!SHA_PATTERN.test(candidateSha)) fail("fixture.candidate_sha must be a full Git commit SHA");
+
+  const preconditions = requirePlainObject(fixture.profile_preconditions, "fixture.profile_preconditions");
+  requireExactKeys(preconditions, PROFILE_NAMES, "fixture.profile_preconditions");
+  for (const profile of PROFILE_NAMES) {
+    if (preconditions[profile] !== PROFILE_PRECONDITIONS[profile]) {
+      fail(`fixture.profile_preconditions.${profile} must be ${PROFILE_PRECONDITIONS[profile]}`);
+    }
+  }
 
   const profiles = requirePlainObject(fixture.profiles, "fixture.profiles");
   requireExactKeys(profiles, PROFILE_NAMES, "fixture.profiles");
