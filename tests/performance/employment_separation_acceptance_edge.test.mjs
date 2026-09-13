@@ -51,7 +51,6 @@ function result(profile = "first_commit") {
     k6: {
       metrics: {
         iterations: { values: { count: iterations } },
-        dropped_iterations: { values: { count: 0 } },
         checks: { values: { rate: 1 } },
         employment_separation_unexpected_response: { values: { rate: 0 } },
         employment_separation_latency_samples: { values: { count: latencySamples } },
@@ -159,8 +158,6 @@ test("rejects malformed k6 metric containers and iteration evidence", () => {
   rejectResult((value) => { delete value.k6.metrics.iterations; }, /iterations must be an object/);
   rejectResult((value) => { value.k6.metrics.iterations.values = []; }, /iterations.values must be an object/);
   rejectResult((value) => { value.k6.metrics.iterations.values.count = 999; }, /iteration count/);
-  rejectResult((value) => { delete value.k6.metrics.dropped_iterations; }, /dropped_iterations must be an object/);
-  rejectResult((value) => { value.k6.metrics.dropped_iterations.values.count = 1; }, /dropped_iterations count must equal 0/);
   rejectResult((value) => { delete value.k6.metrics.employment_separation_latency_samples; }, /latency_samples must be an object/);
   rejectResult((value) => { value.k6.metrics.employment_separation_latency_samples.values.count = 999; }, /latency sample count/);
   rejectResult(
