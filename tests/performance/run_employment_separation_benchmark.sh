@@ -5,6 +5,8 @@ readonly PINNED_K6_VERSION="2.2.0"
 readonly PINNED_K6_IMAGE="ghcr.io/grafana/k6"
 readonly PINNED_K6_IMAGE_DIGEST="sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6"
 readonly PINNED_K6_RUNNER_IDENTITY="${PINNED_K6_IMAGE}@${PINNED_K6_IMAGE_DIGEST}"
+readonly PINNED_K6_CONTAINER_UID="12345"
+readonly PINNED_K6_CONTAINER_GID="12345"
 readonly WORKLOAD="/workspace/tests/performance/employment_separation_buyer_path.js"
 
 if (( $# != 0 )); then
@@ -35,6 +37,11 @@ if ! command -v podman >/dev/null 2>&1; then
 fi
 if ! podman image exists "${PINNED_K6_RUNNER_IDENTITY}"; then
   printf 'preload the exact pinned k6 image before measurement: %s\n' "${PINNED_K6_RUNNER_IDENTITY}" >&2
+  exit 1
+fi
+image_user="$(podman image inspect --format '{{.Config.User}}' "${PINNED_K6_RUNNER_IDENTITY}")"
+if [[ "${image_user}" != "${PINNED_K6_CONTAINER_UID}" ]]; then
+  printf 'pinned k6 image must declare container UID %s; observed: %s\n' "${PINNED_K6_CONTAINER_UID}" "${image_user}" >&2
   exit 1
 fi
 version_line="$(podman run --rm --pull=never "${PINNED_K6_RUNNER_IDENTITY}" version 2>&1 | head -n 1)"
@@ -92,6 +99,8 @@ export ORGMETRA_PERFORMANCE_K6_IMAGE_DIGEST="${PINNED_K6_IMAGE_DIGEST}"
 export ORGMETRA_PERFORMANCE_K6_RUNNER_IDENTITY="${PINNED_K6_RUNNER_IDENTITY}"
 
 podman run --rm --pull=never --network=host --read-only \
+  --user="${PINNED_K6_CONTAINER_UID}:${PINNED_K6_CONTAINER_GID}" \
+  --userns="keep-id:uid=${PINNED_K6_CONTAINER_UID},gid=${PINNED_K6_CONTAINER_GID}" \
   --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=256 \
   --tmpfs /tmp:rw,nosuid,nodev,noexec \
   --mount "type=image,source=${workload_image_id},destination=/workspace" \
