@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  PERFORMANCE_SUMMARY_TREND_STATS,
   requirePerformanceProfile,
   thresholdsForPerformanceProfile,
 } from "./employment_separation_run_contract.mjs";
@@ -24,4 +25,8 @@ test("applies the commercial p95 threshold only to the ordinary first-commit pro
     employment_separation_unexpected_response: ["rate==0"],
     checks: ["rate==1"],
   });
+});
+
+test("requires the buyer evidence percentiles named by issue 316", () => {
+  assert.deepEqual(PERFORMANCE_SUMMARY_TREND_STATS, ["p(50)", "p(95)", "p(99)", "max"]);
 });
