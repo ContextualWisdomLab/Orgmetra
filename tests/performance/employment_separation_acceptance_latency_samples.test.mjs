@@ -4,13 +4,13 @@ import test from "node:test";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
 import {
+  acceptanceFixtureBytes,
   acceptanceFixtureSha256,
-  acceptanceFixtureText,
 } from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const candidateSha = "a".repeat(40);
-const FIXTURE_TEXT = acceptanceFixtureText();
-const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_TEXT);
+const FIXTURE_BYTES = acceptanceFixtureBytes();
+const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_BYTES);
 
 function performanceResult(latencySamples = 1000, trendSamples = latencySamples) {
   return {
@@ -82,7 +82,7 @@ test("rejects a complete iteration count with an incomplete latency counter", ()
   const value = performanceResult(999, 1000);
   const resultText = `${JSON.stringify(value, null, 2)}\n`;
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_TEXT),
+    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_BYTES),
     /latency sample count/,
   );
 });
@@ -91,7 +91,7 @@ test("rejects a complete counter when the measured Trend itself is truncated", (
   const value = performanceResult(1000, 999);
   const resultText = `${JSON.stringify(value, null, 2)}\n`;
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_TEXT),
+    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_BYTES),
     /Trend sample count/,
   );
 });
@@ -99,7 +99,7 @@ test("rejects a complete counter when the measured Trend itself is truncated", (
 test("accepts latency evidence only when every expected request contributed to the measured Trend", () => {
   const value = performanceResult(1000, 1000);
   const resultText = `${JSON.stringify(value, null, 2)}\n`;
-  const accepted = validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_TEXT);
+  const accepted = validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_BYTES);
   assert.equal(accepted.accepted, true);
   assert.equal(accepted.p95_ms, 18);
 });
