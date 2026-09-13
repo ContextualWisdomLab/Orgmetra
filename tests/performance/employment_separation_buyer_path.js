@@ -8,6 +8,10 @@ import {
   requestHeaders,
   validatePerformanceFixture,
 } from "./employment_separation_fixture_contract.mjs";
+import {
+  isGovernedSeparationConflict,
+  isGovernedSeparationSuccess,
+} from "./employment_separation_response_contract.mjs";
 
 const ROUTE = "/v1/employment-separations";
 const MINIMUM_NON_CONTENDING_RECORDS = 1000;
@@ -124,27 +128,32 @@ function observe(response, trend, profile, predicate) {
 }
 
 export function firstCommit() {
-  const response = post(recordAt("first_commit"), "first_commit");
-  observe(response, firstCommitDuration, "first_commit", (result) => {
-    const body = parseJson(result);
-    return result.status === 200 && body !== null && body.replayed === false;
-  });
+  const command = recordAt("first_commit");
+  const response = post(command, "first_commit");
+  observe(response, firstCommitDuration, "first_commit", (result) => (
+    isGovernedSeparationSuccess(result.status, parseJson(result), {
+      employmentRecordId: command.payload.employment_record_id,
+      replayed: false,
+    })
+  ));
 }
 
 export function replay() {
-  const response = post(recordAt("replay"), "replay");
-  observe(response, replayDuration, "replay", (result) => {
-    const body = parseJson(result);
-    return result.status === 200 && body !== null && body.replayed === true;
-  });
+  const command = recordAt("replay");
+  const response = post(command, "replay");
+  observe(response, replayDuration, "replay", (result) => (
+    isGovernedSeparationSuccess(result.status, parseJson(result), {
+      employmentRecordId: command.payload.employment_record_id,
+      replayed: true,
+    })
+  ));
 }
 
 export function rejection() {
   const response = post(recordAt("rejection"), "rejection");
-  observe(response, rejectionDuration, "rejection", (result) => {
-    const body = parseJson(result);
-    return result.status === 409 && body !== null && body.error_code === "separation_conflict";
-  });
+  observe(response, rejectionDuration, "rejection", (result) => (
+    isGovernedSeparationConflict(result.status, parseJson(result))
+  ));
 }
 
 export function contention() {
@@ -154,9 +163,16 @@ export function contention() {
     ["POST", `${baseUrl}${ROUTE}`, requestBody(pair.right), { headers: requestHeaders(pair.right, bearerToken), tags: { profile: "contention" } }],
   ]);
   for (const response of responses) contentionDuration.add(response.timings.duration, { profile: "contention" });
-  const statuses = responses.map((response) => response.status).sort((left, right) => left - right);
-  const passed = check(statuses, {
-    "contention serializes one commit and one conflict": (values) => values.length === 2 && values[0] === 200 && values[1] === 409,
+  const parsed = responses.map((response) => ({ status: response.status, body: parseJson(response) }));
+  const successes = parsed.filter(({ status, body }) => (
+    isGovernedSeparationSuccess(status, body, {
+      employmentRecordId: pair.left.payload.employment_record_id,
+      replayed: false,
+    })
+  ));
+  const conflicts = parsed.filter(({ status, body }) => isGovernedSeparationConflict(status, body));
+  const passed = check(parsed, {
+    "contention serializes one governed commit and one governed conflict": () => successes.length === 1 && conflicts.length === 1,
   });
   unexpectedResponse.add(!passed, { profile: "contention" });
 }
