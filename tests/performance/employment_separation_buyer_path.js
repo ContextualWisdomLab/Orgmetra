@@ -102,7 +102,7 @@ const scenarioByProfile = {
 export const options = {
   discardResponseBodies: false,
   scenarios: { [selectedProfile]: scenarioByProfile[selectedProfile] },
-  thresholds: thresholdsForPerformanceProfile(selectedProfile),
+  thresholds: thresholdsForPerformanceProfile(selectedProfile, selectedRecords.length),
   summaryTrendStats: PERFORMANCE_SUMMARY_TREND_STATS,
 };
 
@@ -187,10 +187,14 @@ export function contention() {
 }
 
 export function handleSummary(data) {
+  const completedIterations = data.metrics?.iterations?.values?.count ?? null;
   const payload = {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: targetSha,
     selected_profile: selectedProfile,
+    expected_iterations: selectedRecords.length,
+    completed_iterations: completedIterations,
+    sample_complete: completedIterations === selectedRecords.length,
     dataset_id: fixture.dataset_id,
     clearance_reference: fixture.clearance_reference,
     preparation_protocol_reference: fixture.preparation_protocol_reference,
