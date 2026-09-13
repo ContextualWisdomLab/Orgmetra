@@ -11,6 +11,24 @@ if (( $# != 0 )); then
   printf 'commercial Employment separation benchmark does not accept caller-supplied k6 CLI options\n' >&2
   exit 64
 fi
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+target_sha="${ORGMETRA_PERFORMANCE_TARGET_SHA:-}"
+if [[ ! "${target_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+  printf 'ORGMETRA_PERFORMANCE_TARGET_SHA must be the exact lowercase 40-character candidate SHA\n' >&2
+  exit 1
+fi
+repository_head="$(git -C "${repo_root}" rev-parse --verify HEAD)"
+if [[ "${repository_head}" != "${ORGMETRA_PERFORMANCE_TARGET_SHA}" ]]; then
+  printf 'benchmark checkout HEAD must equal ORGMETRA_PERFORMANCE_TARGET_SHA; head=%s target=%s\n' "${repository_head}" "${ORGMETRA_PERFORMANCE_TARGET_SHA}" >&2
+  exit 1
+fi
+repository_status="$(git -C "${repo_root}" status --porcelain=v1 --untracked-files=all)"
+if [[ -n "${repository_status}" ]]; then
+  printf 'commercial performance evidence requires an exact clean checkout; modified, staged, or untracked files are present\n' >&2
+  exit 1
+fi
+
 if ! command -v podman >/dev/null 2>&1; then
   printf 'podman is required for the pinned commercial k6 runner\n' >&2
   exit 1
@@ -26,7 +44,6 @@ if [[ "${version_token}" != "v${PINNED_K6_VERSION}" ]]; then
   exit 1
 fi
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 fixture_path="${ORGMETRA_PERFORMANCE_DATA_FILE:-}"
 summary_path="${ORGMETRA_PERFORMANCE_SUMMARY_FILE:-}"
 if [[ -z "${fixture_path}" || ! -f "${fixture_path}" ]]; then
