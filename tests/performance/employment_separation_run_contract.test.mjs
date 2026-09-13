@@ -76,6 +76,13 @@ test("binds result evidence to the exact approved profile load model", () => {
   }, 1000, "first_commit"), /constant-arrival-rate/);
 });
 
+test("requires the selected profile when validating load-model evidence", () => {
+  assert.throws(
+    () => validatePerformanceLoadModel(approvedPerformanceLoadModel("replay"), 1000),
+    /profile must be exactly one of/,
+  );
+});
+
 test("fails closed when the k6 client is routed through an ambient proxy", () => {
   assert.equal(requireDirectPerformanceClientNetwork({}), PERFORMANCE_CLIENT_NETWORK_TOPOLOGY);
   assert.throws(
