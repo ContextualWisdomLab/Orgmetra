@@ -6,6 +6,7 @@ import { validateEmploymentSeparationAcceptance } from "./employment_separation_
 import {
   acceptanceFixtureBytes,
   acceptanceFixtureSha256,
+  acceptanceLoadModel,
 } from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const TREND_BY_PROFILE = {
@@ -38,6 +39,7 @@ function result(profile = "first_commit") {
     completed_iterations: iterations,
     sample_complete: true,
     completed_at: "2026-09-13T04:10:00Z",
+    load_model: acceptanceLoadModel(iterations),
     dataset_id: "dataset:employment-separation-perf-1",
     clearance_reference: "data_clearance:perf-2026-09",
     preparation_protocol_reference: "protocol:employment-separation-perf-v1",
@@ -49,6 +51,7 @@ function result(profile = "first_commit") {
     k6: {
       metrics: {
         iterations: { values: { count: iterations } },
+        dropped_iterations: { values: { count: 0 } },
         checks: { values: { rate: 1 } },
         employment_separation_unexpected_response: { values: { rate: 0 } },
         employment_separation_latency_samples: { values: { count: latencySamples } },
@@ -134,6 +137,14 @@ test("rejects invalid result authority and cardinality metadata", () => {
   rejectResult((value) => { value.completed_iterations = 999; }, /sample must be complete/);
 });
 
+test("rejects invalid load-model and client-network evidence", () => {
+  rejectResult((value) => { delete value.load_model; }, /load_model must be an object/);
+  rejectResult((value) => { value.load_model.executor = "shared-iterations"; }, /constant-arrival-rate/);
+  rejectResult((value) => { value.load_model.duration_seconds = 999; }, /must equal expectedIterations exactly/);
+  rejectResult((value) => { value.load_model.max_vus = 0; }, /positive safe integer/);
+  rejectResult((value) => { value.load_model.client_network_topology = "https_mitm_proxy"; }, /client_network_topology/);
+});
+
 test("rejects invalid timestamps and result evidence references", () => {
   rejectResult((value) => { value.completed_at = "nope"; }, /UTC timestamp/);
   rejectResult((value) => { value.completed_at = "2026-13-40T04:10:00Z"; }, /UTC timestamp/);
@@ -148,6 +159,8 @@ test("rejects malformed k6 metric containers and iteration evidence", () => {
   rejectResult((value) => { delete value.k6.metrics.iterations; }, /iterations must be an object/);
   rejectResult((value) => { value.k6.metrics.iterations.values = []; }, /iterations.values must be an object/);
   rejectResult((value) => { value.k6.metrics.iterations.values.count = 999; }, /iteration count/);
+  rejectResult((value) => { delete value.k6.metrics.dropped_iterations; }, /dropped_iterations must be an object/);
+  rejectResult((value) => { value.k6.metrics.dropped_iterations.values.count = 1; }, /dropped_iterations count must equal 0/);
   rejectResult((value) => { delete value.k6.metrics.employment_separation_latency_samples; }, /latency_samples must be an object/);
   rejectResult((value) => { value.k6.metrics.employment_separation_latency_samples.values.count = 999; }, /latency sample count/);
   rejectResult(
