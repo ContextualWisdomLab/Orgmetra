@@ -76,14 +76,7 @@ export function requireDirectPerformanceClientNetwork(environment) {
   return PERFORMANCE_CLIENT_NETWORK_TOPOLOGY;
 }
 
-function approvedProfileForValidation(profile, iterations) {
-  if (profile !== undefined) return requirePerformanceProfile(profile);
-  if (iterations === 100) return "contention";
-  if (iterations === 1000) return "first_commit";
-  throw new Error("expectedIterations must match a version-controlled approved load-model cardinality");
-}
-
-export function validatePerformanceLoadModel(value, expectedIterations, profile = undefined) {
+export function validatePerformanceLoadModel(value, expectedIterations, profile) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("load_model must be an object");
   }
@@ -106,7 +99,7 @@ export function validatePerformanceLoadModel(value, expectedIterations, profile 
     throw new Error(`load_model.client_network_topology must be ${PERFORMANCE_CLIENT_NETWORK_TOPOLOGY}`);
   }
   const iterations = positiveInteger(expectedIterations, "expectedIterations");
-  const selectedProfile = approvedProfileForValidation(profile, iterations);
+  const selectedProfile = requirePerformanceProfile(profile);
   const rate = positiveInteger(value.target_rps, "load_model.target_rps");
   const duration = positiveInteger(value.duration_seconds, "load_model.duration_seconds");
   const preAllocated = positiveInteger(value.preallocated_vus, "load_model.preallocated_vus");
