@@ -1,6 +1,7 @@
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACTOR_PATTERN = /^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const BODY_KEYS = Object.freeze([
   "confirmation_reference",
@@ -47,6 +48,19 @@ function requireString(value, label) {
   return value;
 }
 
+function requireFullDate(value, label) {
+  const text = requireString(value, label);
+  if (!DATE_PATTERN.test(text)) fail(`${label} must be an RFC 3339 full-date`);
+  const [year, month, day] = text.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() !== month - 1
+    || parsed.getUTCDate() !== day
+  ) fail(`${label} must be an RFC 3339 full-date`);
+  return text;
+}
+
 function requireUuid(value, label) {
   const text = requireString(value, label);
   if (!UUID_PATTERN.test(text)) fail(`${label} must be a canonical UUID string`);
@@ -60,7 +74,7 @@ function requireCommand(command, label) {
   requireExactKeys(value, ["actor_reference", "idempotency_key", "payload", "tenant_record_id"], label);
   requireUuid(value.tenant_record_id, `${label}.tenant_record_id`);
   const actor = requireString(value.actor_reference, `${label}.actor_reference`);
-  if (!ACTOR_PATTERN.test(actor)) fail(`${label}.actor_reference must be a namespaced opaque reference`);
+  if (actor.length > 200 || !ACTOR_PATTERN.test(actor)) fail(`${label}.actor_reference must be a namespaced opaque reference`);
   const key = requireString(value.idempotency_key, `${label}.idempotency_key`);
   if (key.length < 16 || key.length > 200 || [...key].some((character) => {
     const code = character.charCodeAt(0);
@@ -74,15 +88,16 @@ function requireCommand(command, label) {
   requireUuid(payload.person_record_id, `${label}.payload.person_record_id`);
   requireUuid(payload.employment_record_id, `${label}.payload.employment_record_id`);
   requireUuid(payload.expected_employment_record_version_id, `${label}.payload.expected_employment_record_version_id`);
-  if (typeof payload.separation_effective_on !== "string" || !DATE_PATTERN.test(payload.separation_effective_on)) {
-    fail(`${label}.payload.separation_effective_on must be an RFC 3339 full-date`);
-  }
+  requireFullDate(payload.separation_effective_on, `${label}.payload.separation_effective_on`);
   if (!REASON_CODES.has(payload.separation_reason_code)) {
     fail(`${label}.payload.separation_reason_code must use the governed vocabulary`);
   }
-  requireString(payload.evidence_reference, `${label}.payload.evidence_reference`);
-  requireString(payload.evidence_version_code, `${label}.payload.evidence_version_code`);
-  requireString(payload.confirmation_reference, `${label}.payload.confirmation_reference`);
+  const evidenceReference = requireString(payload.evidence_reference, `${label}.payload.evidence_reference`);
+  if (!ACTOR_PATTERN.test(evidenceReference)) fail(`${label}.payload.evidence_reference must be a namespaced opaque reference`);
+  const evidenceVersion = requireString(payload.evidence_version_code, `${label}.payload.evidence_version_code`);
+  if (!VERSION_PATTERN.test(evidenceVersion)) fail(`${label}.payload.evidence_version_code must be a whitespace-free version token`);
+  const confirmationReference = requireString(payload.confirmation_reference, `${label}.payload.confirmation_reference`);
+  if (!ACTOR_PATTERN.test(confirmationReference)) fail(`${label}.payload.confirmation_reference must be a namespaced opaque reference`);
   return value;
 }
 
@@ -131,7 +146,10 @@ export function validatePerformanceFixture(
   if (fixture.synthetic !== false) fail("fixture.synthetic must be false for commercial acceptance");
   requireString(fixture.clearance_reference, "fixture.clearance_reference");
   requireString(fixture.dataset_id, "fixture.dataset_id");
-  requireString(fixture.prepared_at, "fixture.prepared_at");
+  const preparedAt = requireString(fixture.prepared_at, "fixture.prepared_at");
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(preparedAt) || Number.isNaN(Date.parse(preparedAt))) {
+    fail("fixture.prepared_at must be an RFC 3339 UTC timestamp");
+  }
   requireString(fixture.resource_evidence_reference, "fixture.resource_evidence_reference");
   const candidateSha = requireString(fixture.candidate_sha, "fixture.candidate_sha").toLowerCase();
   if (!SHA_PATTERN.test(candidateSha)) fail("fixture.candidate_sha must be a full Git commit SHA");
@@ -180,6 +198,10 @@ export function validatePerformanceFixture(
 export function requestHeaders(command, bearerToken) {
   requireCommand(command, "command");
   const token = requireString(bearerToken, "bearer token");
+  if (token.length > 8192 || [...token].some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 0x21 || code > 0x7e;
+  })) fail("bearer token must be 1 to 8192 visible ASCII characters");
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
