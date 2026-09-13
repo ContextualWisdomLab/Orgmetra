@@ -3,13 +3,20 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
+import {
+  acceptanceFixtureSha256,
+  acceptanceFixtureText,
+} from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const candidateSha = "a".repeat(40);
+const FIXTURE_TEXT = acceptanceFixtureText();
+const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_TEXT);
 
 function performanceResult(latencySamples = 1000, trendSamples = latencySamples) {
   return {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: candidateSha,
+    fixture_sha256: FIXTURE_SHA256,
     selected_profile: "first_commit",
     expected_iterations: 1000,
     completed_iterations: 1000,
@@ -49,6 +56,7 @@ function runtimeEvidence(resultText) {
     observed_service_sha: candidateSha,
     selected_profile: "first_commit",
     performance_result_sha256: createHash("sha256").update(resultText, "utf8").digest("hex"),
+    fixture_sha256: FIXTURE_SHA256,
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
     observer_reference: "observer:perf-runtime-1",
@@ -74,7 +82,7 @@ test("rejects a complete iteration count with an incomplete latency counter", ()
   const value = performanceResult(999, 1000);
   const resultText = `${JSON.stringify(value, null, 2)}\n`;
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText)),
+    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_TEXT),
     /latency sample count/,
   );
 });
@@ -83,7 +91,7 @@ test("rejects a complete counter when the measured Trend itself is truncated", (
   const value = performanceResult(1000, 999);
   const resultText = `${JSON.stringify(value, null, 2)}\n`;
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText)),
+    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_TEXT),
     /Trend sample count/,
   );
 });
@@ -91,7 +99,7 @@ test("rejects a complete counter when the measured Trend itself is truncated", (
 test("accepts latency evidence only when every expected request contributed to the measured Trend", () => {
   const value = performanceResult(1000, 1000);
   const resultText = `${JSON.stringify(value, null, 2)}\n`;
-  const accepted = validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText));
+  const accepted = validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText), FIXTURE_TEXT);
   assert.equal(accepted.accepted, true);
   assert.equal(accepted.p95_ms, 18);
 });
