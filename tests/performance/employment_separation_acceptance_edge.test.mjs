@@ -4,8 +4,8 @@ import test from "node:test";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
 import {
+  acceptanceFixtureBytes,
   acceptanceFixtureSha256,
-  acceptanceFixtureText,
 } from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const TREND_BY_PROFILE = {
@@ -20,8 +20,8 @@ const PROFILE_PRECONDITIONS = Object.freeze({
   rejection: "expected_version_stale_or_semantic_conflict",
   contention: "active_current_expected_version",
 });
-const FIXTURE_TEXT = acceptanceFixtureText();
-const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_TEXT);
+const FIXTURE_BYTES = acceptanceFixtureBytes();
+const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_BYTES);
 
 function result(profile = "first_commit") {
   const iterations = profile === "contention" ? 100 : 1000;
@@ -95,7 +95,7 @@ function rejectResult(mutate, pattern = /./, profile = "first_commit") {
   const value = result(profile);
   mutate(value);
   const text = render(value);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime(text, profile), FIXTURE_TEXT), pattern);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime(text, profile), FIXTURE_BYTES), pattern);
 }
 
 function rejectRuntime(mutate, pattern = /./, profile = "first_commit") {
@@ -103,17 +103,17 @@ function rejectRuntime(mutate, pattern = /./, profile = "first_commit") {
   const text = render(value);
   const evidence = runtime(text, profile);
   mutate(evidence);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, evidence, FIXTURE_TEXT), pattern);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, evidence, FIXTURE_BYTES), pattern);
 }
 
 test("rejects malformed result and runtime containers", () => {
-  assert.throws(() => validateEmploymentSeparationAcceptance("", {}, FIXTURE_TEXT), /non-empty JSON text/);
-  assert.throws(() => validateEmploymentSeparationAcceptance(4, {}, FIXTURE_TEXT), /non-empty JSON text/);
-  assert.throws(() => validateEmploymentSeparationAcceptance("not json", {}, FIXTURE_TEXT), /valid JSON/);
-  assert.throws(() => validateEmploymentSeparationAcceptance("[]", {}, FIXTURE_TEXT), /result must be an object/);
+  assert.throws(() => validateEmploymentSeparationAcceptance("", {}, FIXTURE_BYTES), /non-empty JSON text/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(4, {}, FIXTURE_BYTES), /non-empty JSON text/);
+  assert.throws(() => validateEmploymentSeparationAcceptance("not json", {}, FIXTURE_BYTES), /valid JSON/);
+  assert.throws(() => validateEmploymentSeparationAcceptance("[]", {}, FIXTURE_BYTES), /result must be an object/);
   const text = render(result());
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, [], FIXTURE_TEXT), /runtime must be an object/);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, null, FIXTURE_TEXT), /runtime must be an object/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, [], FIXTURE_BYTES), /runtime must be an object/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, null, FIXTURE_BYTES), /runtime must be an object/);
 });
 
 test("rejects invalid result authority and cardinality metadata", () => {
@@ -183,7 +183,7 @@ test("accepts non-first profiles without applying the first-commit latency targe
   for (const profile of ["replay", "rejection", "contention"]) {
     const value = result(profile);
     const text = render(value);
-    const accepted = validateEmploymentSeparationAcceptance(text, runtime(text, profile), FIXTURE_TEXT);
+    const accepted = validateEmploymentSeparationAcceptance(text, runtime(text, profile), FIXTURE_BYTES);
     assert.equal(accepted.selected_profile, profile);
     assert.equal(accepted.p95_ms, 80);
   }
