@@ -191,9 +191,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "01918512d8882060e9cff0c4aa8206e0eccbdfb61cfd7f829331123c7a9fe6ac",
-      "bytes": 11185,
-      "lines": 64
+      "sha256": "7067c097e77e41d72d63f7d2d6bcb78a0619d5b4c749e950b51288123e7bde9f",
+      "bytes": 13988,
+      "lines": 73
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -215,9 +215,9 @@
     },
     {
       "path": "docs/THREAT_MODEL.md",
-      "sha256": "f314f375c2e41252536de224c7bc7e4a10ab8f340cb86642724e7399e32f4252",
-      "bytes": 6736,
-      "lines": 23
+      "sha256": "bbd0bc9a60c80028cc4e2d196e449d85c92f3c3757dd492f6d7d658d586af06b",
+      "bytes": 10559,
+      "lines": 29
     },
     {
       "path": "docs/TRACEABILITY.md",
