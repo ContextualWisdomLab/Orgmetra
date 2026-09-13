@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import unittest
 from uuid import UUID
+from unittest.mock import patch
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import AuthenticatedPrincipal, AuthenticationFailed
@@ -211,10 +212,14 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         app = self._app(authenticator=authenticator, mutation_port=port)
         bad_cases = (
             {"path": "/v1/unknown"},
+            {"path": 17},
             {"path": f"/v1/tenants/{UUID(int=0)}/candidate-worker-conversions"},
             {"path": "/v1/tenants/not-a-uuid/candidate-worker-conversions"},
+            {"path": "/v1/tenants/" + ("x" * 250) + "/candidate-worker-conversions"},
             {"query": 17},
             {"query": b"\xff"},
+            {"query": b"x" * 4097},
+            {"query": b"one=1&two=2&purpose=candidate_hire"},
             {"query": b"purpose=candidate_hire&purpose=other"},
             {"query": b"purpose=CandidateHire"},
             {"query": b"extra=value&purpose=candidate_hire"},
@@ -226,6 +231,29 @@ class HireHttpRouteTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn(payload["error"], {"invalid_request", "route_not_found"})
         self.assertEqual(authenticator.tokens, [])
         self.assertEqual(port.calls, [])
+
+    async def test_oversized_path_and_query_are_rejected_before_parsing(self) -> None:
+        """Bound route components before shape, UUID, or query parsing can consume them."""
+        app = self._app()
+
+        with patch(
+            "orgmetra_people_api.hire_http._looks_like_hire_route",
+            side_effect=AssertionError("oversized path reached route-shape parsing"),
+        ):
+            status, _, payload = await self._request(
+                app,
+                path="/v1/tenants/" + ("x" * 250) + "/candidate-worker-conversions",
+            )
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"], "invalid_request")
+
+        with patch(
+            "orgmetra_people_api.hire_http.parse_qsl",
+            side_effect=AssertionError("oversized query reached parse_qsl"),
+        ):
+            status, _, payload = await self._request(app, query=b"x" * 4097)
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["error"], "invalid_request")
 
     async def test_idempotency_media_and_body_validation_occurs_after_authentication(self) -> None:
         bad_cases = (
