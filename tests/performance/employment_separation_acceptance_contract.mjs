@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { TextDecoder } from "node:util";
 
 import { validatePerformanceFixture } from "./employment_separation_fixture_contract.mjs";
+import { validatePerformanceLoadModel } from "./employment_separation_run_contract.mjs";
 
 const RESULT_SCHEMA = "orgmetra.employment_separation.performance_result.v1";
 const RUNTIME_SCHEMA = "orgmetra.employment_separation.runtime_evidence.v1";
@@ -177,6 +178,7 @@ function validateResult(result) {
   if (expectedIterations < minimumIterations) {
     fail(`${profile} requires at least ${minimumIterations} iterations`);
   }
+  validatePerformanceLoadModel(result.load_model, expectedIterations);
   const completedIterations = nonNegativeInteger(result.completed_iterations, "result.completed_iterations");
   if (result.sample_complete !== true || completedIterations !== expectedIterations) {
     fail("result sample must be complete");
@@ -186,6 +188,12 @@ function validateResult(result) {
   const iterationValues = metricValues(result, "iterations");
   const metricIterations = nonNegativeInteger(iterationValues.count, "result.k6.metrics.iterations.values.count");
   if (metricIterations !== expectedIterations) fail("k6 iteration count must equal expected_iterations");
+  const droppedValues = metricValues(result, "dropped_iterations");
+  const droppedIterations = nonNegativeInteger(
+    droppedValues.count,
+    "result.k6.metrics.dropped_iterations.values.count",
+  );
+  if (droppedIterations !== 0) fail("k6 dropped_iterations count must equal 0");
 
   const expectedLatencySamples = profile === "contention" ? expectedIterations * 2 : expectedIterations;
   if (!Number.isSafeInteger(expectedLatencySamples)) fail("expected latency sample count must be a safe integer");
