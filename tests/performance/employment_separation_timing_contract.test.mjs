@@ -3,9 +3,9 @@ import test from "node:test";
 
 import { buyerPathElapsedMs } from "./employment_separation_timing_contract.mjs";
 
-test("includes blocked, TCP, TLS, and request phases in buyer-path elapsed time", () => {
+test("counts k6 blocked once because it already spans TCP and TLS acquisition", () => {
   assert.equal(buyerPathElapsedMs({
-    blocked: 1.5,
+    blocked: 7,
     connecting: 2.5,
     tls_handshaking: 3,
     duration: 14,
@@ -21,9 +21,9 @@ test("preserves keep-alive requests when connection phases are zero", () => {
   }), 10);
 });
 
-test("does not drop TCP or TLS latency from a cold request", () => {
+test("includes cold connection acquisition without double-counting nested TCP and TLS phases", () => {
   assert.equal(buyerPathElapsedMs({
-    blocked: 1,
+    blocked: 10,
     connecting: 4,
     tls_handshaking: 5,
     duration: 10,
