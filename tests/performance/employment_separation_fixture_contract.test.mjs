@@ -10,7 +10,7 @@ import {
 
 const ZERO = "00000000-0000-0000-0000-000000000000";
 
-function command(seed, key = `separation-${seed}`) {
+function command(seed, key = `separation-key-${seed.toString().padStart(4, "0")}`) {
   const suffix = seed.toString(16).padStart(12, "0");
   return {
     tenant_record_id: `10000000-0000-4000-8000-${suffix}`,
@@ -30,9 +30,9 @@ function command(seed, key = `separation-${seed}`) {
 }
 
 function fixture() {
-  const left = command(4, "contention-left");
+  const left = command(4, "contention-key-left-0001");
   const right = structuredClone(left);
-  right.idempotency_key = "contention-right";
+  right.idempotency_key = "contention-key-right-0001";
   return {
     schema_version: PERFORMANCE_FIXTURE_SCHEMA,
     candidate_sha: "a".repeat(40),
@@ -91,13 +91,23 @@ test("enforces minimum sample cardinality rather than silently shrinking the run
   );
 });
 
+test("matches the production Idempotency-Key length and visible-ASCII contract", () => {
+  const shortKey = fixture();
+  shortKey.profiles.first_commit[0].idempotency_key = "too-short";
+  assert.throws(() => validatePerformanceFixture(shortKey, smallAcceptance), /16 to 200 visible ASCII/);
+
+  const hiddenByte = fixture();
+  hiddenByte.profiles.first_commit[0].idempotency_key = "valid-prefix-0001\n";
+  assert.throws(() => validatePerformanceFixture(hiddenByte, smallAcceptance), /16 to 200 visible ASCII/);
+});
+
 test("builds the exact published separation request without storing bearer credentials in fixtures", () => {
-  const value = command(9, "exact-key");
+  const value = command(9, "exact-key-00000001");
   const headers = requestHeaders(value, "opaque-token");
   assert.deepEqual(headers, {
     Authorization: "Bearer opaque-token",
     "Content-Type": "application/json",
-    "Idempotency-Key": "exact-key",
+    "Idempotency-Key": "exact-key-00000001",
     "X-Actor-Reference": "worker_admin:perf_9",
     "X-Purpose-Code": "workforce_admin",
     "X-Tenant-Reference": "10000000-0000-4000-8000-000000000009",
