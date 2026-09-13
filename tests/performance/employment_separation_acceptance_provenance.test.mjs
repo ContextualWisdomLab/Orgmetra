@@ -3,6 +3,10 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
+import {
+  acceptanceFixtureSha256,
+  acceptanceFixtureText,
+} from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const PROFILE_PRECONDITIONS = Object.freeze({
   first_commit: "active_current_expected_version",
@@ -10,11 +14,14 @@ const PROFILE_PRECONDITIONS = Object.freeze({
   rejection: "expected_version_stale_or_semantic_conflict",
   contention: "active_current_expected_version",
 });
+const FIXTURE_TEXT = acceptanceFixtureText();
+const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_TEXT);
 
 function result() {
   return {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: "a".repeat(40),
+    fixture_sha256: FIXTURE_SHA256,
     selected_profile: "first_commit",
     expected_iterations: 1000,
     completed_iterations: 1000,
@@ -49,6 +56,7 @@ function runtime(resultText) {
     observed_service_sha: "a".repeat(40),
     selected_profile: "first_commit",
     performance_result_sha256: createHash("sha256").update(resultText, "utf8").digest("hex"),
+    fixture_sha256: FIXTURE_SHA256,
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
     observer_reference: "observer:perf-runtime-1",
@@ -74,7 +82,7 @@ function reject(mutate, pattern) {
   const value = result();
   mutate(value);
   const text = `${JSON.stringify(value, null, 2)}\n`;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime(text)), pattern);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime(text), FIXTURE_TEXT), pattern);
 }
 
 test("requires right-cleared dataset and preparation provenance references", () => {
