@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { validatePerformanceFixture } from "./employment_separation_fixture_contract.mjs";
+
 const RESULT_SCHEMA = "orgmetra.employment_separation.performance_result.v1";
 const RUNTIME_SCHEMA = "orgmetra.employment_separation.runtime_evidence.v1";
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -61,6 +63,12 @@ function sha(value, label) {
   return text;
 }
 
+function sha256(value, label) {
+  const text = stringValue(value, label).toLowerCase();
+  if (!SHA256_PATTERN.test(text)) fail(`${label} must be a SHA-256 digest`);
+  return text;
+}
+
 function reference(value, label) {
   const text = stringValue(value, label);
   if (text.length > 200 || !REFERENCE_PATTERN.test(text)) fail(`${label} must be a namespaced opaque reference`);
@@ -105,6 +113,7 @@ function metricValues(data, name) {
 function validateResult(result) {
   if (result.schema_version !== RESULT_SCHEMA) fail("result.schema_version is unsupported");
   const candidateSha = sha(result.candidate_sha, "result.candidate_sha");
+  const fixtureSha256 = sha256(result.fixture_sha256, "result.fixture_sha256");
   const profile = stringValue(result.selected_profile, "result.selected_profile");
   const trendName = PROFILE_TRENDS[profile];
   if (!trendName) fail("result.selected_profile is unsupported");
@@ -178,10 +187,50 @@ function validateResult(result) {
   }
   if (profile === "first_commit" && p95 > 20) fail("first_commit p95 must be <= 20 ms");
 
-  return { candidateSha, profile, p95, completedAt };
+  return { candidateSha, fixtureSha256, profile, p95, completedAt };
 }
 
-function validateRuntimeEvidence(runtime, resultText, result, validatedResult) {
+function parseAndValidateFixture(fixtureText, result, validatedResult) {
+  if (typeof fixtureText !== "string" || fixtureText.trim() === "") fail("performance fixture must be non-empty JSON text");
+  let parsed;
+  try {
+    parsed = JSON.parse(fixtureText);
+  } catch (error) {
+    throw new Error("performance fixture must be valid JSON", { cause: error });
+  }
+  const fixture = validatePerformanceFixture(parsed, {
+    minimumNonContendingRecords: MINIMUM_NON_CONTENDING_RECORDS,
+    minimumContentionPairs: MINIMUM_CONTENTION_PAIRS,
+  });
+  const observedDigest = createHash("sha256").update(fixtureText, "utf8").digest("hex");
+  if (observedDigest !== validatedResult.fixtureSha256) {
+    fail("result.fixture_sha256 does not bind the supplied performance fixture");
+  }
+  if (fixture.candidate_sha.toLowerCase() !== validatedResult.candidateSha) {
+    fail("fixture.candidate_sha must match result.candidate_sha");
+  }
+  for (const field of [
+    "dataset_id",
+    "clearance_reference",
+    "preparation_protocol_reference",
+    "prepared_state_evidence_reference",
+    "resource_evidence_reference",
+  ]) {
+    if (fixture[field] !== result[field]) fail(`fixture.${field} must match result.${field}`);
+  }
+  for (const profileName of PROFILE_NAMES) {
+    if (fixture.profile_preconditions[profileName] !== result.profile_preconditions[profileName]) {
+      fail(`fixture.profile_preconditions.${profileName} must match result.profile_preconditions.${profileName}`);
+    }
+  }
+  const expectedIterations = fixture.profiles[validatedResult.profile].length;
+  if (expectedIterations !== result.expected_iterations) {
+    fail("result.expected_iterations must equal the selected fixture profile cardinality");
+  }
+  return observedDigest;
+}
+
+function validateRuntimeEvidence(runtime, resultText, result, validatedResult, fixtureDigest) {
   if (runtime.schema_version !== RUNTIME_SCHEMA) fail("runtime.schema_version is unsupported");
   const candidateSha = sha(runtime.candidate_sha, "runtime.candidate_sha");
   const observedServiceSha = sha(runtime.observed_service_sha, "runtime.observed_service_sha");
@@ -189,10 +238,13 @@ function validateRuntimeEvidence(runtime, resultText, result, validatedResult) {
   if (observedServiceSha !== validatedResult.candidateSha) fail("runtime.observed_service_sha must match candidate_sha");
   if (runtime.selected_profile !== validatedResult.profile) fail("runtime.selected_profile must match result.selected_profile");
 
-  const suppliedDigest = stringValue(runtime.performance_result_sha256, "runtime.performance_result_sha256").toLowerCase();
-  if (!SHA256_PATTERN.test(suppliedDigest)) fail("runtime.performance_result_sha256 must be a SHA-256 digest");
+  const suppliedDigest = sha256(runtime.performance_result_sha256, "runtime.performance_result_sha256");
   const observedDigest = createHash("sha256").update(resultText, "utf8").digest("hex");
   if (suppliedDigest !== observedDigest) fail("runtime.performance_result_sha256 does not bind the supplied result artifact");
+  const runtimeFixtureDigest = sha256(runtime.fixture_sha256, "runtime.fixture_sha256");
+  if (runtimeFixtureDigest !== fixtureDigest || runtimeFixtureDigest !== validatedResult.fixtureSha256) {
+    fail("runtime.fixture_sha256 must match the exact validated performance fixture");
+  }
 
   reference(runtime.environment_reference, "runtime.environment_reference");
   reference(runtime.deployment_reference, "runtime.deployment_reference");
@@ -225,7 +277,7 @@ function validateRuntimeEvidence(runtime, resultText, result, validatedResult) {
   return suppliedDigest;
 }
 
-export function validateEmploymentSeparationAcceptance(resultText, runtimeEvidence) {
+export function validateEmploymentSeparationAcceptance(resultText, runtimeEvidence, fixtureText) {
   if (typeof resultText !== "string" || resultText.trim() === "") fail("performance result must be non-empty JSON text");
   let parsed;
   try {
@@ -236,11 +288,13 @@ export function validateEmploymentSeparationAcceptance(resultText, runtimeEviden
   const result = plainObject(parsed, "result");
   const runtime = plainObject(runtimeEvidence, "runtime");
   const validatedResult = validateResult(result);
-  const resultDigest = validateRuntimeEvidence(runtime, resultText, result, validatedResult);
+  const fixtureDigest = parseAndValidateFixture(fixtureText, result, validatedResult);
+  const resultDigest = validateRuntimeEvidence(runtime, resultText, result, validatedResult, fixtureDigest);
   return {
     accepted: true,
     candidate_sha: validatedResult.candidateSha,
     selected_profile: validatedResult.profile,
+    fixture_sha256: fixtureDigest,
     performance_result_sha256: resultDigest,
     p95_ms: validatedResult.p95,
   };
