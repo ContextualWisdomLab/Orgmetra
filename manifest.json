@@ -5,7 +5,7 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "b6a4365936b66803a8112f034c77d53d33301a7a798ed4f68746a4f2d8b081d7",
+      "sha256": "1c84b084884679eaf631d1cab49d42a0c5b3852170402fced3dfd9fee9cafd47",
       "bytes": 6651,
       "lines": 125
     },
@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2d2e0b488c0440533effa821808f2f17e37d92f8fb586174c2fdb594f760ca5",
-      "bytes": 17539,
-      "lines": 77
+      "sha256": "8687ead43d9e9f2216372e01121542f91e6a27b5f4b736f4ae59743b25000785",
+      "bytes": 18657,
+      "lines": 80
     },
     {
       "path": "CLAUDE.md",
@@ -136,40 +136,64 @@
       "lines": 260
     },
     {
+      "path": "database/migrations/0014_employment_separation_transition.sql",
+      "sha256": "8b7ce61220b55b260e432c26a66cdc16a744e8625778ca75095e7ba76bdabd43",
+      "bytes": 21853,
+      "lines": 537
+    },
+    {
+      "path": "database/migrations/0015_employment_separation_capability_hardening.sql",
+      "sha256": "8c08d2f50fd479f895956865d421646d1fa9a56485868f569548cf953306df05",
+      "bytes": 843,
+      "lines": 32
+    },
+    {
+      "path": "database/migrations/0016_employment_separation_executor_capability.sql",
+      "sha256": "41c3528aefe1c1dd7e8abed55bdfccf450fc4372750176137a466a8769f12138",
+      "bytes": 5372,
+      "lines": 179
+    },
+    {
+      "path": "database/migrations/0017_assignment_employment_separation_serialization.sql",
+      "sha256": "115e19bd6fa83d5715ed64b40790543723a5f588b1563b0b6c8ccc1310779848",
+      "bytes": 4703,
+      "lines": 116
+    },
+    {
       "path": "docs/API_CONTRACT.md",
-      "sha256": "63533dff785da62b89e585d742a158e2aeb05913644f2bf9fb6486f281c2e589",
-      "bytes": 4555,
-      "lines": 76
+      "sha256": "8b2114c60f083882f1aea3212bd5c421bada845bed18d7c7e8312f563d145165",
+      "bytes": 6705,
+      "lines": 95
     },
     {
       "path": "docs/DATA_MODEL.md",
-      "sha256": "6ad29731ae7ee7aa5bf3a2d0bfef88894a35a2550edb2be3244d6f143d76444a",
-      "bytes": 13366,
-      "lines": 85
+      "sha256": "d553a9fa105f437ccb79bebec2d028ee0e108846dd3f6386bde9613c75b6236f",
+      "bytes": 15960,
+      "lines": 96
     },
     {
       "path": "docs/ERD.md",
-      "sha256": "546001aa85c4fe020e0c39d881dc860daf7f69090596666fdf9092487b0725fe",
-      "bytes": 6964,
-      "lines": 70
+      "sha256": "3ce3da4fd1c099fca1e115b83f59bf64a30fa1622e5fbd1cf516d8eff11691d6",
+      "bytes": 8992,
+      "lines": 80
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "82b2d3e70cec371ef35e9e0f982ac40fef84351976bc04b863b81d27023d5a62",
-      "bytes": 11189,
-      "lines": 71
+      "sha256": "5743ac3b19da47acfd08f65f0a9125bff5775fa619bf2022f08dd0e880ce4003",
+      "bytes": 15247,
+      "lines": 95
     },
     {
       "path": "docs/PRD.md",
-      "sha256": "3ad85ae633cce0fc7a93af39b21d7a7c70bb2efa786da6b12f3c5327906e34f1",
-      "bytes": 5490,
-      "lines": 111
+      "sha256": "9a4af723b1d039e11521a2e408ff746eb699b9bfceea9521f5c3636c1b523c96",
+      "bytes": 8283,
+      "lines": 124
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "01918512d8882060e9cff0c4aa8206e0eccbdfb61cfd7f829331123c7a9fe6ac",
-      "bytes": 11185,
-      "lines": 64
+      "sha256": "897e51bd2ee20efe06b7f776729858094f0468f61013503afb0b0d2b71734578",
+      "bytes": 14041,
+      "lines": 73
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -185,15 +209,15 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "d0a0bc3b54ed0fc7973747987f1afb117d6144c390b51ed9370eb571972a33f8",
-      "bytes": 16534,
-      "lines": 135
+      "sha256": "c3bd4be0ac6671cc4909a65723c5c846a3bf1c06ea0b0462b387ddfa27be5382",
+      "bytes": 20692,
+      "lines": 150
     },
     {
       "path": "docs/THREAT_MODEL.md",
-      "sha256": "f314f375c2e41252536de224c7bc7e4a10ab8f340cb86642724e7399e32f4252",
-      "bytes": 6736,
-      "lines": 23
+      "sha256": "bbd0bc9a60c80028cc4e2d196e449d85c92f3c3757dd492f6d7d658d586af06b",
+      "bytes": 10559,
+      "lines": 29
     },
     {
       "path": "docs/TRACEABILITY.md",
@@ -203,15 +227,15 @@
     },
     {
       "path": "docs/TRD.md",
-      "sha256": "23697d88a4882698e1a2782b7da3f2ccd0d3cd2d6d1bffe89b6597dc16851077",
-      "bytes": 9064,
-      "lines": 101
+      "sha256": "cea2c7b9f1c0679177152af2fad7e17afe00f6229e6cd6e3888645bec5c46e59",
+      "bytes": 13588,
+      "lines": 124
     },
     {
       "path": "docs/UML.md",
-      "sha256": "fe67c37aa88e5814ceb2db7e8f7d8d85ca27a994802efbb7c75164b387adf0a9",
-      "bytes": 5528,
-      "lines": 122
+      "sha256": "6cc63124d3a2ef1b2a91910386ad54ea13151a76483d1e276e587380f0d1b0f6",
+      "bytes": 8528,
+      "lines": 163
     },
     {
       "path": "docs/USER_STORIES.md",
@@ -251,9 +275,9 @@
     },
     {
       "path": "docs/adr/0005-exclusive-employment-and-staffable-seats.md",
-      "sha256": "10f0eb409f4fa32d2c5bed2d583d8b43be8e61b5cbef0e927e5bebb5f5c8f85b",
-      "bytes": 2091,
-      "lines": 34
+      "sha256": "a575f8bde53b2e7ce88f64607d96b0005c4d67f780a9bc95b612770b13e8ce09",
+      "bytes": 4053,
+      "lines": 42
     },
     {
       "path": "docs/adr/0006-governed-audit-outbox-envelope.md",
@@ -353,15 +377,15 @@
     },
     {
       "path": "schemas/openapi.yaml",
-      "sha256": "09c1e43486779198574fe31b8bcabbd1c1f74beec7bf86245ae578061619838f",
-      "bytes": 29503,
-      "lines": 1020
+      "sha256": "533ceb35786c97d8e5d589b6853192837ad420c5be87c33761a22d8399c54f4e",
+      "bytes": 33818,
+      "lines": 1149
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "9b03efbbdffa60a05f5924e8a61b1cbc3cd75c502df428a5920085e8d0bf3603",
-      "bytes": 28121,
-      "lines": 688
+      "sha256": "40fd2811107590e72a251a5863d100c0c98d0dea57c0a89b4530ee5caa258a46",
+      "bytes": 28597,
+      "lines": 695
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -383,9 +407,15 @@
     },
     {
       "path": "tests/openapi-contract.test.mjs",
-      "sha256": "80c1610ef1c189fa325e55389501e0e51531ddf61ee335bb94d9cb3aa55a9fdc",
-      "bytes": 6438,
-      "lines": 195
+      "sha256": "0a8f459d3f058ac70cded5d42db4108e7bb0a065d26b58b84e7b985101f4b06b",
+      "bytes": 7236,
+      "lines": 210
+    },
+    {
+      "path": "tests/test_assignment_separation_serialization_postgres.sh",
+      "sha256": "899b21b5472176b79c0651d39ebcaccf7d0374ddc38f2172191172df2f44b638",
+      "bytes": 16002,
+      "lines": 380
     },
     {
       "path": "tests/test_audit_outbox_hardening_postgres.sh",
@@ -416,6 +446,18 @@
       "sha256": "0ee9539ee57f840c27d08009f7868cdc8662669df78a01dbc8be39216b8f1a3d",
       "bytes": 17811,
       "lines": 469
+    },
+    {
+      "path": "tests/test_employment_separation_capability_postgres.sh",
+      "sha256": "c80ed620aabdf59d4353cda2efb5ed9b38d193aabbaf9356774bddd12e31b182",
+      "bytes": 9400,
+      "lines": 241
+    },
+    {
+      "path": "tests/test_employment_separation_postgres.sh",
+      "sha256": "b70680e69aa8115435601ffa664860723a44fe68cdccf8d3d23197205abc4fce",
+      "bytes": 21800,
+      "lines": 561
     },
     {
       "path": "tests/test_evidence_sealing_postgres.sh",
@@ -467,9 +509,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "091836b2f68600a30b08f7da2cea8b3bef10201a123da720a7369bf10985eec2",
-      "bytes": 27237,
-      "lines": 637
+      "sha256": "50370ee20344d412682101c1eedb300876f7299fa6b2b5536cb6db38aee1b710",
+      "bytes": 28197,
+      "lines": 656
     }
   ]
 }

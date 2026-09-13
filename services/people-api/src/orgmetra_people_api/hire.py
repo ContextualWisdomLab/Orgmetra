@@ -8,7 +8,7 @@ candidate-to-worker conversion and its immutable audit/outbox evidence.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 import re
 from typing import Protocol, runtime_checkable
@@ -34,10 +34,14 @@ class HireDecisionIntegrityError(RuntimeError):
     """Indicate that decision provenance cannot safely materialize worker truth."""
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require a real UUID outside Orgmetra's reserved protocol sentinels."""
-    if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
+def _validate_operational_uuid(field_name: str, value: object) -> int:
+    """Return the inert integer payload of one exact operational UUID."""
+    if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
+    identity = value.int
+    if type(identity) is not int or not (0 < identity < _MAX_UUID_INT):
+        raise ValueError(f"{field_name} must be an operational UUID.")
+    return identity
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,7 +71,7 @@ class HireAcceptanceCommand:
     employment_status_code: str = "active"
 
     def __post_init__(self) -> None:
-        """Fail closed before authorization or persistence on malformed input."""
+        """Fail closed and detach UUID aliases before authorization or persistence."""
         for field_name in (
             "tenant_record_id",
             "candidate_profile_id",
@@ -80,10 +84,11 @@ class HireAcceptanceCommand:
             "audit_event_record_id",
             "outbox_delivery_record_id",
         ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
+            identity = _validate_operational_uuid(field_name, getattr(self, field_name))
+            object.__setattr__(self, field_name, UUID(int=identity))
         if type(self.effective_from) is not date:
             raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.display_name, str):
+        if type(self.display_name) is not str:
             raise ValueError("display_name must be a string.")
         try:
             self.display_name.encode("utf-8")
@@ -95,7 +100,7 @@ class HireAcceptanceCommand:
             raise ValueError("display_name must not contain control characters.")
         validate_idempotency_key(self.idempotency_key)
         if (
-            not isinstance(self.employment_status_code, str)
+            type(self.employment_status_code) is not str
             or _STATUS_CODE_PATTERN.fullmatch(self.employment_status_code) is None
         ):
             raise ValueError("employment_status_code must be a lower snake_case code.")
@@ -110,13 +115,14 @@ class HireAcceptanceResult:
     candidate_worker_conversion_record_id: UUID
 
     def __post_init__(self) -> None:
-        """Prevent malformed persistence results from crossing the service boundary."""
+        """Validate and detach persistence result identities from adapter-owned aliases."""
         for field_name in (
             "person_record_id",
             "employment_record_id",
             "candidate_worker_conversion_record_id",
         ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
+            identity = _validate_operational_uuid(field_name, getattr(self, field_name))
+            object.__setattr__(self, field_name, UUID(int=identity))
 
 
 @runtime_checkable
@@ -147,8 +153,14 @@ def accept_confirmed_hire(
     ``materialize_worker`` operation and ``candidate_worker_conversion`` field;
     possession of an identity token or purpose string alone is insufficient.
     """
-    if not isinstance(command, HireAcceptanceCommand):
+    if type(command) is not HireAcceptanceCommand:
         raise TypeError("command must be a HireAcceptanceCommand")
+    command = replace(command)
+    expected_person_record_id = UUID(int=command.person_record_id.int)
+    expected_employment_record_id = UUID(int=command.employment_record_id.int)
+    expected_conversion_record_id = UUID(
+        int=command.candidate_worker_conversion_record_id.int
+    )
     if not isinstance(mutation_port, HireAcceptancePort):
         raise TypeError("mutation_port must implement HireAcceptancePort")
 
@@ -164,6 +176,13 @@ def accept_confirmed_hire(
         policy=policy,
     )
     result = mutation_port.accept_hire(command=command, authorization=authorization)
-    if not isinstance(result, HireAcceptanceResult):
+    if type(result) is not HireAcceptanceResult:
         raise TypeError("mutation_port must return HireAcceptanceResult")
+    result = replace(result)
+    if (
+        result.person_record_id != expected_person_record_id
+        or result.employment_record_id != expected_employment_record_id
+        or result.candidate_worker_conversion_record_id != expected_conversion_record_id
+    ):
+        raise HireDecisionIntegrityError("hire result identity does not match command")
     return result

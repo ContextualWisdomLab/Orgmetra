@@ -67,6 +67,10 @@ export const REQUIRED_FILES = Object.freeze([
   'database/migrations/0011_criterion_observation_scope.sql',
   'database/migrations/0012_people_mutation_idempotency.sql',
   'database/migrations/0013_job_analysis_snapshot.sql',
+  'database/migrations/0014_employment_separation_transition.sql',
+  'database/migrations/0015_employment_separation_capability_hardening.sql',
+  'database/migrations/0016_employment_separation_executor_capability.sql',
+  'database/migrations/0017_assignment_employment_separation_serialization.sql',
   'packages/hris-kernel/src/orgmetra_hris_kernel/audit.py',
   'packages/hris-kernel/tests/test_audit_outbox.py',
   'schemas/openapi.yaml',
@@ -75,6 +79,7 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/dispatcher-inventory.test.mjs',
   'tests/foundation-contract.test.mjs',
   'tests/openapi-contract.test.mjs',
+  'tests/test_assignment_separation_serialization_postgres.sh',
   'tests/test_bitemporal_postgres.sh',
   'tests/test_tenant_isolation_postgres.sh',
   'tests/test_evidence_sealing_postgres.sh',
@@ -88,6 +93,8 @@ export const REQUIRED_FILES = Object.freeze([
   'tests/test_criterion_observation_scope_postgres.sh',
   'tests/test_people_mutation_idempotency_postgres.sh',
   'tests/test_job_analysis_snapshot_postgres.sh',
+  'tests/test_employment_separation_postgres.sh',
+  'tests/test_employment_separation_capability_postgres.sh',
   'tests/validate_repository.py'
 ]);
 

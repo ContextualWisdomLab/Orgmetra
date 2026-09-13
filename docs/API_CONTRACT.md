@@ -41,7 +41,25 @@ High-impact commands additionally require:
 
 For confirmed-hire materialization, those high-impact facts are resolved from the exact already-sealed `selection_decision` and its evidence set inside the tenant-bound transaction rather than accepted again as mutable request-body assertions.
 
-The server rejects a reused idempotency key when its method, resource, tenant, actor, purpose, or semantic command digest differs. People employment, position, assignment, and confirmed-hire writes persist that digest on `people_mutation_idempotency_record` in the same transaction as the authoritative HRIS fact and audit/outbox pair. A matching retry returns the first committed record identity without duplicating authoritative or audit/outbox facts. Generated record identifiers are excluded from the employment/position/assignment digest so a retried POST that allocates fresh UUIDs still replays; the confirmed-hire route requires the caller to repeat the exact confirmed identities and rejects a same-key command whose materialization identities differ.
+The server rejects a reused idempotency key when its method, resource, tenant, actor, purpose, or semantic command digest differs. People employment, position, assignment, confirmed-hire, and Employment-separation writes persist the corresponding digest in the same transaction as the authoritative HRIS fact and audit/outbox pair. A matching retry returns the first committed result without duplicating authoritative or audit/outbox facts. Generated record identifiers are excluded from the employment/position/assignment digest so a retried POST that allocates fresh UUIDs still replays; the confirmed-hire route requires the caller to repeat the exact confirmed identities and rejects a same-key command whose materialization identities differ. Employment separation binds the key to the exact tenant, Person, Employment, expected Employment version, effective separation date, controlled reason, actor, `workforce_admin` purpose, evidence version, and human confirmation; a semantic mismatch under the same key fails closed.
+
+## Governed Employment separation
+
+The active People contract on PR #64 introduces `POST /v1/employment-separations`. It is a high-impact governed lifecycle command, not an in-place status update. The command targets one exact current-known `active` or `leave` Employment version, requires human confirmation and versioned evidence, and produces bitemporal supersession plus immutable separation/audit/outbox/idempotency evidence in one PostgreSQL transaction.
+
+`separation_reason_code` is a controlled Ubiquitous-Language value. The public contract accepts exactly:
+
+- `voluntary_resignation`
+- `retirement_transition`
+- `fixed_term_completion`
+- `position_elimination`
+- `employer_initiated_separation`
+
+Arbitrary lower-`snake_case` text is not a valid reason. The route also fails closed for stale expected versions, tenant or Person/Employment mismatches, incompatible future Employment truth, or Assignment truth that would remain effective on or after the requested separation boundary.
+
+The continuation version's `effective_to` is only the structural end of the pre-separation interval. The terminal `employment_record_version` with status `terminated`, together with its `employment_separation_record`, is the authoritative separation fact. Rehire is not part of this route and remains planned under #302; it must not reopen a terminated Employment or treat an old candidate-worker conversion as rehire authority.
+
+This route is active-PR truth, not protected/released truth, until #64 is normally integrated and ADR 0015's PostgreSQL/security/review acceptance conditions are satisfied. Consumers must not treat the active branch as an immutable external dependency.
 
 ## Example endpoints
 
@@ -50,6 +68,7 @@ POST /v1/person-records
 GET  /v1/person-records/{person_record_id}
 POST /v1/tenants/{tenant_record_id}/candidate-worker-conversions?purpose=candidate_hire
 POST /v1/employment-records
+POST /v1/employment-separations
 POST /v1/position-records
 POST /v1/assignment-records
 POST /v1/job-profiles
@@ -60,7 +79,7 @@ POST /v1/criterion-observations
 POST /v1/validity-studies
 ```
 
-The foundation OpenAPI contract covers the shared command vocabulary and baseline person, employment, position, assignment, job-profile, and selection-decision operations. Runtime services must publish any additional path-specific contract before release and may not weaken the shared `Idempotency-Key`, least-privilege scope, authorization, evidence, or error semantics. Employment and assignment writes fail closed when exclusive jobs overlap, a seat is not staffable, or visible seat allocations exceed 1.0000.
+The foundation OpenAPI contract covers the shared command vocabulary and baseline person, employment, Employment-separation, position, assignment, job-profile, and selection-decision operations on the active #64 branch. Runtime services must publish any additional path-specific contract before release and may not weaken the shared `Idempotency-Key`, least-privilege scope, authorization, evidence, or error semantics. Employment and assignment writes fail closed when exclusive jobs overlap, a seat is not staffable, or visible seat allocations exceed 1.0000. Employment separation additionally serializes with Assignment creation on the same Employment aggregate conflict boundary.
 
 ## Error shape
 

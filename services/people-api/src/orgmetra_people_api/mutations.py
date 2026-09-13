@@ -2,9 +2,9 @@
 
 Each command authorizes an exact resource kind before crossing the mutation port.
 The port owns one tenant-scoped transaction that persists the authoritative HRIS
-fact together with ``record_audit_outbox_event``. Employment and assignment
-writes require a current ``candidate_worker_conversion_record``
-(``recorded_to IS NULL``) and never write the legacy
+fact together with ``record_audit_outbox_event``. Generic Employment and Assignment
+writes operate on canonical People truth rather than treating recruiting conversion
+provenance as mutation authority, and never write the legacy
 ``candidate_worker_link`` relation.
 """
 
@@ -30,6 +30,7 @@ _IDEMPOTENCY_MAX = 200
 _IDEMPOTENCY_NAMESPACE = UUID("0198a412-9000-7000-8000-0000000000aa")
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+_ALLOCATION_PATTERN = re.compile(r"^(0\.[0-9]{4}|1\.0000)$")
 _EMPLOYMENT_STATUSES = frozenset({"active", "leave", "terminated"})
 _CONCURRENCY_CODES = frozenset({"exclusive", "concurrent"})
 _POSITION_STATUSES = frozenset({"active", "open", "closed", "frozen", "abolished"})
@@ -46,124 +47,84 @@ class PeopleMutationIntegrityError(RuntimeError):
     """Indicate that the mutation cannot persist without violating employment truth."""
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require a real UUID outside Orgmetra's reserved protocol sentinels."""
-    if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
+def _validate_operational_uuid(field_name: str, value: object) -> int:
+    """Return the inert integer payload of one exact operational UUID."""
+    if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
+    identity = value.int
+    if type(identity) is not int or not (0 < identity < _MAX_UUID_INT):
+        raise ValueError(f"{field_name} must be an operational UUID.")
+    return identity
+
+
+def _clone_uuid(field_name: str, value: object) -> UUID:
+    """Detach one exact operational UUID from caller- or port-retained aliases."""
+    return UUID(int=_validate_operational_uuid(field_name, value))
+
+
+def _clone_date(field_name: str, value: object) -> date:
+    """Detach one exact business date after runtime revalidation."""
+    if type(value) is not date:
+        raise ValueError(f"{field_name} must be a date.")
+    return date(value.year, value.month, value.day)
 
 
 def _validate_confirmation(value: object) -> None:
     """Require one namespaced human-confirmation reference."""
-    if not isinstance(value, str) or _REFERENCE_PATTERN.fullmatch(value) is None:
+    if type(value) is not str or _REFERENCE_PATTERN.fullmatch(value) is None:
         raise ValueError("confirmation_reference must be a namespaced opaque reference.")
 
 
 def _validate_evidence_version(value: object) -> None:
     """Require one whitespace-free evidence version token."""
-    if not isinstance(value, str) or _VERSION_PATTERN.fullmatch(value) is None:
+    if type(value) is not str or _VERSION_PATTERN.fullmatch(value) is None:
         raise ValueError("evidence_version_code must be a whitespace-free version token.")
 
 
 def validate_idempotency_key(value: object) -> str:
     """Require the same visible-ASCII Idempotency-Key contract as the HTTP boundary."""
-    if not isinstance(value, str) or not (_IDEMPOTENCY_MIN <= len(value) <= _IDEMPOTENCY_MAX):
+    if type(value) is not str or not (_IDEMPOTENCY_MIN <= len(value) <= _IDEMPOTENCY_MAX):
         raise ValueError("idempotency_key must be 16 to 200 visible ASCII characters.")
     if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
         raise ValueError("idempotency_key must be 16 to 200 visible ASCII characters.")
     return value
 
 
+def _validate_allocation_ratio(value: object) -> Decimal:
+    """Require one finite strictly-positive Assignment ratio with at most four decimals."""
+    if type(value) is not Decimal:
+        raise ValueError("allocation_ratio must be a Decimal.")
+    if not value.is_finite():
+        raise ValueError("allocation_ratio must be finite.")
+    if value <= Decimal("0") or value > Decimal("1.0000"):
+        raise ValueError("allocation_ratio must be greater than 0 and at most 1.0000.")
+    if value.as_tuple().exponent < -4:
+        raise ValueError("allocation_ratio must have at most four decimal places.")
+    return value
+
+
 def _canonical_allocation_ratio(value: Decimal) -> str:
     """Return the context-independent numeric(5,4) spelling used by persistence."""
-    whole, _separator, fraction = format(value, "f").partition(".")
+    ratio = _validate_allocation_ratio(value)
+    whole, _separator, fraction = format(ratio, "f").partition(".")
     return f"{whole}.{fraction:0<4}"
 
 
-def command_route(
-    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
-) -> str:
-    """Return the durable route that scopes one People mutation idempotency key."""
-    if isinstance(command, EmploymentMutationCommand):
-        return "employment-records"
-    if isinstance(command, PositionMutationCommand):
-        return "position-records"
-    if isinstance(command, AssignmentMutationCommand):
-        return "assignment-records"
-    raise TypeError("command must be a governed People mutation command")
+def _canonical_uuid(value: object, *, field_name: str) -> str:
+    """Return a canonical UUID string after exact operational validation."""
+    return str(UUID(int=_validate_operational_uuid(field_name, value)))
 
 
-def idempotency_record_id(
-    *,
-    tenant_record_id: UUID,
-    command_route_value: str,
-    idempotency_key: str,
-) -> UUID:
-    """Derive a stable operational identity for one tenant/route/key binding."""
-    return uuid5(
-        _IDEMPOTENCY_NAMESPACE,
-        f"{tenant_record_id}:{command_route_value}:{idempotency_key}",
-    )
-
-
-def mutation_command_digest(
-    *,
-    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
-    authorization: AuthorizationDecision,
-) -> str:
-    """Hash method, route, tenant, actor, purpose, and semantic command fields.
-
-    Generated record identifiers are excluded so a retry that allocates fresh
-    UUIDs still matches the first committed command.
-    """
-    if not isinstance(authorization, AuthorizationDecision):
-        raise TypeError("authorization must be an AuthorizationDecision")
-    if isinstance(command, EmploymentMutationCommand):
-        route = "employment-records"
-        semantic_command: dict[str, object] = {
-            "confirmation_reference": command.confirmation_reference,
-            "effective_from": command.effective_from.isoformat(),
-            "employment_concurrency_code": command.employment_concurrency_code,
-            "employment_status_code": command.employment_status_code,
-            "evidence_version_code": command.evidence_version_code,
-            "person_record_id": str(command.person_record_id),
-        }
-    elif isinstance(command, PositionMutationCommand):
-        route = "position-records"
-        semantic_command = {
-            "confirmation_reference": command.confirmation_reference,
-            "effective_from": command.effective_from.isoformat(),
-            "evidence_version_code": command.evidence_version_code,
-            "job_profile_id": str(command.job_profile_id),
-            "organization_unit_id": str(command.organization_unit_id),
-            "position_status_code": command.position_status_code,
-        }
-    elif isinstance(command, AssignmentMutationCommand):
-        route = "assignment-records"
-        semantic_command = {
-            "allocation_ratio": _canonical_allocation_ratio(command.allocation_ratio),
-            "confirmation_reference": command.confirmation_reference,
-            "effective_from": command.effective_from.isoformat(),
-            "employment_record_id": str(command.employment_record_id),
-            "evidence_version_code": command.evidence_version_code,
-            "person_record_id": str(command.person_record_id),
-            "position_record_id": str(command.position_record_id),
-        }
-    else:
-        raise TypeError("command must be a governed People mutation command")
-    payload = {
-        "actor_reference": authorization.actor_reference,
-        "command_route": route,
-        "method": "POST",
-        "purpose_code": authorization.purpose_code,
-        "semantic_command": semantic_command,
-        "tenant_record_id": str(command.tenant_record_id),
-    }
-    return sha256(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")).hexdigest()
+def _validate_semantic_text(field_name: str, value: object, allowed: frozenset[str]) -> str:
+    """Return one exact built-in governance token drawn from a bounded vocabulary."""
+    if type(value) is not str or value not in allowed:
+        raise ValueError(f"{field_name} is invalid.")
+    return value
 
 
 @dataclass(frozen=True, slots=True)
 class EmploymentMutationCommand:
-    """Opaque identities and high-impact evidence needed to create one employment."""
+    """Describe one governed Employment identity/version creation request."""
 
     tenant_record_id: UUID
     person_record_id: UUID
@@ -179,25 +140,30 @@ class EmploymentMutationCommand:
     idempotency_key: str
 
     def __post_init__(self) -> None:
-        """Fail closed before authorization or persistence on malformed input."""
-        for field_name in (
-            "tenant_record_id",
-            "person_record_id",
-            "employment_record_id",
+        """Reject ambiguous input and retain a detached immutable command snapshot."""
+        object.__setattr__(self, "tenant_record_id", _clone_uuid("tenant_record_id", self.tenant_record_id))
+        object.__setattr__(self, "person_record_id", _clone_uuid("person_record_id", self.person_record_id))
+        object.__setattr__(
+            self, "employment_record_id", _clone_uuid("employment_record_id", self.employment_record_id)
+        )
+        object.__setattr__(
+            self,
             "employment_record_version_id",
-            "audit_event_record_id",
+            _clone_uuid("employment_record_version_id", self.employment_record_version_id),
+        )
+        object.__setattr__(
+            self, "audit_event_record_id", _clone_uuid("audit_event_record_id", self.audit_event_record_id)
+        )
+        object.__setattr__(
+            self,
             "outbox_delivery_record_id",
-        ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
-        if type(self.effective_from) is not date:
-            raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.employment_status_code, str) or self.employment_status_code not in _EMPLOYMENT_STATUSES:
-            raise ValueError("employment_status_code must be active, leave, or terminated.")
-        if (
-            not isinstance(self.employment_concurrency_code, str)
-            or self.employment_concurrency_code not in _CONCURRENCY_CODES
-        ):
-            raise ValueError("employment_concurrency_code must be exclusive or concurrent.")
+            _clone_uuid("outbox_delivery_record_id", self.outbox_delivery_record_id),
+        )
+        _validate_semantic_text("employment_status_code", self.employment_status_code, _EMPLOYMENT_STATUSES)
+        _validate_semantic_text(
+            "employment_concurrency_code", self.employment_concurrency_code, _CONCURRENCY_CODES
+        )
+        object.__setattr__(self, "effective_from", _clone_date("effective_from", self.effective_from))
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
         validate_idempotency_key(self.idempotency_key)
@@ -205,13 +171,13 @@ class EmploymentMutationCommand:
 
 @dataclass(frozen=True, slots=True)
 class PositionMutationCommand:
-    """Opaque identities and high-impact evidence needed to create one position seat."""
+    """Describe one governed Position identity/version creation request."""
 
     tenant_record_id: UUID
-    organization_unit_id: UUID
-    job_profile_id: UUID
     position_record_id: UUID
     position_record_version_id: UUID
+    organization_unit_id: UUID
+    job_profile_id: UUID
     audit_event_record_id: UUID
     outbox_delivery_record_id: UUID
     position_status_code: str
@@ -221,21 +187,30 @@ class PositionMutationCommand:
     idempotency_key: str
 
     def __post_init__(self) -> None:
-        """Fail closed before authorization or persistence on malformed input."""
-        for field_name in (
-            "tenant_record_id",
-            "organization_unit_id",
-            "job_profile_id",
-            "position_record_id",
+        """Reject ambiguous input and retain a detached immutable command snapshot."""
+        object.__setattr__(self, "tenant_record_id", _clone_uuid("tenant_record_id", self.tenant_record_id))
+        object.__setattr__(
+            self, "position_record_id", _clone_uuid("position_record_id", self.position_record_id)
+        )
+        object.__setattr__(
+            self,
             "position_record_version_id",
-            "audit_event_record_id",
+            _clone_uuid("position_record_version_id", self.position_record_version_id),
+        )
+        object.__setattr__(
+            self, "organization_unit_id", _clone_uuid("organization_unit_id", self.organization_unit_id)
+        )
+        object.__setattr__(self, "job_profile_id", _clone_uuid("job_profile_id", self.job_profile_id))
+        object.__setattr__(
+            self, "audit_event_record_id", _clone_uuid("audit_event_record_id", self.audit_event_record_id)
+        )
+        object.__setattr__(
+            self,
             "outbox_delivery_record_id",
-        ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
-        if type(self.effective_from) is not date:
-            raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.position_status_code, str) or self.position_status_code not in _POSITION_STATUSES:
-            raise ValueError("position_status_code must be a staffable or closed seat status.")
+            _clone_uuid("outbox_delivery_record_id", self.outbox_delivery_record_id),
+        )
+        _validate_semantic_text("position_status_code", self.position_status_code, _POSITION_STATUSES)
+        object.__setattr__(self, "effective_from", _clone_date("effective_from", self.effective_from))
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
         validate_idempotency_key(self.idempotency_key)
@@ -243,7 +218,7 @@ class PositionMutationCommand:
 
 @dataclass(frozen=True, slots=True)
 class AssignmentMutationCommand:
-    """Opaque identities and high-impact evidence needed to create one assignment."""
+    """Describe one governed Assignment creation request."""
 
     tenant_record_id: UUID
     employment_record_id: UUID
@@ -259,27 +234,27 @@ class AssignmentMutationCommand:
     idempotency_key: str
 
     def __post_init__(self) -> None:
-        """Fail closed before authorization or persistence on malformed input."""
-        for field_name in (
-            "tenant_record_id",
-            "employment_record_id",
-            "person_record_id",
-            "position_record_id",
-            "assignment_record_id",
-            "audit_event_record_id",
+        """Reject ambiguous input and retain a detached immutable command snapshot."""
+        object.__setattr__(self, "tenant_record_id", _clone_uuid("tenant_record_id", self.tenant_record_id))
+        object.__setattr__(
+            self, "employment_record_id", _clone_uuid("employment_record_id", self.employment_record_id)
+        )
+        object.__setattr__(self, "person_record_id", _clone_uuid("person_record_id", self.person_record_id))
+        object.__setattr__(self, "position_record_id", _clone_uuid("position_record_id", self.position_record_id))
+        object.__setattr__(
+            self, "assignment_record_id", _clone_uuid("assignment_record_id", self.assignment_record_id)
+        )
+        object.__setattr__(
+            self, "audit_event_record_id", _clone_uuid("audit_event_record_id", self.audit_event_record_id)
+        )
+        object.__setattr__(
+            self,
             "outbox_delivery_record_id",
-        ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
-        if type(self.effective_from) is not date:
-            raise ValueError("effective_from must be a business date.")
-        if not isinstance(self.allocation_ratio, Decimal):
-            raise ValueError("allocation_ratio must be a Decimal.")
-        if not self.allocation_ratio.is_finite():
-            raise ValueError("allocation_ratio must be finite.")
-        if self.allocation_ratio <= Decimal("0") or self.allocation_ratio > Decimal("1.0000"):
-            raise ValueError("allocation_ratio must be greater than 0 and at most 1.0000.")
-        if self.allocation_ratio.as_tuple().exponent < -4:
-            raise ValueError("allocation_ratio must have at most four decimal places.")
+            _clone_uuid("outbox_delivery_record_id", self.outbox_delivery_record_id),
+        )
+        ratio = _validate_allocation_ratio(self.allocation_ratio)
+        object.__setattr__(self, "allocation_ratio", Decimal(ratio.as_tuple()))
+        object.__setattr__(self, "effective_from", _clone_date("effective_from", self.effective_from))
         _validate_confirmation(self.confirmation_reference)
         _validate_evidence_version(self.evidence_version_code)
         validate_idempotency_key(self.idempotency_key)
@@ -287,40 +262,55 @@ class AssignmentMutationCommand:
 
 @dataclass(frozen=True, slots=True)
 class EmploymentMutationResult:
-    """Opaque identity returned after one committed employment mutation."""
+    """Return the canonical committed Employment identity and optional replay digest."""
 
     employment_record_id: UUID
+    replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Prevent malformed persistence results from crossing the service boundary."""
-        _validate_operational_uuid("employment_record_id", self.employment_record_id)
+        """Detach and validate durable Employment receipt identity."""
+        object.__setattr__(
+            self, "employment_record_id", _clone_uuid("employment_record_id", self.employment_record_id)
+        )
+        if self.replay_command_digest is not None and type(self.replay_command_digest) is not str:
+            raise ValueError("replay_command_digest must be a string when present.")
 
 
 @dataclass(frozen=True, slots=True)
 class PositionMutationResult:
-    """Opaque identity returned after one committed position mutation."""
+    """Return the canonical committed Position identity and optional replay digest."""
 
     position_record_id: UUID
+    replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Prevent malformed persistence results from crossing the service boundary."""
-        _validate_operational_uuid("position_record_id", self.position_record_id)
+        """Detach and validate durable Position receipt identity."""
+        object.__setattr__(
+            self, "position_record_id", _clone_uuid("position_record_id", self.position_record_id)
+        )
+        if self.replay_command_digest is not None and type(self.replay_command_digest) is not str:
+            raise ValueError("replay_command_digest must be a string when present.")
 
 
 @dataclass(frozen=True, slots=True)
 class AssignmentMutationResult:
-    """Opaque identity returned after one committed assignment mutation."""
+    """Return the canonical committed Assignment identity and optional replay digest."""
 
     assignment_record_id: UUID
+    replay_command_digest: str | None = None
 
     def __post_init__(self) -> None:
-        """Prevent malformed persistence results from crossing the service boundary."""
-        _validate_operational_uuid("assignment_record_id", self.assignment_record_id)
+        """Detach and validate durable Assignment receipt identity."""
+        object.__setattr__(
+            self, "assignment_record_id", _clone_uuid("assignment_record_id", self.assignment_record_id)
+        )
+        if self.replay_command_digest is not None and type(self.replay_command_digest) is not str:
+            raise ValueError("replay_command_digest must be a string when present.")
 
 
 @runtime_checkable
 class PeopleMutationPort(Protocol):
-    """Persist authorized People mutations atomically inside an Orgmetra-owned boundary."""
+    """Persist governed People facts after application authorization."""
 
     def create_employment(
         self,
@@ -328,7 +318,8 @@ class PeopleMutationPort(Protocol):
         command: EmploymentMutationCommand,
         authorization: AuthorizationDecision,
     ) -> EmploymentMutationResult:
-        """Persist one employment or raise without partial writes."""
+        """Persist one Employment mutation."""
+        ...
 
     def create_position(
         self,
@@ -336,7 +327,8 @@ class PeopleMutationPort(Protocol):
         command: PositionMutationCommand,
         authorization: AuthorizationDecision,
     ) -> PositionMutationResult:
-        """Persist one position or raise without partial writes."""
+        """Persist one Position mutation."""
+        ...
 
     def create_assignment(
         self,
@@ -344,7 +336,192 @@ class PeopleMutationPort(Protocol):
         command: AssignmentMutationCommand,
         authorization: AuthorizationDecision,
     ) -> AssignmentMutationResult:
-        """Persist one assignment or raise without partial writes."""
+        """Persist one Assignment mutation."""
+        ...
+
+
+def _snapshot_employment_command(command: EmploymentMutationCommand) -> EmploymentMutationCommand:
+    """Detach and revalidate all Employment command authority before callbacks run."""
+    return EmploymentMutationCommand(
+        tenant_record_id=_clone_uuid("tenant_record_id", command.tenant_record_id),
+        person_record_id=_clone_uuid("person_record_id", command.person_record_id),
+        employment_record_id=_clone_uuid("employment_record_id", command.employment_record_id),
+        employment_record_version_id=_clone_uuid(
+            "employment_record_version_id", command.employment_record_version_id
+        ),
+        audit_event_record_id=_clone_uuid("audit_event_record_id", command.audit_event_record_id),
+        outbox_delivery_record_id=_clone_uuid(
+            "outbox_delivery_record_id", command.outbox_delivery_record_id
+        ),
+        employment_status_code=command.employment_status_code,
+        employment_concurrency_code=command.employment_concurrency_code,
+        effective_from=_clone_date("effective_from", command.effective_from),
+        confirmation_reference=command.confirmation_reference,
+        evidence_version_code=command.evidence_version_code,
+        idempotency_key=command.idempotency_key,
+    )
+
+
+def _snapshot_position_command(command: PositionMutationCommand) -> PositionMutationCommand:
+    """Detach and revalidate all Position command authority before callbacks run."""
+    return PositionMutationCommand(
+        tenant_record_id=_clone_uuid("tenant_record_id", command.tenant_record_id),
+        position_record_id=_clone_uuid("position_record_id", command.position_record_id),
+        position_record_version_id=_clone_uuid(
+            "position_record_version_id", command.position_record_version_id
+        ),
+        organization_unit_id=_clone_uuid("organization_unit_id", command.organization_unit_id),
+        job_profile_id=_clone_uuid("job_profile_id", command.job_profile_id),
+        audit_event_record_id=_clone_uuid("audit_event_record_id", command.audit_event_record_id),
+        outbox_delivery_record_id=_clone_uuid(
+            "outbox_delivery_record_id", command.outbox_delivery_record_id
+        ),
+        position_status_code=command.position_status_code,
+        effective_from=_clone_date("effective_from", command.effective_from),
+        confirmation_reference=command.confirmation_reference,
+        evidence_version_code=command.evidence_version_code,
+        idempotency_key=command.idempotency_key,
+    )
+
+
+def _snapshot_assignment_command(command: AssignmentMutationCommand) -> AssignmentMutationCommand:
+    """Detach and revalidate all Assignment command authority before callbacks run."""
+    ratio = _validate_allocation_ratio(command.allocation_ratio)
+    return AssignmentMutationCommand(
+        tenant_record_id=_clone_uuid("tenant_record_id", command.tenant_record_id),
+        employment_record_id=_clone_uuid("employment_record_id", command.employment_record_id),
+        person_record_id=_clone_uuid("person_record_id", command.person_record_id),
+        position_record_id=_clone_uuid("position_record_id", command.position_record_id),
+        assignment_record_id=_clone_uuid("assignment_record_id", command.assignment_record_id),
+        audit_event_record_id=_clone_uuid("audit_event_record_id", command.audit_event_record_id),
+        outbox_delivery_record_id=_clone_uuid(
+            "outbox_delivery_record_id", command.outbox_delivery_record_id
+        ),
+        allocation_ratio=Decimal(ratio.as_tuple()),
+        effective_from=_clone_date("effective_from", command.effective_from),
+        confirmation_reference=command.confirmation_reference,
+        evidence_version_code=command.evidence_version_code,
+        idempotency_key=command.idempotency_key,
+    )
+
+
+def _snapshot_authorization(authorization: AuthorizationDecision) -> AuthorizationDecision:
+    """Detach authorization evidence before a persistence adapter can retain or rewrite it."""
+    if type(authorization) is not AuthorizationDecision:
+        raise TypeError("authorization must be an AuthorizationDecision")
+    return AuthorizationDecision(
+        allowed=authorization.allowed,
+        tenant_record_id=_clone_uuid("authorization.tenant_record_id", authorization.tenant_record_id),
+        actor_reference=authorization.actor_reference,
+        resource_reference=authorization.resource_reference,
+        policy_version_code=authorization.policy_version_code,
+        purpose_code=authorization.purpose_code,
+        operation_code=authorization.operation_code,
+        resource_kind=authorization.resource_kind,
+        requested_fields=frozenset(authorization.requested_fields),
+        authorized_fields=frozenset(authorization.authorized_fields),
+        reason_code=authorization.reason_code,
+        next_action=authorization.next_action,
+    )
+
+
+def command_route(
+    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
+) -> str:
+    """Return the exact HTTP command route used by the durable replay key."""
+    if type(command) is EmploymentMutationCommand:
+        return "employment-records"
+    if type(command) is PositionMutationCommand:
+        return "position-records"
+    if type(command) is AssignmentMutationCommand:
+        return "assignment-records"
+    raise TypeError("command must be a governed People mutation command")
+
+
+def mutation_command_digest(
+    *,
+    command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
+    authorization: AuthorizationDecision,
+) -> str:
+    """Hash one revalidated semantic command and exact authorization context for replay binding."""
+    if type(authorization) is not AuthorizationDecision:
+        raise TypeError("authorization must be an AuthorizationDecision")
+    route = command_route(command)
+    if type(command) is EmploymentMutationCommand:
+        semantic_command = _snapshot_employment_command(command)
+    elif type(command) is PositionMutationCommand:
+        semantic_command = _snapshot_position_command(command)
+    else:
+        semantic_command = _snapshot_assignment_command(command)
+    common = {
+        "actor_reference": authorization.actor_reference,
+        "confirmation_reference": semantic_command.confirmation_reference,
+        "evidence_version_code": semantic_command.evidence_version_code,
+        "policy_version_code": authorization.policy_version_code,
+        "purpose_code": authorization.purpose_code,
+        "route": route,
+        "tenant_record_id": _canonical_uuid(
+            semantic_command.tenant_record_id, field_name="tenant_record_id"
+        ),
+    }
+    if type(semantic_command) is EmploymentMutationCommand:
+        payload = {
+            **common,
+            "effective_from": semantic_command.effective_from.isoformat(),
+            "employment_concurrency_code": semantic_command.employment_concurrency_code,
+            "employment_status_code": semantic_command.employment_status_code,
+            "person_record_id": _canonical_uuid(
+                semantic_command.person_record_id, field_name="person_record_id"
+            ),
+        }
+    elif type(semantic_command) is PositionMutationCommand:
+        payload = {
+            **common,
+            "effective_from": semantic_command.effective_from.isoformat(),
+            "job_profile_id": _canonical_uuid(
+                semantic_command.job_profile_id, field_name="job_profile_id"
+            ),
+            "organization_unit_id": _canonical_uuid(
+                semantic_command.organization_unit_id, field_name="organization_unit_id"
+            ),
+            "position_status_code": semantic_command.position_status_code,
+        }
+    else:
+        payload = {
+            **common,
+            "allocation_ratio": _canonical_allocation_ratio(semantic_command.allocation_ratio),
+            "effective_from": semantic_command.effective_from.isoformat(),
+            "employment_record_id": _canonical_uuid(
+                semantic_command.employment_record_id, field_name="employment_record_id"
+            ),
+            "person_record_id": _canonical_uuid(
+                semantic_command.person_record_id, field_name="person_record_id"
+            ),
+            "position_record_id": _canonical_uuid(
+                semantic_command.position_record_id, field_name="position_record_id"
+            ),
+        }
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return sha256(encoded).hexdigest()
+
+
+def idempotency_record_id(
+    *,
+    tenant_record_id: UUID,
+    command_route_value: str,
+    idempotency_key: str,
+) -> UUID:
+    """Derive a stable opaque row identity from the tenant/route/key business key."""
+    tenant_integer = _validate_operational_uuid("tenant_record_id", tenant_record_id)
+    validate_idempotency_key(idempotency_key)
+    if type(command_route_value) is not str or not command_route_value:
+        raise ValueError("command_route_value must be a non-empty string.")
+    return uuid5(
+        _IDEMPOTENCY_NAMESPACE,
+        f"{tenant_integer}:{command_route_value}:{idempotency_key}",
+    )
 
 
 def _require_port(mutation_port: object) -> PeopleMutationPort:
@@ -352,6 +529,88 @@ def _require_port(mutation_port: object) -> PeopleMutationPort:
     if not isinstance(mutation_port, PeopleMutationPort):
         raise TypeError("mutation_port must implement PeopleMutationPort")
     return mutation_port
+
+
+def _authorize_mutation(
+    *,
+    principal: AuthenticatedPrincipal,
+    tenant_record_id: UUID,
+    purpose_code: str,
+    resource_kind: str,
+    resource_id: UUID,
+    requested_fields: frozenset[str],
+    policy: PurposeBoundAccessPolicy,
+) -> AuthorizationDecision:
+    """Delegate exact mutation authorization without duplicating Keyverse policy ownership."""
+    return authorize_resource_fields(
+        principal=principal,
+        tenant_record_id=tenant_record_id,
+        resource_tenant_record_id=tenant_record_id,
+        resource_reference=f"{resource_kind}:{resource_id.hex}",
+        purpose_code=purpose_code,
+        operation_code="create_record",
+        resource_kind=resource_kind,
+        requested_fields=requested_fields,
+        policy=policy,
+    )
+
+
+def _snapshot_employment_result(result: object) -> EmploymentMutationResult:
+    """Detach and revalidate one Employment persistence receipt."""
+    if type(result) is not EmploymentMutationResult:
+        raise TypeError("mutation_port must return EmploymentMutationResult")
+    replay_digest = result.replay_command_digest
+    if replay_digest is not None and type(replay_digest) is not str:
+        raise ValueError("replay_command_digest must be a string when present.")
+    return EmploymentMutationResult(
+        employment_record_id=_clone_uuid("employment_record_id", result.employment_record_id),
+        replay_command_digest=replay_digest,
+    )
+
+
+def _snapshot_position_result(result: object) -> PositionMutationResult:
+    """Detach and revalidate one Position persistence receipt."""
+    if type(result) is not PositionMutationResult:
+        raise TypeError("mutation_port must return PositionMutationResult")
+    replay_digest = result.replay_command_digest
+    if replay_digest is not None and type(replay_digest) is not str:
+        raise ValueError("replay_command_digest must be a string when present.")
+    return PositionMutationResult(
+        position_record_id=_clone_uuid("position_record_id", result.position_record_id),
+        replay_command_digest=replay_digest,
+    )
+
+
+def _snapshot_assignment_result(result: object) -> AssignmentMutationResult:
+    """Detach and revalidate one Assignment persistence receipt."""
+    if type(result) is not AssignmentMutationResult:
+        raise TypeError("mutation_port must return AssignmentMutationResult")
+    replay_digest = result.replay_command_digest
+    if replay_digest is not None and type(replay_digest) is not str:
+        raise ValueError("replay_command_digest must be a string when present.")
+    return AssignmentMutationResult(
+        assignment_record_id=_clone_uuid("assignment_record_id", result.assignment_record_id),
+        replay_command_digest=replay_digest,
+    )
+
+
+def _require_result_integrity(
+    *,
+    expected_identity: UUID,
+    actual_identity: UUID,
+    replay_command_digest: str | None,
+    expected_command_digest: str,
+    result_name: str,
+) -> None:
+    """Accept the commanded target or a first-commit replay proven by the semantic digest."""
+    if replay_command_digest is not None and replay_command_digest != expected_command_digest:
+        raise PeopleMutationIntegrityError(
+            f"{result_name} replay evidence does not match command"
+        )
+    if actual_identity.int != expected_identity.int and replay_command_digest is None:
+        raise PeopleMutationIntegrityError(
+            f"{result_name} result identity does not match command"
+        )
 
 
 def create_employment_record(
@@ -362,24 +621,41 @@ def create_employment_record(
     policy: PurposeBoundAccessPolicy,
     mutation_port: PeopleMutationPort,
 ) -> EmploymentMutationResult:
-    """Authorize the exact employment target before persisting worker employment truth."""
-    if not isinstance(command, EmploymentMutationCommand):
+    """Authorize and persist one governed Employment record/version."""
+    if type(command) is not EmploymentMutationCommand:
         raise TypeError("command must be an EmploymentMutationCommand")
     port = _require_port(mutation_port)
-    authorization = authorize_resource_fields(
+    semantic_command = _snapshot_employment_command(command)
+    expected_identity = _clone_uuid(
+        "employment_record_id", semantic_command.employment_record_id
+    )
+    authorization = _authorize_mutation(
         principal=principal,
-        tenant_record_id=command.tenant_record_id,
-        resource_tenant_record_id=command.tenant_record_id,
-        resource_reference=f"employment_record:{command.employment_record_id.hex}",
+        tenant_record_id=semantic_command.tenant_record_id,
         purpose_code=purpose_code,
-        operation_code="create_record",
         resource_kind="employment_record",
+        resource_id=semantic_command.employment_record_id,
         requested_fields=_EMPLOYMENT_FIELDS,
         policy=policy,
     )
-    result = port.create_employment(command=command, authorization=authorization)
-    if not isinstance(result, EmploymentMutationResult):
-        raise TypeError("mutation_port must return EmploymentMutationResult")
+    authorization_for_port = _snapshot_authorization(authorization)
+    expected_digest = mutation_command_digest(
+        command=semantic_command,
+        authorization=authorization_for_port,
+    )
+    result = _snapshot_employment_result(
+        port.create_employment(
+            command=semantic_command,
+            authorization=authorization_for_port,
+        )
+    )
+    _require_result_integrity(
+        expected_identity=expected_identity,
+        actual_identity=result.employment_record_id,
+        replay_command_digest=result.replay_command_digest,
+        expected_command_digest=expected_digest,
+        result_name="employment",
+    )
     return result
 
 
@@ -391,24 +667,39 @@ def create_position_record(
     policy: PurposeBoundAccessPolicy,
     mutation_port: PeopleMutationPort,
 ) -> PositionMutationResult:
-    """Authorize the exact position target before persisting a staffable seat."""
-    if not isinstance(command, PositionMutationCommand):
+    """Authorize and persist one governed Position record/version."""
+    if type(command) is not PositionMutationCommand:
         raise TypeError("command must be a PositionMutationCommand")
     port = _require_port(mutation_port)
-    authorization = authorize_resource_fields(
+    semantic_command = _snapshot_position_command(command)
+    expected_identity = _clone_uuid("position_record_id", semantic_command.position_record_id)
+    authorization = _authorize_mutation(
         principal=principal,
-        tenant_record_id=command.tenant_record_id,
-        resource_tenant_record_id=command.tenant_record_id,
-        resource_reference=f"position_record:{command.position_record_id.hex}",
+        tenant_record_id=semantic_command.tenant_record_id,
         purpose_code=purpose_code,
-        operation_code="create_record",
         resource_kind="position_record",
+        resource_id=semantic_command.position_record_id,
         requested_fields=_POSITION_FIELDS,
         policy=policy,
     )
-    result = port.create_position(command=command, authorization=authorization)
-    if not isinstance(result, PositionMutationResult):
-        raise TypeError("mutation_port must return PositionMutationResult")
+    authorization_for_port = _snapshot_authorization(authorization)
+    expected_digest = mutation_command_digest(
+        command=semantic_command,
+        authorization=authorization_for_port,
+    )
+    result = _snapshot_position_result(
+        port.create_position(
+            command=semantic_command,
+            authorization=authorization_for_port,
+        )
+    )
+    _require_result_integrity(
+        expected_identity=expected_identity,
+        actual_identity=result.position_record_id,
+        replay_command_digest=result.replay_command_digest,
+        expected_command_digest=expected_digest,
+        result_name="position",
+    )
     return result
 
 
@@ -420,29 +711,49 @@ def create_assignment_record(
     policy: PurposeBoundAccessPolicy,
     mutation_port: PeopleMutationPort,
 ) -> AssignmentMutationResult:
-    """Authorize the exact assignment target before persisting seat allocation."""
-    if not isinstance(command, AssignmentMutationCommand):
+    """Authorize and persist one governed Assignment record."""
+    if type(command) is not AssignmentMutationCommand:
         raise TypeError("command must be an AssignmentMutationCommand")
     port = _require_port(mutation_port)
-    authorization = authorize_resource_fields(
+    semantic_command = _snapshot_assignment_command(command)
+    expected_identity = _clone_uuid(
+        "assignment_record_id", semantic_command.assignment_record_id
+    )
+    authorization = _authorize_mutation(
         principal=principal,
-        tenant_record_id=command.tenant_record_id,
-        resource_tenant_record_id=command.tenant_record_id,
-        resource_reference=f"assignment_record:{command.assignment_record_id.hex}",
+        tenant_record_id=semantic_command.tenant_record_id,
         purpose_code=purpose_code,
-        operation_code="create_record",
         resource_kind="assignment_record",
+        resource_id=semantic_command.assignment_record_id,
         requested_fields=_ASSIGNMENT_FIELDS,
         policy=policy,
     )
-    result = port.create_assignment(command=command, authorization=authorization)
-    if not isinstance(result, AssignmentMutationResult):
-        raise TypeError("mutation_port must return AssignmentMutationResult")
+    authorization_for_port = _snapshot_authorization(authorization)
+    expected_digest = mutation_command_digest(
+        command=semantic_command,
+        authorization=authorization_for_port,
+    )
+    result = _snapshot_assignment_result(
+        port.create_assignment(
+            command=semantic_command,
+            authorization=authorization_for_port,
+        )
+    )
+    _require_result_integrity(
+        expected_identity=expected_identity,
+        actual_identity=result.assignment_record_id,
+        replay_command_digest=result.replay_command_digest,
+        expected_command_digest=expected_digest,
+        result_name="assignment",
+    )
     return result
 
 
 def parse_allocation_ratio(raw_value: object) -> Decimal:
-    """Parse the OpenAPI allocation token into an exact four-decimal ratio."""
-    if not isinstance(raw_value, str) or re.fullmatch(r"^(0\.[0-9]{4}|1\.0000)$", raw_value) is None:
+    """Parse the OpenAPI allocation token into an exact strictly-positive four-decimal ratio."""
+    if type(raw_value) is not str or _ALLOCATION_PATTERN.fullmatch(raw_value) is None:
         raise ValueError("allocation_ratio must match 0.0001-1.0000 four-decimal form.")
-    return Decimal(raw_value)
+    ratio = Decimal(raw_value)
+    if ratio <= Decimal("0"):
+        raise ValueError("allocation_ratio must match 0.0001-1.0000 four-decimal form.")
+    return ratio

@@ -7,11 +7,11 @@ name = "orgmetra-people-api"
 version = "0.1.0"
 description = "Purpose-bound customer API boundary for authoritative Orgmetra HR records."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "ContextualWisdomLab" }]
 dependencies = [
-  "orgmetra-hris-kernel==0.1.0",
+  "orgmetra-hris-kernel==0.4.0",
   "orgmetra-keyverse-adapter==0.1.0",
 ]
 
