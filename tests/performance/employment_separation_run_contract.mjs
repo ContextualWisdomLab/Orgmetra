@@ -10,6 +10,7 @@ export const PERFORMANCE_SUMMARY_TREND_STATS = Object.freeze([
   "p(95)",
   "p(99)",
   "max",
+  "count",
 ]);
 
 export function requirePerformanceProfile(value) {
