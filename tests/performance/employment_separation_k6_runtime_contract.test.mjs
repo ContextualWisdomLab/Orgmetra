@@ -177,7 +177,7 @@ test("canonical benchmark runner cannot publish stale or failed-run summary evid
   );
   assert.match(
     runner,
-    /summary_source_identity.*summary_source_identity_after.*summary_target_identity[\s\S]*summary_source_digest.*summary_source_digest_after.*summary_target_digest/,
+    /summary_source_identity[\s\S]*summary_source_identity_after[\s\S]*summary_target_identity[\s\S]*summary_source_digest[\s\S]*summary_source_digest_after[\s\S]*summary_target_digest/,
     "source identity and bytes must remain unchanged across publication and equal the published artifact",
   );
   assert.match(
