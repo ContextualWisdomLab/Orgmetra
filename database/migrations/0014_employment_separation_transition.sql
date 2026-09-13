@@ -255,7 +255,7 @@ BEGIN
     END IF;
 
     v_command_digest := encode(
-        digest(
+        public.digest(
             convert_to(
                 jsonb_build_object(
                     'actor_reference', p_actor_reference,
@@ -459,7 +459,7 @@ BEGIN
         || '"time":' || pg_catalog.to_json(v_event_time)::text || ','
         || '"type":"orgmetra.people.employment_separated"}';
     v_event_envelope_digest := encode(
-        digest(convert_to(v_canonical_event_json, 'UTF8'), 'sha256'),
+        public.digest(convert_to(v_canonical_event_json, 'UTF8'), 'sha256'),
         'hex'
     );
 
