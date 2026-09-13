@@ -3,6 +3,10 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
+import {
+  acceptanceFixtureSha256,
+  acceptanceFixtureText,
+} from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const PROFILE_PRECONDITIONS = Object.freeze({
   first_commit: "active_current_expected_version",
@@ -10,6 +14,8 @@ const PROFILE_PRECONDITIONS = Object.freeze({
   rejection: "expected_version_stale_or_semantic_conflict",
   contention: "active_current_expected_version",
 });
+const FIXTURE_TEXT = acceptanceFixtureText();
+const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_TEXT);
 
 function performanceResult(profile, iterations) {
   const trendName = profile === "contention"
@@ -19,6 +25,7 @@ function performanceResult(profile, iterations) {
   return {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: "a".repeat(40),
+    fixture_sha256: FIXTURE_SHA256,
     selected_profile: profile,
     expected_iterations: iterations,
     completed_iterations: iterations,
@@ -55,6 +62,7 @@ function runtimeEvidence(resultText, profile) {
     observed_service_sha: "a".repeat(40),
     selected_profile: profile,
     performance_result_sha256: createHash("sha256").update(resultText, "utf8").digest("hex"),
+    fixture_sha256: FIXTURE_SHA256,
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
     observer_reference: "observer:perf-runtime-1",
@@ -79,7 +87,7 @@ function runtimeEvidence(resultText, profile) {
 function assertRejected(result, pattern) {
   const text = `${JSON.stringify(result, null, 2)}\n`;
   assert.throws(
-    () => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text, result.selected_profile)),
+    () => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text, result.selected_profile), FIXTURE_TEXT),
     pattern,
   );
 }
