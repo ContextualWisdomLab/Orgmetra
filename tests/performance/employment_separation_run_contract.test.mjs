@@ -36,6 +36,6 @@ test("refuses acceptance thresholds without an exact positive iteration requirem
   assert.throws(() => thresholdsForPerformanceProfile("first_commit", 1.5), /positive safe integer/);
 });
 
-test("requires the buyer evidence percentiles named by issue 316", () => {
-  assert.deepEqual(PERFORMANCE_SUMMARY_TREND_STATS, ["p(50)", "p(95)", "p(99)", "max"]);
+test("requires buyer percentiles plus the exact Trend sample count", () => {
+  assert.deepEqual(PERFORMANCE_SUMMARY_TREND_STATS, ["p(50)", "p(95)", "p(99)", "max", "count"]);
 });
