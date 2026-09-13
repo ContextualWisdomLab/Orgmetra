@@ -18,6 +18,7 @@ import {
   requirePerformanceProfile,
   thresholdsForPerformanceProfile,
 } from "./employment_separation_run_contract.mjs";
+import { buyerPathElapsedMs } from "./employment_separation_timing_contract.mjs";
 
 const ROUTE = "/v1/employment-separations";
 const MINIMUM_NON_CONTENDING_RECORDS = 1000;
@@ -145,7 +146,7 @@ function post(command, profile) {
 }
 
 function observe(response, trend, profile, predicate) {
-  trend.add(response.timings.duration, { profile });
+  trend.add(buyerPathElapsedMs(response.timings), { profile });
   latencySamples.add(1, { profile });
   const passed = check(response, {
     [`${profile} returned the governed result`]: predicate,
@@ -189,7 +190,7 @@ export function contention() {
     ["POST", `${baseUrl}${ROUTE}`, requestBody(pair.right), { headers: requestHeaders(pair.right, bearerToken), tags: { profile: "contention" } }],
   ]);
   for (const response of responses) {
-    contentionDuration.add(response.timings.duration, { profile: "contention" });
+    contentionDuration.add(buyerPathElapsedMs(response.timings), { profile: "contention" });
     latencySamples.add(1, { profile: "contention" });
   }
   const parsed = responses.map((response) => ({ status: response.status, body: parseJson(response) }));
