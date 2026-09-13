@@ -341,7 +341,7 @@ export function validateEmploymentSeparationAcceptance(resultArtifact, runtimeEv
     fixtureDigest,
   );
   return {
-    accepted: true,
+    structurally_valid: true,
     candidate_sha: validatedResult.candidateSha,
     selected_profile: validatedResult.profile,
     fixture_sha256: fixtureDigest,
