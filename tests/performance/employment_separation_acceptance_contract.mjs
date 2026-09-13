@@ -8,6 +8,13 @@ const REFERENCE_PATTERN = /^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$/;
 const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 const MINIMUM_NON_CONTENDING_RECORDS = 1000;
 const MINIMUM_CONTENTION_PAIRS = 100;
+const PROFILE_NAMES = Object.freeze(["first_commit", "replay", "rejection", "contention"]);
+const PROFILE_PRECONDITIONS = Object.freeze({
+  first_commit: "active_current_expected_version",
+  replay: "same_key_same_semantics_already_committed",
+  rejection: "expected_version_stale_or_semantic_conflict",
+  contention: "active_current_expected_version",
+});
 const PROFILE_TRENDS = Object.freeze({
   first_commit: "employment_separation_first_commit_duration_ms",
   replay: "employment_separation_replay_duration_ms",
@@ -33,6 +40,14 @@ function plainObject(value, label) {
     fail(`${label} must be an object`);
   }
   return value;
+}
+
+function exactKeys(value, expected, label) {
+  const actual = Object.keys(value).sort();
+  const wanted = [...expected].sort();
+  if (actual.length !== wanted.length || actual.some((key, index) => key !== wanted[index])) {
+    fail(`${label} must contain exactly ${expected.join(", ")}`);
+  }
 }
 
 function stringValue(value, label) {
@@ -94,6 +109,19 @@ function validateResult(result) {
   const trendName = PROFILE_TRENDS[profile];
   if (!trendName) fail("result.selected_profile is unsupported");
 
+  reference(result.dataset_id, "result.dataset_id");
+  reference(result.clearance_reference, "result.clearance_reference");
+  reference(result.preparation_protocol_reference, "result.preparation_protocol_reference");
+  reference(result.prepared_state_evidence_reference, "result.prepared_state_evidence_reference");
+  reference(result.resource_evidence_reference, "result.resource_evidence_reference");
+  const preconditions = plainObject(result.profile_preconditions, "result.profile_preconditions");
+  exactKeys(preconditions, PROFILE_NAMES, "result.profile_preconditions");
+  for (const profileName of PROFILE_NAMES) {
+    if (preconditions[profileName] !== PROFILE_PRECONDITIONS[profileName]) {
+      fail(`result.profile_preconditions.${profileName} must be ${PROFILE_PRECONDITIONS[profileName]}`);
+    }
+  }
+
   if (result.minimum_non_contending_records !== MINIMUM_NON_CONTENDING_RECORDS) {
     fail(`result.minimum_non_contending_records must equal ${MINIMUM_NON_CONTENDING_RECORDS}`);
   }
@@ -111,7 +139,6 @@ function validateResult(result) {
     fail("result sample must be complete");
   }
   const completedAt = utcTimestamp(result.completed_at, "result.completed_at");
-  reference(result.resource_evidence_reference, "result.resource_evidence_reference");
 
   const iterationValues = metricValues(result, "iterations");
   const metricIterations = nonNegativeInteger(iterationValues.count, "result.k6.metrics.iterations.values.count");
