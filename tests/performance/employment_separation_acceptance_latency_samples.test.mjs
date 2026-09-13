@@ -40,7 +40,6 @@ function performanceResult(latencySamples = 1000, trendSamples = latencySamples)
     k6: {
       metrics: {
         iterations: { values: { count: 1000 } },
-        dropped_iterations: { values: { count: 0 } },
         checks: { values: { rate: 1 } },
         employment_separation_unexpected_response: { values: { rate: 0 } },
         employment_separation_latency_samples: { values: { count: latencySamples } },
@@ -67,6 +66,8 @@ function runtimeEvidence(resultArtifact) {
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
     observer_reference: "observer:perf-runtime-1",
+    load_observation_reference: "evidence:perf-load-observation-1",
+    observed_load_model: acceptanceLoadModel(1000),
     resource_evidence_reference: "metrics:employment-separation-perf-1",
     observed_at: "2026-09-13T04:10:01Z",
     host_cpu_percent_p95: 42,
