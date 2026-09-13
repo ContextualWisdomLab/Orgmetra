@@ -16,6 +16,7 @@ import {
 import {
   PERFORMANCE_SUMMARY_TREND_STATS,
   arrivalRateScenarioForPerformanceProfile,
+  requireDirectPerformanceClientNetwork,
   requirePerformanceProfile,
   thresholdsForPerformanceProfile,
 } from "./employment_separation_run_contract.mjs";
@@ -29,6 +30,7 @@ const baseUrl = (__ENV.ORGMETRA_PERFORMANCE_BASE_URL || "").replace(/\/$/, "");
 const bearerToken = __ENV.ORGMETRA_PERFORMANCE_BEARER_TOKEN || "";
 const targetSha = (__ENV.ORGMETRA_PERFORMANCE_TARGET_SHA || "").toLowerCase();
 const selectedProfile = requirePerformanceProfile(__ENV.ORGMETRA_PERFORMANCE_PROFILE || "");
+const clientNetworkTopology = requireDirectPerformanceClientNetwork(__ENV);
 
 if (!fixturePath) fail("ORGMETRA_PERFORMANCE_DATA_FILE is required");
 if (!baseUrl) fail("ORGMETRA_PERFORMANCE_BASE_URL is required");
@@ -197,6 +199,7 @@ export function handleSummary(data) {
       duration_seconds: durationSeconds,
       preallocated_vus: preAllocatedVUs,
       max_vus: maxVUs,
+      client_network_topology: clientNetworkTopology,
     },
     dataset_id: fixture.dataset_id,
     clearance_reference: fixture.clearance_reference,
