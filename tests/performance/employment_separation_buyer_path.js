@@ -34,10 +34,9 @@ const selectedProfile = requirePerformanceProfile(__ENV.ORGMETRA_PERFORMANCE_PRO
 const clientNetworkTopology = requireDirectPerformanceClientNetwork(__ENV);
 const k6Runtime = requirePinnedK6Runtime({
   version: __ENV.ORGMETRA_PERFORMANCE_K6_VERSION || "",
-  releaseAsset: __ENV.ORGMETRA_PERFORMANCE_K6_RELEASE_ASSET || "",
-  releaseAssetSha256: __ENV.ORGMETRA_PERFORMANCE_K6_RELEASE_ASSET_SHA256 || "",
+  image: __ENV.ORGMETRA_PERFORMANCE_K6_IMAGE || "",
+  imageDigest: __ENV.ORGMETRA_PERFORMANCE_K6_IMAGE_DIGEST || "",
   runnerIdentity: __ENV.ORGMETRA_PERFORMANCE_K6_RUNNER_IDENTITY || "",
-  executableSha256: __ENV.ORGMETRA_PERFORMANCE_K6_EXECUTABLE_SHA256 || "",
 });
 
 if (!fixturePath) fail("ORGMETRA_PERFORMANCE_DATA_FILE is required");
@@ -48,34 +47,22 @@ if (!/^[0-9a-f]{40}$/.test(targetSha)) fail("ORGMETRA_PERFORMANCE_TARGET_SHA mus
 const fixtureBytes = open(fixturePath, "b");
 const fixtureSha256 = crypto.sha256(fixtureBytes, "hex");
 let fixtureText;
-try {
-  fixtureText = new TextDecoder("utf-8", { fatal: true }).decode(fixtureBytes);
-} catch (_) {
-  fail("performance fixture must be valid UTF-8");
-}
+try { fixtureText = new TextDecoder("utf-8", { fatal: true }).decode(fixtureBytes); }
+catch (_) { fail("performance fixture must be valid UTF-8"); }
 let fixtureDocument;
-try {
-  fixtureDocument = JSON.parse(fixtureText);
-} catch (_) {
-  fail("performance fixture must be valid JSON");
-}
+try { fixtureDocument = JSON.parse(fixtureText); }
+catch (_) { fail("performance fixture must be valid JSON"); }
 const fixture = validatePerformanceFixture(fixtureDocument, {
   minimumNonContendingRecords: MINIMUM_NON_CONTENDING_RECORDS,
   minimumContentionPairs: MINIMUM_CONTENTION_PAIRS,
 });
-if (fixture.candidate_sha.toLowerCase() !== targetSha) {
-  fail("performance fixture candidate_sha does not match ORGMETRA_PERFORMANCE_TARGET_SHA");
-}
+if (fixture.candidate_sha.toLowerCase() !== targetSha) fail("performance fixture candidate_sha does not match ORGMETRA_PERFORMANCE_TARGET_SHA");
 
 function requiredPositiveIntegerSetting(name) {
   const raw = __ENV[name];
-  if (raw === undefined || raw === "" || !/^\d+$/.test(raw)) {
-    fail(`${name} must be an explicit positive integer`);
-  }
+  if (raw === undefined || raw === "" || !/^\d+$/.test(raw)) fail(`${name} must be an explicit positive integer`);
   const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < 1) {
-    fail(`${name} must be an explicit positive safe integer`);
-  }
+  if (!Number.isSafeInteger(value) || value < 1) fail(`${name} must be an explicit positive safe integer`);
   return value;
 }
 
@@ -85,11 +72,7 @@ const durationSeconds = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_DUR
 const preAllocatedVUs = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_PREALLOCATED_VUS");
 const maxVUs = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_MAX_VUS");
 const selectedScenario = arrivalRateScenarioForPerformanceProfile(selectedProfile, {
-  expectedIterations: selectedRecords.length,
-  targetRps,
-  durationSeconds,
-  preAllocatedVUs,
-  maxVUs,
+  expectedIterations: selectedRecords.length, targetRps, durationSeconds, preAllocatedVUs, maxVUs,
 });
 
 const firstCommitDuration = new Trend("employment_separation_first_commit_duration_ms", true);
@@ -112,81 +95,42 @@ function recordAt(profile) {
   if (index < 0 || index >= records.length) fail(`${profile} iteration ${index} is outside the fixture`);
   return records[index];
 }
-
-function parseJson(response) {
-  try {
-    return response.json();
-  } catch (_) {
-    return null;
-  }
-}
-
+function parseJson(response) { try { return response.json(); } catch (_) { return null; } }
 function post(command, profile) {
-  return http.post(`${baseUrl}${ROUTE}`, requestBody(command), {
-    headers: requestHeaders(command, bearerToken),
-    tags: { profile },
-  });
+  return http.post(`${baseUrl}${ROUTE}`, requestBody(command), { headers: requestHeaders(command, bearerToken), tags: { profile } });
 }
-
 function observe(response, trend, profile, predicate) {
   trend.add(buyerPathElapsedMs(response.timings), { profile });
   latencySamples.add(1, { profile });
-  const passed = check(response, {
-    [`${profile} returned the governed result`]: predicate,
-  });
+  const passed = check(response, { [`${profile} returned the governed result`]: predicate });
   unexpectedResponse.add(!passed, { profile });
 }
 
 export function firstCommit() {
   const command = recordAt("first_commit");
   const response = post(command, "first_commit");
-  observe(response, firstCommitDuration, "first_commit", (result) => (
-    isGovernedSeparationSuccess(result.status, parseJson(result), {
-      employmentRecordId: command.payload.employment_record_id,
-      replayed: false,
-    })
-  ));
+  observe(response, firstCommitDuration, "first_commit", (result) => isGovernedSeparationSuccess(result.status, parseJson(result), { employmentRecordId: command.payload.employment_record_id, replayed: false }));
 }
-
 export function replay() {
   const command = recordAt("replay");
   const response = post(command, "replay");
-  observe(response, replayDuration, "replay", (result) => (
-    isGovernedSeparationSuccess(result.status, parseJson(result), {
-      employmentRecordId: command.payload.employment_record_id,
-      replayed: true,
-    })
-  ));
+  observe(response, replayDuration, "replay", (result) => isGovernedSeparationSuccess(result.status, parseJson(result), { employmentRecordId: command.payload.employment_record_id, replayed: true }));
 }
-
 export function rejection() {
   const response = post(recordAt("rejection"), "rejection");
-  observe(response, rejectionDuration, "rejection", (result) => (
-    isGovernedSeparationConflict(result.status, parseJson(result))
-  ));
+  observe(response, rejectionDuration, "rejection", (result) => isGovernedSeparationConflict(result.status, parseJson(result)));
 }
-
 export function contention() {
   const pair = recordAt("contention");
   const responses = http.batch([
     ["POST", `${baseUrl}${ROUTE}`, requestBody(pair.left), { headers: requestHeaders(pair.left, bearerToken), tags: { profile: "contention" } }],
     ["POST", `${baseUrl}${ROUTE}`, requestBody(pair.right), { headers: requestHeaders(pair.right, bearerToken), tags: { profile: "contention" } }],
   ]);
-  for (const response of responses) {
-    contentionDuration.add(buyerPathElapsedMs(response.timings), { profile: "contention" });
-    latencySamples.add(1, { profile: "contention" });
-  }
+  for (const response of responses) { contentionDuration.add(buyerPathElapsedMs(response.timings), { profile: "contention" }); latencySamples.add(1, { profile: "contention" }); }
   const parsed = responses.map((response) => ({ status: response.status, body: parseJson(response) }));
-  const successes = parsed.filter(({ status, body }) => (
-    isGovernedSeparationSuccess(status, body, {
-      employmentRecordId: pair.left.payload.employment_record_id,
-      replayed: false,
-    })
-  ));
+  const successes = parsed.filter(({ status, body }) => isGovernedSeparationSuccess(status, body, { employmentRecordId: pair.left.payload.employment_record_id, replayed: false }));
   const conflicts = parsed.filter(({ status, body }) => isGovernedSeparationConflict(status, body));
-  const passed = check(parsed, {
-    "contention serializes one governed commit and one governed conflict": () => successes.length === 1 && conflicts.length === 1,
-  });
+  const passed = check(parsed, { "contention serializes one governed commit and one governed conflict": () => successes.length === 1 && conflicts.length === 1 });
   unexpectedResponse.add(!passed, { profile: "contention" });
 }
 
@@ -197,23 +141,15 @@ export function handleSummary(data) {
     candidate_sha: targetSha,
     fixture_sha256: fixtureSha256,
     k6_version: k6Runtime.version,
-    k6_release_asset: k6Runtime.release_asset,
-    k6_release_asset_sha256: k6Runtime.release_asset_sha256,
+    k6_image: k6Runtime.image,
+    k6_image_digest: k6Runtime.image_digest,
     k6_runner_identity: k6Runtime.runner_identity,
-    k6_executable_sha256: k6Runtime.executable_sha256,
     selected_profile: selectedProfile,
     expected_iterations: selectedRecords.length,
     completed_iterations: completedIterations,
     sample_complete: completedIterations === selectedRecords.length,
     completed_at: new Date().toISOString(),
-    load_model: {
-      executor: selectedScenario.executor,
-      target_rps: targetRps,
-      duration_seconds: durationSeconds,
-      preallocated_vus: preAllocatedVUs,
-      max_vus: maxVUs,
-      client_network_topology: clientNetworkTopology,
-    },
+    load_model: { executor: selectedScenario.executor, target_rps: targetRps, duration_seconds: durationSeconds, preallocated_vus: preAllocatedVUs, max_vus: maxVUs, client_network_topology: clientNetworkTopology },
     dataset_id: fixture.dataset_id,
     clearance_reference: fixture.clearance_reference,
     preparation_protocol_reference: fixture.preparation_protocol_reference,

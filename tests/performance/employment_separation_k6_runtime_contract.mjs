@@ -1,8 +1,7 @@
 export const PINNED_K6_VERSION = "2.2.0";
-export const PINNED_K6_RELEASE_ASSET = "k6-v2.2.0-linux-amd64.tar.gz";
-export const PINNED_K6_RELEASE_ASSET_SHA256 = "b5a8003c86f35f5cd5ceef1490312c48e587696c94d998cefc6d7b3b4cb1597d";
-export const PINNED_K6_RUNNER_IDENTITY = `upstream_release_archive:${PINNED_K6_RELEASE_ASSET}@sha256:${PINNED_K6_RELEASE_ASSET_SHA256}`;
-const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+export const PINNED_K6_IMAGE = "ghcr.io/grafana/k6";
+export const PINNED_K6_IMAGE_DIGEST = "sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6";
+export const PINNED_K6_RUNNER_IDENTITY = `${PINNED_K6_IMAGE}@${PINNED_K6_IMAGE_DIGEST}`;
 
 export function requirePinnedK6Version(value) {
   if (value !== PINNED_K6_VERSION) {
@@ -11,31 +10,21 @@ export function requirePinnedK6Version(value) {
   return value;
 }
 
-export function requirePinnedK6Runtime({
-  version,
-  releaseAsset,
-  releaseAssetSha256,
-  runnerIdentity,
-  executableSha256,
-}) {
+export function requirePinnedK6Runtime({ version, image, imageDigest, runnerIdentity }) {
   requirePinnedK6Version(version);
-  if (releaseAsset !== PINNED_K6_RELEASE_ASSET) {
-    throw new Error(`commercial Employment separation performance runs require ${PINNED_K6_RELEASE_ASSET}`);
+  if (image !== PINNED_K6_IMAGE) {
+    throw new Error(`commercial Employment separation performance runs require ${PINNED_K6_IMAGE}`);
   }
-  if (releaseAssetSha256 !== PINNED_K6_RELEASE_ASSET_SHA256) {
-    throw new Error("commercial Employment separation performance runs require the pinned upstream k6 release-asset SHA-256");
+  if (imageDigest !== PINNED_K6_IMAGE_DIGEST) {
+    throw new Error("commercial Employment separation performance runs require the pinned upstream k6 OCI image digest");
   }
   if (runnerIdentity !== PINNED_K6_RUNNER_IDENTITY) {
-    throw new Error("commercial Employment separation performance runs require the pinned upstream k6 runner identity");
-  }
-  if (typeof executableSha256 !== "string" || !SHA256_PATTERN.test(executableSha256)) {
-    throw new Error("commercial Employment separation performance runs require the extracted k6 executable SHA-256");
+    throw new Error("commercial Employment separation performance runs require the pinned upstream k6 OCI runner identity");
   }
   return Object.freeze({
     version,
-    release_asset: releaseAsset,
-    release_asset_sha256: releaseAssetSha256,
+    image,
+    image_digest: imageDigest,
     runner_identity: runnerIdentity,
-    executable_sha256: executableSha256,
   });
 }

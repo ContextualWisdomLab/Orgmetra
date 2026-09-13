@@ -2,57 +2,66 @@
 set -euo pipefail
 
 readonly PINNED_K6_VERSION="2.2.0"
-readonly PINNED_K6_RELEASE_ASSET="k6-v2.2.0-linux-amd64.tar.gz"
-readonly PINNED_K6_RELEASE_ASSET_SHA256="b5a8003c86f35f5cd5ceef1490312c48e587696c94d998cefc6d7b3b4cb1597d"
-readonly PINNED_K6_RUNNER_IDENTITY="upstream_release_archive:${PINNED_K6_RELEASE_ASSET}@sha256:${PINNED_K6_RELEASE_ASSET_SHA256}"
-readonly WORKLOAD="tests/performance/employment_separation_buyer_path.js"
+readonly PINNED_K6_IMAGE="ghcr.io/grafana/k6"
+readonly PINNED_K6_IMAGE_DIGEST="sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6"
+readonly PINNED_K6_RUNNER_IDENTITY="${PINNED_K6_IMAGE}@${PINNED_K6_IMAGE_DIGEST}"
+readonly WORKLOAD="/workspace/tests/performance/employment_separation_buyer_path.js"
 
-archive="${ORGMETRA_K6_RELEASE_ARCHIVE:-}"
-if [[ -z "${archive}" || ! -f "${archive}" ]]; then
-  printf 'ORGMETRA_K6_RELEASE_ARCHIVE must point to the pinned upstream release archive\n' >&2
+if ! command -v podman >/dev/null 2>&1; then
+  printf 'podman is required for the pinned commercial k6 runner\n' >&2
   exit 1
 fi
-if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
-  printf 'commercial Employment separation performance runner requires Linux x86_64 for %s\n' "${PINNED_K6_RELEASE_ASSET}" >&2
+if ! podman image exists "${PINNED_K6_RUNNER_IDENTITY}"; then
+  printf 'preload the exact pinned k6 image before measurement: %s\n' "${PINNED_K6_RUNNER_IDENTITY}" >&2
   exit 1
 fi
-if ! command -v sha256sum >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
-  printf 'sha256sum and tar are required to verify the pinned k6 release artifact\n' >&2
-  exit 1
-fi
-
-tmp_root="$(mktemp -d)"
-trap 'rm -rf -- "${tmp_root}"' EXIT HUP INT TERM
-archive_copy="${tmp_root}/${PINNED_K6_RELEASE_ASSET}"
-cp -- "${archive}" "${archive_copy}"
-observed_archive_sha256="$(sha256sum "${archive_copy}" | awk '{print $1}')"
-if [[ "${observed_archive_sha256}" != "${PINNED_K6_RELEASE_ASSET_SHA256}" ]]; then
-  printf 'k6 release archive SHA-256 mismatch: expected %s, observed %s\n' \
-    "${PINNED_K6_RELEASE_ASSET_SHA256}" "${observed_archive_sha256}" >&2
-  exit 1
-fi
-
-extract_root="${tmp_root}/extract"
-mkdir -p "${extract_root}"
-tar -xzf "${archive_copy}" -C "${extract_root}"
-mapfile -t k6_candidates < <(find "${extract_root}" -type f -name k6 -perm -u+x -print)
-if [[ "${#k6_candidates[@]}" -ne 1 ]]; then
-  printf 'verified k6 archive must contain exactly one executable named k6; found %s\n' "${#k6_candidates[@]}" >&2
-  exit 1
-fi
-k6_bin="${k6_candidates[0]}"
-observed_executable_sha256="$(sha256sum "${k6_bin}" | awk '{print $1}')"
-version_line="$(${k6_bin} version 2>&1 | head -n 1)"
+version_line="$(podman run --rm --pull=never "${PINNED_K6_RUNNER_IDENTITY}" version 2>&1 | head -n 1)"
 version_token="$(printf '%s\n' "${version_line}" | awk '{print $2}')"
 if [[ "${version_token}" != "v${PINNED_K6_VERSION}" ]]; then
-  printf 'verified release archive must contain k6 v%s; observed: %s\n' \
-    "${PINNED_K6_VERSION}" "${version_line}" >&2
+  printf 'pinned k6 image must report v%s; observed: %s\n' "${PINNED_K6_VERSION}" "${version_line}" >&2
   exit 1
 fi
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+fixture_path="${ORGMETRA_PERFORMANCE_DATA_FILE:-}"
+summary_path="${ORGMETRA_PERFORMANCE_SUMMARY_FILE:-}"
+if [[ -z "${fixture_path}" || ! -f "${fixture_path}" ]]; then
+  printf 'ORGMETRA_PERFORMANCE_DATA_FILE must point to the right-cleared fixture\n' >&2
+  exit 1
+fi
+if [[ -z "${summary_path}" ]]; then
+  printf 'ORGMETRA_PERFORMANCE_SUMMARY_FILE is required\n' >&2
+  exit 1
+fi
+fixture_path="$(realpath "${fixture_path}")"
+summary_dir="$(realpath -m "$(dirname "${summary_path}")")"
+summary_name="$(basename "${summary_path}")"
+mkdir -p "${summary_dir}"
+
 export ORGMETRA_PERFORMANCE_K6_VERSION="${PINNED_K6_VERSION}"
-export ORGMETRA_PERFORMANCE_K6_RELEASE_ASSET="${PINNED_K6_RELEASE_ASSET}"
-export ORGMETRA_PERFORMANCE_K6_RELEASE_ASSET_SHA256="${PINNED_K6_RELEASE_ASSET_SHA256}"
+export ORGMETRA_PERFORMANCE_K6_IMAGE="${PINNED_K6_IMAGE}"
+export ORGMETRA_PERFORMANCE_K6_IMAGE_DIGEST="${PINNED_K6_IMAGE_DIGEST}"
 export ORGMETRA_PERFORMANCE_K6_RUNNER_IDENTITY="${PINNED_K6_RUNNER_IDENTITY}"
-export ORGMETRA_PERFORMANCE_K6_EXECUTABLE_SHA256="${observed_executable_sha256}"
-"${k6_bin}" run "${WORKLOAD}" "$@"
+
+podman run --rm --pull=never --network=host --read-only \
+  --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=256 \
+  --tmpfs /tmp:rw,nosuid,nodev,noexec \
+  --volume "${repo_root}:/workspace:ro" \
+  --volume "${fixture_path}:/evidence/fixture.json:ro" \
+  --volume "${summary_dir}:/output:rw" \
+  --workdir /workspace \
+  --env ORGMETRA_PERFORMANCE_BASE_URL \
+  --env ORGMETRA_PERFORMANCE_BEARER_TOKEN \
+  --env ORGMETRA_PERFORMANCE_TARGET_SHA \
+  --env ORGMETRA_PERFORMANCE_PROFILE \
+  --env ORGMETRA_PERFORMANCE_TARGET_RPS \
+  --env ORGMETRA_PERFORMANCE_DURATION_SECONDS \
+  --env ORGMETRA_PERFORMANCE_PREALLOCATED_VUS \
+  --env ORGMETRA_PERFORMANCE_MAX_VUS \
+  --env ORGMETRA_PERFORMANCE_K6_VERSION \
+  --env ORGMETRA_PERFORMANCE_K6_IMAGE \
+  --env ORGMETRA_PERFORMANCE_K6_IMAGE_DIGEST \
+  --env ORGMETRA_PERFORMANCE_K6_RUNNER_IDENTITY \
+  --env ORGMETRA_PERFORMANCE_DATA_FILE=/evidence/fixture.json \
+  --env "ORGMETRA_PERFORMANCE_SUMMARY_FILE=/output/${summary_name}" \
+  "${PINNED_K6_RUNNER_IDENTITY}" run "${WORKLOAD}" "$@"
