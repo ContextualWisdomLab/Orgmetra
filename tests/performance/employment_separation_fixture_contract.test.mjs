@@ -38,10 +38,18 @@ function fixture() {
     candidate_sha: "a".repeat(40),
     right_cleared: true,
     synthetic: false,
-    clearance_reference: "data-clearance:perf-2026-09",
+    clearance_reference: "data_clearance:perf-2026-09",
     dataset_id: "dataset:employment-separation-perf-1",
     prepared_at: "2026-09-13T02:00:00Z",
+    preparation_protocol_reference: "protocol:employment-separation-perf-v1",
+    prepared_state_evidence_reference: "evidence:prepared-state-perf-1",
     resource_evidence_reference: "metrics:employment-separation-perf-1",
+    profile_preconditions: {
+      first_commit: "active_current_expected_version",
+      replay: "same_key_same_semantics_already_committed",
+      rejection: "expected_version_stale_or_semantic_conflict",
+      contention: "active_current_expected_version",
+    },
     profiles: {
       first_commit: [command(1)],
       replay: [command(2)],
@@ -53,7 +61,7 @@ function fixture() {
 
 const smallAcceptance = { minimumNonContendingRecords: 1, minimumContentionPairs: 1 };
 
-test("accepts a right-cleared fixture with isolated performance profiles", () => {
+test("accepts a right-cleared fixture with explicit prepared-state provenance", () => {
   const value = fixture();
   assert.equal(validatePerformanceFixture(value, smallAcceptance), value);
 });
@@ -66,6 +74,22 @@ test("rejects synthetic or uncleared commercial fixtures", () => {
   const uncleared = fixture();
   uncleared.right_cleared = false;
   assert.throws(() => validatePerformanceFixture(uncleared, smallAcceptance), /right_cleared must be true/);
+});
+
+test("requires explicit preparation protocol and prepared-state evidence", () => {
+  const badProtocol = fixture();
+  badProtocol.preparation_protocol_reference = "not namespaced";
+  assert.throws(() => validatePerformanceFixture(badProtocol, smallAcceptance), /preparation_protocol_reference must be a namespaced opaque reference/);
+
+  const badEvidence = fixture();
+  badEvidence.prepared_state_evidence_reference = "not namespaced";
+  assert.throws(() => validatePerformanceFixture(badEvidence, smallAcceptance), /prepared_state_evidence_reference must be a namespaced opaque reference/);
+});
+
+test("pins the pre-state semantics of every measured profile", () => {
+  const value = fixture();
+  value.profile_preconditions.replay = "active_current_expected_version";
+  assert.throws(() => validatePerformanceFixture(value, smallAcceptance), /profile_preconditions.replay/);
 });
 
 test("rejects sentinel identities and profile cross-contamination", () => {
