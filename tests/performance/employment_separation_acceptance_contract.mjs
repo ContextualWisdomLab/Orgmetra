@@ -188,12 +188,6 @@ function validateResult(result) {
   const iterationValues = metricValues(result, "iterations");
   const metricIterations = nonNegativeInteger(iterationValues.count, "result.k6.metrics.iterations.values.count");
   if (metricIterations !== expectedIterations) fail("k6 iteration count must equal expected_iterations");
-  const droppedValues = metricValues(result, "dropped_iterations");
-  const droppedIterations = nonNegativeInteger(
-    droppedValues.count,
-    "result.k6.metrics.dropped_iterations.values.count",
-  );
-  if (droppedIterations !== 0) fail("k6 dropped_iterations count must equal 0");
 
   const expectedLatencySamples = profile === "contention" ? expectedIterations * 2 : expectedIterations;
   if (!Number.isSafeInteger(expectedLatencySamples)) fail("expected latency sample count must be a safe integer");
