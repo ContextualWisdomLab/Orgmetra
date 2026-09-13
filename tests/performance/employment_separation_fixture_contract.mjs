@@ -62,7 +62,12 @@ function requireCommand(command, label) {
   const actor = requireString(value.actor_reference, `${label}.actor_reference`);
   if (!ACTOR_PATTERN.test(actor)) fail(`${label}.actor_reference must be a namespaced opaque reference`);
   const key = requireString(value.idempotency_key, `${label}.idempotency_key`);
-  if (key.length > 200) fail(`${label}.idempotency_key must not exceed 200 characters`);
+  if (key.length < 16 || key.length > 200 || [...key].some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 0x21 || code > 0x7e;
+  })) {
+    fail(`${label}.idempotency_key must be 16 to 200 visible ASCII characters`);
+  }
 
   const payload = requirePlainObject(value.payload, `${label}.payload`);
   requireExactKeys(payload, BODY_KEYS, `${label}.payload`);
