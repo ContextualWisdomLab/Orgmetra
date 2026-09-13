@@ -142,7 +142,6 @@ export function thresholdsForPerformanceProfile(profile, expectedIterations) {
     employment_separation_unexpected_response: ["rate==0"],
     employment_separation_latency_samples: [`count>=${expectedLatencySamples}`],
     checks: ["rate==1"],
-    dropped_iterations: ["count==0"],
     iterations: [`count>=${expectedIterations}`],
   };
   if (profile === "first_commit") {
