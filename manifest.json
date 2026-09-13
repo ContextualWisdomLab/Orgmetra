@@ -251,7 +251,7 @@
     },
     {
       "path": "docs/adr/0001-orgmetra-authoritative-hris-record.md",
-      "sha256": "0f8055b73c63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "sha256": "0f8055b73c63bd3130321415ad53233588ff952aabd1a88952b39c71747253572",
       "bytes": 6108,
       "lines": 53
     },
