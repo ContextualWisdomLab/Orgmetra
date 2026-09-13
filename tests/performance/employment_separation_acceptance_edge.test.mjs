@@ -58,13 +58,13 @@ function result(profile = "first_commit") {
   };
 }
 
-function runtime(resultText, profile = "first_commit") {
+function runtime(resultArtifact, profile = "first_commit") {
   return {
     schema_version: "orgmetra.employment_separation.runtime_evidence.v1",
     candidate_sha: "a".repeat(40),
     observed_service_sha: "a".repeat(40),
     selected_profile: profile,
-    performance_result_sha256: createHash("sha256").update(resultText, "utf8").digest("hex"),
+    performance_result_sha256: createHash("sha256").update(resultArtifact).digest("hex"),
     fixture_sha256: FIXTURE_SHA256,
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
@@ -88,32 +88,33 @@ function runtime(resultText, profile = "first_commit") {
 }
 
 function render(value) {
-  return `${JSON.stringify(value, null, 2)}\n`;
+  return Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
 function rejectResult(mutate, pattern = /./, profile = "first_commit") {
   const value = result(profile);
   mutate(value);
-  const text = render(value);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime(text, profile), FIXTURE_BYTES), pattern);
+  const artifact = render(value);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtime(artifact, profile), FIXTURE_BYTES), pattern);
 }
 
 function rejectRuntime(mutate, pattern = /./, profile = "first_commit") {
   const value = result(profile);
-  const text = render(value);
-  const evidence = runtime(text, profile);
+  const artifact = render(value);
+  const evidence = runtime(artifact, profile);
   mutate(evidence);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, evidence, FIXTURE_BYTES), pattern);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, evidence, FIXTURE_BYTES), pattern);
 }
 
 test("rejects malformed result and runtime containers", () => {
-  assert.throws(() => validateEmploymentSeparationAcceptance("", {}, FIXTURE_BYTES), /non-empty JSON text/);
-  assert.throws(() => validateEmploymentSeparationAcceptance(4, {}, FIXTURE_BYTES), /non-empty JSON text/);
-  assert.throws(() => validateEmploymentSeparationAcceptance("not json", {}, FIXTURE_BYTES), /valid JSON/);
-  assert.throws(() => validateEmploymentSeparationAcceptance("[]", {}, FIXTURE_BYTES), /result must be an object/);
-  const text = render(result());
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, [], FIXTURE_BYTES), /runtime must be an object/);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, null, FIXTURE_BYTES), /runtime must be an object/);
+  assert.throws(() => validateEmploymentSeparationAcceptance("", {}, FIXTURE_BYTES), /raw bytes/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(4, {}, FIXTURE_BYTES), /raw bytes/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(Buffer.alloc(0), {}, FIXTURE_BYTES), /non-empty JSON text/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(Buffer.from("not json", "utf8"), {}, FIXTURE_BYTES), /valid JSON/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(Buffer.from("[]", "utf8"), {}, FIXTURE_BYTES), /result must be an object/);
+  const artifact = render(result());
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, [], FIXTURE_BYTES), /runtime must be an object/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, null, FIXTURE_BYTES), /runtime must be an object/);
 });
 
 test("rejects invalid result authority and cardinality metadata", () => {
@@ -182,8 +183,8 @@ test("rejects invalid or non-monotonic latency distributions", () => {
 test("accepts non-first profiles without applying the first-commit latency target", () => {
   for (const profile of ["replay", "rejection", "contention"]) {
     const value = result(profile);
-    const text = render(value);
-    const accepted = validateEmploymentSeparationAcceptance(text, runtime(text, profile), FIXTURE_BYTES);
+    const artifact = render(value);
+    const accepted = validateEmploymentSeparationAcceptance(artifact, runtime(artifact, profile), FIXTURE_BYTES);
     assert.equal(accepted.selected_profile, profile);
     assert.equal(accepted.p95_ms, 80);
   }
