@@ -18,12 +18,14 @@ test("requires one explicit performance profile per run", () => {
 test("applies the commercial p95 threshold only to the ordinary first-commit profile", () => {
   assert.deepEqual(thresholdsForPerformanceProfile("first_commit", 1000), {
     employment_separation_unexpected_response: ["rate==0"],
+    employment_separation_latency_samples: ["count>=1000"],
     checks: ["rate==1"],
     iterations: ["count>=1000"],
     employment_separation_first_commit_duration_ms: ["p(95)<=20"],
   });
   assert.deepEqual(thresholdsForPerformanceProfile("contention", 100), {
     employment_separation_unexpected_response: ["rate==0"],
+    employment_separation_latency_samples: ["count>=200"],
     checks: ["rate==1"],
     iterations: ["count>=100"],
   });
