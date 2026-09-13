@@ -6,7 +6,7 @@ import { validateEmploymentSeparationAcceptance } from "./employment_separation_
 
 const candidateSha = "a".repeat(40);
 
-function performanceResult(latencySamples = 999) {
+function performanceResult(latencySamples = 1000, trendSamples = latencySamples) {
   return {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: candidateSha,
@@ -35,7 +35,7 @@ function performanceResult(latencySamples = 999) {
         employment_separation_unexpected_response: { values: { rate: 0 } },
         employment_separation_latency_samples: { values: { count: latencySamples } },
         employment_separation_first_commit_duration_ms: {
-          values: { "p(50)": 8, "p(95)": 18, "p(99)": 19, max: 22 },
+          values: { "p(50)": 8, "p(95)": 18, "p(99)": 19, max: 22, count: trendSamples },
         },
       },
     },
@@ -70,8 +70,8 @@ function runtimeEvidence(resultText) {
   };
 }
 
-test("rejects a complete iteration count with an incomplete latency sample", () => {
-  const value = performanceResult();
+test("rejects a complete iteration count with an incomplete latency counter", () => {
+  const value = performanceResult(999, 1000);
   const resultText = `${JSON.stringify(value, null, 2)}\n`;
   assert.throws(
     () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText)),
@@ -79,8 +79,17 @@ test("rejects a complete iteration count with an incomplete latency sample", () 
   );
 });
 
-test("accepts latency evidence only when every expected request contributed a sample", () => {
-  const value = performanceResult(1000);
+test("rejects a complete counter when the measured Trend itself is truncated", () => {
+  const value = performanceResult(1000, 999);
+  const resultText = `${JSON.stringify(value, null, 2)}\n`;
+  assert.throws(
+    () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText)),
+    /Trend sample count/,
+  );
+});
+
+test("accepts latency evidence only when every expected request contributed to the measured Trend", () => {
+  const value = performanceResult(1000, 1000);
   const resultText = `${JSON.stringify(value, null, 2)}\n`;
   const accepted = validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText));
   assert.equal(accepted.accepted, true);
