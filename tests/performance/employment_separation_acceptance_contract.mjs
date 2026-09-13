@@ -119,6 +119,21 @@ function decodeStrictUtf8(value, label) {
   return { bytes, text };
 }
 
+function parseJsonArtifact(value, label) {
+  const { bytes, text } = decodeStrictUtf8(value, label);
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${label} must be valid JSON`, { cause: error });
+  }
+  return {
+    bytes,
+    digest: createHash("sha256").update(bytes).digest("hex"),
+    parsed,
+  };
+}
+
 function metric(data, name) {
   const metrics = plainObject(data.k6, "result.k6").metrics;
   const table = plainObject(metrics, "result.k6.metrics");
@@ -210,19 +225,12 @@ function validateResult(result) {
 }
 
 function parseAndValidateFixture(fixtureArtifact, result, validatedResult) {
-  const { bytes, text: fixtureText } = decodeStrictUtf8(fixtureArtifact, "performance fixture");
-  const observedDigest = createHash("sha256").update(bytes).digest("hex");
-  if (observedDigest !== validatedResult.fixtureSha256) {
+  const fixtureDocument = parseJsonArtifact(fixtureArtifact, "performance fixture");
+  if (fixtureDocument.digest !== validatedResult.fixtureSha256) {
     fail("result.fixture_sha256 does not bind the supplied performance fixture");
   }
 
-  let parsed;
-  try {
-    parsed = JSON.parse(fixtureText);
-  } catch (error) {
-    throw new Error("performance fixture must be valid JSON", { cause: error });
-  }
-  const fixture = validatePerformanceFixture(parsed, {
+  const fixture = validatePerformanceFixture(fixtureDocument.parsed, {
     minimumNonContendingRecords: MINIMUM_NON_CONTENDING_RECORDS,
     minimumContentionPairs: MINIMUM_CONTENTION_PAIRS,
   });
@@ -247,10 +255,10 @@ function parseAndValidateFixture(fixtureArtifact, result, validatedResult) {
   if (expectedIterations !== result.expected_iterations) {
     fail("result.expected_iterations must equal the selected fixture profile cardinality");
   }
-  return observedDigest;
+  return fixtureDocument.digest;
 }
 
-function validateRuntimeEvidence(runtime, resultText, result, validatedResult, fixtureDigest) {
+function validateRuntimeEvidence(runtime, resultDigest, result, validatedResult, fixtureDigest) {
   if (runtime.schema_version !== RUNTIME_SCHEMA) fail("runtime.schema_version is unsupported");
   const candidateSha = sha(runtime.candidate_sha, "runtime.candidate_sha");
   const observedServiceSha = sha(runtime.observed_service_sha, "runtime.observed_service_sha");
@@ -259,8 +267,7 @@ function validateRuntimeEvidence(runtime, resultText, result, validatedResult, f
   if (runtime.selected_profile !== validatedResult.profile) fail("runtime.selected_profile must match result.selected_profile");
 
   const suppliedDigest = sha256(runtime.performance_result_sha256, "runtime.performance_result_sha256");
-  const observedDigest = createHash("sha256").update(resultText, "utf8").digest("hex");
-  if (suppliedDigest !== observedDigest) fail("runtime.performance_result_sha256 does not bind the supplied result artifact");
+  if (suppliedDigest !== resultDigest) fail("runtime.performance_result_sha256 does not bind the supplied result artifact");
   const runtimeFixtureDigest = sha256(runtime.fixture_sha256, "runtime.fixture_sha256");
   if (runtimeFixtureDigest !== fixtureDigest || runtimeFixtureDigest !== validatedResult.fixtureSha256) {
     fail("runtime.fixture_sha256 must match the exact validated performance fixture");
@@ -297,19 +304,19 @@ function validateRuntimeEvidence(runtime, resultText, result, validatedResult, f
   return suppliedDigest;
 }
 
-export function validateEmploymentSeparationAcceptance(resultText, runtimeEvidence, fixtureArtifact) {
-  if (typeof resultText !== "string" || resultText.trim() === "") fail("performance result must be non-empty JSON text");
-  let parsed;
-  try {
-    parsed = JSON.parse(resultText);
-  } catch (error) {
-    throw new Error("performance result must be valid JSON", { cause: error });
-  }
-  const result = plainObject(parsed, "result");
+export function validateEmploymentSeparationAcceptance(resultArtifact, runtimeEvidence, fixtureArtifact) {
+  const resultDocument = parseJsonArtifact(resultArtifact, "performance result");
+  const result = plainObject(resultDocument.parsed, "result");
   const runtime = plainObject(runtimeEvidence, "runtime");
   const validatedResult = validateResult(result);
   const fixtureDigest = parseAndValidateFixture(fixtureArtifact, result, validatedResult);
-  const resultDigest = validateRuntimeEvidence(runtime, resultText, result, validatedResult, fixtureDigest);
+  const resultDigest = validateRuntimeEvidence(
+    runtime,
+    resultDocument.digest,
+    result,
+    validatedResult,
+    fixtureDigest,
+  );
   return {
     accepted: true,
     candidate_sha: validatedResult.candidateSha,
