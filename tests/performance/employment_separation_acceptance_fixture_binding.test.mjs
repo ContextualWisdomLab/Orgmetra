@@ -8,6 +8,7 @@ import {
   ACCEPTANCE_PROFILE_PRECONDITIONS,
   acceptanceFixtureBytes,
   acceptanceFixtureSha256,
+  acceptanceLoadModel,
 } from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 function performanceResult(fixtureSha256, { includeFixtureDigest = true } = {}) {
@@ -19,6 +20,7 @@ function performanceResult(fixtureSha256, { includeFixtureDigest = true } = {}) 
     completed_iterations: 1000,
     sample_complete: true,
     completed_at: "2026-09-13T04:10:00Z",
+    load_model: acceptanceLoadModel(1000),
     dataset_id: "dataset:employment-separation-perf-1",
     clearance_reference: "data_clearance:perf-2026-09",
     preparation_protocol_reference: "protocol:employment-separation-perf-v1",
@@ -30,6 +32,7 @@ function performanceResult(fixtureSha256, { includeFixtureDigest = true } = {}) 
     k6: {
       metrics: {
         iterations: { values: { count: 1000 } },
+        dropped_iterations: { values: { count: 0 } },
         checks: { values: { rate: 1 } },
         employment_separation_unexpected_response: { values: { rate: 0 } },
         employment_separation_latency_samples: { values: { count: 1000 } },
