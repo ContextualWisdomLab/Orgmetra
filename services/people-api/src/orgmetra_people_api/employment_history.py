@@ -43,11 +43,6 @@ def _operational_uuid_scalar(field_name: str, value: object) -> int:
     return scalar
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require an exact UUID outside Orgmetra's reserved protocol sentinels."""
-    _operational_uuid_scalar(field_name, value)
-
-
 def _validate_utc_instant(field_name: str, value: object) -> None:
     """Require an exact datetime with Python's deterministic built-in UTC timezone."""
     if (
