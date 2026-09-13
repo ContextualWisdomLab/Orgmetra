@@ -639,7 +639,12 @@ components:
           format: date
         separation_reason_code:
           type: string
-          pattern: '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$'
+          enum:
+            - voluntary_resignation
+            - retirement_transition
+            - fixed_term_completion
+            - position_elimination
+            - employer_initiated_separation
         evidence_reference:
           type: string
           pattern: '^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$'
