@@ -111,7 +111,7 @@ test("canonical benchmark runner cannot publish stale or failed-run summary evid
   const runner = readFileSync(new URL("./run_employment_separation_benchmark.sh", import.meta.url), "utf8");
   assert.match(
     runner,
-    /summary_target=.*summary_path/,
+    /summary_target="\$\{summary_dir\}\/\$\{summary_name\}"/,
     "the requested result path must be treated as a final publication target",
   );
   assert.match(
