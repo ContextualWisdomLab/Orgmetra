@@ -68,22 +68,37 @@ test("canonical benchmark runner does not forward caller-controlled load-model e
   }
 });
 
-test("canonical benchmark runner binds the mounted workload to the exact clean candidate checkout", () => {
+test("canonical benchmark runner binds the mounted workload to an immutable exact-candidate snapshot", () => {
   const runner = readFileSync(new URL("./run_employment_separation_benchmark.sh", import.meta.url), "utf8");
   assert.match(
     runner,
     /git -C "\$\{repo_root\}" rev-parse --verify HEAD/,
-    "the mounted workload must be bound to an exact repository HEAD",
+    "the source repository must be checked against an exact HEAD before snapshotting",
   );
   assert.match(
     runner,
     /repository_head.*ORGMETRA_PERFORMANCE_TARGET_SHA|ORGMETRA_PERFORMANCE_TARGET_SHA.*repository_head/s,
-    "the exact mounted checkout must match the measured candidate SHA",
+    "the exact source checkout must match the measured candidate SHA",
   );
   assert.match(
     runner,
     /git -C "\$\{repo_root\}" status --porcelain=v1 --untracked-files=all/,
-    "commercial evidence must reject modified, staged, or untracked workload bytes",
+    "commercial evidence must reject modified, staged, or untracked source bytes",
+  );
+  assert.match(
+    runner,
+    /git -C "\$\{repo_root\}" archive --format=tar "\$\{target_sha\}"/,
+    "the executed workload must be materialized from the verified immutable candidate commit",
+  );
+  assert.doesNotMatch(
+    runner,
+    /--volume "\$\{repo_root\}:\/workspace:ro"/,
+    "the live host working tree must never be mounted as the executable workload",
+  );
+  assert.match(
+    runner,
+    /--volume "\$\{snapshot_dir\}:\/workspace:ro"/,
+    "Podman must mount only the immutable candidate snapshot at /workspace",
   );
 });
 
