@@ -107,6 +107,40 @@ test("canonical benchmark runner binds the mounted workload to an immutable exac
   );
 });
 
+test("canonical benchmark runner cannot publish stale or failed-run summary evidence", () => {
+  const runner = readFileSync(new URL("./run_employment_separation_benchmark.sh", import.meta.url), "utf8");
+  assert.match(
+    runner,
+    /summary_target=.*summary_path/,
+    "the requested result path must be treated as a final publication target",
+  );
+  assert.match(
+    runner,
+    /if \[\[ -e "\$\{summary_target\}" \|\| -L "\$\{summary_target\}" \]\]/,
+    "a pre-existing result artifact must fail closed instead of surviving a failed rerun",
+  );
+  assert.match(
+    runner,
+    /mktemp -d .*orgmetra-employment-separation-performance/,
+    "k6 must write into a private per-run staging directory",
+  );
+  assert.doesNotMatch(
+    runner,
+    /--volume "\$\{summary_dir\}:\/output:rw"/,
+    "k6 must not write directly into the caller-visible result directory",
+  );
+  assert.match(
+    runner,
+    /\[\[ ! -f "\$\{summary_run_file\}" \|\| -L "\$\{summary_run_file\}" \|\| ! -s "\$\{summary_run_file\}" \]\]/,
+    "the staged result must be a non-empty regular file",
+  );
+  assert.match(
+    runner,
+    /ln "\$\{summary_run_file\}" "\$\{summary_target\}"/,
+    "publication must use a no-clobber atomic link so a concurrent stale artifact cannot win",
+  );
+});
+
 test("canonical benchmark runner rejects CLI overrides before any Podman dependency is needed", () => {
   const runnerPath = fileURLToPath(new URL("./run_employment_separation_benchmark.sh", import.meta.url));
   const result = spawnSync("bash", [runnerPath, "--duration", "1s"], {
