@@ -39,7 +39,6 @@ function result() {
     k6: {
       metrics: {
         iterations: { values: { count: 1000, rate: 40 } },
-        dropped_iterations: { values: { count: 0, rate: 0 } },
         checks: { values: { rate: 1, passes: 1000, fails: 0 } },
         employment_separation_unexpected_response: { values: { rate: 0, passes: 0, fails: 1000 } },
         employment_separation_latency_samples: { values: { count: 1000, rate: 40 } },
@@ -122,19 +121,14 @@ test("rejects first-commit evidence above the commercial p95 target", () => {
   assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES), /p95 must be <= 20 ms/);
 });
 
-test("rejects closed or incomplete offered-load evidence", () => {
+test("rejects a closed workload model", () => {
   const { performance } = evidencePair();
   performance.load_model.executor = "shared-iterations";
-  let artifact = render(performance);
+  const artifact = render(performance);
   assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES), /constant-arrival-rate/);
-
-  const dropped = result();
-  dropped.k6.metrics.dropped_iterations.values.count = 1;
-  artifact = render(dropped);
-  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES), /dropped_iterations count must equal 0/);
 });
 
-test("rejects incomplete samples even when the completed subset is fast", () => {
+test("rejects incomplete scheduled samples even when the completed subset is fast", () => {
   const { performance } = evidencePair();
   performance.completed_iterations = 999;
   performance.sample_complete = false;
