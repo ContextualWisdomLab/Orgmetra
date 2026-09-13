@@ -93,12 +93,11 @@ test("fails closed when the k6 client is routed through an ambient proxy", () =>
   );
 });
 
-test("applies the commercial p95 threshold only to the ordinary first-commit profile", () => {
+test("uses exact scheduled completion rather than a zero-sample dropped-iteration threshold", () => {
   assert.deepEqual(thresholdsForPerformanceProfile("first_commit", 1000), {
     employment_separation_unexpected_response: ["rate==0"],
     employment_separation_latency_samples: ["count>=1000"],
     checks: ["rate==1"],
-    dropped_iterations: ["count==0"],
     iterations: ["count>=1000"],
     employment_separation_first_commit_duration_ms: ["p(95)<=20"],
   });
@@ -106,7 +105,6 @@ test("applies the commercial p95 threshold only to the ordinary first-commit pro
     employment_separation_unexpected_response: ["rate==0"],
     employment_separation_latency_samples: ["count>=200"],
     checks: ["rate==1"],
-    dropped_iterations: ["count==0"],
     iterations: ["count>=100"],
   });
 });
