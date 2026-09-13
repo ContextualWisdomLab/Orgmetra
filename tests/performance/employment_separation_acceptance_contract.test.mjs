@@ -181,3 +181,16 @@ test("rejects byte-distinct result artifacts that collide after lossy UTF-8 deco
     );
   }
 });
+
+test("local validator cannot emit a commercial acceptance receipt from caller-consistent replacement artifacts", () => {
+  const replacement = result();
+  replacement.dataset_id = "dataset:employment-separation-perf-substituted";
+  const artifact = render(replacement);
+  const structuralEvidence = validateEmploymentSeparationAcceptance(
+    artifact,
+    runtimeEvidence(artifact),
+    FIXTURE_BYTES,
+  );
+  assert.equal(structuralEvidence.structurally_valid, true);
+  assert.equal(Object.hasOwn(structuralEvidence, "accepted"), false);
+});
