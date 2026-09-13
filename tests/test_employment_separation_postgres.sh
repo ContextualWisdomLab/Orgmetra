@@ -394,6 +394,31 @@ if [[ ${assignment_status} -eq 0 || "${assignment_output}" != *"assignment coord
     exit 1
 fi
 
+set +e
+unreviewed_reason_output="$({ tenant_psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT * FROM public.separate_employment_record_once(
+    '${TENANT_ID}'::uuid,
+    '${PERSON_ID}'::uuid,
+    '00000000-0000-7000-8000-000000000102'::uuid,
+    '00000000-0000-7000-8000-000000000202'::uuid,
+    DATE '2026-08-01',
+    'manager_notes_compensation_case',
+    'separation_packet:sep-unreviewed-reason',
+    'v1',
+    'keyverse_subject:operator-17',
+    'workforce_admin',
+    'human_confirmation:separation-unreviewed-reason',
+    'employment-separation-key-unreviewed-reason',
+    '00000000-0000-4000-8000-000000000510'::uuid,
+    '00000000-0000-4000-8000-000000000610'::uuid
+);"; } 2>&1)"
+unreviewed_reason_status=$?
+set -e
+if [[ ${unreviewed_reason_status} -eq 0 || "${unreviewed_reason_output}" != *"reason code is invalid"* ]]; then
+    echo "unreviewed separation reason was not rejected before mutation: ${unreviewed_reason_output}" >&2
+    exit 1
+fi
+
 first_concurrent_output="$(mktemp)"
 second_concurrent_output="$(mktemp)"
 cleanup() {
