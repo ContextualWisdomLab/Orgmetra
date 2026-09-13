@@ -21,8 +21,8 @@ function result(profile = "first_commit") {
   const iterations = profile === "contention" ? 100 : 1000;
   const latencySamples = profile === "contention" ? iterations * 2 : iterations;
   const trend = profile === "first_commit"
-    ? { "p(50)": 8, "p(95)": 18, "p(99)": 19, max: 22 }
-    : { "p(50)": 30, "p(95)": 80, "p(99)": 100, max: 120 };
+    ? { "p(50)": 8, "p(95)": 18, "p(99)": 19, max: 22, count: latencySamples }
+    : { "p(50)": 30, "p(95)": 80, "p(99)": 100, max: 120, count: latencySamples };
   return {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: "a".repeat(40),
@@ -143,6 +143,12 @@ test("rejects malformed k6 metric containers and iteration evidence", () => {
   rejectResult(
     (value) => { value.k6.metrics.employment_separation_latency_samples.values.count = 199; },
     /latency sample count/,
+    "contention",
+  );
+  rejectResult((value) => { value.k6.metrics.employment_separation_first_commit_duration_ms.values.count = 999; }, /Trend sample count/);
+  rejectResult(
+    (value) => { value.k6.metrics.employment_separation_contention_duration_ms.values.count = 199; },
+    /Trend sample count/,
     "contention",
   );
 });
