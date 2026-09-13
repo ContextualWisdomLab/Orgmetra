@@ -49,13 +49,17 @@ function result() {
   };
 }
 
-function runtime(resultText) {
+function render(value) {
+  return Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function runtime(resultArtifact) {
   return {
     schema_version: "orgmetra.employment_separation.runtime_evidence.v1",
     candidate_sha: "a".repeat(40),
     observed_service_sha: "a".repeat(40),
     selected_profile: "first_commit",
-    performance_result_sha256: createHash("sha256").update(resultText, "utf8").digest("hex"),
+    performance_result_sha256: createHash("sha256").update(resultArtifact).digest("hex"),
     fixture_sha256: FIXTURE_SHA256,
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
@@ -81,8 +85,8 @@ function runtime(resultText) {
 function reject(mutate, pattern) {
   const value = result();
   mutate(value);
-  const text = `${JSON.stringify(value, null, 2)}\n`;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime(text), FIXTURE_BYTES), pattern);
+  const artifact = render(value);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtime(artifact), FIXTURE_BYTES), pattern);
 }
 
 test("requires right-cleared dataset and preparation provenance references", () => {
