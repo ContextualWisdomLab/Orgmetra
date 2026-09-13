@@ -179,9 +179,9 @@
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "82b2d3e70cec371ef35e9e0f982ac40fef84351976bc04b863b81d27023d5a62",
-      "bytes": 11189,
-      "lines": 71
+      "sha256": "5743ac3b19da47acfd08f65f0a9125bff5775fa619bf2022f08dd0e880ce4003",
+      "bytes": 15247,
+      "lines": 95
     },
     {
       "path": "docs/PRD.md",
@@ -209,9 +209,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "d0a0bc3b54ed0fc7973747987f1afb117d6144c390b51ed9370eb571972a33f8",
-      "bytes": 16534,
-      "lines": 135
+      "sha256": "c3bd4be0ac6671cc4909a65723c5c846a3bf1c06ea0b0462b387ddfa27be5382",
+      "bytes": 20692,
+      "lines": 150
     },
     {
       "path": "docs/THREAT_MODEL.md",
