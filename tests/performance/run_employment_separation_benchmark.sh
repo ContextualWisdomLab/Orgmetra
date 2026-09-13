@@ -123,7 +123,22 @@ if [[ ! -f "${summary_run_file}" || -L "${summary_run_file}" || ! -s "${summary_
   printf 'successful k6 execution did not produce one non-empty regular summary artifact\n' >&2
   exit 1
 fi
+summary_source_identity="$(stat --printf='%d:%i:%s' -- "${summary_run_file}")"
+summary_source_digest="$(sha256sum -- "${summary_run_file}" | awk '{print $1}')"
 if ! ln "${summary_run_file}" "${summary_target}"; then
   printf 'failed to publish benchmark summary without clobbering an existing artifact: %s\n' "${summary_target}" >&2
+  exit 1
+fi
+summary_source_identity_after="$(stat --printf='%d:%i:%s' -- "${summary_run_file}" 2>/dev/null || true)"
+summary_source_digest_after="$(sha256sum -- "${summary_run_file}" 2>/dev/null | awk '{print $1}' || true)"
+summary_target_identity="$(stat --printf='%d:%i:%s' -- "${summary_target}" 2>/dev/null || true)"
+summary_target_digest="$(sha256sum -- "${summary_target}" 2>/dev/null | awk '{print $1}' || true)"
+if [[ -z "${summary_source_identity_after}" || -z "${summary_source_digest_after}" || -z "${summary_target_identity}" || -z "${summary_target_digest}" \
+  || "${summary_source_identity}" != "${summary_source_identity_after}" \
+  || "${summary_source_identity}" != "${summary_target_identity}" \
+  || "${summary_source_digest}" != "${summary_source_digest_after}" \
+  || "${summary_source_digest}" != "${summary_target_digest}" ]]; then
+  rm -f -- "${summary_target}"
+  printf 'benchmark summary changed during publication; refusing unbound result evidence\n' >&2
   exit 1
 fi
