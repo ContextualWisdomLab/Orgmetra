@@ -101,6 +101,26 @@ test("matches the production Idempotency-Key length and visible-ASCII contract",
   assert.throws(() => validatePerformanceFixture(hiddenByte, smallAcceptance), /16 to 200 visible ASCII/);
 });
 
+test("rejects fixture values the HTTP and application boundaries would reject", () => {
+  const badDate = fixture();
+  badDate.profiles.first_commit[0].payload.separation_effective_on = "2026-02-30";
+  assert.throws(() => validatePerformanceFixture(badDate, smallAcceptance), /RFC 3339 full-date/);
+
+  const badEvidence = fixture();
+  badEvidence.profiles.first_commit[0].payload.evidence_reference = "not namespaced";
+  assert.throws(() => validatePerformanceFixture(badEvidence, smallAcceptance), /namespaced opaque reference/);
+
+  const badVersion = fixture();
+  badVersion.profiles.first_commit[0].payload.evidence_version_code = "version with spaces";
+  assert.throws(() => validatePerformanceFixture(badVersion, smallAcceptance), /whitespace-free version token/);
+});
+
+test("rejects bearer values that the production authentication boundary would reject", () => {
+  const value = command(10);
+  assert.throws(() => requestHeaders(value, "has space"), /visible ASCII/);
+  assert.throws(() => requestHeaders(value, `token${"x".repeat(8192)}`), /visible ASCII/);
+});
+
 test("builds the exact published separation request without storing bearer credentials in fixtures", () => {
   const value = command(9, "exact-key-00000001");
   const headers = requestHeaders(value, "opaque-token");
