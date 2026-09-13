@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { TextDecoder } from "node:util";
 
 import { validatePerformanceFixture } from "./employment_separation_fixture_contract.mjs";
 
@@ -100,6 +101,24 @@ function finiteNumber(value, label, { minimum = 0, maximum = Number.POSITIVE_INF
   return value;
 }
 
+function rawBytes(value, label) {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  fail(`${label} must be supplied as raw bytes`);
+}
+
+function decodeStrictUtf8(value, label) {
+  const bytes = rawBytes(value, label);
+  let text;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch (error) {
+    throw new Error(`${label} must be valid UTF-8`, { cause: error });
+  }
+  if (text.trim() === "") fail(`${label} must be non-empty JSON text`);
+  return { bytes, text };
+}
+
 function metric(data, name) {
   const metrics = plainObject(data.k6, "result.k6").metrics;
   const table = plainObject(metrics, "result.k6.metrics");
@@ -190,8 +209,13 @@ function validateResult(result) {
   return { candidateSha, fixtureSha256, profile, p95, completedAt };
 }
 
-function parseAndValidateFixture(fixtureText, result, validatedResult) {
-  if (typeof fixtureText !== "string" || fixtureText.trim() === "") fail("performance fixture must be non-empty JSON text");
+function parseAndValidateFixture(fixtureArtifact, result, validatedResult) {
+  const { bytes, text: fixtureText } = decodeStrictUtf8(fixtureArtifact, "performance fixture");
+  const observedDigest = createHash("sha256").update(bytes).digest("hex");
+  if (observedDigest !== validatedResult.fixtureSha256) {
+    fail("result.fixture_sha256 does not bind the supplied performance fixture");
+  }
+
   let parsed;
   try {
     parsed = JSON.parse(fixtureText);
@@ -202,10 +226,6 @@ function parseAndValidateFixture(fixtureText, result, validatedResult) {
     minimumNonContendingRecords: MINIMUM_NON_CONTENDING_RECORDS,
     minimumContentionPairs: MINIMUM_CONTENTION_PAIRS,
   });
-  const observedDigest = createHash("sha256").update(fixtureText, "utf8").digest("hex");
-  if (observedDigest !== validatedResult.fixtureSha256) {
-    fail("result.fixture_sha256 does not bind the supplied performance fixture");
-  }
   if (fixture.candidate_sha.toLowerCase() !== validatedResult.candidateSha) {
     fail("fixture.candidate_sha must match result.candidate_sha");
   }
@@ -277,7 +297,7 @@ function validateRuntimeEvidence(runtime, resultText, result, validatedResult, f
   return suppliedDigest;
 }
 
-export function validateEmploymentSeparationAcceptance(resultText, runtimeEvidence, fixtureText) {
+export function validateEmploymentSeparationAcceptance(resultText, runtimeEvidence, fixtureArtifact) {
   if (typeof resultText !== "string" || resultText.trim() === "") fail("performance result must be non-empty JSON text");
   let parsed;
   try {
@@ -288,7 +308,7 @@ export function validateEmploymentSeparationAcceptance(resultText, runtimeEviden
   const result = plainObject(parsed, "result");
   const runtime = plainObject(runtimeEvidence, "runtime");
   const validatedResult = validateResult(result);
-  const fixtureDigest = parseAndValidateFixture(fixtureText, result, validatedResult);
+  const fixtureDigest = parseAndValidateFixture(fixtureArtifact, result, validatedResult);
   const resultDigest = validateRuntimeEvidence(runtime, resultText, result, validatedResult, fixtureDigest);
   return {
     accepted: true,
