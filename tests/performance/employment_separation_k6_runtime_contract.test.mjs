@@ -107,6 +107,22 @@ test("canonical benchmark runner binds the mounted workload to an immutable exac
   );
 });
 
+test("canonical benchmark runner maps host evidence ownership to the pinned non-root k6 user", () => {
+  const runner = readFileSync(new URL("./run_employment_separation_benchmark.sh", import.meta.url), "utf8");
+  assert.match(runner, /readonly PINNED_K6_CONTAINER_UID="12345"/);
+  assert.match(runner, /readonly PINNED_K6_CONTAINER_GID="12345"/);
+  assert.match(
+    runner,
+    /podman image inspect --format '\{\{\.Config\.User\}\}' "\$\{PINNED_K6_RUNNER_IDENTITY\}"/,
+    "the pinned OCI image's configured non-root user must be verified before measurement",
+  );
+  assert.match(
+    runner,
+    /--userns="keep-id:uid=\$\{PINNED_K6_CONTAINER_UID\},gid=\$\{PINNED_K6_CONTAINER_GID\}"/,
+    "the invoking host owner must map to k6 UID/GID so private fixture and staging paths remain usable without world-writable permissions",
+  );
+});
+
 test("canonical benchmark runner cannot publish stale or failed-run summary evidence", () => {
   const runner = readFileSync(new URL("./run_employment_separation_benchmark.sh", import.meta.url), "utf8");
   assert.match(
