@@ -31,6 +31,7 @@ function result() {
         iterations: { values: { count: 1000, rate: 40 } },
         checks: { values: { rate: 1, passes: 1000, fails: 0 } },
         employment_separation_unexpected_response: { values: { rate: 0, passes: 0, fails: 1000 } },
+        employment_separation_latency_samples: { values: { count: 1000, rate: 40 } },
         employment_separation_first_commit_duration_ms: {
           values: { "p(50)": 8.1, "p(95)": 18.4, "p(99)": 19.7, max: 22.3 },
         },
@@ -109,6 +110,7 @@ test("rejects incomplete samples even when the completed subset is fast", () => 
   performance.completed_iterations = 999;
   performance.sample_complete = false;
   performance.k6.metrics.iterations.values.count = 999;
+  performance.k6.metrics.employment_separation_latency_samples.values.count = 999;
   const text = `${JSON.stringify(performance, null, 2)}\n`;
   assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text)), /sample must be complete/);
 });
