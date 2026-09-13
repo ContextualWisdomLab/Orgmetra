@@ -193,7 +193,7 @@ function validateResult(result) {
   if (expectedIterations < minimumIterations) {
     fail(`${profile} requires at least ${minimumIterations} iterations`);
   }
-  const loadModel = validatePerformanceLoadModel(result.load_model, expectedIterations);
+  const loadModel = validatePerformanceLoadModel(result.load_model, expectedIterations, profile);
   const completedIterations = nonNegativeInteger(result.completed_iterations, "result.completed_iterations");
   if (result.sample_complete !== true || completedIterations !== expectedIterations) {
     fail("result sample must be complete");
@@ -297,6 +297,7 @@ function validateRuntimeEvidence(runtime, resultDigest, result, validatedResult,
   const observedLoadModel = validatePerformanceLoadModel(
     runtime.observed_load_model,
     validatedResult.expectedIterations,
+    validatedResult.profile,
   );
   sameLoadModel(observedLoadModel, validatedResult.loadModel);
   const resourceReference = reference(runtime.resource_evidence_reference, "runtime.resource_evidence_reference");
