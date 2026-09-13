@@ -19,6 +19,7 @@ const PROFILE_PRECONDITIONS = Object.freeze({
 
 function result(profile = "first_commit") {
   const iterations = profile === "contention" ? 100 : 1000;
+  const latencySamples = profile === "contention" ? iterations * 2 : iterations;
   const trend = profile === "first_commit"
     ? { "p(50)": 8, "p(95)": 18, "p(99)": 19, max: 22 }
     : { "p(50)": 30, "p(95)": 80, "p(99)": 100, max: 120 };
@@ -43,6 +44,7 @@ function result(profile = "first_commit") {
         iterations: { values: { count: iterations } },
         checks: { values: { rate: 1 } },
         employment_separation_unexpected_response: { values: { rate: 0 } },
+        employment_separation_latency_samples: { values: { count: latencySamples } },
         [TREND_BY_PROFILE[profile]]: { values: trend },
       },
     },
@@ -136,6 +138,13 @@ test("rejects malformed k6 metric containers and iteration evidence", () => {
   rejectResult((value) => { delete value.k6.metrics.iterations; }, /iterations must be an object/);
   rejectResult((value) => { value.k6.metrics.iterations.values = []; }, /iterations.values must be an object/);
   rejectResult((value) => { value.k6.metrics.iterations.values.count = 999; }, /iteration count/);
+  rejectResult((value) => { delete value.k6.metrics.employment_separation_latency_samples; }, /latency_samples must be an object/);
+  rejectResult((value) => { value.k6.metrics.employment_separation_latency_samples.values.count = 999; }, /latency sample count/);
+  rejectResult(
+    (value) => { value.k6.metrics.employment_separation_latency_samples.values.count = 199; },
+    /latency sample count/,
+    "contention",
+  );
 });
 
 test("rejects invalid success and unexpected-response rates", () => {
