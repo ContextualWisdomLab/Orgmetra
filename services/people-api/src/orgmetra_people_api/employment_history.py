@@ -250,7 +250,8 @@ def _reject_effective_overlap(records: list[EmploymentHistoryRecord]) -> None:
 
 
 def _capture_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHistoryRecord:
-    """Reconstruct and validate one persistence-owned Employment row."""
+    """Validate raw scalar state before reconstructing a trusted Employment row."""
+    record.assert_runtime_integrity()
     return EmploymentHistoryRecord(
         tenant_record_id=record.tenant_record_id,
         person_record_id=record.person_record_id,
@@ -272,7 +273,9 @@ def _snapshot_persistence_record(record: EmploymentHistoryRecord) -> EmploymentH
     built-in integers and exposes a fresh UUID view for each read. A persistence
     adapter therefore cannot rewrite the row by retaining either the constructor
     UUID objects or a UUID obtained from a record property. Reconstruction is still
-    mandatory because low-level tuple construction can bypass ``__new__``.
+    mandatory because low-level tuple construction can bypass ``__new__``. Raw
+    scalar state is validated before any UUID view is reconstructed so forged
+    values cannot execute through ``UUID(int=...)`` first.
 
     This in-process integrity boundary does not replace a transactional database
     snapshot, MVCC, locking, or the persistence layer's own concurrency controls.
