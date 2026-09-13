@@ -6,6 +6,8 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const REFERENCE_PATTERN = /^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$/;
 const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+const MINIMUM_NON_CONTENDING_RECORDS = 1000;
+const MINIMUM_CONTENTION_PAIRS = 100;
 const PROFILE_TRENDS = Object.freeze({
   first_commit: "employment_separation_first_commit_duration_ms",
   replay: "employment_separation_replay_duration_ms",
@@ -92,7 +94,18 @@ function validateResult(result) {
   const trendName = PROFILE_TRENDS[profile];
   if (!trendName) fail("result.selected_profile is unsupported");
 
+  if (result.minimum_non_contending_records !== MINIMUM_NON_CONTENDING_RECORDS) {
+    fail(`result.minimum_non_contending_records must equal ${MINIMUM_NON_CONTENDING_RECORDS}`);
+  }
+  if (result.minimum_contention_pairs !== MINIMUM_CONTENTION_PAIRS) {
+    fail(`result.minimum_contention_pairs must equal ${MINIMUM_CONTENTION_PAIRS}`);
+  }
+
   const expectedIterations = positiveInteger(result.expected_iterations, "result.expected_iterations");
+  const minimumIterations = profile === "contention" ? MINIMUM_CONTENTION_PAIRS : MINIMUM_NON_CONTENDING_RECORDS;
+  if (expectedIterations < minimumIterations) {
+    fail(`${profile} requires at least ${minimumIterations} iterations`);
+  }
   const completedIterations = nonNegativeInteger(result.completed_iterations, "result.completed_iterations");
   if (result.sample_complete !== true || completedIterations !== expectedIterations) {
     fail("result sample must be complete");
