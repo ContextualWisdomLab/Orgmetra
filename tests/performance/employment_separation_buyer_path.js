@@ -168,7 +168,6 @@ export function handleSummary(data) {
     dataset_id: fixture.dataset_id,
     clearance_reference: fixture.clearance_reference,
     resource_evidence_reference: fixture.resource_evidence_reference,
-    base_url: baseUrl,
     minimum_non_contending_records: MINIMUM_NON_CONTENDING_RECORDS,
     minimum_contention_pairs: MINIMUM_CONTENTION_PAIRS,
     k6: data,
