@@ -161,21 +161,21 @@
     },
     {
       "path": "docs/API_CONTRACT.md",
-      "sha256": "63533dff785da62b89e585d742a158e2aeb05913644f2bf9fb6486f281c2e589",
-      "bytes": 4555,
-      "lines": 76
+      "sha256": "8b2114c60f083882f1aea3212bd5c421bada845bed18d7c7e8312f563d145165",
+      "bytes": 6705,
+      "lines": 95
     },
     {
       "path": "docs/DATA_MODEL.md",
-      "sha256": "6ad29731ae7ee7aa5bf3a2d0bfef88894a35a2550edb2be3244d6f143d76444a",
-      "bytes": 13366,
-      "lines": 85
+      "sha256": "d553a9fa105f437ccb79bebec2d028ee0e108846dd3f6386bde9613c75b6236f",
+      "bytes": 15960,
+      "lines": 96
     },
     {
       "path": "docs/ERD.md",
-      "sha256": "546001aa85c4fe020e0c39d881dc860daf7f69090596666fdf9092487b0725fe",
-      "bytes": 6964,
-      "lines": 70
+      "sha256": "3ce3da4fd1c099fca1e115b83f59bf64a30fa1622e5fbd1cf516d8eff11691d6",
+      "bytes": 8992,
+      "lines": 80
     },
     {
       "path": "docs/OPERABILITY.md",
@@ -185,9 +185,9 @@
     },
     {
       "path": "docs/PRD.md",
-      "sha256": "3ad85ae633cce0fc7a93af39b21d7a7c70bb2efa786da6b12f3c5327906e34f1",
-      "bytes": 5490,
-      "lines": 111
+      "sha256": "9a4af723b1d039e11521a2e408ff746eb699b9bfceea9521f5c3636c1b523c96",
+      "bytes": 8283,
+      "lines": 124
     },
     {
       "path": "docs/SECURITY.md",
@@ -227,15 +227,15 @@
     },
     {
       "path": "docs/TRD.md",
-      "sha256": "23697d88a4882698e1a2782b7da3f2ccd0d3cd2d6d1bffe89b6597dc16851077",
-      "bytes": 9064,
-      "lines": 101
+      "sha256": "cea2c7b9f1c0679177152af2fad7e17afe00f6229e6cd6e3888645bec5c46e59",
+      "bytes": 13588,
+      "lines": 124
     },
     {
       "path": "docs/UML.md",
-      "sha256": "fe67c37aa88e5814ceb2db7e8f7d8d85ca27a994802efbb7c75164b387adf0a9",
-      "bytes": 5528,
-      "lines": 122
+      "sha256": "6cc63124d3a2ef1b2a91910386ad54ea13151a76483d1e276e587380f0d1b0f6",
+      "bytes": 8528,
+      "lines": 163
     },
     {
       "path": "docs/USER_STORIES.md",
@@ -251,7 +251,7 @@
     },
     {
       "path": "docs/adr/0001-orgmetra-authoritative-hris-record.md",
-      "sha256": "0f8055b73c63d3130321415ad53233588ff952aabd1a88952b39c71747253572",
+      "sha256": "0f8055b73c63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
       "bytes": 6108,
       "lines": 53
     },
