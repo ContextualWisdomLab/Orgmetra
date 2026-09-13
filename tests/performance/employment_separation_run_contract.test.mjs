@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
   PERFORMANCE_SUMMARY_TREND_STATS,
   arrivalRateScenarioForPerformanceProfile,
+  requireDirectPerformanceClientNetwork,
   requirePerformanceProfile,
   thresholdsForPerformanceProfile,
+  validatePerformanceLoadModel,
 } from "./employment_separation_run_contract.mjs";
 
 test("requires one explicit performance profile per run", () => {
@@ -42,7 +45,7 @@ test("refuses arrival schedules that can hide load or outrun fixture cardinality
     durationSeconds: 49,
     preAllocatedVUs: 20,
     maxVUs: 80,
-  }), /must equal the selected fixture iteration count exactly/);
+  }), /must equal expectedIterations exactly/);
   assert.throws(() => arrivalRateScenarioForPerformanceProfile("contention", {
     expectedIterations: 100,
     targetRps: 10,
@@ -50,6 +53,44 @@ test("refuses arrival schedules that can hide load or outrun fixture cardinality
     preAllocatedVUs: 20,
     maxVUs: 10,
   }), /greater than or equal/);
+});
+
+test("binds result evidence to the exact open load model", () => {
+  assert.deepEqual(validatePerformanceLoadModel({
+    executor: "constant-arrival-rate",
+    target_rps: 20,
+    duration_seconds: 50,
+    preallocated_vus: 20,
+    max_vus: 80,
+    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
+  }, 1000), {
+    executor: "constant-arrival-rate",
+    target_rps: 20,
+    duration_seconds: 50,
+    preallocated_vus: 20,
+    max_vus: 80,
+    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
+  });
+  assert.throws(() => validatePerformanceLoadModel({
+    executor: "shared-iterations",
+    target_rps: 20,
+    duration_seconds: 50,
+    preallocated_vus: 20,
+    max_vus: 80,
+    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
+  }, 1000), /constant-arrival-rate/);
+});
+
+test("fails closed when the k6 client is routed through an ambient proxy", () => {
+  assert.equal(requireDirectPerformanceClientNetwork({}), PERFORMANCE_CLIENT_NETWORK_TOPOLOGY);
+  assert.throws(
+    () => requireDirectPerformanceClientNetwork({ HTTPS_PROXY: "https://proxy.example" }),
+    /HTTPS_PROXY must be unset/,
+  );
+  assert.throws(
+    () => requireDirectPerformanceClientNetwork({ all_proxy: "socks5://proxy.example" }),
+    /all_proxy must be unset/,
+  );
 });
 
 test("applies the commercial p95 threshold only to the ordinary first-commit profile", () => {
