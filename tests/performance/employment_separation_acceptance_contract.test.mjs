@@ -99,6 +99,7 @@ test("rejects a result artifact that is not the one observed by the runtime evid
 test("rejects first-commit evidence above the commercial p95 target", () => {
   const { performance } = evidencePair();
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values["p(95)"] = 20.001;
+  performance.k6.metrics.employment_separation_first_commit_duration_ms.values["p(99)"] = 21;
   const text = `${JSON.stringify(performance, null, 2)}\n`;
   assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text)), /p95 must be <= 20 ms/);
 });
