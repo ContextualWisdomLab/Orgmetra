@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { PERFORMANCE_CLIENT_NETWORK_TOPOLOGY } from "./employment_separation_run_contract.mjs";
+
 export const ACCEPTANCE_CANDIDATE_SHA = "a".repeat(40);
 export const ACCEPTANCE_PROFILE_PRECONDITIONS = Object.freeze({
   first_commit: "active_current_expected_version",
@@ -33,6 +35,17 @@ function command(index, keySuffix = "only") {
 
 function records(start, count) {
   return Array.from({ length: count }, (_, offset) => command(start + offset));
+}
+
+export function acceptanceLoadModel(expectedIterations) {
+  return {
+    executor: "constant-arrival-rate",
+    target_rps: 1,
+    duration_seconds: expectedIterations,
+    preallocated_vus: 1,
+    max_vus: 1,
+    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
+  };
 }
 
 export function acceptanceFixture({ rightCleared = true, synthetic = false } = {}) {
