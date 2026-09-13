@@ -3,11 +3,19 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
+import {
+  acceptanceFixtureSha256,
+  acceptanceFixtureText,
+} from "./employment_separation_acceptance_fixture_test_support.mjs";
+
+const FIXTURE_TEXT = acceptanceFixtureText();
+const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_TEXT);
 
 function result() {
   return {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: "a".repeat(40),
+    fixture_sha256: FIXTURE_SHA256,
     selected_profile: "first_commit",
     expected_iterations: 1000,
     completed_iterations: 1000,
@@ -47,6 +55,7 @@ function runtimeEvidence(resultText) {
     observed_service_sha: "a".repeat(40),
     selected_profile: "first_commit",
     performance_result_sha256: createHash("sha256").update(resultText, "utf8").digest("hex"),
+    fixture_sha256: FIXTURE_SHA256,
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
     observer_reference: "observer:perf-runtime-1",
@@ -74,12 +83,13 @@ function evidencePair() {
   return { performance, text, runtime: runtimeEvidence(text) };
 }
 
-test("accepts an exact candidate result only with bound deployment, resource, and cleanup evidence", () => {
+test("accepts an exact candidate result only with bound fixture, deployment, resource, and cleanup evidence", () => {
   const { text, runtime } = evidencePair();
-  assert.deepEqual(validateEmploymentSeparationAcceptance(text, runtime), {
+  assert.deepEqual(validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_TEXT), {
     accepted: true,
     candidate_sha: "a".repeat(40),
     selected_profile: "first_commit",
+    fixture_sha256: FIXTURE_SHA256,
     performance_result_sha256: runtime.performance_result_sha256,
     p95_ms: 18.4,
   });
@@ -88,13 +98,13 @@ test("accepts an exact candidate result only with bound deployment, resource, an
 test("rejects a self-declared target when the observed service revision differs", () => {
   const { text, runtime } = evidencePair();
   runtime.observed_service_sha = "b".repeat(40);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime), /observed_service_sha must match candidate_sha/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_TEXT), /observed_service_sha must match candidate_sha/);
 });
 
 test("rejects a result artifact that is not the one observed by the runtime evidence", () => {
   const { text, runtime } = evidencePair();
   runtime.performance_result_sha256 = "0".repeat(64);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime), /performance_result_sha256/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_TEXT), /performance_result_sha256/);
 });
 
 test("rejects first-commit evidence above the commercial p95 target", () => {
@@ -102,7 +112,7 @@ test("rejects first-commit evidence above the commercial p95 target", () => {
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values["p(95)"] = 20.001;
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values["p(99)"] = 21;
   const text = `${JSON.stringify(performance, null, 2)}\n`;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text)), /p95 must be <= 20 ms/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text), FIXTURE_TEXT), /p95 must be <= 20 ms/);
 });
 
 test("rejects incomplete samples even when the completed subset is fast", () => {
@@ -113,17 +123,17 @@ test("rejects incomplete samples even when the completed subset is fast", () => 
   performance.k6.metrics.employment_separation_latency_samples.values.count = 999;
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values.count = 999;
   const text = `${JSON.stringify(performance, null, 2)}\n`;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text)), /sample must be complete/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text), FIXTURE_TEXT), /sample must be complete/);
 });
 
 test("rejects acceptance when post-run cleanup finds a run-scoped leak", () => {
   const { text, runtime } = evidencePair();
   runtime.residual_open_transactions = 1;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime), /residual_open_transactions must be 0/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_TEXT), /residual_open_transactions must be 0/);
 });
 
 test("rejects missing CPU, memory, or pool observations instead of accepting latency alone", () => {
   const { text, runtime } = evidencePair();
   runtime.db_pool_acquire_p95_ms = null;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime), /db_pool_acquire_p95_ms/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_TEXT), /db_pool_acquire_p95_ms/);
 });
