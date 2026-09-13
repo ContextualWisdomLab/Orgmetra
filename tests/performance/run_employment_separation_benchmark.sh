@@ -44,6 +44,22 @@ if [[ "${version_token}" != "v${PINNED_K6_VERSION}" ]]; then
   exit 1
 fi
 
+workload_image_id=""
+cleanup() {
+  if [[ -n "${workload_image_id}" ]]; then
+    podman image rm --force "${workload_image_id}" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+workload_image_id="$(
+  git -C "${repo_root}" archive --format=tar "${target_sha}" \
+    | podman import --quiet --message "Orgmetra Employment separation benchmark ${target_sha}" -
+)"
+if [[ -z "${workload_image_id}" ]] || ! podman image exists "${workload_image_id}"; then
+  printf 'failed to materialize immutable benchmark workload image for %s\n' "${target_sha}" >&2
+  exit 1
+fi
+
 fixture_path="${ORGMETRA_PERFORMANCE_DATA_FILE:-}"
 summary_path="${ORGMETRA_PERFORMANCE_SUMMARY_FILE:-}"
 if [[ -z "${fixture_path}" || ! -f "${fixture_path}" ]]; then
@@ -67,7 +83,7 @@ export ORGMETRA_PERFORMANCE_K6_RUNNER_IDENTITY="${PINNED_K6_RUNNER_IDENTITY}"
 podman run --rm --pull=never --network=host --read-only \
   --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=256 \
   --tmpfs /tmp:rw,nosuid,nodev,noexec \
-  --volume "${repo_root}:/workspace:ro" \
+  --mount "type=image,source=${workload_image_id},destination=/workspace" \
   --volume "${fixture_path}:/evidence/fixture.json:ro" \
   --volume "${summary_dir}:/output:rw" \
   --workdir /workspace \
