@@ -152,8 +152,38 @@ test("canonical benchmark runner cannot publish stale or failed-run summary evid
   );
   assert.match(
     runner,
+    /summary_source_identity=.*stat --printf='%d:%i:%s'/,
+    "publication must bind the validated source device, inode, and size before linking",
+  );
+  assert.match(
+    runner,
+    /summary_source_digest=.*sha256sum/,
+    "publication must bind the exact validated source bytes before linking",
+  );
+  assert.match(
+    runner,
     /ln "\$\{summary_run_file\}" "\$\{summary_target\}"/,
     "publication must use a no-clobber atomic link so a concurrent stale artifact cannot win",
+  );
+  assert.match(
+    runner,
+    /summary_target_identity=.*stat --printf='%d:%i:%s'/,
+    "the published link must be re-identified after link creation",
+  );
+  assert.match(
+    runner,
+    /summary_target_digest=.*sha256sum/,
+    "the published link bytes must be re-hashed after link creation",
+  );
+  assert.match(
+    runner,
+    /summary_source_identity.*summary_source_identity_after.*summary_target_identity[\s\S]*summary_source_digest.*summary_source_digest_after.*summary_target_digest/,
+    "source identity and bytes must remain unchanged across publication and equal the published artifact",
+  );
+  assert.match(
+    runner,
+    /rm -f -- "\$\{summary_target\}"/,
+    "a publication-integrity mismatch must remove the untrusted caller-visible artifact before failing",
   );
 });
 
