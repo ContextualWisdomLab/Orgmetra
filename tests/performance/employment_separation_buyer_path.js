@@ -12,6 +12,10 @@ import {
   isGovernedSeparationConflict,
   isGovernedSeparationSuccess,
 } from "./employment_separation_response_contract.mjs";
+import {
+  requirePerformanceProfile,
+  thresholdsForPerformanceProfile,
+} from "./employment_separation_run_contract.mjs";
 
 const ROUTE = "/v1/employment-separations";
 const MINIMUM_NON_CONTENDING_RECORDS = 1000;
@@ -20,6 +24,7 @@ const fixturePath = __ENV.ORGMETRA_PERFORMANCE_DATA_FILE;
 const baseUrl = (__ENV.ORGMETRA_PERFORMANCE_BASE_URL || "").replace(/\/$/, "");
 const bearerToken = __ENV.ORGMETRA_PERFORMANCE_BEARER_TOKEN || "";
 const targetSha = (__ENV.ORGMETRA_PERFORMANCE_TARGET_SHA || "").toLowerCase();
+const selectedProfile = requirePerformanceProfile(__ENV.ORGMETRA_PERFORMANCE_PROFILE || "");
 
 if (!fixturePath) fail("ORGMETRA_PERFORMANCE_DATA_FILE is required");
 if (!baseUrl) fail("ORGMETRA_PERFORMANCE_BASE_URL is required");
@@ -45,8 +50,12 @@ function integerSetting(name, fallback, maximum) {
   return value;
 }
 
-const nonContendingVus = integerSetting("ORGMETRA_PERFORMANCE_VUS", 20, fixture.profiles.first_commit.length);
-const contentionVus = integerSetting("ORGMETRA_PERFORMANCE_CONTENTION_VUS", 10, fixture.profiles.contention.length);
+const selectedRecords = fixture.profiles[selectedProfile];
+const selectedVus = integerSetting(
+  selectedProfile === "contention" ? "ORGMETRA_PERFORMANCE_CONTENTION_VUS" : "ORGMETRA_PERFORMANCE_VUS",
+  selectedProfile === "contention" ? 10 : 20,
+  selectedRecords.length,
+);
 
 const firstCommitDuration = new Trend("employment_separation_first_commit_duration_ms", true);
 const replayDuration = new Trend("employment_separation_replay_duration_ms", true);
@@ -54,47 +63,45 @@ const rejectionDuration = new Trend("employment_separation_rejection_duration_ms
 const contentionDuration = new Trend("employment_separation_contention_duration_ms", true);
 const unexpectedResponse = new Rate("employment_separation_unexpected_response");
 
+const scenarioByProfile = {
+  first_commit: {
+    executor: "shared-iterations",
+    exec: "firstCommit",
+    iterations: fixture.profiles.first_commit.length,
+    vus: selectedVus,
+    maxDuration: "30m",
+    gracefulStop: "0s",
+  },
+  replay: {
+    executor: "shared-iterations",
+    exec: "replay",
+    iterations: fixture.profiles.replay.length,
+    vus: selectedVus,
+    maxDuration: "30m",
+    gracefulStop: "0s",
+  },
+  rejection: {
+    executor: "shared-iterations",
+    exec: "rejection",
+    iterations: fixture.profiles.rejection.length,
+    vus: selectedVus,
+    maxDuration: "30m",
+    gracefulStop: "0s",
+  },
+  contention: {
+    executor: "shared-iterations",
+    exec: "contention",
+    iterations: fixture.profiles.contention.length,
+    vus: selectedVus,
+    maxDuration: "30m",
+    gracefulStop: "0s",
+  },
+};
+
 export const options = {
   discardResponseBodies: false,
-  scenarios: {
-    first_commit: {
-      executor: "shared-iterations",
-      exec: "firstCommit",
-      iterations: fixture.profiles.first_commit.length,
-      vus: nonContendingVus,
-      maxDuration: "30m",
-      gracefulStop: "0s",
-    },
-    replay: {
-      executor: "shared-iterations",
-      exec: "replay",
-      iterations: fixture.profiles.replay.length,
-      vus: nonContendingVus,
-      maxDuration: "30m",
-      gracefulStop: "0s",
-    },
-    rejection: {
-      executor: "shared-iterations",
-      exec: "rejection",
-      iterations: fixture.profiles.rejection.length,
-      vus: nonContendingVus,
-      maxDuration: "30m",
-      gracefulStop: "0s",
-    },
-    contention: {
-      executor: "shared-iterations",
-      exec: "contention",
-      iterations: fixture.profiles.contention.length,
-      vus: contentionVus,
-      maxDuration: "30m",
-      gracefulStop: "0s",
-    },
-  },
-  thresholds: {
-    employment_separation_first_commit_duration_ms: ["p(95)<=20"],
-    employment_separation_unexpected_response: ["rate==0"],
-    checks: ["rate==1"],
-  },
+  scenarios: { [selectedProfile]: scenarioByProfile[selectedProfile] },
+  thresholds: thresholdsForPerformanceProfile(selectedProfile),
 };
 
 function recordAt(profile) {
@@ -181,6 +188,7 @@ export function handleSummary(data) {
   const payload = {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: targetSha,
+    selected_profile: selectedProfile,
     dataset_id: fixture.dataset_id,
     clearance_reference: fixture.clearance_reference,
     preparation_protocol_reference: fixture.preparation_protocol_reference,
@@ -192,6 +200,6 @@ export function handleSummary(data) {
     k6: data,
   };
   const rendered = `${JSON.stringify(payload, null, 2)}\n`;
-  const path = __ENV.ORGMETRA_PERFORMANCE_SUMMARY_FILE || "employment-separation-performance-result.json";
+  const path = __ENV.ORGMETRA_PERFORMANCE_SUMMARY_FILE || `employment-separation-performance-${selectedProfile}.json`;
   return { [path]: rendered, stdout: rendered };
 }
