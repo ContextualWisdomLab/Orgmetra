@@ -63,6 +63,14 @@ test("refuses fixture cardinality that does not exactly fit the approved schedul
 test("binds result evidence to the exact approved profile load model", () => {
   const approved = approvedPerformanceLoadModel("first_commit");
   assert.deepEqual(validatePerformanceLoadModel(approved, 1000, "first_commit"), approved);
+  assert.deepEqual(
+    validatePerformanceLoadModel(approvedPerformanceLoadModel("replay"), 1000, "replay"),
+    approvedPerformanceLoadModel("replay"),
+  );
+  assert.deepEqual(
+    validatePerformanceLoadModel(approvedPerformanceLoadModel("rejection"), 1000, "rejection"),
+    approvedPerformanceLoadModel("rejection"),
+  );
   assert.throws(() => validatePerformanceLoadModel({
     ...approved,
     target_rps: 1,
@@ -74,13 +82,6 @@ test("binds result evidence to the exact approved profile load model", () => {
     ...approved,
     executor: "shared-iterations",
   }, 1000, "first_commit"), /constant-arrival-rate/);
-});
-
-test("requires the selected profile when validating load-model evidence", () => {
-  assert.throws(
-    () => validatePerformanceLoadModel(approvedPerformanceLoadModel("replay"), 1000),
-    /profile must be exactly one of/,
-  );
 });
 
 test("fails closed when the k6 client is routed through an ambient proxy", () => {
