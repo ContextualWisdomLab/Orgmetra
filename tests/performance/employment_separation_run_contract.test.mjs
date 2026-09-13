@@ -16,15 +16,22 @@ test("requires one explicit performance profile per run", () => {
 });
 
 test("applies the commercial p95 threshold only to the ordinary first-commit profile", () => {
-  assert.deepEqual(thresholdsForPerformanceProfile("first_commit"), {
+  assert.deepEqual(thresholdsForPerformanceProfile("first_commit", 1000), {
     employment_separation_unexpected_response: ["rate==0"],
     checks: ["rate==1"],
+    iterations: ["count>=1000"],
     employment_separation_first_commit_duration_ms: ["p(95)<=20"],
   });
-  assert.deepEqual(thresholdsForPerformanceProfile("contention"), {
+  assert.deepEqual(thresholdsForPerformanceProfile("contention", 100), {
     employment_separation_unexpected_response: ["rate==0"],
     checks: ["rate==1"],
+    iterations: ["count>=100"],
   });
+});
+
+test("refuses acceptance thresholds without an exact positive iteration requirement", () => {
+  assert.throws(() => thresholdsForPerformanceProfile("first_commit", 0), /positive safe integer/);
+  assert.throws(() => thresholdsForPerformanceProfile("first_commit", 1.5), /positive safe integer/);
 });
 
 test("requires the buyer evidence percentiles named by issue 316", () => {
