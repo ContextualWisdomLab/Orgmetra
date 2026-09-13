@@ -79,6 +79,33 @@ if [[ "${capability_role_contract}" != "${expected_role_contract}" ]]; then
     exit 1
 fi
 
+capability_database_owner_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT count(*)
+FROM pg_catalog.pg_database AS database_record
+JOIN pg_catalog.pg_roles AS owner_role
+  ON owner_role.oid = database_record.datdba
+WHERE database_record.datname = pg_catalog.current_database()
+  AND owner_role.rolname IN (
+      'orgmetra_employment_separation_executor',
+      'orgmetra_employment_separation_owner'
+  );
+")"
+if [[ "${capability_database_owner_count}" != "0" ]]; then
+    echo "Employment separation capability role unexpectedly owns the database" >&2
+    exit 1
+fi
+
+capability_schema_create="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT
+    pg_catalog.has_schema_privilege('orgmetra_employment_separation_executor', 'public', 'CREATE')::text
+    || '|'
+    || pg_catalog.has_schema_privilege('orgmetra_employment_separation_owner', 'public', 'CREATE')::text;
+")"
+if [[ "${capability_schema_create}" != "false|false" ]]; then
+    echo "Employment separation capability role unexpectedly retains CREATE on public: ${capability_schema_create}" >&2
+    exit 1
+fi
+
 function_security_contract="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
 SELECT function_record.prosecdef::text || '|' || owner_role.rolname
 FROM pg_catalog.pg_proc AS function_record
@@ -125,6 +152,40 @@ FROM relation;
 ")"
 if [[ "${executor_direct_dml}" != "false" ]]; then
     echo "Employment separation executor unexpectedly has direct HR/audit table DML capability" >&2
+    exit 1
+fi
+
+set +e
+tenant_mismatch_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE orgmetra_employment_separation_executor;
+SET orgmetra.tenant_record_id = '10000000-0000-7000-8000-000000000001';
+SELECT *
+FROM public.separate_employment_record_once(
+    '10000000-0000-7000-8000-000000000002'::uuid,
+    '00000000-0000-7000-8000-000000000001'::uuid,
+    '00000000-0000-7000-8000-000000000101'::uuid,
+    '00000000-0000-7000-8000-000000000201'::uuid,
+    DATE '2026-06-01',
+    'voluntary_resignation',
+    'separation_packet:tenant_mismatch_probe',
+    'v1',
+    'keyverse_subject:tenant_mismatch_probe',
+    'workforce_admin',
+    'human_confirmation:tenant_mismatch_probe',
+    'employment-separation-tenant-mismatch-probe',
+    '00000000-0000-4000-8000-000000000501'::uuid,
+    '00000000-0000-4000-8000-000000000601'::uuid
+);
+SQL
+} 2>&1)"
+tenant_mismatch_status=$?
+set -e
+if [[ ${tenant_mismatch_status} -eq 0 ]]; then
+    echo "mismatched tenant GUC unexpectedly crossed Employment separation" >&2
+    exit 1
+fi
+if [[ "${tenant_mismatch_output}" != *"employment separation tenant context does not match command tenant"* ]]; then
+    echo "mismatched tenant GUC failed for an unexpected reason: ${tenant_mismatch_output}" >&2
     exit 1
 fi
 
