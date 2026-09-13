@@ -165,6 +165,10 @@ function validateResult(result) {
   }
 
   const trendValues = metricValues(result, trendName);
+  const trendSampleCount = nonNegativeInteger(trendValues.count, `${trendName}.count`);
+  if (trendSampleCount !== expectedLatencySamples) {
+    fail(`Trend sample count must equal ${expectedLatencySamples}`);
+  }
   const p50 = finiteNumber(trendValues["p(50)"], `${trendName}.p50`);
   const p95 = finiteNumber(trendValues["p(95)"], `${trendName}.p95`);
   const p99 = finiteNumber(trendValues["p(99)"], `${trendName}.p99`);
