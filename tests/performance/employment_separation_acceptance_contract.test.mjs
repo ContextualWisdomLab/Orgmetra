@@ -91,16 +91,18 @@ function evidencePair() {
   return { performance, artifact, runtime: runtimeEvidence(artifact) };
 }
 
-test("accepts an exact candidate result only with independently observed load, fixture, deployment, resource, and cleanup evidence", () => {
+test("validates exact candidate evidence as structural evidence only", () => {
   const { artifact, runtime } = evidencePair();
-  assert.deepEqual(validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES), {
-    accepted: true,
+  const structuralEvidence = validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES);
+  assert.deepEqual(structuralEvidence, {
+    structurally_valid: true,
     candidate_sha: "a".repeat(40),
     selected_profile: "first_commit",
     fixture_sha256: FIXTURE_SHA256,
     performance_result_sha256: runtime.performance_result_sha256,
     p95_ms: 18.4,
   });
+  assert.equal(Object.hasOwn(structuralEvidence, "accepted"), false);
 });
 
 test("rejects a self-declared target when the observed service revision differs", () => {
@@ -151,7 +153,7 @@ test("rejects incomplete scheduled samples even when the completed subset is fas
   assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES), /sample must be complete/);
 });
 
-test("rejects acceptance when post-run cleanup finds a run-scoped leak", () => {
+test("rejects structural validity when post-run cleanup finds a run-scoped leak", () => {
   const { artifact, runtime } = evidencePair();
   runtime.residual_open_transactions = 1;
   assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES), /residual_open_transactions must be 0/);
