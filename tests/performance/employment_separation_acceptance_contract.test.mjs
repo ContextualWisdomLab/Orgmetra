@@ -65,6 +65,8 @@ function runtimeEvidence(resultArtifact) {
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
     observer_reference: "observer:perf-runtime-1",
+    load_observation_reference: "evidence:perf-load-observation-1",
+    observed_load_model: acceptanceLoadModel(1000),
     resource_evidence_reference: "metrics:employment-separation-perf-1",
     observed_at: "2026-09-13T04:10:01Z",
     host_cpu_percent_p95: 42.5,
@@ -89,7 +91,7 @@ function evidencePair() {
   return { performance, artifact, runtime: runtimeEvidence(artifact) };
 }
 
-test("accepts an exact candidate result only with bound fixture, deployment, resource, load, and cleanup evidence", () => {
+test("accepts an exact candidate result only with independently observed load, fixture, deployment, resource, and cleanup evidence", () => {
   const { artifact, runtime } = evidencePair();
   assert.deepEqual(validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES), {
     accepted: true,
@@ -111,6 +113,16 @@ test("rejects a result artifact that is not the one observed by the runtime evid
   const { artifact, runtime } = evidencePair();
   runtime.performance_result_sha256 = "0".repeat(64);
   assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES), /performance_result_sha256/);
+});
+
+test("rejects declared load evidence that differs from the independent runtime observation", () => {
+  const { artifact, runtime } = evidencePair();
+  runtime.observed_load_model.target_rps = 2;
+  runtime.observed_load_model.duration_seconds = 500;
+  assert.throws(
+    () => validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES),
+    /observed_load_model.target_rps must match result.load_model.target_rps/,
+  );
 });
 
 test("rejects first-commit evidence above the commercial p95 target", () => {
