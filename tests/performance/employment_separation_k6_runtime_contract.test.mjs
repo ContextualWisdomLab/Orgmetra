@@ -68,12 +68,12 @@ test("canonical benchmark runner does not forward caller-controlled load-model e
   }
 });
 
-test("canonical benchmark runner binds the mounted workload to an immutable exact-candidate snapshot", () => {
+test("canonical benchmark runner binds the mounted workload to an immutable exact-candidate image", () => {
   const runner = readFileSync(new URL("./run_employment_separation_benchmark.sh", import.meta.url), "utf8");
   assert.match(
     runner,
     /git -C "\$\{repo_root\}" rev-parse --verify HEAD/,
-    "the source repository must be checked against an exact HEAD before snapshotting",
+    "the source repository must be checked against an exact HEAD before materialization",
   );
   assert.match(
     runner,
@@ -87,8 +87,8 @@ test("canonical benchmark runner binds the mounted workload to an immutable exac
   );
   assert.match(
     runner,
-    /git -C "\$\{repo_root\}" archive --format=tar "\$\{target_sha\}"/,
-    "the executed workload must be materialized from the verified immutable candidate commit",
+    /git -C "\$\{repo_root\}" archive --format=tar "\$\{target_sha\}"[\s\S]*podman import/,
+    "the executed workload must be imported from the verified immutable candidate commit",
   );
   assert.doesNotMatch(
     runner,
@@ -97,8 +97,13 @@ test("canonical benchmark runner binds the mounted workload to an immutable exac
   );
   assert.match(
     runner,
-    /--volume "\$\{snapshot_dir\}:\/workspace:ro"/,
-    "Podman must mount only the immutable candidate snapshot at /workspace",
+    /--mount "type=image,source=\$\{workload_image_id\},destination=\/workspace"/,
+    "Podman must mount only the imported candidate image at /workspace",
+  );
+  assert.match(
+    runner,
+    /podman image rm --force "\$\{workload_image_id\}"/,
+    "the ephemeral candidate image must be removed after the run",
   );
 });
 
