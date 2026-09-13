@@ -40,8 +40,8 @@ function performanceResult(profile, iterations) {
         employment_separation_latency_samples: { values: { count: latencySamples } },
         [trendName]: {
           values: profile === "contention"
-            ? { "p(50)": 12, "p(95)": 80, "p(99)": 120, max: 200 }
-            : { "p(50)": 8.1, "p(95)": 18.4, "p(99)": 19.7, max: 22.3 },
+            ? { "p(50)": 12, "p(95)": 80, "p(99)": 120, max: 200, count: latencySamples }
+            : { "p(50)": 8.1, "p(95)": 18.4, "p(99)": 19.7, max: 22.3, count: latencySamples },
         },
       },
     },
