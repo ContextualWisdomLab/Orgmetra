@@ -137,3 +137,24 @@ test("rejects missing CPU, memory, or pool observations instead of accepting lat
   runtime.db_pool_acquire_p95_ms = null;
   assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), /db_pool_acquire_p95_ms/);
 });
+
+test("rejects byte-distinct result artifacts that collide after lossy UTF-8 decoding", () => {
+  const text = `${JSON.stringify(result(), null, 2)}\n`;
+  const resultBytes = Buffer.from(text, "utf8");
+  const malformedA = Buffer.concat([Buffer.from([0x80]), resultBytes]);
+  const malformedB = Buffer.concat([Buffer.from([0x81]), resultBytes]);
+  assert.equal(malformedA.toString("utf8"), malformedB.toString("utf8"));
+  assert.notEqual(
+    createHash("sha256").update(malformedA).digest("hex"),
+    createHash("sha256").update(malformedB).digest("hex"),
+  );
+
+  for (const malformed of [malformedA, malformedB]) {
+    const runtime = runtimeEvidence(text);
+    runtime.performance_result_sha256 = createHash("sha256").update(malformed).digest("hex");
+    assert.throws(
+      () => validateEmploymentSeparationAcceptance(malformed, runtime, FIXTURE_BYTES),
+      /valid UTF-8/,
+    );
+  }
+});
