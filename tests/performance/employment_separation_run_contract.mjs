@@ -1,0 +1,25 @@
+export const PERFORMANCE_PROFILES = Object.freeze([
+  "first_commit",
+  "replay",
+  "rejection",
+  "contention",
+]);
+
+export function requirePerformanceProfile(value) {
+  if (typeof value !== "string" || !PERFORMANCE_PROFILES.includes(value)) {
+    throw new Error(`ORGMETRA_PERFORMANCE_PROFILE must be exactly one of: ${PERFORMANCE_PROFILES.join(", ")}`);
+  }
+  return value;
+}
+
+export function thresholdsForPerformanceProfile(profile) {
+  requirePerformanceProfile(profile);
+  const thresholds = {
+    employment_separation_unexpected_response: ["rate==0"],
+    checks: ["rate==1"],
+  };
+  if (profile === "first_commit") {
+    thresholds.employment_separation_first_commit_duration_ms = ["p(95)<=20"];
+  }
+  return thresholds;
+}
