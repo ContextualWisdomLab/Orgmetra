@@ -15,6 +15,7 @@ import {
 } from "./employment_separation_response_contract.mjs";
 import {
   PERFORMANCE_SUMMARY_TREND_STATS,
+  arrivalRateScenarioForPerformanceProfile,
   requirePerformanceProfile,
   thresholdsForPerformanceProfile,
 } from "./employment_separation_run_contract.mjs";
@@ -56,23 +57,30 @@ if (fixture.candidate_sha.toLowerCase() !== targetSha) {
   fail("performance fixture candidate_sha does not match ORGMETRA_PERFORMANCE_TARGET_SHA");
 }
 
-function integerSetting(name, fallback, maximum) {
+function requiredPositiveIntegerSetting(name) {
   const raw = __ENV[name];
-  if (raw === undefined || raw === "") return Math.min(fallback, maximum);
-  if (!/^\d+$/.test(raw)) fail(`${name} must be a positive integer`);
+  if (raw === undefined || raw === "" || !/^\d+$/.test(raw)) {
+    fail(`${name} must be an explicit positive integer`);
+  }
   const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
-    fail(`${name} must be between 1 and ${maximum}`);
+  if (!Number.isSafeInteger(value) || value < 1) {
+    fail(`${name} must be an explicit positive safe integer`);
   }
   return value;
 }
 
 const selectedRecords = fixture.profiles[selectedProfile];
-const selectedVus = integerSetting(
-  selectedProfile === "contention" ? "ORGMETRA_PERFORMANCE_CONTENTION_VUS" : "ORGMETRA_PERFORMANCE_VUS",
-  selectedProfile === "contention" ? 10 : 20,
-  selectedRecords.length,
-);
+const targetRps = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_TARGET_RPS");
+const durationSeconds = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_DURATION_SECONDS");
+const preAllocatedVUs = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_PREALLOCATED_VUS");
+const maxVUs = requiredPositiveIntegerSetting("ORGMETRA_PERFORMANCE_MAX_VUS");
+const selectedScenario = arrivalRateScenarioForPerformanceProfile(selectedProfile, {
+  expectedIterations: selectedRecords.length,
+  targetRps,
+  durationSeconds,
+  preAllocatedVUs,
+  maxVUs,
+});
 
 const firstCommitDuration = new Trend("employment_separation_first_commit_duration_ms", true);
 const replayDuration = new Trend("employment_separation_replay_duration_ms", true);
@@ -81,44 +89,9 @@ const contentionDuration = new Trend("employment_separation_contention_duration_
 const latencySamples = new Counter("employment_separation_latency_samples");
 const unexpectedResponse = new Rate("employment_separation_unexpected_response");
 
-const scenarioByProfile = {
-  first_commit: {
-    executor: "shared-iterations",
-    exec: "firstCommit",
-    iterations: fixture.profiles.first_commit.length,
-    vus: selectedVus,
-    maxDuration: "30m",
-    gracefulStop: "0s",
-  },
-  replay: {
-    executor: "shared-iterations",
-    exec: "replay",
-    iterations: fixture.profiles.replay.length,
-    vus: selectedVus,
-    maxDuration: "30m",
-    gracefulStop: "0s",
-  },
-  rejection: {
-    executor: "shared-iterations",
-    exec: "rejection",
-    iterations: fixture.profiles.rejection.length,
-    vus: selectedVus,
-    maxDuration: "30m",
-    gracefulStop: "0s",
-  },
-  contention: {
-    executor: "shared-iterations",
-    exec: "contention",
-    iterations: fixture.profiles.contention.length,
-    vus: selectedVus,
-    maxDuration: "30m",
-    gracefulStop: "0s",
-  },
-};
-
 export const options = {
   discardResponseBodies: false,
-  scenarios: { [selectedProfile]: scenarioByProfile[selectedProfile] },
+  scenarios: { [selectedProfile]: selectedScenario },
   thresholds: thresholdsForPerformanceProfile(selectedProfile, selectedRecords.length),
   summaryTrendStats: PERFORMANCE_SUMMARY_TREND_STATS,
 };
@@ -218,6 +191,13 @@ export function handleSummary(data) {
     completed_iterations: completedIterations,
     sample_complete: completedIterations === selectedRecords.length,
     completed_at: new Date().toISOString(),
+    load_model: {
+      executor: selectedScenario.executor,
+      target_rps: targetRps,
+      duration_seconds: durationSeconds,
+      preallocated_vus: preAllocatedVUs,
+      max_vus: maxVUs,
+    },
     dataset_id: fixture.dataset_id,
     clearance_reference: fixture.clearance_reference,
     preparation_protocol_reference: fixture.preparation_protocol_reference,
