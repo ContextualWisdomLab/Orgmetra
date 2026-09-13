@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 
-import { PERFORMANCE_CLIENT_NETWORK_TOPOLOGY } from "./employment_separation_run_contract.mjs";
+import {
+  PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
+  approvedPerformanceLoadModel,
+} from "./employment_separation_run_contract.mjs";
 
 export const ACCEPTANCE_CANDIDATE_SHA = "a".repeat(40);
 export const ACCEPTANCE_PROFILE_PRECONDITIONS = Object.freeze({
@@ -38,6 +41,8 @@ function records(start, count) {
 }
 
 export function acceptanceLoadModel(expectedIterations) {
+  if (expectedIterations === 1000) return { ...approvedPerformanceLoadModel("first_commit") };
+  if (expectedIterations === 100) return { ...approvedPerformanceLoadModel("contention") };
   return {
     executor: "constant-arrival-rate",
     target_rps: 1,
