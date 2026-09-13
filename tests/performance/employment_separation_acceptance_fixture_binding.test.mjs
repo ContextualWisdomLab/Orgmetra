@@ -115,3 +115,23 @@ test("rejects a fixture whose exact bytes are synthetic", () => {
     /synthetic/,
   );
 });
+
+test("rejects byte-distinct fixture artifacts that collide after lossy UTF-8 decoding", () => {
+  const fixtureBytes = Buffer.from(acceptanceFixtureText(), "utf8");
+  const malformedA = Buffer.concat([Buffer.from([0x80]), fixtureBytes]);
+  const malformedB = Buffer.concat([Buffer.from([0x81]), fixtureBytes]);
+  assert.equal(malformedA.toString("utf8"), malformedB.toString("utf8"));
+  assert.notEqual(
+    createHash("sha256").update(malformedA).digest("hex"),
+    createHash("sha256").update(malformedB).digest("hex"),
+  );
+
+  for (const malformed of [malformedA, malformedB]) {
+    const fixtureSha256 = createHash("sha256").update(malformed).digest("hex");
+    const resultText = render(performanceResult(fixtureSha256));
+    assert.throws(
+      () => validateEmploymentSeparationAcceptance(resultText, runtimeEvidence(resultText, fixtureSha256), malformed),
+      /valid UTF-8/,
+    );
+  }
+});
