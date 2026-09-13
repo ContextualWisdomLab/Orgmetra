@@ -13,6 +13,7 @@ import {
   isGovernedSeparationSuccess,
 } from "./employment_separation_response_contract.mjs";
 import {
+  PERFORMANCE_SUMMARY_TREND_STATS,
   requirePerformanceProfile,
   thresholdsForPerformanceProfile,
 } from "./employment_separation_run_contract.mjs";
@@ -102,6 +103,7 @@ export const options = {
   discardResponseBodies: false,
   scenarios: { [selectedProfile]: scenarioByProfile[selectedProfile] },
   thresholds: thresholdsForPerformanceProfile(selectedProfile),
+  summaryTrendStats: PERFORMANCE_SUMMARY_TREND_STATS,
 };
 
 function recordAt(profile) {
