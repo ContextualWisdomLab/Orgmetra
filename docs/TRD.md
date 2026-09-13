@@ -17,7 +17,7 @@ Material mathematical and psychometric kernels must use bounded CPU multithreadi
 
 | Canonical service identifier | Responsibility |
 |---|---|
-| `people_core` | Person identity anchors, names, employment, assignments, compensation, candidate-worker linkage, and identity references. |
+| `people_core` | Person identity anchors, names, employment, governed Employment separation, assignments, compensation, candidate-worker linkage, and identity references. |
 | `organization_core` | Organization units, reporting relations, legal entities, locations, and positions. |
 | `job_architecture` | Job profiles, tasks, FJA, KSAO, qualification rules, evidence, and SME approvals. |
 | `talent_acquisition` | Requisitions, candidates, versioned decision-evidence sets, interviews, confirmations, and selection decisions. |
@@ -38,6 +38,9 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 - A finalized high-impact selection command binds one immutable evidence-set version and a database-computed SHA-256 digest over canonical sorted evidence membership; later evidence membership changes are rejected.
 - High-impact decision APIs return evidence sufficiency and escalation status.
 - Generated server validation must enforce the OpenAPI contract before domain handlers execute.
+- `POST /v1/employment-separations` is a high-impact People command on active PR #64. It binds tenant, Person, Employment, exact expected Employment version, effective separation date, actor, `workforce_admin` purpose, human confirmation, evidence reference/version, controlled reason and idempotency key before persistence.
+- `separation_reason_code` is an exact enum: `voluntary_resignation`, `retirement_transition`, `fixed_term_completion`, `position_elimination`, or `employer_initiated_separation`. A syntactically valid but unrecognized lower-`snake_case` value fails closed before mutation.
+- Employment separation does not implement rehire. #302 remains planned downstream and cannot consume mutable #64 source as an external runtime dependency.
 
 ## 4. Event envelope
 
@@ -61,6 +64,8 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 
 `actor_reference` is required and resolves only inside the authorized tenant. `provenance_reference` is also required and resolves to an immutable audit bundle containing actor, policy decision, confirmation, reason, command digest, sealed evidence-set digest and evidence versions. Consumers must verify both fields before treating a high-impact event as accountable.
 
+Employment separation emits the corresponding CloudEvents-compatible `employment_separated` audit envelope from database-owned post-lock recorded time. The audit/outbox fact, `employment_separation_record`, terminal bitemporal state and People idempotency result are one transaction; downstream workflow, payroll, identity deprovisioning and notification behavior begins only after that transaction through owned contracts/events.
+
 ## 5. Data model rules
 
 - Stable entity anchors do not contain mutable descriptive attributes.
@@ -74,9 +79,23 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 - Assignment days must land on an `active` or `open` position version, and visible allocations for one seat cannot exceed 1.0000.
 - Model external organization roles as time-varying relations when one entity can be a customer, partner, competitor, or vendor in different contexts.
 - Keep assessment results as external immutable snapshot references unless a later ADR transfers instrument lifecycle ownership.
-- Candidate-worker links, selection decisions, evidence-set membership after finalization, and validation-study decision/evidence/outcome links are append-only.
+- Candidate-worker links, selection decisions, evidence-set membership after finalization, governed Employment-separation provenance, and validation-study decision/evidence/outcome links are append-only.
 - An open `decision_evidence_set` carries no caller-supplied digest. Selection finalization requires at least one member, computes the canonical SHA-256 digest inside PostgreSQL, and seals exactly one set in the same transaction; a sealed set cannot accept new members, be reused by a second decision, or point to a different consuming decision.
 - Validity studies reference exact selection decisions, sealed evidence sets and criterion observations through normalized link relations so criterion-related validity can be reconstructed without copying specialist-system payloads.
+
+### 5.1 Employment-separation invariant
+
+The active #64 implementation follows ADR 0015 and remains active-PR, not protected/released, truth while that ADR is Proposed.
+
+- A separation corrects one exact current-known `active` or `leave` `employment_record_version`; it never rewrites the prior protected business columns in place.
+- The database takes one post-lock recorded timestamp, closes the expected version's recorded interval, creates an optional continuation version for the pre-separation effective interval, and creates one terminal `terminated` version beginning at the requested separation boundary.
+- The continuation version's `effective_to` is structural interval closure. The terminal version plus `employment_separation_record` is the authoritative separation fact.
+- `employment_separation_record` tenant-qualifies and binds the prior version, optional continuation version, terminal version, controlled reason, evidence, human confirmation, actor/purpose, recorded timestamp and immutable audit identity.
+- The exact tenant+route+idempotency key serializes matching/reused command identity. Distinct separation commands serialize on the durable `employment_record` aggregate anchor.
+- Assignment INSERT and separation use the same Employment anchor as their database conflict boundary. After waiting on that lock, Assignment coverage must be re-read in a separate statement so READ COMMITTED cannot continue from a pre-separation statement snapshot.
+- Separation never creates, closes, rewrites or deletes Assignment-owned rows. An Assignment effective on or after the requested boundary blocks separation until its owning boundary coordinates it; historical Assignment ending at or before the boundary remains valid.
+- The separation function uses a dedicated `NOLOGIN`/`NOBYPASSRLS` SECURITY DEFINER owner, while a distinct executor capability receives function `EXECUTE` without direct People/audit/outbox table DML. Ordinary Assignment writers do not receive broad Employment UPDATE privilege solely for locking.
+- Same-key replay after an uncertain caller outcome must return the first durable terminal result without retry-only separation/audit/outbox side effects.
 
 ## 6. Integration adapters
 
@@ -99,3 +118,7 @@ Adapters use bounded timeouts, typed error semantics, tenant validation, idempot
 ## 7. Testing requirements
 
 `docs/TEST_STRATEGY.md` is the canonical coverage and execution contract. Every service must satisfy its 100% statement/branch coverage requirement where the pinned toolchain exposes those metrics, document exact commands, and preserve migration, API, event, authorization, temporal, tenant-isolation, evidence-sealing, append-only, scientific, adapter-failure, and accessibility evidence. PostgreSQL contract tests use a `NOBYPASSRLS` application role and cover missing tenant context, cross-tenant references, concurrent bitemporal corrections, database-owned evidence digest computation, empty-evidence rejection, and post-decision evidence drift. This TRD does not define a weaker duplicate threshold.
+
+Before ADR 0015 can move from Proposed, canonical PostgreSQL Foundation execution must cover the Employment-separation root plus its same-database concurrency/cleanup/recovery companions and the Assignment/separation serialization root. Acceptance includes bitemporal historical reconstruction, atomic audit/outbox/idempotency durability, exact-key replay, semantic-key conflicts, stale/future/cross-tenant hostile cases, real PostgreSQL blocker graphs for exact-key and distinct-key races, both Assignment-first and separation-first commit orders, failure-path server-session quiescence, uncertain-commit recovery, FORCE RLS, and capability separation. Elapsed time alone is not concurrency evidence.
+
+The canonical execution owner is #311 after prerequisite Foundation integration. A GREEN legacy filename switchboard that does not execute the newly registered roots/companions is not evidence that these acceptance cases passed. Security/review gates remain independently required, and no protected release or latency SLO is implied by active-branch test success.
