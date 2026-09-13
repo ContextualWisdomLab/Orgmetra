@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   PERFORMANCE_SUMMARY_TREND_STATS,
+  arrivalRateScenarioForPerformanceProfile,
   requirePerformanceProfile,
   thresholdsForPerformanceProfile,
 } from "./employment_separation_run_contract.mjs";
@@ -15,11 +16,48 @@ test("requires one explicit performance profile per run", () => {
   assert.throws(() => requirePerformanceProfile("all"), /must be exactly one of/);
 });
 
+test("uses an open arrival-rate model whose schedule is independent of response time", () => {
+  assert.deepEqual(arrivalRateScenarioForPerformanceProfile("first_commit", {
+    expectedIterations: 1000,
+    targetRps: 20,
+    durationSeconds: 50,
+    preAllocatedVUs: 20,
+    maxVUs: 80,
+  }), {
+    executor: "constant-arrival-rate",
+    exec: "firstCommit",
+    rate: 20,
+    timeUnit: "1s",
+    duration: "50s",
+    preAllocatedVUs: 20,
+    maxVUs: 80,
+    gracefulStop: "30s",
+  });
+});
+
+test("refuses arrival schedules that can hide load or outrun fixture cardinality", () => {
+  assert.throws(() => arrivalRateScenarioForPerformanceProfile("first_commit", {
+    expectedIterations: 1000,
+    targetRps: 20,
+    durationSeconds: 49,
+    preAllocatedVUs: 20,
+    maxVUs: 80,
+  }), /must equal the selected fixture iteration count exactly/);
+  assert.throws(() => arrivalRateScenarioForPerformanceProfile("contention", {
+    expectedIterations: 100,
+    targetRps: 10,
+    durationSeconds: 10,
+    preAllocatedVUs: 20,
+    maxVUs: 10,
+  }), /greater than or equal/);
+});
+
 test("applies the commercial p95 threshold only to the ordinary first-commit profile", () => {
   assert.deepEqual(thresholdsForPerformanceProfile("first_commit", 1000), {
     employment_separation_unexpected_response: ["rate==0"],
     employment_separation_latency_samples: ["count>=1000"],
     checks: ["rate==1"],
+    dropped_iterations: ["count==0"],
     iterations: ["count>=1000"],
     employment_separation_first_commit_duration_ms: ["p(95)<=20"],
   });
@@ -27,6 +65,7 @@ test("applies the commercial p95 threshold only to the ordinary first-commit pro
     employment_separation_unexpected_response: ["rate==0"],
     employment_separation_latency_samples: ["count>=200"],
     checks: ["rate==1"],
+    dropped_iterations: ["count==0"],
     iterations: ["count>=100"],
   });
 });
