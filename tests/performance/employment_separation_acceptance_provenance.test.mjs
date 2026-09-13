@@ -6,6 +6,7 @@ import { validateEmploymentSeparationAcceptance } from "./employment_separation_
 import {
   acceptanceFixtureBytes,
   acceptanceFixtureSha256,
+  acceptanceLoadModel,
 } from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const PROFILE_PRECONDITIONS = Object.freeze({
@@ -27,6 +28,7 @@ function result() {
     completed_iterations: 1000,
     sample_complete: true,
     completed_at: "2026-09-13T04:10:00Z",
+    load_model: acceptanceLoadModel(1000),
     dataset_id: "dataset:employment-separation-perf-1",
     clearance_reference: "data_clearance:perf-2026-09",
     preparation_protocol_reference: "protocol:employment-separation-perf-v1",
@@ -38,6 +40,7 @@ function result() {
     k6: {
       metrics: {
         iterations: { values: { count: 1000 } },
+        dropped_iterations: { values: { count: 0 } },
         checks: { values: { rate: 1 } },
         employment_separation_unexpected_response: { values: { rate: 0 } },
         employment_separation_latency_samples: { values: { count: 1000 } },
@@ -107,4 +110,10 @@ test("requires exact profile-precondition vocabulary", () => {
   reject((value) => { delete value.profile_preconditions.replay; }, /exactly first_commit, replay, rejection, contention/);
   reject((value) => { value.profile_preconditions.replay = "already_committed_maybe"; }, /profile_preconditions\.replay/);
   reject((value) => { value.profile_preconditions.extra = "unexpected"; }, /exactly first_commit, replay, rejection, contention/);
+});
+
+test("requires exact open-load and direct-network provenance", () => {
+  reject((value) => { delete value.load_model; }, /load_model must be an object/);
+  reject((value) => { value.load_model.executor = "shared-iterations"; }, /constant-arrival-rate/);
+  reject((value) => { value.load_model.client_network_topology = "https_mitm_proxy"; }, /client_network_topology/);
 });
