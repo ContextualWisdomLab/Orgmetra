@@ -4,12 +4,12 @@ import test from "node:test";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
 import {
+  acceptanceFixtureBytes,
   acceptanceFixtureSha256,
-  acceptanceFixtureText,
 } from "./employment_separation_acceptance_fixture_test_support.mjs";
 
-const FIXTURE_TEXT = acceptanceFixtureText();
-const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_TEXT);
+const FIXTURE_BYTES = acceptanceFixtureBytes();
+const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_BYTES);
 
 function result() {
   return {
@@ -85,7 +85,7 @@ function evidencePair() {
 
 test("accepts an exact candidate result only with bound fixture, deployment, resource, and cleanup evidence", () => {
   const { text, runtime } = evidencePair();
-  assert.deepEqual(validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_TEXT), {
+  assert.deepEqual(validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), {
     accepted: true,
     candidate_sha: "a".repeat(40),
     selected_profile: "first_commit",
@@ -98,13 +98,13 @@ test("accepts an exact candidate result only with bound fixture, deployment, res
 test("rejects a self-declared target when the observed service revision differs", () => {
   const { text, runtime } = evidencePair();
   runtime.observed_service_sha = "b".repeat(40);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_TEXT), /observed_service_sha must match candidate_sha/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), /observed_service_sha must match candidate_sha/);
 });
 
 test("rejects a result artifact that is not the one observed by the runtime evidence", () => {
   const { text, runtime } = evidencePair();
   runtime.performance_result_sha256 = "0".repeat(64);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_TEXT), /performance_result_sha256/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), /performance_result_sha256/);
 });
 
 test("rejects first-commit evidence above the commercial p95 target", () => {
@@ -112,7 +112,7 @@ test("rejects first-commit evidence above the commercial p95 target", () => {
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values["p(95)"] = 20.001;
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values["p(99)"] = 21;
   const text = `${JSON.stringify(performance, null, 2)}\n`;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text), FIXTURE_TEXT), /p95 must be <= 20 ms/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text), FIXTURE_BYTES), /p95 must be <= 20 ms/);
 });
 
 test("rejects incomplete samples even when the completed subset is fast", () => {
@@ -123,17 +123,17 @@ test("rejects incomplete samples even when the completed subset is fast", () => 
   performance.k6.metrics.employment_separation_latency_samples.values.count = 999;
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values.count = 999;
   const text = `${JSON.stringify(performance, null, 2)}\n`;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text), FIXTURE_TEXT), /sample must be complete/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text), FIXTURE_BYTES), /sample must be complete/);
 });
 
 test("rejects acceptance when post-run cleanup finds a run-scoped leak", () => {
   const { text, runtime } = evidencePair();
   runtime.residual_open_transactions = 1;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_TEXT), /residual_open_transactions must be 0/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), /residual_open_transactions must be 0/);
 });
 
 test("rejects missing CPU, memory, or pool observations instead of accepting latency alone", () => {
   const { text, runtime } = evidencePair();
   runtime.db_pool_acquire_p95_ms = null;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_TEXT), /db_pool_acquire_p95_ms/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), /db_pool_acquire_p95_ms/);
 });
