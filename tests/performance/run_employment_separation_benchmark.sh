@@ -143,7 +143,9 @@ if [[ -z "${summary_source_identity_after}" || -z "${summary_source_digest_after
   exit 1
 fi
 
-# The caller-visible pathname remains mutable after this process exits. Treat this
-# digest as the immutable handoff token: downstream acceptance must re-hash the
-# bytes it consumes and require this exact value rather than trusting the path.
+# This digest is structural evidence only. The caller-visible pathname and any
+# value a caller can copy from stdout remain under the same authority. Commercial
+# acceptance stays fail closed until the organization-owned authenticated
+# attestation boundary tracked by ContextualWisdomLab/.github#2162 binds these
+# exact result bytes independently.
 printf 'ORGMETRA_PERFORMANCE_RESULT_SHA256=%s\n' "${summary_source_digest}"
