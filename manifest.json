@@ -137,9 +137,9 @@
     },
     {
       "path": "database/migrations/0014_employment_separation_transition.sql",
-      "sha256": "e24ffddb03fae5d9a2be859656860b58054eb3453a156eec3b402509797dfdc2",
-      "bytes": 21465,
-      "lines": 523
+      "sha256": "8b7ce61220b55b260e432c26a66cdc16a744e8625778ca75095e7ba76bdabd43",
+      "bytes": 21853,
+      "lines": 537
     },
     {
       "path": "database/migrations/0015_employment_separation_capability_hardening.sql",
