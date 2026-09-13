@@ -56,6 +56,18 @@ test("canonical benchmark runner does not accept ungoverned k6 CLI overrides", (
   );
 });
 
+test("canonical benchmark runner does not forward caller-controlled load-model environment", () => {
+  const runner = readFileSync(new URL("./run_employment_separation_benchmark.sh", import.meta.url), "utf8");
+  for (const name of [
+    "ORGMETRA_PERFORMANCE_TARGET_RPS",
+    "ORGMETRA_PERFORMANCE_DURATION_SECONDS",
+    "ORGMETRA_PERFORMANCE_PREALLOCATED_VUS",
+    "ORGMETRA_PERFORMANCE_MAX_VUS",
+  ]) {
+    assert.doesNotMatch(runner, new RegExp(`--env ${name}(?:\\s|$)`), `${name} must be version-controlled by the workload`);
+  }
+});
+
 test("canonical benchmark runner rejects CLI overrides before any Podman dependency is needed", () => {
   const runnerPath = fileURLToPath(new URL("./run_employment_separation_benchmark.sh", import.meta.url));
   const result = spawnSync("bash", [runnerPath, "--duration", "1s"], {
