@@ -15,6 +15,7 @@ function performanceResult(profile, iterations) {
   const trendName = profile === "contention"
     ? "employment_separation_contention_duration_ms"
     : "employment_separation_first_commit_duration_ms";
+  const latencySamples = profile === "contention" ? iterations * 2 : iterations;
   return {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: "a".repeat(40),
@@ -36,6 +37,7 @@ function performanceResult(profile, iterations) {
         iterations: { values: { count: iterations } },
         checks: { values: { rate: 1 } },
         employment_separation_unexpected_response: { values: { rate: 0 } },
+        employment_separation_latency_samples: { values: { count: latencySamples } },
         [trendName]: {
           values: profile === "contention"
             ? { "p(50)": 12, "p(95)": 80, "p(99)": 120, max: 200 }
