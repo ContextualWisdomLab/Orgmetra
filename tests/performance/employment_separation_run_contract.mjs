@@ -13,12 +13,22 @@ export const PERFORMANCE_SUMMARY_TREND_STATS = Object.freeze([
   "count",
 ]);
 
+export const PERFORMANCE_CLIENT_NETWORK_TOPOLOGY = "direct_no_client_mitm_proxy";
+
 const EXEC_BY_PROFILE = Object.freeze({
   first_commit: "firstCommit",
   replay: "replay",
   rejection: "rejection",
   contention: "contention",
 });
+const PROXY_ENVIRONMENT_KEYS = Object.freeze([
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+]);
 
 export function requirePerformanceProfile(value) {
   if (typeof value !== "string" || !PERFORMANCE_PROFILES.includes(value)) {
@@ -34,6 +44,63 @@ function positiveInteger(value, label) {
   return value;
 }
 
+export function requireDirectPerformanceClientNetwork(environment) {
+  if (environment === null || typeof environment !== "object" || Array.isArray(environment)) {
+    throw new Error("performance client environment must be an object");
+  }
+  const configuredProxy = PROXY_ENVIRONMENT_KEYS.find((key) => (
+    typeof environment[key] === "string" && environment[key].trim() !== ""
+  ));
+  if (configuredProxy) {
+    throw new Error(`${configuredProxy} must be unset for commercial timing acceptance`);
+  }
+  return PERFORMANCE_CLIENT_NETWORK_TOPOLOGY;
+}
+
+export function validatePerformanceLoadModel(value, expectedIterations) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("load_model must be an object");
+  }
+  const expectedKeys = [
+    "executor",
+    "target_rps",
+    "duration_seconds",
+    "preallocated_vus",
+    "max_vus",
+    "client_network_topology",
+  ].sort();
+  const actualKeys = Object.keys(value).sort();
+  if (actualKeys.length !== expectedKeys.length || actualKeys.some((key, index) => key !== expectedKeys[index])) {
+    throw new Error(`load_model must contain exactly ${expectedKeys.join(", ")}`);
+  }
+  if (value.executor !== "constant-arrival-rate") {
+    throw new Error("load_model.executor must be constant-arrival-rate");
+  }
+  if (value.client_network_topology !== PERFORMANCE_CLIENT_NETWORK_TOPOLOGY) {
+    throw new Error(`load_model.client_network_topology must be ${PERFORMANCE_CLIENT_NETWORK_TOPOLOGY}`);
+  }
+  const iterations = positiveInteger(expectedIterations, "expectedIterations");
+  const rate = positiveInteger(value.target_rps, "load_model.target_rps");
+  const duration = positiveInteger(value.duration_seconds, "load_model.duration_seconds");
+  const preAllocated = positiveInteger(value.preallocated_vus, "load_model.preallocated_vus");
+  const maximum = positiveInteger(value.max_vus, "load_model.max_vus");
+  if (maximum < preAllocated) {
+    throw new Error("load_model.max_vus must be greater than or equal to load_model.preallocated_vus");
+  }
+  const scheduledIterations = rate * duration;
+  if (!Number.isSafeInteger(scheduledIterations) || scheduledIterations !== iterations) {
+    throw new Error("load_model target_rps * duration_seconds must equal expectedIterations exactly");
+  }
+  return Object.freeze({
+    executor: value.executor,
+    target_rps: rate,
+    duration_seconds: duration,
+    preallocated_vus: preAllocated,
+    max_vus: maximum,
+    client_network_topology: value.client_network_topology,
+  });
+}
+
 export function arrivalRateScenarioForPerformanceProfile(profile, {
   expectedIterations,
   targetRps,
@@ -42,26 +109,22 @@ export function arrivalRateScenarioForPerformanceProfile(profile, {
   maxVUs,
 }) {
   requirePerformanceProfile(profile);
-  const iterations = positiveInteger(expectedIterations, "expectedIterations");
-  const rate = positiveInteger(targetRps, "targetRps");
-  const duration = positiveInteger(durationSeconds, "durationSeconds");
-  const preAllocated = positiveInteger(preAllocatedVUs, "preAllocatedVUs");
-  const maximum = positiveInteger(maxVUs, "maxVUs");
-  if (maximum < preAllocated) {
-    throw new Error("maxVUs must be greater than or equal to preAllocatedVUs");
-  }
-  const scheduledIterations = rate * duration;
-  if (!Number.isSafeInteger(scheduledIterations) || scheduledIterations !== iterations) {
-    throw new Error("targetRps * durationSeconds must equal the selected fixture iteration count exactly");
-  }
-  return {
+  const loadModel = validatePerformanceLoadModel({
     executor: "constant-arrival-rate",
+    target_rps: targetRps,
+    duration_seconds: durationSeconds,
+    preallocated_vus: preAllocatedVUs,
+    max_vus: maxVUs,
+    client_network_topology: PERFORMANCE_CLIENT_NETWORK_TOPOLOGY,
+  }, expectedIterations);
+  return {
+    executor: loadModel.executor,
     exec: EXEC_BY_PROFILE[profile],
-    rate,
+    rate: loadModel.target_rps,
     timeUnit: "1s",
-    duration: `${duration}s`,
-    preAllocatedVUs: preAllocated,
-    maxVUs: maximum,
+    duration: `${loadModel.duration_seconds}s`,
+    preAllocatedVUs: loadModel.preallocated_vus,
+    maxVUs: loadModel.max_vus,
     gracefulStop: "30s",
   };
 }
