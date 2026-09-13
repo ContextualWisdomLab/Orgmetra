@@ -48,13 +48,17 @@ function result() {
   };
 }
 
-function runtimeEvidence(resultText) {
+function render(value) {
+  return Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function runtimeEvidence(resultArtifact) {
   return {
     schema_version: "orgmetra.employment_separation.runtime_evidence.v1",
     candidate_sha: "a".repeat(40),
     observed_service_sha: "a".repeat(40),
     selected_profile: "first_commit",
-    performance_result_sha256: createHash("sha256").update(resultText, "utf8").digest("hex"),
+    performance_result_sha256: createHash("sha256").update(resultArtifact).digest("hex"),
     fixture_sha256: FIXTURE_SHA256,
     environment_reference: "environment:perf-staging-1",
     deployment_reference: "deployment:orgmetra-people-a1",
@@ -79,13 +83,13 @@ function runtimeEvidence(resultText) {
 
 function evidencePair() {
   const performance = result();
-  const text = `${JSON.stringify(performance, null, 2)}\n`;
-  return { performance, text, runtime: runtimeEvidence(text) };
+  const artifact = render(performance);
+  return { performance, artifact, runtime: runtimeEvidence(artifact) };
 }
 
 test("accepts an exact candidate result only with bound fixture, deployment, resource, and cleanup evidence", () => {
-  const { text, runtime } = evidencePair();
-  assert.deepEqual(validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), {
+  const { artifact, runtime } = evidencePair();
+  assert.deepEqual(validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES), {
     accepted: true,
     candidate_sha: "a".repeat(40),
     selected_profile: "first_commit",
@@ -96,23 +100,23 @@ test("accepts an exact candidate result only with bound fixture, deployment, res
 });
 
 test("rejects a self-declared target when the observed service revision differs", () => {
-  const { text, runtime } = evidencePair();
+  const { artifact, runtime } = evidencePair();
   runtime.observed_service_sha = "b".repeat(40);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), /observed_service_sha must match candidate_sha/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES), /observed_service_sha must match candidate_sha/);
 });
 
 test("rejects a result artifact that is not the one observed by the runtime evidence", () => {
-  const { text, runtime } = evidencePair();
+  const { artifact, runtime } = evidencePair();
   runtime.performance_result_sha256 = "0".repeat(64);
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), /performance_result_sha256/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES), /performance_result_sha256/);
 });
 
 test("rejects first-commit evidence above the commercial p95 target", () => {
   const { performance } = evidencePair();
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values["p(95)"] = 20.001;
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values["p(99)"] = 21;
-  const text = `${JSON.stringify(performance, null, 2)}\n`;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text), FIXTURE_BYTES), /p95 must be <= 20 ms/);
+  const artifact = render(performance);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES), /p95 must be <= 20 ms/);
 });
 
 test("rejects incomplete samples even when the completed subset is fast", () => {
@@ -122,25 +126,24 @@ test("rejects incomplete samples even when the completed subset is fast", () => 
   performance.k6.metrics.iterations.values.count = 999;
   performance.k6.metrics.employment_separation_latency_samples.values.count = 999;
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values.count = 999;
-  const text = `${JSON.stringify(performance, null, 2)}\n`;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtimeEvidence(text), FIXTURE_BYTES), /sample must be complete/);
+  const artifact = render(performance);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES), /sample must be complete/);
 });
 
 test("rejects acceptance when post-run cleanup finds a run-scoped leak", () => {
-  const { text, runtime } = evidencePair();
+  const { artifact, runtime } = evidencePair();
   runtime.residual_open_transactions = 1;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), /residual_open_transactions must be 0/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES), /residual_open_transactions must be 0/);
 });
 
 test("rejects missing CPU, memory, or pool observations instead of accepting latency alone", () => {
-  const { text, runtime } = evidencePair();
+  const { artifact, runtime } = evidencePair();
   runtime.db_pool_acquire_p95_ms = null;
-  assert.throws(() => validateEmploymentSeparationAcceptance(text, runtime, FIXTURE_BYTES), /db_pool_acquire_p95_ms/);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES), /db_pool_acquire_p95_ms/);
 });
 
 test("rejects byte-distinct result artifacts that collide after lossy UTF-8 decoding", () => {
-  const text = `${JSON.stringify(result(), null, 2)}\n`;
-  const resultBytes = Buffer.from(text, "utf8");
+  const resultBytes = render(result());
   const malformedA = Buffer.concat([Buffer.from([0x80]), resultBytes]);
   const malformedB = Buffer.concat([Buffer.from([0x81]), resultBytes]);
   assert.equal(malformedA.toString("utf8"), malformedB.toString("utf8"));
@@ -150,8 +153,7 @@ test("rejects byte-distinct result artifacts that collide after lossy UTF-8 deco
   );
 
   for (const malformed of [malformedA, malformedB]) {
-    const runtime = runtimeEvidence(text);
-    runtime.performance_result_sha256 = createHash("sha256").update(malformed).digest("hex");
+    const runtime = runtimeEvidence(malformed);
     assert.throws(
       () => validateEmploymentSeparationAcceptance(malformed, runtime, FIXTURE_BYTES),
       /valid UTF-8/,
