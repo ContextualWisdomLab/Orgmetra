@@ -6,6 +6,7 @@ import { validateEmploymentSeparationAcceptance } from "./employment_separation_
 import {
   acceptanceFixtureBytes,
   acceptanceFixtureSha256,
+  acceptanceLoadModel,
 } from "./employment_separation_acceptance_fixture_test_support.mjs";
 
 const FIXTURE_BYTES = acceptanceFixtureBytes();
@@ -21,6 +22,7 @@ function result() {
     completed_iterations: 1000,
     sample_complete: true,
     completed_at: "2026-09-13T04:10:00Z",
+    load_model: acceptanceLoadModel(1000),
     dataset_id: "dataset:employment-separation-perf-1",
     clearance_reference: "data_clearance:perf-2026-09",
     preparation_protocol_reference: "protocol:employment-separation-perf-v1",
@@ -37,6 +39,7 @@ function result() {
     k6: {
       metrics: {
         iterations: { values: { count: 1000, rate: 40 } },
+        dropped_iterations: { values: { count: 0, rate: 0 } },
         checks: { values: { rate: 1, passes: 1000, fails: 0 } },
         employment_separation_unexpected_response: { values: { rate: 0, passes: 0, fails: 1000 } },
         employment_separation_latency_samples: { values: { count: 1000, rate: 40 } },
@@ -87,7 +90,7 @@ function evidencePair() {
   return { performance, artifact, runtime: runtimeEvidence(artifact) };
 }
 
-test("accepts an exact candidate result only with bound fixture, deployment, resource, and cleanup evidence", () => {
+test("accepts an exact candidate result only with bound fixture, deployment, resource, load, and cleanup evidence", () => {
   const { artifact, runtime } = evidencePair();
   assert.deepEqual(validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES), {
     accepted: true,
@@ -117,6 +120,18 @@ test("rejects first-commit evidence above the commercial p95 target", () => {
   performance.k6.metrics.employment_separation_first_commit_duration_ms.values["p(99)"] = 21;
   const artifact = render(performance);
   assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES), /p95 must be <= 20 ms/);
+});
+
+test("rejects closed or incomplete offered-load evidence", () => {
+  const { performance } = evidencePair();
+  performance.load_model.executor = "shared-iterations";
+  let artifact = render(performance);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES), /constant-arrival-rate/);
+
+  const dropped = result();
+  dropped.k6.metrics.dropped_iterations.values.count = 1;
+  artifact = render(dropped);
+  assert.throws(() => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES), /dropped_iterations count must equal 0/);
 });
 
 test("rejects incomplete samples even when the completed subset is fast", () => {
