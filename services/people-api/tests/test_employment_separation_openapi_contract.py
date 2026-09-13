@@ -7,6 +7,13 @@ import unittest
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _OPENAPI_PATH = _REPOSITORY_ROOT / "schemas" / "openapi.yaml"
+_APPROVED_SEPARATION_REASONS = (
+    "voluntary_resignation",
+    "retirement_transition",
+    "fixed_term_completion",
+    "position_elimination",
+    "employer_initiated_separation",
+)
 
 
 def _yaml_block(document: str, marker: str) -> str:
@@ -70,7 +77,15 @@ class EmploymentSeparationOpenApiTests(unittest.TestCase):
                 self.assertIn(f"        - {field_name}", block)
                 self.assertIn(f"        {field_name}:", block)
         self.assertIn("      additionalProperties: false", block)
-        self.assertIn("pattern: '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$'", block)
+        reason_block = _yaml_block(block, "        separation_reason_code:")
+        self.assertIn("          enum:", reason_block)
+        published_reasons = tuple(
+            line.strip()[2:]
+            for line in reason_block.splitlines()
+            if line.strip().startswith("- ")
+        )
+        self.assertEqual(published_reasons, _APPROVED_SEPARATION_REASONS)
+        self.assertNotIn("pattern:", reason_block)
         self.assertIn("pattern: '^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$'", block)
         self.assertIn("pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'", block)
 
