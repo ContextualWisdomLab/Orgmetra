@@ -1,4 +1,5 @@
 import http from "k6/http";
+import crypto from "k6/crypto";
 import { check, fail } from "k6";
 import exec from "k6/execution";
 import { Counter, Rate, Trend } from "k6/metrics";
@@ -32,7 +33,9 @@ if (!baseUrl) fail("ORGMETRA_PERFORMANCE_BASE_URL is required");
 if (!bearerToken) fail("ORGMETRA_PERFORMANCE_BEARER_TOKEN is required and must not be stored in the fixture");
 if (!/^[0-9a-f]{40}$/.test(targetSha)) fail("ORGMETRA_PERFORMANCE_TARGET_SHA must be a full Git commit SHA");
 
-const fixture = validatePerformanceFixture(JSON.parse(open(fixturePath)), {
+const fixtureText = open(fixturePath);
+const fixtureSha256 = crypto.sha256(fixtureText, "hex");
+const fixture = validatePerformanceFixture(JSON.parse(fixtureText), {
   minimumNonContendingRecords: MINIMUM_NON_CONTENDING_RECORDS,
   minimumContentionPairs: MINIMUM_CONTENTION_PAIRS,
 });
@@ -196,6 +199,7 @@ export function handleSummary(data) {
   const payload = {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: targetSha,
+    fixture_sha256: fixtureSha256,
     selected_profile: selectedProfile,
     expected_iterations: selectedRecords.length,
     completed_iterations: completedIterations,
