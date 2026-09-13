@@ -102,9 +102,14 @@ test("rejects a complete counter when the measured Trend itself is truncated", (
   );
 });
 
-test("accepts latency evidence only when every expected request contributed to the measured Trend", () => {
+test("validates latency evidence structurally only when every expected request contributed to the measured Trend", () => {
   const artifact = render(performanceResult(1000, 1000));
-  const accepted = validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES);
-  assert.equal(accepted.accepted, true);
-  assert.equal(accepted.p95_ms, 18);
+  const structuralEvidence = validateEmploymentSeparationAcceptance(
+    artifact,
+    runtimeEvidence(artifact),
+    FIXTURE_BYTES,
+  );
+  assert.equal(structuralEvidence.structurally_valid, true);
+  assert.equal(Object.hasOwn(structuralEvidence, "accepted"), false);
+  assert.equal(structuralEvidence.p95_ms, 18);
 });
