@@ -19,11 +19,15 @@ export function requirePerformanceProfile(value) {
   return value;
 }
 
-export function thresholdsForPerformanceProfile(profile) {
+export function thresholdsForPerformanceProfile(profile, expectedIterations) {
   requirePerformanceProfile(profile);
+  if (!Number.isSafeInteger(expectedIterations) || expectedIterations < 1) {
+    throw new Error("expectedIterations must be a positive safe integer");
+  }
   const thresholds = {
     employment_separation_unexpected_response: ["rate==0"],
     checks: ["rate==1"],
+    iterations: [`count>=${expectedIterations}`],
   };
   if (profile === "first_commit") {
     thresholds.employment_separation_first_commit_duration_ms = ["p(95)<=20"];
