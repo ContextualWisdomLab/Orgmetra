@@ -7,10 +7,10 @@ async function main() {
   if (!resultPath || !runtimeEvidencePath || !fixturePath || process.argv.length !== 5) {
     throw new Error("usage: node employment_separation_acceptance_check.mjs <performance-result.json> <runtime-evidence.json> <performance-fixture.json>");
   }
-  const [resultText, runtimeText, fixtureText] = await Promise.all([
+  const [resultText, runtimeText, fixtureBytes] = await Promise.all([
     readFile(resultPath, "utf8"),
     readFile(runtimeEvidencePath, "utf8"),
-    readFile(fixturePath, "utf8"),
+    readFile(fixturePath),
   ]);
   let runtimeEvidence;
   try {
@@ -18,7 +18,7 @@ async function main() {
   } catch (error) {
     throw new Error("runtime evidence must be valid JSON", { cause: error });
   }
-  const acceptance = validateEmploymentSeparationAcceptance(resultText, runtimeEvidence, fixtureText);
+  const acceptance = validateEmploymentSeparationAcceptance(resultText, runtimeEvidence, fixtureBytes);
   process.stdout.write(`${JSON.stringify(acceptance, null, 2)}\n`);
 }
 
