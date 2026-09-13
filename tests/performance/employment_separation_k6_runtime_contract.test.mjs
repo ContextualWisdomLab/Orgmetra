@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -37,4 +38,18 @@ test("rejects substituted versions, images, digests, and runner identities", () 
   assert.throws(() => requirePinnedK6Runtime({ ...validRuntime(), image: "example.invalid/k6" }), /require ghcr\.io\/grafana\/k6/);
   assert.throws(() => requirePinnedK6Runtime({ ...validRuntime(), imageDigest: `sha256:${"0".repeat(64)}` }), /OCI image digest/);
   assert.throws(() => requirePinnedK6Runtime({ ...validRuntime(), runnerIdentity: "ghcr.io/grafana/k6@sha256:substitute" }), /runner identity/);
+});
+
+test("canonical benchmark runner does not accept ungoverned k6 CLI overrides", () => {
+  const runner = readFileSync(new URL("./run_employment_separation_benchmark.sh", import.meta.url), "utf8");
+  assert.doesNotMatch(
+    runner,
+    /"\$@"/,
+    "arbitrary k6 CLI flags can override version-controlled script options and __ENV inputs",
+  );
+  assert.match(
+    runner,
+    /"\$\{PINNED_K6_RUNNER_IDENTITY\}" run "\$\{WORKLOAD\}"\s*$/m,
+    "commercial measurement must end at the version-controlled workload without caller-supplied k6 flags",
+  );
 });
