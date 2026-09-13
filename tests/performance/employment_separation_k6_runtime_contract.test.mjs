@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -185,6 +195,90 @@ test("canonical benchmark runner cannot publish stale or failed-run summary evid
     /rm -f -- "\$\{summary_target\}"/,
     "a publication-integrity mismatch must remove the untrusted caller-visible artifact before failing",
   );
+});
+
+test("canonical benchmark runner rejects a staged-path replacement during publication", () => {
+  const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
+  const runnerPath = fileURLToPath(new URL("./run_employment_separation_benchmark.sh", import.meta.url));
+  const temporaryRoot = mkdtempSync(join(tmpdir(), "orgmetra-summary-publication-race-"));
+  try {
+    const fakeBin = join(temporaryRoot, "bin");
+    mkdirSync(fakeBin);
+    const podmanPath = join(fakeBin, "podman");
+    writeFileSync(
+      podmanPath,
+      `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$1" == "image" && "$2" == "exists" ]]; then exit 0; fi
+if [[ "$1" == "image" && "$2" == "inspect" ]]; then printf '12345\\n'; exit 0; fi
+if [[ "$1" == "image" && "$2" == "rm" ]]; then exit 0; fi
+if [[ "$1" == "import" ]]; then cat >/dev/null; printf 'sha256:fake-workload\\n'; exit 0; fi
+if [[ "$1" == "run" ]]; then
+  if [[ "\${!#}" == "version" ]]; then printf 'k6 v2.2.0\\n'; exit 0; fi
+  output_dir=''
+  summary_name=''
+  args=("$@")
+  for ((i=0; i<\${#args[@]}; i++)); do
+    if [[ "\${args[$i]}" == "--volume" ]]; then
+      value="\${args[$((i+1))]}"
+      if [[ "$value" == *":/output:rw" ]]; then output_dir="\${value%:/output:rw}"; fi
+    fi
+    if [[ "\${args[$i]}" == "--env" ]]; then
+      value="\${args[$((i+1))]}"
+      if [[ "$value" == ORGMETRA_PERFORMANCE_SUMMARY_FILE=/output/* ]]; then
+        summary_name="\${value#ORGMETRA_PERFORMANCE_SUMMARY_FILE=/output/}"
+      fi
+    fi
+  done
+  [[ -n "$output_dir" && -n "$summary_name" ]]
+  printf '{"schema_version":"orgmetra.race_probe.original"}\\n' > "$output_dir/$summary_name"
+  exit 0
+fi
+exit 99
+`,
+      { mode: 0o700 },
+    );
+    chmodSync(podmanPath, 0o700);
+
+    const lnPath = join(fakeBin, "ln");
+    writeFileSync(
+      lnPath,
+      `#!/usr/bin/env bash
+set -euo pipefail
+printf '{"schema_version":"orgmetra.race_probe.replaced"}\\n' > "$1"
+exec /bin/ln "$@"
+`,
+      { mode: 0o700 },
+    );
+    chmodSync(lnPath, 0o700);
+
+    const fixturePath = join(temporaryRoot, "fixture.json");
+    const summaryPath = join(temporaryRoot, "result.json");
+    writeFileSync(fixturePath, "{}\n", { mode: 0o600 });
+
+    const head = spawnSync("git", ["-C", repoRoot, "rev-parse", "HEAD"], { encoding: "utf8" });
+    assert.equal(head.status, 0, head.stderr);
+    const targetSha = head.stdout.trim();
+    const result = spawnSync("bash", [runnerPath], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+        ORGMETRA_PERFORMANCE_BASE_URL: "http://127.0.0.1:18080",
+        ORGMETRA_PERFORMANCE_BEARER_TOKEN: "test-only-token",
+        ORGMETRA_PERFORMANCE_TARGET_SHA: targetSha,
+        ORGMETRA_PERFORMANCE_PROFILE: "first_commit",
+        ORGMETRA_PERFORMANCE_DATA_FILE: fixturePath,
+        ORGMETRA_PERFORMANCE_SUMMARY_FILE: summaryPath,
+      },
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /summary changed during publication/);
+    assert.equal(existsSync(summaryPath), false, "a replaced staged artifact must never remain published");
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true });
+  }
 });
 
 test("canonical benchmark runner rejects CLI overrides before any Podman dependency is needed", () => {
