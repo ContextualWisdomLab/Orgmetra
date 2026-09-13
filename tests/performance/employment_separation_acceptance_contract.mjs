@@ -144,6 +144,17 @@ function validateResult(result) {
   const metricIterations = nonNegativeInteger(iterationValues.count, "result.k6.metrics.iterations.values.count");
   if (metricIterations !== expectedIterations) fail("k6 iteration count must equal expected_iterations");
 
+  const expectedLatencySamples = profile === "contention" ? expectedIterations * 2 : expectedIterations;
+  if (!Number.isSafeInteger(expectedLatencySamples)) fail("expected latency sample count must be a safe integer");
+  const latencySampleValues = metricValues(result, "employment_separation_latency_samples");
+  const latencySampleCount = nonNegativeInteger(
+    latencySampleValues.count,
+    "result.k6.metrics.employment_separation_latency_samples.values.count",
+  );
+  if (latencySampleCount !== expectedLatencySamples) {
+    fail(`latency sample count must equal ${expectedLatencySamples}`);
+  }
+
   const checkValues = metricValues(result, "checks");
   if (finiteNumber(checkValues.rate, "result.k6.metrics.checks.values.rate", { maximum: 1 }) !== 1) {
     fail("k6 checks rate must equal 1");
