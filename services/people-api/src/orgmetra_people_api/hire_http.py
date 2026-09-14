@@ -160,6 +160,14 @@ class HireAcceptanceAsgiApp:
         """Serve one hire mutation without exposing bearer tokens or backend secrets."""
         if type(scope) is not dict:
             raise ValueError("ASGI scope must be a built-in dict")
+
+        # Bind the validated executable dependencies before crossing any external
+        # await boundary. A low-level field replacement during authentication must
+        # not change which policy or mutation capability this request consumes.
+        authenticator = self.authenticator
+        policy = self.policy
+        mutation_port = self.mutation_port
+
         scope_type = scope.get("type")
         if type(scope_type) is not str or scope_type != "http":
             raise ValueError("HireAcceptanceAsgiApp accepts only HTTP ASGI scopes")
@@ -224,7 +232,7 @@ class HireAcceptanceAsgiApp:
 
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
-            principal = await self.authenticator.authenticate(bearer_token)
+            principal = await authenticator.authenticate(bearer_token)
             if type(principal) is not AuthenticatedPrincipal:
                 raise TypeError("authenticator returned an invalid principal")
         except AuthenticationFailed:
@@ -313,8 +321,8 @@ class HireAcceptanceAsgiApp:
                 principal=principal,
                 command=command,
                 purpose_code=purpose_code,
-                policy=self.policy,
-                mutation_port=self.mutation_port,
+                policy=policy,
+                mutation_port=mutation_port,
             )
         except AuthorizationDeniedError:
             await _send_json(
