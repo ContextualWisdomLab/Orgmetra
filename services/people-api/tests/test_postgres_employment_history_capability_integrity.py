@@ -1,4 +1,4 @@
-"""Executable-capability integrity regressions for PostgreSQL Employment-history reads."""
+"""Executable-capability and retained-input integrity regressions for PostgreSQL Employment-history reads."""
 
 from __future__ import annotations
 
@@ -74,3 +74,65 @@ def test_validated_connection_factory_cannot_be_replaced_after_construction() ->
     ) == ()
     assert accepted_calls == 1
     assert replacement_calls == 0
+
+
+def test_forged_uuid_payload_fails_before_executable_equality_or_db_access() -> None:
+    """An exact UUID wrapper must not make a forged retained payload executable."""
+    connection_calls = 0
+
+    class _ExplosivePayload:
+        def __eq__(self, other: object) -> bool:
+            raise AssertionError(f"forged UUID payload compared with {other!r}")
+
+    forged_tenant_id = UUID("0198a415-9ab1-7000-8000-000000000011")
+    object.__setattr__(forged_tenant_id, "int", _ExplosivePayload())
+
+    def connection_factory() -> _Connection:
+        nonlocal connection_calls
+        connection_calls += 1
+        return _Connection()
+
+    port = PostgresEmploymentHistoryReadPort(connection_factory)
+    with pytest.raises(ValueError, match="tenant_record_id must be an operational UUID"):
+        port.read_employment_history(
+            tenant_record_id=forged_tenant_id,
+            person_record_id=PERSON_ID,
+            known_at=KNOWN_AT,
+        )
+    assert connection_calls == 0
+
+
+def test_validated_request_uuid_aliases_are_detached_before_connection_acquisition() -> None:
+    """A dependency cannot retarget the query by mutating caller-owned UUID aliases after validation."""
+    requested_tenant_id = UUID("0198a415-9ab1-7000-8000-000000000021")
+    requested_person_id = UUID("0198a415-9ab1-7000-8000-000000000022")
+    original_tenant_id = UUID(int=requested_tenant_id.int)
+    original_person_id = UUID(int=requested_person_id.int)
+    replacement_tenant_id = UUID("0198a415-9ab1-7000-8000-000000000031")
+    replacement_person_id = UUID("0198a415-9ab1-7000-8000-000000000032")
+    executions: list[tuple[str, object | None]] = []
+
+    class _RecordingCursor(_Cursor):
+        def execute(self, sql: str, parameters: object | None = None) -> None:
+            executions.append((sql, parameters))
+
+    class _RecordingConnection(_Connection):
+        def cursor(self) -> _RecordingCursor:
+            return _RecordingCursor()
+
+    def mutating_factory() -> _RecordingConnection:
+        object.__setattr__(requested_tenant_id, "int", replacement_tenant_id.int)
+        object.__setattr__(requested_person_id, "int", replacement_person_id.int)
+        return _RecordingConnection()
+
+    port = PostgresEmploymentHistoryReadPort(mutating_factory)
+    assert port.read_employment_history(
+        tenant_record_id=requested_tenant_id,
+        person_record_id=requested_person_id,
+        known_at=KNOWN_AT,
+    ) == ()
+
+    assert executions[1][1] == (str(original_tenant_id),)
+    query_parameters = executions[2][1]
+    assert type(query_parameters) is tuple
+    assert query_parameters[:2] == (original_tenant_id, original_person_id)
