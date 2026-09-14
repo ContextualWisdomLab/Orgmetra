@@ -134,6 +134,40 @@ async def _send_authentication_backend_error(
     )
 
 
+async def _send_persistence_backend_error(
+    send: AsgiSend,
+    *,
+    request: _ParsedPositionHistoryRequest,
+    error: Exception,
+) -> None:
+    """Correlate a protected-read failure without logging backend secrets."""
+    support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+    client_message = (
+        "Retry later or contact an Orgmetra operator with non-secret request metadata; "
+        "never include the bearer token."
+    )
+    _LOGGER.error(
+        "Position-history persistence backend failed",
+        extra={
+            "route": "position_history",
+            "tenant_record_id": str(request.tenant_record_id),
+            "exception_type": type(error).__name__,
+            "support_reference": support_reference,
+        },
+    )
+    await _emit_json(
+        send,
+        status=500,
+        payload={
+            "error": "internal_error",
+            "error_code": "internal_error",
+            "message": client_message,
+            "next_action": client_message,
+            "support_reference": support_reference,
+        },
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class PositionHistoryAsgiApp:
     """Expose one tenant-scoped, read-only Position-history route.
@@ -261,13 +295,8 @@ class PositionHistoryAsgiApp:
                 message="The Position history cannot be returned safely; ask an Orgmetra operator to inspect the authoritative lineage.",
             )
             return
-        except Exception:  # noqa: BLE001 - HTTP boundary must fail closed without backend details.
-            await _send_error(
-                send,
-                status=500,
-                error_code="internal_error",
-                message="Retry later or contact an Orgmetra operator with non-secret request metadata; never include the bearer token.",
-            )
+        except Exception as error:  # noqa: BLE001 - HTTP boundary must fail closed without backend details.
+            await _send_persistence_backend_error(send, request=request, error=error)
             return
 
         await _emit_json(
