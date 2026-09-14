@@ -116,11 +116,14 @@ class TokenAuthenticator(Protocol):
 def extract_bearer_token(authorization_header: str | None) -> str:
     """Return one bounded printable bearer token without logging its value.
 
-    Splitting only on the first ASCII space keeps C0 separators visible so they
-    are rejected rather than silently treated as whitespace by ``str.split``.
+    Only exact built-in text is parsed. Splitting only on the first ASCII space
+    keeps C0 separators visible so they are rejected rather than silently treated
+    as whitespace by ``str.split``.
     """
     if authorization_header is None:
         raise AuthenticationFailed("bearer authentication is required")
+    if type(authorization_header) is not str:
+        raise AuthenticationFailed("authorization header must be exact text")
     parts = authorization_header.split(" ", 1)
     if len(parts) != 2 or parts[0].casefold() != "bearer":
         raise AuthenticationFailed("authorization must use the Bearer scheme")
