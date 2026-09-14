@@ -73,9 +73,12 @@ def _operational_uuid(field_name: str, value: object) -> UUID:
 def _generated_operational_uuid(field_name: str, id_factory: Callable[[], UUID]) -> UUID:
     """Treat malformed server-generated identities as operational failure, never caller error."""
     value = id_factory()
-    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
+    if type(value) is not UUID:
         raise RuntimeError(f"{field_name} factory did not return an operational UUID")
-    return UUID(int=value.int)
+    integer_payload = value.int
+    if type(integer_payload) is not int or integer_payload in (0, _MAX_UUID_INT):
+        raise RuntimeError(f"{field_name} factory did not return an operational UUID")
+    return UUID(int=integer_payload)
 
 
 def _business_date(value: object) -> date:
