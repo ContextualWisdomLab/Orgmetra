@@ -162,6 +162,17 @@ class HeaderContainerIntegrityTests(unittest.IsolatedAsyncioTestCase):
         status, payload = await self._invoke_with_post_auth_headers(replacement)
         self.assertEqual((status, payload["error"]), (400, "invalid_request"))
 
+    async def test_post_auth_header_collection_reapplies_aggregate_byte_budget(self) -> None:
+        replacement = [
+            (b"authorization", b"Bearer opaque-token"),
+            (b"x-first", b"a" * 8192),
+            (b"x-second", b"b" * 8192),
+            (b"content-type", b"application/json"),
+            (b"idempotency-key", IDEMPOTENCY_KEY),
+        ]
+        status, payload = await self._invoke_with_post_auth_headers(replacement)
+        self.assertEqual((status, payload["error"]), (400, "invalid_request"))
+
 
 if __name__ == "__main__":
     unittest.main()
