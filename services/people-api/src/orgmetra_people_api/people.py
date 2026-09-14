@@ -49,7 +49,8 @@ class WorkerPeopleRecord:
 
     The persistence adapter is responsible for deriving this record from the
     current tenant-scoped candidate conversion, person name, employment, and
-    employment-version facts at the requested effective date. No credential or
+    employment-version facts at the requested effective date. UUID evidence is
+    detached from persistence-owned aliases during construction. No credential or
     purpose grant is stored here.
     """
 
@@ -62,7 +63,7 @@ class WorkerPeopleRecord:
     employment_status_code: str
 
     def __post_init__(self) -> None:
-        """Reject sentinel identities and malformed business values from persistence."""
+        """Reject malformed values and detach accepted UUID evidence from persistence aliases."""
         for field_name in (
             "tenant_record_id",
             "candidate_worker_conversion_record_id",
@@ -70,7 +71,8 @@ class WorkerPeopleRecord:
             "person_record_id",
             "employment_record_id",
         ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
+            identity = _validate_operational_uuid(field_name, getattr(self, field_name))
+            object.__setattr__(self, field_name, UUID(int=identity))
         if type(self.display_name) is not str or not self.display_name.strip():
             raise ValueError("display_name must contain a usable worker name.")
         if (
