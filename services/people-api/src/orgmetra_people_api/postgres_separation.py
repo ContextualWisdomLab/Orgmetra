@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from dataclasses import replace
 from typing import Any, Callable, NoReturn
+from uuid import UUID
 
 from orgmetra_keyverse_adapter import AuthorizationDecision
 
@@ -31,6 +32,15 @@ FROM public.separate_employment_record_once(
 )
 """.strip()
 _EMPLOYMENT_FIELDS = frozenset({"employment_record"})
+_MAX_UUID_INT = (1 << 128) - 1
+
+
+def _is_operational_uuid(value: object) -> bool:
+    """Return whether UUID evidence has an inert operational integer payload."""
+    if type(value) is not UUID:
+        return False
+    identity = value.int
+    return type(identity) is int and 0 < identity < _MAX_UUID_INT
 
 
 def _require_authorization(
@@ -38,25 +48,75 @@ def _require_authorization(
     authorization: object,
     command: EmploymentSeparationCommand,
 ) -> AuthorizationDecision:
-    """Require exact allow evidence for the governed separation operation."""
+    """Validate and detach allow evidence for the governed separation operation."""
     if type(authorization) is not AuthorizationDecision:
         raise EmploymentSeparationPersistenceIntegrityError(
             "Employment separation requires typed authorization evidence"
         )
+
+    allowed = authorization.allowed
+    tenant_record_id = authorization.tenant_record_id
+    actor_reference = authorization.actor_reference
+    resource_reference = authorization.resource_reference
+    policy_version_code = authorization.policy_version_code
+    purpose_code = authorization.purpose_code
+    operation_code = authorization.operation_code
+    resource_kind = authorization.resource_kind
+    requested_fields = authorization.requested_fields
+    authorized_fields = authorization.authorized_fields
+    reason_code = authorization.reason_code
+    next_action = authorization.next_action
+
     if (
-        not authorization.allowed
-        or authorization.tenant_record_id != command.tenant_record_id
-        or authorization.resource_reference != f"employment_record:{command.employment_record_id.hex}"
-        or authorization.purpose_code != "workforce_admin"
-        or authorization.operation_code != "separate_record"
-        or authorization.resource_kind != "employment_record"
-        or authorization.requested_fields != _EMPLOYMENT_FIELDS
-        or authorization.authorized_fields != _EMPLOYMENT_FIELDS
+        type(allowed) is not bool
+        or not _is_operational_uuid(tenant_record_id)
+        or type(actor_reference) is not str
+        or type(resource_reference) is not str
+        or type(policy_version_code) is not str
+        or type(purpose_code) is not str
+        or type(operation_code) is not str
+        or type(resource_kind) is not str
+        or type(requested_fields) is not frozenset
+        or type(authorized_fields) is not frozenset
+        or type(reason_code) is not str
+        or type(next_action) is not str
+        or any(type(field) is not str for field in requested_fields)
+        or any(type(field) is not str for field in authorized_fields)
+    ):
+        raise EmploymentSeparationPersistenceIntegrityError(
+            "Employment separation authorization evidence is invalid"
+        )
+
+    tenant_identity = tenant_record_id.int
+    assert type(tenant_identity) is int
+    decision = AuthorizationDecision(
+        allowed=allowed,
+        tenant_record_id=UUID(int=tenant_identity),
+        actor_reference=actor_reference,
+        resource_reference=resource_reference,
+        policy_version_code=policy_version_code,
+        purpose_code=purpose_code,
+        operation_code=operation_code,
+        resource_kind=resource_kind,
+        requested_fields=frozenset(tuple(requested_fields)),
+        authorized_fields=frozenset(tuple(authorized_fields)),
+        reason_code=reason_code,
+        next_action=next_action,
+    )
+    if (
+        not decision.allowed
+        or decision.tenant_record_id != command.tenant_record_id
+        or decision.resource_reference != f"employment_record:{command.employment_record_id.hex}"
+        or decision.purpose_code != "workforce_admin"
+        or decision.operation_code != "separate_record"
+        or decision.resource_kind != "employment_record"
+        or decision.requested_fields != _EMPLOYMENT_FIELDS
+        or decision.authorized_fields != _EMPLOYMENT_FIELDS
     ):
         raise EmploymentSeparationPersistenceIntegrityError(
             "Employment separation authorization does not match the exact record"
         )
-    return authorization
+    return decision
 
 
 def _require_transactional_connection(connection: object) -> None:
