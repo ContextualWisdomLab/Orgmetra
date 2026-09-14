@@ -7,6 +7,7 @@ existing hire-acceptance contracts.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import date
 import json
@@ -305,7 +306,8 @@ class HireAcceptanceAsgiApp:
             return
 
         try:
-            result = accept_confirmed_hire(
+            result = await asyncio.to_thread(
+                accept_confirmed_hire,
                 principal=principal,
                 command=command,
                 purpose_code=purpose_code,
