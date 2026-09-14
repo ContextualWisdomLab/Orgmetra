@@ -119,6 +119,27 @@ def _command_from_payload(
 
 
 @dataclass(frozen=True, slots=True)
+class _SeparationRuntime:
+    """Bind executable Employment-separation capabilities before an external await."""
+
+    authenticator: TokenAuthenticator
+    policy: PurposeBoundAccessPolicy
+    separation_port: EmploymentSeparationPort
+    id_factory: Callable[[], UUID]
+
+    def __post_init__(self) -> None:
+        """Fail closed if request-entry capabilities no longer satisfy their contracts."""
+        if not isinstance(self.authenticator, TokenAuthenticator):
+            raise TypeError("authenticator must implement TokenAuthenticator")
+        if not isinstance(self.policy, PurposeBoundAccessPolicy):
+            raise TypeError("policy must be a PurposeBoundAccessPolicy")
+        if not isinstance(self.separation_port, EmploymentSeparationPort):
+            raise TypeError("separation_port must implement EmploymentSeparationPort")
+        if not callable(self.id_factory):
+            raise TypeError("id_factory must be callable")
+
+
+@dataclass(frozen=True, slots=True)
 class EmploymentSeparationAsgiApp:
     """Expose one purpose-bound buyer route for authoritative Employment separation."""
 
@@ -129,20 +150,23 @@ class EmploymentSeparationAsgiApp:
 
     def __post_init__(self) -> None:
         """Reject incomplete dependency injection before serving high-impact writes."""
-        if not isinstance(self.authenticator, TokenAuthenticator):
-            raise TypeError("authenticator must implement TokenAuthenticator")
-        if not isinstance(self.policy, PurposeBoundAccessPolicy):
-            raise TypeError("policy must be a PurposeBoundAccessPolicy")
-        if not isinstance(self.separation_port, EmploymentSeparationPort):
-            raise TypeError("separation_port must implement EmploymentSeparationPort")
-        if not callable(self.id_factory):
-            raise TypeError("id_factory must be callable")
+        _SeparationRuntime(
+            authenticator=self.authenticator,
+            policy=self.policy,
+            separation_port=self.separation_port,
+            id_factory=self.id_factory,
+        )
 
     async def __call__(self, scope: Mapping[str, object], receive: AsgiReceive, send: AsgiSend) -> None:
         """Serve one separation without leaking bearer tokens or database capabilities."""
-        if scope.get("type") != "http":
+        if type(scope) is not dict:
+            raise ValueError("EmploymentSeparationAsgiApp requires an exact ASGI scope dict")
+        scope_type = scope.get("type")
+        if type(scope_type) is not str or scope_type != "http":
             raise ValueError("EmploymentSeparationAsgiApp accepts only HTTP ASGI scopes")
-        if scope.get("method") != "POST":
+
+        method = scope.get("method")
+        if type(method) is not str or method != "POST":
             await _send_error(
                 send,
                 status=405,
@@ -150,7 +174,8 @@ class EmploymentSeparationAsgiApp:
                 extra_headers=((b"allow", b"POST"),),
             )
             return
-        if scope.get("path") != _ROUTE:
+        path = scope.get("path")
+        if type(path) is not str or path != _ROUTE:
             await _send_error(
                 send,
                 status=404,
@@ -178,9 +203,16 @@ class EmploymentSeparationAsgiApp:
             )
             return
 
+        runtime = _SeparationRuntime(
+            authenticator=self.authenticator,
+            policy=self.policy,
+            separation_port=self.separation_port,
+            id_factory=self.id_factory,
+        )
+
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
-            principal = await self.authenticator.authenticate(bearer_token)
+            principal = await runtime.authenticator.authenticate(bearer_token)
             if not isinstance(principal, AuthenticatedPrincipal):
                 raise TypeError("authenticator returned an invalid principal")
         except AuthenticationFailed:
@@ -248,8 +280,8 @@ class EmploymentSeparationAsgiApp:
             return
 
         try:
-            audit_event_record_id = _generated_operational_uuid("audit_event_record_id", self.id_factory)
-            outbox_delivery_record_id = _generated_operational_uuid("outbox_delivery_record_id", self.id_factory)
+            audit_event_record_id = _generated_operational_uuid("audit_event_record_id", runtime.id_factory)
+            outbox_delivery_record_id = _generated_operational_uuid("outbox_delivery_record_id", runtime.id_factory)
         except Exception as error:  # noqa: BLE001 - server identity generation is an operational dependency.
             support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
             _LOGGER.error(
@@ -293,8 +325,8 @@ class EmploymentSeparationAsgiApp:
                 principal=principal,
                 command=command,
                 purpose_code=headers.purpose_code,
-                policy=self.policy,
-                separation_port=self.separation_port,
+                policy=runtime.policy,
+                separation_port=runtime.separation_port,
             )
         except AuthorizationDeniedError:
             await _send_error(
