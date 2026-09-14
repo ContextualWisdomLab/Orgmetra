@@ -29,7 +29,7 @@ class _ExplodingBytes(bytes):
 
 
 class HireHttpBodyFrameIntegrityTests(unittest.IsolatedAsyncioTestCase):
-    """Reject executable ASGI body-frame subtypes before structural operations."""
+    """Reject executable or malformed ASGI body frames before framing decisions."""
 
     async def test_frame_subclass_is_rejected_before_get(self) -> None:
         async def receive() -> dict[str, object]:
@@ -58,6 +58,39 @@ class HireHttpBodyFrameIntegrityTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(_InvalidHttpRequest):
             await _read_json_object(receive)
+
+    async def test_integer_more_body_is_rejected_instead_of_truncating_body(self) -> None:
+        async def receive() -> dict[str, object]:
+            return {"type": "http.request", "body": b"{}", "more_body": 1}
+
+        with self.assertRaises(_InvalidHttpRequest):
+            await _read_json_object(receive)
+
+    async def test_string_more_body_is_rejected_instead_of_truncating_body(self) -> None:
+        async def receive() -> dict[str, object]:
+            return {"type": "http.request", "body": b"{}", "more_body": "false"}
+
+        with self.assertRaises(_InvalidHttpRequest):
+            await _read_json_object(receive)
+
+    async def test_exact_true_continues_to_next_frame(self) -> None:
+        frames = iter(
+            (
+                {"type": "http.request", "body": b'{"value":', "more_body": True},
+                {"type": "http.request", "body": b"17}", "more_body": False},
+            )
+        )
+
+        async def receive() -> dict[str, object]:
+            return next(frames)
+
+        self.assertEqual(await _read_json_object(receive), {"value": 17})
+
+    async def test_missing_more_body_defaults_to_false(self) -> None:
+        async def receive() -> dict[str, object]:
+            return {"type": "http.request", "body": b"{}"}
+
+        self.assertEqual(await _read_json_object(receive), {})
 
     async def test_exact_dict_string_and_bytes_frame_remains_supported(self) -> None:
         async def receive() -> dict[str, object]:
