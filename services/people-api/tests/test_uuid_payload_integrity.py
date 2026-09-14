@@ -11,6 +11,7 @@ from orgmetra_people_api.postgres_hire import _is_operational_uuid as _is_hire_o
 from orgmetra_people_api.postgres_mutations import (
     _is_operational_uuid as _is_mutation_operational_uuid,
 )
+from orgmetra_people_api.separation import _operational_uuid as _validate_separation_operational_uuid
 
 _OPERATIONAL_UUID = UUID("0198a412-9000-7000-8000-0000000000aa")
 _OUT_OF_RANGE_IDENTITIES = (-1, 1 << 128)
@@ -30,6 +31,15 @@ class _ExecutableUUIDPayload:
         self.calls += 1
         raise TypeError("UUID payload inequality executed before exact integer validation")
 
+    def __lt__(self, other: object) -> bool:
+        self.calls += 1
+        raise TypeError("UUID payload ordering executed before exact integer validation")
+
+    def __gt__(self, other: object) -> bool:
+        self.calls += 1
+        raise TypeError("UUID payload ordering executed before exact integer validation")
+
+
 
 def _forged_uuid(payload: object) -> UUID:
     """Return an exact UUID whose internal integer slot was rewritten after construction."""
@@ -42,7 +52,11 @@ class PeopleUuidPayloadIntegrityTests(unittest.TestCase):
     """Keep mutation/application and durable UUID gates inert on corrupted exact UUIDs."""
 
     def test_application_uuid_gates_reject_executable_internal_payload(self) -> None:
-        for validator in (_validate_hire_operational_uuid, _validate_mutation_operational_uuid):
+        for validator in (
+            _validate_hire_operational_uuid,
+            _validate_mutation_operational_uuid,
+            _validate_separation_operational_uuid,
+        ):
             with self.subTest(validator=validator.__module__):
                 payload = _ExecutableUUIDPayload()
 
@@ -60,7 +74,11 @@ class PeopleUuidPayloadIntegrityTests(unittest.TestCase):
                 self.assertEqual(payload.calls, 0)
 
     def test_application_uuid_gates_reject_out_of_range_exact_integer_payload(self) -> None:
-        for validator in (_validate_hire_operational_uuid, _validate_mutation_operational_uuid):
+        for validator in (
+            _validate_hire_operational_uuid,
+            _validate_mutation_operational_uuid,
+            _validate_separation_operational_uuid,
+        ):
             for identity in _OUT_OF_RANGE_IDENTITIES:
                 with self.subTest(validator=validator.__module__, identity=identity):
                     with self.assertRaisesRegex(ValueError, "tenant_record_id must be an operational UUID"):
@@ -73,7 +91,11 @@ class PeopleUuidPayloadIntegrityTests(unittest.TestCase):
                     self.assertFalse(validator(_forged_uuid(identity)))
 
     def test_exact_operational_uuid_remains_accepted(self) -> None:
-        for validator in (_validate_hire_operational_uuid, _validate_mutation_operational_uuid):
+        for validator in (
+            _validate_hire_operational_uuid,
+            _validate_mutation_operational_uuid,
+            _validate_separation_operational_uuid,
+        ):
             with self.subTest(validator=validator.__module__):
                 validator("tenant_record_id", _OPERATIONAL_UUID)
         self.assertTrue(_is_hire_operational_uuid(_OPERATIONAL_UUID))

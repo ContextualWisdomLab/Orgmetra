@@ -43,9 +43,10 @@ def _operational_uuid(field_name: str, value: object) -> UUID:
     """Validate one operational UUID and detach any retained identity alias."""
     if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
-    if not (0 < value.int < _MAX_UUID_INT):
+    identity = value.int
+    if type(identity) is not int or not (0 < identity < _MAX_UUID_INT):
         raise ValueError(f"{field_name} must be an operational UUID.")
-    return UUID(int=value.int)
+    return UUID(int=identity)
 
 
 def _namespaced_reference(field_name: str, value: object) -> str:
