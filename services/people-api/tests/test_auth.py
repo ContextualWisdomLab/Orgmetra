@@ -89,6 +89,19 @@ class PrincipalBoundaryTests(unittest.TestCase):
         self.assertEqual(principal.tenant_record_id, TENANT)
         self.assertIsNot(principal.tenant_record_id, caller_tenant)
 
+    def test_tenant_uuid_views_do_not_mutate_retained_principal_authority(self) -> None:
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({"orgmetra.people.read"}),
+        )
+        exposed_tenant = principal.tenant_record_id
+
+        object.__setattr__(exposed_tenant, "int", OTHER_TENANT.int)
+
+        self.assertEqual(principal.tenant_record_id, TENANT)
+        self.assertIsNot(principal.tenant_record_id, exposed_tenant)
+
     def test_rejects_behavior_bearing_text_and_scope_container(self) -> None:
         cases = (
             {
