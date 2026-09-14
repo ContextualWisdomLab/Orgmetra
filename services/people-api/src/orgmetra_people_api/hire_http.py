@@ -155,11 +155,12 @@ class HireAcceptanceAsgiApp:
 
     async def __call__(self, scope: Mapping[str, object], receive: AsgiReceive, send: AsgiSend) -> None:
         """Serve one hire mutation without exposing bearer tokens or backend secrets."""
-        if scope.get("type") != "http":
+        scope_type = scope.get("type")
+        if type(scope_type) is not str or scope_type != "http":
             raise ValueError("HireAcceptanceAsgiApp accepts only HTTP ASGI scopes")
 
         method = scope.get("method")
-        if method != "POST":
+        if type(method) is not str or method != "POST":
             await _send_json(
                 send,
                 status=405,
@@ -172,7 +173,7 @@ class HireAcceptanceAsgiApp:
             return
 
         path = scope.get("path")
-        if not isinstance(path, str):
+        if type(path) is not str:
             await _send_json(
                 send,
                 status=404,
@@ -219,7 +220,7 @@ class HireAcceptanceAsgiApp:
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
             principal = await self.authenticator.authenticate(bearer_token)
-            if not isinstance(principal, AuthenticatedPrincipal):
+            if type(principal) is not AuthenticatedPrincipal:
                 raise TypeError("authenticator returned an invalid principal")
         except AuthenticationFailed:
             await _send_json(
@@ -381,7 +382,7 @@ def _looks_like_hire_route(path: str) -> bool:
 
 def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
     """Validate tenant and purpose before authentication and body interpretation."""
-    if not isinstance(raw_query, bytes):
+    if type(raw_query) is not bytes:
         raise _InvalidHttpRequest("query_string must be bytes")
     if len(raw_query) > _MAX_QUERY_STRING_BYTES:
         raise _InvalidHttpRequest("query string exceeds the accepted size")
@@ -428,9 +429,11 @@ def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
         if not isinstance(header, (list, tuple)) or len(header) != 2:
             raise _InvalidHttpRequest("Idempotency-Key is required")
         name, value = header
-        if not isinstance(name, bytes) or not isinstance(value, bytes):
+        if type(name) is not bytes:
             raise _InvalidHttpRequest("Idempotency-Key is required")
         if name.lower() == b"idempotency-key":
+            if type(value) is not bytes:
+                raise _InvalidHttpRequest("Idempotency-Key is required")
             values.append(value)
     if len(values) != 1:
         raise _InvalidHttpRequest("exactly one Idempotency-Key is required")
@@ -451,9 +454,11 @@ def _require_json_content_type(scope: Mapping[str, object]) -> None:
         if not isinstance(header, (list, tuple)) or len(header) != 2:
             raise _UnsupportedMediaType("content-type is required")
         name, value = header
-        if not isinstance(name, bytes) or not isinstance(value, bytes):
+        if type(name) is not bytes:
             raise _UnsupportedMediaType("content-type is required")
         if name.lower() == b"content-type":
+            if type(value) is not bytes:
+                raise _UnsupportedMediaType("content-type is required")
             values.append(value)
     if len(values) != 1 or values[0].split(b";", 1)[0].strip().lower() != b"application/json":
         raise _UnsupportedMediaType("application/json is required")
