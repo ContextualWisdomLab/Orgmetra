@@ -36,9 +36,11 @@ authentication, authorization, integrity, and unexpected failures to the
 published client-safe error envelope.
 
 OpenAPI publishes the route, query/path parameters, Employment-history response,
-scope, and 400/401/403/409 responses. The dedicated workflow checks the exact
-PR head, compiles the service, and runs the complete People suite at 100%
-statement and branch coverage.
+scope, and 400/401/403/409 responses. Repository-owned acceptance is executed by
+the canonical Foundation CI after this stacked lane returns to a protected-
+`develop` pull-request boundary. The historical feature-local Employment-history
+workflow is retired; its service tests remain part of the complete People suite
+and retain the exact 100% statement and branch coverage requirement.
 
 ## Consequences
 
@@ -50,13 +52,18 @@ statement and branch coverage.
 - The route intentionally does not add pagination, export, writes,
   cross-service joins, or high-impact employment decisions; each requires a
   separate contract.
+- Current #149 contains later application-integrity repairs and protected #161
+  workflow consolidation. This PR must adopt that parent through ordinary
+  non-force reconciliation before any protected-integration claim.
 
 ## Verification
 
 The test-only child head `6c2d6b89` fails during collection while the HTTP
-adapter module is absent. The implementation retains that test-first chain and
-must remain a Draft stacked PR until independent review and all protected
-central gates are authoritative.
+adapter module is absent. The implementation retains that test-first chain.
+Historical evidence from the pre-consolidation feature head does not transfer to
+the current branch. After semantic parent reconciliation, the resulting exact
+head must run the canonical Foundation, security, CodeQL, model-review, and
+independent-review gates before integration.
 
 RFC 3339, OpenAPI 3.2.0, NIST zero-trust authorization guidance, and
 PostgreSQL temporal/read-boundary guidance inform this transport decision. They
