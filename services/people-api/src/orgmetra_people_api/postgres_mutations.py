@@ -125,15 +125,27 @@ SELECT
     job.job_profile_id,
     pg_catalog.transaction_timestamp()
 FROM public.organization_unit AS organization
+JOIN public.organization_unit_version AS organization_version
+  ON organization_version.tenant_record_id = organization.tenant_record_id
+ AND organization_version.organization_unit_id = organization.organization_unit_id
 JOIN public.job_profile AS job
   ON job.tenant_record_id = organization.tenant_record_id
  AND job.job_profile_id = %s
+JOIN public.job_profile_version AS job_version
+  ON job_version.tenant_record_id = job.tenant_record_id
+ AND job_version.job_profile_id = job.job_profile_id
 WHERE organization.tenant_record_id = %s
   AND organization.organization_unit_id = %s
   AND organization.recorded_to IS NULL
   AND job.recorded_to IS NULL
+  AND organization_version.recorded_to IS NULL
+  AND organization_version.effective_from <= %s
+  AND (organization_version.effective_to IS NULL OR organization_version.effective_to > %s)
+  AND job_version.recorded_to IS NULL
+  AND job_version.effective_from <= %s
+  AND (job_version.effective_to IS NULL OR job_version.effective_to > %s)
 LIMIT 2
-FOR SHARE OF organization, job
+FOR SHARE OF organization, job, organization_version, job_version
 """.strip()
 
 _INSERT_POSITION_SQL = """
@@ -839,7 +851,15 @@ class PostgresPeopleMutationPort(tuple):
                     )
                 cursor.execute(
                     _POSITION_PARENTS_SQL,
-                    (command.job_profile_id, command.tenant_record_id, command.organization_unit_id),
+                    (
+                        command.job_profile_id,
+                        command.tenant_record_id,
+                        command.organization_unit_id,
+                        command.effective_from,
+                        command.effective_from,
+                        command.effective_from,
+                        command.effective_from,
+                    ),
                 )
                 rows = _unpack_fixed_rows(
                     cursor.fetchmany(2),
