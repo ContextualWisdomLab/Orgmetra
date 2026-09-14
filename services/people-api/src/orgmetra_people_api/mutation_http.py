@@ -104,6 +104,33 @@ class _MutationHeaders:
     idempotency_key: str
 
 
+@dataclass(frozen=True, slots=True)
+class _MutationRuntime:
+    """Bind executable mutation capabilities before crossing an external await."""
+
+    authenticator: TokenAuthenticator
+    employment_policy: PurposeBoundAccessPolicy
+    position_policy: PurposeBoundAccessPolicy
+    assignment_policy: PurposeBoundAccessPolicy
+    mutation_port: PeopleMutationPort
+    id_factory: Callable[[], UUID]
+
+    def __post_init__(self) -> None:
+        """Fail closed if request-entry capabilities no longer satisfy their contracts."""
+        if not isinstance(self.authenticator, TokenAuthenticator):
+            raise TypeError("authenticator must implement TokenAuthenticator")
+        if not isinstance(self.employment_policy, PurposeBoundAccessPolicy):
+            raise TypeError("employment_policy must be a PurposeBoundAccessPolicy")
+        if not isinstance(self.position_policy, PurposeBoundAccessPolicy):
+            raise TypeError("position_policy must be a PurposeBoundAccessPolicy")
+        if not isinstance(self.assignment_policy, PurposeBoundAccessPolicy):
+            raise TypeError("assignment_policy must be a PurposeBoundAccessPolicy")
+        if not isinstance(self.mutation_port, PeopleMutationPort):
+            raise TypeError("mutation_port must implement PeopleMutationPort")
+        if not callable(self.id_factory):
+            raise TypeError("id_factory must be callable")
+
+
 async def _send_error(
     send: AsgiSend,
     *,
@@ -166,18 +193,14 @@ class PeopleMutationAsgiApp:
 
     def __post_init__(self) -> None:
         """Reject incomplete dependency injection before serving mutations."""
-        if not isinstance(self.authenticator, TokenAuthenticator):
-            raise TypeError("authenticator must implement TokenAuthenticator")
-        if not isinstance(self.employment_policy, PurposeBoundAccessPolicy):
-            raise TypeError("employment_policy must be a PurposeBoundAccessPolicy")
-        if not isinstance(self.position_policy, PurposeBoundAccessPolicy):
-            raise TypeError("position_policy must be a PurposeBoundAccessPolicy")
-        if not isinstance(self.assignment_policy, PurposeBoundAccessPolicy):
-            raise TypeError("assignment_policy must be a PurposeBoundAccessPolicy")
-        if not isinstance(self.mutation_port, PeopleMutationPort):
-            raise TypeError("mutation_port must implement PeopleMutationPort")
-        if not callable(self.id_factory):
-            raise TypeError("id_factory must be callable")
+        _MutationRuntime(
+            authenticator=self.authenticator,
+            employment_policy=self.employment_policy,
+            position_policy=self.position_policy,
+            assignment_policy=self.assignment_policy,
+            mutation_port=self.mutation_port,
+            id_factory=self.id_factory,
+        )
 
     async def __call__(self, scope: Mapping[str, object], receive: AsgiReceive, send: AsgiSend) -> None:
         """Serve one People mutation without exposing bearer tokens or backend secrets."""
@@ -237,9 +260,18 @@ class PeopleMutationAsgiApp:
             )
             return
 
+        runtime = _MutationRuntime(
+            authenticator=self.authenticator,
+            employment_policy=self.employment_policy,
+            position_policy=self.position_policy,
+            assignment_policy=self.assignment_policy,
+            mutation_port=self.mutation_port,
+            id_factory=self.id_factory,
+        )
+
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
-            principal = await self.authenticator.authenticate(bearer_token)
+            principal = await runtime.authenticator.authenticate(bearer_token)
             if not isinstance(principal, AuthenticatedPrincipal):
                 raise TypeError("authenticator returned an invalid principal")
         except AuthenticationFailed:
@@ -295,7 +327,7 @@ class PeopleMutationAsgiApp:
                 route,
                 headers.tenant_record_id,
                 payload,
-                self.id_factory,
+                runtime.id_factory,
                 headers.idempotency_key,
             )
         except _PayloadTooLarge:
@@ -325,7 +357,7 @@ class PeopleMutationAsgiApp:
                 principal=principal,
                 command=command,
                 purpose_code=headers.purpose_code,
-                app=self,
+                app=runtime,
             )
         except AuthorizationDeniedError:
             await _send_error(
@@ -612,7 +644,7 @@ def _dispatch_mutation(
     principal: AuthenticatedPrincipal,
     command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
     purpose_code: str,
-    app: PeopleMutationAsgiApp,
+    app: PeopleMutationAsgiApp | _MutationRuntime,
 ) -> tuple[dict[str, str], str]:
     """Invoke the authorized application function for the matched route."""
     if route == "employment-records":
