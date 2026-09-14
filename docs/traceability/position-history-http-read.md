@@ -14,6 +14,7 @@ serialization code widening the data surface.
 | Requirement | Production boundary | Regression |
 | --- | --- | --- |
 | Bound untrusted transport input before protected work | `PositionHistoryAsgiApp` rejects paths over 256 characters before route tokenization and raw query strings over 4096 bytes before `parse_qsl`; `parse_qsl` receives a bounded field count before authentication | focused hardening regressions prove oversized paths never reach route tokenization or UUID parsing and oversized queries never reach `parse_qsl` or authentication |
+| Reject executable scalar subtypes before parsing | ASGI `path` and `query_string` must be exact built-in `str` and `bytes`; subclasses fail closed before `len`, `strip`, or `decode` can dispatch caller-defined behavior | trapping `str`/`bytes` subclasses raise if their overrides execute; the HTTP boundary must return 404/400 with zero authentication calls |
 | Validate caller-controlled semantics before protected work | route, query, operational UUIDs, UTC cutoff, purpose, and fields are validated before authentication | malformed input cases prove no authenticator or read-port call |
 | Authenticate one bearer credential and canonical principal | existing `_authorization_header`/`extract_bearer_token` contracts plus exact `AuthenticatedPrincipal` runtime check | rejected credentials return 401; unexpected backend failure and noncanonical principal return opaque 500 before the governed service/persistence boundary |
 | Preserve the published backend-error contract | authentication-backend failures log one opaque support reference and return that same reference inside a complete `ErrorResponse`; the current Position-stack shared JSON emitter is a passthrough and receives only arguments in its exact signature | focused regression requires `error`, `error_code`, `message`, `next_action`, and `support_reference`, with no secret-bearing exception detail; support-reference compatibility guard requires the route log and payload reference to remain equal |
@@ -41,6 +42,8 @@ serialization code widening the data surface.
 11. **Backend-envelope/event-loop causal repair:** `17adbbf4044a0288489153f72e08179b78b54fd0` puts the generated support reference in the schema-valid payload and awaits `asyncio.to_thread(read_position_history, ...)`. A later sibling-stack comparison incorrectly reintroduced an unsupported keyword; CodeRabbit revalidation identified the tree mismatch and ordinary-forward `66b64fd550230bc20d884919cba1e045bb130c5c` restored the actual Position-stack emitter contract. `f1e303dc5fa947f9f6b404a609aba313fdce4f6e` remains a compatibility guard, not a claimed RED against this predecessor.
 12. **Persistence-observability RED contract:** `d6d8e6469f80793d6a13060abb2a38de256a4b23` requires an unexpected protected-read failure to produce one Position-history ERROR record containing non-secret route/tenant/exception-type metadata and the same support reference returned in the 500 response. The predecessor routes this failure through generic `_send_error(...)`, which emits only an INFO rejection and discards the backend exception type.
 13. **Persistence-observability causal repair:** `411ba41631a2f31fa80aaadcb3f15d22aa8c26fe` adds a dedicated persistence-backend error emitter and preserves the existing client-safe envelope while keeping the exception message out of both response and log message. Authorization and integrity failures remain on their existing 403/409 paths.
+14. **Executable-scalar RED contract:** `d64f4b09ed24d224a3e1eee168791caa75856733` adds `str`/`bytes` subclasses whose `__len__`, `strip`, and `decode` methods raise. The predecessor accepts those subclasses through `isinstance(...)`, so request parsing can dispatch caller-defined Python behavior before authentication.
+15. **Executable-scalar causal repair:** `d48927a99979305153a04fb4545994f6bb57c77e` requires exact built-in `str`/`bytes` at the ASGI path/query ingress. Non-exact path data retains the route-not-found response and non-exact query data retains the invalid-request response, both before authentication.
 
 ## Security, availability, and data boundary
 
@@ -50,10 +53,13 @@ Assignment, compensation, candidate, performance, credential, prompt, or model
 output data. It performs no write, audit/outbox mutation, or high-impact
 employment decision. Identity and persistence backend failures are logged only
 with non-secret metadata and one opaque support reference; exception messages and
-bearer tokens are not returned to the client. The worker-thread offload changes
-only scheduling of the synchronous service call; authorization and the short
-read-only PostgreSQL transaction remain owned by #152/#153 and exceptions retain
-their existing 403, 409, or opaque 500 mapping.
+bearer tokens are not returned to the client. Transport path/query scalars are
+accepted only in their exact interpreter-built-in forms before length/tokenization
+or decode work, preventing caller-defined subtype behavior from becoming a
+pre-authentication execution capability. The worker-thread offload changes only
+scheduling of the synchronous service call; authorization and the short read-only
+PostgreSQL transaction remain owned by #152/#153 and exceptions retain their
+existing 403, 409, or opaque 500 mapping.
 
 The offload prevents synchronous DB I/O from monopolizing the ASGI event loop, but
 it is not performance acceptance. The buyer path still requires exact-candidate
@@ -64,9 +70,10 @@ settings before the repository can claim the <=20 ms target.
 
 #154 remains an ordinary descendant of current #153: its direct base is
 `dc566a0167d5e8ab17e8fad5e37f86618e4a93e7`, with no parent delta intentionally
-copied into this HTTP lane. Current production head `411ba41631a2f31fa80aaadcb3f15d22aa8c26fe`
-remains stacked rather than protected-base. These short-lived/current heads have
-no PR-triggered Foundation run because the PR targets #153 rather than protected
+copied into this HTTP lane. Current production repair head is
+`d48927a99979305153a04fb4545994f6bb57c77e`; later documentation-only commits do
+not change that source/test contract. These short-lived/current heads have no
+PR-triggered Foundation run because the PR targets #153 rather than protected
 `develop`; that absence is neither hosted RED nor GREEN. The current exact head
 must not inherit predecessor Foundation, security, model-review, or feature-local
 GREEN. Those gates must be reacquired after #152/#153 reach the protected lane and
