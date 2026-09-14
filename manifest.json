@@ -401,9 +401,9 @@
     },
     {
       "path": "tests/test_bitemporal_postgres.sh",
-      "sha256": "7684b8c2ff52c044c081135515bd5aabbfd00e2daad0d471b0868701af2df6cc",
-      "bytes": 8209,
-      "lines": 230
+      "sha256": "bb0af83fe37d54e13458fc5156d5aeabe97df601376a4967d850da4c35b1a77d",
+      "bytes": 17281,
+      "lines": 458
     },
     {
       "path": "tests/test_candidate_worker_conversion_postgres.sh",
