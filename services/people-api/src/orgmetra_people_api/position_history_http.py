@@ -97,6 +97,7 @@ async def _send_error(
             "support_reference": support_reference,
         },
         extra_headers=extra_headers,
+        support_reference=support_reference,
     )
 
 
@@ -131,6 +132,7 @@ async def _send_authentication_backend_error(
             "next_action": client_message,
             "support_reference": support_reference,
         },
+        support_reference=support_reference,
     )
 
 
