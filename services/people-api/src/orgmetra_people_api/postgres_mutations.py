@@ -282,6 +282,12 @@ def _is_aware_datetime(value: object) -> bool:
     return value.utcoffset() is not None
 
 
+def _require_transactional_connection(connection: object) -> None:
+    """Require core People writes to run inside a real implicit transaction."""
+    if getattr(connection, "autocommit", None) is not False:
+        raise RuntimeError("People mutations require autocommit disabled.")
+
+
 def _unpack_fixed_rows(
     value: object,
     *,
@@ -596,8 +602,11 @@ class PostgresPeopleMutationPort(tuple):
     """Persist People mutations and governance evidence in one DB transaction.
 
     ``connection_factory`` must return a DB-API connection context manager whose
-    successful exit commits and exceptional exit rolls back. The accepted
-    executable factory is stored in the immutable tuple payload so retained
+    successful exit commits and exceptional exit rolls back. The returned
+    connection must expose exact ``autocommit is False`` before cursor acquisition
+    so transaction mode, tenant context, aggregate locks, HRIS writes, idempotency,
+    audit/outbox, and post-lock database time share one short atomic boundary. The
+    accepted executable factory is stored in the immutable tuple payload so retained
     references cannot replace the validated database capability before later
     authoritative writes. Fixed query projections must arrive as exact built-in
     list/tuple batches and rows; custom row factories must normalize before this
@@ -634,6 +643,7 @@ class PostgresPeopleMutationPort(tuple):
         )
         connection_factory = tuple.__getitem__(self, 0)
         with connection_factory() as connection:
+            _require_transactional_connection(connection)
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
@@ -754,6 +764,7 @@ class PostgresPeopleMutationPort(tuple):
         )
         connection_factory = tuple.__getitem__(self, 0)
         with connection_factory() as connection:
+            _require_transactional_connection(connection)
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
@@ -856,6 +867,7 @@ class PostgresPeopleMutationPort(tuple):
         )
         connection_factory = tuple.__getitem__(self, 0)
         with connection_factory() as connection:
+            _require_transactional_connection(connection)
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
