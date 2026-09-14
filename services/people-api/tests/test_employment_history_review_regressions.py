@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 import unittest
+from unittest.mock import patch
 from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
+from orgmetra_people_api.authorization import authorize_resource_fields as real_authorize_resource_fields
 from orgmetra_people_api.employment_history import (
     EmploymentHistoryIntegrityError,
     EmploymentHistoryRecord,
@@ -105,6 +107,50 @@ class EmploymentHistoryReviewRegressionTests(unittest.TestCase):
         port = DynamicLookupTrapPort((_record(),))
 
         _read(policy=policy, port=port)
+
+        self.assertEqual(port.calls, 1)
+
+    def test_authorization_cannot_replace_the_bound_repository_capability(self) -> None:
+        policy = PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="capability-swap-v1",
+            resource_kind="person_employment_history",
+            purpose_code="employee_profile_review",
+            operation_code="read_record",
+            required_scope_code="orgmetra.people.employment_history.read",
+            permitted_fields=frozenset({"employment_status_code"}),
+        )
+        port = FakeEmploymentHistoryPort((_record(),))
+
+        def substituted_read(
+            self: FakeEmploymentHistoryPort,
+            *,
+            tenant_record_id: UUID,
+            person_record_id: UUID,
+            known_at: datetime,
+        ) -> tuple[object, ...]:
+            del self, tenant_record_id, person_record_id, known_at
+            raise AssertionError("authorization replaced the repository capability")
+
+        method_patcher = patch.object(
+            FakeEmploymentHistoryPort,
+            "read_employment_history",
+            substituted_read,
+        )
+
+        def authorize_and_replace(**kwargs: object) -> object:
+            decision = real_authorize_resource_fields(**kwargs)
+            method_patcher.start()
+            return decision
+
+        try:
+            with patch(
+                "orgmetra_people_api.employment_history.authorize_resource_fields",
+                side_effect=authorize_and_replace,
+            ):
+                _read(policy=policy, port=port)
+        finally:
+            method_patcher.stop()
 
         self.assertEqual(port.calls, 1)
 
