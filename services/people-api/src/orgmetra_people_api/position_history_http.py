@@ -213,7 +213,7 @@ class PositionHistoryAsgiApp:
             return
 
         path = scope.get("path")
-        if not isinstance(path, str):
+        if type(path) is not str:
             await _send_error(
                 send,
                 status=404,
@@ -331,7 +331,7 @@ def _parse_position_history_request(path: str, raw_query: object) -> _ParsedPosi
     if tenant_record_id.int in (0, _MAX_UUID_INT) or position_record_id.int in (0, _MAX_UUID_INT):
         raise _InvalidHttpRequest("route IDs must be operational UUIDs")
 
-    if not isinstance(raw_query, bytes):
+    if type(raw_query) is not bytes:
         raise _InvalidHttpRequest("query_string must be bytes")
     if len(raw_query) > _MAX_QUERY_STRING_BYTES:
         raise _InvalidHttpRequest("query string exceeds the accepted size")
