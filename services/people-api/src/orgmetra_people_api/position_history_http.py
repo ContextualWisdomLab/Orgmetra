@@ -19,6 +19,7 @@ from uuid import UUID
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 
 from orgmetra_people_api.auth import (
+    AuthenticatedPrincipal,
     AuthenticationFailed,
     TokenAuthenticator,
     extract_bearer_token,
@@ -45,6 +46,9 @@ _RFC3339_INSTANT_PATTERN = re.compile(
 )
 _MAX_UUID_INT = (1 << 128) - 1
 _REQUIRED_QUERY_KEYS = frozenset({"known_at", "purpose", "fields"})
+_MAX_REQUEST_PATH_CHARACTERS = 256
+_MAX_QUERY_STRING_BYTES = 4096
+_MAX_QUERY_FIELDS = len(_REQUIRED_QUERY_KEYS) + 1
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 
 
@@ -92,6 +96,34 @@ async def _send_error(
             "support_reference": support_reference,
         },
         extra_headers=extra_headers,
+    )
+
+
+async def _send_authentication_backend_error(
+    send: AsgiSend,
+    *,
+    request: _ParsedPositionHistoryRequest,
+    error: Exception,
+) -> None:
+    """Record identity-backend failure metadata and emit one non-disclosing 500."""
+    support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+    _LOGGER.error(
+        "Position-history authentication backend failed",
+        extra={
+            "route": "position_history",
+            "tenant_record_id": str(request.tenant_record_id),
+            "exception_type": type(error).__name__,
+            "support_reference": support_reference,
+        },
+    )
+    await _emit_json(
+        send,
+        status=500,
+        payload={
+            "error": "internal_error",
+            "message": "Retry later or contact an Orgmetra operator with non-secret request metadata; never include the bearer token.",
+        },
+        support_reference=support_reference,
     )
 
 
@@ -148,6 +180,14 @@ class PositionHistoryAsgiApp:
                 message="Use /v1/tenants/{tenant_record_id}/positions/{position_record_id}/history.",
             )
             return
+        if len(path) > _MAX_REQUEST_PATH_CHARACTERS:
+            await _send_error(
+                send,
+                status=400,
+                error_code="invalid_request",
+                message="Use the canonical Position-history route without oversized path data, then retry.",
+            )
+            return
 
         try:
             request = _parse_position_history_request(path, scope.get("query_string", b""))
@@ -163,6 +203,8 @@ class PositionHistoryAsgiApp:
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
             principal = await self.authenticator.authenticate(bearer_token)
+            if type(principal) is not AuthenticatedPrincipal:
+                raise TypeError("authenticator returned an invalid principal")
         except AuthenticationFailed:
             await _send_error(
                 send,
@@ -171,6 +213,9 @@ class PositionHistoryAsgiApp:
                 message="Provide one valid Bearer credential and retry.",
                 extra_headers=((b"www-authenticate", b"Bearer"),),
             )
+            return
+        except Exception as error:  # noqa: BLE001 - identity backend failures must remain client-safe.
+            await _send_authentication_backend_error(send, request=request, error=error)
             return
 
         try:
@@ -214,10 +259,7 @@ class PositionHistoryAsgiApp:
             status=200,
             payload={
                 "resource_reference": view.resource_reference,
-                "entries": [
-                    {"fields": dict(entry.field_values)}
-                    for entry in view.entries
-                ],
+                "entries": [{"fields": dict(entry.field_values)} for entry in view.entries],
             },
         )
 
@@ -246,9 +288,16 @@ def _parse_position_history_request(path: str, raw_query: object) -> _ParsedPosi
 
     if not isinstance(raw_query, bytes):
         raise _InvalidHttpRequest("query_string must be bytes")
+    if len(raw_query) > _MAX_QUERY_STRING_BYTES:
+        raise _InvalidHttpRequest("query string exceeds the accepted size")
     try:
         query_text = raw_query.decode("ascii")
-        pairs = parse_qsl(query_text, keep_blank_values=True, strict_parsing=True)
+        pairs = parse_qsl(
+            query_text,
+            keep_blank_values=True,
+            strict_parsing=True,
+            max_num_fields=_MAX_QUERY_FIELDS,
+        )
     except (UnicodeDecodeError, ValueError) as error:
         raise _InvalidHttpRequest("query string is malformed") from error
 
@@ -273,7 +322,7 @@ def _parse_position_history_request(path: str, raw_query: object) -> _ParsedPosi
 
     raw_fields = query["fields"].split(",")
     if any(_FIELD_PATTERN.fullmatch(field) is None for field in raw_fields):
-        raise _InvalidHttpRequest("fields must be explicit lower snake-case names")
+        raise _InvalidHttpRequest("fields must be explicit lower snake_case names")
     if len(set(raw_fields)) != len(raw_fields):
         raise _InvalidHttpRequest("fields must not repeat")
 
