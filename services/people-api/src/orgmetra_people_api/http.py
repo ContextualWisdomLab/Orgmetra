@@ -14,7 +14,7 @@ import json
 import logging
 import re
 from secrets import token_urlsafe
-from typing import Awaitable, Callable, Mapping, Sequence
+from typing import Awaitable, Callable, Mapping
 from urllib.parse import parse_qsl
 from uuid import UUID
 
@@ -342,13 +342,13 @@ def _parse_worker_request(path: str, raw_query: object) -> _ParsedWorkerRequest:
 def _authorization_header(scope: Mapping[str, object]) -> str | None:
     """Return one bounded ASCII Authorization header, rejecting malformed input."""
     raw_headers = scope.get("headers", ())
-    if not isinstance(raw_headers, Sequence):
+    if type(raw_headers) not in (list, tuple):
         raise AuthenticationFailed("request headers are invalid")
     if len(raw_headers) > _MAX_REQUEST_HEADERS:
         raise AuthenticationFailed("request headers exceed the accepted count")
     authorization_values: list[bytes] = []
     for header in raw_headers:
-        if not isinstance(header, Sequence) or len(header) != 2:
+        if type(header) not in (list, tuple) or len(header) != 2:
             raise AuthenticationFailed("request headers are invalid")
         name, value = header
         if type(name) is not bytes or type(value) is not bytes:
