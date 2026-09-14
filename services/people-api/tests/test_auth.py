@@ -89,6 +89,35 @@ class PrincipalBoundaryTests(unittest.TestCase):
         self.assertEqual(principal.tenant_record_id, TENANT)
         self.assertIsNot(principal.tenant_record_id, caller_tenant)
 
+    def test_tenant_uuid_views_do_not_mutate_retained_principal_authority(self) -> None:
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({"orgmetra.people.read"}),
+        )
+        exposed_tenant = principal.tenant_record_id
+
+        object.__setattr__(exposed_tenant, "int", OTHER_TENANT.int)
+
+        self.assertEqual(principal.tenant_record_id, TENANT)
+        self.assertIsNot(principal.tenant_record_id, exposed_tenant)
+
+    def test_revalidates_low_level_retained_principal_storage(self) -> None:
+        valid_scopes = frozenset({"orgmetra.people.read"})
+        malformed_payloads = (
+            (TENANT.int, "keyverse:actor-1"),
+            (True, "keyverse:actor-1", valid_scopes),
+            (0, "keyverse:actor-1", valid_scopes),
+            (TENANT.int, _BehaviorBearingStr("keyverse:actor-1"), valid_scopes),
+            (TENANT.int, "keyverse:actor-1", frozenset()),
+            (TENANT.int, "keyverse:actor-1", _BehaviorBearingFrozenset(valid_scopes)),
+            (TENANT.int, "keyverse:actor-1", frozenset({_BehaviorBearingStr("orgmetra.people.read")})),
+        )
+        for payload in malformed_payloads:
+            forged = tuple.__new__(AuthenticatedPrincipal, payload)
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                _ = forged.tenant_record_id
+
     def test_rejects_behavior_bearing_text_and_scope_container(self) -> None:
         cases = (
             {
