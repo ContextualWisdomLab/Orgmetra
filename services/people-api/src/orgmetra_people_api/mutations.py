@@ -260,52 +260,121 @@ class AssignmentMutationCommand:
         validate_idempotency_key(self.idempotency_key)
 
 
-@dataclass(frozen=True, slots=True)
-class EmploymentMutationResult:
+class _MutationResultReceipt(tuple):
+    """Retain one mutation receipt as inert scalar authority and return fresh UUID views."""
+
+    __slots__ = ()
+    _identity_field_name = "mutation_record_id"
+
+    def __new__(
+        cls,
+        identity: object,
+        replay_command_digest: object = None,
+    ) -> _MutationResultReceipt:
+        """Validate public receipt inputs before storing only immutable built-in scalars."""
+        identity_value = _validate_operational_uuid(cls._identity_field_name, identity)
+        if replay_command_digest is not None and type(replay_command_digest) is not str:
+            raise ValueError("replay_command_digest must be a string when present.")
+        return tuple.__new__(cls, (identity_value, replay_command_digest))
+
+    def _validated_payload(self) -> tuple[int, str | None]:
+        """Revalidate tuple storage so low-level forged instances fail closed on use."""
+        if tuple.__len__(self) != 2:
+            raise ValueError("mutation result storage is invalid.")
+        identity_value = tuple.__getitem__(self, 0)
+        replay_command_digest = tuple.__getitem__(self, 1)
+        if type(identity_value) is not int or not (0 < identity_value < _MAX_UUID_INT):
+            raise ValueError(f"{self._identity_field_name} must be an operational UUID.")
+        if replay_command_digest is not None and type(replay_command_digest) is not str:
+            raise ValueError("replay_command_digest must be a string when present.")
+        return identity_value, replay_command_digest
+
+    def _identity_uuid(self) -> UUID:
+        """Return a new UUID view over retained inert identity authority."""
+        identity_value, _replay_command_digest = self._validated_payload()
+        return UUID(int=identity_value)
+
+    @property
+    def replay_command_digest(self) -> str | None:
+        """Return the validated optional digest that proves a first-commit replay."""
+        _identity_value, replay_command_digest = self._validated_payload()
+        return replay_command_digest
+
+    def __eq__(self, other: object) -> bool:
+        """Keep result-type identity distinct even though storage is tuple-backed."""
+        return type(self) is type(other) and tuple.__eq__(self, other)
+
+    def __hash__(self) -> int:
+        """Hash the immutable receipt payload consistently with exact-type equality."""
+        return hash((type(self), tuple.__hash__(self)))
+
+    def __repr__(self) -> str:
+        """Preserve a field-oriented receipt representation for diagnostics."""
+        return (
+            f"{type(self).__name__}("
+            f"{self._identity_field_name}={self._identity_uuid()!r}, "
+            f"replay_command_digest={self.replay_command_digest!r})"
+        )
+
+
+class EmploymentMutationResult(_MutationResultReceipt):
     """Return the canonical committed Employment identity and optional replay digest."""
 
-    employment_record_id: UUID
-    replay_command_digest: str | None = None
+    __slots__ = ()
+    _identity_field_name = "employment_record_id"
 
-    def __post_init__(self) -> None:
-        """Detach and validate durable Employment receipt identity."""
-        object.__setattr__(
-            self, "employment_record_id", _clone_uuid("employment_record_id", self.employment_record_id)
-        )
-        if self.replay_command_digest is not None and type(self.replay_command_digest) is not str:
-            raise ValueError("replay_command_digest must be a string when present.")
+    def __new__(
+        cls,
+        employment_record_id: UUID,
+        replay_command_digest: str | None = None,
+    ) -> EmploymentMutationResult:
+        """Retain Employment receipt authority without a mutable nested UUID alias."""
+        return super().__new__(cls, employment_record_id, replay_command_digest)
+
+    @property
+    def employment_record_id(self) -> UUID:
+        """Return a fresh canonical Employment identity view."""
+        return self._identity_uuid()
 
 
-@dataclass(frozen=True, slots=True)
-class PositionMutationResult:
+class PositionMutationResult(_MutationResultReceipt):
     """Return the canonical committed Position identity and optional replay digest."""
 
-    position_record_id: UUID
-    replay_command_digest: str | None = None
+    __slots__ = ()
+    _identity_field_name = "position_record_id"
 
-    def __post_init__(self) -> None:
-        """Detach and validate durable Position receipt identity."""
-        object.__setattr__(
-            self, "position_record_id", _clone_uuid("position_record_id", self.position_record_id)
-        )
-        if self.replay_command_digest is not None and type(self.replay_command_digest) is not str:
-            raise ValueError("replay_command_digest must be a string when present.")
+    def __new__(
+        cls,
+        position_record_id: UUID,
+        replay_command_digest: str | None = None,
+    ) -> PositionMutationResult:
+        """Retain Position receipt authority without a mutable nested UUID alias."""
+        return super().__new__(cls, position_record_id, replay_command_digest)
+
+    @property
+    def position_record_id(self) -> UUID:
+        """Return a fresh canonical Position identity view."""
+        return self._identity_uuid()
 
 
-@dataclass(frozen=True, slots=True)
-class AssignmentMutationResult:
+class AssignmentMutationResult(_MutationResultReceipt):
     """Return the canonical committed Assignment identity and optional replay digest."""
 
-    assignment_record_id: UUID
-    replay_command_digest: str | None = None
+    __slots__ = ()
+    _identity_field_name = "assignment_record_id"
 
-    def __post_init__(self) -> None:
-        """Detach and validate durable Assignment receipt identity."""
-        object.__setattr__(
-            self, "assignment_record_id", _clone_uuid("assignment_record_id", self.assignment_record_id)
-        )
-        if self.replay_command_digest is not None and type(self.replay_command_digest) is not str:
-            raise ValueError("replay_command_digest must be a string when present.")
+    def __new__(
+        cls,
+        assignment_record_id: UUID,
+        replay_command_digest: str | None = None,
+    ) -> AssignmentMutationResult:
+        """Retain Assignment receipt authority without a mutable nested UUID alias."""
+        return super().__new__(cls, assignment_record_id, replay_command_digest)
+
+    @property
+    def assignment_record_id(self) -> UUID:
+        """Return a fresh canonical Assignment identity view."""
+        return self._identity_uuid()
 
 
 @runtime_checkable
