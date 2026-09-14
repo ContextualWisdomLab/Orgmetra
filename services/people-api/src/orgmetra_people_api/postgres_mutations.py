@@ -75,6 +75,7 @@ SELECT
 FROM public.employment_record AS employment
 WHERE employment.tenant_record_id = %s
   AND employment.employment_record_id = %s
+  AND employment.recorded_to IS NULL
 LIMIT 2
 FOR UPDATE OF employment
 """.strip()
@@ -203,6 +204,7 @@ JOIN public.position_record_version AS version
  AND version.position_record_id = position.position_record_id
 WHERE position.tenant_record_id = %s
   AND position.position_record_id = %s
+  AND position.recorded_to IS NULL
 FOR UPDATE OF position
 """.strip()
 
