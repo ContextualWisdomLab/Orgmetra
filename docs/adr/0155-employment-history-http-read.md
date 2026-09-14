@@ -34,7 +34,11 @@ The boundary validates operational UUIDs, exact required query keys, ASCII query
 syntax, a UTC RFC 3339 `known_at` ending in `Z`, lower snake-case purpose/fields,
 and duplicate-field/parameter rejection before authentication. It caps the path
 at 256 characters before route tokenization and the raw query at 4096 bytes before
-`parse_qsl`; parser field count is bounded too.
+`parse_qsl`; parser field count is bounded too. Path and raw-query values must be
+exact built-in `str` and `bytes`, not subclasses: caller-defined subtypes can
+override `__len__`, `strip`, or `decode`, so accepting them would execute mutable
+Python behavior before authentication. Non-exact scalars fail closed before those
+operations while preserving the existing 404 path and 400 query response classes.
 
 Authentication accepts only exact `AuthenticatedPrincipal`. The route deliberately
 reuses the canonical People `_send_json` contract inherited through #149/#55.
@@ -62,7 +66,8 @@ workflow is not recreated.
 
 - Customer Employment history remains a read-only purpose-bound boundary.
 - Parent service/PostgreSQL owners retain authorization and persistence truth.
-- Caller-controlled parsing is bounded before protected work.
+- Caller-controlled parsing is bounded before protected work, and executable
+  path/query scalar subtypes are rejected before overridden behavior can run.
 - One support reference correlates route logging and the response through the
   canonical shared emitter.
 - Synchronous Employment/PostgreSQL work is worker-thread isolated from ASGI;
@@ -92,6 +97,15 @@ requires the Employment route's ERROR log reference to equal the response
 `support_reference`. Causal repair `15220135234107de82c481816f19749198c61012`
 restores canonical emitter ownership and also passes the already-generated
 reference through `_send_error`, preventing double-reference correlation drift.
+
+Issue #321 then generalized a separately verified transport-integrity mechanism.
+Employment-local test-first `a6862f7f37184265a4827cf40cfbec0faff8ed09`
+adds trapping `str`/`bytes` subclasses and requires rejection before their
+`__len__`, `strip`, or `decode` behavior or any authenticator/persistence call.
+The predecessor accepts them through `isinstance(...)`; causal repair
+`e1618605d64262f7aea6a7e53692ce0903a946a1` changes the Employment path/query
+ingress to exact built-in type checks. Canonical People owner #55 has its own
+independent #321 RED/repair; neither lane borrows the other's acceptance verdict.
 
 No hosted RED/GREEN is claimed for these stacked heads because #155 targets #149,
 not protected `develop`. Final acceptance must be reacquired after the owner stack
