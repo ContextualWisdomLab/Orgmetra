@@ -111,6 +111,20 @@ class PositionHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCase
         start, body = messages
         return int(start["status"]), json.loads(bytes(body["body"]))
 
+    async def test_oversized_path_is_rejected_before_route_tokenization(self) -> None:
+        authenticator = RecordingAuthenticator(self.principal)
+        app = self._app(authenticator=authenticator)
+        path = f"/v1/tenants/{'a' * 300}/positions/{POSITION}/history"
+
+        with patch(
+            "orgmetra_people_api.position_history_http._looks_like_position_history_route",
+            side_effect=AssertionError("route tokenizer must not receive oversized path data"),
+        ):
+            status, _ = await self._request(app, path=path)
+
+        self.assertEqual(status, 400)
+        self.assertEqual(authenticator.calls, 0)
+
     async def test_oversized_path_is_rejected_before_uuid_parsing_or_authentication(self) -> None:
         authenticator = RecordingAuthenticator(self.principal)
         app = self._app(authenticator=authenticator)
