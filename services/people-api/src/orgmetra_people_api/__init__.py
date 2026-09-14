@@ -15,6 +15,7 @@ from orgmetra_people_api.employment_history import (
     EmploymentHistoryRecord,
     read_employment_history,
 )
+from orgmetra_people_api.employment_history_http import EmploymentHistoryAsgiApp
 from orgmetra_people_api.hire import (
     HireAcceptanceCommand,
     HireAcceptancePort,
@@ -61,6 +62,7 @@ __all__ = [
     "AuthorizedEmploymentHistoryView",
     "AuthorizedWorkerPeopleView",
     "EmploymentHistoryIntegrityError",
+    "EmploymentHistoryAsgiApp",
     "EmploymentHistoryReadPort",
     "EmploymentHistoryRecord",
     "EmploymentMutationCommand",

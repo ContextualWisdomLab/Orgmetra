@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "77fc285afec228feae5cc44b33be6ce538c9f8acc6ef291a6234d8d95e78812d",
-      "bytes": 17795,
-      "lines": 78
+      "sha256": "580916b211da4cb75eaa57a3484a4fd311f9e7c50446fa4d41d2b8d9d0a3e8f7",
+      "bytes": 18390,
+      "lines": 79
     },
     {
       "path": "CLAUDE.md",
@@ -137,9 +137,9 @@
     },
     {
       "path": "docs/API_CONTRACT.md",
-      "sha256": "63533dff785da62b89e585d742a158e2aeb05913644f2bf9fb6486f281c2e589",
-      "bytes": 4555,
-      "lines": 76
+      "sha256": "8857996b3a0d9cb6c970bec495cbba6b5d7859fd03bafc1237fa5fff695eabc4",
+      "bytes": 4944,
+      "lines": 77
     },
     {
       "path": "docs/DATA_MODEL.md",
@@ -167,9 +167,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "01918512d8882060e9cff0c4aa8206e0eccbdfb61cfd7f829331123c7a9fe6ac",
-      "bytes": 11185,
-      "lines": 64
+      "sha256": "70f073f3f9b86f824efc04706f2a299bfd77e7c2d23d5999eba3c06691e39186",
+      "bytes": 11860,
+      "lines": 74
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -185,9 +185,9 @@
     },
     {
       "path": "docs/TEST_STRATEGY.md",
-      "sha256": "d0a0bc3b54ed0fc7973747987f1afb117d6144c390b51ed9370eb571972a33f8",
-      "bytes": 16534,
-      "lines": 135
+      "sha256": "1763a5d7f49502a733ede68c1add98eb8accfcc526bb8a722d46010b8caea4e4",
+      "bytes": 16967,
+      "lines": 136
     },
     {
       "path": "docs/THREAT_MODEL.md",
@@ -197,9 +197,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "dbf6fd91375ea28e05456d2a0c9ba629506cbac6f52f5dfda61ae68db2395f7e",
-      "bytes": 11462,
-      "lines": 40
+      "sha256": "8fe78c72fd45fb28af64da727e41b9164c61052331cb1a12fe9c1d8a10b795ca",
+      "bytes": 12006,
+      "lines": 41
     },
     {
       "path": "docs/TRD.md",
@@ -209,9 +209,9 @@
     },
     {
       "path": "docs/UML.md",
-      "sha256": "fe67c37aa88e5814ceb2db7e8f7d8d85ca27a994802efbb7c75164b387adf0a9",
-      "bytes": 5528,
-      "lines": 122
+      "sha256": "cf0f41fa4b783ae77607ba5d21076bf8f2af92b975e49e6585b112211ce949fa",
+      "bytes": 6625,
+      "lines": 148
     },
     {
       "path": "docs/USER_STORIES.md",
@@ -311,9 +311,9 @@
     },
     {
       "path": "docs/adr/README.md",
-      "sha256": "f3b3b5ed3b3b31a40a0a3696abf0065e3c25879b6be50077f38ffae742b9d002",
-      "bytes": 1838,
-      "lines": 18
+      "sha256": "820fd9556036344e39012f1ddd1b70b6593ea6dd02b8adaefaaa15f8ed3d1815",
+      "bytes": 1995,
+      "lines": 19
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
@@ -353,15 +353,15 @@
     },
     {
       "path": "schemas/openapi.yaml",
-      "sha256": "09c1e43486779198574fe31b8bcabbd1c1f74beec7bf86245ae578061619838f",
-      "bytes": 29503,
-      "lines": 1020
+      "sha256": "a0513cc34b33bb2deedada4b706daeeba69c5239af16a586639a90ab62661f3d",
+      "bytes": 32417,
+      "lines": 1110
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
-      "sha256": "9b03efbbdffa60a05f5924e8a61b1cbc3cd75c502df428a5920085e8d0bf3603",
-      "bytes": 28121,
-      "lines": 688
+      "sha256": "db05a860799aab6d256a0f87c1d6d2167748f27ec31754378f0c8baaefe32dc2",
+      "bytes": 29354,
+      "lines": 706
     },
     {
       "path": "scripts/foundation-contract.mjs",
@@ -383,9 +383,9 @@
     },
     {
       "path": "tests/openapi-contract.test.mjs",
-      "sha256": "80c1610ef1c189fa325e55389501e0e51531ddf61ee335bb94d9cb3aa55a9fdc",
-      "bytes": 6438,
-      "lines": 195
+      "sha256": "cf0269695fb3c3ceb9ea1fa1bcddb463e56a64753b0f953200b7609f8be7dfb0",
+      "bytes": 7170,
+      "lines": 215
     },
     {
       "path": "tests/test_audit_outbox_hardening_postgres.sh",
@@ -467,9 +467,9 @@
     },
     {
       "path": "tests/validate_repository.py",
-      "sha256": "091836b2f68600a30b08f7da2cea8b3bef10201a123da720a7369bf10985eec2",
-      "bytes": 27237,
-      "lines": 637
+      "sha256": "898db5b114ec005022d79c8b3b841fcc1ade9fcf3c530021fe1a23a849f081b8",
+      "bytes": 28683,
+      "lines": 676
     }
   ]
 }

@@ -166,6 +166,26 @@ for (const testCase of [
     fragment: '        - confirmation_reference\n',
     occurrence: 5,
     expected: /CreateAssignmentRecordCommand.*confirmation/
+  },
+  {
+    name: 'readEmploymentHistory path',
+    fragment: '  /tenants/{tenant_record_id}/people/{person_record_id}/employment-history:\n',
+    expected: /readEmploymentHistory.*path block/
+  },
+  {
+    name: 'readEmploymentHistory scope',
+    fragment: '            - orgmetra.people.employment_history.read\n',
+    expected: /readEmploymentHistory.*scope/
+  },
+  {
+    name: 'readEmploymentHistory known_at parameter',
+    fragment: '        - name: known_at\n',
+    expected: /readEmploymentHistory.*known_at parameter/
+  },
+  {
+    name: 'readEmploymentHistory response schema',
+    fragment: "                $ref: '#/components/schemas/EmploymentHistoryResponse'\n",
+    expected: /readEmploymentHistory.*response schema/
   }
 ]) {
   test(`structural OpenAPI gate rejects missing ${testCase.name}`, () => {
