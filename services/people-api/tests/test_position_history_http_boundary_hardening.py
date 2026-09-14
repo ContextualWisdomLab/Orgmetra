@@ -23,6 +23,30 @@ DEFAULT_QUERY = (
 _SUPPORT_REFERENCE = re.compile(r"^err_[A-Za-z0-9_-]{20,80}$")
 
 
+class _TrapScope(dict[str, object]):
+    """Expose execution if a noncanonical ASGI scope reaches mapping operations."""
+
+    def get(self, *args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise AssertionError("noncanonical scope must be rejected before get()")
+
+    def __getitem__(self, key: str) -> object:
+        del key
+        raise AssertionError("noncanonical scope must be rejected before item access")
+
+
+class _TrapScalar(str):
+    """Expose execution if a noncanonical ASGI scalar reaches comparison."""
+
+    def __eq__(self, other: object) -> bool:
+        del other
+        raise AssertionError("noncanonical ASGI scalar must be rejected before comparison")
+
+    def __ne__(self, other: object) -> bool:
+        del other
+        raise AssertionError("noncanonical ASGI scalar must be rejected before comparison")
+
+
 class _TrapPath(str):
     """Expose execution if a noncanonical ASGI path reaches string operations."""
 
@@ -137,6 +161,85 @@ class PositionHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCase
         await app(scope, receive, send)
         start, body = messages
         return int(start["status"]), json.loads(bytes(body["body"]))
+
+    async def test_nonexact_scope_is_rejected_before_mapping_behavior_or_authentication(self) -> None:
+        authenticator = RecordingAuthenticator(self.principal)
+        read_port = RecordingReadPort()
+        app = self._app(authenticator=authenticator, read_port=read_port)
+        scope = _TrapScope(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": f"/v1/tenants/{TENANT}/positions/{POSITION}/history",
+                "query_string": DEFAULT_QUERY,
+                "headers": [(b"authorization", b"Bearer opaque-token")],
+            }
+        )
+
+        async def receive() -> dict[str, object]:
+            raise AssertionError("invalid scope must not read the request body")
+
+        async def send(message: dict[str, object]) -> None:
+            del message
+            raise AssertionError("invalid scope must not emit a response")
+
+        with self.assertRaisesRegex(ValueError, "built-in dict"):
+            await app(scope, receive, send)
+
+        self.assertEqual(authenticator.calls, 0)
+        self.assertEqual(read_port.calls, 0)
+
+    async def test_nonexact_scope_type_is_rejected_before_comparison_or_authentication(self) -> None:
+        authenticator = RecordingAuthenticator(self.principal)
+        read_port = RecordingReadPort()
+        app = self._app(authenticator=authenticator, read_port=read_port)
+        scope: dict[str, object] = {
+            "type": _TrapScalar("http"),
+            "method": "GET",
+            "path": f"/v1/tenants/{TENANT}/positions/{POSITION}/history",
+            "query_string": DEFAULT_QUERY,
+            "headers": [(b"authorization", b"Bearer opaque-token")],
+        }
+
+        async def receive() -> dict[str, object]:
+            raise AssertionError("invalid scope type must not read the request body")
+
+        async def send(message: dict[str, object]) -> None:
+            del message
+            raise AssertionError("invalid scope type must not emit a response")
+
+        with self.assertRaisesRegex(ValueError, "HTTP ASGI scopes"):
+            await app(scope, receive, send)
+
+        self.assertEqual(authenticator.calls, 0)
+        self.assertEqual(read_port.calls, 0)
+
+    async def test_nonexact_method_is_rejected_without_comparison_or_authentication(self) -> None:
+        authenticator = RecordingAuthenticator(self.principal)
+        read_port = RecordingReadPort()
+        app = self._app(authenticator=authenticator, read_port=read_port)
+        scope: dict[str, object] = {
+            "type": "http",
+            "method": _TrapScalar("GET"),
+            "path": f"/v1/tenants/{TENANT}/positions/{POSITION}/history",
+            "query_string": DEFAULT_QUERY,
+            "headers": [(b"authorization", b"Bearer opaque-token")],
+        }
+        messages: list[dict[str, object]] = []
+
+        async def receive() -> dict[str, object]:
+            raise AssertionError("invalid method must not read the request body")
+
+        async def send(message: dict[str, object]) -> None:
+            messages.append(message)
+
+        await app(scope, receive, send)
+
+        start, body = messages
+        self.assertEqual(int(start["status"]), 405)
+        self.assertEqual(json.loads(bytes(body["body"]))["error"], "method_not_allowed")
+        self.assertEqual(authenticator.calls, 0)
+        self.assertEqual(read_port.calls, 0)
 
     async def test_nonexact_path_is_rejected_before_subclass_behavior_or_authentication(self) -> None:
         authenticator = RecordingAuthenticator(self.principal)
