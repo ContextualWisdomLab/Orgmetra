@@ -13,6 +13,7 @@ serialization code widening the data surface.
 
 | Requirement | Production boundary | Regression |
 | --- | --- | --- |
+| Reject executable outer ASGI scope authority | `PositionHistoryAsgiApp` requires an exact built-in `dict` before any scope field access; scope type/method are compared only after exact built-in `str` checks | trapping `dict` and `str` subclasses prove `.get()`, item access, and comparison overrides cannot execute before rejection; authentication and persistence remain untouched |
 | Bound untrusted transport input before protected work | `PositionHistoryAsgiApp` rejects paths over 256 characters before route tokenization and raw query strings over 4096 bytes before `parse_qsl`; `parse_qsl` receives a bounded field count before authentication | focused hardening regressions prove oversized paths never reach route tokenization or UUID parsing and oversized queries never reach `parse_qsl` or authentication |
 | Reject executable scalar subtypes before parsing | ASGI `path` and `query_string` must be exact built-in `str` and `bytes`; subclasses fail closed before `len`, `strip`, or `decode` can dispatch caller-defined behavior | trapping `str`/`bytes` subclasses raise if their overrides execute; the HTTP boundary must return 404/400 with zero authentication calls |
 | Validate caller-controlled semantics before protected work | route, query, operational UUIDs, UTC cutoff, purpose, and fields are validated before authentication | malformed input cases prove no authenticator or read-port call |
@@ -44,6 +45,8 @@ serialization code widening the data surface.
 13. **Persistence-observability causal repair:** `411ba41631a2f31fa80aaadcb3f15d22aa8c26fe` adds a dedicated persistence-backend error emitter and preserves the existing client-safe envelope while keeping the exception message out of both response and log message. Authorization and integrity failures remain on their existing 403/409 paths.
 14. **Executable-scalar RED contract:** `d64f4b09ed24d224a3e1eee168791caa75856733` adds `str`/`bytes` subclasses whose `__len__`, `strip`, and `decode` methods raise. The predecessor accepts those subclasses through `isinstance(...)`, so request parsing can dispatch caller-defined Python behavior before authentication.
 15. **Executable-scalar causal repair:** `d48927a99979305153a04fb4545994f6bb57c77e` requires exact built-in `str`/`bytes` at the ASGI path/query ingress. Non-exact path data retains the route-not-found response and non-exact query data retains the invalid-request response, both before authentication.
+16. **Outer-scope authority RED contract:** issue #328 and test-only `e0500d1e538ff08b9dc0375d8a4b399e040060c3` add a `dict` subtype that traps mapping access and `str` subtypes that trap equality/inequality. The predecessor calls `scope.get(...)` and compares `type`/`method` directly, so these cases expose executable caller behavior before the intended transport authority gates.
+17. **Outer-scope authority causal repair:** `45abf5082cb9eda10db323dd8ae6a6e914d60542` requires `type(scope) is dict` before any lookup, exact built-in `str` before comparing the scope type or method, preserves the existing 405 method response, and keeps authentication/persistence untouched for rejected representations.
 
 ## Security, availability, and data boundary
 
@@ -53,13 +56,15 @@ Assignment, compensation, candidate, performance, credential, prompt, or model
 output data. It performs no write, audit/outbox mutation, or high-impact
 employment decision. Identity and persistence backend failures are logged only
 with non-secret metadata and one opaque support reference; exception messages and
-bearer tokens are not returned to the client. Transport path/query scalars are
+bearer tokens are not returned to the client. The outer ASGI scope is accepted
+only as an exact built-in `dict`, and route-control scalars are accepted only as
+exact built-in strings before comparison. Transport path/query scalars are also
 accepted only in their exact interpreter-built-in forms before length/tokenization
-or decode work, preventing caller-defined subtype behavior from becoming a
-pre-authentication execution capability. The worker-thread offload changes only
-scheduling of the synchronous service call; authorization and the short read-only
-PostgreSQL transaction remain owned by #152/#153 and exceptions retain their
-existing 403, 409, or opaque 500 mapping.
+or decode work. These gates prevent caller-defined container/scalar behavior from
+becoming a pre-authentication execution capability. The worker-thread offload
+changes only scheduling of the synchronous service call; authorization and the
+short read-only PostgreSQL transaction remain owned by #152/#153 and exceptions
+retain their existing 403, 409, or opaque 500 mapping.
 
 The offload prevents synchronous DB I/O from monopolizing the ASGI event loop, but
 it is not performance acceptance. The buyer path still requires exact-candidate
@@ -71,7 +76,7 @@ settings before the repository can claim the <=20 ms target.
 #154 remains an ordinary descendant of current #153: its direct base is
 `dc566a0167d5e8ab17e8fad5e37f86618e4a93e7`, with no parent delta intentionally
 copied into this HTTP lane. Current production repair head is
-`d48927a99979305153a04fb4545994f6bb57c77e`; later documentation-only commits do
+`45abf5082cb9eda10db323dd8ae6a6e914d60542`; later documentation-only commits do
 not change that source/test contract. These short-lived/current heads have no
 PR-triggered Foundation run because the PR targets #153 rather than protected
 `develop`; that absence is neither hosted RED nor GREEN. The current exact head
