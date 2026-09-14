@@ -37,6 +37,8 @@ from orgmetra_people_api.http import (
     AsgiReceive,
     AsgiSend,
     _MAX_QUERY_STRING_BYTES,
+    _MAX_REQUEST_HEADER_BYTES,
+    _MAX_REQUEST_HEADERS,
     _MAX_REQUEST_PATH_CHARACTERS,
     _authorization_header,
     _send_json as _emit_json,
@@ -423,21 +425,47 @@ def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
     return tenant_record_id, purpose_code
 
 
-def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
-    """Require exactly one visible-ASCII Idempotency-Key after authentication."""
+def _bounded_hire_headers(
+    scope: Mapping[str, object],
+    *,
+    error_type: type[ValueError],
+    invalid_message: str,
+) -> tuple[tuple[bytes, bytes], ...]:
+    """Revalidate post-authentication header authority under the canonical request budget."""
     raw_headers = scope.get("headers", ())
     if type(raw_headers) not in (list, tuple):
-        raise _InvalidHttpRequest("Idempotency-Key is required")
-    values: list[bytes] = []
+        raise error_type(invalid_message)
+    if len(raw_headers) > _MAX_REQUEST_HEADERS:
+        raise error_type("request headers exceed the accepted count")
+
+    aggregate_header_bytes = 0
+    validated_headers: list[tuple[bytes, bytes]] = []
     for header in raw_headers:
         if type(header) not in (list, tuple) or len(header) != 2:
-            raise _InvalidHttpRequest("Idempotency-Key is required")
+            raise error_type(invalid_message)
         name, value = header
-        if type(name) is not bytes:
-            raise _InvalidHttpRequest("Idempotency-Key is required")
+        if type(name) is not bytes or type(value) is not bytes:
+            raise error_type(invalid_message)
+        header_bytes = len(name) + len(value)
+        if header_bytes > _MAX_REQUEST_HEADER_BYTES:
+            raise error_type("request header exceeds the accepted size")
+        aggregate_header_bytes += header_bytes
+        if aggregate_header_bytes > _MAX_REQUEST_HEADER_BYTES:
+            raise error_type("request headers exceed the accepted size")
+        validated_headers.append((name, value))
+    return tuple(validated_headers)
+
+
+def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
+    """Require exactly one bounded visible-ASCII Idempotency-Key after authentication."""
+    raw_headers = _bounded_hire_headers(
+        scope,
+        error_type=_InvalidHttpRequest,
+        invalid_message="Idempotency-Key is required",
+    )
+    values: list[bytes] = []
+    for name, value in raw_headers:
         if name.lower() == b"idempotency-key":
-            if type(value) is not bytes:
-                raise _InvalidHttpRequest("Idempotency-Key is required")
             values.append(value)
     if len(values) != 1:
         raise _InvalidHttpRequest("exactly one Idempotency-Key is required")
@@ -449,21 +477,13 @@ def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
 
 
 def _require_json_content_type(scope: Mapping[str, object]) -> None:
-    """Accept exactly one application/json content type before reading the body."""
-    raw_headers = scope.get("headers", ())
-    if type(raw_headers) not in (list, tuple):
-        raise _UnsupportedMediaType("content-type is required")
-    values: list[bytes] = []
-    for header in raw_headers:
-        if type(header) not in (list, tuple) or len(header) != 2:
-            raise _UnsupportedMediaType("content-type is required")
-        name, value = header
-        if type(name) is not bytes:
-            raise _UnsupportedMediaType("content-type is required")
-        if name.lower() == b"content-type":
-            if type(value) is not bytes:
-                raise _UnsupportedMediaType("content-type is required")
-            values.append(value)
+    """Accept exactly one bounded application/json content type before reading the body."""
+    raw_headers = _bounded_hire_headers(
+        scope,
+        error_type=_UnsupportedMediaType,
+        invalid_message="content-type is required",
+    )
+    values = [value for name, value in raw_headers if name.lower() == b"content-type"]
     if len(values) != 1 or values[0].split(b";", 1)[0].strip().lower() != b"application/json":
         raise _UnsupportedMediaType("application/json is required")
 
