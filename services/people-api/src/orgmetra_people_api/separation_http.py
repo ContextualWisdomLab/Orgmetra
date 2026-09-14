@@ -159,9 +159,14 @@ class EmploymentSeparationAsgiApp:
 
     async def __call__(self, scope: Mapping[str, object], receive: AsgiReceive, send: AsgiSend) -> None:
         """Serve one separation without leaking bearer tokens or database capabilities."""
-        if scope.get("type") != "http":
+        if type(scope) is not dict:
+            raise ValueError("EmploymentSeparationAsgiApp requires an exact ASGI scope dict")
+        scope_type = scope.get("type")
+        if type(scope_type) is not str or scope_type != "http":
             raise ValueError("EmploymentSeparationAsgiApp accepts only HTTP ASGI scopes")
-        if scope.get("method") != "POST":
+
+        method = scope.get("method")
+        if type(method) is not str or method != "POST":
             await _send_error(
                 send,
                 status=405,
@@ -169,7 +174,8 @@ class EmploymentSeparationAsgiApp:
                 extra_headers=((b"allow", b"POST"),),
             )
             return
-        if scope.get("path") != _ROUTE:
+        path = scope.get("path")
+        if type(path) is not str or path != _ROUTE:
             await _send_error(
                 send,
                 status=404,
