@@ -369,20 +369,79 @@ def _require_authorization(
     resource_kind: str,
     requested_fields: frozenset[str],
 ) -> AuthorizationDecision:
-    """Require an exact allow decision for the intended mutation target."""
+    """Validate and snapshot the exact authorization evidence consumed by persistence."""
     if type(authorization) is not AuthorizationDecision:
         raise PeopleMutationIntegrityError("people mutation requires a typed authorization decision")
     if (
-        not authorization.allowed
-        or authorization.tenant_record_id != tenant_record_id
-        or authorization.resource_reference != resource_reference
-        or authorization.resource_kind != resource_kind
-        or authorization.operation_code != "create_record"
-        or authorization.requested_fields != requested_fields
-        or authorization.authorized_fields != requested_fields
+        not _is_operational_uuid(tenant_record_id)
+        or type(resource_reference) is not str
+        or type(resource_kind) is not str
+        or type(requested_fields) is not frozenset
+        or any(type(field) is not str for field in requested_fields)
+    ):
+        raise PeopleMutationIntegrityError("people mutation authorization contract is invalid")
+
+    allowed = authorization.allowed
+    decision_tenant_record_id = authorization.tenant_record_id
+    actor_reference = authorization.actor_reference
+    decision_resource_reference = authorization.resource_reference
+    policy_version_code = authorization.policy_version_code
+    purpose_code = authorization.purpose_code
+    operation_code = authorization.operation_code
+    decision_resource_kind = authorization.resource_kind
+    decision_requested_fields = authorization.requested_fields
+    decision_authorized_fields = authorization.authorized_fields
+    reason_code = authorization.reason_code
+    next_action = authorization.next_action
+
+    if (
+        type(allowed) is not bool
+        or not _is_operational_uuid(decision_tenant_record_id)
+        or type(actor_reference) is not str
+        or type(decision_resource_reference) is not str
+        or type(policy_version_code) is not str
+        or type(purpose_code) is not str
+        or type(operation_code) is not str
+        or type(decision_resource_kind) is not str
+        or type(decision_requested_fields) is not frozenset
+        or type(decision_authorized_fields) is not frozenset
+        or type(reason_code) is not str
+        or type(next_action) is not str
+        or any(type(field) is not str for field in decision_requested_fields)
+        or any(type(field) is not str for field in decision_authorized_fields)
+    ):
+        raise PeopleMutationIntegrityError("people mutation authorization evidence is invalid")
+
+    expected_tenant_identity = tenant_record_id.int
+    decision_tenant_identity = decision_tenant_record_id.int
+    assert type(expected_tenant_identity) is int
+    assert type(decision_tenant_identity) is int
+    expected_tenant_record_id = UUID(int=expected_tenant_identity)
+    detached_decision = AuthorizationDecision(
+        allowed=allowed,
+        tenant_record_id=UUID(int=decision_tenant_identity),
+        actor_reference=actor_reference,
+        resource_reference=decision_resource_reference,
+        policy_version_code=policy_version_code,
+        purpose_code=purpose_code,
+        operation_code=operation_code,
+        resource_kind=decision_resource_kind,
+        requested_fields=frozenset(tuple(decision_requested_fields)),
+        authorized_fields=frozenset(tuple(decision_authorized_fields)),
+        reason_code=reason_code,
+        next_action=next_action,
+    )
+    if (
+        not detached_decision.allowed
+        or detached_decision.tenant_record_id != expected_tenant_record_id
+        or detached_decision.resource_reference != resource_reference
+        or detached_decision.resource_kind != resource_kind
+        or detached_decision.operation_code != "create_record"
+        or detached_decision.requested_fields != requested_fields
+        or detached_decision.authorized_fields != requested_fields
     ):
         raise PeopleMutationIntegrityError("people mutation authorization does not match the exact record")
-    return authorization
+    return detached_decision
 
 
 def _record_audit(
