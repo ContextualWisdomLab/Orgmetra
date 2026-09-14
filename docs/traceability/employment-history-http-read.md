@@ -16,7 +16,9 @@ surface.
 | Validate before protected work | `EmploymentHistoryAsgiApp` parses route, query, UUIDs, UTC cutoff, purpose, and fields before authentication | malformed input cases prove no authenticator or read-port call |
 | Bound caller-controlled transport work | path length is capped at 256 characters before route tokenization; raw query at 4096 bytes before `parse_qsl`; query field count is bounded before authentication | boundary-hardening regressions prove oversized path never reaches route tokenization and oversized query never reaches `parse_qsl`, authenticator, or read port |
 | Authenticate one bearer credential | existing bounded `_authorization_header` and `extract_bearer_token` contracts | missing, duplicate, malformed, non-ASCII, and rejected credentials return 401 |
-| Preserve authenticated identity integrity | only exact `AuthenticatedPrincipal` is accepted after authentication; unexpected identity-backend failures become client-safe 500 responses with opaque support references | arbitrary principal result and secret-bearing authenticator exception both fail before persistence; response omits backend secret text |
+| Preserve authenticated identity integrity | only exact `AuthenticatedPrincipal` is accepted after authentication; unexpected identity-backend failures become client-safe 500 responses with one opaque support reference | arbitrary principal result and secret-bearing authenticator exception both fail before persistence; response omits backend secret text |
+| Preserve the published backend-error contract | identity-backend failure returns the same opaque reference recorded by the server inside a complete `ErrorResponse`; shared JSON emitter receives only supported arguments | focused regression requires `error`, `error_code`, `message`, `next_action`, and `support_reference` |
+| Keep synchronous persistence off the ASGI event loop | synchronous `read_employment_history()` service/PostgreSQL work executes through `asyncio.to_thread(...)` | focused regression records the read-port thread and requires it to differ from the event-loop thread |
 | Use least privilege and exact purpose | `orgmetra.people.employment_history.read` plus `read_employment_history()` policy binding | disallowed fields return 403 before the port is called |
 | Preserve bitemporal scope | `known_at` is an exact UTC system-recorded cutoff passed to the Employment-history service | call capture and service bitemporal tests |
 | Minimize the response | `resource_reference` plus authorized `entries[].fields` only | successful and empty-result response assertions; no Person/Position/Assignment joins |
@@ -37,7 +39,9 @@ surface.
 9. **Owner-lineage restack:** ordinary two-parent merge `554e223ee5133c2a30646c1c048cc004e7f1eb36` adopts current #149 `d2e7d0c1fc038bf151466ad8e1ce1a3074d2d750`, which already carries canonical #55's retained-UUID scalar-authority repair.
 10. **Route-tokenization RED:** `8a367eb8885807dc21581c55e6a21b10e2ca5799` requires an oversized path to be rejected before `_looks_like_employment_history_route()` executes. The preceding implementation called the route tokenizer before its size gate.
 11. **Route-tokenization causal repair:** `99c3ec578a57c31f039cab70b6e3a90a4b85623a` moves the 256-character gate ahead of route decomposition while retaining ordinary 404 routing semantics.
-12. **Required verification:** after the owner stack returns to the canonical protected-`develop` PR boundary, reacquire exact-head Foundation/security/SAST/CodeQL/model-review and qualifying independent-review evidence. Pre-consolidation and predecessor-head results do not transfer.
+12. **Backend-envelope/event-loop RED:** `d998cd684adee518b04ddc37cfad7c17ea151d8c` requires a schema-valid backend-error response with the same opaque support reference and requires synchronous protected reads to execute off the ASGI event-loop thread. The predecessor violates both contracts.
+13. **Causal repair:** `3432b08b67f28cf5e665346494104ec15d523590` removes the unsupported JSON-emitter argument, returns `error_code`/`next_action`/`support_reference`, and awaits `asyncio.to_thread(read_employment_history, ...)`.
+14. **Required verification:** after the owner stack returns to the canonical protected-`develop` PR boundary, reacquire exact-head Foundation/security/SAST/CodeQL/model-review, qualifying independent-review evidence, and applicable latency evidence. Pre-consolidation and predecessor-head results do not transfer.
 
 ## Stack authority
 
@@ -45,10 +49,10 @@ Canonical Employment-history application owner #149 is
 `d2e7d0c1fc038bf151466ad8e1ce1a3074d2d750` on #55. #155 ordinary-forward
 adopted that owner in `554e223ee5133c2a30646c1c048cc004e7f1eb36`; the current HTTP lineage remains
 0-behind that direct base and keeps the retired feature-local workflow absent.
-The later route-tokenization RED/repair changes only #155-owned transport/tests
-and their ADR/traceability evidence; no parent-owned source is copied downstream.
+The later transport repairs change only #155-owned HTTP source/tests and their
+ADR/traceability evidence; no parent-owned source is copied downstream.
 
-## Security and data boundary
+## Security, availability, and data boundary
 
 The route reads only authorized Employment-version fields and the already-
 governed Person/Employment lineage. It does not join Position, Assignment,
@@ -59,7 +63,13 @@ Caller-controlled path/query work is bounded before route/query parsing, identit
 or persistence work. Authentication failure remains distinguishable as 401,
 while identity-backend malfunction or a noncanonical principal object fails closed
 as a generic 500 and never reaches authorization/persistence. Bearer credentials
-and backend exception text are not copied into customer responses.
+and backend exception text are not copied into customer responses. Synchronous
+Employment/PostgreSQL work is worker-thread isolated from the ASGI event loop,
+without changing the short read-only transaction owned by the persistence lane.
+
+The worker-thread repair is not a p95 claim. Production-equivalent connection/pool
+settings still require exact-candidate k6/E2E measurement before <=20 ms can be
+claimed for this buyer path.
 
 ## Out of scope
 
