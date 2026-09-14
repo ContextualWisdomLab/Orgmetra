@@ -61,7 +61,9 @@ class FakeCursor:
 
 
 class FakeConnection:
-    """Provide one transaction-scoped cursor context for the adapter."""
+    """Provide one non-autocommit transaction-scoped cursor context for the adapter."""
+
+    autocommit = False
 
     def __init__(self, cursor: FakeCursor) -> None:
         self.cursor_instance = cursor
