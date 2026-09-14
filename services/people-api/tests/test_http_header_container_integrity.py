@@ -132,6 +132,15 @@ class HeaderContainerIntegrityTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(AuthenticationFailed):
             _authorization_header({"headers": [pair]})
 
+    def test_authorization_header_collection_enforces_aggregate_byte_budget(self) -> None:
+        headers = [
+            (b"x-first", b"a" * 8192),
+            (b"x-second", b"b" * 8192),
+            (b"authorization", b"Bearer opaque-token"),
+        ]
+        with self.assertRaisesRegex(AuthenticationFailed, "request headers exceed the accepted size"):
+            _authorization_header({"headers": headers})
+
     async def test_post_auth_outer_header_subclass_is_rejected_before_iteration(self) -> None:
         replacement = _ExplodingHeaderList(
             [
