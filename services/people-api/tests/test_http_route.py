@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 import json
+import threading
 import unittest
 from uuid import UUID
 
@@ -42,10 +43,12 @@ class FakeReadPort:
     def __init__(self, result: WorkerPeopleRecord | None) -> None:
         self.result = result
         self.calls: list[tuple[UUID, UUID, date]] = []
+        self.thread_ids: list[int] = []
 
     def read_worker(self, *, tenant_record_id: UUID, person_record_id: UUID, effective_on: date) -> WorkerPeopleRecord | None:
         """Return deterministic worker truth for transport tests."""
         self.calls.append((tenant_record_id, person_record_id, effective_on))
+        self.thread_ids.append(threading.get_ident())
         return self.result
 
 
@@ -156,6 +159,18 @@ class PeopleHttpRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["fields"], {"display_name": "Ada Lovelace", "employment_status_code": "active"})
         self.assertEqual(authenticator.tokens, ["opaque-token"])
         self.assertEqual(port.calls, [(TENANT, PERSON, date(2026, 8, 17))])
+
+    async def test_synchronous_governed_read_runs_off_event_loop_thread(self) -> None:
+        """Keep synchronous People/PostgreSQL work off the ASGI event-loop thread."""
+        event_loop_thread_id = threading.get_ident()
+        port = FakeReadPort(worker_record())
+
+        status, _, payload = await self._request(self._app(read_port=port))
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["resource_reference"], f"person_record:{PERSON.hex}")
+        self.assertEqual(len(port.thread_ids), 1)
+        self.assertNotEqual(port.thread_ids[0], event_loop_thread_id)
 
     async def test_malformed_request_fails_before_authentication_or_protected_read(self) -> None:
         authenticator = FakeAuthenticator(self.principal)
