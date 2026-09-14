@@ -118,6 +118,21 @@ for (const testCase of [
     expected: /recordSelectionDecision.*response.*422/
   },
   {
+    name: 'Position-history path',
+    fragment: '  /tenants/{tenant_record_id}/positions/{position_record_id}/history:\n',
+    expected: /readPositionHistory.*path block/
+  },
+  {
+    name: 'Position-history read scope',
+    fragment: '            - orgmetra.people.position_history.read\n',
+    expected: /readPositionHistory.*scope/
+  },
+  {
+    name: 'Position-history response schema',
+    fragment: "                $ref: '#/components/schemas/PositionHistoryView'\n",
+    expected: /readPositionHistory.*response schema/
+  },
+  {
     name: 'safe support reference error field',
     fragment: '        - support_reference\n',
     expected: /ErrorResponse.*support_reference/

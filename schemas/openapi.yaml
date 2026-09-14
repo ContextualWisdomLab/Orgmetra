@@ -8,6 +8,8 @@ servers:
 tags:
   - name: people-core
     description: People identity and employment commands.
+  - name: people-history
+    description: Purpose-bound bitemporal People history reads.
   - name: job-architecture
     description: Evidence-backed job architecture commands.
   - name: talent-acquisition
@@ -344,6 +346,42 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/SnapshotNotFound'
+  /tenants/{tenant_record_id}/positions/{position_record_id}/history:
+    get:
+      operationId: readPositionHistory
+      summary: Read purpose-authorized bitemporal Position history at a knowledge cutoff
+      tags:
+        - people-history
+      security:
+        - keyverse_oidc:
+            - orgmetra.people.position_history.read
+      parameters:
+        - $ref: '#/components/parameters/TenantRecordId'
+        - $ref: '#/components/parameters/PositionRecordId'
+        - $ref: '#/components/parameters/KnownAt'
+        - $ref: '#/components/parameters/PurposeQuery'
+        - $ref: '#/components/parameters/FieldsQuery'
+      responses:
+        '200':
+          description: Authorized Position versions visible at the requested system-time cutoff.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PositionHistoryView'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Authoritative Position history failed integrity validation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   securitySchemes:
     keyverse_oidc:
@@ -383,6 +421,51 @@ components:
       schema:
         type: string
         pattern: '^[a-z][a-z0-9_]{2,63}$'
+    TenantRecordId:
+      name: tenant_record_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PositionRecordId:
+      name: position_record_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    KnownAt:
+      name: known_at
+      in: query
+      required: true
+      description: RFC 3339 UTC system-recorded knowledge cutoff, including a trailing Z.
+      schema:
+        type: string
+        format: date-time
+        pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$'
+    PurposeQuery:
+      name: purpose
+      in: query
+      required: true
+      description: Business purpose evaluated by the purpose-bound authorization policy.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        pattern: '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$'
+    FieldsQuery:
+      name: fields
+      in: query
+      required: true
+      description: Comma-separated explicit lower snake-case fields to request.
+      style: form
+      explode: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 1000
+        pattern: '^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(,[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*$'
   schemas:
     EvidenceReference:
       type: object
@@ -422,6 +505,31 @@ components:
         person_record_id:
           type: string
           format: uuid
+    PositionHistoryView:
+      type: object
+      additionalProperties: false
+      required:
+        - resource_reference
+        - entries
+      properties:
+        resource_reference:
+          type: string
+          minLength: 1
+          maxLength: 300
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/PositionHistoryEntry'
+    PositionHistoryEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - fields
+      properties:
+        fields:
+          type: object
+          additionalProperties:
+            type: [string, 'null']
     CreateJobProfileCommand:
       type: object
       additionalProperties: false
@@ -1014,6 +1122,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     UnsupportedMediaType:
       description: The job-analysis POST body is missing application/json media type.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: The service could not safely complete the request.
       content:
         application/json:
           schema:

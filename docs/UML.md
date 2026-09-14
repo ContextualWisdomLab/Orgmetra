@@ -46,6 +46,31 @@ flowchart LR
 
 The cluster is physically shared in the initial modular deployment. Each bounded context has a separate schema and role; direct reads of another context's application tables are prohibited.
 
+## Position-history read sequence
+
+```mermaid
+sequenceDiagram
+    actor Customer
+    participant Gateway
+    participant PositionHistory
+    participant Policy
+    participant PostgreSQL
+
+    Customer->>Gateway: GET Position history(tenant, Position, known_at, purpose, fields)
+    Gateway->>Gateway: Validate route/query and authenticate Bearer token
+    Gateway->>Policy: Authorize exact target, purpose, scope, and fields
+    Policy-->>Gateway: Authorized field decision
+    Gateway->>PositionHistory: Read authorized bitemporal history
+    PositionHistory->>PostgreSQL: Tenant-scoped read-only query at known_at
+    PostgreSQL-->>PositionHistory: Typed Position/Job/organization lineage
+    PositionHistory-->>Gateway: Minimized authorized entries
+    Gateway-->>Customer: no-store response with opaque resource reference
+```
+
+Authorization precedes protected persistence access. The route does not join
+Person, Employment, Assignment, compensation, candidate, performance,
+credential, or employment-decision data.
+
 ## Selection decision sequence
 
 ```mermaid

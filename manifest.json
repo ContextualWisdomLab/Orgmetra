@@ -137,9 +137,9 @@
     },
     {
       "path": "docs/API_CONTRACT.md",
-      "sha256": "63533dff785da62b89e585d742a158e2aeb05913644f2bf9fb6486f281c2e589",
-      "bytes": 4555,
-      "lines": 76
+      "sha256": "3384cfb7baba2102f5680443efbba3dea7ce706fde3645ed7691866457eb067a",
+      "bytes": 5391,
+      "lines": 80
     },
     {
       "path": "docs/DATA_MODEL.md",
@@ -167,9 +167,9 @@
     },
     {
       "path": "docs/SECURITY.md",
-      "sha256": "01918512d8882060e9cff0c4aa8206e0eccbdfb61cfd7f829331123c7a9fe6ac",
-      "bytes": 11185,
-      "lines": 64
+      "sha256": "d88a9e3175ec953821b1b60f78d98426ad2f74843476bafa31a0e14467ec196c",
+      "bytes": 11665,
+      "lines": 66
     },
     {
       "path": "docs/STORYBOARD.md",
@@ -197,9 +197,9 @@
     },
     {
       "path": "docs/TRACEABILITY.md",
-      "sha256": "dbf6fd91375ea28e05456d2a0c9ba629506cbac6f52f5dfda61ae68db2395f7e",
-      "bytes": 11462,
-      "lines": 40
+      "sha256": "5e6e82516ea393f83419dabe0e6b7f42c783d2af4d165ead82fbde140108b439",
+      "bytes": 12015,
+      "lines": 41
     },
     {
       "path": "docs/TRD.md",
@@ -209,9 +209,9 @@
     },
     {
       "path": "docs/UML.md",
-      "sha256": "fe67c37aa88e5814ceb2db7e8f7d8d85ca27a994802efbb7c75164b387adf0a9",
-      "bytes": 5528,
-      "lines": 122
+      "sha256": "debab73fc43f06d7592f32dadfefd8674c2c2996f10a5e9c531ad287539125d7",
+      "bytes": 6549,
+      "lines": 147
     },
     {
       "path": "docs/USER_STORIES.md",
@@ -311,9 +311,9 @@
     },
     {
       "path": "docs/adr/README.md",
-      "sha256": "f3b3b5ed3b3b31a40a0a3696abf0065e3c25879b6be50077f38ffae742b9d002",
-      "bytes": 1838,
-      "lines": 18
+      "sha256": "51f7adb9a3687e8f935d1219acc228fb3ba7eae8c8abcced0b9cf613cb7176eb",
+      "bytes": 2309,
+      "lines": 21
     },
     {
       "path": "docs/doctoring/REFERENCES.md",
@@ -353,9 +353,9 @@
     },
     {
       "path": "schemas/openapi.yaml",
-      "sha256": "09c1e43486779198574fe31b8bcabbd1c1f74beec7bf86245ae578061619838f",
-      "bytes": 29503,
-      "lines": 1020
+      "sha256": "c303f7b92737ac7f3e94c4cf07c7f4609abda295dbe629cea2ef38d80d74dd00",
+      "bytes": 33036,
+      "lines": 1134
     },
     {
       "path": "scripts/foundation-contract-core.mjs",
@@ -383,9 +383,9 @@
     },
     {
       "path": "tests/openapi-contract.test.mjs",
-      "sha256": "80c1610ef1c189fa325e55389501e0e51531ddf61ee335bb94d9cb3aa55a9fdc",
-      "bytes": 6438,
-      "lines": 195
+      "sha256": "6247322ba1371a421656f414416a6f69e34235b669e3fba3b8e3907e4b62b1a8",
+      "bytes": 6975,
+      "lines": 210
     },
     {
       "path": "tests/test_audit_outbox_hardening_postgres.sh",

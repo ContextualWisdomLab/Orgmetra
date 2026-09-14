@@ -49,6 +49,8 @@ All mutation families additionally require resource-scoped authorization and a v
 
 A caller-controlled purpose value cannot substitute for a missing token scope. The OpenAPI contract is executable input to generated gateway and server validation; an implementation that accepts a request outside its published contract fails CI.
 
+The Position-history HTTP boundary binds `known_at` to one explicit UTC system-time cutoff and authorizes the exact opaque Position-history target before invoking persistence. It returns only the requested authorized fields and fails closed on malformed identifiers, duplicate query fields, cross-tenant policy context, contradictory bitemporal rows, and unexpected backend failures; it does not expand the read into Person, Employment, Assignment, or high-impact decision data.
+
 Internal traces remain in restricted telemetry. Customer-facing failures return a bounded `error_code`, actionable `message`, `next_action`, and random `support_reference`; the support lookup is access-controlled and retention-bound.
 
 The same governance contract applies to selection decisions, compensation changes, terminations, promotions, job-profile publication, validation-study policy changes, data exports, and identity deprovisioning. Draft creation may use a narrower permission, but publication or authoritative state transition may not reuse draft-only authorization.
