@@ -342,21 +342,26 @@ def _parse_worker_request(path: str, raw_query: object) -> _ParsedWorkerRequest:
 
 
 def _authorization_header(scope: Mapping[str, object]) -> str | None:
-    """Return one bounded ASCII Authorization header, rejecting malformed input."""
+    """Return one request-budgeted ASCII Authorization header, rejecting malformed input."""
     raw_headers = scope.get("headers", ())
     if type(raw_headers) not in (list, tuple):
         raise AuthenticationFailed("request headers are invalid")
     if len(raw_headers) > _MAX_REQUEST_HEADERS:
         raise AuthenticationFailed("request headers exceed the accepted count")
     authorization_values: list[bytes] = []
+    aggregate_header_bytes = 0
     for header in raw_headers:
         if type(header) not in (list, tuple) or len(header) != 2:
             raise AuthenticationFailed("request headers are invalid")
         name, value = header
         if type(name) is not bytes or type(value) is not bytes:
             raise AuthenticationFailed("request headers are invalid")
-        if len(name) + len(value) > _MAX_REQUEST_HEADER_BYTES:
+        header_bytes = len(name) + len(value)
+        if header_bytes > _MAX_REQUEST_HEADER_BYTES:
             raise AuthenticationFailed("request header exceeds the accepted size")
+        aggregate_header_bytes += header_bytes
+        if aggregate_header_bytes > _MAX_REQUEST_HEADER_BYTES:
+            raise AuthenticationFailed("request headers exceed the accepted size")
         if name.lower() == b"authorization":
             authorization_values.append(value)
     if len(authorization_values) != 1:
