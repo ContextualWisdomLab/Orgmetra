@@ -83,10 +83,11 @@ class PostgresPeopleReadPort(tuple):
     executable dependency is stored in tuple payload rather than a writable
     instance slot, so a post-construction attribute write cannot substitute a
     different pool, credential, TLS, or database-role capability after it has
-    passed validation. The returned connection must expose exact
-    ``autocommit is False`` before cursor acquisition so ``SET TRANSACTION`` and
-    transaction-local tenant state govern the protected SELECT in one short
-    database transaction.
+    passed validation. Request UUIDs are reduced to immutable scalar authority
+    before connection acquisition, then reconstructed for tenant context and SQL.
+    The returned connection must expose exact ``autocommit is False`` before
+    cursor acquisition so ``SET TRANSACTION`` and transaction-local tenant state
+    govern the protected SELECT in one short database transaction.
     """
 
     __slots__ = ()
@@ -120,22 +121,24 @@ class PostgresPeopleReadPort(tuple):
         rows are fetched so an unexpected duplicate lineage is detected and
         rejected rather than hidden by ``LIMIT 1``.
         """
-        _validate_operational_uuid("tenant_record_id", tenant_record_id)
-        _validate_operational_uuid("person_record_id", person_record_id)
+        tenant_identity = _validate_operational_uuid("tenant_record_id", tenant_record_id)
+        person_identity = _validate_operational_uuid("person_record_id", person_record_id)
         if type(effective_on) is not date:
             raise ValueError("effective_on must be a business date.")
 
         connection_factory = cast(PostgresConnectionFactory, tuple.__getitem__(self, 0))
         with connection_factory() as connection:
             _require_transactional_connection(connection)
+            tenant_target = UUID(int=tenant_identity)
+            person_target = UUID(int=person_identity)
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
-                cursor.execute(_TENANT_CONTEXT_SQL, (str(tenant_record_id),))
+                cursor.execute(_TENANT_CONTEXT_SQL, (str(tenant_target),))
                 cursor.execute(
                     _WORKER_READ_SQL,
                     (
-                        tenant_record_id,
-                        person_record_id,
+                        tenant_target,
+                        person_target,
                         effective_on,
                         effective_on,
                         effective_on,
@@ -169,6 +172,8 @@ class PostgresPeopleReadPort(tuple):
             display_name=display_name,
             employment_status_code=employment_status_code,
         )
-        if record.tenant_record_id != tenant_record_id or record.person_record_id != person_record_id:
+        record_tenant_identity = _validate_operational_uuid("row tenant_record_id", record.tenant_record_id)
+        record_person_identity = _validate_operational_uuid("row person_record_id", record.person_record_id)
+        if record_tenant_identity != tenant_identity or record_person_identity != person_identity:
             raise PeopleRecordIntegrityError("database row escaped requested target")
         return record
