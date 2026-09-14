@@ -199,10 +199,14 @@ class PositionHistoryAsgiApp:
     async def __call__(self, scope: Mapping[str, object], receive: AsgiReceive, send: AsgiSend) -> None:
         """Serve one HTTP request without exposing bearer tokens or internals."""
         del receive
-        if scope.get("type") != "http":
+        if type(scope) is not dict:
+            raise ValueError("ASGI scope must be a built-in dict")
+        scope_type = scope.get("type")
+        if type(scope_type) is not str or scope_type != "http":
             raise ValueError("PositionHistoryAsgiApp accepts only HTTP ASGI scopes")
 
-        if scope.get("method") != "GET":
+        method = scope.get("method")
+        if type(method) is not str or method != "GET":
             await _send_error(
                 send,
                 status=405,
