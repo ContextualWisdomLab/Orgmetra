@@ -51,12 +51,14 @@ ORDER BY employment_version.effective_from,
 _MAX_UUID_INT = (1 << 128) - 1
 
 
-def _require_operational_uuid(field_name: str, value: object) -> None:
-    """Require an exact non-sentinel UUID before any database access."""
+def _require_operational_uuid(field_name: str, value: object) -> int:
+    """Return detached scalar authority for one exact operational UUID."""
     if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
-    if value.int in (0, _MAX_UUID_INT):
+    identity = value.int
+    if type(identity) is not int or not 0 < identity < _MAX_UUID_INT:
         raise ValueError(f"{field_name} must be an operational UUID.")
+    return identity
 
 
 def _require_utc_instant(field_name: str, value: object) -> None:
@@ -146,20 +148,22 @@ class PostgresEmploymentHistoryReadPort(tuple):
         known_at: datetime,
     ) -> tuple[EmploymentHistoryRecord, ...]:
         """Return Employment versions visible at ``known_at`` without authorizing disclosure."""
-        _require_operational_uuid("tenant_record_id", tenant_record_id)
-        _require_operational_uuid("person_record_id", person_record_id)
+        tenant_identity = _require_operational_uuid("tenant_record_id", tenant_record_id)
+        person_identity = _require_operational_uuid("person_record_id", person_record_id)
         _require_utc_instant("known_at", known_at)
+        requested_tenant_id = UUID(int=tenant_identity)
+        requested_person_id = UUID(int=person_identity)
 
         connection_factory = cast(PostgresConnectionFactory, tuple.__getitem__(self, 0))
         with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
-                cursor.execute(_TENANT_CONTEXT_SQL, (str(tenant_record_id),))
+                cursor.execute(_TENANT_CONTEXT_SQL, (str(requested_tenant_id),))
                 cursor.execute(
                     _EMPLOYMENT_HISTORY_SQL,
                     (
-                        tenant_record_id,
-                        person_record_id,
+                        requested_tenant_id,
+                        requested_person_id,
                         known_at,
                         known_at,
                         known_at,
@@ -177,8 +181,8 @@ class PostgresEmploymentHistoryReadPort(tuple):
         for row in rows:
             record = _record_from_row(row)
             if (
-                record.tenant_record_id != tenant_record_id
-                or record.person_record_id != person_record_id
+                record.tenant_record_id != requested_tenant_id
+                or record.person_record_id != requested_person_id
             ):
                 raise EmploymentHistoryIntegrityError(
                     "database Employment-history row does not match the requested target"
