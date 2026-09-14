@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+import threading
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
@@ -18,6 +20,7 @@ DEFAULT_QUERY = (
     b"known_at=2026-08-30T00:00:00Z&purpose=employee_profile_review&"
     b"fields=effective_from,employment_status_code"
 )
+_SUPPORT_REFERENCE = re.compile(r"^err_[A-Za-z0-9_-]{20,80}$")
 
 
 class RecordingAuthenticator:
@@ -41,6 +44,7 @@ class EmptyHistoryPort:
 
     def __init__(self) -> None:
         self.calls: list[tuple[UUID, UUID, datetime]] = []
+        self.thread_ids: list[int] = []
 
     def read_employment_history(
         self,
@@ -51,6 +55,7 @@ class EmptyHistoryPort:
     ) -> tuple[EmploymentHistoryRecord, ...]:
         """Return an immutable empty history for transport-boundary tests."""
         self.calls.append((tenant_record_id, person_record_id, known_at))
+        self.thread_ids.append(threading.get_ident())
         return ()
 
 
@@ -111,7 +116,7 @@ class EmploymentHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCa
         return int(start["status"]), json.loads(bytes(body["body"]))
 
     async def test_authentication_backend_failure_is_client_safe_and_skips_persistence(self) -> None:
-        """An identity-backend exception must not escape the ASGI boundary or leak secrets."""
+        """An identity-backend exception must return the published envelope without secrets."""
         authenticator = RecordingAuthenticator(
             self.principal,
             error=RuntimeError("oidc client_secret=do-not-leak"),
@@ -121,9 +126,26 @@ class EmploymentHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCa
         status, payload = await self._request(self._app(authenticator, port))
 
         self.assertEqual((status, payload["error_code"]), (500, "internal_error"))
+        self.assertEqual(payload["error"], "internal_error")
+        self.assertEqual(payload["next_action"], payload["message"])
+        self.assertRegex(str(payload["support_reference"]), _SUPPORT_REFERENCE)
         self.assertNotIn("client_secret", json.dumps(payload))
         self.assertEqual(authenticator.tokens, ["opaque-token"])
         self.assertEqual(port.calls, [])
+
+    async def test_synchronous_service_read_runs_off_event_loop_thread(self) -> None:
+        """Do not run synchronous Employment/PostgreSQL work on the ASGI event loop."""
+        event_loop_thread_id = threading.get_ident()
+        authenticator = RecordingAuthenticator(self.principal)
+        port = EmptyHistoryPort()
+
+        status, payload = await self._request(self._app(authenticator, port))
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["entries"], [])
+        self.assertEqual(len(port.calls), 1)
+        self.assertEqual(len(port.thread_ids), 1)
+        self.assertNotEqual(port.thread_ids[0], event_loop_thread_id)
 
     async def test_noncanonical_authenticator_result_is_client_safe_and_skips_persistence(self) -> None:
         """A structurally arbitrary principal cannot cross the authenticated identity boundary."""
