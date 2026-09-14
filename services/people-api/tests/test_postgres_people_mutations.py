@@ -87,6 +87,7 @@ class FakeConnection:
     def __init__(self, cursor: ScriptedCursor) -> None:
         self.cursor_instance = cursor
         self.exit_exception: type[BaseException] | None = None
+        self.autocommit = False
 
     def __enter__(self) -> FakeConnection:
         return self
@@ -250,6 +251,12 @@ class PostgresPeopleMutationTests(unittest.TestCase):
         self.assertEqual(result.position_record_id, POSITION)
         sql_text = "\n".join(sql for sql, _parameters in cursor.executions)
         self.assertIn("public.organization_unit", sql_text)
+        parent_sql = next(
+            sql for sql, _parameters in cursor.executions if "FROM public.organization_unit AS organization" in sql
+        )
+        self.assertIn("organization.recorded_to IS NULL", parent_sql)
+        self.assertIn("job.recorded_to IS NULL", parent_sql)
+        self.assertIn("FOR SHARE OF organization, job", parent_sql)
         self.assertIn("public.position_record", sql_text)
         self.assertIn("public.record_audit_outbox_event", sql_text)
         self.assertIn("public.people_mutation_idempotency_record", sql_text)
