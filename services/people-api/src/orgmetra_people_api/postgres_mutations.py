@@ -850,16 +850,16 @@ class PostgresPeopleMutationPort(tuple):
                     raise PeopleMutationNotFound("organization unit or job profile was not found")
                 if len(rows) != 1:
                     raise PeopleMutationIntegrityError("position parent row is invalid")
-                organization_unit_id, job_profile_id, recorded_at = rows[0]
+                organization_unit_id, job_profile_id, parent_transaction_time = rows[0]
                 if (
                     not _is_operational_uuid(organization_unit_id)
                     or not _is_operational_uuid(job_profile_id)
                     or organization_unit_id != command.organization_unit_id
                     or job_profile_id != command.job_profile_id
-                    or not _is_aware_datetime(recorded_at)
+                    or not _is_aware_datetime(parent_transaction_time)
                 ):
                     raise PeopleMutationIntegrityError("position parent identity is invalid")
-                assert isinstance(recorded_at, datetime)
+                recorded_at = _post_lock_recorded_at(cursor)
                 cursor.execute(
                     _INSERT_POSITION_SQL,
                     (
