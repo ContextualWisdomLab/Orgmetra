@@ -9,9 +9,8 @@ revalidate before disclosure.
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable
+from typing import Any, Callable, cast
 from uuid import UUID
 
 from orgmetra_people_api.employment_history import (
@@ -114,16 +113,30 @@ def _record_from_row(row: object) -> EmploymentHistoryRecord:
         ) from exc
 
 
-@dataclass(frozen=True, slots=True)
-class PostgresEmploymentHistoryReadPort:
-    """Read canonical Employment history through a tenant-scoped read-only transaction."""
+class PostgresEmploymentHistoryReadPort(tuple):
+    """Read canonical Employment history through one immutable PostgreSQL capability.
 
-    connection_factory: PostgresConnectionFactory
+    The executable connection factory is validated once and stored in tuple
+    payload rather than a writable instance slot. A later attribute mutation
+    therefore cannot substitute a different pool, credential, TLS, role, or
+    database endpoint after dependency validation.
+    """
 
-    def __post_init__(self) -> None:
-        """Reject an unusable connection factory before a protected read can start."""
-        if not callable(self.connection_factory):
+    __slots__ = ()
+
+    def __new__(
+        cls,
+        connection_factory: PostgresConnectionFactory,
+    ) -> PostgresEmploymentHistoryReadPort:
+        """Validate and structurally bind the exact executable database capability."""
+        if not callable(connection_factory):
             raise TypeError("connection_factory must be callable")
+        return tuple.__new__(cls, (connection_factory,))
+
+    @property
+    def connection_factory(self) -> PostgresConnectionFactory:
+        """Expose the exact connection capability accepted at construction."""
+        return cast(PostgresConnectionFactory, tuple.__getitem__(self, 0))
 
     def read_employment_history(
         self,
@@ -137,7 +150,8 @@ class PostgresEmploymentHistoryReadPort:
         _require_operational_uuid("person_record_id", person_record_id)
         _require_utc_instant("known_at", known_at)
 
-        with self.connection_factory() as connection:
+        connection_factory = cast(PostgresConnectionFactory, tuple.__getitem__(self, 0))
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(tenant_record_id),))
