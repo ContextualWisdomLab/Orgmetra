@@ -23,6 +23,7 @@ from orgmetra_people_api.authorization import authorize_resource_fields
 
 _MAX_UUID_INT = (1 << 128) - 1
 _STATUS_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+_MAX_DISPLAY_NAME_LENGTH = 512
 
 
 class PeopleRecordNotFound(LookupError):
@@ -73,8 +74,16 @@ class WorkerPeopleRecord:
         ):
             identity = _validate_operational_uuid(field_name, getattr(self, field_name))
             object.__setattr__(self, field_name, UUID(int=identity))
-        if type(self.display_name) is not str or not self.display_name.strip():
-            raise ValueError("display_name must contain a usable worker name.")
+        if type(self.display_name) is not str:
+            raise ValueError("display_name must be a string.")
+        try:
+            self.display_name.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError("display_name must contain valid Unicode scalar values.") from error
+        if not self.display_name.strip() or len(self.display_name) > _MAX_DISPLAY_NAME_LENGTH:
+            raise ValueError("display_name must contain 1-512 usable characters.")
+        if any(ord(character) < 0x20 for character in self.display_name):
+            raise ValueError("display_name must not contain control characters.")
         if (
             type(self.employment_status_code) is not str
             or _STATUS_CODE_PATTERN.fullmatch(self.employment_status_code) is None
