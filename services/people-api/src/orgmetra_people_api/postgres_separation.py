@@ -59,6 +59,12 @@ def _require_authorization(
     return authorization
 
 
+def _require_transactional_connection(connection: object) -> None:
+    """Require the governed write to run inside an implicit database transaction."""
+    if getattr(connection, "autocommit", None) is not False:
+        raise RuntimeError("Employment separation requires autocommit disabled.")
+
+
 def _one_result_row(cursor: Any) -> tuple[object, object, object, object]:
     """Detach exactly one built-in database row before validating result evidence."""
     rows = cursor.fetchmany(2)
@@ -114,7 +120,9 @@ class PostgresEmploymentSeparationPort(tuple):
     The database login is expected to receive the released
     ``orgmetra_employment_separation_executor`` capability operationally. This
     adapter never assumes the privileged function-owner role and never issues
-    direct People/audit/outbox DML.
+    direct People/audit/outbox DML. The returned connection must expose exact
+    ``autocommit is False`` before cursor acquisition so the transaction mode and
+    transaction-local tenant context govern the complete function invocation.
     """
 
     __slots__ = ()
@@ -143,6 +151,7 @@ class PostgresEmploymentSeparationPort(tuple):
 
         try:
             with connection_factory() as connection:
+                _require_transactional_connection(connection)
                 with connection.cursor() as cursor:
                     cursor.execute(_READ_WRITE_SQL)
                     cursor.execute(_TENANT_CONTEXT_SQL, (str(detached_command.tenant_record_id),))
