@@ -12,6 +12,24 @@ TENANT = UUID("0198a412-6000-7000-8000-000000000001")
 OTHER_TENANT = UUID("0198a412-6000-7000-8000-000000000002")
 
 
+class _ExplosiveEquality:
+    """Fail if malformed retained UUID evidence reaches equality semantics."""
+
+    def __eq__(self, other: object) -> bool:
+        raise AssertionError("forged UUID payload equality must not execute")
+
+
+class _BehaviorBearingStr(str):
+    """Represent a non-exact string that must not cross the authority boundary."""
+
+
+class _BehaviorBearingFrozenset(frozenset):
+    """Fail if a frozenset subclass is iterated during principal validation."""
+
+    def __iter__(self):
+        raise AssertionError("scope-container subclass iteration must not execute")
+
+
 class BearerBoundaryTests(unittest.TestCase):
     """Prove that malformed token syntax never reaches an injected authenticator."""
 
@@ -42,6 +60,52 @@ class PrincipalBoundaryTests(unittest.TestCase):
             {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset()},
             {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({"orgmetra.*"})},
             {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({1})},
+        )
+        for values in cases:
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                AuthenticatedPrincipal(**values)
+
+    def test_rejects_forged_uuid_payload_before_executable_equality(self) -> None:
+        forged_tenant = UUID(str(TENANT))
+        object.__setattr__(forged_tenant, "int", _ExplosiveEquality())
+
+        with self.assertRaises(ValueError):
+            AuthenticatedPrincipal(
+                tenant_record_id=forged_tenant,
+                actor_reference="keyverse:actor-1",
+                granted_scope_codes=frozenset({"orgmetra.people.read"}),
+            )
+
+    def test_detaches_tenant_uuid_from_caller_alias(self) -> None:
+        caller_tenant = UUID(str(TENANT))
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=caller_tenant,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({"orgmetra.people.read"}),
+        )
+
+        object.__setattr__(caller_tenant, "int", OTHER_TENANT.int)
+
+        self.assertEqual(principal.tenant_record_id, TENANT)
+        self.assertIsNot(principal.tenant_record_id, caller_tenant)
+
+    def test_rejects_behavior_bearing_text_and_scope_container(self) -> None:
+        cases = (
+            {
+                "tenant_record_id": TENANT,
+                "actor_reference": _BehaviorBearingStr("keyverse:actor-1"),
+                "granted_scope_codes": frozenset({"orgmetra.people.read"}),
+            },
+            {
+                "tenant_record_id": TENANT,
+                "actor_reference": "keyverse:actor-1",
+                "granted_scope_codes": frozenset({_BehaviorBearingStr("orgmetra.people.read")}),
+            },
+            {
+                "tenant_record_id": TENANT,
+                "actor_reference": "keyverse:actor-1",
+                "granted_scope_codes": _BehaviorBearingFrozenset({"orgmetra.people.read"}),
+            },
         )
         for values in cases:
             with self.subTest(values=values), self.assertRaises(ValueError):
