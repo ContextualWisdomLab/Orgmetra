@@ -22,6 +22,7 @@ OTHER_PERSON = UUID("0198a412-6000-7000-8000-000000000011")
 EMPLOYMENT = UUID("0198a412-6000-7000-8000-000000000020")
 CONVERSION = UUID("0198a412-6000-7000-8000-000000000030")
 CANDIDATE = UUID("0198a412-6000-7000-8000-000000000040")
+MUTATED_IDENTITY = UUID("0198a412-6000-7000-8000-000000000099")
 EFFECTIVE_ON = date(2026, 9, 9)
 
 
@@ -147,6 +148,36 @@ def test_people_read_rejects_post_authorization_target_alias_rewrite() -> None:
             policy=_policy(),
             read_port=_RetargetingPort(),
         )
+
+
+def test_worker_record_detaches_all_constructor_uuid_aliases() -> None:
+    """Governed read evidence must not retain persistence-owned UUID aliases."""
+    aliases = {
+        "tenant_record_id": UUID(int=TENANT.int),
+        "candidate_worker_conversion_record_id": UUID(int=CONVERSION.int),
+        "candidate_profile_id": UUID(int=CANDIDATE.int),
+        "person_record_id": UUID(int=PERSON.int),
+        "employment_record_id": UUID(int=EMPLOYMENT.int),
+    }
+    expected = {field_name: UUID(int=value.int) for field_name, value in aliases.items()}
+
+    record = WorkerPeopleRecord(
+        tenant_record_id=aliases["tenant_record_id"],
+        candidate_worker_conversion_record_id=aliases["candidate_worker_conversion_record_id"],
+        candidate_profile_id=aliases["candidate_profile_id"],
+        person_record_id=aliases["person_record_id"],
+        employment_record_id=aliases["employment_record_id"],
+        display_name="Ada Lovelace",
+        employment_status_code="active",
+    )
+
+    for alias in aliases.values():
+        object.__setattr__(alias, "int", MUTATED_IDENTITY.int)
+
+    for field_name, expected_value in expected.items():
+        retained_value = getattr(record, field_name)
+        assert retained_value == expected_value
+        assert retained_value is not aliases[field_name]
 
 
 @pytest.mark.parametrize("identity", [-1, 1 << 128])
