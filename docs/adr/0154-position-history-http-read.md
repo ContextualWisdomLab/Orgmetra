@@ -17,7 +17,10 @@ The HTTP boundary also receives attacker-controlled path/query bytes and delegat
 authentication to the Keyverse-facing identity boundary. It must bound parser work
 before authentication, reject a noncanonical authenticated-principal object before
 the governed service is called, and turn unexpected identity-backend failures into
-opaque client-safe responses without exposing credential or backend details.
+opaque client-safe responses without exposing credential or backend details. The
+ASGI boundary must also avoid running the synchronous Position-history service and
+PostgreSQL adapter on the event-loop thread; a blocking connection/cursor/fetch path
+would otherwise stall unrelated concurrent requests.
 
 ## Decision
 
@@ -40,12 +43,26 @@ path must not reach `strip()`/`split()` route decomposition or UUID parsing. The
 boundary reuses the existing People ASGI JSON transport and authorization-header
 parser, authenticates exactly one Bearer credential, requires the exact
 `AuthenticatedPrincipal` runtime type, then delegates to `read_position_history()`.
-Unexpected identity-backend exceptions are translated to an opaque 500 response
-before the service or persistence boundary is entered. The operation declares
-`orgmetra.people.position_history.read`, returns only authorized fields, uses
-`Cache-Control: no-store` and `Vary: Authorization`, and maps malformed input,
-authentication, authorization, integrity, and unexpected failures to the published
-client-safe error envelope.
+
+Unexpected identity-backend exceptions are translated to the same published
+`ErrorResponse` shape used by the rest of the route. The opaque support reference
+is generated once, logged with non-secret metadata, and returned in the payload;
+`error`, `error_code`, `message`, `next_action`, and `support_reference` are all
+present. No unsupported keyword is passed into the shared JSON emitter.
+
+`read_position_history()` remains a synchronous domain/application contract because
+its PostgreSQL port is synchronous. The ASGI adapter therefore executes the whole
+service call through `asyncio.to_thread(...)`. Authorization, persistence, row
+validation, and exception semantics stay unchanged, while blocking connection,
+cursor, execute, and fetch work no longer runs on the event-loop thread. Exceptions
+raised in the worker propagate through the await and are mapped by the existing
+403/409/500 handlers. This is an event-loop isolation repair, not a claim that the
+buyer-path p95 target has been measured or met.
+
+The operation declares `orgmetra.people.position_history.read`, returns only
+authorized fields, uses `Cache-Control: no-store` and `Vary: Authorization`, and
+maps malformed input, authentication, authorization, integrity, and unexpected
+failures to the published client-safe error envelope.
 
 OpenAPI publishes the route, query/path parameters, `PositionHistoryView`, and
 400/401/403/409/500 responses. Repository acceptance is owned by consolidated
@@ -60,8 +77,10 @@ must not be treated as evidence for a later exact head.
 - Oversized transport input is rejected before route/query parser work or
   authentication, and an invalid principal or failed identity backend cannot
   reach protected persistence.
-- Error support references are opaque and safe for customer correlation; the
-  route does not expose backend exception details.
+- Identity-backend 500 responses remain schema-valid and correlate to the exact
+  non-secret support reference recorded by the server.
+- Synchronous Position-history/PostgreSQL work is isolated from the ASGI event
+  loop; this does not replace later k6/E2E latency and capacity measurement.
 - The route intentionally does not add pagination, writes, cross-service joins,
   or high-impact employment decisions; those require separate contracts.
 
@@ -82,10 +101,22 @@ Causal repair `5d239e7db8a0ddb72a367c83e8b285f87421753c`
 moves the length gate ahead of route decomposition while preserving the existing
 404 behavior for non-string and nonmatching normal-sized paths.
 
+Current review then exposed two distinct defects. Test-only head
+`88e28cbc565f49992e6de741d356582d20252c30` strengthens the identity-backend
+failure contract to require the published error fields/support reference and adds
+a regression requiring the synchronous read port to execute off the ASGI event-loop
+thread. The preceding source passes an unsupported `support_reference` keyword to
+the shared JSON emitter and executes the synchronous read directly on the event
+loop. Causal repair `17adbbf4044a0288489153f72e08179b78b54fd0`
+returns the generated reference inside the schema-valid payload and offloads the
+service call with `asyncio.to_thread(...)`. Both short-lived/current stacked heads
+have no PR-triggered Foundation run because the PR targets #153 rather than
+`develop`; no hosted RED or GREEN is inferred from that absence.
+
 No predecessor or feature-local GREEN is accepted as current-head evidence. After
 the #152/#153 owner lineage reaches the protected `develop` lane, the final exact
 #154 head must reacquire Foundation, security, SAST, CodeQL, model-backed review,
-and qualifying independent review evidence.
+qualifying independent review, and applicable buyer-path latency evidence.
 
 RFC 3339, OpenAPI 3.2.0, NIST SP 800-53 Rev. 5, and PostgreSQL RLS/read-only
 transaction guidance inform the boundary. They are defense-in-depth references,
