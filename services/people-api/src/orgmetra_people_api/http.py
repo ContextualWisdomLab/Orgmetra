@@ -98,7 +98,8 @@ class PeopleAsgiApp:
     async def __call__(self, scope: Mapping[str, object], receive: AsgiReceive, send: AsgiSend) -> None:
         """Serve one HTTP request without exposing bearer tokens or internal errors."""
         del receive
-        if scope.get("type") != "http":
+        scope_type = scope.get("type")
+        if type(scope_type) is not str or scope_type != "http":
             raise ValueError("PeopleAsgiApp accepts only HTTP ASGI scopes")
 
         method = scope.get("method")
