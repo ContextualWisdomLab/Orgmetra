@@ -32,7 +32,9 @@ class _Cursor:
 
 
 class _Connection:
-    """Provide one deterministic connection context."""
+    """Provide one deterministic non-autocommit connection context."""
+
+    autocommit = False
 
     def __enter__(self) -> _Connection:
         return self
