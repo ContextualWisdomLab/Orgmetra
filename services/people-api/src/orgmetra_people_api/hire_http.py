@@ -422,11 +422,11 @@ def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
 def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
     """Require exactly one visible-ASCII Idempotency-Key after authentication."""
     raw_headers = scope.get("headers", ())
-    if not isinstance(raw_headers, (list, tuple)):
+    if type(raw_headers) not in (list, tuple):
         raise _InvalidHttpRequest("Idempotency-Key is required")
     values: list[bytes] = []
     for header in raw_headers:
-        if not isinstance(header, (list, tuple)) or len(header) != 2:
+        if type(header) not in (list, tuple) or len(header) != 2:
             raise _InvalidHttpRequest("Idempotency-Key is required")
         name, value = header
         if type(name) is not bytes:
@@ -447,11 +447,11 @@ def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
 def _require_json_content_type(scope: Mapping[str, object]) -> None:
     """Accept exactly one application/json content type before reading the body."""
     raw_headers = scope.get("headers", ())
-    if not isinstance(raw_headers, (list, tuple)):
+    if type(raw_headers) not in (list, tuple):
         raise _UnsupportedMediaType("content-type is required")
     values: list[bytes] = []
     for header in raw_headers:
-        if not isinstance(header, (list, tuple)) or len(header) != 2:
+        if type(header) not in (list, tuple) or len(header) != 2:
             raise _UnsupportedMediaType("content-type is required")
         name, value = header
         if type(name) is not bytes:
