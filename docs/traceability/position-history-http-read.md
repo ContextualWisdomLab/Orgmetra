@@ -16,7 +16,8 @@ serialization code widening the data surface.
 | Bound untrusted transport input before protected work | `PositionHistoryAsgiApp` rejects paths over 256 characters before route tokenization and raw query strings over 4096 bytes before `parse_qsl`; `parse_qsl` receives a bounded field count before authentication | focused hardening regressions prove oversized paths never reach route tokenization or UUID parsing and oversized queries never reach `parse_qsl` or authentication |
 | Validate caller-controlled semantics before protected work | route, query, operational UUIDs, UTC cutoff, purpose, and fields are validated before authentication | malformed input cases prove no authenticator or read-port call |
 | Authenticate one bearer credential and canonical principal | existing `_authorization_header`/`extract_bearer_token` contracts plus exact `AuthenticatedPrincipal` runtime check | rejected credentials return 401; unexpected backend failure and noncanonical principal return opaque 500 before the governed service/persistence boundary |
-| Preserve the published backend-error contract | authentication-backend failures log one opaque support reference and return that same reference inside a complete `ErrorResponse`; the shared JSON emitter receives only supported arguments | focused regression requires `error`, `error_code`, `message`, `next_action`, and `support_reference`, with no secret-bearing exception detail |
+| Preserve the published backend-error contract | authentication-backend failures log one opaque support reference and return that same reference inside a complete `ErrorResponse`; the current Position-stack shared JSON emitter is a passthrough and receives only arguments in its exact signature | focused regression requires `error`, `error_code`, `message`, `next_action`, and `support_reference`, with no secret-bearing exception detail; support-reference compatibility guard requires the route log and payload reference to remain equal |
+| Correlate unexpected persistence failures without disclosure | unexpected protected-read failures use a dedicated Position-history ERROR record containing route, tenant, exception type, and the same opaque support reference returned in the complete 500 envelope; exception messages are not logged or returned | end-to-end failing-read regression requires one ERROR record whose reference equals the response reference while a secret-bearing backend message is absent from the client payload and log message |
 | Keep synchronous persistence off the ASGI event loop | the synchronous `read_position_history()` service and PostgreSQL adapter execute through `asyncio.to_thread(...)`; worker exceptions propagate to the existing response mapping | focused regression records the protected read-port thread and requires it to differ from the event-loop thread |
 | Use least privilege and exact purpose | `orgmetra.people.position_history.read` plus `read_position_history()` policy binding | disallowed fields return 403 before the port is called |
 | Preserve bitemporal scope | `known_at` is an exact UTC system-recorded cutoff passed to the Position-history service | call capture and service/real PostgreSQL cutoff tests |
@@ -36,8 +37,10 @@ serialization code widening the data surface.
 7. **Semantic parent reconciliation:** `0b0b1e3de3529a1856dcc4270b48220fd9f2f236` adopts current #153 `dc566a0167d5e8ab17e8fad5e37f86618e4a93e7` as a second parent while preserving only the HTTP/OpenAPI/customer delta and the consolidated Foundation ownership model; `c5e2e5d8b08ad0ea7526ef106740da65b834deda` aligns the ADR lifecycle index.
 8. **Route-tokenization RED:** `7ae776750b20f621468a5f188f5dbb0130bf1d97` requires an oversized path to be rejected before `_looks_like_position_history_route()` executes. The preceding implementation invoked the route tokenizer before its length gate.
 9. **Route-tokenization causal repair:** `5d239e7db8a0ddb72a367c83e8b285f87421753c` moves the 256-character gate ahead of route decomposition while preserving ordinary 404 routing semantics.
-10. **Backend-envelope/event-loop RED:** `88e28cbc565f49992e6de741d356582d20252c30` requires authentication-backend failures to return the complete published error envelope with the same opaque support reference and requires the synchronous protected read to run outside the ASGI event-loop thread. The predecessor violates both contracts: `_send_json` does not accept the supplied `support_reference` keyword, and the service call executes directly in `__call__`.
-11. **Causal repair:** `17adbbf4044a0288489153f72e08179b78b54fd0` puts the generated support reference in the payload with `error_code`/`next_action`, removes the unsupported emitter keyword, and awaits `asyncio.to_thread(read_position_history, ...)` so synchronous PostgreSQL work cannot block the event-loop thread.
+10. **Backend-envelope/event-loop RED:** `88e28cbc565f49992e6de741d356582d20252c30` requires authentication-backend failures to return the complete published error envelope with one opaque support reference and requires the synchronous protected read to run outside the ASGI event-loop thread. At that historical head the Position-stack shared emitter did not accept a `support_reference` keyword and the service call executed directly in `__call__`.
+11. **Backend-envelope/event-loop causal repair:** `17adbbf4044a0288489153f72e08179b78b54fd0` puts the generated support reference in the schema-valid payload and awaits `asyncio.to_thread(read_position_history, ...)`. A later sibling-stack comparison incorrectly reintroduced an unsupported keyword; CodeRabbit revalidation identified the tree mismatch and ordinary-forward `66b64fd550230bc20d884919cba1e045bb130c5c` restored the actual Position-stack emitter contract. `f1e303dc5fa947f9f6b404a609aba313fdce4f6e` remains a compatibility guard, not a claimed RED against this predecessor.
+12. **Persistence-observability RED contract:** `d6d8e6469f80793d6a13060abb2a38de256a4b23` requires an unexpected protected-read failure to produce one Position-history ERROR record containing non-secret route/tenant/exception-type metadata and the same support reference returned in the 500 response. The predecessor routes this failure through generic `_send_error(...)`, which emits only an INFO rejection and discards the backend exception type.
+13. **Persistence-observability causal repair:** `411ba41631a2f31fa80aaadcb3f15d22aa8c26fe` adds a dedicated persistence-backend error emitter and preserves the existing client-safe envelope while keeping the exception message out of both response and log message. Authorization and integrity failures remain on their existing 403/409 paths.
 
 ## Security, availability, and data boundary
 
@@ -45,12 +48,12 @@ The route reads only authorized Position-version fields and the already-governed
 Position/Job/organization lineage. It does not join Person, Employment,
 Assignment, compensation, candidate, performance, credential, prompt, or model
 output data. It performs no write, audit/outbox mutation, or high-impact
-employment decision. Identity-backend failures are logged only with non-secret
-metadata and one opaque support reference; exception messages and bearer tokens are
-not returned to the client. The worker-thread offload changes only scheduling of
-the synchronous service call; authorization and the short read-only PostgreSQL
-transaction remain owned by #152/#153 and exceptions retain their existing 403,
-409, or opaque 500 mapping.
+employment decision. Identity and persistence backend failures are logged only
+with non-secret metadata and one opaque support reference; exception messages and
+bearer tokens are not returned to the client. The worker-thread offload changes
+only scheduling of the synchronous service call; authorization and the short
+read-only PostgreSQL transaction remain owned by #152/#153 and exceptions retain
+their existing 403, 409, or opaque 500 mapping.
 
 The offload prevents synchronous DB I/O from monopolizing the ASGI event loop, but
 it is not performance acceptance. The buyer path still requires exact-candidate
@@ -61,9 +64,9 @@ settings before the repository can claim the <=20 ms target.
 
 #154 remains an ordinary descendant of current #153: its direct base is
 `dc566a0167d5e8ab17e8fad5e37f86618e4a93e7`, with no parent delta intentionally
-copied into this HTTP lane. The current repair is ordinary-forward on that stack.
-Both test-only `88e28cbc...` and causal source head `17adbbf...` have zero
-PR-triggered workflow runs because this PR targets #153 rather than protected
+copied into this HTTP lane. Current production head `411ba41631a2f31fa80aaadcb3f15d22aa8c26fe`
+remains stacked rather than protected-base. These short-lived/current heads have
+no PR-triggered Foundation run because the PR targets #153 rather than protected
 `develop`; that absence is neither hosted RED nor GREEN. The current exact head
 must not inherit predecessor Foundation, security, model-review, or feature-local
 GREEN. Those gates must be reacquired after #152/#153 reach the protected lane and
