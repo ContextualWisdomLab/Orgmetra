@@ -12,6 +12,31 @@ TENANT = UUID("0198a412-6000-7000-8000-000000000001")
 OTHER_TENANT = UUID("0198a412-6000-7000-8000-000000000002")
 
 
+class _ExplosiveEquality:
+    """Fail if malformed retained UUID evidence reaches equality semantics."""
+
+    def __eq__(self, other: object) -> bool:
+        raise AssertionError("forged UUID payload equality must not execute")
+
+
+class _BehaviorBearingStr(str):
+    """Represent a non-exact string that must not cross the authority boundary."""
+
+
+class _BehaviorBearingAuthorizationHeader(str):
+    """Fail if bearer parsing dispatches methods on a non-exact string."""
+
+    def split(self, *args: object, **kwargs: object) -> list[str]:
+        raise AssertionError("authorization-header subclass split must not execute")
+
+
+class _BehaviorBearingFrozenset(frozenset):
+    """Fail if a frozenset subclass is iterated during principal validation."""
+
+    def __iter__(self):
+        raise AssertionError("scope-container subclass iteration must not execute")
+
+
 class BearerBoundaryTests(unittest.TestCase):
     """Prove that malformed token syntax never reaches an injected authenticator."""
 
@@ -22,6 +47,10 @@ class BearerBoundaryTests(unittest.TestCase):
         for header in (None, "", "Basic token", "Bearer", "Bearer one two"):
             with self.subTest(header=header), self.assertRaises(AuthenticationFailed):
                 extract_bearer_token(header)
+
+    def test_rejects_behavior_bearing_authorization_header_before_parser_dispatch(self) -> None:
+        with self.assertRaises(AuthenticationFailed):
+            extract_bearer_token(_BehaviorBearingAuthorizationHeader("Bearer safe-token_123"))
 
     def test_rejects_hidden_control_non_ascii_and_unbounded_tokens(self) -> None:
         for token in ("bad\x1ftoken", "tökén", "x" * 8193):
@@ -42,6 +71,81 @@ class PrincipalBoundaryTests(unittest.TestCase):
             {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset()},
             {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({"orgmetra.*"})},
             {"tenant_record_id": TENANT, "actor_reference": "keyverse:actor-1", "granted_scope_codes": frozenset({1})},
+        )
+        for values in cases:
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                AuthenticatedPrincipal(**values)
+
+    def test_rejects_forged_uuid_payload_before_executable_equality(self) -> None:
+        forged_tenant = UUID(str(TENANT))
+        object.__setattr__(forged_tenant, "int", _ExplosiveEquality())
+
+        with self.assertRaises(ValueError):
+            AuthenticatedPrincipal(
+                tenant_record_id=forged_tenant,
+                actor_reference="keyverse:actor-1",
+                granted_scope_codes=frozenset({"orgmetra.people.read"}),
+            )
+
+    def test_detaches_tenant_uuid_from_caller_alias(self) -> None:
+        caller_tenant = UUID(str(TENANT))
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=caller_tenant,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({"orgmetra.people.read"}),
+        )
+
+        object.__setattr__(caller_tenant, "int", OTHER_TENANT.int)
+
+        self.assertEqual(principal.tenant_record_id, TENANT)
+        self.assertIsNot(principal.tenant_record_id, caller_tenant)
+
+    def test_tenant_uuid_views_do_not_mutate_retained_principal_authority(self) -> None:
+        principal = AuthenticatedPrincipal(
+            tenant_record_id=TENANT,
+            actor_reference="keyverse:actor-1",
+            granted_scope_codes=frozenset({"orgmetra.people.read"}),
+        )
+        exposed_tenant = principal.tenant_record_id
+
+        object.__setattr__(exposed_tenant, "int", OTHER_TENANT.int)
+
+        self.assertEqual(principal.tenant_record_id, TENANT)
+        self.assertIsNot(principal.tenant_record_id, exposed_tenant)
+
+    def test_revalidates_low_level_retained_principal_storage(self) -> None:
+        valid_scopes = frozenset({"orgmetra.people.read"})
+        malformed_payloads = (
+            (TENANT.int, "keyverse:actor-1"),
+            (True, "keyverse:actor-1", valid_scopes),
+            (0, "keyverse:actor-1", valid_scopes),
+            (TENANT.int, _BehaviorBearingStr("keyverse:actor-1"), valid_scopes),
+            (TENANT.int, "keyverse:actor-1", frozenset()),
+            (TENANT.int, "keyverse:actor-1", _BehaviorBearingFrozenset(valid_scopes)),
+            (TENANT.int, "keyverse:actor-1", frozenset({_BehaviorBearingStr("orgmetra.people.read")})),
+        )
+        for payload in malformed_payloads:
+            forged = tuple.__new__(AuthenticatedPrincipal, payload)
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                _ = forged.tenant_record_id
+
+    def test_rejects_behavior_bearing_text_and_scope_container(self) -> None:
+        cases = (
+            {
+                "tenant_record_id": TENANT,
+                "actor_reference": _BehaviorBearingStr("keyverse:actor-1"),
+                "granted_scope_codes": frozenset({"orgmetra.people.read"}),
+            },
+            {
+                "tenant_record_id": TENANT,
+                "actor_reference": "keyverse:actor-1",
+                "granted_scope_codes": frozenset({_BehaviorBearingStr("orgmetra.people.read")}),
+            },
+            {
+                "tenant_record_id": TENANT,
+                "actor_reference": "keyverse:actor-1",
+                "granted_scope_codes": _BehaviorBearingFrozenset({"orgmetra.people.read"}),
+            },
         )
         for values in cases:
             with self.subTest(values=values), self.assertRaises(ValueError):

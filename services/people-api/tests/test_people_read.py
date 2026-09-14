@@ -241,12 +241,15 @@ class WorkerPeopleReadTests(unittest.TestCase):
                 read_worker_people_record(**kwargs)
         self.assertEqual(port.calls, [])
 
-    def test_worker_record_rejects_reserved_identity_and_blank_business_values(self) -> None:
+    def test_worker_record_rejects_reserved_identity_and_invalid_business_values(self) -> None:
         cases = (
             {"tenant_record_id": UUID(int=0)},
             {"candidate_profile_id": "candidate-1"},
             {"display_name": "   "},
             {"display_name": 42},
+            {"display_name": "A" * 513},
+            {"display_name": "Ada" + chr(0)},
+            {"display_name": "Ada" + chr(0xD800)},
             {"employment_status_code": "Active Employment"},
             {"employment_status_code": 42},
         )

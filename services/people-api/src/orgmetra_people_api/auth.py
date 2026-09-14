@@ -8,7 +8,6 @@ purpose-bound policy contract after the target resource has been resolved.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
 from typing import Protocol, runtime_checkable
 from uuid import UUID
@@ -22,32 +21,88 @@ class AuthenticationFailed(RuntimeError):
     """Indicate that bearer authentication evidence is absent or malformed."""
 
 
-@dataclass(frozen=True, slots=True)
-class AuthenticatedPrincipal:
-    """Identity attributes that may be trusted only after token authentication.
+def _validate_retained_principal_payload(
+    principal: "AuthenticatedPrincipal",
+) -> tuple[int, str, frozenset[str]]:
+    """Revalidate structurally retained authentication evidence before authority use."""
+    if tuple.__len__(principal) != 3:
+        raise ValueError("authenticated principal storage is malformed.")
+    tenant_identity = tuple.__getitem__(principal, 0)
+    actor_reference = tuple.__getitem__(principal, 1)
+    granted_scope_codes = tuple.__getitem__(principal, 2)
 
-    ``tenant_record_id`` binds the authenticated actor to one Orgmetra tenant.
-    ``actor_reference`` is opaque audit correlation rather than a person record
-    identifier. ``granted_scope_codes`` carries explicit operation capabilities;
-    it never carries an HR purpose decision.
+    if type(tenant_identity) is not int or not 0 <= tenant_identity <= _MAX_UUID_INT:
+        raise ValueError("tenant_record_id must contain an exact 128-bit integer identity.")
+    if tenant_identity in (0, _MAX_UUID_INT):
+        raise ValueError("tenant_record_id must not use a reserved UUID sentinel.")
+    if type(actor_reference) is not str or _REFERENCE_PATTERN.fullmatch(actor_reference) is None:
+        raise ValueError("actor_reference must be an exact namespaced opaque reference.")
+    if type(granted_scope_codes) is not frozenset or not granted_scope_codes:
+        raise ValueError("granted_scope_codes must be an exact non-empty frozenset.")
+    if any(
+        type(scope) is not str or _SCOPE_PATTERN.fullmatch(scope) is None
+        for scope in granted_scope_codes
+    ):
+        raise ValueError("granted_scope_codes must contain exact explicit Orgmetra scopes.")
+    return tenant_identity, actor_reference, granted_scope_codes
+
+
+class AuthenticatedPrincipal(tuple):
+    """Structurally immutable authenticated identity/scope evidence.
+
+    Tenant authority is retained only as an exact built-in integer scalar. Public
+    UUID access reconstructs a fresh view, so callers cannot mutate the principal's
+    later tenant authority through a returned ``uuid.UUID`` alias. Actor and scope
+    values remain exact built-in immutable scalars and never carry HR purpose.
     """
 
-    tenant_record_id: UUID
-    actor_reference: str
-    granted_scope_codes: frozenset[str]
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        """Reject sentinel identities, mutable grants, wildcards, and bad references."""
-        if not isinstance(self.tenant_record_id, UUID):
-            raise ValueError("tenant_record_id must be a UUID.")
-        if self.tenant_record_id.int in (0, _MAX_UUID_INT):
+    def __new__(
+        cls,
+        tenant_record_id: UUID,
+        actor_reference: str,
+        granted_scope_codes: frozenset[str],
+    ) -> "AuthenticatedPrincipal":
+        """Validate and detach authentication evidence before retaining authority."""
+        if type(tenant_record_id) is not UUID:
+            raise ValueError("tenant_record_id must be an exact UUID.")
+        tenant_identity = tenant_record_id.int
+        if type(tenant_identity) is not int or not 0 <= tenant_identity <= _MAX_UUID_INT:
+            raise ValueError("tenant_record_id must contain an exact 128-bit integer identity.")
+        if tenant_identity in (0, _MAX_UUID_INT):
             raise ValueError("tenant_record_id must not use a reserved UUID sentinel.")
-        if not isinstance(self.actor_reference, str) or _REFERENCE_PATTERN.fullmatch(self.actor_reference) is None:
-            raise ValueError("actor_reference must be a namespaced opaque reference.")
-        if not isinstance(self.granted_scope_codes, frozenset) or not self.granted_scope_codes:
-            raise ValueError("granted_scope_codes must be a non-empty frozenset.")
-        if any(not isinstance(scope, str) or _SCOPE_PATTERN.fullmatch(scope) is None for scope in self.granted_scope_codes):
-            raise ValueError("granted_scope_codes must contain explicit Orgmetra scopes.")
+        if type(actor_reference) is not str or _REFERENCE_PATTERN.fullmatch(actor_reference) is None:
+            raise ValueError("actor_reference must be an exact namespaced opaque reference.")
+        if type(granted_scope_codes) is not frozenset or not granted_scope_codes:
+            raise ValueError("granted_scope_codes must be an exact non-empty frozenset.")
+        if any(
+            type(scope) is not str or _SCOPE_PATTERN.fullmatch(scope) is None
+            for scope in granted_scope_codes
+        ):
+            raise ValueError("granted_scope_codes must contain exact explicit Orgmetra scopes.")
+        return tuple.__new__(
+            cls,
+            (tenant_identity, actor_reference, frozenset(granted_scope_codes)),
+        )
+
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return a fresh UUID view of the retained tenant scalar authority."""
+        tenant_identity, _, _ = _validate_retained_principal_payload(self)
+        return UUID(int=tenant_identity)
+
+    @property
+    def actor_reference(self) -> str:
+        """Return the revalidated opaque authenticated actor reference."""
+        _, actor_reference, _ = _validate_retained_principal_payload(self)
+        return actor_reference
+
+    @property
+    def granted_scope_codes(self) -> frozenset[str]:
+        """Return the revalidated exact operation-scope evidence."""
+        _, _, granted_scope_codes = _validate_retained_principal_payload(self)
+        return granted_scope_codes
 
 
 @runtime_checkable
@@ -61,11 +116,14 @@ class TokenAuthenticator(Protocol):
 def extract_bearer_token(authorization_header: str | None) -> str:
     """Return one bounded printable bearer token without logging its value.
 
-    Splitting only on the first ASCII space keeps C0 separators visible so they
-    are rejected rather than silently treated as whitespace by ``str.split``.
+    Only exact built-in text is parsed. Splitting only on the first ASCII space
+    keeps C0 separators visible so they are rejected rather than silently treated
+    as whitespace by ``str.split``.
     """
     if authorization_header is None:
         raise AuthenticationFailed("bearer authentication is required")
+    if type(authorization_header) is not str:
+        raise AuthenticationFailed("authorization header must be exact text")
     parts = authorization_header.split(" ", 1)
     if len(parts) != 2 or parts[0].casefold() != "bearer":
         raise AuthenticationFailed("authorization must use the Bearer scheme")

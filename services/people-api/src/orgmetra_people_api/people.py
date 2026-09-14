@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from inspect import getattr_static
 import re
+from types import FunctionType
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -21,6 +23,7 @@ from orgmetra_people_api.authorization import authorize_resource_fields
 
 _MAX_UUID_INT = (1 << 128) - 1
 _STATUS_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+_MAX_DISPLAY_NAME_LENGTH = 512
 
 
 class PeopleRecordNotFound(LookupError):
@@ -31,10 +34,14 @@ class PeopleRecordIntegrityError(RuntimeError):
     """Indicate that persistence returned data outside the authorized target boundary."""
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require a UUID that is not one of Orgmetra's reserved protocol sentinels."""
-    if not isinstance(value, UUID) or value.int in (0, _MAX_UUID_INT):
+def _validate_operational_uuid(field_name: str, value: object) -> int:
+    """Return detached scalar authority for one exact operational UUID."""
+    if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
+    identity = value.int
+    if type(identity) is not int or not 0 < identity < _MAX_UUID_INT:
+        raise ValueError(f"{field_name} must be an operational UUID.")
+    return identity
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,7 +50,8 @@ class WorkerPeopleRecord:
 
     The persistence adapter is responsible for deriving this record from the
     current tenant-scoped candidate conversion, person name, employment, and
-    employment-version facts at the requested effective date. No credential or
+    employment-version facts at the requested effective date. UUID evidence is
+    detached from persistence-owned aliases during construction. No credential or
     purpose grant is stored here.
     """
 
@@ -56,7 +64,7 @@ class WorkerPeopleRecord:
     employment_status_code: str
 
     def __post_init__(self) -> None:
-        """Reject sentinel identities and malformed business values from persistence."""
+        """Reject malformed values and detach accepted UUID evidence from persistence aliases."""
         for field_name in (
             "tenant_record_id",
             "candidate_worker_conversion_record_id",
@@ -64,11 +72,20 @@ class WorkerPeopleRecord:
             "person_record_id",
             "employment_record_id",
         ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
-        if not isinstance(self.display_name, str) or not self.display_name.strip():
-            raise ValueError("display_name must contain a usable worker name.")
+            identity = _validate_operational_uuid(field_name, getattr(self, field_name))
+            object.__setattr__(self, field_name, UUID(int=identity))
+        if type(self.display_name) is not str:
+            raise ValueError("display_name must be a string.")
+        try:
+            self.display_name.encode("utf-8")
+        except UnicodeEncodeError as error:
+            raise ValueError("display_name must contain valid Unicode scalar values.") from error
+        if not self.display_name.strip() or len(self.display_name) > _MAX_DISPLAY_NAME_LENGTH:
+            raise ValueError("display_name must contain 1-512 usable characters.")
+        if any(ord(character) < 0x20 for character in self.display_name):
+            raise ValueError("display_name must not contain control characters.")
         if (
-            not isinstance(self.employment_status_code, str)
+            type(self.employment_status_code) is not str
             or _STATUS_CODE_PATTERN.fullmatch(self.employment_status_code) is None
         ):
             raise ValueError("employment_status_code must be a lower snake_case code.")
@@ -86,6 +103,9 @@ class PeopleReadPort(Protocol):
         effective_on: date,
     ) -> WorkerPeopleRecord | None:
         """Resolve one worker at one business date under the caller's tenant transaction."""
+
+
+_PROTOCOL_READ_CAPABILITY = getattr_static(PeopleReadPort, "read_worker")
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,21 +144,28 @@ def read_worker_people_record(
 ) -> AuthorizedWorkerPeopleView:
     """Authorize an exact person target before retrieving any protected worker value.
 
-    The target reference uses only the opaque person UUID. Authorization happens
-    before ``read_port`` is invoked, so denied purposes, scopes, or field sets do
-    not cause PII retrieval. A persistence adapter that returns another tenant or
-    person fails closed rather than widening the authorization decision.
+    UUID request objects are reduced to exact built-in integer authority before any
+    external authorization or persistence capability is invoked. Fresh UUID views
+    are reconstructed for those calls, while post-read target verification compares
+    persistence evidence back to the immutable scalar snapshot. A concrete
+    repository method is captured inertly before authorization and the same exact
+    function is invoked afterward.
     """
-    _validate_operational_uuid("tenant_record_id", tenant_record_id)
-    _validate_operational_uuid("person_record_id", person_record_id)
-    if not isinstance(effective_on, date):
+    if type(principal) is not AuthenticatedPrincipal:
+        raise TypeError("principal must be an AuthenticatedPrincipal")
+    read_capability = getattr_static(type(read_port), "read_worker", None)
+    if type(read_capability) is not FunctionType or read_capability is _PROTOCOL_READ_CAPABILITY:
+        raise TypeError("read_port must expose a statically callable read_worker.")
+    tenant_identity = _validate_operational_uuid("tenant_record_id", tenant_record_id)
+    person_identity = _validate_operational_uuid("person_record_id", person_record_id)
+    if type(effective_on) is not date:
         raise ValueError("effective_on must be a business date.")
 
-    resource_reference = f"person_record:{person_record_id.hex}"
+    resource_reference = f"person_record:{UUID(int=person_identity).hex}"
     decision = authorize_resource_fields(
         principal=principal,
-        tenant_record_id=tenant_record_id,
-        resource_tenant_record_id=tenant_record_id,
+        tenant_record_id=UUID(int=tenant_identity),
+        resource_tenant_record_id=UUID(int=tenant_identity),
         resource_reference=resource_reference,
         purpose_code=purpose_code,
         operation_code="read_record",
@@ -147,14 +174,19 @@ def read_worker_people_record(
         policy=policy,
     )
 
-    record = read_port.read_worker(
-        tenant_record_id=tenant_record_id,
-        person_record_id=person_record_id,
+    record = read_capability(
+        read_port,
+        tenant_record_id=UUID(int=tenant_identity),
+        person_record_id=UUID(int=person_identity),
         effective_on=effective_on,
     )
     if record is None:
         raise PeopleRecordNotFound("worker record is unavailable")
-    if record.tenant_record_id != tenant_record_id or record.person_record_id != person_record_id:
+    if type(record) is not WorkerPeopleRecord:
+        raise PeopleRecordIntegrityError("resolved worker must be a governed WorkerPeopleRecord")
+    record_tenant_identity = _validate_operational_uuid("resolved tenant_record_id", record.tenant_record_id)
+    record_person_identity = _validate_operational_uuid("resolved person_record_id", record.person_record_id)
+    if record_tenant_identity != tenant_identity or record_person_identity != person_identity:
         raise PeopleRecordIntegrityError("resolved worker does not match authorized target")
 
     return AuthorizedWorkerPeopleView(

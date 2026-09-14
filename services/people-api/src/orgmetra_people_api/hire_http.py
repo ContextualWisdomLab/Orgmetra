@@ -7,6 +7,7 @@ existing hire-acceptance contracts.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import date
 import json
@@ -35,6 +36,10 @@ from orgmetra_people_api.hire import (
 from orgmetra_people_api.http import (
     AsgiReceive,
     AsgiSend,
+    _MAX_QUERY_STRING_BYTES,
+    _MAX_REQUEST_HEADER_BYTES,
+    _MAX_REQUEST_HEADERS,
+    _MAX_REQUEST_PATH_CHARACTERS,
     _authorization_header,
     _send_json as _emit_json,
 )
@@ -49,6 +54,7 @@ _MAX_UUID_INT = (1 << 128) - 1
 _MAX_BODY_BYTES = 65536
 _MAX_BODY_FRAMES = 1024
 _MAX_JSON_NESTING_DEPTH = 128
+_MAX_QUERY_FIELDS = 2
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 _REQUIRED_BODY_KEYS = frozenset(
     {
@@ -119,6 +125,7 @@ async def _send_json(
             "support_reference": support_reference,
         },
         extra_headers=extra_headers,
+        support_reference=support_reference,
     )
 
 
@@ -151,11 +158,22 @@ class HireAcceptanceAsgiApp:
 
     async def __call__(self, scope: Mapping[str, object], receive: AsgiReceive, send: AsgiSend) -> None:
         """Serve one hire mutation without exposing bearer tokens or backend secrets."""
-        if scope.get("type") != "http":
+        if type(scope) is not dict:
+            raise ValueError("ASGI scope must be a built-in dict")
+
+        # Bind the validated executable dependencies before crossing any external
+        # await boundary. A low-level field replacement during authentication must
+        # not change which policy or mutation capability this request consumes.
+        authenticator = self.authenticator
+        policy = self.policy
+        mutation_port = self.mutation_port
+
+        scope_type = scope.get("type")
+        if type(scope_type) is not str or scope_type != "http":
             raise ValueError("HireAcceptanceAsgiApp accepts only HTTP ASGI scopes")
 
         method = scope.get("method")
-        if method != "POST":
+        if type(method) is not str or method != "POST":
             await _send_json(
                 send,
                 status=405,
@@ -168,7 +186,27 @@ class HireAcceptanceAsgiApp:
             return
 
         path = scope.get("path")
-        if not isinstance(path, str) or not _looks_like_hire_route(path):
+        if type(path) is not str:
+            await _send_json(
+                send,
+                status=404,
+                payload={
+                    "error": "route_not_found",
+                    "message": "Use /v1/tenants/{tenant_record_id}/candidate-worker-conversions.",
+                },
+            )
+            return
+        if len(path) > _MAX_REQUEST_PATH_CHARACTERS:
+            await _send_json(
+                send,
+                status=400,
+                payload={
+                    "error": "invalid_request",
+                    "message": "Use the canonical hire route without oversized path data, then retry.",
+                },
+            )
+            return
+        if not _looks_like_hire_route(path):
             await _send_json(
                 send,
                 status=404,
@@ -194,8 +232,8 @@ class HireAcceptanceAsgiApp:
 
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
-            principal = await self.authenticator.authenticate(bearer_token)
-            if not isinstance(principal, AuthenticatedPrincipal):
+            principal = await authenticator.authenticate(bearer_token)
+            if type(principal) is not AuthenticatedPrincipal:
                 raise TypeError("authenticator returned an invalid principal")
         except AuthenticationFailed:
             await _send_json(
@@ -278,12 +316,13 @@ class HireAcceptanceAsgiApp:
             return
 
         try:
-            result = accept_confirmed_hire(
+            result = await asyncio.to_thread(
+                accept_confirmed_hire,
                 principal=principal,
                 command=command,
                 purpose_code=purpose_code,
-                policy=self.policy,
-                mutation_port=self.mutation_port,
+                policy=policy,
+                mutation_port=mutation_port,
             )
         except AuthorizationDeniedError:
             await _send_json(
@@ -357,6 +396,11 @@ def _looks_like_hire_route(path: str) -> bool:
 
 def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
     """Validate tenant and purpose before authentication and body interpretation."""
+    if type(raw_query) is not bytes:
+        raise _InvalidHttpRequest("query_string must be bytes")
+    if len(raw_query) > _MAX_QUERY_STRING_BYTES:
+        raise _InvalidHttpRequest("query string exceeds the accepted size")
+
     parts = path.strip("/").split("/")
     try:
         tenant_record_id = UUID(parts[2])
@@ -365,14 +409,13 @@ def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
     if tenant_record_id.int in (0, _MAX_UUID_INT):
         raise _InvalidHttpRequest("tenant_record_id must be an operational UUID")
 
-    if not isinstance(raw_query, bytes):
-        raise _InvalidHttpRequest("query_string must be bytes")
     try:
         query_text = raw_query.decode("ascii")
         pairs = parse_qsl(
             query_text,
             keep_blank_values=True,
             strict_parsing=True,
+            max_num_fields=_MAX_QUERY_FIELDS,
         )
     except (UnicodeDecodeError, ValueError) as error:
         raise _InvalidHttpRequest("query string is malformed") from error
@@ -390,18 +433,50 @@ def _parse_hire_route(path: str, raw_query: object) -> tuple[UUID, str]:
     return tenant_record_id, purpose_code
 
 
-def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
-    """Require exactly one visible-ASCII Idempotency-Key after authentication."""
+def _bounded_hire_headers(
+    scope: Mapping[str, object],
+    *,
+    error_type: type[ValueError],
+    invalid_message: str,
+) -> tuple[tuple[bytes, bytes], ...]:
+    """Revalidate post-authentication header authority under the canonical request budget."""
     raw_headers = scope.get("headers", ())
-    if not isinstance(raw_headers, (list, tuple)):
-        raise _InvalidHttpRequest("Idempotency-Key is required")
-    values: list[bytes] = []
+    if type(raw_headers) not in (list, tuple):
+        raise error_type(invalid_message)
+    if len(raw_headers) > _MAX_REQUEST_HEADERS:
+        raise error_type("request headers exceed the accepted count")
+
+    aggregate_header_bytes = 0
+    validated_headers: list[tuple[bytes, bytes]] = []
     for header in raw_headers:
-        if not isinstance(header, (list, tuple)) or len(header) != 2:
-            raise _InvalidHttpRequest("Idempotency-Key is required")
+        if type(header) not in (list, tuple) or len(header) != 2:
+            raise error_type(invalid_message)
         name, value = header
-        if not isinstance(name, bytes) or not isinstance(value, bytes):
-            raise _InvalidHttpRequest("Idempotency-Key is required")
+        if type(name) is not bytes:
+            raise error_type(invalid_message)
+        if type(value) is not bytes:
+            if name.lower() == b"content-type":
+                raise _UnsupportedMediaType("content-type must be bytes")
+            raise error_type(invalid_message)
+        header_bytes = len(name) + len(value)
+        if header_bytes > _MAX_REQUEST_HEADER_BYTES:
+            raise error_type("request header exceeds the accepted size")
+        aggregate_header_bytes += header_bytes
+        if aggregate_header_bytes > _MAX_REQUEST_HEADER_BYTES:
+            raise error_type("request headers exceed the accepted size")
+        validated_headers.append((name, value))
+    return tuple(validated_headers)
+
+
+def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
+    """Require exactly one bounded visible-ASCII Idempotency-Key after authentication."""
+    raw_headers = _bounded_hire_headers(
+        scope,
+        error_type=_InvalidHttpRequest,
+        invalid_message="Idempotency-Key is required",
+    )
+    values: list[bytes] = []
+    for name, value in raw_headers:
         if name.lower() == b"idempotency-key":
             values.append(value)
     if len(values) != 1:
@@ -414,19 +489,13 @@ def _parse_idempotency_key(scope: Mapping[str, object]) -> str:
 
 
 def _require_json_content_type(scope: Mapping[str, object]) -> None:
-    """Accept exactly one application/json content type before reading the body."""
-    raw_headers = scope.get("headers", ())
-    if not isinstance(raw_headers, (list, tuple)):
-        raise _UnsupportedMediaType("content-type is required")
-    values: list[bytes] = []
-    for header in raw_headers:
-        if not isinstance(header, (list, tuple)) or len(header) != 2:
-            raise _UnsupportedMediaType("content-type is required")
-        name, value = header
-        if not isinstance(name, bytes) or not isinstance(value, bytes):
-            raise _UnsupportedMediaType("content-type is required")
-        if name.lower() == b"content-type":
-            values.append(value)
+    """Accept exactly one bounded application/json content type before reading the body."""
+    raw_headers = _bounded_hire_headers(
+        scope,
+        error_type=_UnsupportedMediaType,
+        invalid_message="content-type is required",
+    )
+    values = [value for name, value in raw_headers if name.lower() == b"content-type"]
     if len(values) != 1 or values[0].split(b";", 1)[0].strip().lower() != b"application/json":
         raise _UnsupportedMediaType("application/json is required")
 
@@ -440,15 +509,21 @@ async def _read_json_object(receive: AsgiReceive) -> dict[str, object]:
             raise _PayloadTooLarge("hire command exceeds the bounded frame count")
         message = await receive()
         frame_count += 1
-        if message.get("type") != "http.request":
+        if type(message) is not dict:
+            raise _InvalidHttpRequest("request body frame must be a built-in dict")
+        message_type = message.get("type")
+        if type(message_type) is not str or message_type != "http.request":
             raise _InvalidHttpRequest("request body is missing")
         raw_chunk = message.get("body", b"")
-        if not isinstance(raw_chunk, (bytes, bytearray)):
+        if type(raw_chunk) is not bytes:
             raise _InvalidHttpRequest("request body must be bytes")
+        more_body = message.get("more_body", False)
+        if type(more_body) is not bool:
+            raise _InvalidHttpRequest("request body more_body must be boolean")
         if len(body) + len(raw_chunk) > _MAX_BODY_BYTES:
             raise _PayloadTooLarge("hire command exceeds the bounded size")
         body.extend(raw_chunk)
-        if message.get("more_body") is not True:
+        if not more_body:
             break
     if len(body) == 0:
         raise _InvalidHttpRequest("request body is empty")

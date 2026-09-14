@@ -11,9 +11,8 @@ arbitrary employment lineage.
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
 from datetime import date
-from typing import Any, Callable
+from typing import Any, Callable, cast
 from uuid import UUID
 
 from orgmetra_people_api.people import (
@@ -70,23 +69,42 @@ LIMIT 2
 """.strip()
 
 
-@dataclass(frozen=True, slots=True)
-class PostgresPeopleReadPort:
-    """Resolve current worker truth through a transaction-local PostgreSQL tenant scope.
+def _require_transactional_connection(connection: object) -> None:
+    """Reject DB capabilities that cannot prove implicit transaction management."""
+    if getattr(connection, "autocommit", None) is not False:
+        raise RuntimeError("PostgreSQL People reads require autocommit disabled.")
+
+
+class PostgresPeopleReadPort(tuple):
+    """Resolve current worker truth through one immutable PostgreSQL capability.
 
     ``connection_factory`` must return a DB-API-compatible connection context
-    manager, such as a configured ``psycopg.connect`` callable. Keeping the
-    driver behind this factory preserves a small standalone service package
-    while allowing deployment code to own pooling, credentials, TLS, and role
-    selection.
+    manager, such as a configured ``psycopg.connect`` callable. The accepted
+    executable dependency is stored in tuple payload rather than a writable
+    instance slot, so a post-construction attribute write cannot substitute a
+    different pool, credential, TLS, or database-role capability after it has
+    passed validation. Request UUIDs are reduced to immutable scalar authority
+    before connection acquisition, then reconstructed for tenant context and SQL.
+    The returned connection must expose exact ``autocommit is False`` before
+    cursor acquisition so ``SET TRANSACTION`` and transaction-local tenant state
+    govern the protected SELECT in one short database transaction.
     """
 
-    connection_factory: PostgresConnectionFactory
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        """Reject unusable factories before any protected read can be attempted."""
-        if not callable(self.connection_factory):
+    def __new__(
+        cls,
+        connection_factory: PostgresConnectionFactory,
+    ) -> PostgresPeopleReadPort:
+        """Validate and bind the exact executable capability used by reads."""
+        if not callable(connection_factory):
             raise TypeError("connection_factory must be callable")
+        return tuple.__new__(cls, (connection_factory,))
+
+    @property
+    def connection_factory(self) -> PostgresConnectionFactory:
+        """Expose the immutable connection capability accepted at construction."""
+        return cast(PostgresConnectionFactory, tuple.__getitem__(self, 0))
 
     def read_worker(
         self,
@@ -103,20 +121,24 @@ class PostgresPeopleReadPort:
         rows are fetched so an unexpected duplicate lineage is detected and
         rejected rather than hidden by ``LIMIT 1``.
         """
-        _validate_operational_uuid("tenant_record_id", tenant_record_id)
-        _validate_operational_uuid("person_record_id", person_record_id)
-        if not isinstance(effective_on, date):
+        tenant_identity = _validate_operational_uuid("tenant_record_id", tenant_record_id)
+        person_identity = _validate_operational_uuid("person_record_id", person_record_id)
+        if type(effective_on) is not date:
             raise ValueError("effective_on must be a business date.")
 
-        with self.connection_factory() as connection:
+        connection_factory = cast(PostgresConnectionFactory, tuple.__getitem__(self, 0))
+        with connection_factory() as connection:
+            _require_transactional_connection(connection)
+            tenant_target = UUID(int=tenant_identity)
+            person_target = UUID(int=person_identity)
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
-                cursor.execute(_TENANT_CONTEXT_SQL, (str(tenant_record_id),))
+                cursor.execute(_TENANT_CONTEXT_SQL, (str(tenant_target),))
                 cursor.execute(
                     _WORKER_READ_SQL,
                     (
-                        tenant_record_id,
-                        person_record_id,
+                        tenant_target,
+                        person_target,
                         effective_on,
                         effective_on,
                         effective_on,
@@ -150,6 +172,8 @@ class PostgresPeopleReadPort:
             display_name=display_name,
             employment_status_code=employment_status_code,
         )
-        if record.tenant_record_id != tenant_record_id or record.person_record_id != person_record_id:
+        record_tenant_identity = _validate_operational_uuid("row tenant_record_id", record.tenant_record_id)
+        record_person_identity = _validate_operational_uuid("row person_record_id", record.person_record_id)
+        if record_tenant_identity != tenant_identity or record_person_identity != person_identity:
             raise PeopleRecordIntegrityError("database row escaped requested target")
         return record
