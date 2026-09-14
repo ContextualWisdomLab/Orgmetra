@@ -473,10 +473,13 @@ async def _read_json_object(receive: AsgiReceive) -> dict[str, object]:
             raise _PayloadTooLarge("hire command exceeds the bounded frame count")
         message = await receive()
         frame_count += 1
-        if message.get("type") != "http.request":
+        if type(message) is not dict:
+            raise _InvalidHttpRequest("request body frame must be a built-in dict")
+        message_type = message.get("type")
+        if type(message_type) is not str or message_type != "http.request":
             raise _InvalidHttpRequest("request body is missing")
         raw_chunk = message.get("body", b"")
-        if not isinstance(raw_chunk, (bytes, bytearray)):
+        if type(raw_chunk) is not bytes:
             raise _InvalidHttpRequest("request body must be bytes")
         if len(body) + len(raw_chunk) > _MAX_BODY_BYTES:
             raise _PayloadTooLarge("hire command exceeds the bounded size")
