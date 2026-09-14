@@ -119,6 +119,7 @@ class PeopleHttpScalarIntegrityTests(unittest.IsolatedAsyncioTestCase):
         self,
         app: PeopleAsgiApp,
         *,
+        scope_type: object = "http",
         method: object = "GET",
         path: str,
         query: bytes,
@@ -133,7 +134,7 @@ class PeopleHttpScalarIntegrityTests(unittest.IsolatedAsyncioTestCase):
             messages.append(message)
 
         scope = {
-            "type": "http",
+            "type": scope_type,
             "method": method,
             "path": path,
             "query_string": query,
@@ -146,6 +147,20 @@ class PeopleHttpScalarIntegrityTests(unittest.IsolatedAsyncioTestCase):
         await app(scope, receive, send)
         start, body = messages
         return int(start["status"]), json.loads(bytes(body["body"]))
+
+    async def test_nonexact_scope_type_is_rejected_before_subclass_behavior_or_authentication(self) -> None:
+        app, authenticator, read_port = self._app()
+
+        with self.assertRaisesRegex(ValueError, "accepts only HTTP ASGI scopes"):
+            await self._request(
+                app,
+                scope_type=_TrapMethod("http"),
+                path=f"/v1/tenants/{TENANT}/people/{PERSON}",
+                query=DEFAULT_QUERY,
+            )
+
+        self.assertEqual(authenticator.calls, 0)
+        self.assertEqual(read_port.calls, 0)
 
     async def test_nonexact_method_is_rejected_before_subclass_behavior_or_authentication(self) -> None:
         app, authenticator, read_port = self._app()
