@@ -9,7 +9,6 @@ revalidate before disclosure.
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 from uuid import UUID
@@ -50,12 +49,14 @@ ORDER BY position_version.effective_from, position_version.position_record_versi
 _MAX_UUID_INT = (1 << 128) - 1
 
 
-def _require_operational_uuid(field_name: str, value: object) -> None:
-    """Require an exact non-sentinel UUID before any database access."""
+def _operational_uuid_scalar(field_name: str, value: object) -> int:
+    """Detach exact UUID input into immutable scalar authority before DB access."""
     if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
-    if value.int in (0, _MAX_UUID_INT):
+    scalar = value.int
+    if type(scalar) is not int or not 0 < scalar < _MAX_UUID_INT:
         raise ValueError(f"{field_name} must be an operational UUID.")
+    return scalar
 
 
 def _require_utc_instant(field_name: str, value: object) -> None:
@@ -112,16 +113,29 @@ def _record_from_row(row: object) -> PositionHistoryRecord:
         ) from exc
 
 
-@dataclass(frozen=True, slots=True)
-class PostgresPositionHistoryReadPort:
-    """Read canonical Position history through a tenant-scoped read-only transaction."""
+class PostgresPositionHistoryReadPort(tuple):
+    """Read canonical Position history through one proven non-autocommit transaction.
 
-    connection_factory: PostgresConnectionFactory
+    The validated connection capability is stored in tuple payload rather than a
+    writable instance slot. Request UUIDs are detached before connection
+    acquisition, and transaction-local tenant context is established only after
+    the connection proves ``autocommit is False``.
+    """
 
-    def __post_init__(self) -> None:
-        """Reject an unusable connection factory before a protected read can start."""
-        if not callable(self.connection_factory):
+    __slots__ = ()
+
+    def __new__(
+        cls,
+        connection_factory: PostgresConnectionFactory,
+    ) -> PostgresPositionHistoryReadPort:
+        if not callable(connection_factory):
             raise TypeError("connection_factory must be callable")
+        return tuple.__new__(cls, (connection_factory,))
+
+    @property
+    def connection_factory(self) -> PostgresConnectionFactory:
+        """Return the structurally bound connection capability."""
+        return tuple.__getitem__(self, 0)
 
     def read_position_history(
         self,
@@ -131,19 +145,35 @@ class PostgresPositionHistoryReadPort:
         known_at: datetime,
     ) -> tuple[PositionHistoryRecord, ...]:
         """Return Position versions visible at ``known_at`` without authorizing disclosure."""
-        _require_operational_uuid("tenant_record_id", tenant_record_id)
-        _require_operational_uuid("position_record_id", position_record_id)
+        tenant_record_id_scalar = _operational_uuid_scalar(
+            "tenant_record_id",
+            tenant_record_id,
+        )
+        position_record_id_scalar = _operational_uuid_scalar(
+            "position_record_id",
+            position_record_id,
+        )
         _require_utc_instant("known_at", known_at)
 
-        with self.connection_factory() as connection:
+        trusted_tenant_record_id = UUID(int=tenant_record_id_scalar)
+        trusted_position_record_id = UUID(int=position_record_id_scalar)
+        connection_factory = tuple.__getitem__(self, 0)
+        with connection_factory() as connection:
+            if getattr(connection, "autocommit", None) is not False:
+                raise ValueError(
+                    "connection autocommit must be explicitly False for Position-history reads"
+                )
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
-                cursor.execute(_TENANT_CONTEXT_SQL, (str(tenant_record_id),))
+                cursor.execute(
+                    _TENANT_CONTEXT_SQL,
+                    (str(trusted_tenant_record_id),),
+                )
                 cursor.execute(
                     _POSITION_HISTORY_SQL,
                     (
-                        tenant_record_id,
-                        position_record_id,
+                        trusted_tenant_record_id,
+                        trusted_position_record_id,
                         known_at,
                         known_at,
                         known_at,
@@ -161,8 +191,8 @@ class PostgresPositionHistoryReadPort:
         for row in rows:
             record = _record_from_row(row)
             if (
-                record.tenant_record_id != tenant_record_id
-                or record.position_record_id != position_record_id
+                record.tenant_record_id_scalar != tenant_record_id_scalar
+                or record.position_record_id_scalar != position_record_id_scalar
             ):
                 raise PositionHistoryIntegrityError(
                     "database Position-history row does not match the requested target"

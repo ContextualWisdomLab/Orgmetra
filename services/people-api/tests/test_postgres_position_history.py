@@ -83,10 +83,11 @@ class FakeCursor(AbstractContextManager["FakeCursor"]):
 
 
 class FakeConnection(AbstractContextManager["FakeConnection"]):
-    """Minimal connection exposing one stable cursor."""
+    """Minimal proven non-autocommit connection exposing one stable cursor."""
 
     def __init__(self, cursor: FakeCursor) -> None:
         self._cursor = cursor
+        self.autocommit = False
 
     def __enter__(self) -> "FakeConnection":
         return self
