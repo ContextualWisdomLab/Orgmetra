@@ -41,6 +41,15 @@ class FakeEmploymentHistoryPort:
         return self.records
 
 
+class DynamicLookupTrapPort(FakeEmploymentHistoryPort):
+    """Reject a fresh instance lookup of the repository capability."""
+
+    def __getattribute__(self, name: str) -> object:
+        if name == "read_employment_history":
+            raise AttributeError("dynamic repository lookup is forbidden")
+        return super().__getattribute__(name)
+
+
 def _record() -> EmploymentHistoryRecord:
     """Build one canonical row before exercising low-level tuple forgery."""
     return EmploymentHistoryRecord(
@@ -82,6 +91,22 @@ def _read(*, policy: PurposeBoundAccessPolicy, port: FakeEmploymentHistoryPort) 
 
 class EmploymentHistoryReviewRegressionTests(unittest.TestCase):
     """Pin review findings to public fail-closed service behavior."""
+
+    def test_repository_capability_is_bound_before_authorization(self) -> None:
+        policy = PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="capability-binding-v1",
+            resource_kind="person_employment_history",
+            purpose_code="employee_profile_review",
+            operation_code="read_record",
+            required_scope_code="orgmetra.people.employment_history.read",
+            permitted_fields=frozenset({"employment_status_code"}),
+        )
+        port = DynamicLookupTrapPort((_record(),))
+
+        _read(policy=policy, port=port)
+
+        self.assertEqual(port.calls, 1)
 
     def test_low_level_tuple_shape_drift_is_rejected_before_field_access(self) -> None:
         canonical = _record()
