@@ -10,12 +10,15 @@ import pytest
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api import (
     AuthenticatedPrincipal,
+    PeopleRecordIntegrityError,
     WorkerPeopleRecord,
     read_worker_people_record,
 )
 
 TENANT = UUID("0198a412-6000-7000-8000-000000000001")
+OTHER_TENANT = UUID("0198a412-6000-7000-8000-000000000002")
 PERSON = UUID("0198a412-6000-7000-8000-000000000010")
+OTHER_PERSON = UUID("0198a412-6000-7000-8000-000000000011")
 EMPLOYMENT = UUID("0198a412-6000-7000-8000-000000000020")
 CONVERSION = UUID("0198a412-6000-7000-8000-000000000030")
 CANDIDATE = UUID("0198a412-6000-7000-8000-000000000040")
@@ -46,6 +49,30 @@ class _UnreadPort:
         """Fail if validation permits the malformed identity to reach storage."""
         self.calls += 1
         raise AssertionError("malformed UUID reached People persistence")
+
+
+class _RetargetingPort:
+    """Attempt to rewrite request aliases after authorization but before verification."""
+
+    def read_worker(
+        self,
+        *,
+        tenant_record_id: UUID,
+        person_record_id: UUID,
+        effective_on: date,
+    ) -> WorkerPeopleRecord | None:
+        """Mutate received aliases and return a row for the substituted target."""
+        object.__setattr__(tenant_record_id, "int", OTHER_TENANT.int)
+        object.__setattr__(person_record_id, "int", OTHER_PERSON.int)
+        return WorkerPeopleRecord(
+            tenant_record_id=UUID(int=OTHER_TENANT.int),
+            candidate_worker_conversion_record_id=CONVERSION,
+            candidate_profile_id=CANDIDATE,
+            person_record_id=UUID(int=OTHER_PERSON.int),
+            employment_record_id=EMPLOYMENT,
+            display_name="Mallory Example",
+            employment_status_code="active",
+        )
 
 
 def _principal() -> AuthenticatedPrincipal:
@@ -102,6 +129,24 @@ def test_people_read_rejects_executable_uuid_payload_before_comparison_or_storag
         )
 
     assert port.calls == 0
+
+
+def test_people_read_rejects_post_authorization_target_alias_rewrite() -> None:
+    """Persistence cannot retarget the tenant or Person by mutating request UUID aliases."""
+    tenant_record_id = UUID(int=TENANT.int)
+    person_record_id = UUID(int=PERSON.int)
+
+    with pytest.raises(PeopleRecordIntegrityError, match="authorized target"):
+        read_worker_people_record(
+            principal=_principal(),
+            tenant_record_id=tenant_record_id,
+            person_record_id=person_record_id,
+            effective_on=EFFECTIVE_ON,
+            purpose_code="people_read",
+            requested_fields=frozenset({"display_name"}),
+            policy=_policy(),
+            read_port=_RetargetingPort(),
+        )
 
 
 @pytest.mark.parametrize("identity", [-1, 1 << 128])

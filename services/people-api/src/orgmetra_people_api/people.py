@@ -33,13 +33,14 @@ class PeopleRecordIntegrityError(RuntimeError):
     """Indicate that persistence returned data outside the authorized target boundary."""
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require an exact UUID whose retained integer payload is operational."""
+def _validate_operational_uuid(field_name: str, value: object) -> int:
+    """Return detached scalar authority for one exact operational UUID."""
     if type(value) is not UUID:
         raise ValueError(f"{field_name} must be an operational UUID.")
     identity = value.int
     if type(identity) is not int or not 0 < identity < _MAX_UUID_INT:
         raise ValueError(f"{field_name} must be an operational UUID.")
+    return identity
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,28 +133,28 @@ def read_worker_people_record(
 ) -> AuthorizedWorkerPeopleView:
     """Authorize an exact person target before retrieving any protected worker value.
 
-    The target reference uses only the opaque person UUID. A concrete repository
-    method is captured inertly before authorization and the same exact function is
-    invoked afterward, so caller-controlled instance lookup cannot substitute a
-    different executable capability after the access decision. A persistence
-    adapter that returns another tenant or person fails closed rather than widening
-    the authorization decision.
+    UUID request objects are reduced to exact built-in integer authority before any
+    external authorization or persistence capability is invoked. Fresh UUID views
+    are reconstructed for those calls, while post-read target verification compares
+    persistence evidence back to the immutable scalar snapshot. A concrete
+    repository method is captured inertly before authorization and the same exact
+    function is invoked afterward.
     """
     if type(principal) is not AuthenticatedPrincipal:
         raise TypeError("principal must be an AuthenticatedPrincipal")
     read_capability = getattr_static(type(read_port), "read_worker", None)
     if type(read_capability) is not FunctionType or read_capability is _PROTOCOL_READ_CAPABILITY:
         raise TypeError("read_port must expose a statically callable read_worker.")
-    _validate_operational_uuid("tenant_record_id", tenant_record_id)
-    _validate_operational_uuid("person_record_id", person_record_id)
+    tenant_identity = _validate_operational_uuid("tenant_record_id", tenant_record_id)
+    person_identity = _validate_operational_uuid("person_record_id", person_record_id)
     if type(effective_on) is not date:
         raise ValueError("effective_on must be a business date.")
 
-    resource_reference = f"person_record:{person_record_id.hex}"
+    resource_reference = f"person_record:{UUID(int=person_identity).hex}"
     decision = authorize_resource_fields(
         principal=principal,
-        tenant_record_id=tenant_record_id,
-        resource_tenant_record_id=tenant_record_id,
+        tenant_record_id=UUID(int=tenant_identity),
+        resource_tenant_record_id=UUID(int=tenant_identity),
         resource_reference=resource_reference,
         purpose_code=purpose_code,
         operation_code="read_record",
@@ -164,15 +165,17 @@ def read_worker_people_record(
 
     record = read_capability(
         read_port,
-        tenant_record_id=tenant_record_id,
-        person_record_id=person_record_id,
+        tenant_record_id=UUID(int=tenant_identity),
+        person_record_id=UUID(int=person_identity),
         effective_on=effective_on,
     )
     if record is None:
         raise PeopleRecordNotFound("worker record is unavailable")
     if type(record) is not WorkerPeopleRecord:
         raise PeopleRecordIntegrityError("resolved worker must be a governed WorkerPeopleRecord")
-    if record.tenant_record_id != tenant_record_id or record.person_record_id != person_record_id:
+    record_tenant_identity = _validate_operational_uuid("resolved tenant_record_id", record.tenant_record_id)
+    record_person_identity = _validate_operational_uuid("resolved person_record_id", record.person_record_id)
+    if record_tenant_identity != tenant_identity or record_person_identity != person_identity:
         raise PeopleRecordIntegrityError("resolved worker does not match authorized target")
 
     return AuthorizedWorkerPeopleView(
