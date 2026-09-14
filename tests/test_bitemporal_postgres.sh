@@ -187,7 +187,7 @@ INSERT INTO person_name_record (
     effective_from, recorded_from
 ) VALUES (
     '10000000-0000-7000-8000-000000000001',
-    '00000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000011',
     '00000000-0000-7000-8000-000000000001',
     'Ada Lovelace', DATE '2026-01-01', TIMESTAMPTZ '2026-01-02 00:00:00+00'
 );
@@ -295,20 +295,34 @@ target = Path(sys.argv[1])
 PY
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
-BEGIN;
-UPDATE employment_record_version
-SET recorded_to = TIMESTAMPTZ '2026-02-01 00:00:00+00'
-WHERE tenant_record_id = '10000000-0000-7000-8000-000000000001'
-  AND employment_record_version_id = '00000000-0000-7000-8000-000000000021';
+INSERT INTO employment_record (
+    tenant_record_id, employment_record_id, person_record_id, recorded_from
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000024',
+    '00000000-0000-7000-8000-000000000001',
+    TIMESTAMPTZ '2026-01-01 00:00:00+00'
+);
+INSERT INTO employment_record_version (
+    tenant_record_id, employment_record_version_id, employment_record_id,
+    employment_status_code, employment_concurrency_code,
+    effective_from, recorded_from, recorded_to
+) VALUES (
+    '10000000-0000-7000-8000-000000000001',
+    '00000000-0000-7000-8000-000000000025',
+    '00000000-0000-7000-8000-000000000024',
+    'active', 'concurrent', DATE '2026-01-01',
+    TIMESTAMPTZ '2026-01-02 00:00:00+00', TIMESTAMPTZ '2026-02-01 00:00:00+00'
+);
 INSERT INTO employment_record_version (
     tenant_record_id, employment_record_version_id, employment_record_id,
     employment_status_code, employment_concurrency_code,
     effective_from, recorded_from
 ) VALUES (
     '10000000-0000-7000-8000-000000000001',
-    '00000000-0000-7000-8000-000000000023',
-    '00000000-0000-7000-8000-000000000002',
-    'leave', 'exclusive', DATE '2026-01-01', TIMESTAMPTZ '2026-02-01 00:00:00+00'
+    '00000000-0000-7000-8000-000000000026',
+    '00000000-0000-7000-8000-000000000024',
+    'leave', 'concurrent', DATE '2026-01-01', TIMESTAMPTZ '2026-02-01 00:00:00+00'
 );
 INSERT INTO tenant_record (tenant_record_id, tenant_reference)
 VALUES ('20000000-0000-7000-8000-000000000001', 'tenant_beta');
@@ -336,7 +350,6 @@ INSERT INTO employment_record_version (
     '00000000-0000-7000-8000-000000000102',
     'active', 'exclusive', DATE '2026-01-01', TIMESTAMPTZ '2026-01-01 00:00:00+00'
 );
-COMMIT;
 SQL
 
 run_employment_history_query() {
@@ -369,10 +382,10 @@ IFS='|' read -r history_tenant history_person history_employment history_version
     <<<"${history_before}"
 if [[ "${history_tenant}" != "10000000-0000-7000-8000-000000000001" \
    || "${history_person}" != "00000000-0000-7000-8000-000000000001" \
-   || "${history_employment}" != "00000000-0000-7000-8000-000000000002" \
-   || "${history_version}" != "00000000-0000-7000-8000-000000000021" \
+   || "${history_employment}" != "00000000-0000-7000-8000-000000000024" \
+   || "${history_version}" != "00000000-0000-7000-8000-000000000025" \
    || "${history_status}" != "active" \
-   || "${history_concurrency}" != "exclusive" \
+   || "${history_concurrency}" != "concurrent" \
    || "${history_effective_from}" != "2026-01-01" \
    || -n "${history_effective_to}" \
    || "${history_recorded_from}" != "2026-01-02 00:00:00" \
@@ -389,8 +402,10 @@ history_after="$(run_employment_history_query \
 IFS='|' read -r history_tenant history_person history_employment history_version history_status \
     history_concurrency history_effective_from history_effective_to history_recorded_from history_recorded_to \
     <<<"${history_after}"
-if [[ "${history_version}" != "00000000-0000-7000-8000-000000000023" \
+if [[ "${history_employment}" != "00000000-0000-7000-8000-000000000024" \
+   || "${history_version}" != "00000000-0000-7000-8000-000000000026" \
    || "${history_status}" != "leave" \
+   || "${history_concurrency}" != "concurrent" \
    || "${history_recorded_from}" != "2026-02-01 00:00:00" \
    || -n "${history_recorded_to}" ]]; then
     echo "Employment-history query did not reconstruct the post-correction system-time version: ${history_after}" >&2
@@ -402,8 +417,8 @@ history_at_boundary="$(run_employment_history_query \
     '00000000-0000-7000-8000-000000000001' \
     '2026-02-01 00:00:00+00' \
     'UTC')"
-if [[ "${history_at_boundary}" != *"|00000000-0000-7000-8000-000000000023|leave|"* \
-   || "${history_at_boundary}" == *"00000000-0000-7000-8000-000000000021"* ]]; then
+if [[ "${history_at_boundary}" != *"|00000000-0000-7000-8000-000000000026|leave|concurrent|"* \
+   || "${history_at_boundary}" == *"00000000-0000-7000-8000-000000000025"* ]]; then
     echo "Employment-history query violated the half-open recorded-time boundary: ${history_at_boundary}" >&2
     exit 1
 fi
