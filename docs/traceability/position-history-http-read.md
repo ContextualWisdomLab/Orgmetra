@@ -16,6 +16,8 @@ serialization code widening the data surface.
 | Bound untrusted transport input before protected work | `PositionHistoryAsgiApp` rejects paths over 256 characters before route tokenization and raw query strings over 4096 bytes before `parse_qsl`; `parse_qsl` receives a bounded field count before authentication | focused hardening regressions prove oversized paths never reach route tokenization or UUID parsing and oversized queries never reach `parse_qsl` or authentication |
 | Validate caller-controlled semantics before protected work | route, query, operational UUIDs, UTC cutoff, purpose, and fields are validated before authentication | malformed input cases prove no authenticator or read-port call |
 | Authenticate one bearer credential and canonical principal | existing `_authorization_header`/`extract_bearer_token` contracts plus exact `AuthenticatedPrincipal` runtime check | rejected credentials return 401; unexpected backend failure and noncanonical principal return opaque 500 before the governed service/persistence boundary |
+| Preserve the published backend-error contract | authentication-backend failures log one opaque support reference and return that same reference inside a complete `ErrorResponse`; the shared JSON emitter receives only supported arguments | focused regression requires `error`, `error_code`, `message`, `next_action`, and `support_reference`, with no secret-bearing exception detail |
+| Keep synchronous persistence off the ASGI event loop | the synchronous `read_position_history()` service and PostgreSQL adapter execute through `asyncio.to_thread(...)`; worker exceptions propagate to the existing response mapping | focused regression records the protected read-port thread and requires it to differ from the event-loop thread |
 | Use least privilege and exact purpose | `orgmetra.people.position_history.read` plus `read_position_history()` policy binding | disallowed fields return 403 before the port is called |
 | Preserve bitemporal scope | `known_at` is an exact UTC system-recorded cutoff passed to the Position-history service | call capture and service/real PostgreSQL cutoff tests |
 | Minimize the response | `resource_reference` plus authorized `entries[].fields` only | successful and empty-result response assertions; no Person/Employment/Assignment joins |
@@ -34,27 +36,38 @@ serialization code widening the data surface.
 7. **Semantic parent reconciliation:** `0b0b1e3de3529a1856dcc4270b48220fd9f2f236` adopts current #153 `dc566a0167d5e8ab17e8fad5e37f86618e4a93e7` as a second parent while preserving only the HTTP/OpenAPI/customer delta and the consolidated Foundation ownership model; `c5e2e5d8b08ad0ea7526ef106740da65b834deda` aligns the ADR lifecycle index.
 8. **Route-tokenization RED:** `7ae776750b20f621468a5f188f5dbb0130bf1d97` requires an oversized path to be rejected before `_looks_like_position_history_route()` executes. The preceding implementation invoked the route tokenizer before its length gate.
 9. **Route-tokenization causal repair:** `5d239e7db8a0ddb72a367c83e8b285f87421753c` moves the 256-character gate ahead of route decomposition while preserving ordinary 404 routing semantics.
+10. **Backend-envelope/event-loop RED:** `88e28cbc565f49992e6de741d356582d20252c30` requires authentication-backend failures to return the complete published error envelope with the same opaque support reference and requires the synchronous protected read to run outside the ASGI event-loop thread. The predecessor violates both contracts: `_send_json` does not accept the supplied `support_reference` keyword, and the service call executes directly in `__call__`.
+11. **Causal repair:** `17adbbf4044a0288489153f72e08179b78b54fd0` puts the generated support reference in the payload with `error_code`/`next_action`, removes the unsupported emitter keyword, and awaits `asyncio.to_thread(read_position_history, ...)` so synchronous PostgreSQL work cannot block the event-loop thread.
 
-## Security and data boundary
+## Security, availability, and data boundary
 
 The route reads only authorized Position-version fields and the already-governed
 Position/Job/organization lineage. It does not join Person, Employment,
 Assignment, compensation, candidate, performance, credential, prompt, or model
 output data. It performs no write, audit/outbox mutation, or high-impact
 employment decision. Identity-backend failures are logged only with non-secret
-metadata and an opaque support reference; exception messages and bearer tokens are
-not returned to the client.
+metadata and one opaque support reference; exception messages and bearer tokens are
+not returned to the client. The worker-thread offload changes only scheduling of
+the synchronous service call; authorization and the short read-only PostgreSQL
+transaction remain owned by #152/#153 and exceptions retain their existing 403,
+409, or opaque 500 mapping.
+
+The offload prevents synchronous DB I/O from monopolizing the ASGI event loop, but
+it is not performance acceptance. The buyer path still requires exact-candidate
+k6/E2E measurement and p95 evidence under production-equivalent connection/pool
+settings before the repository can claim the <=20 ms target.
 
 ## Current evidence boundary
 
-#154 is now an ordinary descendant of current #153: its merge base is
-`dc566a0167d5e8ab17e8fad5e37f86618e4a93e7`, with no parent commits behind. The
-semantic reconciliation removed the retired feature workflow and reduced the PR
-delta to the Position HTTP/OpenAPI/customer contract plus its feature evidence.
-This is still a stacked feature branch, not protected-`develop` acceptance. The
-current exact head must not inherit predecessor Foundation, security, model-review,
-or feature-local GREEN; those gates must be reacquired after #152/#153 reach the
-protected lane and #154 is retargeted onto that resulting protected truth.
+#154 remains an ordinary descendant of current #153: its direct base is
+`dc566a0167d5e8ab17e8fad5e37f86618e4a93e7`, with no parent delta intentionally
+copied into this HTTP lane. The current repair is ordinary-forward on that stack.
+Both test-only `88e28cbc...` and causal source head `17adbbf...` have zero
+PR-triggered workflow runs because this PR targets #153 rather than protected
+`develop`; that absence is neither hosted RED nor GREEN. The current exact head
+must not inherit predecessor Foundation, security, model-review, or feature-local
+GREEN. Those gates must be reacquired after #152/#153 reach the protected lane and
+#154 is ordinary-forward retargeted onto that resulting protected truth.
 
 ## Out of scope
 
