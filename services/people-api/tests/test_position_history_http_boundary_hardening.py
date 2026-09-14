@@ -23,6 +23,28 @@ DEFAULT_QUERY = (
 _SUPPORT_REFERENCE = re.compile(r"^err_[A-Za-z0-9_-]{20,80}$")
 
 
+class _TrapPath(str):
+    """Expose execution if a noncanonical ASGI path reaches string operations."""
+
+    def __len__(self) -> int:
+        raise AssertionError("noncanonical path must be rejected before len()")
+
+    def strip(self, *args: object, **kwargs: object) -> str:
+        del args, kwargs
+        raise AssertionError("noncanonical path must be rejected before tokenization")
+
+
+class _TrapQuery(bytes):
+    """Expose execution if a noncanonical query byte string reaches parsing."""
+
+    def __len__(self) -> int:
+        raise AssertionError("noncanonical query bytes must be rejected before len()")
+
+    def decode(self, *args: object, **kwargs: object) -> str:
+        del args, kwargs
+        raise AssertionError("noncanonical query bytes must be rejected before decode()")
+
+
 class RecordingAuthenticator:
     """Return one configured value while recording authentication attempts."""
 
@@ -100,7 +122,7 @@ class PositionHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCase
         scope = {
             "type": "http",
             "method": "GET",
-            "path": path or f"/v1/tenants/{TENANT}/positions/{POSITION}/history",
+            "path": path if path is not None else f"/v1/tenants/{TENANT}/positions/{POSITION}/history",
             "query_string": query,
             "headers": [(b"authorization", b"Bearer opaque-token")],
         }
@@ -115,6 +137,26 @@ class PositionHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCase
         await app(scope, receive, send)
         start, body = messages
         return int(start["status"]), json.loads(bytes(body["body"]))
+
+    async def test_nonexact_path_is_rejected_before_subclass_behavior_or_authentication(self) -> None:
+        authenticator = RecordingAuthenticator(self.principal)
+        app = self._app(authenticator=authenticator)
+        path = _TrapPath(f"/v1/tenants/{TENANT}/positions/{POSITION}/history")
+
+        status, _ = await self._request(app, path=path)
+
+        self.assertEqual(status, 404)
+        self.assertEqual(authenticator.calls, 0)
+
+    async def test_nonexact_query_bytes_are_rejected_before_subclass_behavior_or_authentication(self) -> None:
+        authenticator = RecordingAuthenticator(self.principal)
+        app = self._app(authenticator=authenticator)
+        query = _TrapQuery(DEFAULT_QUERY)
+
+        status, _ = await self._request(app, query=query)
+
+        self.assertEqual(status, 400)
+        self.assertEqual(authenticator.calls, 0)
 
     async def test_oversized_path_is_rejected_before_route_tokenization(self) -> None:
         authenticator = RecordingAuthenticator(self.principal)
