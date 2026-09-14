@@ -88,6 +88,9 @@ _MAX_EVIDENCE_VERSION_LENGTH = 200
 _MAX_DECISION_REASON_LENGTH = 4000
 _MAX_CONFIRMATION_REFERENCE_LENGTH = 300
 _MAX_ACTOR_REFERENCE_LENGTH = 200
+_MAX_HEADER_COUNT = 64
+_MAX_HEADER_PAIR_BYTES = 16 * 1024
+_MAX_HEADER_BYTES = 16 * 1024
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 
 
@@ -178,11 +181,14 @@ class PeopleMutationAsgiApp:
 
     async def __call__(self, scope: Mapping[str, object], receive: AsgiReceive, send: AsgiSend) -> None:
         """Serve one People mutation without exposing bearer tokens or backend secrets."""
-        if scope.get("type") != "http":
+        if type(scope) is not dict:
+            raise ValueError("PeopleMutationAsgiApp requires an exact ASGI scope dict")
+        scope_type = scope.get("type")
+        if type(scope_type) is not str or scope_type != "http":
             raise ValueError("PeopleMutationAsgiApp accepts only HTTP ASGI scopes")
 
         method = scope.get("method")
-        if method != "POST":
+        if type(method) is not str or method != "POST":
             await _send_error(
                 send,
                 status=405,
@@ -384,7 +390,7 @@ class PeopleMutationAsgiApp:
 
 def _mutation_route(path: object) -> str | None:
     """Return the canonical mutation leaf or None when the path is not owned here."""
-    if not isinstance(path, str):
+    if type(path) is not str:
         return None
     parts = path.strip("/").split("/")
     if len(parts) != 2 or parts[0] != "v1":
@@ -395,16 +401,25 @@ def _mutation_route(path: object) -> str | None:
 
 
 def _parse_command_headers(scope: Mapping[str, object]) -> _MutationHeaders:
-    """Validate OpenAPI command headers before authentication."""
+    """Validate bounded exact ASGI command headers before authentication."""
+    if type(scope) is not dict:
+        raise _InvalidHttpRequest("command scope is invalid")
     raw_headers = scope.get("headers", ())
-    if not isinstance(raw_headers, (list, tuple)):
+    if type(raw_headers) not in (list, tuple) or len(raw_headers) > _MAX_HEADER_COUNT:
         raise _InvalidHttpRequest("command headers are invalid")
+    total_bytes = 0
     values: dict[str, str] = {}
     for header in raw_headers:
-        if not isinstance(header, (list, tuple)) or len(header) != 2:
+        if type(header) not in (list, tuple) or len(header) != 2:
             raise _InvalidHttpRequest("command headers are invalid")
         name, value = header
-        if not isinstance(name, bytes) or not isinstance(value, bytes):
+        if type(name) is not bytes or type(value) is not bytes:
+            raise _InvalidHttpRequest("command headers are invalid")
+        pair_bytes = len(name) + len(value)
+        if pair_bytes > _MAX_HEADER_PAIR_BYTES:
+            raise _InvalidHttpRequest("command headers are invalid")
+        total_bytes += pair_bytes
+        if total_bytes > _MAX_HEADER_BYTES:
             raise _InvalidHttpRequest("command headers are invalid")
         key = name.lower().decode("ascii")
         if key in {
