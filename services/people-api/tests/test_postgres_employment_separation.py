@@ -106,10 +106,12 @@ class InvalidBatchCursor(FakeCursor):
 
 
 class FakeConnection(AbstractContextManager["FakeConnection"]):
-    """Expose one cursor and capture whether the transaction exits with an error."""
+    """Expose one cursor and capture transaction/cursor boundary behavior."""
 
-    def __init__(self, cursor: FakeCursor) -> None:
+    def __init__(self, cursor: FakeCursor, *, autocommit: object = False) -> None:
         self._cursor = cursor
+        self.autocommit = autocommit
+        self.cursor_calls = 0
         self.exit_exception_type: object | None = None
 
     def __enter__(self) -> "FakeConnection":
@@ -120,6 +122,7 @@ class FakeConnection(AbstractContextManager["FakeConnection"]):
         return None
 
     def cursor(self) -> FakeCursor:
+        self.cursor_calls += 1
         return self._cursor
 
 
@@ -147,6 +150,7 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
         result = port.separate_employment(command=command(), authorization=authorization())
 
         self.assertEqual(factory.calls, 1)
+        self.assertEqual(connection.cursor_calls, 1)
         self.assertIsNone(connection.exit_exception_type)
         self.assertEqual(result.employment_record_id, EMPLOYMENT)
         self.assertEqual(result.separated_employment_record_version_id, TERMINAL_VERSION)
@@ -175,6 +179,38 @@ class PostgresEmploymentSeparationTests(unittest.TestCase):
                 OUTBOX,
             ),
         )
+
+    def test_requires_exact_non_autocommit_connection_before_cursor_acquisition(self) -> None:
+        cases: tuple[tuple[str, object], ...] = (
+            ("autocommit", True),
+            ("unknown", None),
+            ("integer_false", 0),
+            ("text_false", "false"),
+        )
+        for label, autocommit in cases:
+            cursor = FakeCursor(row=(EMPLOYMENT, TERMINAL_VERSION, RECORDED_AT, False))
+            connection = FakeConnection(cursor, autocommit=autocommit)
+            with self.subTest(case=label), self.assertRaisesRegex(
+                RuntimeError,
+                "Employment separation requires autocommit disabled",
+            ):
+                PostgresEmploymentSeparationPort(ConnectionFactory(connection)).separate_employment(
+                    command=command(),
+                    authorization=authorization(),
+                )
+            self.assertEqual(connection.cursor_calls, 0)
+            self.assertEqual(cursor.calls, [])
+
+        cursor = FakeCursor(row=(EMPLOYMENT, TERMINAL_VERSION, RECORDED_AT, False))
+        connection = FakeConnection(cursor)
+        del connection.autocommit
+        with self.assertRaisesRegex(RuntimeError, "Employment separation requires autocommit disabled"):
+            PostgresEmploymentSeparationPort(ConnectionFactory(connection)).separate_employment(
+                command=command(),
+                authorization=authorization(),
+            )
+        self.assertEqual(connection.cursor_calls, 0)
+        self.assertEqual(cursor.calls, [])
 
     def test_rejects_authorization_that_does_not_match_exact_operation(self) -> None:
         port = PostgresEmploymentSeparationPort(ConnectionFactory(FakeConnection(FakeCursor())))
