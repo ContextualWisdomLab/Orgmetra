@@ -13,28 +13,32 @@ The adapter is not an authorization engine or a second source of truth. The pare
 
 The retired feature-local PostgreSQL workflow did not start PostgreSQL or execute this adapter against the schema; its name therefore cannot be used as real-database evidence. Repository-owned PostgreSQL acceptance belongs to canonical Foundation CI.
 
+A fresh comparison with the canonical governed-People PostgreSQL adapter exposed the same checked-versus-used capability risk already repaired there: a frozen/slotted dataclass still retains its validated `connection_factory` in a writable slot that `object.__setattr__` can replace after construction. Employment-history persistence must bind the exact accepted executable capability structurally rather than re-read a replaceable instance slot later.
+
 ## Decision
 
 Add `PostgresEmploymentHistoryReadPort` as the PostgreSQL implementation of the `EmploymentHistoryReadPort` protocol.
 
 The adapter:
 
-1. validates exact operational tenant/Person UUIDs and an exact built-in UTC `known_at` before acquiring a connection;
-2. opens one `READ COMMITTED, READ ONLY` transaction and sets the transaction-local tenant context before the protected query;
-3. joins only Orgmetra-owned `employment_record_version` to its `employment_record` anchor, preserving Person scope without joining another bounded context's application tables;
-4. applies explicit tenant, Person, parent-recorded, and version-recorded half-open predicates;
-5. projects recorded timestamps with `AT TIME ZONE 'UTC'`, accepts only exact naive UTC DB projections, and attaches built-in UTC after validation; and
-6. treats DB-API output as untrusted by checking the default list collection, exact tuple row shape, domain reconstruction, requested target identity, and knowledge-cutoff visibility before returning an immutable tuple.
+1. validates and structurally binds the exact callable connection capability in immutable tuple payload, then invokes that stored capability directly rather than performing a later replaceable attribute lookup;
+2. validates exact operational tenant/Person UUIDs and an exact built-in UTC `known_at` before acquiring a connection;
+3. opens one `READ COMMITTED, READ ONLY` transaction and sets the transaction-local tenant context before the protected query;
+4. joins only Orgmetra-owned `employment_record_version` to its `employment_record` anchor, preserving Person scope without joining another bounded context's application tables;
+5. applies explicit tenant, Person, parent-recorded, and version-recorded half-open predicates;
+6. projects recorded timestamps with `AT TIME ZONE 'UTC'`, accepts only exact naive UTC DB projections, and attaches built-in UTC after validation; and
+7. treats DB-API output as untrusted by checking the default list collection, exact tuple row shape, domain reconstruction, requested target identity, and knowledge-cutoff visibility before returning an immutable tuple.
 
 Purpose-bound field authorization remains in the parent service. This adapter performs no mutation, audit/outbox write, foreign-service call, disclosure, or high-impact employment decision.
 
-Real PostgreSQL acceptance extends the already canonical `tests/test_bitemporal_postgres.sh` contract instead of introducing another feature-local workflow or an untracked PostgreSQL script. The contract parses the adapter source, extracts `_READ_ONLY_SQL`, `_TENANT_CONTEXT_SQL`, and `_EMPLOYMENT_HISTORY_SQL`, requires their placeholder shape, substitutes only psql-bound values, and executes those exact statements against the seeded canonical schema. This keeps the database contract coupled to the production SQL while leaving Python DB-API shape/error behavior in the People unit suite.
+Real PostgreSQL acceptance extends the already canonical `tests/test_bitemporal_postgres.sh` contract instead of introducing another feature-local workflow or an untracked PostgreSQL script. The contract parses the adapter source, extracts `_READ_ONLY_SQL`, `_TENANT_CONTEXT_SQL`, and `_EMPLOYMENT_HISTORY_SQL`, requires their placeholder shape, substitutes only psql-bound values, and executes those exact statements against the seeded canonical schema. This keeps the database contract coupled to the production SQL while leaving Python DB-API shape/error and executable-capability behavior in the People unit suite.
 
 ## Consequences
 
 ### Positive
 
 - The Employment-history application contract can use canonical normalized PostgreSQL truth without host-specific persistence code.
+- The executable database dependency accepted at construction cannot be replaced through a later instance-slot mutation before the protected read.
 - Read-only transaction mode, explicit predicates, and tenant context provide layered database scope controls.
 - Person, Employment identity, and Employment-version history remain separate while business-effective time stays distinct from system-recorded visibility.
 - Exact DB timestamp validation prevents driver/session timezone behavior from changing evidence meaning.
@@ -43,13 +47,16 @@ Real PostgreSQL acceptance extends the already canonical `tests/test_bitemporal_
 ### Trade-offs
 
 - The adapter is PostgreSQL/DB-API specific and intentionally requires the default tuple-row contract.
-- The source-exact shell contract exercises PostgreSQL semantics through `psql`; the Python unit suite remains responsible for connection-factory, cursor, row-shape, and domain-reconstruction behavior. Neither alone substitutes for the other.
+- The source-exact shell contract exercises PostgreSQL semantics through `psql`; the Python unit suite remains responsible for connection-factory, cursor, row-shape, domain-reconstruction, and capability-binding behavior. Neither alone substitutes for the other.
+- Structural binding protects the validated dependency from post-construction slot replacement; it is not a claim of isolation from arbitrary code already executing inside the trusted service interpreter.
 - Explicit query predicates are defense in depth, not RLS evidence. The existing tenant-isolation PostgreSQL contract remains the authority for forced-RLS behavior under non-bypass application roles.
 - The parent service must continue to revalidate rows before serialization.
 
 ## Verification
 
-The contract-first child test head `1a8b9fb7` failed during collection while the adapter module was absent. Current source now contains both the fake DB-API regressions and a canonical Foundation-owned real PostgreSQL contract in `tests/test_bitemporal_postgres.sh`. The latter seeds isolated Employment history, executes the exact adapter SQL at two knowledge cutoffs and the closing/opening boundary under non-UTC session time zones, confirms a foreign-tenant Person target yields no row, and proves the adapter's exact read-only transaction statement rejects writes.
+The contract-first child test head `1a8b9fb7` failed during collection while the adapter module was absent. The later capability regression head `5a8c95f5942824d712a80ee4261ec320596605ad` requires `object.__setattr__` replacement of the validated factory to fail and the originally accepted factory to remain the one executed; its parent implementation still stored the dependency in the frozen dataclass slot, so this is a test-first repair lineage rather than transferred predecessor evidence. Production repair `a41ef5278ef45b15c1ab721244c40b35f828907a` replaces that slot-backed storage with immutable tuple payload and direct tuple access.
+
+Current source contains both the fake DB-API regressions and a canonical Foundation-owned real PostgreSQL contract in `tests/test_bitemporal_postgres.sh`. The latter seeds isolated Employment history, executes the exact adapter SQL at two knowledge cutoffs and the closing/opening boundary under non-UTC session time zones, confirms a foreign-tenant Person target yields no row, and proves the adapter's exact read-only transaction statement rejects writes.
 
 No hosted GREEN is claimed on the current stacked head: canonical Foundation's pull-request trigger targets `develop`, while #156 intentionally targets #155. Parent or predecessor runs do not transfer. After the owner stack reaches protected `develop`, #156 must ordinary-forward onto that truth, retarget to `develop`, and reacquire the exact-head Foundation PostgreSQL execution, full People statement/branch coverage, security checks, model review, and qualifying independent approval before this ADR can advance from Proposed.
 
