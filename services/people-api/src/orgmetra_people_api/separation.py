@@ -120,33 +120,86 @@ class EmploymentSeparationCommand:
         validate_idempotency_key(self.idempotency_key)
 
 
-@dataclass(frozen=True, slots=True)
-class EmploymentSeparationResult:
-    """Database-owned identity and recorded-time evidence for one separation."""
+class EmploymentSeparationResult(tuple):
+    """Retain separation receipt identity as inert scalars and expose fresh UUID views."""
 
-    employment_record_id: UUID
-    separated_employment_record_version_id: UUID
-    recorded_at: datetime
-    replayed: bool
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        """Validate and detach persistence evidence before returning it to callers."""
-        object.__setattr__(
-            self,
-            "employment_record_id",
-            _operational_uuid("employment_record_id", self.employment_record_id),
-        )
-        object.__setattr__(
-            self,
+    def __new__(
+        cls,
+        employment_record_id: UUID,
+        separated_employment_record_version_id: UUID,
+        recorded_at: datetime,
+        replayed: bool,
+    ) -> EmploymentSeparationResult:
+        """Validate public receipt inputs before retaining immutable identity authority."""
+        employment_identity = _operational_uuid("employment_record_id", employment_record_id).int
+        version_identity = _operational_uuid(
             "separated_employment_record_version_id",
-            _operational_uuid(
-                "separated_employment_record_version_id",
-                self.separated_employment_record_version_id,
-            ),
-        )
-        _aware_datetime("recorded_at", self.recorded_at)
-        if type(self.replayed) is not bool:
+            separated_employment_record_version_id,
+        ).int
+        recorded_time = _aware_datetime("recorded_at", recorded_at)
+        if type(replayed) is not bool:
             raise ValueError("replayed must be a bool.")
+        return tuple.__new__(cls, (employment_identity, version_identity, recorded_time, replayed))
+
+    def _validated_payload(self) -> tuple[int, int, datetime, bool]:
+        """Revalidate retained storage so low-level tuple fabrication fails closed on use."""
+        if tuple.__len__(self) != 4:
+            raise ValueError("Employment separation result storage is invalid.")
+        employment_identity = tuple.__getitem__(self, 0)
+        version_identity = tuple.__getitem__(self, 1)
+        recorded_at = tuple.__getitem__(self, 2)
+        replayed = tuple.__getitem__(self, 3)
+        if type(employment_identity) is not int or not (0 < employment_identity < _MAX_UUID_INT):
+            raise ValueError("employment_record_id must be an operational UUID.")
+        if type(version_identity) is not int or not (0 < version_identity < _MAX_UUID_INT):
+            raise ValueError("separated_employment_record_version_id must be an operational UUID.")
+        recorded_time = _aware_datetime("recorded_at", recorded_at)
+        if type(replayed) is not bool:
+            raise ValueError("replayed must be a bool.")
+        return employment_identity, version_identity, recorded_time, replayed
+
+    @property
+    def employment_record_id(self) -> UUID:
+        """Return a fresh Employment identity view over retained scalar authority."""
+        employment_identity, _version_identity, _recorded_at, _replayed = self._validated_payload()
+        return UUID(int=employment_identity)
+
+    @property
+    def separated_employment_record_version_id(self) -> UUID:
+        """Return a fresh terminal Employment-version identity view."""
+        _employment_identity, version_identity, _recorded_at, _replayed = self._validated_payload()
+        return UUID(int=version_identity)
+
+    @property
+    def recorded_at(self) -> datetime:
+        """Return the validated database-owned recorded time."""
+        _employment_identity, _version_identity, recorded_at, _replayed = self._validated_payload()
+        return recorded_at
+
+    @property
+    def replayed(self) -> bool:
+        """Return whether persistence replayed the first committed separation result."""
+        _employment_identity, _version_identity, _recorded_at, replayed = self._validated_payload()
+        return replayed
+
+    def __eq__(self, other: object) -> bool:
+        """Keep receipt type identity distinct from an ordinary tuple."""
+        return type(self) is type(other) and tuple.__eq__(self, other)
+
+    def __hash__(self) -> int:
+        """Hash immutable receipt storage consistently with exact-type equality."""
+        return hash((type(self), tuple.__hash__(self)))
+
+    def __repr__(self) -> str:
+        """Preserve field-oriented receipt diagnostics while hiding tuple storage details."""
+        return (
+            "EmploymentSeparationResult("
+            f"employment_record_id={self.employment_record_id!r}, "
+            f"separated_employment_record_version_id={self.separated_employment_record_version_id!r}, "
+            f"recorded_at={self.recorded_at!r}, replayed={self.replayed!r})"
+        )
 
 
 @runtime_checkable
@@ -205,7 +258,12 @@ def separate_employment_record(
     )
     if type(result) is not EmploymentSeparationResult:
         raise TypeError("separation_port must return EmploymentSeparationResult")
-    detached_result = replace(result)
+    detached_result = EmploymentSeparationResult(
+        employment_record_id=result.employment_record_id,
+        separated_employment_record_version_id=result.separated_employment_record_version_id,
+        recorded_at=result.recorded_at,
+        replayed=result.replayed,
+    )
     if detached_result.employment_record_id != expected_employment_record_id:
         raise EmploymentSeparationPersistenceIntegrityError("separation result identity does not match command")
     return detached_result
