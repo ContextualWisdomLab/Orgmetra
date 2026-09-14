@@ -23,6 +23,28 @@ DEFAULT_QUERY = (
 _SUPPORT_REFERENCE = re.compile(r"^err_[A-Za-z0-9_-]{20,80}$")
 
 
+class _TrapPath(str):
+    """Expose execution if a noncanonical path reaches string operations."""
+
+    def __len__(self) -> int:
+        raise AssertionError("noncanonical path must be rejected before len()")
+
+    def strip(self, *args: object, **kwargs: object) -> str:
+        del args, kwargs
+        raise AssertionError("noncanonical path must be rejected before tokenization")
+
+
+class _TrapQuery(bytes):
+    """Expose execution if noncanonical query bytes reach parsing."""
+
+    def __len__(self) -> int:
+        raise AssertionError("noncanonical query bytes must be rejected before len()")
+
+    def decode(self, *args: object, **kwargs: object) -> str:
+        del args, kwargs
+        raise AssertionError("noncanonical query bytes must be rejected before decode()")
+
+
 class RecordingAuthenticator:
     """Return one configured value or raise one configured backend error."""
 
@@ -114,6 +136,30 @@ class EmploymentHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCa
         await app(scope, receive, send)
         start, body = messages
         return int(start["status"]), json.loads(bytes(body["body"]))
+
+    async def test_nonexact_path_fails_before_subclass_behavior_or_authentication(self) -> None:
+        """Reject executable path subtypes before any path operation or identity work."""
+        authenticator = RecordingAuthenticator(self.principal)
+        port = EmptyHistoryPort()
+        path = _TrapPath(f"/v1/tenants/{TENANT}/people/{PERSON}/employment-history")
+
+        status, payload = await self._request(self._app(authenticator, port), path=path)
+
+        self.assertEqual((status, payload["error_code"]), (404, "route_not_found"))
+        self.assertEqual(authenticator.tokens, [])
+        self.assertEqual(port.calls, [])
+
+    async def test_nonexact_query_fails_before_subclass_behavior_or_authentication(self) -> None:
+        """Reject executable query subtypes before length/decode or identity work."""
+        authenticator = RecordingAuthenticator(self.principal)
+        port = EmptyHistoryPort()
+        query = _TrapQuery(DEFAULT_QUERY)
+
+        status, payload = await self._request(self._app(authenticator, port), query=query)
+
+        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
+        self.assertEqual(authenticator.tokens, [])
+        self.assertEqual(port.calls, [])
 
     async def test_authentication_backend_failure_is_client_safe_and_skips_persistence(self) -> None:
         """An identity-backend exception must retain one support reference end to end."""
