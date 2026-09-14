@@ -16,6 +16,18 @@ PERSON = UUID("0198a412-6000-7000-8000-000000000010")
 DEFAULT_QUERY = b"effective_on=2026-08-17&purpose=people_read&fields=display_name"
 
 
+class _TrapMethod(str):
+    """Expose execution if a noncanonical method reaches string comparison."""
+
+    def __eq__(self, other: object) -> bool:
+        del other
+        raise AssertionError("noncanonical method must be rejected before comparison")
+
+    def __ne__(self, other: object) -> bool:
+        del other
+        raise AssertionError("noncanonical method must be rejected before comparison")
+
+
 class _TrapPath(str):
     """Expose execution if a noncanonical path reaches string operations."""
 
@@ -36,6 +48,20 @@ class _TrapQuery(bytes):
     def decode(self, *args: object, **kwargs: object) -> str:
         del args, kwargs
         raise AssertionError("noncanonical query bytes must be rejected before decode()")
+
+
+class _TrapHeaderBytes(bytes):
+    """Expose execution if noncanonical header bytes reach credential parsing."""
+
+    def __len__(self) -> int:
+        raise AssertionError("noncanonical header bytes must be rejected before len()")
+
+    def lower(self) -> bytes:
+        raise AssertionError("noncanonical header bytes must be rejected before lower()")
+
+    def decode(self, *args: object, **kwargs: object) -> str:
+        del args, kwargs
+        raise AssertionError("noncanonical header bytes must be rejected before decode()")
 
 
 class GuardAuthenticator:
@@ -69,7 +95,7 @@ class GuardReadPort:
 
 
 class PeopleHttpScalarIntegrityTests(unittest.IsolatedAsyncioTestCase):
-    """Require inert built-in ASGI path/query scalar authority before authentication."""
+    """Require inert built-in ASGI scalar authority before authentication."""
 
     def _app(self) -> tuple[PeopleAsgiApp, GuardAuthenticator, GuardReadPort]:
         authenticator = GuardAuthenticator()
@@ -93,8 +119,10 @@ class PeopleHttpScalarIntegrityTests(unittest.IsolatedAsyncioTestCase):
         self,
         app: PeopleAsgiApp,
         *,
+        method: object = "GET",
         path: str,
         query: bytes,
+        headers: object | None = None,
     ) -> tuple[int, dict[str, object]]:
         messages: list[dict[str, object]] = []
 
@@ -106,14 +134,33 @@ class PeopleHttpScalarIntegrityTests(unittest.IsolatedAsyncioTestCase):
 
         scope = {
             "type": "http",
-            "method": "GET",
+            "method": method,
             "path": path,
             "query_string": query,
-            "headers": [(b"authorization", b"Bearer opaque-token")],
+            "headers": (
+                [(b"authorization", b"Bearer opaque-token")]
+                if headers is None
+                else headers
+            ),
         }
         await app(scope, receive, send)
         start, body = messages
         return int(start["status"]), json.loads(bytes(body["body"]))
+
+    async def test_nonexact_method_is_rejected_before_subclass_behavior_or_authentication(self) -> None:
+        app, authenticator, read_port = self._app()
+
+        status, payload = await self._request(
+            app,
+            method=_TrapMethod("GET"),
+            path=f"/v1/tenants/{TENANT}/people/{PERSON}",
+            query=DEFAULT_QUERY,
+        )
+
+        self.assertEqual(status, 405)
+        self.assertEqual(payload["error"], "method_not_allowed")
+        self.assertEqual(authenticator.calls, 0)
+        self.assertEqual(read_port.calls, 0)
 
     async def test_nonexact_path_is_rejected_before_subclass_behavior_or_authentication(self) -> None:
         app, authenticator, read_port = self._app()
@@ -138,6 +185,36 @@ class PeopleHttpScalarIntegrityTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(status, 400)
         self.assertEqual(payload["error"], "invalid_request")
+        self.assertEqual(authenticator.calls, 0)
+        self.assertEqual(read_port.calls, 0)
+
+    async def test_nonexact_header_name_is_rejected_before_subclass_behavior_or_authentication(self) -> None:
+        app, authenticator, read_port = self._app()
+
+        status, payload = await self._request(
+            app,
+            path=f"/v1/tenants/{TENANT}/people/{PERSON}",
+            query=DEFAULT_QUERY,
+            headers=[(_TrapHeaderBytes(b"authorization"), b"Bearer opaque-token")],
+        )
+
+        self.assertEqual(status, 401)
+        self.assertEqual(payload["error"], "authentication_required")
+        self.assertEqual(authenticator.calls, 0)
+        self.assertEqual(read_port.calls, 0)
+
+    async def test_nonexact_header_value_is_rejected_before_subclass_behavior_or_authentication(self) -> None:
+        app, authenticator, read_port = self._app()
+
+        status, payload = await self._request(
+            app,
+            path=f"/v1/tenants/{TENANT}/people/{PERSON}",
+            query=DEFAULT_QUERY,
+            headers=[(b"authorization", _TrapHeaderBytes(b"Bearer opaque-token"))],
+        )
+
+        self.assertEqual(status, 401)
+        self.assertEqual(payload["error"], "authentication_required")
         self.assertEqual(authenticator.calls, 0)
         self.assertEqual(read_port.calls, 0)
 
