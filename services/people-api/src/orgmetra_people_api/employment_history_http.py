@@ -97,6 +97,7 @@ async def _send_error(
             "support_reference": support_reference,
         },
         extra_headers=extra_headers,
+        support_reference=support_reference,
     )
 
 
@@ -108,10 +109,6 @@ async def _send_authentication_backend_error(
 ) -> None:
     """Record identity-backend failure metadata and emit one non-disclosing 500."""
     support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
-    client_message = (
-        "Retry later or contact an Orgmetra operator with non-secret request metadata; "
-        "never include the bearer token."
-    )
     _LOGGER.error(
         "Employment-history authentication backend failed",
         extra={
@@ -126,11 +123,9 @@ async def _send_authentication_backend_error(
         status=500,
         payload={
             "error": "internal_error",
-            "error_code": "internal_error",
-            "message": client_message,
-            "next_action": client_message,
-            "support_reference": support_reference,
+            "message": "Retry later or contact an Orgmetra operator with non-secret request metadata; never include the bearer token.",
         },
+        support_reference=support_reference,
     )
 
 

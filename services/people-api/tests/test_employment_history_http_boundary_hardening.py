@@ -116,19 +116,21 @@ class EmploymentHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCa
         return int(start["status"]), json.loads(bytes(body["body"]))
 
     async def test_authentication_backend_failure_is_client_safe_and_skips_persistence(self) -> None:
-        """An identity-backend exception must return the published envelope without secrets."""
+        """An identity-backend exception must retain one support reference end to end."""
         authenticator = RecordingAuthenticator(
             self.principal,
             error=RuntimeError("oidc client_secret=do-not-leak"),
         )
         port = EmptyHistoryPort()
 
-        status, payload = await self._request(self._app(authenticator, port))
+        with self.assertLogs("orgmetra_people_api.employment_history_http", level="ERROR") as logs:
+            status, payload = await self._request(self._app(authenticator, port))
 
         self.assertEqual((status, payload["error_code"]), (500, "internal_error"))
         self.assertEqual(payload["error"], "internal_error")
         self.assertEqual(payload["next_action"], payload["message"])
         self.assertRegex(str(payload["support_reference"]), _SUPPORT_REFERENCE)
+        self.assertEqual(payload["support_reference"], logs.records[0].support_reference)
         self.assertNotIn("client_secret", json.dumps(payload))
         self.assertEqual(authenticator.tokens, ["opaque-token"])
         self.assertEqual(port.calls, [])
