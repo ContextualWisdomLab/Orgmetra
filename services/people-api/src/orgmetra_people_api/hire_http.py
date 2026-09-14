@@ -483,10 +483,13 @@ async def _read_json_object(receive: AsgiReceive) -> dict[str, object]:
         raw_chunk = message.get("body", b"")
         if type(raw_chunk) is not bytes:
             raise _InvalidHttpRequest("request body must be bytes")
+        more_body = message.get("more_body", False)
+        if type(more_body) is not bool:
+            raise _InvalidHttpRequest("request body more_body must be boolean")
         if len(body) + len(raw_chunk) > _MAX_BODY_BYTES:
             raise _PayloadTooLarge("hire command exceeds the bounded size")
         body.extend(raw_chunk)
-        if message.get("more_body") is not True:
+        if not more_body:
             break
     if len(body) == 0:
         raise _InvalidHttpRequest("request body is empty")
