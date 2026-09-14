@@ -69,6 +69,12 @@ LIMIT 2
 """.strip()
 
 
+def _require_transactional_connection(connection: object) -> None:
+    """Reject DB capabilities that cannot prove implicit transaction management."""
+    if getattr(connection, "autocommit", None) is not False:
+        raise RuntimeError("PostgreSQL People reads require autocommit disabled.")
+
+
 class PostgresPeopleReadPort(tuple):
     """Resolve current worker truth through one immutable PostgreSQL capability.
 
@@ -77,7 +83,10 @@ class PostgresPeopleReadPort(tuple):
     executable dependency is stored in tuple payload rather than a writable
     instance slot, so a post-construction attribute write cannot substitute a
     different pool, credential, TLS, or database-role capability after it has
-    passed validation.
+    passed validation. The returned connection must expose exact
+    ``autocommit is False`` before cursor acquisition so ``SET TRANSACTION`` and
+    transaction-local tenant state govern the protected SELECT in one short
+    database transaction.
     """
 
     __slots__ = ()
@@ -118,6 +127,7 @@ class PostgresPeopleReadPort(tuple):
 
         connection_factory = cast(PostgresConnectionFactory, tuple.__getitem__(self, 0))
         with connection_factory() as connection:
+            _require_transactional_connection(connection)
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(tenant_record_id),))
