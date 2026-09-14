@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import unittest
 from datetime import datetime, timezone
+from unittest.mock import patch
 from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
@@ -132,6 +133,22 @@ class EmploymentHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCa
         status, payload = await self._request(self._app(authenticator, port))
 
         self.assertEqual((status, payload["error_code"]), (500, "internal_error"))
+        self.assertEqual(port.calls, [])
+
+    async def test_oversized_path_fails_before_route_tokenization(self) -> None:
+        """Reject oversized route material before route decomposition or identity work."""
+        authenticator = RecordingAuthenticator(self.principal)
+        port = EmptyHistoryPort()
+        path = "/v1/tenants/" + ("a" * 300) + f"/people/{PERSON}/employment-history"
+
+        with patch(
+            "orgmetra_people_api.employment_history_http._looks_like_employment_history_route",
+            side_effect=AssertionError("route tokenizer must not receive oversized path data"),
+        ):
+            status, payload = await self._request(self._app(authenticator, port), path=path)
+
+        self.assertEqual((status, payload["error_code"]), (400, "invalid_request"))
+        self.assertEqual(authenticator.tokens, [])
         self.assertEqual(port.calls, [])
 
     async def test_oversized_path_fails_before_authentication(self) -> None:
