@@ -444,7 +444,11 @@ def _bounded_hire_headers(
         if type(header) not in (list, tuple) or len(header) != 2:
             raise error_type(invalid_message)
         name, value = header
-        if type(name) is not bytes or type(value) is not bytes:
+        if type(name) is not bytes:
+            raise error_type(invalid_message)
+        if type(value) is not bytes:
+            if name.lower() == b"content-type":
+                raise _UnsupportedMediaType("content-type must be bytes")
             raise error_type(invalid_message)
         header_bytes = len(name) + len(value)
         if header_bytes > _MAX_REQUEST_HEADER_BYTES:

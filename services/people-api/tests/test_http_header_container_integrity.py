@@ -162,6 +162,24 @@ class HeaderContainerIntegrityTests(unittest.IsolatedAsyncioTestCase):
         status, payload = await self._invoke_with_post_auth_headers(replacement)
         self.assertEqual((status, payload["error"]), (400, "invalid_request"))
 
+    async def test_post_auth_malformed_content_type_scalar_remains_415(self) -> None:
+        replacement = [
+            (b"authorization", b"Bearer opaque-token"),
+            (b"content-type", "application/json"),
+            (b"idempotency-key", IDEMPOTENCY_KEY),
+        ]
+        status, payload = await self._invoke_with_post_auth_headers(replacement)
+        self.assertEqual((status, payload["error"]), (415, "unsupported_media_type"))
+
+    async def test_post_auth_malformed_idempotency_scalar_remains_400(self) -> None:
+        replacement = [
+            (b"authorization", b"Bearer opaque-token"),
+            (b"content-type", b"application/json"),
+            (b"idempotency-key", "hire-idempotency-key-17"),
+        ]
+        status, payload = await self._invoke_with_post_auth_headers(replacement)
+        self.assertEqual((status, payload["error"]), (400, "invalid_request"))
+
     async def test_post_auth_header_collection_reapplies_aggregate_byte_budget(self) -> None:
         replacement = [
             (b"authorization", b"Bearer opaque-token"),
