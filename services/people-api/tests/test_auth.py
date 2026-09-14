@@ -23,6 +23,13 @@ class _BehaviorBearingStr(str):
     """Represent a non-exact string that must not cross the authority boundary."""
 
 
+class _BehaviorBearingAuthorizationHeader(str):
+    """Fail if bearer parsing dispatches methods on a non-exact string."""
+
+    def split(self, *args: object, **kwargs: object) -> list[str]:
+        raise AssertionError("authorization-header subclass split must not execute")
+
+
 class _BehaviorBearingFrozenset(frozenset):
     """Fail if a frozenset subclass is iterated during principal validation."""
 
@@ -40,6 +47,10 @@ class BearerBoundaryTests(unittest.TestCase):
         for header in (None, "", "Basic token", "Bearer", "Bearer one two"):
             with self.subTest(header=header), self.assertRaises(AuthenticationFailed):
                 extract_bearer_token(header)
+
+    def test_rejects_behavior_bearing_authorization_header_before_parser_dispatch(self) -> None:
+        with self.assertRaises(AuthenticationFailed):
+            extract_bearer_token(_BehaviorBearingAuthorizationHeader("Bearer safe-token_123"))
 
     def test_rejects_hidden_control_non_ascii_and_unbounded_tokens(self) -> None:
         for token in ("bad\x1ftoken", "tökén", "x" * 8193):
