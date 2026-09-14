@@ -130,7 +130,10 @@ JOIN public.job_profile AS job
  AND job.job_profile_id = %s
 WHERE organization.tenant_record_id = %s
   AND organization.organization_unit_id = %s
+  AND organization.recorded_to IS NULL
+  AND job.recorded_to IS NULL
 LIMIT 2
+FOR SHARE OF organization, job
 """.strip()
 
 _INSERT_POSITION_SQL = """
