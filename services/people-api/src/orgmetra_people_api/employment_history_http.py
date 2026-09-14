@@ -7,6 +7,7 @@ bitemporal integrity, and minimizing the fields returned to the caller.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 import logging
@@ -107,6 +108,10 @@ async def _send_authentication_backend_error(
 ) -> None:
     """Record identity-backend failure metadata and emit one non-disclosing 500."""
     support_reference = f"err_{token_urlsafe(_SUPPORT_REFERENCE_RANDOM_BYTES)}"
+    client_message = (
+        "Retry later or contact an Orgmetra operator with non-secret request metadata; "
+        "never include the bearer token."
+    )
     _LOGGER.error(
         "Employment-history authentication backend failed",
         extra={
@@ -121,9 +126,11 @@ async def _send_authentication_backend_error(
         status=500,
         payload={
             "error": "internal_error",
-            "message": "Retry later or contact an Orgmetra operator with non-secret request metadata; never include the bearer token.",
+            "error_code": "internal_error",
+            "message": client_message,
+            "next_action": client_message,
+            "support_reference": support_reference,
         },
-        support_reference=support_reference,
     )
 
 
@@ -227,7 +234,8 @@ class EmploymentHistoryAsgiApp:
             return
 
         try:
-            view = read_employment_history(
+            view = await asyncio.to_thread(
+                read_employment_history,
                 principal=principal,
                 tenant_record_id=request.tenant_record_id,
                 person_record_id=request.person_record_id,
