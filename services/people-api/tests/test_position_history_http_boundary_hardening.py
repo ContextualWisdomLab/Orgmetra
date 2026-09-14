@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import re
+import threading
 import unittest
 from unittest.mock import patch
 from uuid import UUID
@@ -18,6 +20,7 @@ DEFAULT_QUERY = (
     b"known_at=2026-08-30T00:00:00Z&purpose=workforce_position_review&"
     b"fields=effective_from,position_status_code"
 )
+_SUPPORT_REFERENCE = re.compile(r"^err_[A-Za-z0-9_-]{20,80}$")
 
 
 class RecordingAuthenticator:
@@ -41,6 +44,7 @@ class RecordingReadPort:
 
     def __init__(self) -> None:
         self.calls = 0
+        self.thread_ids: list[int] = []
 
     def read_position_history(
         self,
@@ -51,6 +55,7 @@ class RecordingReadPort:
     ) -> tuple[object, ...]:
         del tenant_record_id, position_record_id, known_at
         self.calls += 1
+        self.thread_ids.append(threading.get_ident())
         return ()
 
 
@@ -153,7 +158,7 @@ class PositionHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCase
         self.assertEqual(status, 400)
         self.assertEqual(authenticator.calls, 0)
 
-    async def test_unexpected_identity_backend_failure_returns_opaque_500(self) -> None:
+    async def test_unexpected_identity_backend_failure_returns_published_opaque_500(self) -> None:
         authenticator = RecordingAuthenticator(error=RuntimeError("oidc client_secret=do-not-leak"))
         read_port = RecordingReadPort()
         app = self._app(authenticator=authenticator, read_port=read_port)
@@ -162,8 +167,25 @@ class PositionHistoryHttpBoundaryHardeningTests(unittest.IsolatedAsyncioTestCase
 
         self.assertEqual(status, 500)
         self.assertEqual(payload["error"], "internal_error")
+        self.assertEqual(payload["error_code"], "internal_error")
+        self.assertEqual(payload["next_action"], payload["message"])
+        self.assertRegex(str(payload["support_reference"]), _SUPPORT_REFERENCE)
         self.assertNotIn("do-not-leak", json.dumps(payload))
         self.assertEqual(read_port.calls, 0)
+
+    async def test_synchronous_service_read_runs_off_event_loop_thread(self) -> None:
+        event_loop_thread_id = threading.get_ident()
+        authenticator = RecordingAuthenticator(self.principal)
+        read_port = RecordingReadPort()
+        app = self._app(authenticator=authenticator, read_port=read_port)
+
+        status, payload = await self._request(app)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["entries"], [])
+        self.assertEqual(read_port.calls, 1)
+        self.assertEqual(len(read_port.thread_ids), 1)
+        self.assertNotEqual(read_port.thread_ids[0], event_loop_thread_id)
 
     async def test_noncanonical_principal_is_rejected_before_service_or_persistence(self) -> None:
         authenticator = RecordingAuthenticator(object())
