@@ -13,17 +13,18 @@ transport route. Deployments need one stable boundary that preserves the same
 tenant, purpose, field, bitemporal, and no-disclosure controls without adding
 Person, Employment, Assignment, or employment-decision authority.
 
-The HTTP boundary also receives attacker-controlled path/query bytes and delegates
-authentication to the Keyverse-facing identity boundary. It must bound parser work
-before authentication, reject a noncanonical authenticated-principal object before
-the governed service is called, and turn unexpected identity-backend failures into
-opaque client-safe responses without exposing credential or backend details. The
-ASGI boundary must also avoid running the synchronous Position-history service and
-PostgreSQL adapter on the event-loop thread; a blocking connection/cursor/fetch path
-would otherwise stall unrelated concurrent requests. Unexpected protected-read
-failures must remain non-disclosing to the caller while still leaving enough
-non-secret server evidence to correlate the opaque 500 response to the failed
-backend boundary.
+The HTTP boundary also receives attacker-controlled ASGI scope/path/query data and
+delegates authentication to the Keyverse-facing identity boundary. It must reject
+noncanonical scope containers and scalar representations before caller-defined
+Python behavior can run, bound parser work before authentication, reject a
+noncanonical authenticated-principal object before the governed service is called,
+and turn unexpected identity-backend failures into opaque client-safe responses
+without exposing credential or backend details. The ASGI boundary must also avoid
+running the synchronous Position-history service and PostgreSQL adapter on the
+event-loop thread; a blocking connection/cursor/fetch path would otherwise stall
+unrelated concurrent requests. Unexpected protected-read failures must remain
+non-disclosing to the caller while still leaving enough non-secret server evidence
+to correlate the opaque 500 response to the failed backend boundary.
 
 ## Decision
 
@@ -35,6 +36,14 @@ GET /v1/tenants/{tenant_record_id}/positions/{position_record_id}/history
     &purpose=workforce_position_review
     &fields=effective_from,position_status_code
 ```
+
+The ASGI ingress accepts only an exact built-in `dict` as `scope` before any field
+lookup. `scope["type"]` and `scope["method"]` are compared only after proving exact
+built-in `str`; a custom mapping or behavior-bearing string subtype therefore
+cannot execute `.get()`, `__getitem__()`, `__eq__()`, or `__ne__()` before the
+transport boundary decides whether the request is admissible. A noncanonical scope
+or scope type is rejected before response emission; a noncanonical/non-GET method
+uses the existing 405 contract without authentication.
 
 The boundary validates operational UUIDs, exact required query keys, ASCII
 query syntax, a UTC RFC 3339 `known_at` ending in `Z`, lower snake-case purpose
@@ -92,6 +101,8 @@ must not be treated as evidence for a later exact head.
 - Customers receive one stable, read-only Position-history boundary.
 - Existing Position-history service and PostgreSQL ownership boundaries remain
   the only owners of authorization, bitemporal validation, and persistence.
+- Noncanonical ASGI scope containers and type/method scalar subtypes are rejected
+  before their mapping/comparison behavior can execute or authentication can run.
 - Oversized transport input is rejected before route/query parser work or
   authentication, and executable path/query scalar subtypes are rejected before
   their overridden behavior can run.
@@ -150,6 +161,17 @@ subclasses and requires both to fail closed before subclass behavior or identity
 work. Causal repair `d48927a99979305153a04fb4545994f6bb57c77e`
 changes those ingress checks to exact built-in type checks while preserving the
 existing 404 path and 400 query response semantics.
+
+Issue #328 extends the same trust-boundary audit to the outer ASGI scope and its
+routing scalars. Test-first `e0500d1e538ff08b9dc0375d8a4b399e040060c3`
+adds a `dict` subtype that traps mapping access plus `str` subtypes that trap
+comparison for scope type/method. The predecessor calls `scope.get(...)` and
+compares those values directly, so the new cases exercise caller-defined behavior
+before the intended trust gates. Causal repair
+`45abf5082cb9eda10db323dd8ae6a6e914d60542` requires an exact built-in `dict`
+before any scope lookup and exact built-in `str` before scope-type/method
+comparison. The method case preserves the established 405 response and proves
+zero authentication/persistence calls.
 
 These stacked heads have no protected-base PR-triggered Foundation run because the
 PR targets #153 rather than `develop`; no hosted RED or GREEN is inferred from that
