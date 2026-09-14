@@ -102,7 +102,7 @@ class PeopleAsgiApp:
             raise ValueError("PeopleAsgiApp accepts only HTTP ASGI scopes")
 
         method = scope.get("method")
-        if method != "GET":
+        if type(method) is not str or method != "GET":
             await _send_json(
                 send,
                 status=405,
@@ -350,7 +350,7 @@ def _authorization_header(scope: Mapping[str, object]) -> str | None:
         if not isinstance(header, Sequence) or len(header) != 2:
             raise AuthenticationFailed("request headers are invalid")
         name, value = header
-        if not isinstance(name, bytes) or not isinstance(value, bytes):
+        if type(name) is not bytes or type(value) is not bytes:
             raise AuthenticationFailed("request headers are invalid")
         if len(name) + len(value) > _MAX_REQUEST_HEADER_BYTES:
             raise AuthenticationFailed("request header exceeds the accepted size")
