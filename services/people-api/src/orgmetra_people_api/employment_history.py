@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections import namedtuple
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from inspect import getattr_static
+from types import FunctionType
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -22,16 +24,37 @@ from orgmetra_people_api.authorization import authorize_resource_fields
 _MAX_UUID_INT = (1 << 128) - 1
 _EMPLOYMENT_STATUSES = frozenset({"active", "leave", "terminated"})
 _CONCURRENCY_CODES = frozenset({"exclusive", "concurrent"})
+_SUPPORTED_FIELDS = frozenset(
+    {
+        "effective_from",
+        "effective_to",
+        "employment_concurrency_code",
+        "employment_record_id",
+        "employment_record_version_id",
+        "employment_status_code",
+        "recorded_from",
+        "recorded_to",
+    }
+)
 
 
 class EmploymentHistoryIntegrityError(RuntimeError):
     """Indicate that persistence violated the authorized Employment-history contract."""
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require an exact UUID outside Orgmetra's reserved protocol sentinels."""
-    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
+def _validate_operational_uuid_scalar(field_name: str, value: object) -> None:
+    """Require one immutable built-in scalar inside the operational UUID range."""
+    if type(value) is not int or not 0 < value < _MAX_UUID_INT:
         raise ValueError(f"{field_name} must be an operational UUID.")
+
+
+def _operational_uuid_scalar(field_name: str, value: object) -> int:
+    """Detach an exact UUID into immutable scalar authority without caller behavior."""
+    if type(value) is not UUID:
+        raise ValueError(f"{field_name} must be an operational UUID.")
+    scalar = value.int
+    _validate_operational_uuid_scalar(field_name, scalar)
+    return scalar
 
 
 def _validate_utc_instant(field_name: str, value: object) -> None:
@@ -47,10 +70,10 @@ def _validate_utc_instant(field_name: str, value: object) -> None:
 _EmploymentHistoryRecordTuple = namedtuple(
     "_EmploymentHistoryRecordTuple",
     (
-        "tenant_record_id",
-        "person_record_id",
-        "employment_record_id",
-        "employment_record_version_id",
+        "tenant_record_id_scalar",
+        "person_record_id_scalar",
+        "employment_record_id_scalar",
+        "employment_record_version_id_scalar",
         "employment_status_code",
         "employment_concurrency_code",
         "effective_from",
@@ -66,10 +89,10 @@ class EmploymentHistoryRecord(_EmploymentHistoryRecordTuple):
 
     __slots__ = ()
 
-    tenant_record_id: UUID
-    person_record_id: UUID
-    employment_record_id: UUID
-    employment_record_version_id: UUID
+    tenant_record_id_scalar: int
+    person_record_id_scalar: int
+    employment_record_id_scalar: int
+    employment_record_version_id_scalar: int
     employment_status_code: str
     employment_concurrency_code: str
     effective_from: date
@@ -91,13 +114,16 @@ class EmploymentHistoryRecord(_EmploymentHistoryRecordTuple):
         recorded_from: datetime,
         recorded_to: datetime | None,
     ) -> EmploymentHistoryRecord:
-        """Build one validated row whose tuple storage cannot be rewritten in place."""
+        """Build one validated row with detached immutable UUID scalar storage."""
         instance = super().__new__(
             cls,
-            tenant_record_id,
-            person_record_id,
-            employment_record_id,
-            employment_record_version_id,
+            _operational_uuid_scalar("tenant_record_id", tenant_record_id),
+            _operational_uuid_scalar("person_record_id", person_record_id),
+            _operational_uuid_scalar("employment_record_id", employment_record_id),
+            _operational_uuid_scalar(
+                "employment_record_version_id",
+                employment_record_version_id,
+            ),
             employment_status_code,
             employment_concurrency_code,
             effective_from,
@@ -108,16 +134,42 @@ class EmploymentHistoryRecord(_EmploymentHistoryRecordTuple):
         instance.assert_runtime_integrity()
         return instance
 
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return a detached UUID view of the stored tenant identity scalar."""
+        return UUID(int=self.tenant_record_id_scalar)
+
+    @property
+    def person_record_id(self) -> UUID:
+        """Return a detached UUID view of the stored Person identity scalar."""
+        return UUID(int=self.person_record_id_scalar)
+
+    @property
+    def employment_record_id(self) -> UUID:
+        """Return a detached UUID view of the stored Employment identity scalar."""
+        return UUID(int=self.employment_record_id_scalar)
+
+    @property
+    def employment_record_version_id(self) -> UUID:
+        """Return a detached UUID view of the stored Employment-version scalar."""
+        return UUID(int=self.employment_record_version_id_scalar)
+
     def assert_runtime_integrity(self) -> None:
-        """Revalidate a row after it crosses the untrusted persistence boundary."""
-        for field_name in (
-            "tenant_record_id",
-            "person_record_id",
-            "employment_record_id",
-            "employment_record_version_id",
+        """Revalidate scalar-backed row state after the persistence boundary."""
+        for field_name, scalar in (
+            ("tenant_record_id", self.tenant_record_id_scalar),
+            ("person_record_id", self.person_record_id_scalar),
+            ("employment_record_id", self.employment_record_id_scalar),
+            (
+                "employment_record_version_id",
+                self.employment_record_version_id_scalar,
+            ),
         ):
-            _validate_operational_uuid(field_name, getattr(self, field_name))
-        if type(self.employment_status_code) is not str or self.employment_status_code not in _EMPLOYMENT_STATUSES:
+            _validate_operational_uuid_scalar(field_name, scalar)
+        if (
+            type(self.employment_status_code) is not str
+            or self.employment_status_code not in _EMPLOYMENT_STATUSES
+        ):
             raise ValueError("employment_status_code must be active, leave, or terminated.")
         if (
             type(self.employment_concurrency_code) is not str
@@ -151,6 +203,12 @@ class EmploymentHistoryReadPort(Protocol):
         """Return Employment rows visible to persistence at ``known_at``."""
 
 
+_PROTOCOL_READ_CAPABILITY = getattr_static(
+    EmploymentHistoryReadPort,
+    "read_employment_history",
+)
+
+
 @dataclass(frozen=True, slots=True)
 class AuthorizedEmploymentHistoryEntry:
     """One Employment version containing only explicitly authorized fields."""
@@ -174,7 +232,9 @@ def _instant_text(value: datetime) -> str:
 def _authorized_field_value(record: EmploymentHistoryRecord, field_name: str) -> str | None:
     """Return one explicitly supported Employment-history field without reflection."""
     if type(field_name) is not str:
-        raise EmploymentHistoryIntegrityError("authorization returned an unsupported Employment-history field")
+        raise EmploymentHistoryIntegrityError(
+            "authorization returned an unsupported Employment-history field"
+        )
     if field_name == "effective_from":
         return record.effective_from.isoformat()
     if field_name == "effective_to":
@@ -191,28 +251,48 @@ def _authorized_field_value(record: EmploymentHistoryRecord, field_name: str) ->
         return _instant_text(record.recorded_from)
     if field_name == "recorded_to":
         return None if record.recorded_to is None else _instant_text(record.recorded_to)
-    raise EmploymentHistoryIntegrityError("authorization returned an unsupported Employment-history field")
+    raise EmploymentHistoryIntegrityError(
+        "authorization returned an unsupported Employment-history field"
+    )
+
+
+def _validate_authorized_fields(authorized_fields: frozenset[str]) -> tuple[str, ...]:
+    """Freeze the supported response schema before protected persistence is read."""
+    for field_name in authorized_fields:
+        if type(field_name) is not str or field_name not in _SUPPORTED_FIELDS:
+            raise EmploymentHistoryIntegrityError(
+                "authorization returned an unsupported Employment-history field"
+            )
+    return tuple(sorted(authorized_fields))
 
 
 def _is_recorded_visible(record: EmploymentHistoryRecord, known_at: datetime) -> bool:
     """Return whether ``known_at`` lies in the row's half-open system interval."""
-    return record.recorded_from <= known_at and (record.recorded_to is None or known_at < record.recorded_to)
+    return record.recorded_from <= known_at and (
+        record.recorded_to is None or known_at < record.recorded_to
+    )
 
 
 def _reject_effective_overlap(records: list[EmploymentHistoryRecord]) -> None:
     """Reject overlapping business-time truth for one Employment at one knowledge cutoff."""
-    previous_by_employment: dict[UUID, EmploymentHistoryRecord] = {}
-    for record in sorted(records, key=lambda item: (item.employment_record_id.int, item.effective_from)):
-        previous = previous_by_employment.get(record.employment_record_id)
+    previous_by_employment: dict[int, EmploymentHistoryRecord] = {}
+    for record in sorted(
+        records,
+        key=lambda item: (item.employment_record_id_scalar, item.effective_from),
+    ):
+        previous = previous_by_employment.get(record.employment_record_id_scalar)
         if previous is not None and (
             previous.effective_to is None or record.effective_from < previous.effective_to
         ):
-            raise EmploymentHistoryIntegrityError("overlapping Employment business-time truth")
-        previous_by_employment[record.employment_record_id] = record
+            raise EmploymentHistoryIntegrityError(
+                "overlapping Employment business-time truth"
+            )
+        previous_by_employment[record.employment_record_id_scalar] = record
 
 
 def _capture_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHistoryRecord:
-    """Reconstruct and validate one persistence-owned Employment row."""
+    """Validate raw scalar state before reconstructing a trusted Employment row."""
+    record.assert_runtime_integrity()
     return EmploymentHistoryRecord(
         tenant_record_id=record.tenant_record_id,
         person_record_id=record.person_record_id,
@@ -230,10 +310,13 @@ def _capture_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHi
 def _snapshot_persistence_record(record: EmploymentHistoryRecord) -> EmploymentHistoryRecord:
     """Detach and revalidate structurally immutable persistence evidence.
 
-    ``EmploymentHistoryRecord`` stores its fields in immutable tuple storage, so a
-    persistence adapter retaining the returned object cannot rewrite that alias in
-    place through ``object.__setattr__``. Reconstruction is still mandatory because
-    low-level tuple construction can bypass the public validating constructor.
+    ``EmploymentHistoryRecord`` stores trust-bearing UUID identities as immutable
+    built-in integers and exposes a fresh UUID view for each read. A persistence
+    adapter therefore cannot rewrite the row by retaining either the constructor
+    UUID objects or a UUID obtained from a record property. Reconstruction is still
+    mandatory because low-level tuple construction can bypass ``__new__``. Raw
+    scalar state is validated before any UUID view is reconstructed so forged
+    values cannot execute through ``UUID(int=...)`` first.
 
     This in-process integrity boundary does not replace a transactional database
     snapshot, MVCC, locking, or the persistence layer's own concurrency controls.
@@ -254,21 +337,45 @@ def read_employment_history(
 ) -> AuthorizedEmploymentHistoryView:
     """Authorize then return bitemporal Employment history for one Person.
 
-    A denied purpose, scope, target, or field request causes zero protected reads.
-    After retrieval, every row is detached from its persistence-owned alias and
-    must still match the authorized tenant/person and requested system-time view.
-    Duplicate version identities and overlapping business-time truth for one
-    Employment fail closed instead of being guessed.
+    A concrete repository function is captured inertly before authorization and
+    the same exact function is invoked afterward, so caller-controlled instance or
+    class lookup cannot substitute a different executable capability after the
+    access decision. Request UUIDs are detached to immutable scalars before
+    authorization or the untrusted persistence call. After retrieval, every row is
+    reconstructed and must still match those authorized tenant/person scalars and
+    the requested system-time view. Duplicate version identities and overlapping
+    business-time truth for one Employment fail closed instead of being guessed.
     """
-    _validate_operational_uuid("tenant_record_id", tenant_record_id)
-    _validate_operational_uuid("person_record_id", person_record_id)
+    read_capability = getattr_static(
+        type(read_port),
+        "read_employment_history",
+        None,
+    )
+    if (
+        type(read_capability) is not FunctionType
+        or read_capability is _PROTOCOL_READ_CAPABILITY
+    ):
+        raise TypeError(
+            "read_port must expose a statically callable read_employment_history."
+        )
+
+    tenant_record_id_scalar = _operational_uuid_scalar(
+        "tenant_record_id",
+        tenant_record_id,
+    )
+    person_record_id_scalar = _operational_uuid_scalar(
+        "person_record_id",
+        person_record_id,
+    )
     _validate_utc_instant("known_at", known_at)
 
-    resource_reference = f"person_employment_history:{person_record_id.hex}"
+    resource_reference = (
+        f"person_employment_history:{UUID(int=person_record_id_scalar).hex}"
+    )
     decision = authorize_resource_fields(
         principal=principal,
-        tenant_record_id=tenant_record_id,
-        resource_tenant_record_id=tenant_record_id,
+        tenant_record_id=UUID(int=tenant_record_id_scalar),
+        resource_tenant_record_id=UUID(int=tenant_record_id_scalar),
         resource_reference=resource_reference,
         purpose_code=purpose_code,
         operation_code="read_record",
@@ -276,35 +383,55 @@ def read_employment_history(
         requested_fields=requested_fields,
         policy=policy,
     )
+    authorized_fields = _validate_authorized_fields(decision.authorized_fields)
 
-    records = read_port.read_employment_history(
-        tenant_record_id=tenant_record_id,
-        person_record_id=person_record_id,
+    records = read_capability(
+        read_port,
+        tenant_record_id=UUID(int=tenant_record_id_scalar),
+        person_record_id=UUID(int=person_record_id_scalar),
         known_at=known_at,
     )
     if type(records) is not tuple:
-        raise EmploymentHistoryIntegrityError("Employment-history persistence must return an immutable tuple")
+        raise EmploymentHistoryIntegrityError(
+            "Employment-history persistence must return an immutable tuple"
+        )
 
-    seen_version_ids: set[UUID] = set()
+    seen_version_ids: set[int] = set()
     verified: list[EmploymentHistoryRecord] = []
     for record in records:
         if type(record) is not EmploymentHistoryRecord:
-            raise EmploymentHistoryIntegrityError("Employment-history persistence returned an unsupported row type")
+            raise EmploymentHistoryIntegrityError(
+                "Employment-history persistence returned an unsupported row type"
+            )
+        if len(record) != len(EmploymentHistoryRecord._fields):
+            raise EmploymentHistoryIntegrityError(
+                "Employment-history persistence returned an invalid row shape"
+            )
         try:
             trusted_record = _snapshot_persistence_record(record)
         except ValueError as exc:
-            raise EmploymentHistoryIntegrityError("Employment-history row failed runtime integrity") from exc
-        if trusted_record.tenant_record_id != tenant_record_id or trusted_record.person_record_id != person_record_id:
-            raise EmploymentHistoryIntegrityError("Employment-history row does not match the authorized target")
+            raise EmploymentHistoryIntegrityError(
+                "Employment-history row failed runtime integrity"
+            ) from exc
+        if (
+            trusted_record.tenant_record_id_scalar != tenant_record_id_scalar
+            or trusted_record.person_record_id_scalar != person_record_id_scalar
+        ):
+            raise EmploymentHistoryIntegrityError(
+                "Employment-history row does not match the authorized target"
+            )
         if not _is_recorded_visible(trusted_record, known_at):
-            raise EmploymentHistoryIntegrityError("Employment-history row is not visible at the requested knowledge cutoff")
-        if trusted_record.employment_record_version_id in seen_version_ids:
-            raise EmploymentHistoryIntegrityError("duplicate Employment version identity")
-        seen_version_ids.add(trusted_record.employment_record_version_id)
+            raise EmploymentHistoryIntegrityError(
+                "Employment-history row is not visible at the requested knowledge cutoff"
+            )
+        if trusted_record.employment_record_version_id_scalar in seen_version_ids:
+            raise EmploymentHistoryIntegrityError(
+                "duplicate Employment version identity"
+            )
+        seen_version_ids.add(trusted_record.employment_record_version_id_scalar)
         verified.append(trusted_record)
 
     _reject_effective_overlap(verified)
-    authorized_fields = tuple(sorted(decision.authorized_fields))
     entries = tuple(
         AuthorizedEmploymentHistoryEntry(
             field_values=tuple(
@@ -316,9 +443,12 @@ def read_employment_history(
             verified,
             key=lambda item: (
                 item.effective_from,
-                item.employment_record_id.int,
-                item.employment_record_version_id.int,
+                item.employment_record_id_scalar,
+                item.employment_record_version_id_scalar,
             ),
         )
     )
-    return AuthorizedEmploymentHistoryView(resource_reference=decision.resource_reference, entries=entries)
+    return AuthorizedEmploymentHistoryView(
+        resource_reference=decision.resource_reference,
+        entries=entries,
+    )

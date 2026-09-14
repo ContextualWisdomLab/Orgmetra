@@ -19,7 +19,7 @@
 | Preserve tenant and accountable reviewer context | canonical operational tenant UUID plus UUID-backed `actor:` reviewer reference, fixed purpose, reviewed reason, and canonical evidence version | reserved/noncanonical UUID, malformed reference, closed-reason, and bounded evidence-version regressions |
 | Produce stable immutable correlation evidence | canonical JSON plus SHA-256 | deterministic JSON and independent SHA-256 recomputation regression |
 | Avoid host-time ambiguity | timezone-aware `generated_at`, canonical UTC rendering | naive/unknown-offset rejection and non-UTC-to-UTC canonicalization regression |
-| Meet owned production coverage gate | `orgmetra_selection_review` | Selection Review Quality requires exact 100% statement and branch coverage |
+| Meet owned production coverage gate | `orgmetra_selection_review` | Foundation CI requires exact 100% statement and branch coverage |
 
 ## Authority boundary
 
