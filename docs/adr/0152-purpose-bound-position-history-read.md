@@ -1,6 +1,6 @@
 # ADR 0152: Purpose-bound bitemporal Position history read
 
-- **Status:** Accepted for active PR #152; not protected-main truth until integrated
+- **Status:** Proposed
 - **Date:** 2026-08-30
 - **Owners:** Orgmetra People domain
 
@@ -15,17 +15,21 @@ A Position-history read is a high-value governance boundary because historical w
 Orgmetra adds a read-only `position_history` application boundary in the People service.
 
 1. The caller supplies an exact operational tenant UUID, an exact operational Position UUID, an exact built-in UTC knowledge instant, a declared purpose, and an explicit requested-field set.
-2. Purpose-bound authorization is evaluated **before** the injected read port may retrieve protected Position history.
-3. The persistence adapter returns immutable `PositionHistoryRecord` values. Application code treats those values as untrusted evidence and revalidates exact row shape, primitive types, tenant and Position identity, system-time visibility, version uniqueness, and business-effective non-overlap.
-4. System-recorded intervals are interpreted as half-open intervals: `recorded_from <= known_at < recorded_to`, with an absent `recorded_to` meaning open-ended visibility.
-5. Business-effective intervals are also half-open. Two versions visible at the same knowledge instant may not claim overlapping business truth for the same Position. An absent business end is represented as **unbounded**, not by substituting a finite date sentinel such as `date.max`; this preserves overlap semantics even when a valid interval begins on Python's maximum representable date.
-6. The response is deterministic and contains only fields explicitly authorized by the purpose-bound policy. Unknown fields and `str` subclasses fail closed rather than reaching reflection-based serialization.
-7. `position_record_version_id`, organization lineage, Job lineage, status, business-effective dates, and system-recorded timestamps remain distinct concepts. The read does not collapse Job, Position, or Assignment.
-8. The application boundary depends on an injected port. It does not query another service's application tables and does not introduce cross-service SQL.
+2. Trust-bearing request UUIDs are immediately reduced to exact built-in integer scalar authority. Fresh UUID views are reconstructed only when an existing authorization or persistence contract requires UUID values, so retained caller aliases cannot change the authorized tenant or Position after validation.
+3. The concrete persistence capability is captured inertly from the repository type before authorization and the same exact function is invoked afterward. A post-decision instance lookup cannot substitute a different executable repository capability.
+4. Purpose-bound authorization is evaluated **before** the injected read port may retrieve protected Position history. The authorized field schema is also validated before protected retrieval, including empty-result cases.
+5. The persistence adapter returns immutable `PositionHistoryRecord` values. Trust-bearing UUID identities inside a row are stored as built-in integer scalars rather than retained UUID objects. Application code treats every row as untrusted evidence, revalidates raw scalar-backed state, reconstructs a detached trusted row, and then checks tenant and Position identity, system-time visibility, version uniqueness, and business-effective non-overlap.
+6. System-recorded intervals are interpreted as half-open intervals: `recorded_from <= known_at < recorded_to`, with an absent `recorded_to` meaning open-ended visibility.
+7. Business-effective intervals are also half-open. Two versions visible at the same knowledge instant may not claim overlapping business truth for the same Position. An absent business end is represented as **unbounded**, not by substituting a finite date sentinel such as `date.max`; this preserves overlap semantics even when a valid interval begins on Python's maximum representable date.
+8. The response is deterministic and contains only fields explicitly authorized by the purpose-bound policy. Unknown fields and `str` subclasses fail closed rather than reaching reflection-based serialization.
+9. `position_record_version_id`, organization lineage, Job lineage, status, business-effective dates, and system-recorded timestamps remain distinct concepts. The read does not collapse Job, Position, or Assignment.
+10. The application boundary depends on an injected port. It does not query another service's application tables and does not introduce cross-service SQL.
 
 ## Trust and time semantics
 
-The service accepts exact built-in UUID/date/datetime/timezone primitives at the trust boundary. Caller-controlled subclasses and timezone implementations are rejected. This prevents user-defined equality, hashing, formatting, or UTC-offset behavior from participating in authorization, chronology, or evidence serialization.
+The service accepts exact built-in UUID/date/datetime/timezone primitives at the trust boundary. Caller-controlled subclasses and timezone implementations are rejected. Exact outer type is not sufficient authority for UUIDs because a retained UUID object can be mutated through low-level object mechanisms after validation. The application therefore snapshots UUID identity to built-in integer scalars before authorization or protected retrieval and stores the same scalar authority inside Position-history records.
+
+The persistence port is an executable trust boundary. Validation of one method lookup followed by a second dynamic lookup after authorization would create a checked-versus-used gap. The application captures the concrete class function before authorization, rejects missing/non-function/Protocol-placeholder implementations, and invokes that captured function directly after the access decision.
 
 `known_at` is system-recorded time, not business-effective time. A version may be visible at `known_at` while describing a past or future business-effective period. These dimensions must never be substituted for one another.
 
@@ -48,6 +52,8 @@ An adapter that materializes Position history must preserve those meanings and m
 
 - HR operators can inspect Position history without broad Person/Assignment disclosure.
 - Authorization-before-retrieval is executable and testable.
+- Retained request/record UUID aliases and post-authorization repository substitution cannot silently change the protected target.
+- Unsupported disclosure schema fails before persistence even when the result would be empty.
 - Bitemporal contradictions fail closed at the service boundary, including valid extreme-date intervals whose end is genuinely unbounded.
 - The module is standalone and can be extracted behind a service/API boundary later without rewriting its authorization and evidence semantics.
 - Exact owned statement/branch coverage can be enforced independently of a future database adapter.
@@ -56,6 +62,7 @@ An adapter that materializes Position history must preserve those meanings and m
 
 - The read port must deliberately materialize data that the application can validate; adapters cannot return arbitrary ORM entities.
 - A database adapter must provide a transactionally coherent snapshot. The application checks cannot replace MVCC/snapshot isolation where concurrent database writes are possible.
+- Static capability capture intentionally rejects unusual dynamic repository dispatch at this high-trust boundary.
 - This slice exposes no HTTP route or write mutation. Those are separate bounded decisions and must not be inferred from this ADR.
 
 ## Verification
@@ -64,4 +71,6 @@ PR #152 records a hosted test-first sequence. A test-only head failed because th
 
 A later source sweep found that open-ended business intervals were approximated with `date.max` during overlap checks. Test-only head `af8d0b9b88c50f17c87eb8ecf1eea29918835dce` produced genuine hosted RED in People API Quality run `33267978859`, job `99141335635`: 157 existing tests passed, exact owned coverage remained 100%, but the new extreme-date regression failed because `[date.max, ∞)` was incorrectly treated as non-overlapping with an earlier open interval. Root repair `955956f838c467c06c25b63127b7c6e976dea812` removes the finite-infinity sentinel and compares optional interval ends directly.
 
-The PR remains Draft until the exact current head has fresh applicable local/central evidence and qualifying independent review. Evidence from predecessor heads is non-transferable.
+After repository workflow consolidation reached protected `develop`, PR #152 adopted that protected truth by ordinary two-parent merge rather than retaining its stale pre-consolidation base. A new test-only head then fixed four additional trust contracts in source: constructor UUID aliases must not retain authority, request Position identity must survive post-authorization mutation attempts, unsupported authorized fields must fail before an empty persistence read, and repository execution must use the capability captured before authorization. Production repair snapshots request and record identity to built-in integer scalars, validates disclosure schema before retrieval, and statically binds the repository function.
+
+This ADR remains **Proposed** until the exact current implementation is integrated into protected `develop`. Predecessor evidence is non-transferable; every material head must reacquire applicable hosted checks and qualifying independent review.
