@@ -7,6 +7,7 @@ isolation remain delegated to the existing People service contracts.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import date
 import json
@@ -197,7 +198,8 @@ class PeopleAsgiApp:
             return
 
         try:
-            view = read_worker_people_record(
+            view = await asyncio.to_thread(
+                read_worker_people_record,
                 principal=principal,
                 tenant_record_id=request.tenant_record_id,
                 person_record_id=request.person_record_id,
