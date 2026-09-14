@@ -22,7 +22,7 @@ PR #155 defines a customer-callable, purpose-bound Employment-history read but l
 | Canonical UTC | `AT TIME ZONE 'UTC'` projection and exact naive DB timestamp validation | malformed timestamp unit regressions plus real PostgreSQL queries under `Asia/Seoul` and `Pacific/Honolulu` session time zones |
 | Untrusted DB-API boundary | exact list result, exact tuple row shape, domain reconstruction | malformed collection/row/value unit regressions |
 | Immutable typed result | tuple of `EmploymentHistoryRecord` values | empty and non-empty result regressions |
-| Parent authority remains single owner | adapter accepts no purpose or authorization input | PR #155 performs authorization and service revalidation |
+| Parent authority remains single owner | adapter accepts no purpose or authorization input | PR #155 performs authentication/transport isolation and #149 performs authorization/service revalidation |
 
 ## Test-first and repair chain
 
@@ -39,8 +39,9 @@ PR #155 defines a customer-callable, purpose-bound Employment-history read but l
 11. **Transaction-integrity RED:** `b207e6db14452e36f2428c0fc472f8f5bb98e7a7` requires autocommit or otherwise unproven connection modes to fail before cursor access. `ab34fdcf0b02420219a1133571f87915e6934b8e` and `b1b51fbf241e768536dcbcb2c22a0e0cd443fee5` make accepted test doubles explicitly non-autocommit.
 12. **Transaction-integrity repair:** `15c28cfaafd261bdea047961fb5461c641bb8be5` checks exact `autocommit is False` immediately after connection acquisition and before obtaining a cursor. Issue #318 hands the same verified defect to canonical governed-People owner #55 rather than copying child implementation upstream.
 13. **Canonical owner restack:** `a2a9f04be385ee2bfb66dc8f5e58306f540ebe8f` ordinary-forward adopted #155 after #149 had inherited canonical #55 retained-identity repair #319.
-14. **HTTP parent hardening adoption:** #155 subsequently fixed its own oversized-path ordering so the 256-character gate precedes route `strip()`/`split()` tokenization. Ordinary two-parent merge `23e2ffb028628d74df7de12196fb8a336b3a68cb` adopts #155 `03030dbccba3b6044e2b4d8201203f309d4f40de` and its four HTTP-owned source/test/ADR/traceability files while preserving #156's PostgreSQL-only delta. Comparison to that parent is 0-behind.
-15. **Hosted evidence rule:** #156 remains stacked on #155, while the canonical Foundation pull-request trigger targets `develop`. Therefore the source-level real-database contract and integrity repairs have not yet produced hosted exact-head acceptance evidence for this stack. After the owner stack reaches protected `develop`, #156 must retarget and reacquire Foundation plus applicable security/review gates; parent/predecessor results do not transfer.
+14. **HTTP parser-hardening adoption:** ordinary two-parent merge `23e2ffb028628d74df7de12196fb8a336b3a68cb` adopted #155 `03030dbccba3b6044e2b4d8201203f309d4f40de` after its oversized-path-before-tokenization repair, without altering #156's PostgreSQL-only delta.
+15. **HTTP backend/event-loop adoption:** after #155 test-first `d998cd684adee518b04ddc37cfad7c17ea151d8c` and causal repair `3432b08b67f28cf5e665346494104ec15d523590` fixed the invalid backend-error envelope and moved the synchronous Employment-history service off the ASGI event-loop thread, ordinary two-parent merge `04d1c354d2b7bce972af38d26e64c590a70f0550` adopted current #155 `ef27e2e91e0e73c98f396f13ca8da913484c2927`. The resolved tree takes the four parent-owned HTTP source/test/ADR/traceability files from #155 and preserves all #156-owned PostgreSQL files.
+16. **Hosted evidence rule:** #156 remains stacked on #155, while the canonical Foundation pull-request trigger targets `develop`. Therefore the source-level real-database contract and integrity repairs have not yet produced hosted exact-head acceptance evidence for this stack. After the owner stack reaches protected `develop`, #156 must retarget and reacquire Foundation plus applicable security/review gates; parent/predecessor results do not transfer.
 
 ## Evidence interpretation
 
@@ -48,7 +49,7 @@ PR #155 defines a customer-callable, purpose-bound Employment-history read but l
 
 Source-equivalent causal execution reproduces the predecessor forged-payload equality failure and the repaired fail-closed scalar check. A separate retained-alias check shows the reconstructed UUIDs keep the original identities even after caller-owned UUID objects are mutated. The transaction regression demonstrates the intended fail-before-cursor boundary in source. These are causal local contracts, not hosted Foundation evidence.
 
-Current direct parent authority is #155 `03030dbccba3b6044e2b4d8201203f309d4f40de`; #156 is an ordinary descendant with no parent commits behind. The inherited Employment HTTP parser-order repair is parent-owned and is not reimplemented in the PostgreSQL adapter.
+Current direct parent authority is #155 `ef27e2e91e0e73c98f396f13ca8da913484c2927`; #156 is an ordinary descendant through merge `04d1c354d2b7bce972af38d26e64c590a70f0550` with no intentional parent-owned source duplication. The inherited Employment HTTP parser-order, schema-valid backend-error, and event-loop-isolation repairs remain parent-owned and are not reimplemented in the PostgreSQL adapter.
 
 ## Security and data boundary
 
