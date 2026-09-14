@@ -12,7 +12,7 @@ PR #55 is the single writer for governed People-read infrastructure. PR #149 is 
 
 - `database/migrations/0001_foundation_schema.sql` separates `employment_record` identity from bitemporal `employment_record_version` business/system truth.
 - `services/people-api/src/orgmetra_people_api/authorization.py` delegates protected-field authorization to the integrated purpose-bound Keyverse adapter contract.
-- `services/people-api/src/orgmetra_people_api/people.py` establishes authorization-before-protected-read and target-scope revalidation; #55 owns its governed-read hardening.
+- `services/people-api/src/orgmetra_people_api/people.py` establishes authorization-before-protected-read, static pre-authorization repository-capability binding, and target-scope revalidation; #55 owns its governed-read hardening.
 - `services/people-api/src/orgmetra_people_api/mutations.py` defines current controlled Employment statuses (`active`, `leave`, `terminated`) and concurrency codes (`exclusive`, `concurrent`).
 - `.github/workflows/foundation-ci.yml` is the current repository-owned exact-head quality owner after protected PR #161 consolidated the former leaf People API workflow.
 
@@ -20,7 +20,8 @@ PR #55 is the single writer for governed People-read infrastructure. PR #149 is 
 
 | Requirement | Production boundary | Regression evidence |
 | --- | --- | --- |
-| Authorize before protected retrieval | `read_employment_history()` calls `authorize_resource_fields()` before `EmploymentHistoryReadPort` | denied-field test requires zero port calls |
+| Bind exact persistence capability before authorization | `read_employment_history()` resolves the concrete `read_employment_history` function with `getattr_static()` before policy evaluation and invokes that retained function directly afterward | dynamic instance lookup trap and authorization-time class substitution both fail unless the pre-authorization function is retained |
+| Authorize before protected retrieval | `read_employment_history()` calls `authorize_resource_fields()` before invoking the retained `EmploymentHistoryReadPort` capability | denied-field test requires zero port calls |
 | Preserve business/system time separately | `EmploymentHistoryRecord.effective_*` and `.recorded_*` | deterministic history and recorded-cutoff tests |
 | Tenant/Person isolation | request UUIDs are detached to immutable scalars; every persistence row is reconstructed and compared to those scalars | other-tenant and other-Person rows fail closed |
 | Half-open system visibility | `[recorded_from, recorded_to)` at exact `known_at` | future-recorded and `recorded_to == known_at` rows fail closed |
@@ -40,7 +41,7 @@ PR #55 is the single writer for governed People-read infrastructure. PR #149 is 
 
 PR #149 does not create/update/delete Employment, alter schema, expose a PostgreSQL adapter, add UI geometry, infer attendance/fitness/compensation/performance, or authorize an employment decision. It does not mutate Keyverse or another dedicated-writer repository. A future persistence adapter and employee-profile UI must reuse this contract instead of bypassing the People service.
 
-The in-process row object uses tuple-backed state and immutable scalar identity storage, and the service revalidates exact row shape, raw scalar state, plus a detached reconstruction before authorization output. The authorization field schema is validated independently of result cardinality before protected retrieval. These controls do not claim to replace database transaction isolation, MVCC, locks, or a persistence adapter's obligation to return one coherent view.
+The in-process row object uses tuple-backed state and immutable scalar identity storage, and the service revalidates exact row shape, raw scalar state, plus a detached reconstruction before authorization output. The authorization field schema is validated independently of result cardinality before protected retrieval. Static capability binding prevents a post-decision executable lookup from changing which repository function runs. These controls do not claim to replace database transaction isolation, MVCC, locks, or a persistence adapter's obligation to return one coherent view.
 
 ## Test-first evidence rule
 
@@ -61,6 +62,8 @@ A sixth review found one constructor-bypass edge left by that repair: a low-leve
 The dependent lane then adopted canonical People-read owner #55 by ordinary merge `22ab29277b37c593b5010b8cb02b2c6d486ffbf6` and retargeted to #55's branch. No #55 source was copied into a parallel owner lane; the owner remains the PR parent.
 
 A seventh current-head review found two independent fail-open/unstable edges. Low-level `tuple.__new__` could construct an exact `EmploymentHistoryRecord` with too few fields, leaking `IndexError`, or with extra fields that were silently ignored. Separately, policy-schema drift was discovered only while encoding a non-empty result, so an empty history could return successfully with an unsupported authorized field. Test-first commit `441fa306c7fbfae0869577caf34c60b41f848145` added public-service regressions for both cases before production repair. Because #149 is intentionally stacked on #55 and the protected Foundation pull-request workflow targets `develop`, no hosted RED is claimed for this stacked test-only head. Repair `ca9d3cf1511ea9fcdddfc4c09129b1249c2ff6d0` validates exact row cardinality before any field descriptor access and validates the authorized response schema immediately after authorization, before protected persistence. The latter makes unsupported schema fail closed even for an empty history and keeps the repository unread in that case.
+
+An eighth review compared #149 with canonical People-read owner #55 and found a checked-vs-used capability gap: Employment history performed a fresh `read_port.read_employment_history` instance lookup only after authorization, while #55 already freezes the concrete repository function before the access decision. Test-first commits `f2e41e8afe5387be3b7a662fe2fd842b4d7ab481` and `602c5cf2c604fc6e5f677f782a424531c207452c` add regressions for a hostile dynamic instance lookup and for authorization-time replacement of the repository class method. No hosted RED is claimed because the PR remains intentionally stacked on #55 and therefore does not trigger the protected `pull_request -> develop` Foundation workflow. Repair `54fe8a78239d7b0c7fcb9daf09bcd085ee1d61b1` now uses `getattr_static()` to retain one exact concrete function before authorization, rejects the Protocol placeholder/non-function descriptor, and invokes that retained function directly afterward. This preserves #55's canonical capability-integrity invariant without copying its domain implementation.
 
 ADR 0149 remains **Proposed** while PR #149 is active. It must not become Accepted until the repaired feature reaches normal protected integration after its owner prerequisite.
 
