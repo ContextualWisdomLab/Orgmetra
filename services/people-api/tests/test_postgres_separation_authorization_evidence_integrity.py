@@ -65,6 +65,12 @@ def test_rejects_non_boolean_allowed_evidence() -> None:
         _require(authorization(allowed=1))
 
 
+def test_rejects_non_uuid_tenant_evidence() -> None:
+    """The tenant authority must be an exact operational UUID before comparison."""
+    with pytest.raises(EmploymentSeparationPersistenceIntegrityError, match="authorization evidence is invalid"):
+        _require(authorization(tenant_record_id="0198a412-8000-7000-8000-000000000001"))
+
+
 def test_rejects_behavior_bearing_nested_text_before_comparison() -> None:
     """Persistence must not execute caller-defined text comparison during authorization."""
     _ExecutableText.calls = 0
@@ -85,6 +91,12 @@ def test_rejects_behavior_bearing_field_container_before_comparison() -> None:
         _require(decision)
 
     assert _ExecutableFields.calls == 0
+
+
+def test_rejects_non_text_field_evidence() -> None:
+    """Exact containers still require exact inert text members."""
+    with pytest.raises(EmploymentSeparationPersistenceIntegrityError, match="authorization evidence is invalid"):
+        _require(authorization(authorized_fields=frozenset({1})))
 
 
 def test_rejects_forged_uuid_payload_before_comparison() -> None:
