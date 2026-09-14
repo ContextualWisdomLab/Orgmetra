@@ -9,9 +9,12 @@ from uuid import UUID
 
 from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
-from orgmetra_people_api.authorization import authorize_resource_fields as real_authorize_resource_fields
+from orgmetra_people_api.authorization import (
+    authorize_resource_fields as real_authorize_resource_fields,
+)
 from orgmetra_people_api.employment_history import (
     EmploymentHistoryIntegrityError,
+    EmploymentHistoryReadPort,
     EmploymentHistoryRecord,
     read_employment_history,
 )
@@ -52,6 +55,16 @@ class DynamicLookupTrapPort(FakeEmploymentHistoryPort):
         return super().__getattribute__(name)
 
 
+class ProtocolOnlyPort(EmploymentHistoryReadPort):
+    """Inherit the interface declaration without implementing repository behavior."""
+
+
+class NonFunctionReadPort:
+    """Expose a non-function member under the expected repository capability name."""
+
+    read_employment_history = object()
+
+
 def _record() -> EmploymentHistoryRecord:
     """Build one canonical row before exercising low-level tuple forgery."""
     return EmploymentHistoryRecord(
@@ -77,7 +90,7 @@ def _principal() -> AuthenticatedPrincipal:
     )
 
 
-def _read(*, policy: PurposeBoundAccessPolicy, port: FakeEmploymentHistoryPort) -> None:
+def _read(*, policy: PurposeBoundAccessPolicy, port: object) -> None:
     """Execute the public service through the exact authorization boundary."""
     read_employment_history(
         principal=_principal(),
@@ -153,6 +166,28 @@ class EmploymentHistoryReviewRegressionTests(unittest.TestCase):
             method_patcher.stop()
 
         self.assertEqual(port.calls, 1)
+
+    def test_nonconcrete_repository_capability_is_rejected_before_authorization(self) -> None:
+        policy = PurposeBoundAccessPolicy(
+            tenant_record_id=TENANT,
+            policy_version_code="capability-shape-v1",
+            resource_kind="person_employment_history",
+            purpose_code="employee_profile_review",
+            operation_code="read_record",
+            required_scope_code="orgmetra.people.employment_history.read",
+            permitted_fields=frozenset({"employment_status_code"}),
+        )
+
+        for port in (NonFunctionReadPort(), ProtocolOnlyPort()):
+            with (
+                self.subTest(port_type=type(port).__name__),
+                patch(
+                    "orgmetra_people_api.employment_history.authorize_resource_fields",
+                    side_effect=AssertionError("authorization must not run"),
+                ),
+                self.assertRaisesRegex(TypeError, "statically callable"),
+            ):
+                _read(policy=policy, port=port)
 
     def test_low_level_tuple_shape_drift_is_rejected_before_field_access(self) -> None:
         canonical = _record()
