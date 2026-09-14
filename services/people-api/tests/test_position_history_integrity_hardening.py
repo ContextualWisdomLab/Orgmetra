@@ -10,7 +10,9 @@ from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
 from orgmetra_people_api.auth import AuthenticatedPrincipal
 from orgmetra_people_api.position_history import (
     PositionHistoryIntegrityError,
+    PositionHistoryReadPort,
     PositionHistoryRecord,
+    _authorized_field_value,
     read_position_history,
 )
 
@@ -76,6 +78,10 @@ class DynamicLookupTrapPort:
 
     def read_position_history(self, **_: object) -> tuple[PositionHistoryRecord, ...]:
         return ()
+
+
+class ProtocolDefaultPort(PositionHistoryReadPort):
+    """Concrete subtype that inherits only the protocol placeholder capability."""
 
 
 class MutatingPositionPort:
@@ -151,6 +157,25 @@ class PositionHistoryIntegrityHardeningTests(unittest.TestCase):
                 read_port=port,
             )
         self.assertEqual(port.calls, 0)
+
+    def test_unsupported_field_serializer_guard_fails_closed(self) -> None:
+        with self.assertRaisesRegex(PositionHistoryIntegrityError, "unsupported Position-history field"):
+            _authorized_field_value(_record(), "future_sensitive_field")
+
+    def test_nonconcrete_repository_capabilities_fail_before_authorization(self) -> None:
+        for read_port in (object(), ProtocolDefaultPort()):
+            with self.subTest(read_port_type=type(read_port).__name__):
+                with self.assertRaisesRegex(TypeError, "statically callable read_position_history"):
+                    read_position_history(
+                        principal=_principal(),
+                        tenant_record_id=TENANT,
+                        position_record_id=POSITION,
+                        known_at=KNOWN_AT,
+                        purpose_code="workforce_position_review",
+                        requested_fields=frozenset({"position_status_code"}),
+                        policy=_policy(frozenset({"position_status_code"})),
+                        read_port=read_port,
+                    )
 
     def test_repository_capability_is_captured_without_instance_lookup(self) -> None:
         view = read_position_history(
