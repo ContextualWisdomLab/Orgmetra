@@ -71,6 +71,14 @@ def _require_utc_instant(field_name: str, value: object) -> None:
         raise ValueError(f"{field_name} must be a timezone-aware UTC datetime.")
 
 
+def _require_transactional_connection(connection: object) -> None:
+    """Reject DB capabilities that cannot prove implicit transaction management."""
+    if getattr(connection, "autocommit", None) is not False:
+        raise RuntimeError(
+            "PostgreSQL Employment-history reads require autocommit disabled."
+        )
+
+
 def _db_utc_instant(value: object) -> datetime:
     """Attach built-in UTC only to PostgreSQL's explicit naive UTC projection."""
     if type(value) is not datetime or value.tzinfo is not None:
@@ -121,7 +129,10 @@ class PostgresEmploymentHistoryReadPort(tuple):
     The executable connection factory is validated once and stored in tuple
     payload rather than a writable instance slot. A later attribute mutation
     therefore cannot substitute a different pool, credential, TLS, role, or
-    database endpoint after dependency validation.
+    database endpoint after dependency validation. The returned connection
+    must expose exact ``autocommit is False`` so PostgreSQL starts one implicit
+    transaction before ``SET TRANSACTION``; otherwise the adapter fails before
+    obtaining a cursor.
     """
 
     __slots__ = ()
@@ -156,6 +167,7 @@ class PostgresEmploymentHistoryReadPort(tuple):
 
         connection_factory = cast(PostgresConnectionFactory, tuple.__getitem__(self, 0))
         with connection_factory() as connection:
+            _require_transactional_connection(connection)
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(requested_tenant_id),))
