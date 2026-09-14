@@ -34,10 +34,12 @@ GET /v1/tenants/{tenant_record_id}/people/{person_record_id}/employment-history
 The boundary validates operational UUIDs, exact required query keys, ASCII
 query syntax, a UTC RFC 3339 `known_at` ending in `Z`, lower snake-case purpose
 and fields, and duplicate-field/parameter rejection before authentication. It
-caps the path at 256 characters and the raw query string at 4096 bytes, and it
-bounds query-field parsing to one more than the exact required-key cardinality
-so malformed extra input fails before identity or persistence work. It reuses
-the existing People ASGI JSON transport and bounded authorization-header parser.
+caps the path at 256 characters **before route tokenization** and the raw query
+string at 4096 bytes before query parsing. `parse_qsl` is additionally bounded to
+one more than the exact required-key cardinality. The ordering is part of the
+security contract: an oversized path cannot reach the route helper's
+`strip()`/`split()` decomposition or UUID parsing. The route reuses the existing
+People ASGI JSON transport and bounded authorization-header parser.
 
 The route authenticates exactly one Bearer credential and accepts only an exact
 `AuthenticatedPrincipal`. `AuthenticationFailed` maps to 401. Any other identity-
@@ -63,7 +65,8 @@ and retain the exact 100% statement and branch coverage requirement.
 - Customers receive one stable, read-only Employment-history boundary.
 - Existing Employment-history service ownership remains responsible for
   purpose-bound authorization, bitemporal validation, and persistence access.
-- Caller-controlled route and query work is bounded before authentication.
+- Caller-controlled route and query work is bounded before route/query parser or
+  authentication work.
 - Identity-backend failures and invalid principal objects cannot become uncaught
   ASGI failures or reach protected persistence.
 - Error support references are opaque and safe for customer correlation; the
@@ -80,21 +83,28 @@ and retain the exact 100% statement and branch coverage requirement.
 The original test-only child head `6c2d6b89` failed during collection while the
 HTTP adapter module was absent. That historical test-first chain is retained.
 
-A fresh transport-boundary review found that the Employment-history route had
-not inherited four controls already present on the canonical People HTTP path:
+A transport-boundary review found that the Employment-history route had not
+inherited four controls already present on the canonical People HTTP path:
 bounded path length, bounded query bytes/field parsing, exact principal type,
 and client-safe handling of unexpected identity-backend failure. Test-first
-commit `2bcf5586745b57b19b65a9b9c801497a409c3b66` adds focused regressions for
-those cases. Repair `15cd1ec7680dd059fa926bad88d7a89c0598716f` implements the
-minimum matching boundary controls without widening authorization or persistence
-ownership.
+commit `2bcf5586745b57b19b65a9b9c801497a409c3b66` added focused regressions and
+repair `15cd1ec7680dd059fa926bad88d7a89c0598716f` implemented those boundaries.
+
+A later exact-order review found that the 256-character path check still occurred
+after `_looks_like_employment_history_route()`, so oversized input reached
+`strip()`/`split()` before rejection. Test-only head
+`8a367eb8885807dc21581c55e6a21b10e2ca5799` patches that route helper to fail
+if called for an oversized path; it is RED against the preceding order. Causal
+repair `99c3ec578a57c31f039cab70b6e3a90a4b85623a` moves the length gate ahead of
+route tokenization while retaining the existing 404 behavior for non-string and
+normal-sized nonmatching routes.
 
 Because #155 remains intentionally stacked on #149, the protected Foundation
-pull-request trigger does not provide hosted RED or GREEN evidence for those
-short-lived/current stacked heads. After the owner stack reaches protected
-`develop`, the final exact head must reacquire Foundation, security, CodeQL,
-model-review, and qualifying independent-review evidence. Historical and
-predecessor-head results do not transfer.
+pull-request trigger does not provide hosted RED or GREEN evidence for these
+stacked heads. After the owner stack reaches protected `develop`, the final exact
+head must reacquire Foundation, security, SAST, CodeQL, model-review, and
+qualifying independent-review evidence. Historical and predecessor-head results
+do not transfer.
 
 RFC 3339, OpenAPI 3.2.0, NIST zero-trust authorization guidance, and
 PostgreSQL temporal/read-boundary guidance inform this transport decision. They

@@ -172,7 +172,7 @@ class EmploymentHistoryAsgiApp:
             return
 
         path = scope.get("path")
-        if not isinstance(path, str) or not _looks_like_employment_history_route(path):
+        if not isinstance(path, str):
             await _send_error(
                 send,
                 status=404,
@@ -186,6 +186,14 @@ class EmploymentHistoryAsgiApp:
                 status=400,
                 error_code="invalid_request",
                 message="Use the canonical Employment-history route without oversized path data, then retry.",
+            )
+            return
+        if not _looks_like_employment_history_route(path):
+            await _send_error(
+                send,
+                status=404,
+                error_code="route_not_found",
+                message="Use /v1/tenants/{tenant_record_id}/people/{person_record_id}/employment-history.",
             )
             return
 
