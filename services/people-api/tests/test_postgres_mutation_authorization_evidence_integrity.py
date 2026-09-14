@@ -49,6 +49,30 @@ class _ExecutableText(str):
     __hash__ = str.__hash__
 
 
+class _ExecutableFields(frozenset[str]):
+    """Tripwire for iteration before exact field-container validation."""
+
+    calls = 0
+
+    def __iter__(self):  # type: ignore[override]
+        type(self).calls += 1
+        raise TypeError("authorization field iteration executed before validation")
+
+
+class _ExecutableInt(int):
+    """Tripwire for ordering before exact UUID scalar validation."""
+
+    calls = 0
+
+    def __lt__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise TypeError("authorization UUID ordering executed before validation")
+
+    def __gt__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise TypeError("authorization UUID ordering executed before validation")
+
+
 def _require(decision: AuthorizationDecision) -> AuthorizationDecision:
     return _require_authorization(
         authorization=decision,
@@ -72,6 +96,45 @@ def test_rejects_behavior_bearing_nested_text_before_comparison() -> None:
 
     with pytest.raises(PeopleMutationIntegrityError, match="authorization evidence is invalid"):
         _require(decision)
+
+    assert _ExecutableText.calls == 0
+
+
+def test_rejects_behavior_bearing_field_container_before_iteration() -> None:
+    """Reject a field-set subtype before its iteration behavior can run."""
+    _ExecutableFields.calls = 0
+    decision = _decision(requested_fields=_ExecutableFields(FIELDS))
+
+    with pytest.raises(PeopleMutationIntegrityError, match="authorization evidence is invalid"):
+        _require(decision)
+
+    assert _ExecutableFields.calls == 0
+
+
+def test_rejects_forged_uuid_payload_before_ordering() -> None:
+    """Reject a forged exact UUID payload before ordering behavior can run."""
+    forged = UUID(str(TENANT))
+    object.__setattr__(forged, "int", _ExecutableInt(forged.int))
+    _ExecutableInt.calls = 0
+
+    with pytest.raises(PeopleMutationIntegrityError, match="authorization evidence is invalid"):
+        _require(_decision(tenant_record_id=forged))
+
+    assert _ExecutableInt.calls == 0
+
+
+def test_rejects_behavior_bearing_expected_contract_before_comparison() -> None:
+    """Validate the expected persistence contract before comparing authorization evidence."""
+    _ExecutableText.calls = 0
+
+    with pytest.raises(PeopleMutationIntegrityError, match="authorization contract is invalid"):
+        _require_authorization(
+            authorization=_decision(),
+            tenant_record_id=TENANT,
+            resource_reference=_ExecutableText(RESOURCE),
+            resource_kind="employment_record",
+            requested_fields=FIELDS,
+        )
 
     assert _ExecutableText.calls == 0
 
