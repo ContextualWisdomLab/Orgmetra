@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from inspect import getattr_static
 import re
+from types import FunctionType
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -21,16 +23,37 @@ from orgmetra_people_api.authorization import authorize_resource_fields
 
 _MAX_UUID_INT = (1 << 128) - 1
 _STATUS_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+_SUPPORTED_FIELDS = frozenset(
+    {
+        "effective_from",
+        "effective_to",
+        "job_profile_id",
+        "organization_unit_id",
+        "position_record_version_id",
+        "position_status_code",
+        "recorded_from",
+        "recorded_to",
+    }
+)
 
 
 class PositionHistoryIntegrityError(RuntimeError):
     """Indicate that Position-history persistence violated the authorized contract."""
 
 
-def _validate_operational_uuid(field_name: str, value: object) -> None:
-    """Require an exact UUID that is not an Orgmetra protocol sentinel."""
-    if type(value) is not UUID or value.int in (0, _MAX_UUID_INT):
+def _validate_operational_uuid_scalar(field_name: str, value: object) -> None:
+    """Require an immutable built-in integer inside the operational UUID range."""
+    if type(value) is not int or not 0 < value < _MAX_UUID_INT:
         raise ValueError(f"{field_name} must be an operational UUID.")
+
+
+def _operational_uuid_scalar(field_name: str, value: object) -> int:
+    """Detach an exact UUID into immutable scalar authority without caller behavior."""
+    if type(value) is not UUID:
+        raise ValueError(f"{field_name} must be an operational UUID.")
+    scalar = value.int
+    _validate_operational_uuid_scalar(field_name, scalar)
+    return scalar
 
 
 def _validate_utc_instant(field_name: str, value: object) -> None:
@@ -64,7 +87,7 @@ def _validate_record_values(values: tuple[object, ...]) -> None:
         values[:5],
         strict=True,
     ):
-        _validate_operational_uuid(field_name, value)
+        _validate_operational_uuid_scalar(field_name, value)
     _validate_position_status(values[5])
     effective_from = values[6]
     effective_to = values[7]
@@ -86,9 +109,11 @@ def _validate_record_values(values: tuple[object, ...]) -> None:
 class PositionHistoryRecord(tuple):
     """Structurally immutable Position version returned by the persistence boundary.
 
-    Tuple storage deliberately prevents low-level attribute mutation after the row
-    crosses into the service. ``effective_*`` is business time and ``recorded_*``
-    is the half-open system-recorded interval for the version evidence.
+    Trust-bearing UUID identities are stored as exact built-in integer scalars so
+    a caller or adapter retaining constructor UUID objects cannot rewrite record
+    authority after validation. Public UUID properties reconstruct detached views.
+    ``effective_*`` is business time and ``recorded_*`` is the half-open
+    system-recorded interval for the version evidence.
     """
 
     __slots__ = ()
@@ -108,11 +133,14 @@ class PositionHistoryRecord(tuple):
         recorded_to: datetime | None,
     ) -> PositionHistoryRecord:
         values: tuple[object, ...] = (
-            tenant_record_id,
-            position_record_id,
-            position_record_version_id,
-            organization_unit_id,
-            job_profile_id,
+            _operational_uuid_scalar("tenant_record_id", tenant_record_id),
+            _operational_uuid_scalar("position_record_id", position_record_id),
+            _operational_uuid_scalar(
+                "position_record_version_id",
+                position_record_version_id,
+            ),
+            _operational_uuid_scalar("organization_unit_id", organization_unit_id),
+            _operational_uuid_scalar("job_profile_id", job_profile_id),
             position_status_code,
             effective_from,
             effective_to,
@@ -123,29 +151,54 @@ class PositionHistoryRecord(tuple):
         return tuple.__new__(cls, values)
 
     @property
-    def tenant_record_id(self) -> UUID:
-        """Return the tenant that owns this Position version."""
+    def tenant_record_id_scalar(self) -> int:
+        """Return immutable scalar authority for the owning tenant."""
         return tuple.__getitem__(self, 0)
 
     @property
-    def position_record_id(self) -> UUID:
-        """Return the stable Position anchor identity."""
+    def position_record_id_scalar(self) -> int:
+        """Return immutable scalar authority for the Position anchor."""
         return tuple.__getitem__(self, 1)
 
     @property
-    def position_record_version_id(self) -> UUID:
-        """Return the immutable Position-version identity."""
+    def position_record_version_id_scalar(self) -> int:
+        """Return immutable scalar authority for the Position version."""
         return tuple.__getitem__(self, 2)
 
     @property
-    def organization_unit_id(self) -> UUID:
-        """Return the organization owning the Position anchor."""
+    def organization_unit_id_scalar(self) -> int:
+        """Return immutable scalar authority for the owning organization."""
         return tuple.__getitem__(self, 3)
 
     @property
-    def job_profile_id(self) -> UUID:
-        """Return the Job profile bound to the Position anchor."""
+    def job_profile_id_scalar(self) -> int:
+        """Return immutable scalar authority for the bound Job profile."""
         return tuple.__getitem__(self, 4)
+
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return a detached UUID view of the owning tenant."""
+        return UUID(int=self.tenant_record_id_scalar)
+
+    @property
+    def position_record_id(self) -> UUID:
+        """Return a detached UUID view of the stable Position anchor."""
+        return UUID(int=self.position_record_id_scalar)
+
+    @property
+    def position_record_version_id(self) -> UUID:
+        """Return a detached UUID view of the immutable Position version."""
+        return UUID(int=self.position_record_version_id_scalar)
+
+    @property
+    def organization_unit_id(self) -> UUID:
+        """Return a detached UUID view of the organization owning the Position."""
+        return UUID(int=self.organization_unit_id_scalar)
+
+    @property
+    def job_profile_id(self) -> UUID:
+        """Return a detached UUID view of the Job profile bound to the Position."""
+        return UUID(int=self.job_profile_id_scalar)
 
     @property
     def position_status_code(self) -> str:
@@ -173,7 +226,7 @@ class PositionHistoryRecord(tuple):
         return tuple.__getitem__(self, 9)
 
     def assert_runtime_integrity(self) -> None:
-        """Revalidate a row reconstructed through low-level tuple mechanisms."""
+        """Revalidate scalar-backed state after low-level tuple reconstruction."""
         _validate_record_values(tuple(self))
 
 
@@ -189,6 +242,9 @@ class PositionHistoryReadPort(Protocol):
         known_at: datetime,
     ) -> tuple[PositionHistoryRecord, ...]:
         """Return Position versions visible to persistence at ``known_at``."""
+
+
+_PROTOCOL_READ_CAPABILITY = getattr_static(PositionHistoryReadPort, "read_position_history")
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,8 +269,6 @@ def _instant_text(value: datetime) -> str:
 
 def _authorized_field_value(record: PositionHistoryRecord, field_name: str) -> str | None:
     """Serialize one explicitly supported field without reflective access."""
-    if type(field_name) is not str:
-        raise PositionHistoryIntegrityError("authorization returned an unsupported Position-history field")
     if field_name == "effective_from":
         return record.effective_from.isoformat()
     if field_name == "effective_to":
@@ -234,6 +288,16 @@ def _authorized_field_value(record: PositionHistoryRecord, field_name: str) -> s
     raise PositionHistoryIntegrityError("authorization returned an unsupported Position-history field")
 
 
+def _validate_authorized_fields(authorized_fields: frozenset[str]) -> tuple[str, ...]:
+    """Freeze the supported response schema before protected persistence is read."""
+    for field_name in authorized_fields:
+        if type(field_name) is not str or field_name not in _SUPPORTED_FIELDS:
+            raise PositionHistoryIntegrityError(
+                "authorization returned an unsupported Position-history field"
+            )
+    return tuple(sorted(authorized_fields))
+
+
 def _is_recorded_visible(record: PositionHistoryRecord, known_at: datetime) -> bool:
     """Return whether ``known_at`` lies inside the half-open system interval."""
     return record.recorded_from <= known_at and (
@@ -246,6 +310,23 @@ def _business_intervals_overlap(left: PositionHistoryRecord, right: PositionHist
     return (
         (right.effective_to is None or left.effective_from < right.effective_to)
         and (left.effective_to is None or right.effective_from < left.effective_to)
+    )
+
+
+def _snapshot_persistence_record(record: PositionHistoryRecord) -> PositionHistoryRecord:
+    """Detach and revalidate one persistence row before using trust-bearing values."""
+    record.assert_runtime_integrity()
+    return PositionHistoryRecord(
+        tenant_record_id=record.tenant_record_id,
+        position_record_id=record.position_record_id,
+        position_record_version_id=record.position_record_version_id,
+        organization_unit_id=record.organization_unit_id,
+        job_profile_id=record.job_profile_id,
+        position_status_code=record.position_status_code,
+        effective_from=record.effective_from,
+        effective_to=record.effective_to,
+        recorded_from=record.recorded_from,
+        recorded_to=record.recorded_to,
     )
 
 
@@ -262,20 +343,38 @@ def read_position_history(
 ) -> AuthorizedPositionHistoryView:
     """Authorize, validate, minimize, and return one Position's bitemporal history.
 
-    Authorization happens before protected retrieval. A persistence row from a
-    different tenant or Position, outside the requested system-time view, with a
-    malformed runtime shape, duplicated version identity, or contradictory
-    business-effective truth fails closed before any row is returned.
+    The repository capability and request identities are frozen before the access
+    decision. The same exact repository function is invoked afterward without a
+    second instance lookup, and every returned row is reconstructed from validated
+    scalar-backed evidence before scope, time, uniqueness, overlap, or disclosure
+    decisions are made.
     """
-    _validate_operational_uuid("tenant_record_id", tenant_record_id)
-    _validate_operational_uuid("position_record_id", position_record_id)
+    read_capability = getattr_static(type(read_port), "read_position_history", None)
+    if (
+        type(read_capability) is not FunctionType
+        or read_capability is _PROTOCOL_READ_CAPABILITY
+    ):
+        raise TypeError(
+            "read_port must expose a statically callable read_position_history."
+        )
+
+    tenant_record_id_scalar = _operational_uuid_scalar(
+        "tenant_record_id",
+        tenant_record_id,
+    )
+    position_record_id_scalar = _operational_uuid_scalar(
+        "position_record_id",
+        position_record_id,
+    )
     _validate_utc_instant("known_at", known_at)
 
-    resource_reference = f"position_history:{position_record_id.hex}"
+    resource_reference = (
+        f"position_history:{UUID(int=position_record_id_scalar).hex}"
+    )
     decision = authorize_resource_fields(
         principal=principal,
-        tenant_record_id=tenant_record_id,
-        resource_tenant_record_id=tenant_record_id,
+        tenant_record_id=UUID(int=tenant_record_id_scalar),
+        resource_tenant_record_id=UUID(int=tenant_record_id_scalar),
         resource_reference=resource_reference,
         purpose_code=purpose_code,
         operation_code="read_record",
@@ -283,36 +382,40 @@ def read_position_history(
         requested_fields=requested_fields,
         policy=policy,
     )
+    authorized_fields = _validate_authorized_fields(decision.authorized_fields)
 
-    records = read_port.read_position_history(
-        tenant_record_id=tenant_record_id,
-        position_record_id=position_record_id,
+    records = read_capability(
+        read_port,
+        tenant_record_id=UUID(int=tenant_record_id_scalar),
+        position_record_id=UUID(int=position_record_id_scalar),
         known_at=known_at,
     )
     if type(records) is not tuple:
         raise PositionHistoryIntegrityError("Position-history persistence must return an immutable tuple")
 
-    seen_version_ids: set[UUID] = set()
+    seen_version_ids: set[int] = set()
     verified: list[PositionHistoryRecord] = []
     for record in records:
         if type(record) is not PositionHistoryRecord:
             raise PositionHistoryIntegrityError("Position-history persistence returned an unsupported row type")
         try:
-            record.assert_runtime_integrity()
+            trusted_record = _snapshot_persistence_record(record)
         except ValueError as exc:
             raise PositionHistoryIntegrityError("Position-history row failed runtime integrity") from exc
-        if record.tenant_record_id != tenant_record_id or record.position_record_id != position_record_id:
+        if (
+            trusted_record.tenant_record_id_scalar != tenant_record_id_scalar
+            or trusted_record.position_record_id_scalar != position_record_id_scalar
+        ):
             raise PositionHistoryIntegrityError("Position-history row does not match the authorized target")
-        if not _is_recorded_visible(record, known_at):
+        if not _is_recorded_visible(trusted_record, known_at):
             raise PositionHistoryIntegrityError("Position-history row is not visible at the requested knowledge cutoff")
-        if record.position_record_version_id in seen_version_ids:
+        if trusted_record.position_record_version_id_scalar in seen_version_ids:
             raise PositionHistoryIntegrityError("duplicate visible Position version")
-        if any(_business_intervals_overlap(record, existing) for existing in verified):
+        if any(_business_intervals_overlap(trusted_record, existing) for existing in verified):
             raise PositionHistoryIntegrityError("overlapping visible Position truth")
-        seen_version_ids.add(record.position_record_version_id)
-        verified.append(record)
+        seen_version_ids.add(trusted_record.position_record_version_id_scalar)
+        verified.append(trusted_record)
 
-    authorized_fields = tuple(sorted(decision.authorized_fields))
     entries = tuple(
         AuthorizedPositionHistoryEntry(
             field_values=tuple(
@@ -322,7 +425,7 @@ def read_position_history(
         )
         for record in sorted(
             verified,
-            key=lambda item: (item.effective_from, item.position_record_version_id.int),
+            key=lambda item: (item.effective_from, item.position_record_version_id_scalar),
         )
     )
     return AuthorizedPositionHistoryView(
