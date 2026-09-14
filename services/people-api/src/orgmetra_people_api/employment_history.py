@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections import namedtuple
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from inspect import getattr_static
+from types import FunctionType
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -201,6 +203,12 @@ class EmploymentHistoryReadPort(Protocol):
         """Return Employment rows visible to persistence at ``known_at``."""
 
 
+_PROTOCOL_READ_CAPABILITY = getattr_static(
+    EmploymentHistoryReadPort,
+    "read_employment_history",
+)
+
+
 @dataclass(frozen=True, slots=True)
 class AuthorizedEmploymentHistoryEntry:
     """One Employment version containing only explicitly authorized fields."""
@@ -329,13 +337,28 @@ def read_employment_history(
 ) -> AuthorizedEmploymentHistoryView:
     """Authorize then return bitemporal Employment history for one Person.
 
-    A denied purpose, scope, target, or field request causes zero protected reads.
-    Request UUIDs are detached to immutable scalars before authorization or the
-    untrusted persistence call. After retrieval, every row is reconstructed and
-    must still match those authorized tenant/person scalars and the requested
-    system-time view. Duplicate version identities and overlapping business-time
-    truth for one Employment fail closed instead of being guessed.
+    A concrete repository function is captured inertly before authorization and
+    the same exact function is invoked afterward, so caller-controlled instance or
+    class lookup cannot substitute a different executable capability after the
+    access decision. Request UUIDs are detached to immutable scalars before
+    authorization or the untrusted persistence call. After retrieval, every row is
+    reconstructed and must still match those authorized tenant/person scalars and
+    the requested system-time view. Duplicate version identities and overlapping
+    business-time truth for one Employment fail closed instead of being guessed.
     """
+    read_capability = getattr_static(
+        type(read_port),
+        "read_employment_history",
+        None,
+    )
+    if (
+        type(read_capability) is not FunctionType
+        or read_capability is _PROTOCOL_READ_CAPABILITY
+    ):
+        raise TypeError(
+            "read_port must expose a statically callable read_employment_history."
+        )
+
     tenant_record_id_scalar = _operational_uuid_scalar(
         "tenant_record_id",
         tenant_record_id,
@@ -362,7 +385,8 @@ def read_employment_history(
     )
     authorized_fields = _validate_authorized_fields(decision.authorized_fields)
 
-    records = read_port.read_employment_history(
+    records = read_capability(
+        read_port,
         tenant_record_id=UUID(int=tenant_record_id_scalar),
         person_record_id=UUID(int=person_record_id_scalar),
         known_at=known_at,
