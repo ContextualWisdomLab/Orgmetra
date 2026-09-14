@@ -42,7 +42,11 @@ and fields, and duplicate-field/parameter rejection before authentication. Path
 input is capped at 256 characters **before route tokenization**, and raw query
 input is capped at 4096 bytes before `parse_qsl`; `parse_qsl` also receives a
 bounded field count. The ordering is part of the security contract: an oversized
-path must not reach `strip()`/`split()` route decomposition or UUID parsing. The
+path must not reach `strip()`/`split()` route decomposition or UUID parsing. Raw
+ASGI path/query scalars must also be exact built-in `str`/`bytes`, not subclasses:
+a caller-defined subtype can override `__len__`, `strip`, or `decode`, so accepting
+it would execute untrusted Python behavior before authentication. Non-exact path
+and query scalars therefore fail closed before any of those operations. The
 boundary reuses the existing People ASGI JSON transport and authorization-header
 parser, authenticates exactly one Bearer credential, requires the exact
 `AuthenticatedPrincipal` runtime type, then delegates to `read_position_history()`.
@@ -89,8 +93,8 @@ must not be treated as evidence for a later exact head.
 - Existing Position-history service and PostgreSQL ownership boundaries remain
   the only owners of authorization, bitemporal validation, and persistence.
 - Oversized transport input is rejected before route/query parser work or
-  authentication, and an invalid principal or failed identity backend cannot
-  reach protected persistence.
+  authentication, and executable path/query scalar subtypes are rejected before
+  their overridden behavior can run.
 - Identity and persistence backend 500 responses remain schema-valid and correlate
   to the exact non-secret support reference recorded by the server.
 - Synchronous Position-history/PostgreSQL work is isolated from the ASGI event
@@ -136,7 +140,16 @@ non-secret ERROR record whose support reference equals the opaque 500 response.
 The predecessor only called generic `_send_error(...)`, losing the backend
 exception class at server side. Causal repair
 `411ba41631a2f31fa80aaadcb3f15d22aa8c26fe` adds the dedicated persistence
-backend error path. Traceability is current through `ae03931ef7858eafaa3c8c0e626d1b392af9a7ea`.
+backend error path.
+
+Fresh trust-boundary review then found that `isinstance(path, str)` and
+`isinstance(raw_query, bytes)` accepted subclasses whose overridden `__len__`,
+`strip`, or `decode` methods could execute before authentication. Test-only
+`d64f4b09ed24d224a3e1eee168791caa75856733` introduces trapping `str`/`bytes`
+subclasses and requires both to fail closed before subclass behavior or identity
+work. Causal repair `d48927a99979305153a04fb4545994f6bb57c77e`
+changes those ingress checks to exact built-in type checks while preserving the
+existing 404 path and 400 query response semantics.
 
 These stacked heads have no protected-base PR-triggered Foundation run because the
 PR targets #153 rather than `develop`; no hosted RED or GREEN is inferred from that
