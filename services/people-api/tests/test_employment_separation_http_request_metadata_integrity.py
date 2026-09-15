@@ -32,6 +32,22 @@ class _ExecutableString(str):
         raise TypeError("string inequality executed before exact scalar validation")
 
 
+class _ExecutableScopeKey(str):
+    """Tripwire for keyed lookup before exact ASGI key validation."""
+
+    calls = 0
+
+    __hash__ = str.__hash__
+
+    def __eq__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise TypeError("scope key equality executed before exact key validation")
+
+    def __ne__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise TypeError("scope key inequality executed before exact key validation")
+
+
 class EmploymentSeparationHttpRequestMetadataIntegrityTests(unittest.IsolatedAsyncioTestCase):
     """Require inert outer ASGI metadata before separation routing behavior executes."""
 
@@ -50,6 +66,27 @@ class EmploymentSeparationHttpRequestMetadataIntegrityTests(unittest.IsolatedAsy
         with self.assertRaisesRegex(ValueError, "exact ASGI scope"):
             await app(scope, receive, send)
         self.assertEqual(_ExecutableScope.calls, 0)
+
+    async def test_scope_key_subclass_is_rejected_before_lookup_equality_executes(self) -> None:
+        """A colliding scope key must fail before dict lookup can execute its equality hook."""
+        app = object.__new__(EmploymentSeparationAsgiApp)
+        executable_key = _ExecutableScopeKey("type")
+        scope: dict[object, object] = {
+            executable_key: "http",
+            "method": "POST",
+            "path": ROUTE,
+        }
+        _ExecutableScopeKey.calls = 0
+
+        async def receive() -> dict[str, object]:
+            raise AssertionError("body must not be read")
+
+        async def send(message: dict[str, object]) -> None:
+            raise AssertionError(f"response must not be sent: {message}")
+
+        with self.assertRaisesRegex(ValueError, "exact string keys"):
+            await app(scope, receive, send)  # type: ignore[arg-type]
+        self.assertEqual(_ExecutableScopeKey.calls, 0)
 
     async def test_method_subclass_is_rejected_before_equality_executes(self) -> None:
         """A method subtype must route to 405 without caller-defined equality behavior."""
