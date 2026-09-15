@@ -105,11 +105,15 @@ test("fails closed when the k6 client is routed through an ambient proxy", () =>
 });
 
 test("fails closed when resolved k6 options disable TLS certificate verification", () => {
-  assert.equal(requireVerifiedTlsTransport(false), false);
-  assert.throws(
-    () => requireVerifiedTlsTransport(true),
-    /TLS certificate verification must remain enabled/,
-  );
+  for (const safeDefault of [false, null, undefined]) {
+    assert.equal(requireVerifiedTlsTransport(safeDefault), false);
+  }
+  for (const unsafe of [true, "true", 1]) {
+    assert.throws(
+      () => requireVerifiedTlsTransport(unsafe),
+      /TLS certificate verification must remain enabled/,
+    );
+  }
 });
 
 test("uses exact scheduled completion rather than a zero-sample dropped-iteration threshold", () => {
