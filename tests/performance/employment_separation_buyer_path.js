@@ -14,6 +14,7 @@ import {
   validatePerformanceFixture,
 } from "./employment_separation_fixture_contract.mjs";
 import { requirePinnedK6Runtime } from "./employment_separation_k6_runtime_contract.mjs";
+import { normalizeEmploymentSeparationK6V2Summary } from "./employment_separation_k6_v2_summary_contract.mjs";
 import {
   isGovernedSeparationConflict,
   isGovernedSeparationSuccess,
@@ -32,6 +33,12 @@ import { buyerPathElapsedMs } from "./employment_separation_timing_contract.mjs"
 const ROUTE = "/v1/employment-separations";
 const MINIMUM_NON_CONTENDING_RECORDS = 1000;
 const MINIMUM_CONTENTION_PAIRS = 100;
+const TREND_BY_PROFILE = Object.freeze({
+  first_commit: "employment_separation_first_commit_duration_ms",
+  replay: "employment_separation_replay_duration_ms",
+  rejection: "employment_separation_rejection_duration_ms",
+  contention: "employment_separation_contention_duration_ms",
+});
 const fixturePath = __ENV.ORGMETRA_PERFORMANCE_DATA_FILE;
 const baseUrl = (__ENV.ORGMETRA_PERFORMANCE_BASE_URL || "").replace(/\/$/, "");
 const bearerToken = __ENV.ORGMETRA_PERFORMANCE_BEARER_TOKEN || "";
@@ -131,7 +138,11 @@ export function contention() {
 }
 
 export function handleSummary(data) {
-  const completedIterations = data.metrics?.iterations?.values?.count ?? null;
+  const normalizedK6 = normalizeEmploymentSeparationK6V2Summary(data, {
+    expectedK6Version: k6Runtime.version,
+    trendName: TREND_BY_PROFILE[selectedProfile],
+  });
+  const completedIterations = normalizedK6.metrics.iterations.values.count;
   const payload = {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
     candidate_sha: targetSha,
@@ -154,7 +165,7 @@ export function handleSummary(data) {
     profile_preconditions: fixture.profile_preconditions,
     minimum_non_contending_records: MINIMUM_NON_CONTENDING_RECORDS,
     minimum_contention_pairs: MINIMUM_CONTENTION_PAIRS,
-    k6: data,
+    k6: normalizedK6,
   };
   const rendered = `${JSON.stringify(payload, null, 2)}\n`;
   const path = __ENV.ORGMETRA_PERFORMANCE_SUMMARY_FILE || `employment-separation-performance-${selectedProfile}.json`;
