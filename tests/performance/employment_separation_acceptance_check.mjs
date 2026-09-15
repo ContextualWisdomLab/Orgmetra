@@ -21,12 +21,15 @@ async function main() {
     readFile(fixturePath),
   ]);
   const runtimeDocument = parseRuntimeEvidenceArtifact(runtimeBytes);
-  const k6Evidence = validatePinnedK6AcceptanceEvidence(resultBytes, runtimeDocument.parsed);
   const evidenceContract = validateEmploymentSeparationAcceptance(
     resultBytes,
     runtimeDocument.parsed,
     fixtureBytes,
   );
+  // Structural validation owns the bounded/strict result parser. Run it before
+  // this secondary pinned-runtime interpretation so duplicate members, nesting
+  // abuse, and oversized result artifacts cannot reach ordinary JSON.parse first.
+  const k6Evidence = validatePinnedK6AcceptanceEvidence(resultBytes, runtimeDocument.parsed);
   process.stdout.write(`${JSON.stringify({
     ...evidenceContract,
     ...k6Evidence,
