@@ -104,3 +104,27 @@ test("rejects an impossible runtime observation calendar date instead of accepti
     /runtime.observed_at must be an RFC 3339 UTC timestamp/,
   );
 });
+
+test("rejects a sub-millisecond runtime observation that precedes completion", () => {
+  const performance = performanceResult();
+  performance.completed_at = "2026-09-13T04:10:00.0009Z";
+  const artifact = render(performance);
+  const runtime = runtimeEvidence(artifact);
+  runtime.observed_at = "2026-09-13T04:10:00.0001Z";
+
+  assert.throws(
+    () => validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES),
+    /runtime.observed_at must not precede result.completed_at/,
+  );
+});
+
+test("accepts equivalent fractional instants with trailing-zero spelling differences", () => {
+  const performance = performanceResult();
+  performance.completed_at = "2026-09-13T04:10:00.100Z";
+  const artifact = render(performance);
+  const runtime = runtimeEvidence(artifact);
+  runtime.observed_at = "2026-09-13T04:10:00.1000Z";
+
+  const evidence = validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES);
+  assert.equal(evidence.structurally_valid, true);
+});
