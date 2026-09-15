@@ -290,6 +290,9 @@ function parseAndValidateFixture(fixtureArtifact, result, validatedResult) {
   if (fixture.candidate_sha.toLowerCase() !== validatedResult.candidateSha) {
     fail("fixture.candidate_sha must match result.candidate_sha");
   }
+  if (compareUtcTimestamps(fixture.prepared_at, validatedResult.completedAt) > 0) {
+    fail("fixture.prepared_at must not follow result.completed_at");
+  }
   for (const field of [
     "dataset_id",
     "clearance_reference",
