@@ -14,8 +14,10 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from hashlib import sha256
+from inspect import getattr_static
 import json
 import re
+from types import FunctionType
 from typing import Protocol, runtime_checkable
 from uuid import UUID, uuid5
 
@@ -593,11 +595,19 @@ def idempotency_record_id(
     )
 
 
-def _require_port(mutation_port: object) -> PeopleMutationPort:
-    """Reject objects that do not implement the People mutation port."""
-    if not isinstance(mutation_port, PeopleMutationPort):
-        raise TypeError("mutation_port must implement PeopleMutationPort")
-    return mutation_port
+def _require_port_operation(mutation_port: object, operation_name: str) -> FunctionType:
+    """Bind one ordinary class-defined mutation function without executing descriptors."""
+    operation = getattr_static(type(mutation_port), operation_name, None)
+    if type(operation) is not FunctionType:
+        raise TypeError(
+            f"mutation_port must provide {operation_name} as an ordinary instance method"
+        )
+    protocol_operation = getattr_static(PeopleMutationPort, operation_name)
+    if operation is protocol_operation:
+        raise TypeError(
+            f"mutation_port must provide {operation_name} as an ordinary instance method"
+        )
+    return operation
 
 
 def _authorize_mutation(
@@ -693,7 +703,7 @@ def create_employment_record(
     """Authorize and persist one governed Employment record/version."""
     if type(command) is not EmploymentMutationCommand:
         raise TypeError("command must be an EmploymentMutationCommand")
-    port = _require_port(mutation_port)
+    operation = _require_port_operation(mutation_port, "create_employment")
     semantic_command = _snapshot_employment_command(command)
     expected_identity = _clone_uuid(
         "employment_record_id", semantic_command.employment_record_id
@@ -713,7 +723,8 @@ def create_employment_record(
         authorization=authorization_for_port,
     )
     result = _snapshot_employment_result(
-        port.create_employment(
+        operation(
+            mutation_port,
             command=semantic_command,
             authorization=authorization_for_port,
         )
@@ -739,7 +750,7 @@ def create_position_record(
     """Authorize and persist one governed Position record/version."""
     if type(command) is not PositionMutationCommand:
         raise TypeError("command must be a PositionMutationCommand")
-    port = _require_port(mutation_port)
+    operation = _require_port_operation(mutation_port, "create_position")
     semantic_command = _snapshot_position_command(command)
     expected_identity = _clone_uuid("position_record_id", semantic_command.position_record_id)
     authorization = _authorize_mutation(
@@ -757,7 +768,8 @@ def create_position_record(
         authorization=authorization_for_port,
     )
     result = _snapshot_position_result(
-        port.create_position(
+        operation(
+            mutation_port,
             command=semantic_command,
             authorization=authorization_for_port,
         )
@@ -783,7 +795,7 @@ def create_assignment_record(
     """Authorize and persist one governed Assignment record."""
     if type(command) is not AssignmentMutationCommand:
         raise TypeError("command must be an AssignmentMutationCommand")
-    port = _require_port(mutation_port)
+    operation = _require_port_operation(mutation_port, "create_assignment")
     semantic_command = _snapshot_assignment_command(command)
     expected_identity = _clone_uuid(
         "assignment_record_id", semantic_command.assignment_record_id
@@ -803,7 +815,8 @@ def create_assignment_record(
         authorization=authorization_for_port,
     )
     result = _snapshot_assignment_result(
-        port.create_assignment(
+        operation(
+            mutation_port,
             command=semantic_command,
             authorization=authorization_for_port,
         )
