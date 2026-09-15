@@ -66,6 +66,15 @@ test("accepts a right-cleared fixture with explicit prepared-state provenance", 
   assert.equal(validatePerformanceFixture(value, smallAcceptance), value);
 });
 
+test("rejects an impossible fixture preparation calendar timestamp", () => {
+  const value = fixture();
+  value.prepared_at = "2026-02-30T02:00:00Z";
+  assert.throws(
+    () => validatePerformanceFixture(value, smallAcceptance),
+    /fixture.prepared_at must be an RFC 3339 UTC timestamp/,
+  );
+});
+
 test("rejects synthetic or uncleared commercial fixtures", () => {
   const synthetic = fixture();
   synthetic.synthetic = true;
