@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
+from inspect import getattr_static
 import re
+from types import FunctionType
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -215,11 +217,15 @@ class EmploymentSeparationPort(Protocol):
         """Return the first committed terminal Employment version or its replay."""
 
 
-def _require_port(separation_port: object) -> EmploymentSeparationPort:
-    """Reject dependencies that do not expose the governed separation operation."""
-    if not isinstance(separation_port, EmploymentSeparationPort):
-        raise TypeError("separation_port must implement EmploymentSeparationPort")
-    return separation_port
+def _require_port(separation_port: object) -> FunctionType:
+    """Bind one ordinary class-defined persistence function without executing descriptors."""
+    operation = getattr_static(type(separation_port), "separate_employment", None)
+    if type(operation) is not FunctionType:
+        raise TypeError("separation_port must provide separate_employment as an ordinary instance method")
+    protocol_operation = getattr_static(EmploymentSeparationPort, "separate_employment")
+    if operation is protocol_operation:
+        raise TypeError("separation_port must provide separate_employment as an ordinary instance method")
+    return operation
 
 
 def separate_employment_record(
@@ -240,7 +246,7 @@ def separate_employment_record(
 
     detached_command = replace(command)
     expected_employment_record_id = UUID(int=detached_command.employment_record_id.int)
-    port = _require_port(separation_port)
+    separation_operation = _require_port(separation_port)
     authorization = authorize_resource_fields(
         principal=principal,
         tenant_record_id=detached_command.tenant_record_id,
@@ -252,7 +258,8 @@ def separate_employment_record(
         requested_fields=_EMPLOYMENT_FIELDS,
         policy=policy,
     )
-    result = port.separate_employment(
+    result = separation_operation(
+        separation_port,
         command=replace(detached_command),
         authorization=authorization,
     )
