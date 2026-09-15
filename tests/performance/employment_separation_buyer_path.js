@@ -14,7 +14,7 @@ import {
   validatePerformanceFixture,
 } from "./employment_separation_fixture_contract.mjs";
 import { requirePinnedK6Runtime } from "./employment_separation_k6_runtime_contract.mjs";
-import { normalizeEmploymentSeparationK6V2Summary } from "./employment_separation_k6_v2_summary_contract.mjs";
+import { normalizeEmploymentSeparationK6Summary } from "./employment_separation_k6_summary_contract.mjs";
 import {
   isGovernedSeparationConflict,
   isGovernedSeparationSuccess,
@@ -138,7 +138,7 @@ export function contention() {
 }
 
 export function handleSummary(data) {
-  const normalizedK6 = normalizeEmploymentSeparationK6V2Summary(data, {
+  const normalizedK6 = normalizeEmploymentSeparationK6Summary(data, {
     expectedK6Version: k6Runtime.version,
     trendName: TREND_BY_PROFILE[selectedProfile],
   });
