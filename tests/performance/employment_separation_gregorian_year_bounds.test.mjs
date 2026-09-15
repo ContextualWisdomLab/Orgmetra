@@ -21,6 +21,29 @@ test("accepts the earliest People business date without ECMAScript year normaliz
   assert.doesNotThrow(() => validatePerformanceFixture(value, smallAcceptance));
 });
 
+test("accepts the latest People business date in the four-digit contract", () => {
+  const value = smallFixture();
+  value.profiles.first_commit[0].payload.separation_effective_on = "9999-12-31";
+  assert.doesNotThrow(() => validatePerformanceFixture(value, smallAcceptance));
+});
+
+test("rejects year zero in People business dates", () => {
+  const value = smallFixture();
+  value.profiles.first_commit[0].payload.separation_effective_on = "0000-01-01";
+  assert.throws(
+    () => validatePerformanceFixture(value, smallAcceptance),
+    /separation_effective_on must be an RFC 3339 full-date/,
+  );
+});
+
+test("accepts the governed UTC timestamp year boundaries", () => {
+  for (const preparedAt of ["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999Z"]) {
+    const value = smallFixture();
+    value.prepared_at = preparedAt;
+    assert.doesNotThrow(() => validatePerformanceFixture(value, smallAcceptance));
+  }
+});
+
 test("rejects year zero in governed UTC evidence timestamps", () => {
   const value = smallFixture();
   value.prepared_at = "0000-01-01T00:00:00Z";
