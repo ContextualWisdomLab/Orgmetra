@@ -600,12 +600,12 @@ def _require_port_operation(mutation_port: object, operation_name: str) -> Funct
     operation = getattr_static(type(mutation_port), operation_name, None)
     if type(operation) is not FunctionType:
         raise TypeError(
-            f"mutation_port must provide {operation_name} as an ordinary instance method"
+            f"mutation_port must implement PeopleMutationPort and provide {operation_name} as an ordinary instance method"
         )
     protocol_operation = getattr_static(PeopleMutationPort, operation_name)
     if operation is protocol_operation:
         raise TypeError(
-            f"mutation_port must provide {operation_name} as an ordinary instance method"
+            f"mutation_port must implement PeopleMutationPort and provide {operation_name} as an ordinary instance method"
         )
     return operation
 
