@@ -35,7 +35,15 @@ class _ExecutableUUIDPayload:
         self.calls += 1
         raise TypeError("UUID payload ordering executed before exact integer validation")
 
+    def __le__(self, other: object) -> bool:
+        self.calls += 1
+        raise TypeError("UUID payload ordering executed before exact integer validation")
+
     def __gt__(self, other: object) -> bool:
+        self.calls += 1
+        raise TypeError("UUID payload ordering executed before exact integer validation")
+
+    def __ge__(self, other: object) -> bool:
         self.calls += 1
         raise TypeError("UUID payload ordering executed before exact integer validation")
 

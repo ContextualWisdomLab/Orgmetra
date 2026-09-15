@@ -68,7 +68,15 @@ class _ExecutableInt(int):
         type(self).calls += 1
         raise TypeError("authorization UUID ordering executed before validation")
 
+    def __le__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise TypeError("authorization UUID ordering executed before validation")
+
     def __gt__(self, other: object) -> bool:
+        type(self).calls += 1
+        raise TypeError("authorization UUID ordering executed before validation")
+
+    def __ge__(self, other: object) -> bool:
         type(self).calls += 1
         raise TypeError("authorization UUID ordering executed before validation")
 
