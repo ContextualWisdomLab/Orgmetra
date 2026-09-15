@@ -306,6 +306,10 @@ class _MutationResultReceipt(tuple):
         """Keep result-type identity distinct even though storage is tuple-backed."""
         return type(self) is type(other) and tuple.__eq__(self, other)
 
+    def __ne__(self, other: object) -> bool:
+        """Keep inequality symmetric with exact-type receipt equality."""
+        return not self.__eq__(other)
+
     def __hash__(self) -> int:
         """Hash the immutable receipt payload consistently with exact-type equality."""
         return hash((type(self), tuple.__hash__(self)))
