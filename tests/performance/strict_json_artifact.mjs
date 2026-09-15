@@ -1,3 +1,5 @@
+const MAX_JSON_NESTING_DEPTH = 64;
+
 function invalidJson(label, cause) {
   if (cause === undefined) return new Error(`${label} must be valid JSON`);
   return new Error(`${label} must be valid JSON`, { cause });
@@ -50,11 +52,11 @@ function scanPrimitive(text, start, label) {
   return index;
 }
 
-function scanArray(text, start, label) {
+function scanArray(text, start, label, depth) {
   let index = skipWhitespace(text, start + 1);
   if (text[index] === "]") return index + 1;
   while (index < text.length) {
-    index = scanValue(text, index, label);
+    index = scanValue(text, index, label, depth);
     index = skipWhitespace(text, index);
     if (text[index] === "]") return index + 1;
     if (text[index] !== ",") throw invalidJson(label);
@@ -63,7 +65,7 @@ function scanArray(text, start, label) {
   throw invalidJson(label);
 }
 
-function scanObject(text, start, label) {
+function scanObject(text, start, label, depth) {
   const names = new Set();
   let index = skipWhitespace(text, start + 1);
   if (text[index] === "}") return index + 1;
@@ -75,7 +77,7 @@ function scanObject(text, start, label) {
     names.add(member.value);
     index = skipWhitespace(text, member.end);
     if (text[index] !== ":") throw invalidJson(label);
-    index = scanValue(text, skipWhitespace(text, index + 1), label);
+    index = scanValue(text, skipWhitespace(text, index + 1), label, depth);
     index = skipWhitespace(text, index);
     if (text[index] === "}") return index + 1;
     if (text[index] !== ",") throw invalidJson(label);
@@ -84,18 +86,23 @@ function scanObject(text, start, label) {
   throw invalidJson(label);
 }
 
-function scanValue(text, start, label) {
+function scanValue(text, start, label, depth) {
   const index = skipWhitespace(text, start);
   if (index >= text.length) throw invalidJson(label);
-  if (text[index] === "{") return scanObject(text, index, label);
-  if (text[index] === "[") return scanArray(text, index, label);
+  if (text[index] === "{" || text[index] === "[") {
+    if (depth >= MAX_JSON_NESTING_DEPTH) {
+      throw new Error(`${label} exceeds maximum JSON nesting depth ${MAX_JSON_NESTING_DEPTH}`);
+    }
+    if (text[index] === "{") return scanObject(text, index, label, depth + 1);
+    return scanArray(text, index, label, depth + 1);
+  }
   if (text[index] === '"') return scanString(text, index, label).end;
   return scanPrimitive(text, index, label);
 }
 
 export function parseStrictJsonText(text, label) {
   if (typeof text !== "string") throw new TypeError(`${label} must be JSON text`);
-  const end = skipWhitespace(text, scanValue(text, 0, label));
+  const end = skipWhitespace(text, scanValue(text, 0, label, 0));
   if (end !== text.length) throw invalidJson(label);
   try {
     return JSON.parse(text);
