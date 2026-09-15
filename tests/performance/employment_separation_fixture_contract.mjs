@@ -63,16 +63,18 @@ function requireNamespacedReference(value, label) {
   return text;
 }
 
+function daysInGregorianMonth(year, month) {
+  if (year < 1 || year > 9999 || month < 1 || month > 12) return 0;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  return [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+}
+
 function requireFullDate(value, label) {
   const text = requireString(value, label);
   if (!DATE_PATTERN.test(text)) fail(`${label} must be an RFC 3339 full-date`);
   const [year, month, day] = text.split("-").map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year
-    || parsed.getUTCMonth() !== month - 1
-    || parsed.getUTCDate() !== day
-  ) fail(`${label} must be an RFC 3339 full-date`);
+  const maximumDay = daysInGregorianMonth(year, month);
+  if (maximumDay === 0 || day < 1 || day > maximumDay) fail(`${label} must be an RFC 3339 full-date`);
   return text;
 }
 
@@ -85,13 +87,11 @@ function requireUtcTimestamp(value, label) {
   const hour = Number(text.slice(11, 13));
   const minute = Number(text.slice(14, 16));
   const second = Number(text.slice(17, 19));
-  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const maximumDay = daysInGregorianMonth(year, month);
   if (
-    month < 1
-    || month > 12
+    maximumDay === 0
     || day < 1
-    || day > daysInMonth[month - 1]
+    || day > maximumDay
     || hour > 23
     || minute > 59
     || second > 59
