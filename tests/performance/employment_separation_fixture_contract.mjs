@@ -1,6 +1,7 @@
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACTOR_PATTERN = /^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const BODY_KEYS = Object.freeze([
@@ -70,6 +71,29 @@ function requireFullDate(value, label) {
     || parsed.getUTCMonth() !== month - 1
     || parsed.getUTCDate() !== day
   ) fail(`${label} must be an RFC 3339 full-date`);
+  return text;
+}
+
+function requireUtcTimestamp(value, label) {
+  const text = requireString(value, label);
+  if (!UTC_TIMESTAMP_PATTERN.test(text)) fail(`${label} must be an RFC 3339 UTC timestamp`);
+  const year = Number(text.slice(0, 4));
+  const month = Number(text.slice(5, 7));
+  const day = Number(text.slice(8, 10));
+  const hour = Number(text.slice(11, 13));
+  const minute = Number(text.slice(14, 16));
+  const second = Number(text.slice(17, 19));
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (
+    month < 1
+    || month > 12
+    || day < 1
+    || day > daysInMonth[month - 1]
+    || hour > 23
+    || minute > 59
+    || second > 59
+  ) fail(`${label} must be an RFC 3339 UTC timestamp`);
   return text;
 }
 
@@ -161,10 +185,7 @@ export function validatePerformanceFixture(
   requireNamespacedReference(fixture.preparation_protocol_reference, "fixture.preparation_protocol_reference");
   requireNamespacedReference(fixture.prepared_state_evidence_reference, "fixture.prepared_state_evidence_reference");
   requireNamespacedReference(fixture.resource_evidence_reference, "fixture.resource_evidence_reference");
-  const preparedAt = requireString(fixture.prepared_at, "fixture.prepared_at");
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(preparedAt) || Number.isNaN(Date.parse(preparedAt))) {
-    fail("fixture.prepared_at must be an RFC 3339 UTC timestamp");
-  }
+  requireUtcTimestamp(fixture.prepared_at, "fixture.prepared_at");
   const candidateSha = requireString(fixture.candidate_sha, "fixture.candidate_sha").toLowerCase();
   if (!SHA_PATTERN.test(candidateSha)) fail("fixture.candidate_sha must be a full Git commit SHA");
 
