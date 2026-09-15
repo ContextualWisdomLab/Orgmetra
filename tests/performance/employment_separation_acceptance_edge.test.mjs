@@ -51,8 +51,8 @@ function result(profile = "first_commit") {
     k6: {
       metrics: {
         iterations: { values: { count: iterations } },
-        checks: { values: { rate: 1 } },
-        employment_separation_unexpected_response: { values: { rate: 0 } },
+        checks: { values: { rate: 1, passes: iterations, fails: 0 } },
+        employment_separation_unexpected_response: { values: { rate: 0, passes: 0, fails: iterations } },
         employment_separation_latency_samples: { values: { count: latencySamples } },
         [TREND_BY_PROFILE[profile]]: { values: trend },
       },
