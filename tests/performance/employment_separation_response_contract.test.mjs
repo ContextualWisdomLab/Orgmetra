@@ -127,6 +127,21 @@ test("accepts only one governed JSON response media type", () => {
   assert.equal(hasGovernedSeparationJsonMediaType({ "Content-Type": ["application/json"] }), false);
 });
 
+test("rejects k6-collapsed duplicate Content-Type values without rejecting quoted parameter commas", () => {
+  assert.equal(
+    hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json; charset=utf-8, text/plain" }),
+    false,
+  );
+  assert.equal(
+    hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json; profile=\"a,b\"" }),
+    true,
+  );
+  assert.equal(
+    hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json; profile=\"unterminated, text/plain" }),
+    false,
+  );
+});
+
 test("accepts only the published closed ErrorResponse shape for separation conflicts", () => {
   assert.equal(isGovernedSeparationConflict(409, conflictBody()), true);
   assert.equal(isGovernedSeparationConflict(409, { error: "separation_conflict" }), false);
