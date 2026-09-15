@@ -7,6 +7,7 @@ readonly PINNED_K6_IMAGE_DIGEST="sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2a
 readonly PINNED_K6_RUNNER_IDENTITY="${PINNED_K6_IMAGE}@${PINNED_K6_IMAGE_DIGEST}"
 readonly PINNED_K6_CONTAINER_UID="12345"
 readonly PINNED_K6_CONTAINER_GID="12345"
+readonly MAXIMUM_FIXTURE_ARTIFACT_BYTES="8388608"
 readonly WORKLOAD="/workspace/tests/performance/employment_separation_buyer_path.js"
 
 if (( $# != 0 )); then
@@ -28,6 +29,19 @@ fi
 repository_status="$(git -C "${repo_root}" status --porcelain=v1 --untracked-files=all)"
 if [[ -n "${repository_status}" ]]; then
   printf 'commercial performance evidence requires an exact clean checkout; modified, staged, or untracked files are present\n' >&2
+  exit 1
+fi
+
+fixture_path="${ORGMETRA_PERFORMANCE_DATA_FILE:-}"
+summary_path="${ORGMETRA_PERFORMANCE_SUMMARY_FILE:-}"
+if [[ -z "${fixture_path}" || ! -f "${fixture_path}" ]]; then
+  printf 'ORGMETRA_PERFORMANCE_DATA_FILE must point to the right-cleared fixture\n' >&2
+  exit 1
+fi
+fixture_path="$(realpath "${fixture_path}")"
+fixture_bytes="$(stat --printf='%s' -- "${fixture_path}")"
+if [[ ! "${fixture_bytes}" =~ ^[0-9]+$ ]] || (( fixture_bytes > MAXIMUM_FIXTURE_ARTIFACT_BYTES )); then
+  printf 'performance fixture must not exceed %s bytes\n' "${MAXIMUM_FIXTURE_ARTIFACT_BYTES}" >&2
   exit 1
 fi
 
@@ -71,17 +85,10 @@ if [[ -z "${workload_image_id}" ]] || ! podman image exists "${workload_image_id
   exit 1
 fi
 
-fixture_path="${ORGMETRA_PERFORMANCE_DATA_FILE:-}"
-summary_path="${ORGMETRA_PERFORMANCE_SUMMARY_FILE:-}"
-if [[ -z "${fixture_path}" || ! -f "${fixture_path}" ]]; then
-  printf 'ORGMETRA_PERFORMANCE_DATA_FILE must point to the right-cleared fixture\n' >&2
-  exit 1
-fi
 if [[ -z "${summary_path}" ]]; then
   printf 'ORGMETRA_PERFORMANCE_SUMMARY_FILE is required\n' >&2
   exit 1
 fi
-fixture_path="$(realpath "${fixture_path}")"
 summary_dir="$(realpath -m "$(dirname "${summary_path}")")"
 summary_name="$(basename "${summary_path}")"
 mkdir -p "${summary_dir}"
