@@ -1,3 +1,5 @@
+import { parseStrictJsonText } from "./strict_json_artifact.mjs";
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
@@ -24,6 +26,13 @@ function isValidUtcTimestamp(value) {
     && minute <= 59
     && second <= 59
   );
+}
+
+export function parseGovernedSeparationResponseBody(value) {
+  if (typeof value !== "string") {
+    throw new Error("governed separation response body must be JSON text");
+  }
+  return parseStrictJsonText(value, "governed separation response body");
 }
 
 export function isGovernedSeparationSuccess(status, body, { employmentRecordId, replayed }) {
