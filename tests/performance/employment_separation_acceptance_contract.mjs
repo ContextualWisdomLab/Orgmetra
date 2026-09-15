@@ -13,6 +13,8 @@ const REFERENCE_PATTERN = /^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$/;
 const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 const MINIMUM_NON_CONTENDING_RECORDS = 1000;
 const MINIMUM_CONTENTION_PAIRS = 100;
+const MAXIMUM_RESULT_ARTIFACT_BYTES = 1024 * 1024;
+const MAXIMUM_FIXTURE_ARTIFACT_BYTES = 8 * 1024 * 1024;
 const PROFILE_NAMES = Object.freeze(["first_commit", "replay", "rejection", "contention"]);
 const PROFILE_PRECONDITIONS = Object.freeze({
   first_commit: "active_current_expected_version",
@@ -193,8 +195,12 @@ function rawBytes(value, label) {
   fail(`${label} must be supplied as raw bytes`);
 }
 
-function decodeStrictUtf8(value, label) {
+function decodeStrictUtf8(value, label, maximumBytes) {
   const bytes = rawBytes(value, label);
+  if (bytes.byteLength > maximumBytes) {
+    fail(`${label} must not exceed ${maximumBytes} bytes`);
+  }
+
   let text;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
@@ -205,8 +211,8 @@ function decodeStrictUtf8(value, label) {
   return { bytes, text };
 }
 
-function parseJsonArtifact(value, label) {
-  const { bytes, text } = decodeStrictUtf8(value, label);
+function parseJsonArtifact(value, label, maximumBytes) {
+  const { bytes, text } = decodeStrictUtf8(value, label, maximumBytes);
   const parsed = parseStrictJsonText(text, label);
   return {
     bytes,
@@ -323,7 +329,11 @@ function validateResult(result) {
 }
 
 function parseAndValidateFixture(fixtureArtifact, result, validatedResult) {
-  const fixtureDocument = parseJsonArtifact(fixtureArtifact, "performance fixture");
+  const fixtureDocument = parseJsonArtifact(
+    fixtureArtifact,
+    "performance fixture",
+    MAXIMUM_FIXTURE_ARTIFACT_BYTES,
+  );
   if (fixtureDocument.digest !== validatedResult.fixtureSha256) {
     fail("result.fixture_sha256 does not bind the supplied performance fixture");
   }
@@ -414,7 +424,11 @@ function validateRuntimeEvidence(runtime, resultDigest, result, validatedResult,
 }
 
 export function validateEmploymentSeparationAcceptance(resultArtifact, runtimeEvidence, fixtureArtifact) {
-  const resultDocument = parseJsonArtifact(resultArtifact, "performance result");
+  const resultDocument = parseJsonArtifact(
+    resultArtifact,
+    "performance result",
+    MAXIMUM_RESULT_ARTIFACT_BYTES,
+  );
   const result = plainObject(resultDocument.parsed, "result");
   const runtime = plainObject(runtimeEvidence, "runtime");
   const validatedResult = validateResult(result);
