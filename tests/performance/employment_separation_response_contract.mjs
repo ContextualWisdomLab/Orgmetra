@@ -3,6 +3,7 @@ import { parseStrictJsonText } from "./strict_json_artifact.mjs";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 const SUPPORT_REFERENCE_PATTERN = /^err_[A-Za-z0-9_-]{20,80}$/;
+const HTTP_TOKEN_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/u;
 const SUCCESS_RESPONSE_KEYS = Object.freeze([
   "employment_record_id",
   "separated_employment_record_version_id",
@@ -55,25 +56,73 @@ function isValidUtcTimestamp(value) {
   );
 }
 
-function hasSingleContentTypeFieldValue(value) {
+function splitContentTypeSegments(value) {
+  const segments = [];
+  let start = 0;
   let quoted = false;
   let escaped = false;
-  for (const character of value) {
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
     if (escaped) {
+      const codePoint = character.codePointAt(0);
+      if (codePoint !== 0x09 && (codePoint < 0x20 || codePoint === 0x7f)) return null;
       escaped = false;
       continue;
     }
-    if (quoted && character === "\\") {
-      escaped = true;
+    if (quoted) {
+      if (character === "\\") {
+        escaped = true;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        const codePoint = character.codePointAt(0);
+        if (codePoint !== 0x09 && (codePoint < 0x20 || codePoint === 0x7f)) return null;
+      }
       continue;
     }
     if (character === '"') {
-      quoted = !quoted;
+      quoted = true;
       continue;
     }
-    if (!quoted && character === ",") return false;
+    if (character === ",") return null;
+    if (character === ";") {
+      segments.push(value.slice(start, index));
+      start = index + 1;
+    }
   }
-  return !quoted && !escaped;
+  if (quoted || escaped) return null;
+  segments.push(value.slice(start));
+  return segments;
+}
+
+function isValidQuotedParameterValue(value) {
+  if (value.length < 2 || value[0] !== '"' || value[value.length - 1] !== '"') return false;
+  let escaped = false;
+  for (let index = 1; index < value.length - 1; index += 1) {
+    const character = value[index];
+    const codePoint = character.codePointAt(0);
+    if (escaped) {
+      if (codePoint !== 0x09 && (codePoint < 0x20 || codePoint === 0x7f)) return false;
+      escaped = false;
+      continue;
+    }
+    if (character === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (character === '"') return false;
+    if (codePoint !== 0x09 && (codePoint < 0x20 || codePoint === 0x7f)) return false;
+  }
+  return !escaped;
+}
+
+function isValidContentTypeParameter(segment) {
+  const separator = segment.indexOf("=");
+  if (separator <= 0) return false;
+  const name = segment.slice(0, separator).trim();
+  const value = segment.slice(separator + 1).trim();
+  if (!HTTP_TOKEN_PATTERN.test(name) || value === "") return false;
+  return HTTP_TOKEN_PATTERN.test(value) || isValidQuotedParameterValue(value);
 }
 
 export function hasGovernedSeparationJsonMediaType(headers) {
@@ -83,9 +132,12 @@ export function hasGovernedSeparationJsonMediaType(headers) {
   );
   if (contentTypeEntries.length !== 1) return false;
   const value = contentTypeEntries[0][1];
-  if (typeof value !== "string" || !hasSingleContentTypeFieldValue(value)) return false;
-  const mediaType = value.split(";", 1)[0].trim().toLowerCase();
-  return mediaType === "application/json";
+  if (typeof value !== "string") return false;
+  const segments = splitContentTypeSegments(value);
+  if (segments === null || segments.length < 1) return false;
+  const mediaType = segments[0].trim().toLowerCase();
+  if (mediaType !== "application/json") return false;
+  return segments.slice(1).every((segment) => isValidContentTypeParameter(segment.trim()));
 }
 
 export function parseGovernedSeparationResponseBody(value) {
