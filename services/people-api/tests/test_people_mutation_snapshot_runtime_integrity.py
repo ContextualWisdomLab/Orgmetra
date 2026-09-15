@@ -38,23 +38,22 @@ def test_idempotency_identity_rejects_empty_command_route() -> None:
         )
 
 
-def test_result_snapshots_reject_post_construction_replay_digest_rewrite() -> None:
-    """A port must not rewrite replay evidence after a valid receipt has been constructed."""
+def test_result_snapshots_reject_low_level_replay_digest_corruption() -> None:
+    """Snapshots must reject malformed tuple storage without weakening structural receipts."""
     cases = (
         (
             mutations._snapshot_employment_result,
-            mutations.EmploymentMutationResult(employment_record_id=EMPLOYMENT),
+            tuple.__new__(mutations.EmploymentMutationResult, (EMPLOYMENT.int, object())),
         ),
         (
             mutations._snapshot_position_result,
-            mutations.PositionMutationResult(position_record_id=POSITION),
+            tuple.__new__(mutations.PositionMutationResult, (POSITION.int, object())),
         ),
         (
             mutations._snapshot_assignment_result,
-            mutations.AssignmentMutationResult(assignment_record_id=ASSIGNMENT),
+            tuple.__new__(mutations.AssignmentMutationResult, (ASSIGNMENT.int, object())),
         ),
     )
     for snapshot, result in cases:
-        object.__setattr__(result, "replay_command_digest", object())
         with pytest.raises(ValueError, match="replay_command_digest must be a string"):
             snapshot(result)
