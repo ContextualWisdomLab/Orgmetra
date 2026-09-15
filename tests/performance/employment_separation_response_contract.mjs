@@ -3,6 +3,12 @@ import { parseStrictJsonText } from "./strict_json_artifact.mjs";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 const SUPPORT_REFERENCE_PATTERN = /^err_[A-Za-z0-9_-]{20,80}$/;
+const SUCCESS_RESPONSE_KEYS = Object.freeze([
+  "employment_record_id",
+  "separated_employment_record_version_id",
+  "recorded_at",
+  "replayed",
+]);
 const ERROR_RESPONSE_KEYS = Object.freeze([
   "error_code",
   "message",
@@ -49,7 +55,7 @@ export function parseGovernedSeparationResponseBody(value) {
 }
 
 export function isGovernedSeparationSuccess(status, body, { employmentRecordId, replayed }) {
-  if (status !== 200 || !isPlainObject(body)) return false;
+  if (status !== 200 || !isPlainObject(body) || !hasExactKeys(body, SUCCESS_RESPONSE_KEYS)) return false;
   if (typeof employmentRecordId !== "string" || !UUID_PATTERN.test(employmentRecordId)) return false;
   if (typeof replayed !== "boolean") return false;
   if (typeof body.employment_record_id !== "string" || body.employment_record_id.toLowerCase() !== employmentRecordId.toLowerCase()) {
