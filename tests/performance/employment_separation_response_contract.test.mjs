@@ -76,6 +76,27 @@ test("rejects impossible success-response calendar timestamps", () => {
   );
 });
 
+test("keeps success-response recorded_at inside the People datetime year domain", () => {
+  for (const recordedAt of ["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999Z"]) {
+    assert.equal(
+      isGovernedSeparationSuccess(
+        200,
+        { ...successBody(false), recorded_at: recordedAt },
+        { employmentRecordId: EMPLOYMENT, replayed: false },
+      ),
+      true,
+    );
+  }
+  assert.equal(
+    isGovernedSeparationSuccess(
+      200,
+      { ...successBody(false), recorded_at: "0000-01-01T00:00:00Z" },
+      { employmentRecordId: EMPLOYMENT, replayed: false },
+    ),
+    false,
+  );
+});
+
 test("rejects success responses that are replay- or target-inconsistent", () => {
   assert.equal(
     isGovernedSeparationSuccess(200, successBody(true), { employmentRecordId: EMPLOYMENT, replayed: false }),
