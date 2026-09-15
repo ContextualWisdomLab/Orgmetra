@@ -36,6 +36,8 @@ class Authenticator:
 class MalformedReceiptCursor(AbstractContextManager["MalformedReceiptCursor"]):
     """Return a database receipt whose recorded time violates the typed boundary."""
 
+    fetchmany_calls = 0
+
     def __enter__(self) -> "MalformedReceiptCursor":
         return self
 
@@ -46,6 +48,7 @@ class MalformedReceiptCursor(AbstractContextManager["MalformedReceiptCursor"]):
         del sql, parameters
 
     def fetchmany(self, size: int) -> list[tuple[object, object, object, object]]:
+        type(self).fetchmany_calls += 1
         if size != 2:
             raise AssertionError("adapter must bound result reads")
         return [(EMPLOYMENT, EXPECTED_VERSION, "not-a-database-timestamp", False)]
@@ -54,6 +57,9 @@ class MalformedReceiptCursor(AbstractContextManager["MalformedReceiptCursor"]):
 class Connection(AbstractContextManager["Connection"]):
     """Expose the malformed receipt through the normal transaction context."""
 
+    autocommit = False
+    cursor_calls = 0
+
     def __enter__(self) -> "Connection":
         return self
 
@@ -61,6 +67,7 @@ class Connection(AbstractContextManager["Connection"]):
         return None
 
     def cursor(self) -> MalformedReceiptCursor:
+        type(self).cursor_calls += 1
         return MalformedReceiptCursor()
 
 
@@ -68,6 +75,8 @@ class EmploymentSeparationIntegrityHttpTests(unittest.IsolatedAsyncioTestCase):
     """Keep database-integrity faults distinct from client-resolvable conflicts."""
 
     async def test_malformed_database_receipt_is_internal_error_not_client_conflict(self) -> None:
+        Connection.cursor_calls = 0
+        MalformedReceiptCursor.fetchmany_calls = 0
         policy = PurposeBoundAccessPolicy(
             tenant_record_id=TENANT,
             policy_version_code="employment-separation-v1",
@@ -129,6 +138,8 @@ class EmploymentSeparationIntegrityHttpTests(unittest.IsolatedAsyncioTestCase):
 
         start, response = messages
         payload = json.loads(bytes(response["body"]))
+        self.assertEqual(Connection.cursor_calls, 1)
+        self.assertEqual(MalformedReceiptCursor.fetchmany_calls, 1)
         self.assertEqual(start["status"], 500)
         self.assertEqual(payload["error_code"], "internal_error")
         self.assertIn("support_reference", payload)
