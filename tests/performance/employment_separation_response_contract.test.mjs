@@ -51,6 +51,22 @@ test("rejects undeclared fields in the published success response envelope", () 
   );
 });
 
+test("rejects sentinel separated-version identities in governed success evidence", () => {
+  for (const separatedVersionId of [
+    "00000000-0000-0000-0000-000000000000",
+    "ffffffff-ffff-ffff-ffff-ffffffffffff",
+  ]) {
+    assert.equal(
+      isGovernedSeparationSuccess(
+        200,
+        { ...successBody(false), separated_employment_record_version_id: separatedVersionId },
+        { employmentRecordId: EMPLOYMENT, replayed: false },
+      ),
+      false,
+    );
+  }
+});
+
 test("rejects impossible success-response calendar timestamps", () => {
   const body = successBody(false);
   body.recorded_at = "2026-02-30T02:00:00Z";
