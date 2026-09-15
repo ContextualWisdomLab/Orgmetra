@@ -29,6 +29,15 @@ test("accepts the published first-commit and replay response shape", () => {
   );
 });
 
+test("rejects impossible success-response calendar timestamps", () => {
+  const body = successBody(false);
+  body.recorded_at = "2026-02-30T02:00:00Z";
+  assert.equal(
+    isGovernedSeparationSuccess(200, body, { employmentRecordId: EMPLOYMENT, replayed: false }),
+    false,
+  );
+});
+
 test("rejects success responses that are replay- or target-inconsistent", () => {
   assert.equal(
     isGovernedSeparationSuccess(200, successBody(true), { employmentRecordId: EMPLOYMENT, replayed: false }),
