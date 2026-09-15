@@ -27,7 +27,11 @@ from orgmetra_people_api.hire_http import (
     _require_json_content_type,
 )
 from orgmetra_people_api.http import AsgiReceive, AsgiSend, _authorization_header, _send_json
-from orgmetra_people_api.mutation_http import _parse_command_headers, _send_error
+from orgmetra_people_api.mutation_http import (
+    _detach_authenticated_principal,
+    _parse_command_headers,
+    _send_error,
+)
 from orgmetra_people_api.mutations import PeopleMutationNotFound
 from orgmetra_people_api.separation import (
     EmploymentSeparationCommand,
@@ -215,9 +219,9 @@ class EmploymentSeparationAsgiApp:
 
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
-            principal = await runtime.authenticator.authenticate(bearer_token)
-            if not isinstance(principal, AuthenticatedPrincipal):
-                raise TypeError("authenticator returned an invalid principal")
+            principal = _detach_authenticated_principal(
+                await runtime.authenticator.authenticate(bearer_token)
+            )
         except AuthenticationFailed:
             await _send_error(
                 send,

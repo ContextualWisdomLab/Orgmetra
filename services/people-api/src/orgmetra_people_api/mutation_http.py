@@ -131,6 +131,31 @@ class _MutationRuntime:
             raise TypeError("id_factory must be callable")
 
 
+def _detach_authenticated_principal(principal: object) -> AuthenticatedPrincipal:
+    """Reduce identity-backend evidence to exact inert authority before later request behavior."""
+    if type(principal) is not AuthenticatedPrincipal:
+        raise TypeError("authenticator must return an exact AuthenticatedPrincipal")
+    tenant_record_id = principal.tenant_record_id
+    if type(tenant_record_id) is not UUID:
+        raise TypeError("authenticated tenant_record_id must be an exact UUID")
+    tenant_identity = tenant_record_id.int
+    if type(tenant_identity) is not int or not (0 < tenant_identity < _MAX_UUID_INT):
+        raise TypeError("authenticated tenant_record_id must contain an operational integer UUID payload")
+    actor_reference = principal.actor_reference
+    if type(actor_reference) is not str:
+        raise TypeError("authenticated actor_reference must be exact built-in text")
+    granted_scope_codes = principal.granted_scope_codes
+    if type(granted_scope_codes) is not frozenset or not granted_scope_codes:
+        raise TypeError("authenticated granted_scope_codes must be an exact non-empty frozenset")
+    if any(type(scope_code) is not str for scope_code in granted_scope_codes):
+        raise TypeError("authenticated granted_scope_codes must contain exact built-in text")
+    return AuthenticatedPrincipal(
+        tenant_record_id=UUID(int=tenant_identity),
+        actor_reference=actor_reference,
+        granted_scope_codes=frozenset(tuple(granted_scope_codes)),
+    )
+
+
 async def _send_error(
     send: AsgiSend,
     *,
@@ -271,9 +296,9 @@ class PeopleMutationAsgiApp:
 
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
-            principal = await runtime.authenticator.authenticate(bearer_token)
-            if not isinstance(principal, AuthenticatedPrincipal):
-                raise TypeError("authenticator returned an invalid principal")
+            principal = _detach_authenticated_principal(
+                await runtime.authenticator.authenticate(bearer_token)
+            )
         except AuthenticationFailed:
             await _send_error(
                 send,
