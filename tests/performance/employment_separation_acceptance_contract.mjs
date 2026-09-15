@@ -3,6 +3,7 @@ import { TextDecoder } from "node:util";
 
 import { validatePerformanceFixture } from "./employment_separation_fixture_contract.mjs";
 import { validatePerformanceLoadModel } from "./employment_separation_run_contract.mjs";
+import { parseStrictJsonText } from "./strict_json_artifact.mjs";
 
 const RESULT_SCHEMA = "orgmetra.employment_separation.performance_result.v1";
 const RUNTIME_SCHEMA = "orgmetra.employment_separation.runtime_evidence.v1";
@@ -206,12 +207,7 @@ function decodeStrictUtf8(value, label) {
 
 function parseJsonArtifact(value, label) {
   const { bytes, text } = decodeStrictUtf8(value, label);
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch (error) {
-    throw new Error(`${label} must be valid JSON`, { cause: error });
-  }
+  const parsed = parseStrictJsonText(text, label);
   return {
     bytes,
     digest: createHash("sha256").update(bytes).digest("hex"),
