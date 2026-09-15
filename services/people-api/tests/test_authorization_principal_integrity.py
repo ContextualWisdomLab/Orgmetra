@@ -30,15 +30,23 @@ class _ExecutableUuidPayload:
 
     def __eq__(self, other: object) -> bool:
         type(self).comparisons += 1
-        raise AssertionError("forged UUID payload must not participate in comparison")
+        raise TypeError("forged UUID payload must not participate in comparison")
 
     def __lt__(self, other: object) -> bool:
         type(self).comparisons += 1
-        raise AssertionError("forged UUID payload must not participate in ordering")
+        raise TypeError("forged UUID payload must not participate in ordering")
+
+    def __le__(self, other: object) -> bool:
+        type(self).comparisons += 1
+        raise TypeError("forged UUID payload must not participate in ordering")
 
     def __gt__(self, other: object) -> bool:
         type(self).comparisons += 1
-        raise AssertionError("forged UUID payload must not participate in ordering")
+        raise TypeError("forged UUID payload must not participate in ordering")
+
+    def __ge__(self, other: object) -> bool:
+        type(self).comparisons += 1
+        raise TypeError("forged UUID payload must not participate in ordering")
 
 
 class _TextSubtype(str):
