@@ -55,6 +55,27 @@ function isValidUtcTimestamp(value) {
   );
 }
 
+function hasSingleContentTypeFieldValue(value) {
+  let quoted = false;
+  let escaped = false;
+  for (const character of value) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (quoted && character === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (character === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (!quoted && character === ",") return false;
+  }
+  return !quoted && !escaped;
+}
+
 export function hasGovernedSeparationJsonMediaType(headers) {
   if (!isPlainObject(headers)) return false;
   const contentTypeEntries = Object.entries(headers).filter(
@@ -62,7 +83,7 @@ export function hasGovernedSeparationJsonMediaType(headers) {
   );
   if (contentTypeEntries.length !== 1) return false;
   const value = contentTypeEntries[0][1];
-  if (typeof value !== "string") return false;
+  if (typeof value !== "string" || !hasSingleContentTypeFieldValue(value)) return false;
   const mediaType = value.split(";", 1)[0].trim().toLowerCase();
   return mediaType === "application/json";
 }
