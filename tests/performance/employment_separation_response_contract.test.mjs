@@ -151,6 +151,15 @@ test("rejects k6-collapsed duplicate Content-Type values without rejecting quote
   assert.equal(hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json;" }), false);
 });
 
+test("rejects invalid or duplicate media-type parameters", () => {
+  assert.equal(hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json; charset =utf-8" }), false);
+  assert.equal(hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json; charset= utf-8" }), false);
+  assert.equal(
+    hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json; charset=utf-8; Charset=latin1" }),
+    false,
+  );
+});
+
 test("accepts only the published closed ErrorResponse shape for separation conflicts", () => {
   assert.equal(isGovernedSeparationConflict(409, conflictBody()), true);
   assert.equal(isGovernedSeparationConflict(409, { error: "separation_conflict" }), false);
