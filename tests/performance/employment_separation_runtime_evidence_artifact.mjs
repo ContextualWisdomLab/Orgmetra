@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { TextDecoder } from "node:util";
 
+import { parseStrictJsonText } from "./strict_json_artifact.mjs";
+
 function rawBytes(value) {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
@@ -20,12 +22,7 @@ export function parseRuntimeEvidenceArtifact(value) {
     throw new Error("runtime evidence must be non-empty JSON text");
   }
 
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch (error) {
-    throw new Error("runtime evidence must be valid JSON", { cause: error });
-  }
+  const parsed = parseStrictJsonText(text, "runtime evidence");
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("runtime evidence must be a JSON object");
   }
