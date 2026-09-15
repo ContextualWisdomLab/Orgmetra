@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import unittest
+from unittest.mock import patch
 from uuid import UUID
 
 from orgmetra_people_api.auth import AuthenticatedPrincipal
@@ -12,12 +13,21 @@ from orgmetra_people_api.mutation_http import (
     _detach_authenticated_principal,
     _parse_command_headers,
 )
-from orgmetra_people_api.mutations import EmploymentMutationResult
+from orgmetra_people_api.mutations import (
+    AssignmentMutationResult,
+    EmploymentMutationResult,
+    PositionMutationResult,
+    _snapshot_assignment_result,
+    _snapshot_employment_result,
+    _snapshot_position_result,
+)
 from orgmetra_people_api.separation import EmploymentSeparationResult
 
 TENANT = UUID("0198a412-9300-7000-8000-000000000001")
 EMPLOYMENT = UUID("0198a412-9300-7000-8000-000000000010")
 VERSION = UUID("0198a412-9300-7000-8000-000000000011")
+POSITION = UUID("0198a412-9300-7000-8000-000000000012")
+ASSIGNMENT = UUID("0198a412-9300-7000-8000-000000000013")
 RECORDED_AT = datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc)
 
 
@@ -85,6 +95,30 @@ class PeopleDefensiveBoundaryIntegrityTests(unittest.TestCase):
         self.assertIsInstance(hash(result), int)
         self.assertIn("EmploymentMutationResult", repr(result))
         self.assertIn("employment_record_id", repr(result))
+
+    def test_snapshot_revalidates_runtime_replay_digest_capability(self) -> None:
+        cases = (
+            (
+                EmploymentMutationResult(employment_record_id=EMPLOYMENT),
+                EmploymentMutationResult,
+                _snapshot_employment_result,
+            ),
+            (
+                PositionMutationResult(position_record_id=POSITION),
+                PositionMutationResult,
+                _snapshot_position_result,
+            ),
+            (
+                AssignmentMutationResult(assignment_record_id=ASSIGNMENT),
+                AssignmentMutationResult,
+                _snapshot_assignment_result,
+            ),
+        )
+        for result, result_type, snapshot in cases:
+            with self.subTest(result_type=result_type.__name__):
+                with patch.object(result_type, "replay_command_digest", new=property(lambda self: 7)):
+                    with self.assertRaisesRegex(ValueError, "replay_command_digest"):
+                        snapshot(result)
 
     def test_separation_receipt_rejects_forged_storage_and_preserves_value_protocols(self) -> None:
         forged_version = tuple.__new__(
