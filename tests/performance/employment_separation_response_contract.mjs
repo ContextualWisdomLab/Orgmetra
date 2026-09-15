@@ -1,6 +1,6 @@
 import { parseStrictJsonText } from "./strict_json_artifact.mjs";
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 const SUPPORT_REFERENCE_PATTERN = /^err_[A-Za-z0-9_-]{20,80}$/;
 const HTTP_TOKEN_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/u;
@@ -116,13 +116,16 @@ function isValidQuotedParameterValue(value) {
   return !escaped;
 }
 
-function isValidContentTypeParameter(segment) {
-  const separator = segment.indexOf("=");
-  if (separator <= 0) return false;
-  const name = segment.slice(0, separator).trim();
-  const value = segment.slice(separator + 1).trim();
-  if (!HTTP_TOKEN_PATTERN.test(name) || value === "") return false;
-  return HTTP_TOKEN_PATTERN.test(value) || isValidQuotedParameterValue(value);
+function parseContentTypeParameter(segment) {
+  const text = segment.trim();
+  const separator = text.indexOf("=");
+  if (separator <= 0) return null;
+  const rawName = text.slice(0, separator);
+  const rawValue = text.slice(separator + 1);
+  if (rawName !== rawName.trim() || rawValue !== rawValue.trim()) return null;
+  if (!HTTP_TOKEN_PATTERN.test(rawName) || rawValue === "") return null;
+  if (!HTTP_TOKEN_PATTERN.test(rawValue) && !isValidQuotedParameterValue(rawValue)) return null;
+  return rawName.toLowerCase();
 }
 
 export function hasGovernedSeparationJsonMediaType(headers) {
@@ -137,7 +140,13 @@ export function hasGovernedSeparationJsonMediaType(headers) {
   if (segments === null || segments.length < 1) return false;
   const mediaType = segments[0].trim().toLowerCase();
   if (mediaType !== "application/json") return false;
-  return segments.slice(1).every((segment) => isValidContentTypeParameter(segment.trim()));
+  const parameterNames = new Set();
+  for (const segment of segments.slice(1)) {
+    const parameterName = parseContentTypeParameter(segment);
+    if (parameterName === null || parameterNames.has(parameterName)) return false;
+    parameterNames.add(parameterName);
+  }
+  return true;
 }
 
 export function parseGovernedSeparationResponseBody(value) {
