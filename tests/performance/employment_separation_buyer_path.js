@@ -17,6 +17,7 @@ import { requirePinnedK6Runtime } from "./employment_separation_k6_runtime_contr
 import {
   isGovernedSeparationConflict,
   isGovernedSeparationSuccess,
+  parseGovernedSeparationResponseBody,
 } from "./employment_separation_response_contract.mjs";
 import {
   PERFORMANCE_SUMMARY_TREND_STATS,
@@ -87,7 +88,10 @@ function recordAt(profile) {
   if (index < 0 || index >= records.length) fail(`${profile} iteration ${index} is outside the fixture`);
   return records[index];
 }
-function parseJson(response) { try { return response.json(); } catch (_) { return null; } }
+function parseJson(response) {
+  try { return parseGovernedSeparationResponseBody(response.body); }
+  catch (_) { return null; }
+}
 function post(command, profile) {
   return http.post(`${baseUrl}${ROUTE}`, requestBody(command), { headers: requestHeaders(command, bearerToken), tags: { profile } });
 }
