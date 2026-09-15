@@ -77,10 +77,10 @@ export function requireDirectPerformanceClientNetwork(environment) {
 }
 
 export function requireVerifiedTlsTransport(insecureSkipTlsVerify) {
-  if (insecureSkipTlsVerify !== false) {
+  if (![false, null, undefined].includes(insecureSkipTlsVerify)) {
     throw new Error("TLS certificate verification must remain enabled for commercial timing acceptance");
   }
-  return insecureSkipTlsVerify;
+  return false;
 }
 
 export function validatePerformanceLoadModel(value, expectedIterations, profile) {
