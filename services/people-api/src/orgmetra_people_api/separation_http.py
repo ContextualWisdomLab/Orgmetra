@@ -168,6 +168,8 @@ class EmploymentSeparationAsgiApp:
         """Serve one separation without leaking bearer tokens or database capabilities."""
         if type(scope) is not dict:
             raise ValueError("EmploymentSeparationAsgiApp requires an exact ASGI scope dict")
+        if any(type(key) is not str for key in scope):
+            raise ValueError("EmploymentSeparationAsgiApp requires exact string keys")
         scope_type = scope.get("type")
         if type(scope_type) is not str or scope_type != "http":
             raise ValueError("EmploymentSeparationAsgiApp accepts only HTTP ASGI scopes")
