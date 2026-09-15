@@ -32,6 +32,7 @@ import {
   arrivalRateScenarioForPerformanceProfile,
   requireDirectPerformanceClientNetwork,
   requirePerformanceProfile,
+  requireVerifiedTlsTransport,
   thresholdsForPerformanceProfile,
 } from "./employment_separation_run_contract.mjs";
 import { buyerPathElapsedMs } from "./employment_separation_timing_contract.mjs";
@@ -100,6 +101,9 @@ function recordAt(profile) {
   if (index < 0 || index >= records.length) fail(`${profile} iteration ${index} is outside the fixture`);
   return records[index];
 }
+function requireCommercialTls() {
+  requireVerifiedTlsTransport(exec.test.options.insecureSkipTLSVerify);
+}
 function parseJson(response) {
   if (!hasGovernedSeparationJsonMediaType(response.headers)) return null;
   if (!hasGovernedSeparationNoStorePolicy(response.headers)) return null;
@@ -107,6 +111,7 @@ function parseJson(response) {
   catch (_) { return null; }
 }
 function post(command, profile) {
+  requireCommercialTls();
   const headers = requestHeaders(command, bearerToken);
   return http.post(
     `${baseUrl}${ROUTE}`,
@@ -136,6 +141,7 @@ export function rejection() {
   observe(response, rejectionDuration, "rejection", (result) => isGovernedSeparationConflict(result.status, parseJson(result)));
 }
 export function contention() {
+  requireCommercialTls();
   const pair = recordAt("contention");
   const responses = http.batch([
     [
