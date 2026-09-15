@@ -124,6 +124,29 @@ test("enforces minimum sample cardinality rather than silently shrinking the run
   );
 });
 
+test("rejects surplus non-contending records before walking an unbounded profile", () => {
+  const value = fixture();
+  value.profiles.replay = Array.from({ length: 1001 }, (_, index) => command(10000 + index));
+  assert.throws(
+    () => validatePerformanceFixture(value, smallAcceptance),
+    /at most 1000 records/,
+  );
+});
+
+test("rejects surplus contention pairs before walking an unbounded profile", () => {
+  const value = fixture();
+  value.profiles.contention = Array.from({ length: 101 }, (_, index) => {
+    const left = command(20000 + index, `contention-left-${index.toString().padStart(4, "0")}`);
+    const right = structuredClone(left);
+    right.idempotency_key = `contention-right-${index.toString().padStart(4, "0")}`;
+    return { left, right };
+  });
+  assert.throws(
+    () => validatePerformanceFixture(value, smallAcceptance),
+    /at most 100 pairs/,
+  );
+});
+
 test("matches the production Idempotency-Key length and visible-ASCII contract", () => {
   const shortKey = fixture();
   shortKey.profiles.first_commit[0].idempotency_key = "too-short";
