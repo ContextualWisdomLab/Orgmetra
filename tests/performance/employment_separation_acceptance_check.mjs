@@ -1,34 +1,16 @@
 import { readFile } from "node:fs/promises";
 
 import { validateEmploymentSeparationAcceptance } from "./employment_separation_acceptance_contract.mjs";
-import { requireAuthenticatedDeploymentEvidence } from "./employment_separation_deployment_evidence_gate.mjs";
-import { requireAuthenticatedPerformanceEvidence } from "./employment_separation_authenticated_evidence_gate.mjs";
+import { requireCommercialPerformanceAuthorities } from "./employment_separation_commercial_owner_gate.mjs";
 import { validatePinnedK6AcceptanceEvidence } from "./employment_separation_k6_evidence_contract.mjs";
 import { parseRuntimeEvidenceArtifact } from "./employment_separation_runtime_evidence_artifact.mjs";
-
-function requireCommercialOwnerBoundaries() {
-  const failures = [];
-  for (const gate of [
-    requireAuthenticatedPerformanceEvidence,
-    requireAuthenticatedDeploymentEvidence,
-  ]) {
-    try {
-      gate();
-    } catch (error) {
-      failures.push(error instanceof Error ? error.message : String(error));
-    }
-  }
-  if (failures.length !== 0) {
-    throw new Error(failures.join("\n"));
-  }
-}
 
 async function main() {
   // Byte/provenance attestation and deployed-candidate identity are separate
   // trust boundaries. Surface every unresolved owner gap before touching caller
   // paths so resolving one authority cannot accidentally enable acceptance while
   // the other remains self-asserted.
-  requireCommercialOwnerBoundaries();
+  requireCommercialPerformanceAuthorities();
 
   const [resultPath, runtimeEvidencePath, fixturePath] = process.argv.slice(2);
   if (!resultPath || !runtimeEvidencePath || !fixturePath || process.argv.length !== 5) {
