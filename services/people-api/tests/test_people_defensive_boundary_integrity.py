@@ -91,7 +91,16 @@ class PeopleDefensiveBoundaryIntegrityTests(unittest.TestCase):
             _ = forged.employment_record_id
 
         result = EmploymentMutationResult(employment_record_id=EMPLOYMENT)
-        self.assertNotEqual(result, (EMPLOYMENT.int, None))
+        same_result = EmploymentMutationResult(employment_record_id=EMPLOYMENT)
+        sibling_result = PositionMutationResult(position_record_id=EMPLOYMENT)
+        plain_tuple = (EMPLOYMENT.int, None)
+
+        self.assertEqual(result, same_result)
+        self.assertEqual(hash(result), hash(same_result))
+        self.assertNotEqual(result, sibling_result)
+        self.assertNotEqual(sibling_result, result)
+        self.assertNotEqual(result, plain_tuple)
+        self.assertNotEqual(plain_tuple, result)
         self.assertIsInstance(hash(result), int)
         self.assertIn("EmploymentMutationResult", repr(result))
         self.assertIn("employment_record_id", repr(result))
@@ -141,7 +150,18 @@ class PeopleDefensiveBoundaryIntegrityTests(unittest.TestCase):
             recorded_at=RECORDED_AT,
             replayed=False,
         )
-        self.assertNotEqual(result, tuple(result))
+        same_result = EmploymentSeparationResult(
+            employment_record_id=EMPLOYMENT,
+            separated_employment_record_version_id=VERSION,
+            recorded_at=RECORDED_AT,
+            replayed=False,
+        )
+        plain_tuple = tuple(result)
+
+        self.assertEqual(result, same_result)
+        self.assertEqual(hash(result), hash(same_result))
+        self.assertNotEqual(result, plain_tuple)
+        self.assertNotEqual(plain_tuple, result)
         self.assertIsInstance(hash(result), int)
         self.assertIn("EmploymentSeparationResult", repr(result))
         self.assertIn("separated_employment_record_version_id", repr(result))
