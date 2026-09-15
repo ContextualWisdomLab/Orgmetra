@@ -13,6 +13,7 @@ import {
   requestHeaders,
   validatePerformanceFixture,
 } from "./employment_separation_fixture_contract.mjs";
+import { governedSeparationRequestParams } from "./employment_separation_request_contract.mjs";
 import { requirePinnedK6Runtime } from "./employment_separation_k6_runtime_contract.mjs";
 import { normalizeEmploymentSeparationK6Summary } from "./employment_separation_k6_summary_contract.mjs";
 import {
@@ -104,7 +105,12 @@ function parseJson(response) {
   catch (_) { return null; }
 }
 function post(command, profile) {
-  return http.post(`${baseUrl}${ROUTE}`, requestBody(command), { headers: requestHeaders(command, bearerToken), tags: { profile } });
+  const headers = requestHeaders(command, bearerToken);
+  return http.post(
+    `${baseUrl}${ROUTE}`,
+    requestBody(command),
+    governedSeparationRequestParams(headers, profile),
+  );
 }
 function observe(response, trend, profile, predicate) {
   trend.add(buyerPathElapsedMs(response.timings), { profile });
@@ -130,8 +136,18 @@ export function rejection() {
 export function contention() {
   const pair = recordAt("contention");
   const responses = http.batch([
-    ["POST", `${baseUrl}${ROUTE}`, requestBody(pair.left), { headers: requestHeaders(pair.left, bearerToken), tags: { profile: "contention" } }],
-    ["POST", `${baseUrl}${ROUTE}`, requestBody(pair.right), { headers: requestHeaders(pair.right, bearerToken), tags: { profile: "contention" } }],
+    [
+      "POST",
+      `${baseUrl}${ROUTE}`,
+      requestBody(pair.left),
+      governedSeparationRequestParams(requestHeaders(pair.left, bearerToken), "contention"),
+    ],
+    [
+      "POST",
+      `${baseUrl}${ROUTE}`,
+      requestBody(pair.right),
+      governedSeparationRequestParams(requestHeaders(pair.right, bearerToken), "contention"),
+    ],
   ]);
   for (const response of responses) { contentionDuration.add(buyerPathElapsedMs(response.timings), { profile: "contention" }); latencySamples.add(1, { profile: "contention" }); }
   const parsed = responses.map((response) => ({ status: response.status, body: parseJson(response) }));
