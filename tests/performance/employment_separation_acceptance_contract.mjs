@@ -57,6 +57,12 @@ const RESULT_KEYS = Object.freeze([
   "schema_version",
   "selected_profile",
 ]);
+const RESULT_K6_IDENTITY_KEYS = Object.freeze([
+  "k6_version",
+  "k6_image",
+  "k6_image_digest",
+  "k6_runner_identity",
+]);
 const RUNTIME_KEYS = Object.freeze([
   "candidate_sha",
   "db_connections_max",
@@ -85,6 +91,12 @@ const RUNTIME_KEYS = Object.freeze([
   "schema_version",
   "selected_profile",
 ]);
+const RUNTIME_K6_IDENTITY_KEYS = Object.freeze([
+  "observed_k6_version",
+  "observed_k6_image",
+  "observed_k6_image_digest",
+  "observed_k6_runner_identity",
+]);
 
 function fail(message) {
   throw new Error(message);
@@ -105,9 +117,26 @@ function exactKeys(value, expected, label) {
   }
 }
 
+function exactKeysWithOptionalGroup(value, required, optional, label) {
+  const actual = Object.keys(value);
+  const allowed = new Set([...required, ...optional]);
+  const requiredPresent = required.every((key) => Object.prototype.hasOwnProperty.call(value, key));
+  const optionalPresent = optional.filter((key) => Object.prototype.hasOwnProperty.call(value, key));
+  const hasUnknown = actual.some((key) => !allowed.has(key));
+  const hasPartialOptionalGroup = optionalPresent.length !== 0 && optionalPresent.length !== optional.length;
+  if (!requiredPresent || hasUnknown || hasPartialOptionalGroup) {
+    fail(`${label} must contain exactly the required fields and either all or none of ${optional.join(", ")}`);
+  }
+}
+
 function stringValue(value, label) {
   if (typeof value !== "string" || value.trim() === "") fail(`${label} must be a non-empty string`);
   return value;
+}
+
+function validateOptionalStringGroup(value, keys, label) {
+  if (!Object.prototype.hasOwnProperty.call(value, keys[0])) return;
+  for (const key of keys) stringValue(value[key], `${label}.${key}`);
 }
 
 function sha(value, label) {
@@ -247,7 +276,8 @@ function sameLoadModel(observed, declared) {
 }
 
 function validateResult(result) {
-  exactKeys(result, RESULT_KEYS, "result");
+  exactKeysWithOptionalGroup(result, RESULT_KEYS, RESULT_K6_IDENTITY_KEYS, "result");
+  validateOptionalStringGroup(result, RESULT_K6_IDENTITY_KEYS, "result");
   if (result.schema_version !== RESULT_SCHEMA) fail("result.schema_version is unsupported");
   const candidateSha = sha(result.candidate_sha, "result.candidate_sha");
   const fixtureSha256 = sha256(result.fixture_sha256, "result.fixture_sha256");
@@ -370,7 +400,8 @@ function parseAndValidateFixture(fixtureArtifact, result, validatedResult) {
 }
 
 function validateRuntimeEvidence(runtime, resultDigest, result, validatedResult, fixtureDigest) {
-  exactKeys(runtime, RUNTIME_KEYS, "runtime");
+  exactKeysWithOptionalGroup(runtime, RUNTIME_KEYS, RUNTIME_K6_IDENTITY_KEYS, "runtime");
+  validateOptionalStringGroup(runtime, RUNTIME_K6_IDENTITY_KEYS, "runtime");
   if (runtime.schema_version !== RUNTIME_SCHEMA) fail("runtime.schema_version is unsupported");
   const candidateSha = sha(runtime.candidate_sha, "runtime.candidate_sha");
   const observedServiceSha = sha(runtime.observed_service_sha, "runtime.observed_service_sha");
