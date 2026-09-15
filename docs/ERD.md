@@ -1,6 +1,6 @@
 # ERD
 
-For readability, the diagram renders representative `tenant_record` scoping edges rather than repeating the same edge for every tenant-owned relation. The authoritative tenant-isolation contract is `docs/DATA_MODEL.md`: **every owned HRIS fact** stores `tenant_record_id`, every cross-table reference is tenant-qualified, and forced row-level security applies independently to every tenant-scoped table. This omission is visual only; it does not weaken the relational or authorization contract for employment, candidate, evidence, decision, validation-link, compensation, transition, audit, outbox, or outbox-escalation entities.
+For readability, the diagram renders representative `tenant_record` scoping edges rather than repeating the same edge for every tenant-owned relation. The authoritative tenant-isolation contract is `docs/DATA_MODEL.md`: **every owned HRIS fact** stores `tenant_record_id`, every cross-table reference is tenant-qualified, and forced row-level security applies independently to every tenant-scoped table. This omission is visual only; it does not weaken the relational or authorization contract for employment, Employment separation, candidate, evidence, decision, validation-link, compensation, audit, outbox, or outbox-escalation entities.
 
 ```mermaid
 erDiagram
@@ -9,9 +9,13 @@ erDiagram
     tenant_record ||--o{ job_profile : scopes
     tenant_record ||--o{ audit_event_record : scopes
     tenant_record ||--o{ outbox_delivery_escalation_record : scopes
+    tenant_record ||--o{ people_mutation_idempotency_record : scopes
     person_record ||--o{ person_name_record : has_names
     person_record ||--o{ employment_record : has
     employment_record ||--o{ employment_record_version : has_versions
+    employment_record ||--o{ employment_separation_record : has_separations
+    employment_record_version ||--o{ employment_separation_record : referenced_by
+    audit_event_record ||--o| employment_separation_record : proves
     organization_unit ||--o{ organization_unit_version : has_versions
     organization_unit_version }o--o| organization_unit : may_parent
     organization_unit ||--o{ position_record : contains
@@ -39,8 +43,6 @@ erDiagram
     validity_study ||--o{ validity_study_evidence_set_link : preserves_evidence
     decision_evidence_set ||--o{ validity_study_evidence_set_link : supplies_evidence
     person_record ||--o{ compensation_record : has
-    employment_record ||--o{ employment_transition : changes_through
-    tenant_record ||--o{ people_mutation_idempotency_record : scopes
     audit_event_record ||--o{ outbox_delivery_record : delivers_through
     outbox_delivery_record ||--o| outbox_delivery_escalation_record : terminally_escalates
 ```
@@ -50,6 +52,14 @@ erDiagram
 `organization_unit`, `job_profile`, `employment_record`, and `position_record` are durable anchors. Mutable names, classifications, parent relationships, titles, families, version codes, and employment or position status live in bitemporal version rows. Positions retain stable organization/job references while retroactive corrections append or supersede version facts rather than rewriting identity. An organization version may reference another durable organization as its parent; self-parenting is rejected at the database boundary. An assignment names the employment that covers it, so a person cannot be assigned through another worker's employment. Exclusive employment versions for one person cannot overlap. An assignment day must land on an `active` or `open` position version, and visible allocations for one seat cannot exceed 1.0000.
 
 Every owned HRIS fact carries `tenant_record_id`. Relationships that cross table boundaries use tenant-qualified foreign keys, and row-level security independently filters every tenant-scoped relation. The tenant column is therefore both a referential-integrity boundary and a runtime isolation boundary, not a caller-supplied business attribute.
+
+### Employment separation
+
+The active #64 People branch models separation through `employment_separation_record`; the former conceptual `employment_transition` edge is not an authoritative termination relation. Each separation belongs to one durable `employment_record` and references exactly one prior `employment_record_version`, zero or one continuation version, and exactly one terminal version. The continuation exists only when the requested separation date is later than the prior version's `effective_from`; it preserves the pre-separation interval. The terminal version has status `terminated` and owns the interval beginning at the separation boundary.
+
+The prior/continuation/terminal references are role-specific foreign keys even though the compact ER diagram renders them through one `employment_record_version` relationship. The terminal version plus `employment_separation_record` is the authoritative separation truth. A continuation version's `effective_to` is structural interval closure, not a second termination fact. The separation record also binds the governed decision metadata and immutable `audit_event_record`; audit/outbox/idempotency and the bitemporal version change commit atomically.
+
+Assignment INSERT and Employment separation serialize on the same `employment_record` aggregate anchor. Separation does not own Assignment lifecycle and therefore does not close or rewrite `assignment_record`; a current/future Assignment that conflicts with the requested boundary causes the separation command to fail closed. ADR 0015 remains Proposed and these relations are active-PR truth until #64 reaches protected truth. Rehire is planned under #302 and is not represented as an implemented transition in this ERD.
 
 A candidate profile can be linked to at most one worker identity within its tenant. A person identity can have multiple candidate-worker links across reapplications or historical candidate profiles, so the person-side cardinality is one-to-many.
 
@@ -61,7 +71,7 @@ A `validity_study` connects the criterion blueprint to the exact selection decis
 
 One immutable `audit_event_record` may have multiple `outbox_delivery_record` rows when the same event must reach multiple delivery targets. The unique `(tenant_record_id, audit_event_record_id, delivery_target_code)` key permits at most one delivery lifecycle per target. Delivery retries mutate only the delivery relation; the canonical event bytes and digest are append-only and therefore cannot drift with transport state.
 
-A `people_mutation_idempotency_record` belongs to one tenant and names one created employment, position, or assignment identity for one route and `Idempotency-Key`. The unique `(tenant_record_id, command_route, idempotency_key)` key prevents a retry from creating a second authoritative fact. Tenants do not share keys.
+A `people_mutation_idempotency_record` belongs to one tenant and binds one canonical governed command result to one route and `Idempotency-Key`. Employment, Position and Assignment creation replay their first created identity; Employment separation replays its first terminal result. The unique `(tenant_record_id, command_route, idempotency_key)` key prevents a retry from creating a second authoritative fact. Tenants do not share keys.
 
 A delivery can have at most one `outbox_delivery_escalation_record`, enforced by the unique `(tenant_record_id, outbox_delivery_record_id)` key. The escalation row exists only for a terminal `dead_lettered` delivery and records the failure classification, terminal attempt count, recorded time, and an opaque operator/customer escalation reference without copying the event payload. The row is append-only; terminal queue history is not reopened or rewritten.
 

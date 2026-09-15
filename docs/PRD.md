@@ -13,6 +13,7 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 - Did selection evidence predict later job performance?
 - Did performance criteria actually measure the job analysis model?
 - Did organizational context, manager, opportunity, or time distort the observed outcome?
+- When an Employment ends, can the organization reconstruct the exact prior state, effective boundary, reason, evidence, accountable actor, confirmation, and later corrections without rewriting history?
 - Can HR act on PII without unsafe masking while remaining compliant and auditable?
 
 ## 3. Target users
@@ -34,8 +35,9 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 3. Record human selection decisions with explicit evidence, uncertainty, and constraints.
 4. Convert a hired candidate into a worker without losing candidate evidence provenance.
 5. Track assignments and performance outcomes over effective time and system time.
-6. Validate whether selection tools predict job-relevant outcomes and whether they do so fairly.
-7. Integrate specialist CWL services without destroying the HRIS source-of-truth boundary.
+6. End an Employment through a human-confirmed, evidence-backed, bitemporal transition that preserves prior knowledge and does not silently rewrite Assignment-owned truth.
+7. Validate whether selection tools predict job-relevant outcomes and whether they do so fairly.
+8. Integrate specialist CWL services without destroying the HRIS source-of-truth boundary.
 
 ## 5. Scope
 
@@ -50,6 +52,7 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 - Audit/provenance contract.
 - CWL integration adapter contracts.
 - Documentation and diagram baseline.
+- Governed Employment-separation contract on active PR #64, with bitemporal supersession, controlled reasons, human confirmation, evidence, idempotency, audit/outbox atomicity, tenant isolation, and Assignment serialization. This item is not protected/released truth until #64 satisfies ADR 0015 acceptance and is normally integrated.
 
 ### P1 product slice
 
@@ -74,6 +77,8 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 - Orgmetra is not the psychometric numerical kernel; fast-mlsirm owns that boundary.
 - Orgmetra is not the mailbox or calendar provider; Naruon and customer providers own that boundary.
 - Orgmetra does not directly query other products' application tables.
+- Employment separation does not own payroll, identity deprovisioning, notification delivery, or Assignment lifecycle; those remain downstream owned contracts/events.
+- Rehire is not implemented by the separation contract. It remains planned under #302 and must create a new Employment for the existing Person after protected prior-separation truth exists.
 
 ## 7. Functional requirements
 
@@ -89,8 +94,15 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 | FR-008 | The system shall support purpose-bound access rather than global PII masking. |
 | FR-009 | The system shall integrate CWL services only through versioned APIs, events, packages, or adapters. |
 | FR-010 | The system shall distinguish shipped truth, active PR, accepted architecture, planned, research-only, superseded, and out-of-scope states in documentation. |
+| FR-011 | The system shall support a governed Employment-separation command that targets one exact current-known Employment version, requires accountable human confirmation and versioned evidence, uses only the controlled separation-reason vocabulary, preserves bitemporal history, atomically records audit/outbox/idempotency provenance, and fails closed rather than creating contradictory current/future Assignment or Employment truth. |
 
-## 8. Non-functional requirements
+## 8. Employment-separation buyer acceptance
+
+The buyer-visible capability is an accountable end-of-Employment operation whose result can be reconstructed across effective time and recorded time. A valid receipt must identify the terminal Employment version and correspond to immutable separation/audit evidence; same-key retries converge on the first durable result, including after an uncertain caller outcome. The command must not convert a request failure into a partial separation, duplicate audit/outbox event, or orphaned idempotency marker.
+
+The active #64 implementation is not a release claim. Before this requirement can be marked protected/shipped, ADR 0015 remains Proposed until canonical PostgreSQL Foundation owner #311 executes the registered separation/Assignment-serialization acceptance roots/companions on an immutable candidate and the remaining required security and independent-review gates pass. No p95 claim is made here; production-capability latency must be measured separately under the repository performance contract before a buyer-facing SLO is asserted.
+
+## 9. Non-functional requirements
 
 - Auditability: every high-impact decision links to evidence and actor context.
 - Reliability: idempotent commands and explicit retry/compensation where integrations fail.
@@ -99,11 +111,12 @@ Current HR systems often separate job architecture, recruiting, assessment, empl
 - Accessibility: WCAG 2.2 AA-oriented UI with exact-value tables for charts.
 - Scientific integrity: psychometric claims require validity evidence, not correlation-only shortcuts.
 
-## 9. Success metrics
+## 10. Success metrics
 
 - Time to create a reviewable job profile from evidence.
 - Percentage of hiring decisions with complete evidence lineage.
 - Percentage of candidate-worker links with preserved provenance.
+- Percentage of governed Employment separations with complete actor/purpose/reason/evidence/confirmation lineage and replay-safe audit/outbox evidence after the capability reaches protected truth.
 - Criterion blueprint coverage by job family.
 - Criterion observations assigned to a valid effective-dated performance cycle.
 - Validity studies with predictor/criterion version linkage.

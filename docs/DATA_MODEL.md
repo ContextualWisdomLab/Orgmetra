@@ -8,6 +8,7 @@
 | `person_record` | Durable person entity inside Orgmetra, not an authentication subject. |
 | `employment_record` | Durable employment identity for a person. |
 | `employment_record_version` | Bitemporal employment status, exclusive-or-concurrent code, and effective period. |
+| `employment_separation_record` | Append-only governed separation provenance linking the exact prior Employment version, optional continuation version, terminal version, decision metadata, evidence, human confirmation, and immutable audit event. |
 | `organization_unit` | Durable organizational identity referenced by positions and hierarchy facts. |
 | `organization_unit_version` | Bitemporal organizational name, type, and parent relationship for an organization unit. |
 | `job_profile` | Durable job identity referenced by positions, criteria, and decisions. |
@@ -18,7 +19,7 @@
 | `candidate_profile` | Applicant/candidate record before hire. |
 | `candidate_worker_link` | Legacy append-only candidate-to-worker linkage retained for historical reads; new writes use `candidate_worker_conversion_record`. |
 | `candidate_worker_conversion_record` | Governed bitemporal candidate-to-worker conversion bound to the hire decision, person, employment, immutable audit event, and outbox evidence. |
-| `people_mutation_idempotency_record` | Append-only tenant/route/idempotency-key binding to the canonical command digest and first committed created-record identity for governed People writes. |
+| `people_mutation_idempotency_record` | Append-only tenant/route/idempotency-key binding to the canonical command digest and first committed created/result record identity for governed People writes. |
 | `criterion_blueprint` | Job-related performance criterion definition. |
 | `criterion_observation` | Observed criterion result. |
 | `decision_evidence_set` | Versioned evidence-set header whose database-computed digest and membership are sealed by one accountable selection decision. |
@@ -52,6 +53,16 @@ Intervals are half-open and non-empty: an end value, when present, must be stric
 
 Durable anchors such as `organization_unit`, `job_profile`, `employment_record`, and `position_record` do not repeat mutable descriptive attributes. Their descriptive versions live in `organization_unit_version`, `job_profile_version`, `employment_record_version`, and `position_record_version`. Single-valued bitemporal version families reject overlapping effective/system intervals, so one `effective_from`/`effective_to` interval combined with one `recorded_from`/`recorded_to` interval cannot yield contradictory current descriptions. Corrections close the previous recorded interval and insert a replacement; in-place business mutation is rejected.
 
+### Employment separation truth
+
+On the active #64 People branch, a governed Employment separation is a bitemporal correction of one exact current-known `active` or `leave` `employment_record_version`; it is not an UPDATE of the protected business columns. The database closes the expected version's recorded interval at one post-lock database-owned timestamp. When the requested separation date is later than the prior version's `effective_from`, an optional continuation version preserves `[effective_from, separation_effective_on)`. A terminal `employment_record_version` with status `terminated` owns `[separation_effective_on, infinity)`.
+
+`employment_separation_record` binds the prior version, optional continuation version, terminal version, controlled `separation_reason_code`, actor, `workforce_admin` purpose, evidence reference/version, human confirmation, recorded timestamp, and audit identity. The continuation version's `effective_to` is only an interval boundary. The terminal version plus its `employment_separation_record` is the single authoritative separation truth; no parallel `employment_transition` termination fact is introduced.
+
+Separation and Assignment INSERT serialize on the same `employment_record` aggregate anchor. After the anchor lock, Assignment coverage is re-read in a separate statement so a waiter cannot proceed from a pre-lock READ COMMITTED snapshot. Separation never edits Assignment-owned rows: an Assignment that remains effective on or after the separation boundary blocks the separation until the Assignment owner coordinates it. Historical Assignments ending at or before the boundary remain legal.
+
+ADR 0015 remains Proposed and this model is active-PR truth until #64 is normally integrated and its PostgreSQL/security/review acceptance conditions pass. Rehire remains planned under #302; it creates a new Employment for the existing Person after a protected successful separation rather than reopening the terminated Employment.
+
 Assignments remain a legitimately multiple-membership fact. Each assignment must name the covering employment and the same person as that employment. Exclusive employments for one person cannot overlap; a second job must be marked `concurrent`. Allocation totals for one employment, and visible allocations for one position, are enforced by `orgmetra_hris_kernel` rather than a single-valued exclusion. An assignment day must also land on an `active` or `open` position version.
 
 ## High-impact decision evidence
@@ -62,9 +73,9 @@ New predictive-validity membership uses `validity_study_case_record` rather than
 
 ## People mutation idempotency
 
-`people_mutation_idempotency_record` is the durable retry boundary for governed candidate-worker conversion, Employment, Position, and Assignment mutations. Its unique business key is `(tenant_record_id, command_route, idempotency_key)`; the row stores the canonical semantic-command SHA-256 digest and the first committed created-record identity. Matching retries replay that identity, while a changed command under the same tenant/route/key fails closed instead of creating another HRIS fact.
+`people_mutation_idempotency_record` is the durable retry boundary for governed candidate-worker conversion, Employment, Position, Assignment, and Employment-separation mutations. Its unique business key is `(tenant_record_id, command_route, idempotency_key)`; the row stores the canonical semantic-command SHA-256 digest and the first committed created/result record identity. Matching retries replay that identity, while a changed command under the same tenant/route/key fails closed instead of creating another HRIS fact.
 
-The owning write port acquires an exact-key transaction-scoped advisory lock and writes the HRIS fact, immutable audit/outbox evidence, and idempotency row inside one PostgreSQL transaction. A rolled-back mutation therefore cannot leave a false replay marker. The relation is append-only, TRUNCATE-protected, tenant-RLS isolated, and uses opaque operational UUIDs. The idempotency key is transport correlation, not HR data or authorization evidence; actor, purpose, human-confirmation and resource authorization remain independently required.
+The owning write port acquires an exact-key transaction-scoped advisory lock and writes the HRIS fact, immutable audit/outbox evidence, and idempotency row inside one PostgreSQL transaction. Separation additionally locks the Employment aggregate so distinct idempotency keys cannot create contradictory terminal truth. A rolled-back mutation therefore cannot leave a false replay marker. After an uncertain caller outcome, a fresh same-key request replays the first durable result rather than creating retry-only separation, audit, or outbox facts. The relation is append-only, TRUNCATE-protected, tenant-RLS isolated, and uses opaque operational UUIDs. The idempotency key is transport correlation, not HR data or authorization evidence; actor, purpose, human-confirmation and resource authorization remain independently required.
 
 ## Audit and outbox normalization
 
@@ -82,4 +93,4 @@ Exponential/backoff policy selection, policy-specific producer configuration, re
 
 ## PII policy
 
-PII is not globally masked. Instead, every sensitive read is evaluated against tenant, actor, role, purpose, resource, field sensitivity, legal basis, retention, and audit policy. Audit envelopes and escalation evidence store opaque references and governance codes instead of duplicating mutable employee or candidate payloads.
+PII is not globally masked. Instead, every sensitive read is evaluated against tenant, actor, role, purpose, resource, field sensitivity, legal basis, retention, and audit policy. Audit envelopes, Employment-separation provenance, and escalation evidence store opaque references and governance codes instead of duplicating mutable employee or candidate payloads.

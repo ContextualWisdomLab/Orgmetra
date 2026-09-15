@@ -15,6 +15,19 @@ function removeOccurrence(text, fragment, occurrence = 1) {
   return text.slice(0, searchIndex) + text.slice(searchIndex + fragment.length);
 }
 
+function removeFromBlock(text, blockMarker, fragment) {
+  const blockStart = text.indexOf(blockMarker);
+  assert.ok(blockStart >= 0, `fixture block missing: ${blockMarker}`);
+  const indentation = blockMarker.match(/^ */)[0].length;
+  const nextPeer = new RegExp(`^ {${indentation}}\\S`, 'gm');
+  nextPeer.lastIndex = blockStart + blockMarker.length;
+  const nextMatch = nextPeer.exec(text);
+  const blockEnd = nextMatch?.index ?? text.length;
+  const block = text.slice(blockStart, blockEnd);
+  const mutatedBlock = removeOccurrence(block, fragment);
+  return text.slice(0, blockStart) + mutatedBlock + text.slice(blockEnd);
+}
+
 test('canonical OpenAPI passes structural operation validation', () => {
   assert.deepEqual(validateOpenApiContract(canonical), []);
 });
@@ -151,8 +164,8 @@ for (const testCase of [
   },
   {
     name: 'createAssignmentRecord scope',
+    blockMarker: '  /assignment-records:\n',
     fragment: '            - orgmetra.people.write\n',
-    occurrence: 3,
     expected: /createAssignmentRecord.*scope/
   },
   {
@@ -163,13 +176,15 @@ for (const testCase of [
   },
   {
     name: 'assignment confirmation requirement',
+    blockMarker: '    CreateAssignmentRecordCommand:\n',
     fragment: '        - confirmation_reference\n',
-    occurrence: 5,
     expected: /CreateAssignmentRecordCommand.*confirmation/
   }
 ]) {
   test(`structural OpenAPI gate rejects missing ${testCase.name}`, () => {
-    const mutated = removeOccurrence(canonical, testCase.fragment, testCase.occurrence ?? 1);
+    const mutated = testCase.blockMarker
+      ? removeFromBlock(canonical, testCase.blockMarker, testCase.fragment)
+      : removeOccurrence(canonical, testCase.fragment, testCase.occurrence ?? 1);
     const errors = validateOpenApiContract(mutated);
     assert.ok(errors.some((error) => testCase.expected.test(error)), errors.join('\n'));
   });

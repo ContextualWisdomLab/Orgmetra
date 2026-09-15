@@ -1,19 +1,22 @@
 """Atomic PostgreSQL adapter for governed People employment, position, and assignment writes.
 
-The adapter writes only Orgmetra-owned canonical HRIS relations. Employment and
-assignment paths require a current ``candidate_worker_conversion_record`` and
-never insert ``candidate_worker_link``. Every accepted write calls
-``record_audit_outbox_event`` in the same tenant-bound transaction.
+The adapter writes only Orgmetra-owned canonical HRIS relations. Generic Employment
+creation serializes on its current Person aggregate; generic Assignment creation
+serializes on its named Employment and Position aggregates rather than recruiting
+provenance. Neither path writes the legacy ``candidate_worker_link`` relation.
+Every accepted write calls ``record_audit_outbox_event`` in the same tenant-bound
+transaction.
 """
 
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
-from datetime import date, datetime
+from dataclasses import replace
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Callable
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from orgmetra_hris_kernel import (
     AssignmentFact,
@@ -53,16 +56,28 @@ _EMPLOYMENT_FIELDS = frozenset({"employment_record"})
 _POSITION_FIELDS = frozenset({"position_record"})
 _ASSIGNMENT_FIELDS = frozenset({"assignment_record"})
 
-_CONVERSION_SQL = """
+_PERSON_EMPLOYMENT_ANCHOR_SQL = """
 SELECT
-    conversion.candidate_worker_conversion_record_id,
+    person.person_record_id,
     pg_catalog.transaction_timestamp()
-FROM public.candidate_worker_conversion_record AS conversion
-WHERE conversion.tenant_record_id = %s
-  AND conversion.person_record_id = %s
-  AND conversion.recorded_to IS NULL
+FROM public.person_record AS person
+WHERE person.tenant_record_id = %s
+  AND person.person_record_id = %s
+  AND person.recorded_to IS NULL
 LIMIT 2
-FOR UPDATE OF conversion
+FOR UPDATE OF person
+""".strip()
+
+_ASSIGNMENT_EMPLOYMENT_ANCHOR_SQL = """
+SELECT
+    employment.employment_record_id,
+    employment.person_record_id
+FROM public.employment_record AS employment
+WHERE employment.tenant_record_id = %s
+  AND employment.employment_record_id = %s
+  AND employment.recorded_to IS NULL
+LIMIT 2
+FOR UPDATE OF employment
 """.strip()
 
 _EMPLOYMENT_VERSIONS_SQL = """
@@ -111,12 +126,27 @@ SELECT
     job.job_profile_id,
     pg_catalog.transaction_timestamp()
 FROM public.organization_unit AS organization
+JOIN public.organization_unit_version AS organization_version
+  ON organization_version.tenant_record_id = organization.tenant_record_id
+ AND organization_version.organization_unit_id = organization.organization_unit_id
 JOIN public.job_profile AS job
   ON job.tenant_record_id = organization.tenant_record_id
  AND job.job_profile_id = %s
+JOIN public.job_profile_version AS job_version
+  ON job_version.tenant_record_id = job.tenant_record_id
+ AND job_version.job_profile_id = job.job_profile_id
 WHERE organization.tenant_record_id = %s
   AND organization.organization_unit_id = %s
+  AND organization.recorded_to IS NULL
+  AND job.recorded_to IS NULL
+  AND organization_version.recorded_to IS NULL
+  AND organization_version.effective_from <= %s
+  AND (organization_version.effective_to IS NULL OR organization_version.effective_to > %s)
+  AND job_version.recorded_to IS NULL
+  AND job_version.effective_from <= %s
+  AND (job_version.effective_to IS NULL OR job_version.effective_to > %s)
 LIMIT 2
+FOR SHARE OF organization, job, organization_version, job_version
 """.strip()
 
 _INSERT_POSITION_SQL = """
@@ -174,6 +204,7 @@ JOIN public.position_record_version AS version
  AND version.position_record_id = position.position_record_id
 WHERE position.tenant_record_id = %s
   AND position.position_record_id = %s
+  AND position.recorded_to IS NULL
 FOR UPDATE OF position
 """.strip()
 
@@ -252,13 +283,43 @@ INSERT INTO public.people_mutation_idempotency_record (
 
 
 def _is_operational_uuid(value: object) -> bool:
-    """Return whether a value is an Orgmetra operational UUID."""
-    return isinstance(value, UUID) and value.int not in (0, _MAX_UUID_INT)
+    """Return whether durable UUID evidence has an inert operational integer payload."""
+    if type(value) is not UUID:
+        return False
+    identity = value.int
+    return type(identity) is int and 0 < identity < _MAX_UUID_INT
 
 
 def _is_aware_datetime(value: object) -> bool:
-    """Return whether a value is a timezone-aware datetime with a real offset."""
-    return isinstance(value, datetime) and value.tzinfo is not None and value.utcoffset() is not None
+    """Return whether durable time is exact and backed by an inert standard provider."""
+    if type(value) is not datetime or value.tzinfo is None:
+        return False
+    if type(value.tzinfo) not in (timezone, ZoneInfo):
+        return False
+    return value.utcoffset() is not None
+
+
+def _require_transactional_connection(connection: object) -> None:
+    """Require core People writes to run inside a real implicit transaction."""
+    if getattr(connection, "autocommit", None) is not False:
+        raise RuntimeError("People mutations require autocommit disabled.")
+
+
+def _unpack_fixed_rows(
+    value: object,
+    *,
+    row_width: int,
+    error_message: str,
+) -> tuple[tuple[object, ...], ...]:
+    """Detach exact built-in DB row containers before projection values are inspected."""
+    if type(value) not in (list, tuple):
+        raise PeopleMutationIntegrityError(error_message)
+    detached: list[tuple[object, ...]] = []
+    for row in value:
+        if type(row) not in (list, tuple) or len(row) != row_width:
+            raise PeopleMutationIntegrityError(error_message)
+        detached.append(tuple(row))
+    return tuple(detached)
 
 
 def _replayed_record_id(
@@ -266,25 +327,29 @@ def _replayed_record_id(
     *,
     command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
     authorization: AuthorizationDecision,
-) -> UUID | None:
-    """Serialize one key, then return its committed record identity when present."""
+) -> tuple[UUID, str] | None:
+    """Serialize one key and return its committed identity plus verified semantic digest."""
     route = command_route(command)
     digest = mutation_command_digest(command=command, authorization=authorization)
     key_parameters = (command.tenant_record_id, route, command.idempotency_key)
     cursor.execute(_LOOKUP_IDEMPOTENCY_SQL, key_parameters)
     cursor.execute(_READ_IDEMPOTENCY_SQL, key_parameters)
-    rows = cursor.fetchmany(2)
+    rows = _unpack_fixed_rows(
+        cursor.fetchmany(2),
+        row_width=2,
+        error_message="idempotency row is invalid",
+    )
     if not rows:
         return None
-    if len(rows) != 1 or len(rows[0]) != 2:
+    if len(rows) != 1:
         raise PeopleMutationIntegrityError("idempotency row is invalid")
     created_record_id, stored_digest = rows[0]
-    if not _is_operational_uuid(created_record_id) or not isinstance(stored_digest, str):
+    if not _is_operational_uuid(created_record_id) or type(stored_digest) is not str:
         raise PeopleMutationIntegrityError("idempotency row is invalid")
     if stored_digest != digest:
         raise PeopleMutationIntegrityError("idempotency key is bound to a different command")
     assert isinstance(created_record_id, UUID)
-    return created_record_id
+    return created_record_id, stored_digest
 
 
 def _record_idempotency(
@@ -321,20 +386,79 @@ def _require_authorization(
     resource_kind: str,
     requested_fields: frozenset[str],
 ) -> AuthorizationDecision:
-    """Require an exact allow decision for the intended mutation target."""
-    if not isinstance(authorization, AuthorizationDecision):
+    """Validate and snapshot the exact authorization evidence consumed by persistence."""
+    if type(authorization) is not AuthorizationDecision:
         raise PeopleMutationIntegrityError("people mutation requires a typed authorization decision")
     if (
-        not authorization.allowed
-        or authorization.tenant_record_id != tenant_record_id
-        or authorization.resource_reference != resource_reference
-        or authorization.resource_kind != resource_kind
-        or authorization.operation_code != "create_record"
-        or authorization.requested_fields != requested_fields
-        or authorization.authorized_fields != requested_fields
+        not _is_operational_uuid(tenant_record_id)
+        or type(resource_reference) is not str
+        or type(resource_kind) is not str
+        or type(requested_fields) is not frozenset
+        or any(type(field) is not str for field in requested_fields)
+    ):
+        raise PeopleMutationIntegrityError("people mutation authorization contract is invalid")
+
+    allowed = authorization.allowed
+    decision_tenant_record_id = authorization.tenant_record_id
+    actor_reference = authorization.actor_reference
+    decision_resource_reference = authorization.resource_reference
+    policy_version_code = authorization.policy_version_code
+    purpose_code = authorization.purpose_code
+    operation_code = authorization.operation_code
+    decision_resource_kind = authorization.resource_kind
+    decision_requested_fields = authorization.requested_fields
+    decision_authorized_fields = authorization.authorized_fields
+    reason_code = authorization.reason_code
+    next_action = authorization.next_action
+
+    if (
+        type(allowed) is not bool
+        or not _is_operational_uuid(decision_tenant_record_id)
+        or type(actor_reference) is not str
+        or type(decision_resource_reference) is not str
+        or type(policy_version_code) is not str
+        or type(purpose_code) is not str
+        or type(operation_code) is not str
+        or type(decision_resource_kind) is not str
+        or type(decision_requested_fields) is not frozenset
+        or type(decision_authorized_fields) is not frozenset
+        or type(reason_code) is not str
+        or type(next_action) is not str
+        or any(type(field) is not str for field in decision_requested_fields)
+        or any(type(field) is not str for field in decision_authorized_fields)
+    ):
+        raise PeopleMutationIntegrityError("people mutation authorization evidence is invalid")
+
+    expected_tenant_identity = tenant_record_id.int
+    decision_tenant_identity = decision_tenant_record_id.int
+    assert type(expected_tenant_identity) is int
+    assert type(decision_tenant_identity) is int
+    expected_tenant_record_id = UUID(int=expected_tenant_identity)
+    detached_decision = AuthorizationDecision(
+        allowed=allowed,
+        tenant_record_id=UUID(int=decision_tenant_identity),
+        actor_reference=actor_reference,
+        resource_reference=decision_resource_reference,
+        policy_version_code=policy_version_code,
+        purpose_code=purpose_code,
+        operation_code=operation_code,
+        resource_kind=decision_resource_kind,
+        requested_fields=frozenset(tuple(decision_requested_fields)),
+        authorized_fields=frozenset(tuple(decision_authorized_fields)),
+        reason_code=reason_code,
+        next_action=next_action,
+    )
+    if (
+        not detached_decision.allowed
+        or detached_decision.tenant_record_id != expected_tenant_record_id
+        or detached_decision.resource_reference != resource_reference
+        or detached_decision.resource_kind != resource_kind
+        or detached_decision.operation_code != "create_record"
+        or detached_decision.requested_fields != requested_fields
+        or detached_decision.authorized_fields != requested_fields
     ):
         raise PeopleMutationIntegrityError("people mutation authorization does not match the exact record")
-    return authorization
+    return detached_decision
 
 
 def _record_audit(
@@ -378,8 +502,8 @@ def _employment_version_from_row(tenant_record_id: UUID, row: tuple[object, ...]
         not _is_operational_uuid(employment_record_id)
         or not _is_operational_uuid(employment_record_version_id)
         or not _is_operational_uuid(person_record_id)
-        or not isinstance(status_code, str)
-        or not isinstance(concurrency_code, str)
+        or type(status_code) is not str
+        or type(concurrency_code) is not str
         or type(effective_from) is not date
         or (effective_to is not None and type(effective_to) is not date)
         or not _is_aware_datetime(recorded_from)
@@ -419,7 +543,7 @@ def _position_version_from_row(tenant_record_id: UUID, row: tuple[object, ...]) 
     if (
         not _is_operational_uuid(position_record_id)
         or not _is_operational_uuid(position_record_version_id)
-        or not isinstance(status_code, str)
+        or type(status_code) is not str
         or type(effective_from) is not date
         or (effective_to is not None and type(effective_to) is not date)
         or not _is_aware_datetime(recorded_from)
@@ -460,7 +584,7 @@ def _assignment_from_row(tenant_record_id: UUID, row: tuple[object, ...]) -> Ass
         or not _is_operational_uuid(employment_record_id)
         or not _is_operational_uuid(person_record_id)
         or not _is_operational_uuid(position_record_id)
-        or not isinstance(allocation_ratio, Decimal)
+        or type(allocation_ratio) is not Decimal
         or type(effective_from) is not date
         or (effective_to is not None and type(effective_to) is not date)
         or not _is_aware_datetime(recorded_from)
@@ -485,47 +609,96 @@ def _assignment_from_row(tenant_record_id: UUID, row: tuple[object, ...]) -> Ass
     )
 
 
-def _require_one_conversion(rows: list[tuple[object, ...]]) -> tuple[UUID, datetime]:
-    """Require exactly one current conversion row and a usable transaction timestamp."""
-    if not rows:
-        raise PeopleMutationIntegrityError("person has no governed candidate-worker conversion")
-    if len(rows) != 1:
-        raise PeopleMutationIntegrityError("multiple candidate-worker conversions matched the person")
-    if len(rows[0]) != 2:
-        raise PeopleMutationIntegrityError("conversion row has an invalid shape")
-    conversion_id, recorded_at = rows[0]
-    if not _is_operational_uuid(conversion_id) or not _is_aware_datetime(recorded_at):
-        raise PeopleMutationIntegrityError("conversion identity or transaction time is invalid")
-    assert isinstance(conversion_id, UUID)
-    assert isinstance(recorded_at, datetime)
-    return conversion_id, recorded_at
+def _require_one_person_employment_anchor(
+    rows: object,
+    *,
+    expected_person_record_id: UUID,
+) -> None:
+    """Require and verify the current Person row that serializes Employment creation."""
+    detached = _unpack_fixed_rows(
+        rows,
+        row_width=2,
+        error_message="person employment anchor row has an invalid shape",
+    )
+    if not detached:
+        raise PeopleMutationNotFound("person record was not found")
+    if len(detached) != 1:
+        raise PeopleMutationIntegrityError("multiple person employment anchors matched the person")
+    person_record_id, anchor_time = detached[0]
+    if (
+        not _is_operational_uuid(person_record_id)
+        or person_record_id != expected_person_record_id
+        or not _is_aware_datetime(anchor_time)
+    ):
+        raise PeopleMutationIntegrityError("person employment anchor identity is invalid")
+
+
+def _require_one_assignment_employment_anchor(
+    rows: object,
+    *,
+    expected_employment_record_id: UUID,
+    expected_person_record_id: UUID,
+) -> None:
+    """Require the exact Employment root that serializes Assignment eligibility and capacity."""
+    detached = _unpack_fixed_rows(
+        rows,
+        row_width=2,
+        error_message="assignment employment anchor row has an invalid shape",
+    )
+    if not detached:
+        raise PeopleMutationNotFound("assignment employment record was not found")
+    if len(detached) != 1:
+        raise PeopleMutationIntegrityError("multiple assignment employment anchors matched the record")
+    employment_record_id, person_record_id = detached[0]
+    if (
+        not _is_operational_uuid(employment_record_id)
+        or not _is_operational_uuid(person_record_id)
+        or employment_record_id != expected_employment_record_id
+        or person_record_id != expected_person_record_id
+    ):
+        raise PeopleMutationIntegrityError("assignment employment anchor identity is invalid")
 
 
 def _post_lock_recorded_at(cursor: Any) -> datetime:
     """Read one database clock instant only after the relevant conflict lock is held."""
     cursor.execute(_POST_LOCK_RECORDED_AT_SQL)
-    rows = cursor.fetchmany(2)
-    if len(rows) != 1 or len(rows[0]) != 1 or not _is_aware_datetime(rows[0][0]):
+    rows = _unpack_fixed_rows(
+        cursor.fetchmany(2),
+        row_width=1,
+        error_message="post-lock database clock row is invalid",
+    )
+    if len(rows) != 1 or not _is_aware_datetime(rows[0][0]):
         raise PeopleMutationIntegrityError("post-lock database clock row is invalid")
     recorded_at = rows[0][0]
     assert isinstance(recorded_at, datetime)
     return recorded_at
 
 
-@dataclass(frozen=True, slots=True)
-class PostgresPeopleMutationPort:
+class PostgresPeopleMutationPort(tuple):
     """Persist People mutations and governance evidence in one DB transaction.
 
     ``connection_factory`` must return a DB-API connection context manager whose
-    successful exit commits and exceptional exit rolls back.
+    successful exit commits and exceptional exit rolls back. The returned
+    connection must expose exact ``autocommit is False`` before cursor acquisition
+    so transaction mode, tenant context, aggregate locks, HRIS writes, idempotency,
+    audit/outbox, and post-lock database time share one short atomic boundary. The
+    accepted executable factory is stored in the immutable tuple payload so retained
+    references cannot replace the validated database capability before later
+    authoritative writes. Fixed query projections must arrive as exact built-in
+    list/tuple batches and rows; custom row factories must normalize before this
+    trust boundary.
     """
 
-    connection_factory: PostgresConnectionFactory
+    __slots__ = ()
 
-    def __post_init__(self) -> None:
-        """Reject unusable database factories before protected mutation is attempted."""
-        if not callable(self.connection_factory):
+    def __new__(
+        cls,
+        connection_factory: PostgresConnectionFactory,
+    ) -> PostgresPeopleMutationPort:
+        """Validate and structurally bind the executable database capability."""
+        if not callable(connection_factory):
             raise TypeError("connection_factory must be callable")
+        return tuple.__new__(cls, (connection_factory,))
 
     def create_employment(
         self,
@@ -533,9 +706,10 @@ class PostgresPeopleMutationPort:
         command: EmploymentMutationCommand,
         authorization: AuthorizationDecision,
     ) -> EmploymentMutationResult:
-        """Persist one employment after conversion and exclusivity checks."""
-        if not isinstance(command, EmploymentMutationCommand):
+        """Persist one Employment after Person serialization and exclusivity checks."""
+        if type(command) is not EmploymentMutationCommand:
             raise TypeError("command must be an EmploymentMutationCommand")
+        command = replace(command)
         decision = _require_authorization(
             authorization=authorization,
             tenant_record_id=command.tenant_record_id,
@@ -543,23 +717,40 @@ class PostgresPeopleMutationPort:
             resource_kind="employment_record",
             requested_fields=_EMPLOYMENT_FIELDS,
         )
-        with self.connection_factory() as connection:
+        connection_factory = tuple.__getitem__(self, 0)
+        with connection_factory() as connection:
+            _require_transactional_connection(connection)
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
                 replayed = _replayed_record_id(cursor, command=command, authorization=decision)
                 if replayed is not None:
-                    return EmploymentMutationResult(employment_record_id=replayed)
-                cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
-                _require_one_conversion(cursor.fetchmany(2))
+                    replayed_record_id, replay_digest = replayed
+                    return EmploymentMutationResult(
+                        employment_record_id=replayed_record_id,
+                        replay_command_digest=replay_digest,
+                    )
+                cursor.execute(
+                    _PERSON_EMPLOYMENT_ANCHOR_SQL,
+                    (command.tenant_record_id, command.person_record_id),
+                )
+                _require_one_person_employment_anchor(
+                    cursor.fetchmany(2),
+                    expected_person_record_id=command.person_record_id,
+                )
                 recorded_at = _post_lock_recorded_at(cursor)
                 cursor.execute(
                     _EMPLOYMENT_VERSIONS_SQL,
                     (command.tenant_record_id, command.person_record_id),
                 )
+                existing_rows = _unpack_fixed_rows(
+                    cursor.fetchall(),
+                    row_width=9,
+                    error_message="employment version row has an invalid shape",
+                )
                 existing = [
                     _employment_version_from_row(command.tenant_record_id, row)
-                    for row in cursor.fetchall()
+                    for row in existing_rows
                 ]
                 proposed = EmploymentVersion(
                     tenant_record_id=command.tenant_record_id,
@@ -637,8 +828,9 @@ class PostgresPeopleMutationPort:
         authorization: AuthorizationDecision,
     ) -> PositionMutationResult:
         """Persist one position after organization and job parent checks."""
-        if not isinstance(command, PositionMutationCommand):
+        if type(command) is not PositionMutationCommand:
             raise TypeError("command must be a PositionMutationCommand")
+        command = replace(command)
         decision = _require_authorization(
             authorization=authorization,
             tenant_record_id=command.tenant_record_id,
@@ -646,30 +838,50 @@ class PostgresPeopleMutationPort:
             resource_kind="position_record",
             requested_fields=_POSITION_FIELDS,
         )
-        with self.connection_factory() as connection:
+        connection_factory = tuple.__getitem__(self, 0)
+        with connection_factory() as connection:
+            _require_transactional_connection(connection)
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
                 replayed = _replayed_record_id(cursor, command=command, authorization=decision)
                 if replayed is not None:
-                    return PositionMutationResult(position_record_id=replayed)
+                    replayed_record_id, replay_digest = replayed
+                    return PositionMutationResult(
+                        position_record_id=replayed_record_id,
+                        replay_command_digest=replay_digest,
+                    )
                 cursor.execute(
                     _POSITION_PARENTS_SQL,
-                    (command.job_profile_id, command.tenant_record_id, command.organization_unit_id),
+                    (
+                        command.job_profile_id,
+                        command.tenant_record_id,
+                        command.organization_unit_id,
+                        command.effective_from,
+                        command.effective_from,
+                        command.effective_from,
+                        command.effective_from,
+                    ),
                 )
-                rows = cursor.fetchmany(2)
+                rows = _unpack_fixed_rows(
+                    cursor.fetchmany(2),
+                    row_width=3,
+                    error_message="position parent row is invalid",
+                )
                 if not rows:
                     raise PeopleMutationNotFound("organization unit or job profile was not found")
-                if len(rows) != 1 or len(rows[0]) != 3:
+                if len(rows) != 1:
                     raise PeopleMutationIntegrityError("position parent row is invalid")
-                organization_unit_id, job_profile_id, recorded_at = rows[0]
+                organization_unit_id, job_profile_id, parent_transaction_time = rows[0]
                 if (
-                    organization_unit_id != command.organization_unit_id
+                    not _is_operational_uuid(organization_unit_id)
+                    or not _is_operational_uuid(job_profile_id)
+                    or organization_unit_id != command.organization_unit_id
                     or job_profile_id != command.job_profile_id
-                    or not _is_aware_datetime(recorded_at)
+                    or not _is_aware_datetime(parent_transaction_time)
                 ):
                     raise PeopleMutationIntegrityError("position parent identity is invalid")
-                assert isinstance(recorded_at, datetime)
+                recorded_at = _post_lock_recorded_at(cursor)
                 cursor.execute(
                     _INSERT_POSITION_SQL,
                     (
@@ -726,9 +938,10 @@ class PostgresPeopleMutationPort:
         command: AssignmentMutationCommand,
         authorization: AuthorizationDecision,
     ) -> AssignmentMutationResult:
-        """Persist one assignment after conversion and kernel coverage checks."""
-        if not isinstance(command, AssignmentMutationCommand):
+        """Persist one Assignment after Employment/Position serialization and kernel checks."""
+        if type(command) is not AssignmentMutationCommand:
             raise TypeError("command must be an AssignmentMutationCommand")
+        command = replace(command)
         decision = _require_authorization(
             authorization=authorization,
             tenant_record_id=command.tenant_record_id,
@@ -736,30 +949,53 @@ class PostgresPeopleMutationPort:
             resource_kind="assignment_record",
             requested_fields=_ASSIGNMENT_FIELDS,
         )
-        with self.connection_factory() as connection:
+        connection_factory = tuple.__getitem__(self, 0)
+        with connection_factory() as connection:
+            _require_transactional_connection(connection)
             with connection.cursor() as cursor:
                 cursor.execute(_READ_WRITE_SQL)
                 cursor.execute(_TENANT_CONTEXT_SQL, (str(command.tenant_record_id),))
                 replayed = _replayed_record_id(cursor, command=command, authorization=decision)
                 if replayed is not None:
-                    return AssignmentMutationResult(assignment_record_id=replayed)
-                cursor.execute(_CONVERSION_SQL, (command.tenant_record_id, command.person_record_id))
-                _require_one_conversion(cursor.fetchmany(2))
+                    replayed_record_id, replay_digest = replayed
+                    return AssignmentMutationResult(
+                        assignment_record_id=replayed_record_id,
+                        replay_command_digest=replay_digest,
+                    )
+                cursor.execute(
+                    _ASSIGNMENT_EMPLOYMENT_ANCHOR_SQL,
+                    (command.tenant_record_id, command.employment_record_id),
+                )
+                _require_one_assignment_employment_anchor(
+                    cursor.fetchmany(2),
+                    expected_employment_record_id=command.employment_record_id,
+                    expected_person_record_id=command.person_record_id,
+                )
                 cursor.execute(
                     _NAMED_EMPLOYMENT_VERSIONS_SQL,
                     (command.tenant_record_id, command.employment_record_id),
                 )
+                employment_rows = _unpack_fixed_rows(
+                    cursor.fetchall(),
+                    row_width=9,
+                    error_message="employment version row has an invalid shape",
+                )
                 employment_versions = [
                     _employment_version_from_row(command.tenant_record_id, row)
-                    for row in cursor.fetchall()
+                    for row in employment_rows
                 ]
                 cursor.execute(
                     _NAMED_POSITION_VERSIONS_SQL,
                     (command.tenant_record_id, command.position_record_id),
                 )
+                position_rows = _unpack_fixed_rows(
+                    cursor.fetchall(),
+                    row_width=7,
+                    error_message="position version row has an invalid shape",
+                )
                 position_versions = [
                     _position_version_from_row(command.tenant_record_id, row)
-                    for row in cursor.fetchall()
+                    for row in position_rows
                 ]
                 recorded_at = _post_lock_recorded_at(cursor)
                 cursor.execute(
@@ -770,9 +1006,14 @@ class PostgresPeopleMutationPort:
                         command.position_record_id,
                     ),
                 )
+                assignment_rows = _unpack_fixed_rows(
+                    cursor.fetchall(),
+                    row_width=9,
+                    error_message="assignment row has an invalid shape",
+                )
                 existing_assignments = [
                     _assignment_from_row(command.tenant_record_id, row)
-                    for row in cursor.fetchall()
+                    for row in assignment_rows
                 ]
                 proposed = AssignmentFact(
                     tenant_record_id=command.tenant_record_id,

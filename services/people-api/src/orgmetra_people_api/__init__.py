@@ -1,4 +1,4 @@
-"""Request-edge, governed read, confirmed-hire, and People mutation contracts."""
+"""Request-edge, governed read, hire, separation, and People mutation contracts."""
 
 from orgmetra_people_api.auth import (
     AuthenticatedPrincipal,
@@ -43,6 +43,15 @@ from orgmetra_people_api.people import (
 from orgmetra_people_api.postgres import PostgresPeopleReadPort
 from orgmetra_people_api.postgres_hire import PostgresHireAcceptancePort
 from orgmetra_people_api.postgres_mutations import PostgresPeopleMutationPort
+from orgmetra_people_api.postgres_separation import PostgresEmploymentSeparationPort
+from orgmetra_people_api.separation import (
+    EmploymentSeparationCommand,
+    EmploymentSeparationIntegrityError,
+    EmploymentSeparationPort,
+    EmploymentSeparationResult,
+    separate_employment_record,
+)
+from orgmetra_people_api.separation_http import EmploymentSeparationAsgiApp
 
 __all__ = [
     "AuthenticatedPrincipal",
@@ -67,10 +76,16 @@ __all__ = [
     "PostgresHireAcceptancePort",
     "PostgresPeopleMutationPort",
     "PostgresPeopleReadPort",
+    "PostgresEmploymentSeparationPort",
     "AssignmentMutationCommand",
     "AssignmentMutationResult",
     "EmploymentMutationCommand",
     "EmploymentMutationResult",
+    "EmploymentSeparationAsgiApp",
+    "EmploymentSeparationCommand",
+    "EmploymentSeparationIntegrityError",
+    "EmploymentSeparationPort",
+    "EmploymentSeparationResult",
     "TokenAuthenticator",
     "WorkerPeopleRecord",
     "accept_confirmed_hire",
@@ -80,4 +95,5 @@ __all__ = [
     "create_position_record",
     "extract_bearer_token",
     "read_worker_people_record",
+    "separate_employment_record",
 ]

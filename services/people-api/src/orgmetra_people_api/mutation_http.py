@@ -88,6 +88,9 @@ _MAX_EVIDENCE_VERSION_LENGTH = 200
 _MAX_DECISION_REASON_LENGTH = 4000
 _MAX_CONFIRMATION_REFERENCE_LENGTH = 300
 _MAX_ACTOR_REFERENCE_LENGTH = 200
+_MAX_HEADER_COUNT = 64
+_MAX_HEADER_PAIR_BYTES = 16 * 1024
+_MAX_HEADER_BYTES = 16 * 1024
 _SUPPORT_REFERENCE_RANDOM_BYTES = 24
 
 
@@ -99,6 +102,58 @@ class _MutationHeaders:
     actor_reference: str
     purpose_code: str
     idempotency_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class _MutationRuntime:
+    """Bind executable mutation capabilities before crossing an external await."""
+
+    authenticator: TokenAuthenticator
+    employment_policy: PurposeBoundAccessPolicy
+    position_policy: PurposeBoundAccessPolicy
+    assignment_policy: PurposeBoundAccessPolicy
+    mutation_port: PeopleMutationPort
+    id_factory: Callable[[], UUID]
+
+    def __post_init__(self) -> None:
+        """Fail closed if request-entry capabilities no longer satisfy their contracts."""
+        if not isinstance(self.authenticator, TokenAuthenticator):
+            raise TypeError("authenticator must implement TokenAuthenticator")
+        if not isinstance(self.employment_policy, PurposeBoundAccessPolicy):
+            raise TypeError("employment_policy must be a PurposeBoundAccessPolicy")
+        if not isinstance(self.position_policy, PurposeBoundAccessPolicy):
+            raise TypeError("position_policy must be a PurposeBoundAccessPolicy")
+        if not isinstance(self.assignment_policy, PurposeBoundAccessPolicy):
+            raise TypeError("assignment_policy must be a PurposeBoundAccessPolicy")
+        if not isinstance(self.mutation_port, PeopleMutationPort):
+            raise TypeError("mutation_port must implement PeopleMutationPort")
+        if not callable(self.id_factory):
+            raise TypeError("id_factory must be callable")
+
+
+def _detach_authenticated_principal(principal: object) -> AuthenticatedPrincipal:
+    """Reduce identity-backend evidence to exact inert authority before later request behavior."""
+    if type(principal) is not AuthenticatedPrincipal:
+        raise TypeError("authenticator must return an exact AuthenticatedPrincipal")
+    tenant_record_id = principal.tenant_record_id
+    if type(tenant_record_id) is not UUID:
+        raise TypeError("authenticated tenant_record_id must be an exact UUID")
+    tenant_identity = tenant_record_id.int
+    if type(tenant_identity) is not int or not (0 < tenant_identity < _MAX_UUID_INT):
+        raise TypeError("authenticated tenant_record_id must contain an operational integer UUID payload")
+    actor_reference = principal.actor_reference
+    if type(actor_reference) is not str:
+        raise TypeError("authenticated actor_reference must be exact built-in text")
+    granted_scope_codes = principal.granted_scope_codes
+    if type(granted_scope_codes) is not frozenset or not granted_scope_codes:
+        raise TypeError("authenticated granted_scope_codes must be an exact non-empty frozenset")
+    if any(type(scope_code) is not str for scope_code in granted_scope_codes):
+        raise TypeError("authenticated granted_scope_codes must contain exact built-in text")
+    return AuthenticatedPrincipal(
+        tenant_record_id=UUID(int=tenant_identity),
+        actor_reference=actor_reference,
+        granted_scope_codes=frozenset(tuple(granted_scope_codes)),
+    )
 
 
 async def _send_error(
@@ -163,26 +218,25 @@ class PeopleMutationAsgiApp:
 
     def __post_init__(self) -> None:
         """Reject incomplete dependency injection before serving mutations."""
-        if not isinstance(self.authenticator, TokenAuthenticator):
-            raise TypeError("authenticator must implement TokenAuthenticator")
-        if not isinstance(self.employment_policy, PurposeBoundAccessPolicy):
-            raise TypeError("employment_policy must be a PurposeBoundAccessPolicy")
-        if not isinstance(self.position_policy, PurposeBoundAccessPolicy):
-            raise TypeError("position_policy must be a PurposeBoundAccessPolicy")
-        if not isinstance(self.assignment_policy, PurposeBoundAccessPolicy):
-            raise TypeError("assignment_policy must be a PurposeBoundAccessPolicy")
-        if not isinstance(self.mutation_port, PeopleMutationPort):
-            raise TypeError("mutation_port must implement PeopleMutationPort")
-        if not callable(self.id_factory):
-            raise TypeError("id_factory must be callable")
+        _MutationRuntime(
+            authenticator=self.authenticator,
+            employment_policy=self.employment_policy,
+            position_policy=self.position_policy,
+            assignment_policy=self.assignment_policy,
+            mutation_port=self.mutation_port,
+            id_factory=self.id_factory,
+        )
 
     async def __call__(self, scope: Mapping[str, object], receive: AsgiReceive, send: AsgiSend) -> None:
         """Serve one People mutation without exposing bearer tokens or backend secrets."""
-        if scope.get("type") != "http":
+        if type(scope) is not dict:
+            raise ValueError("PeopleMutationAsgiApp requires an exact ASGI scope dict")
+        scope_type = scope.get("type")
+        if type(scope_type) is not str or scope_type != "http":
             raise ValueError("PeopleMutationAsgiApp accepts only HTTP ASGI scopes")
 
         method = scope.get("method")
-        if method != "POST":
+        if type(method) is not str or method != "POST":
             await _send_error(
                 send,
                 status=405,
@@ -231,11 +285,20 @@ class PeopleMutationAsgiApp:
             )
             return
 
+        runtime = _MutationRuntime(
+            authenticator=self.authenticator,
+            employment_policy=self.employment_policy,
+            position_policy=self.position_policy,
+            assignment_policy=self.assignment_policy,
+            mutation_port=self.mutation_port,
+            id_factory=self.id_factory,
+        )
+
         try:
             bearer_token = extract_bearer_token(_authorization_header(scope))
-            principal = await self.authenticator.authenticate(bearer_token)
-            if not isinstance(principal, AuthenticatedPrincipal):
-                raise TypeError("authenticator returned an invalid principal")
+            principal = _detach_authenticated_principal(
+                await runtime.authenticator.authenticate(bearer_token)
+            )
         except AuthenticationFailed:
             await _send_error(
                 send,
@@ -289,7 +352,7 @@ class PeopleMutationAsgiApp:
                 route,
                 headers.tenant_record_id,
                 payload,
-                self.id_factory,
+                runtime.id_factory,
                 headers.idempotency_key,
             )
         except _PayloadTooLarge:
@@ -319,7 +382,7 @@ class PeopleMutationAsgiApp:
                 principal=principal,
                 command=command,
                 purpose_code=headers.purpose_code,
-                app=self,
+                app=runtime,
             )
         except AuthorizationDeniedError:
             await _send_error(
@@ -384,7 +447,7 @@ class PeopleMutationAsgiApp:
 
 def _mutation_route(path: object) -> str | None:
     """Return the canonical mutation leaf or None when the path is not owned here."""
-    if not isinstance(path, str):
+    if type(path) is not str:
         return None
     parts = path.strip("/").split("/")
     if len(parts) != 2 or parts[0] != "v1":
@@ -395,16 +458,25 @@ def _mutation_route(path: object) -> str | None:
 
 
 def _parse_command_headers(scope: Mapping[str, object]) -> _MutationHeaders:
-    """Validate OpenAPI command headers before authentication."""
+    """Validate bounded exact ASGI command headers before authentication."""
+    if type(scope) is not dict:
+        raise _InvalidHttpRequest("command scope is invalid")
     raw_headers = scope.get("headers", ())
-    if not isinstance(raw_headers, (list, tuple)):
+    if type(raw_headers) not in (list, tuple) or len(raw_headers) > _MAX_HEADER_COUNT:
         raise _InvalidHttpRequest("command headers are invalid")
+    total_bytes = 0
     values: dict[str, str] = {}
     for header in raw_headers:
-        if not isinstance(header, (list, tuple)) or len(header) != 2:
+        if type(header) not in (list, tuple) or len(header) != 2:
             raise _InvalidHttpRequest("command headers are invalid")
         name, value = header
-        if not isinstance(name, bytes) or not isinstance(value, bytes):
+        if type(name) is not bytes or type(value) is not bytes:
+            raise _InvalidHttpRequest("command headers are invalid")
+        pair_bytes = len(name) + len(value)
+        if pair_bytes > _MAX_HEADER_PAIR_BYTES:
+            raise _InvalidHttpRequest("command headers are invalid")
+        total_bytes += pair_bytes
+        if total_bytes > _MAX_HEADER_BYTES:
             raise _InvalidHttpRequest("command headers are invalid")
         key = name.lower().decode("ascii")
         if key in {
@@ -597,7 +669,7 @@ def _dispatch_mutation(
     principal: AuthenticatedPrincipal,
     command: EmploymentMutationCommand | PositionMutationCommand | AssignmentMutationCommand,
     purpose_code: str,
-    app: PeopleMutationAsgiApp,
+    app: PeopleMutationAsgiApp | _MutationRuntime,
 ) -> tuple[dict[str, str], str]:
     """Invoke the authorized application function for the matched route."""
     if route == "employment-records":
