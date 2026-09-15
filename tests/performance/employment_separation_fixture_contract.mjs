@@ -28,6 +28,8 @@ const PROFILE_PRECONDITIONS = Object.freeze({
   rejection: "expected_version_stale_or_semantic_conflict",
   contention: "active_current_expected_version",
 });
+const MAXIMUM_NON_CONTENDING_RECORDS = 1000;
+const MAXIMUM_CONTENTION_PAIRS = 100;
 
 function fail(message) {
   throw new Error(message);
@@ -203,9 +205,15 @@ export function validatePerformanceFixture(
     if (!Array.isArray(profiles[profile]) || profiles[profile].length < minimumNonContendingRecords) {
       fail(`fixture.profiles.${profile} must contain at least ${minimumNonContendingRecords} records`);
     }
+    if (profiles[profile].length > MAXIMUM_NON_CONTENDING_RECORDS) {
+      fail(`fixture.profiles.${profile} must contain at most ${MAXIMUM_NON_CONTENDING_RECORDS} records`);
+    }
   }
   if (!Array.isArray(profiles.contention) || profiles.contention.length < minimumContentionPairs) {
     fail(`fixture.profiles.contention must contain at least ${minimumContentionPairs} pairs`);
+  }
+  if (profiles.contention.length > MAXIMUM_CONTENTION_PAIRS) {
+    fail(`fixture.profiles.contention must contain at most ${MAXIMUM_CONTENTION_PAIRS} pairs`);
   }
 
   const seenEmployment = new Set();
