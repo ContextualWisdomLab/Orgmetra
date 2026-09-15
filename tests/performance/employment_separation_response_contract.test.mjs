@@ -169,6 +169,25 @@ test("accepts only the published closed ErrorResponse shape for separation confl
   assert.equal(isGovernedSeparationConflict(404, conflictBody()), false);
 });
 
+test("bounds governed response JSON before strict parsing while preserving the closed error envelope", () => {
+  const escapedBoundaryText = "\u0001".repeat(1000);
+  const largestSemanticEnvelope = JSON.stringify(conflictBody({
+    message: escapedBoundaryText,
+    next_action: escapedBoundaryText,
+  }));
+  assert.ok(largestSemanticEnvelope.length < 16 * 1024);
+  assert.deepEqual(
+    parseGovernedSeparationResponseBody(largestSemanticEnvelope),
+    JSON.parse(largestSemanticEnvelope),
+  );
+
+  const oversized = `${" ".repeat(16 * 1024)}${JSON.stringify(successBody(false))}`;
+  assert.throws(
+    () => parseGovernedSeparationResponseBody(oversized),
+    /governed separation response body must not exceed 16384 UTF-8 bytes/,
+  );
+});
+
 test("strict response parsing rejects duplicate trust-bearing JSON members before semantic validation", () => {
   assert.throws(
     () => parseGovernedSeparationResponseBody(`{"employment_record_id":"${EMPLOYMENT}","separated_employment_record_version_id":"${VERSION}","recorded_at":"2026-09-13T02:00:00Z","replayed":true,"replayed":false}`),
