@@ -55,6 +55,18 @@ function isValidUtcTimestamp(value) {
   );
 }
 
+export function hasGovernedSeparationJsonMediaType(headers) {
+  if (!isPlainObject(headers)) return false;
+  const contentTypeEntries = Object.entries(headers).filter(
+    ([name]) => name.toLowerCase() === "content-type",
+  );
+  if (contentTypeEntries.length !== 1) return false;
+  const value = contentTypeEntries[0][1];
+  if (typeof value !== "string") return false;
+  const mediaType = value.split(";", 1)[0].trim().toLowerCase();
+  return mediaType === "application/json";
+}
+
 export function parseGovernedSeparationResponseBody(value) {
   if (typeof value !== "string") {
     throw new Error("governed separation response body must be JSON text");
