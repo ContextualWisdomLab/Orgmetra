@@ -105,6 +105,22 @@ function utcTimestamp(value, label) {
   return text;
 }
 
+function compareUtcTimestamps(left, right) {
+  const leftBody = left.slice(0, -1);
+  const rightBody = right.slice(0, -1);
+  const [leftSecond, leftFraction = ""] = leftBody.split(".");
+  const [rightSecond, rightFraction = ""] = rightBody.split(".");
+  if (leftSecond < rightSecond) return -1;
+  if (leftSecond > rightSecond) return 1;
+
+  const precision = Math.max(leftFraction.length, rightFraction.length);
+  const normalizedLeft = leftFraction.padEnd(precision, "0");
+  const normalizedRight = rightFraction.padEnd(precision, "0");
+  if (normalizedLeft < normalizedRight) return -1;
+  if (normalizedLeft > normalizedRight) return 1;
+  return 0;
+}
+
 function positiveInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 1) fail(`${label} must be a positive safe integer`);
   return value;
@@ -325,7 +341,7 @@ function validateRuntimeEvidence(runtime, resultDigest, result, validatedResult,
     fail("runtime.resource_evidence_reference must match result.resource_evidence_reference");
   }
   const observedAt = utcTimestamp(runtime.observed_at, "runtime.observed_at");
-  if (Date.parse(observedAt) < Date.parse(validatedResult.completedAt)) {
+  if (compareUtcTimestamps(observedAt, validatedResult.completedAt) < 0) {
     fail("runtime.observed_at must not precede result.completed_at");
   }
 
