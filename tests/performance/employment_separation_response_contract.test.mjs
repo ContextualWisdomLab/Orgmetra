@@ -137,9 +137,18 @@ test("rejects k6-collapsed duplicate Content-Type values without rejecting quote
     true,
   );
   assert.equal(
+    hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json; profile=\"a\\\",b\"" }),
+    true,
+  );
+  assert.equal(
     hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json; profile=\"unterminated, text/plain" }),
     false,
   );
+  assert.equal(
+    hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json; profile=a\"b,c\"" }),
+    false,
+  );
+  assert.equal(hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json;" }), false);
 });
 
 test("accepts only the published closed ErrorResponse shape for separation conflicts", () => {
