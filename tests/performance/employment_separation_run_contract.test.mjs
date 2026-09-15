@@ -8,6 +8,7 @@ import {
   arrivalRateScenarioForPerformanceProfile,
   requireDirectPerformanceClientNetwork,
   requirePerformanceProfile,
+  requireVerifiedTlsTransport,
   thresholdsForPerformanceProfile,
   validatePerformanceLoadModel,
 } from "./employment_separation_run_contract.mjs";
@@ -100,6 +101,14 @@ test("fails closed when the k6 client is routed through an ambient proxy", () =>
   assert.throws(
     () => requireDirectPerformanceClientNetwork({ all_proxy: "socks5://proxy.example" }),
     /all_proxy must be unset/,
+  );
+});
+
+test("fails closed when resolved k6 options disable TLS certificate verification", () => {
+  assert.equal(requireVerifiedTlsTransport(false), false);
+  assert.throws(
+    () => requireVerifiedTlsTransport(true),
+    /TLS certificate verification must remain enabled/,
   );
 });
 
