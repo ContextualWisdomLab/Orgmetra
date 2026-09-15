@@ -221,10 +221,14 @@ def _require_port(separation_port: object) -> FunctionType:
     """Bind one ordinary class-defined persistence function without executing descriptors."""
     operation = getattr_static(type(separation_port), "separate_employment", None)
     if type(operation) is not FunctionType:
-        raise TypeError("separation_port must provide separate_employment as an ordinary instance method")
+        raise TypeError(
+            "separation_port must implement EmploymentSeparationPort and provide separate_employment as an ordinary instance method"
+        )
     protocol_operation = getattr_static(EmploymentSeparationPort, "separate_employment")
     if operation is protocol_operation:
-        raise TypeError("separation_port must provide separate_employment as an ordinary instance method")
+        raise TypeError(
+            "separation_port must implement EmploymentSeparationPort and provide separate_employment as an ordinary instance method"
+        )
     return operation
 
 
