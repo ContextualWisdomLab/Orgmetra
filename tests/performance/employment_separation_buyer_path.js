@@ -13,7 +13,10 @@ import {
   requestHeaders,
   validatePerformanceFixture,
 } from "./employment_separation_fixture_contract.mjs";
-import { governedSeparationRequestParams } from "./employment_separation_request_contract.mjs";
+import {
+  governedSeparationRequestParams,
+  requireGovernedSeparationHttpsOrigin,
+} from "./employment_separation_request_contract.mjs";
 import { requirePinnedK6Runtime } from "./employment_separation_k6_runtime_contract.mjs";
 import { normalizeEmploymentSeparationK6Summary } from "./employment_separation_k6_summary_contract.mjs";
 import {
@@ -43,7 +46,7 @@ const TREND_BY_PROFILE = Object.freeze({
   contention: "employment_separation_contention_duration_ms",
 });
 const fixturePath = __ENV.ORGMETRA_PERFORMANCE_DATA_FILE;
-const baseUrl = (__ENV.ORGMETRA_PERFORMANCE_BASE_URL || "").replace(/\/$/, "");
+const baseUrl = requireGovernedSeparationHttpsOrigin(__ENV.ORGMETRA_PERFORMANCE_BASE_URL || "");
 const bearerToken = __ENV.ORGMETRA_PERFORMANCE_BEARER_TOKEN || "";
 const targetSha = (__ENV.ORGMETRA_PERFORMANCE_TARGET_SHA || "").toLowerCase();
 const selectedProfile = requirePerformanceProfile(__ENV.ORGMETRA_PERFORMANCE_PROFILE || "");
@@ -56,7 +59,6 @@ const k6Runtime = requirePinnedK6Runtime({
 });
 
 if (!fixturePath) fail("ORGMETRA_PERFORMANCE_DATA_FILE is required");
-if (!baseUrl) fail("ORGMETRA_PERFORMANCE_BASE_URL is required");
 if (!bearerToken) fail("ORGMETRA_PERFORMANCE_BEARER_TOKEN is required and must not be stored in the fixture");
 if (!/^[0-9a-f]{40}$/.test(targetSha)) fail("ORGMETRA_PERFORMANCE_TARGET_SHA must be a full Git commit SHA");
 
