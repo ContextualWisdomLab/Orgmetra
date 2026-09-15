@@ -3,6 +3,8 @@ import { TextDecoder } from "node:util";
 
 import { parseStrictJsonText } from "./strict_json_artifact.mjs";
 
+const MAXIMUM_RUNTIME_EVIDENCE_BYTES = 1024 * 1024;
+
 function rawBytes(value) {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
@@ -11,6 +13,10 @@ function rawBytes(value) {
 
 export function parseRuntimeEvidenceArtifact(value) {
   const bytes = rawBytes(value);
+  if (bytes.byteLength > MAXIMUM_RUNTIME_EVIDENCE_BYTES) {
+    throw new Error(`runtime evidence must not exceed ${MAXIMUM_RUNTIME_EVIDENCE_BYTES} bytes`);
+  }
+
   let text;
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
