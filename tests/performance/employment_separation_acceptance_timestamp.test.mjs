@@ -128,3 +128,22 @@ test("accepts equivalent fractional instants with trailing-zero spelling differe
   const evidence = validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES);
   assert.equal(evidence.structurally_valid, true);
 });
+
+test("rejects a fixture prepared after the measured run completed", () => {
+  const performance = performanceResult();
+  performance.completed_at = "2026-09-13T04:10:00.0001Z";
+  const fixture = JSON.parse(FIXTURE_BYTES.toString("utf8"));
+  fixture.prepared_at = "2026-09-13T04:10:00.0009Z";
+  const fixtureArtifact = render(fixture);
+  const fixtureSha256 = createHash("sha256").update(fixtureArtifact).digest("hex");
+  performance.fixture_sha256 = fixtureSha256;
+  const artifact = render(performance);
+  const runtime = runtimeEvidence(artifact);
+  runtime.fixture_sha256 = fixtureSha256;
+  runtime.observed_at = "2026-09-13T04:10:00.001Z";
+
+  assert.throws(
+    () => validateEmploymentSeparationAcceptance(artifact, runtime, fixtureArtifact),
+    /fixture.prepared_at must not follow result.completed_at/,
+  );
+});
