@@ -4,6 +4,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 const SUPPORT_REFERENCE_PATTERN = /^err_[A-Za-z0-9_-]{20,80}$/;
 const HTTP_TOKEN_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/u;
+const MAXIMUM_GOVERNED_RESPONSE_BODY_BYTES = 16 * 1024;
 const SUCCESS_RESPONSE_KEYS = Object.freeze([
   "employment_record_id",
   "separated_employment_record_version_id",
@@ -128,6 +129,19 @@ function parseContentTypeParameter(segment) {
   return rawName.toLowerCase();
 }
 
+function exceedsUtf8ByteBudget(value, maximumBytes) {
+  let bytes = 0;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint <= 0x7f) bytes += 1;
+    else if (codePoint <= 0x7ff) bytes += 2;
+    else if (codePoint <= 0xffff) bytes += 3;
+    else bytes += 4;
+    if (bytes > maximumBytes) return true;
+  }
+  return false;
+}
+
 export function hasGovernedSeparationJsonMediaType(headers) {
   if (!isPlainObject(headers)) return false;
   const contentTypeEntries = Object.entries(headers).filter(
@@ -152,6 +166,11 @@ export function hasGovernedSeparationJsonMediaType(headers) {
 export function parseGovernedSeparationResponseBody(value) {
   if (typeof value !== "string") {
     throw new Error("governed separation response body must be JSON text");
+  }
+  if (exceedsUtf8ByteBudget(value, MAXIMUM_GOVERNED_RESPONSE_BODY_BYTES)) {
+    throw new Error(
+      `governed separation response body must not exceed ${MAXIMUM_GOVERNED_RESPONSE_BODY_BYTES} UTF-8 bytes`,
+    );
   }
   return parseStrictJsonText(value, "governed separation response body");
 }
