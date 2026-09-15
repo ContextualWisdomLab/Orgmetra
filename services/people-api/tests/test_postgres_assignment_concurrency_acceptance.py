@@ -232,6 +232,7 @@ class _LibpqConnection:
         self._handle = handle
         self._barrier = barrier
         self.closed = False
+        self.autocommit = False
         if _LIBPQ.PQstatus(handle) != 0:
             message = _LIBPQ.PQerrorMessage(handle).decode().strip()
             _LIBPQ.PQfinish(handle)
