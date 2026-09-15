@@ -105,6 +105,29 @@ test("rejects an impossible runtime observation calendar date instead of accepti
   );
 });
 
+test("rejects year zero in result completion evidence before chronology comparison", () => {
+  const performance = performanceResult();
+  performance.completed_at = "0000-01-01T00:00:00Z";
+  const artifact = render(performance);
+
+  assert.throws(
+    () => validateEmploymentSeparationAcceptance(artifact, runtimeEvidence(artifact), FIXTURE_BYTES),
+    /result.completed_at must be an RFC 3339 UTC timestamp/,
+  );
+});
+
+test("rejects year zero in runtime observation evidence before chronology comparison", () => {
+  const performance = performanceResult();
+  const artifact = render(performance);
+  const runtime = runtimeEvidence(artifact);
+  runtime.observed_at = "0000-01-01T00:00:00Z";
+
+  assert.throws(
+    () => validateEmploymentSeparationAcceptance(artifact, runtime, FIXTURE_BYTES),
+    /runtime.observed_at must be an RFC 3339 UTC timestamp/,
+  );
+});
+
 test("rejects a sub-millisecond runtime observation that precedes completion", () => {
   const performance = performanceResult();
   performance.completed_at = "2026-09-13T04:10:00.0009Z";
