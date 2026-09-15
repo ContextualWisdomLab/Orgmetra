@@ -29,6 +29,7 @@ POSITION_VERSION = UUID("0198a412-a700-7000-8000-000000000061")
 ASSIGNMENT = UUID("0198a412-a700-7000-8000-000000000070")
 AUDIT_EVENT = UUID("0198a412-a700-7000-8000-000000000080")
 OUTBOX = UUID("0198a412-a700-7000-8000-000000000081")
+EFFECTIVE_FROM = date(2026, 9, 5)
 
 
 class _ExecutableUUID(UUID):
@@ -75,7 +76,7 @@ def test_postgres_employment_revalidates_exact_command_after_object_setattr_rewr
         outbox_delivery_record_id=OUTBOX,
         employment_status_code="active",
         employment_concurrency_code="exclusive",
-        effective_from=date(2026, 9, 5),
+        effective_from=EFFECTIVE_FROM,
         confirmation_reference="human_confirmation:post-construction-227-employment",
         evidence_version_code="employment-evidence-v1",
         idempotency_key="post-construction-runtime-227-employment",
@@ -105,7 +106,7 @@ def test_postgres_position_revalidates_exact_command_after_object_setattr_rewrit
         audit_event_record_id=AUDIT_EVENT,
         outbox_delivery_record_id=OUTBOX,
         position_status_code="open",
-        effective_from=date(2026, 9, 5),
+        effective_from=EFFECTIVE_FROM,
         confirmation_reference="human_confirmation:post-construction-227-position",
         evidence_version_code="position-evidence-v1",
         idempotency_key="post-construction-runtime-227-position",
@@ -135,7 +136,7 @@ def test_postgres_assignment_revalidates_exact_command_after_object_setattr_rewr
         audit_event_record_id=AUDIT_EVENT,
         outbox_delivery_record_id=OUTBOX,
         allocation_ratio=Decimal("1.0000"),
-        effective_from=date(2026, 9, 5),
+        effective_from=EFFECTIVE_FROM,
         confirmation_reference="human_confirmation:post-construction-227-assignment",
         evidence_version_code="assignment-evidence-v1",
         idempotency_key="post-construction-runtime-227-assignment",
@@ -165,7 +166,7 @@ def test_postgres_position_detaches_validated_command_before_connection_factory_
         audit_event_record_id=AUDIT_EVENT,
         outbox_delivery_record_id=OUTBOX,
         position_status_code="open",
-        effective_from=date(2026, 9, 5),
+        effective_from=EFFECTIVE_FROM,
         confirmation_reference="human_confirmation:post-construction-229-position",
         evidence_version_code="position-evidence-v1",
         idempotency_key="post-construction-runtime-229-position",
@@ -191,7 +192,15 @@ def test_postgres_position_detaches_validated_command_before_connection_factory_
     parent_query = next(
         execution for execution in cursor.executions if "FROM public.organization_unit AS organization" in execution[0]
     )
-    assert parent_query[1] == (JOB_PROFILE, TENANT, ORGANIZATION)
+    assert parent_query[1] == (
+        JOB_PROFILE,
+        TENANT,
+        ORGANIZATION,
+        EFFECTIVE_FROM,
+        EFFECTIVE_FROM,
+        EFFECTIVE_FROM,
+        EFFECTIVE_FROM,
+    )
     insert_position = next(
         execution for execution in cursor.executions if execution[0].startswith("INSERT INTO public.position_record (")
     )
@@ -210,7 +219,7 @@ def test_postgres_position_detaches_nested_uuid_before_connection_factory_callba
         audit_event_record_id=AUDIT_EVENT,
         outbox_delivery_record_id=OUTBOX,
         position_status_code="open",
-        effective_from=date(2026, 9, 5),
+        effective_from=EFFECTIVE_FROM,
         confirmation_reference="human_confirmation:post-construction-268-position",
         evidence_version_code="position-evidence-v1",
         idempotency_key="post-construction-runtime-268-position",
@@ -237,7 +246,15 @@ def test_postgres_position_detaches_nested_uuid_before_connection_factory_callba
     parent_query = next(
         execution for execution in cursor.executions if "FROM public.organization_unit AS organization" in execution[0]
     )
-    assert parent_query[1] == (JOB_PROFILE, TENANT, ORGANIZATION)
+    assert parent_query[1] == (
+        JOB_PROFILE,
+        TENANT,
+        ORGANIZATION,
+        EFFECTIVE_FROM,
+        EFFECTIVE_FROM,
+        EFFECTIVE_FROM,
+        EFFECTIVE_FROM,
+    )
     insert_position = next(
         execution for execution in cursor.executions if execution[0].startswith("INSERT INTO public.position_record (")
     )
