@@ -22,6 +22,10 @@ const FIXTURE_BYTES = acceptanceFixtureBytes();
 const FIXTURE_SHA256 = acceptanceFixtureSha256(FIXTURE_BYTES);
 const ITERATIONS = 1000;
 
+function render(value) {
+  return Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
 function performanceResult() {
   return {
     schema_version: "orgmetra.employment_separation.performance_result.v1",
@@ -95,7 +99,7 @@ function runtimeEvidence(resultArtifact) {
 }
 
 test("one evidence pair satisfies both structural and pinned-k6 contracts", () => {
-  const resultArtifact = Buffer.from(`${JSON.stringify(performanceResult(), null, 2)}\n`, "utf8");
+  const resultArtifact = render(performanceResult());
   const runtime = runtimeEvidence(resultArtifact);
 
   const structural = validateEmploymentSeparationAcceptance(resultArtifact, runtime, FIXTURE_BYTES);
@@ -108,4 +112,45 @@ test("one evidence pair satisfies both structural and pinned-k6 contracts", () =
     k6_image_digest: PINNED_K6_IMAGE_DIGEST,
     k6_runner_identity: PINNED_K6_RUNNER_IDENTITY,
   });
+});
+
+test("structural schema rejects a partial result k6 identity group", () => {
+  const result = performanceResult();
+  delete result.k6_runner_identity;
+  const resultArtifact = render(result);
+
+  assert.throws(
+    () => validateEmploymentSeparationAcceptance(
+      resultArtifact,
+      runtimeEvidence(resultArtifact),
+      FIXTURE_BYTES,
+    ),
+    /either all or none of k6_version, k6_image, k6_image_digest, k6_runner_identity/,
+  );
+});
+
+test("structural schema rejects a partial runtime k6 identity group", () => {
+  const resultArtifact = render(performanceResult());
+  const runtime = runtimeEvidence(resultArtifact);
+  delete runtime.observed_k6_runner_identity;
+
+  assert.throws(
+    () => validateEmploymentSeparationAcceptance(resultArtifact, runtime, FIXTURE_BYTES),
+    /either all or none of observed_k6_version, observed_k6_image, observed_k6_image_digest, observed_k6_runner_identity/,
+  );
+});
+
+test("structural schema rejects non-string declared k6 identity evidence", () => {
+  const result = performanceResult();
+  result.k6_version = 220;
+  const resultArtifact = render(result);
+
+  assert.throws(
+    () => validateEmploymentSeparationAcceptance(
+      resultArtifact,
+      runtimeEvidence(resultArtifact),
+      FIXTURE_BYTES,
+    ),
+    /result.k6_version must be a non-empty string/,
+  );
 });
