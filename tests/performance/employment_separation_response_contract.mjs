@@ -129,6 +129,21 @@ function parseContentTypeParameter(segment) {
   return rawName.toLowerCase();
 }
 
+function singleResponseHeaderValue(headers, fieldName) {
+  if (!isPlainObject(headers)) return null;
+  const entries = Object.entries(headers).filter(([name]) => name.toLowerCase() === fieldName);
+  if (entries.length !== 1 || typeof entries[0][1] !== "string") return null;
+  return entries[0][1];
+}
+
+function commaSeparatedHttpTokens(value) {
+  const tokens = value.split(",").map((token) => token.trim());
+  if (tokens.length < 1 || tokens.some((token) => !HTTP_TOKEN_PATTERN.test(token))) return null;
+  const normalized = tokens.map((token) => token.toLowerCase());
+  if (new Set(normalized).size !== normalized.length) return null;
+  return normalized;
+}
+
 function exceedsUtf8ByteBudget(value, maximumBytes) {
   let bytes = 0;
   for (const character of value) {
@@ -143,13 +158,8 @@ function exceedsUtf8ByteBudget(value, maximumBytes) {
 }
 
 export function hasGovernedSeparationJsonMediaType(headers) {
-  if (!isPlainObject(headers)) return false;
-  const contentTypeEntries = Object.entries(headers).filter(
-    ([name]) => name.toLowerCase() === "content-type",
-  );
-  if (contentTypeEntries.length !== 1) return false;
-  const value = contentTypeEntries[0][1];
-  if (typeof value !== "string") return false;
+  const value = singleResponseHeaderValue(headers, "content-type");
+  if (value === null) return false;
   const segments = splitContentTypeSegments(value);
   if (segments === null || segments.length < 1) return false;
   const mediaType = segments[0].trim().toLowerCase();
@@ -161,6 +171,15 @@ export function hasGovernedSeparationJsonMediaType(headers) {
     parameterNames.add(parameterName);
   }
   return true;
+}
+
+export function hasGovernedSeparationNoStorePolicy(headers) {
+  const cacheControl = singleResponseHeaderValue(headers, "cache-control");
+  const vary = singleResponseHeaderValue(headers, "vary");
+  if (cacheControl === null || vary === null) return false;
+  if (cacheControl.trim().toLowerCase() !== "no-store") return false;
+  const varyTokens = commaSeparatedHttpTokens(vary);
+  return varyTokens !== null && varyTokens.includes("authorization");
 }
 
 export function parseGovernedSeparationResponseBody(value) {
