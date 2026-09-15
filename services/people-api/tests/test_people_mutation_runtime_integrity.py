@@ -52,10 +52,11 @@ class _UnvalidatedEmploymentCommand(EmploymentMutationCommand):
 
 
 class _UnvalidatedEmploymentResult(EmploymentMutationResult):
-    """Attempt to bypass persistence-result validation."""
+    """Fabricate invalid structural result storage without invoking base validation."""
 
-    def __post_init__(self) -> None:
-        """Intentionally skip the governed base validation."""
+    def __new__(cls) -> "_UnvalidatedEmploymentResult":
+        """Return malformed tuple storage so the service must reject the subtype itself."""
+        return tuple.__new__(cls, ("not-a-uuid", None))
 
 
 def _employment_values(**overrides: object) -> dict[str, object]:
@@ -216,7 +217,7 @@ def test_create_employment_rejects_result_subclass_that_skipped_validation() -> 
     class _Port:
         def create_employment(self, *, command: EmploymentMutationCommand, authorization: object) -> EmploymentMutationResult:
             del command, authorization
-            return _UnvalidatedEmploymentResult(employment_record_id="not-a-uuid")  # type: ignore[arg-type]
+            return _UnvalidatedEmploymentResult()
 
         def create_position(self, *, command: object, authorization: object) -> object:
             del command, authorization

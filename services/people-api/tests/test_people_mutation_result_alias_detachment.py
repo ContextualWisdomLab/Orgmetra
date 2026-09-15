@@ -151,7 +151,7 @@ def _hire_command() -> HireAcceptanceCommand:
 
 
 class _RetainedPeopleResultPort:
-    """Return exact result objects while retaining the same mutable object aliases."""
+    """Return exact result objects while retaining the same object aliases."""
 
     def __init__(
         self,
@@ -160,7 +160,7 @@ class _RetainedPeopleResultPort:
         position_result: PositionMutationResult | None = None,
         assignment_result: AssignmentMutationResult | None = None,
     ) -> None:
-        """Retain each result so the adapter can mutate it after service return."""
+        """Retain each result so the adapter still owns the source receipt."""
         self.employment_result = employment_result
         self.position_result = position_result
         self.assignment_result = assignment_result
@@ -198,14 +198,18 @@ class _RetainedHireResultPort:
 
 
 class PeopleMutationResultAliasDetachmentTests(unittest.TestCase):
-    """Require service outputs to stop sharing result objects or UUID payloads with ports."""
+    """Require service outputs to stop sharing mutable identity authority with ports."""
 
     @staticmethod
     def _mutate_retained_result(result: object, field_name: str) -> None:
-        """Rewrite both a retained nested UUID and then its containing result field."""
+        """Attack a public UUID view, then rewrite the container only when it is mutable."""
         retained_uuid = getattr(result, field_name)
         object.__setattr__(retained_uuid, "int", OTHER.int)
-        object.__setattr__(result, field_name, OTHER)
+        try:
+            object.__setattr__(result, field_name, OTHER)
+        except AttributeError:
+            # Structural mutation receipts intentionally expose no writable field storage.
+            pass
 
     def test_employment_result_is_detached_from_port_alias(self) -> None:
         """A port must not rewrite an accepted Employment result after service return."""

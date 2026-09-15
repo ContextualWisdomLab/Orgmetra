@@ -40,8 +40,12 @@ class AuthenticatedPrincipal:
         """Reject sentinel identities, mutable grants, wildcards, and bad references."""
         if not isinstance(self.tenant_record_id, UUID):
             raise ValueError("tenant_record_id must be a UUID.")
-        if self.tenant_record_id.int in (0, _MAX_UUID_INT):
+        tenant_identity = self.tenant_record_id.int
+        if type(tenant_identity) is not int:
+            raise ValueError("tenant_record_id must contain an inert UUID payload.")
+        if tenant_identity in (0, _MAX_UUID_INT):
             raise ValueError("tenant_record_id must not use a reserved UUID sentinel.")
+        object.__setattr__(self, "tenant_record_id", UUID(int=tenant_identity))
         if not isinstance(self.actor_reference, str) or _REFERENCE_PATTERN.fullmatch(self.actor_reference) is None:
             raise ValueError("actor_reference must be a namespaced opaque reference.")
         if not isinstance(self.granted_scope_codes, frozenset) or not self.granted_scope_codes:
