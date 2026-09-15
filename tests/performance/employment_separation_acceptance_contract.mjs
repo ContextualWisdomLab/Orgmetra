@@ -34,6 +34,54 @@ const RESIDUAL_FIELDS = Object.freeze([
   "residual_pool_checkouts",
   "residual_pool_waiters",
 ]);
+const RESULT_KEYS = Object.freeze([
+  "candidate_sha",
+  "clearance_reference",
+  "completed_at",
+  "completed_iterations",
+  "dataset_id",
+  "expected_iterations",
+  "fixture_sha256",
+  "k6",
+  "load_model",
+  "minimum_contention_pairs",
+  "minimum_non_contending_records",
+  "preparation_protocol_reference",
+  "prepared_state_evidence_reference",
+  "profile_preconditions",
+  "resource_evidence_reference",
+  "sample_complete",
+  "schema_version",
+  "selected_profile",
+]);
+const RUNTIME_KEYS = Object.freeze([
+  "candidate_sha",
+  "db_connections_max",
+  "db_pool_acquire_p95_ms",
+  "db_pool_in_use_max",
+  "db_pool_waiters_max",
+  "deployment_reference",
+  "environment_reference",
+  "fixture_sha256",
+  "host_cpu_percent_p95",
+  "host_rss_bytes_max",
+  "load_observation_reference",
+  "observed_at",
+  "observed_load_model",
+  "observed_service_sha",
+  "observer_reference",
+  "performance_result_sha256",
+  "residual_background_workers",
+  "residual_db_sessions",
+  "residual_http_tasks",
+  "residual_open_transactions",
+  "residual_pool_checkouts",
+  "residual_pool_waiters",
+  "residual_sockets",
+  "resource_evidence_reference",
+  "schema_version",
+  "selected_profile",
+]);
 
 function fail(message) {
   throw new Error(message);
@@ -197,6 +245,7 @@ function sameLoadModel(observed, declared) {
 }
 
 function validateResult(result) {
+  exactKeys(result, RESULT_KEYS, "result");
   if (result.schema_version !== RESULT_SCHEMA) fail("result.schema_version is unsupported");
   const candidateSha = sha(result.candidate_sha, "result.candidate_sha");
   const fixtureSha256 = sha256(result.fixture_sha256, "result.fixture_sha256");
@@ -315,6 +364,7 @@ function parseAndValidateFixture(fixtureArtifact, result, validatedResult) {
 }
 
 function validateRuntimeEvidence(runtime, resultDigest, result, validatedResult, fixtureDigest) {
+  exactKeys(runtime, RUNTIME_KEYS, "runtime");
   if (runtime.schema_version !== RUNTIME_SCHEMA) fail("runtime.schema_version is unsupported");
   const candidateSha = sha(runtime.candidate_sha, "runtime.candidate_sha");
   const observedServiceSha = sha(runtime.observed_service_sha, "runtime.observed_service_sha");
