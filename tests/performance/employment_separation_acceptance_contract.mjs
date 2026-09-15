@@ -338,9 +338,26 @@ function validateResult(result) {
   if (finiteNumber(checkValues.rate, "result.k6.metrics.checks.values.rate", { maximum: 1 }) !== 1) {
     fail("k6 checks rate must equal 1");
   }
+  const checkPasses = nonNegativeInteger(checkValues.passes, "result.k6.metrics.checks.values.passes");
+  const checkFailures = nonNegativeInteger(checkValues.fails, "result.k6.metrics.checks.values.fails");
+  if (checkPasses !== expectedIterations || checkFailures !== 0) {
+    fail("k6 governed outcome checks must cover exactly expected_iterations with zero failures");
+  }
+
   const unexpectedValues = metricValues(result, "employment_separation_unexpected_response");
   if (finiteNumber(unexpectedValues.rate, "result.k6.metrics.employment_separation_unexpected_response.values.rate", { maximum: 1 }) !== 0) {
     fail("unexpected response rate must equal 0");
+  }
+  const unexpectedPasses = nonNegativeInteger(
+    unexpectedValues.passes,
+    "result.k6.metrics.employment_separation_unexpected_response.values.passes",
+  );
+  const unexpectedFailures = nonNegativeInteger(
+    unexpectedValues.fails,
+    "result.k6.metrics.employment_separation_unexpected_response.values.fails",
+  );
+  if (unexpectedPasses !== 0 || unexpectedFailures !== expectedIterations) {
+    fail("governed outcome observations must cover exactly expected_iterations with zero unexpected responses");
   }
 
   const trendValues = metricValues(result, trendName);
