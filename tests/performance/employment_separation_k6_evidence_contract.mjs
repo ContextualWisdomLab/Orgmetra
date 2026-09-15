@@ -7,18 +7,23 @@ import {
   PINNED_K6_VERSION,
   requirePinnedK6Runtime,
 } from "./employment_separation_k6_runtime_contract.mjs";
+import { parseStrictJsonText } from "./strict_json_artifact.mjs";
+
+const MAXIMUM_RESULT_ARTIFACT_BYTES = 1024 * 1024;
 
 function fail(message) { throw new Error(message); }
 
 function parseResultBytes(value) {
   if (!(value instanceof Uint8Array) && !(value instanceof ArrayBuffer)) fail("performance result must be supplied as raw bytes");
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+  if (bytes.byteLength > MAXIMUM_RESULT_ARTIFACT_BYTES) {
+    fail(`performance result must not exceed ${MAXIMUM_RESULT_ARTIFACT_BYTES} bytes`);
+  }
+
   let text;
   try { text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
   catch (error) { throw new Error("performance result must be valid UTF-8", { cause: error }); }
-  let result;
-  try { result = JSON.parse(text); }
-  catch (error) { throw new Error("performance result must be valid JSON", { cause: error }); }
+  const result = parseStrictJsonText(text, "performance result");
   if (result === null || typeof result !== "object" || Array.isArray(result)) fail("performance result must be an object");
   return result;
 }
