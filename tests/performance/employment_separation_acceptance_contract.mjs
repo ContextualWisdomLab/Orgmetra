@@ -79,7 +79,27 @@ function reference(value, label) {
 
 function utcTimestamp(value, label) {
   const text = stringValue(value, label);
-  if (!UTC_TIMESTAMP_PATTERN.test(text) || Number.isNaN(Date.parse(text))) {
+  if (!UTC_TIMESTAMP_PATTERN.test(text)) {
+    fail(`${label} must be an RFC 3339 UTC timestamp`);
+  }
+
+  const year = Number(text.slice(0, 4));
+  const month = Number(text.slice(5, 7));
+  const day = Number(text.slice(8, 10));
+  const hour = Number(text.slice(11, 13));
+  const minute = Number(text.slice(14, 16));
+  const second = Number(text.slice(17, 19));
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (
+    month < 1
+    || month > 12
+    || day < 1
+    || day > daysInMonth[month - 1]
+    || hour > 23
+    || minute > 59
+    || second > 59
+  ) {
     fail(`${label} must be an RFC 3339 UTC timestamp`);
   }
   return text;
