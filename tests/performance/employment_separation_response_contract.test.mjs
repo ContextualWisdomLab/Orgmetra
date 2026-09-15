@@ -25,7 +25,7 @@ function conflictBody(overrides = {}) {
     error_code: "separation_conflict",
     message: "Refresh Employment and Assignment state, then retry.",
     next_action: "Refresh Employment and Assignment state, then retry.",
-    support_reference: "err_ABCDEFGHIJKLMNOPQRSTUVWX",
+    support_reference: "err_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef",
     ...overrides,
   };
 }
@@ -167,6 +167,16 @@ test("accepts only the published closed ErrorResponse shape for separation confl
   assert.equal(isGovernedSeparationConflict(409, conflictBody({ support_reference: "trace-123" })), false);
   assert.equal(isGovernedSeparationConflict(409, { ...conflictBody(), extra: "undeclared" }), false);
   assert.equal(isGovernedSeparationConflict(404, conflictBody()), false);
+});
+
+test("binds conflict support references to the canonical People token_urlsafe length", () => {
+  assert.equal(isGovernedSeparationConflict(409, conflictBody()), true);
+  for (const suffixLength of [24, 31, 33, 80]) {
+    assert.equal(
+      isGovernedSeparationConflict(409, conflictBody({ support_reference: `err_${"A".repeat(suffixLength)}` })),
+      false,
+    );
+  }
 });
 
 test("bounds governed response JSON before strict parsing while preserving the closed error envelope", () => {
