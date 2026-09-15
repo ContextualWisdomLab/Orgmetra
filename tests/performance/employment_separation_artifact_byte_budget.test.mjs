@@ -51,8 +51,8 @@ function result(fixtureSha256) {
     k6: {
       metrics: {
         iterations: { values: { count: ITERATIONS } },
-        checks: { values: { rate: 1 } },
-        employment_separation_unexpected_response: { values: { rate: 0 } },
+        checks: { values: { rate: 1, passes: ITERATIONS, fails: 0 } },
+        employment_separation_unexpected_response: { values: { rate: 0, passes: 0, fails: ITERATIONS } },
         employment_separation_latency_samples: { values: { count: ITERATIONS } },
         employment_separation_first_commit_duration_ms: {
           values: { "p(50)": 8, "p(95)": 18, "p(99)": 19, max: 22, count: ITERATIONS },
