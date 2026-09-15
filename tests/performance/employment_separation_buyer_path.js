@@ -17,6 +17,7 @@ import { requirePinnedK6Runtime } from "./employment_separation_k6_runtime_contr
 import { normalizeEmploymentSeparationK6Summary } from "./employment_separation_k6_summary_contract.mjs";
 import {
   hasGovernedSeparationJsonMediaType,
+  hasGovernedSeparationNoStorePolicy,
   isGovernedSeparationConflict,
   isGovernedSeparationSuccess,
   parseGovernedSeparationResponseBody,
@@ -98,6 +99,7 @@ function recordAt(profile) {
 }
 function parseJson(response) {
   if (!hasGovernedSeparationJsonMediaType(response.headers)) return null;
+  if (!hasGovernedSeparationNoStorePolicy(response.headers)) return null;
   try { return parseGovernedSeparationResponseBody(response.body); }
   catch (_) { return null; }
 }
