@@ -14,7 +14,6 @@ from uuid import UUID, uuid4
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 
 from orgmetra_people_api.auth import (
-    AuthenticatedPrincipal,
     AuthenticationFailed,
     TokenAuthenticator,
     extract_bearer_token,
