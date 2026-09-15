@@ -76,6 +76,13 @@ export function requireDirectPerformanceClientNetwork(environment) {
   return PERFORMANCE_CLIENT_NETWORK_TOPOLOGY;
 }
 
+export function requireVerifiedTlsTransport(insecureSkipTlsVerify) {
+  if (insecureSkipTlsVerify !== false) {
+    throw new Error("TLS certificate verification must remain enabled for commercial timing acceptance");
+  }
+  return insecureSkipTlsVerify;
+}
+
 export function validatePerformanceLoadModel(value, expectedIterations, profile) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("load_model must be an object");
