@@ -19,6 +19,16 @@ function successBody(replayed = false) {
   };
 }
 
+function conflictBody(overrides = {}) {
+  return {
+    error_code: "separation_conflict",
+    message: "Refresh Employment and Assignment state, then retry.",
+    next_action: "Refresh Employment and Assignment state, then retry.",
+    support_reference: "err_ABCDEFGHIJKLMNOPQRSTUVWX",
+    ...overrides,
+  };
+}
+
 test("accepts the published first-commit and replay response shape", () => {
   assert.equal(
     isGovernedSeparationSuccess(200, successBody(false), { employmentRecordId: EMPLOYMENT, replayed: false }),
@@ -53,10 +63,13 @@ test("rejects success responses that are replay- or target-inconsistent", () => 
   );
 });
 
-test("uses the published conflict error field rather than an invented error_code field", () => {
-  assert.equal(isGovernedSeparationConflict(409, { error: "separation_conflict" }), true);
+test("accepts only the published closed ErrorResponse shape for separation conflicts", () => {
+  assert.equal(isGovernedSeparationConflict(409, conflictBody()), true);
+  assert.equal(isGovernedSeparationConflict(409, { error: "separation_conflict" }), false);
   assert.equal(isGovernedSeparationConflict(409, { error_code: "separation_conflict" }), false);
-  assert.equal(isGovernedSeparationConflict(404, { error: "separation_conflict" }), false);
+  assert.equal(isGovernedSeparationConflict(409, conflictBody({ support_reference: "trace-123" })), false);
+  assert.equal(isGovernedSeparationConflict(409, { ...conflictBody(), extra: "undeclared" }), false);
+  assert.equal(isGovernedSeparationConflict(404, conflictBody()), false);
 });
 
 test("strict response parsing rejects duplicate trust-bearing JSON members before semantic validation", () => {
@@ -65,8 +78,8 @@ test("strict response parsing rejects duplicate trust-bearing JSON members befor
     /duplicate JSON object member name "replayed"/,
   );
   assert.throws(
-    () => parseGovernedSeparationResponseBody('{"error":"separation_conflict","\\u0065rror":"separation_conflict"}'),
-    /duplicate JSON object member name "error"/,
+    () => parseGovernedSeparationResponseBody('{"error_code":"separation_conflict","\\u0065rror_code":"separation_conflict"}'),
+    /duplicate JSON object member name "error_code"/,
   );
 });
 
