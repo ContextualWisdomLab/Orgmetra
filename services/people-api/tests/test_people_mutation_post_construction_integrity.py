@@ -172,12 +172,10 @@ def test_service_revalidates_exact_command_before_authorization_or_port_work() -
 
 
 def test_service_revalidates_exact_result_after_port_rewrite() -> None:
-    """An exact result rewritten by a port must not cross the People service boundary."""
-    result = EmploymentMutationResult(employment_record_id=EMPLOYMENT)
-    object.__setattr__(
-        result,
-        "employment_record_id",
-        _ExecutableUUID("0198a412-a600-7000-8000-000000000097"),
+    """A low-level forged structural receipt must not cross the People service boundary."""
+    result = tuple.__new__(
+        EmploymentMutationResult,
+        (_ExecutableUUID("0198a412-a600-7000-8000-000000000097"), None),
     )
 
     with pytest.raises(ValueError, match="employment_record_id must be an operational UUID"):
