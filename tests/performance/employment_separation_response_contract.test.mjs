@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   hasGovernedSeparationJsonMediaType,
+  hasGovernedSeparationNoStorePolicy,
   isGovernedSeparationConflict,
   isGovernedSeparationSuccess,
   parseGovernedSeparationResponseBody,
@@ -125,6 +126,46 @@ test("accepts only one governed JSON response media type", () => {
     false,
   );
   assert.equal(hasGovernedSeparationJsonMediaType({ "Content-Type": ["application/json"] }), false);
+});
+
+test("requires the canonical no-store and Authorization-vary response policy", () => {
+  assert.equal(
+    hasGovernedSeparationNoStorePolicy({ "Cache-Control": "no-store", Vary: "Authorization" }),
+    true,
+  );
+  assert.equal(
+    hasGovernedSeparationNoStorePolicy({ "cache-control": "No-Store", vary: "Accept-Encoding, authorization" }),
+    true,
+  );
+  assert.equal(hasGovernedSeparationNoStorePolicy({ Vary: "Authorization" }), false);
+  assert.equal(
+    hasGovernedSeparationNoStorePolicy({ "Cache-Control": "public, no-store", Vary: "Authorization" }),
+    false,
+  );
+  assert.equal(
+    hasGovernedSeparationNoStorePolicy({ "Cache-Control": "no-store, s-maxage=60", Vary: "Authorization" }),
+    false,
+  );
+  assert.equal(
+    hasGovernedSeparationNoStorePolicy({ "Cache-Control": "no-store", Vary: "Accept-Encoding" }),
+    false,
+  );
+  assert.equal(
+    hasGovernedSeparationNoStorePolicy({ "Cache-Control": "no-store", Vary: "*" }),
+    false,
+  );
+  assert.equal(
+    hasGovernedSeparationNoStorePolicy({
+      "Cache-Control": "no-store",
+      "cache-control": "no-store",
+      Vary: "Authorization",
+    }),
+    false,
+  );
+  assert.equal(
+    hasGovernedSeparationNoStorePolicy({ "Cache-Control": ["no-store"], Vary: "Authorization" }),
+    false,
+  );
 });
 
 test("rejects k6-collapsed duplicate Content-Type values without rejecting quoted parameter commas", () => {
