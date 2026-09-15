@@ -26,6 +26,12 @@ function hasExactKeys(value, expectedKeys) {
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
+function isOperationalUuid(value) {
+  if (typeof value !== "string" || !UUID_PATTERN.test(value)) return false;
+  const compact = value.replaceAll("-", "").toLowerCase();
+  return compact !== "0".repeat(32) && compact !== "f".repeat(32);
+}
+
 function isValidUtcTimestamp(value) {
   if (typeof value !== "string" || !UTC_TIMESTAMP_PATTERN.test(value)) return false;
   const year = Number(value.slice(0, 4));
@@ -56,14 +62,12 @@ export function parseGovernedSeparationResponseBody(value) {
 
 export function isGovernedSeparationSuccess(status, body, { employmentRecordId, replayed }) {
   if (status !== 200 || !isPlainObject(body) || !hasExactKeys(body, SUCCESS_RESPONSE_KEYS)) return false;
-  if (typeof employmentRecordId !== "string" || !UUID_PATTERN.test(employmentRecordId)) return false;
+  if (!isOperationalUuid(employmentRecordId)) return false;
   if (typeof replayed !== "boolean") return false;
-  if (typeof body.employment_record_id !== "string" || body.employment_record_id.toLowerCase() !== employmentRecordId.toLowerCase()) {
+  if (!isOperationalUuid(body.employment_record_id) || body.employment_record_id.toLowerCase() !== employmentRecordId.toLowerCase()) {
     return false;
   }
-  if (typeof body.separated_employment_record_version_id !== "string" || !UUID_PATTERN.test(body.separated_employment_record_version_id)) {
-    return false;
-  }
+  if (!isOperationalUuid(body.separated_employment_record_version_id)) return false;
   if (!isValidUtcTimestamp(body.recorded_at)) return false;
   return body.replayed === replayed;
 }
