@@ -2,9 +2,22 @@ import { parseStrictJsonText } from "./strict_json_artifact.mjs";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+const SUPPORT_REFERENCE_PATTERN = /^err_[A-Za-z0-9_-]{20,80}$/;
+const ERROR_RESPONSE_KEYS = Object.freeze([
+  "error_code",
+  "message",
+  "next_action",
+  "support_reference",
+]);
 
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasExactKeys(value, expectedKeys) {
+  const actual = Object.keys(value).sort();
+  const expected = [...expectedKeys].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
 function isValidUtcTimestamp(value) {
@@ -50,5 +63,9 @@ export function isGovernedSeparationSuccess(status, body, { employmentRecordId, 
 }
 
 export function isGovernedSeparationConflict(status, body) {
-  return status === 409 && isPlainObject(body) && body.error === "separation_conflict";
+  if (status !== 409 || !isPlainObject(body) || !hasExactKeys(body, ERROR_RESPONSE_KEYS)) return false;
+  if (body.error_code !== "separation_conflict") return false;
+  if (typeof body.message !== "string" || body.message.length < 1 || body.message.length > 1000) return false;
+  if (typeof body.next_action !== "string" || body.next_action.length < 1 || body.next_action.length > 1000) return false;
+  return typeof body.support_reference === "string" && SUPPORT_REFERENCE_PATTERN.test(body.support_reference);
 }
