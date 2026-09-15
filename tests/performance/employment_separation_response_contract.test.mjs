@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   isGovernedSeparationConflict,
   isGovernedSeparationSuccess,
+  parseGovernedSeparationResponseBody,
 } from "./employment_separation_response_contract.mjs";
 
 const EMPLOYMENT = "30000000-0000-4000-8000-000000000001";
@@ -56,4 +57,20 @@ test("uses the published conflict error field rather than an invented error_code
   assert.equal(isGovernedSeparationConflict(409, { error: "separation_conflict" }), true);
   assert.equal(isGovernedSeparationConflict(409, { error_code: "separation_conflict" }), false);
   assert.equal(isGovernedSeparationConflict(404, { error: "separation_conflict" }), false);
+});
+
+test("strict response parsing rejects duplicate trust-bearing JSON members before semantic validation", () => {
+  assert.throws(
+    () => parseGovernedSeparationResponseBody(`{"employment_record_id":"${EMPLOYMENT}","separated_employment_record_version_id":"${VERSION}","recorded_at":"2026-09-13T02:00:00Z","replayed":true,"replayed":false}`),
+    /duplicate JSON object member name "replayed"/,
+  );
+  assert.throws(
+    () => parseGovernedSeparationResponseBody('{"error":"separation_conflict","\\u0065rror":"separation_conflict"}'),
+    /duplicate JSON object member name "error"/,
+  );
+});
+
+test("strict response parsing preserves the published response object", () => {
+  const body = successBody(false);
+  assert.deepEqual(parseGovernedSeparationResponseBody(JSON.stringify(body)), body);
 });
