@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  hasGovernedSeparationJsonMediaType,
   isGovernedSeparationConflict,
   isGovernedSeparationSuccess,
   parseGovernedSeparationResponseBody,
@@ -109,6 +110,21 @@ test("rejects success responses that are replay- or target-inconsistent", () => 
     }),
     false,
   );
+});
+
+test("accepts only one governed JSON response media type", () => {
+  assert.equal(hasGovernedSeparationJsonMediaType({ "Content-Type": "application/json" }), true);
+  assert.equal(hasGovernedSeparationJsonMediaType({ "content-type": "Application/JSON; charset=utf-8" }), true);
+  assert.equal(hasGovernedSeparationJsonMediaType({}), false);
+  assert.equal(hasGovernedSeparationJsonMediaType({ "Content-Type": "text/plain" }), false);
+  assert.equal(
+    hasGovernedSeparationJsonMediaType({
+      "Content-Type": "application/json",
+      "content-type": "application/json",
+    }),
+    false,
+  );
+  assert.equal(hasGovernedSeparationJsonMediaType({ "Content-Type": ["application/json"] }), false);
 });
 
 test("accepts only the published closed ErrorResponse shape for separation conflicts", () => {
