@@ -11,6 +11,7 @@ from .weights import (
     CalibrationAdjustmentReceipt,
     FinalAnalysisWeightReceipt,
     NonresponseAdjustmentReceipt,
+    TrimmingBoundingAdjustmentReceipt,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "CalibrationAdjustmentReceipt",
     "FinalAnalysisWeightReceipt",
     "NonresponseAdjustmentReceipt",
+    "TrimmingBoundingAdjustmentReceipt",
 ]
