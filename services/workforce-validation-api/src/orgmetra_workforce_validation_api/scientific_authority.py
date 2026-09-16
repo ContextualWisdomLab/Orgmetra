@@ -1,0 +1,479 @@
+"""Resolve purpose-bound scientific auxiliary-use authority through its owner port.
+
+This application boundary corroborates opaque calibration auxiliary coordinates
+without copying protected auxiliary values or querying another bounded context's
+application tables. It deliberately stops before durable PostgreSQL adoption:
+the repository port must later be backed by released/versioned owner evidence.
+The returned projection is data, not a reusable authorization credential.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from inspect import getattr_static
+import re
+from types import FunctionType
+from typing import Protocol, runtime_checkable
+from uuid import UUID
+
+from orgmetra_keyverse_adapter import (
+    PurposeBoundAccessPolicy,
+    PurposeBoundAccessRequest,
+    require_purpose_bound_access,
+)
+
+from .registry import (
+    ValidationPrincipal,
+    _detach_policy,
+    _require_aware_datetime,
+    _require_code,
+    _restore_operational_uuid,
+    _store_operational_uuid,
+)
+
+_DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
+_RESOURCE_KIND = "calibration_auxiliary_authority"
+_OPERATION = "read"
+_READ_FIELDS = frozenset(
+    {
+        "authority_reference",
+        "auxiliary_projection_reference",
+        "auxiliary_projection_digest",
+        "scientific_purpose_reference",
+        "scientific_purpose_digest",
+        "owner_contract_reference",
+        "owner_contract_version",
+        "owner_contract_digest",
+        "authorization_receipt_reference",
+        "authorization_receipt_digest",
+        "authorized_from",
+        "authorized_to",
+    }
+)
+
+
+class CalibrationAuxiliaryAuthorityNotFound(LookupError):
+    """Indicate that no owner evidence corroborates the requested authority tuple."""
+
+
+class CalibrationAuxiliaryAuthorityIntegrityError(RuntimeError):
+    """Indicate that owner evidence does not match the authorized scientific use."""
+
+
+def _require_reference(field_name: str, value: object, namespace: str) -> str:
+    """Require one exact opaque namespaced reference without protected source values."""
+    if (
+        type(value) is not str
+        or _REFERENCE_PATTERN.fullmatch(value) is None
+        or value.partition(":")[0] != namespace
+    ):
+        raise ValueError(f"{field_name} must be an exact {namespace}: opaque reference.")
+    return value
+
+
+def _require_digest(field_name: str, value: object) -> str:
+    """Require lowercase SHA-256 evidence rather than caller-readable source content."""
+    if type(value) is not str or _DIGEST_PATTERN.fullmatch(value) is None:
+        raise ValueError(f"{field_name} must be lowercase SHA-256 hex.")
+    return value
+
+
+def _require_positive_integer(field_name: str, value: object) -> int:
+    """Require a strict positive integer contract version without accepting booleans."""
+    if type(value) is not int or value <= 0:
+        raise ValueError(f"{field_name} must be a positive integer.")
+    return value
+
+
+class CalibrationAuxiliaryAuthorityRecord(tuple):
+    """Immutable owner projection corroborating one auxiliary-use authorization.
+
+    Only opaque references, digests, versions, target identities, and the exact
+    authorization interval cross this boundary. Raw calibration attributes,
+    benchmark values, protected characteristics, and row-level weights remain
+    behind their authoritative owners.
+    """
+
+    __slots__ = ()
+
+    def __new__(
+        cls,
+        *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        authority_reference: str,
+        auxiliary_projection_reference: str,
+        auxiliary_projection_digest: str,
+        scientific_purpose_reference: str,
+        scientific_purpose_digest: str,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        owner_contract_digest: str,
+        authorization_receipt_reference: str,
+        authorization_receipt_digest: str,
+        authorized_from: datetime,
+        authorized_to: datetime | None,
+    ) -> CalibrationAuxiliaryAuthorityRecord:
+        """Validate and detach every authority-bearing scalar before tuple storage."""
+        tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
+        study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
+        authority_ref = _require_reference(
+            "authority_reference", authority_reference, "scientific_auxiliary_authority"
+        )
+        projection_ref = _require_reference(
+            "auxiliary_projection_reference",
+            auxiliary_projection_reference,
+            "calibration_auxiliary_projection",
+        )
+        projection_digest = _require_digest(
+            "auxiliary_projection_digest", auxiliary_projection_digest
+        )
+        purpose_ref = _require_reference(
+            "scientific_purpose_reference",
+            scientific_purpose_reference,
+            "scientific_data_use_purpose",
+        )
+        purpose_digest = _require_digest("scientific_purpose_digest", scientific_purpose_digest)
+        owner_ref = _require_reference(
+            "owner_contract_reference", owner_contract_reference, "released_owner_contract"
+        )
+        owner_version = _require_positive_integer(
+            "owner_contract_version", owner_contract_version
+        )
+        owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
+        authorization_ref = _require_reference(
+            "authorization_receipt_reference",
+            authorization_receipt_reference,
+            "scientific_data_authorization",
+        )
+        authorization_digest = _require_digest(
+            "authorization_receipt_digest", authorization_receipt_digest
+        )
+        authorization_start = _require_aware_datetime("authorized_from", authorized_from)
+        authorization_end = (
+            None
+            if authorized_to is None
+            else _require_aware_datetime("authorized_to", authorized_to)
+        )
+        if authorization_end is not None and authorization_end <= authorization_start:
+            raise ValueError("authorized_to must be later than authorized_from.")
+        return tuple.__new__(
+            cls,
+            (
+                tenant_identity,
+                study_identity,
+                authority_ref,
+                projection_ref,
+                projection_digest,
+                purpose_ref,
+                purpose_digest,
+                owner_ref,
+                owner_version,
+                owner_digest,
+                authorization_ref,
+                authorization_digest,
+                authorization_start,
+                authorization_end,
+            ),
+        )
+
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return a fresh tenant identity for this owner evidence."""
+        return _restore_operational_uuid("tenant_record_id", self[0])
+
+    @property
+    def validity_study_id(self) -> UUID:
+        """Return a fresh validity-study identity bound to the scientific use."""
+        return _restore_operational_uuid("validity_study_id", self[1])
+
+    @property
+    def authority_reference(self) -> str:
+        """Return the opaque owner authority reference."""
+        return self[2]
+
+    @property
+    def auxiliary_projection_reference(self) -> str:
+        """Return the opaque purpose-limited auxiliary projection reference."""
+        return self[3]
+
+    @property
+    def auxiliary_projection_digest(self) -> str:
+        """Return the projection evidence digest without exposing source attributes."""
+        return self[4]
+
+    @property
+    def scientific_purpose_reference(self) -> str:
+        """Return the governed scientific-use purpose reference."""
+        return self[5]
+
+    @property
+    def scientific_purpose_digest(self) -> str:
+        """Return the exact scientific-use purpose evidence digest."""
+        return self[6]
+
+    @property
+    def owner_contract_reference(self) -> str:
+        """Return the released owner-contract reference."""
+        return self[7]
+
+    @property
+    def owner_contract_version(self) -> int:
+        """Return the positive released owner-contract version."""
+        return self[8]
+
+    @property
+    def owner_contract_digest(self) -> str:
+        """Return the immutable bytes digest for the released owner contract."""
+        return self[9]
+
+    @property
+    def authorization_receipt_reference(self) -> str:
+        """Return the authoritative scientific-use authorization receipt reference."""
+        return self[10]
+
+    @property
+    def authorization_receipt_digest(self) -> str:
+        """Return the authorization receipt digest used for exact correlation."""
+        return self[11]
+
+    @property
+    def authorized_from(self) -> datetime:
+        """Return the UTC instant when this scientific use became authorized."""
+        return self[12]
+
+    @property
+    def authorized_to(self) -> datetime | None:
+        """Return the exclusive UTC authorization end when one exists."""
+        return self[13]
+
+
+class CalibrationAuxiliaryAuthorityView(tuple):
+    """Field-minimized owner evidence issued only after authorization and resolution."""
+
+    __slots__ = ()
+
+    def __new__(
+        cls,
+        *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        fields: tuple[tuple[str, object], ...],
+    ) -> CalibrationAuxiliaryAuthorityView:
+        """Reject public construction; the resolver is the only supported issuer."""
+        raise TypeError(
+            "CalibrationAuxiliaryAuthorityView is issued only by "
+            "resolve_calibration_auxiliary_authority."
+        )
+
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return a fresh authorized tenant identity."""
+        return _restore_operational_uuid("tenant_record_id", self[0])
+
+    @property
+    def validity_study_id(self) -> UUID:
+        """Return a fresh validity-study identity."""
+        return _restore_operational_uuid("validity_study_id", self[1])
+
+    @property
+    def fields(self) -> tuple[tuple[str, object], ...]:
+        """Return immutable corroborating authority fields without protected values."""
+        return self[2]
+
+
+@runtime_checkable
+class CalibrationAuxiliaryAuthorityReadPort(Protocol):
+    """Owner read contract for released calibration auxiliary-use authority evidence."""
+
+    def read_calibration_auxiliary_authority(
+        self,
+        *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        auxiliary_projection_reference: str,
+        auxiliary_projection_digest: str,
+        scientific_purpose_reference: str,
+        scientific_purpose_digest: str,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        authorization_receipt_digest: str,
+    ) -> CalibrationAuxiliaryAuthorityRecord | None:
+        """Return matching released authority evidence or ``None`` through an owner ACL."""
+        ...
+
+
+_PROTOCOL_READ_CAPABILITY = getattr_static(
+    CalibrationAuxiliaryAuthorityReadPort, "read_calibration_auxiliary_authority"
+)
+
+
+def resolve_calibration_auxiliary_authority(
+    *,
+    principal: ValidationPrincipal,
+    tenant_record_id: UUID,
+    validity_study_id: UUID,
+    auxiliary_projection_reference: str,
+    auxiliary_projection_digest: str,
+    scientific_purpose_reference: str,
+    scientific_purpose_digest: str,
+    owner_contract_reference: str,
+    owner_contract_version: int,
+    authorization_receipt_digest: str,
+    used_at: datetime,
+    purpose_code: str,
+    policy: PurposeBoundAccessPolicy,
+    read_port: CalibrationAuxiliaryAuthorityReadPort,
+) -> CalibrationAuxiliaryAuthorityView:
+    """Authorize and corroborate one calibration auxiliary-use authority tuple.
+
+    The exact owner capability is captured inertly before authorization and the
+    same function is invoked afterward. The request carries no protected source
+    values. Owner evidence must then reproduce every caller-supplied coordinate
+    and cover the exact scientific-use instant before any corroborating fields
+    are returned.
+    """
+    if type(principal) is not ValidationPrincipal:
+        raise TypeError("principal must be an exact ValidationPrincipal.")
+    if type(policy) is not PurposeBoundAccessPolicy:
+        raise TypeError("policy must be an exact PurposeBoundAccessPolicy.")
+    read_capability = getattr_static(
+        type(read_port), "read_calibration_auxiliary_authority", None
+    )
+    if (
+        type(read_capability) is not FunctionType
+        or read_capability is _PROTOCOL_READ_CAPABILITY
+    ):
+        raise TypeError(
+            "read_port must expose a statically callable "
+            "read_calibration_auxiliary_authority."
+        )
+
+    detached_principal = ValidationPrincipal(
+        tenant_record_id=principal.tenant_record_id,
+        actor_reference=principal.actor_reference,
+        granted_scope_codes=principal.granted_scope_codes,
+    )
+    tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
+    study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
+    tenant_id = _restore_operational_uuid("tenant_record_id", tenant_identity)
+    study_id = _restore_operational_uuid("validity_study_id", study_identity)
+    projection_ref = _require_reference(
+        "auxiliary_projection_reference",
+        auxiliary_projection_reference,
+        "calibration_auxiliary_projection",
+    )
+    projection_digest = _require_digest(
+        "auxiliary_projection_digest", auxiliary_projection_digest
+    )
+    purpose_ref = _require_reference(
+        "scientific_purpose_reference",
+        scientific_purpose_reference,
+        "scientific_data_use_purpose",
+    )
+    purpose_digest = _require_digest("scientific_purpose_digest", scientific_purpose_digest)
+    owner_ref = _require_reference(
+        "owner_contract_reference", owner_contract_reference, "released_owner_contract"
+    )
+    owner_version = _require_positive_integer("owner_contract_version", owner_contract_version)
+    authorization_digest = _require_digest(
+        "authorization_receipt_digest", authorization_receipt_digest
+    )
+    use_instant = _require_aware_datetime("used_at", used_at)
+    purpose = _require_code("purpose_code", purpose_code)
+    detached_policy = _detach_policy(policy)
+
+    require_purpose_bound_access(
+        request=PurposeBoundAccessRequest(
+            tenant_record_id=tenant_id,
+            actor_tenant_record_id=detached_principal.tenant_record_id,
+            resource_tenant_record_id=tenant_id,
+            actor_reference=detached_principal.actor_reference,
+            resource_reference=f"{_RESOURCE_KIND}:{study_id}",
+            purpose_code=purpose,
+            operation_code=_OPERATION,
+            resource_kind=_RESOURCE_KIND,
+            requested_fields=_READ_FIELDS,
+            granted_scope_codes=detached_principal.granted_scope_codes,
+        ),
+        policy=detached_policy,
+    )
+
+    persisted = read_capability(
+        read_port,
+        tenant_record_id=_restore_operational_uuid("tenant_record_id", tenant_identity),
+        validity_study_id=_restore_operational_uuid("validity_study_id", study_identity),
+        auxiliary_projection_reference=projection_ref,
+        auxiliary_projection_digest=projection_digest,
+        scientific_purpose_reference=purpose_ref,
+        scientific_purpose_digest=purpose_digest,
+        owner_contract_reference=owner_ref,
+        owner_contract_version=owner_version,
+        authorization_receipt_digest=authorization_digest,
+    )
+    if persisted is None:
+        raise CalibrationAuxiliaryAuthorityNotFound(str(study_id))
+    if type(persisted) is not CalibrationAuxiliaryAuthorityRecord:
+        raise CalibrationAuxiliaryAuthorityIntegrityError(
+            "owner port returned non-canonical calibration auxiliary authority evidence"
+        )
+
+    record = CalibrationAuxiliaryAuthorityRecord(
+        tenant_record_id=persisted.tenant_record_id,
+        validity_study_id=persisted.validity_study_id,
+        authority_reference=persisted.authority_reference,
+        auxiliary_projection_reference=persisted.auxiliary_projection_reference,
+        auxiliary_projection_digest=persisted.auxiliary_projection_digest,
+        scientific_purpose_reference=persisted.scientific_purpose_reference,
+        scientific_purpose_digest=persisted.scientific_purpose_digest,
+        owner_contract_reference=persisted.owner_contract_reference,
+        owner_contract_version=persisted.owner_contract_version,
+        owner_contract_digest=persisted.owner_contract_digest,
+        authorization_receipt_reference=persisted.authorization_receipt_reference,
+        authorization_receipt_digest=persisted.authorization_receipt_digest,
+        authorized_from=persisted.authorized_from,
+        authorized_to=persisted.authorized_to,
+    )
+    if (
+        _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
+        != tenant_identity
+        or _store_operational_uuid("record validity_study_id", record.validity_study_id)
+        != study_identity
+        or record.auxiliary_projection_reference != projection_ref
+        or record.auxiliary_projection_digest != projection_digest
+        or record.scientific_purpose_reference != purpose_ref
+        or record.scientific_purpose_digest != purpose_digest
+        or record.owner_contract_reference != owner_ref
+        or record.owner_contract_version != owner_version
+        or record.authorization_receipt_digest != authorization_digest
+    ):
+        raise CalibrationAuxiliaryAuthorityIntegrityError(
+            "owner evidence does not match the requested calibration auxiliary authority"
+        )
+    if use_instant < record.authorized_from or (
+        record.authorized_to is not None and use_instant >= record.authorized_to
+    ):
+        raise CalibrationAuxiliaryAuthorityIntegrityError(
+            "scientific use falls outside the resolved authorization interval"
+        )
+
+    values = {
+        "authority_reference": record.authority_reference,
+        "auxiliary_projection_reference": record.auxiliary_projection_reference,
+        "auxiliary_projection_digest": record.auxiliary_projection_digest,
+        "scientific_purpose_reference": record.scientific_purpose_reference,
+        "scientific_purpose_digest": record.scientific_purpose_digest,
+        "owner_contract_reference": record.owner_contract_reference,
+        "owner_contract_version": record.owner_contract_version,
+        "owner_contract_digest": record.owner_contract_digest,
+        "authorization_receipt_reference": record.authorization_receipt_reference,
+        "authorization_receipt_digest": record.authorization_receipt_digest,
+        "authorized_from": record.authorized_from,
+        "authorized_to": record.authorized_to,
+    }
+    fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
+    return tuple.__new__(
+        CalibrationAuxiliaryAuthorityView,
+        (tenant_identity, study_identity, fields),
+    )
