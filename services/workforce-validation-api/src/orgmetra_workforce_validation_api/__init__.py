@@ -9,8 +9,21 @@ from orgmetra_workforce_validation_api.registry import (
     ValidityStudyView,
     read_validity_study,
 )
+from orgmetra_workforce_validation_api.scientific_authority import (
+    CalibrationAuxiliaryAuthorityIntegrityError,
+    CalibrationAuxiliaryAuthorityNotFound,
+    CalibrationAuxiliaryAuthorityReadPort,
+    CalibrationAuxiliaryAuthorityRecord,
+    CalibrationAuxiliaryAuthorityView,
+    resolve_calibration_auxiliary_authority,
+)
 
 __all__ = [
+    "CalibrationAuxiliaryAuthorityIntegrityError",
+    "CalibrationAuxiliaryAuthorityNotFound",
+    "CalibrationAuxiliaryAuthorityReadPort",
+    "CalibrationAuxiliaryAuthorityRecord",
+    "CalibrationAuxiliaryAuthorityView",
     "ValidationPrincipal",
     "ValidityStudyIntegrityError",
     "ValidityStudyNotFound",
@@ -18,4 +31,5 @@ __all__ = [
     "ValidityStudyRecord",
     "ValidityStudyView",
     "read_validity_study",
+    "resolve_calibration_auxiliary_authority",
 ]
