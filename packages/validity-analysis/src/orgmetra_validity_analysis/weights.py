@@ -21,6 +21,7 @@ from .handoff import (
 )
 
 _CALIBRATION_TERMINATION_CODES = frozenset({"converged", "fallback_applied"})
+_WEIGHT_SCOPE_CODES = frozenset({"cross_sectional", "longitudinal"})
 _SPECIALIZED_EVIDENCE_KIND_BY_ADJUSTMENT_CODE = {
     "nonresponse_adjustment": "nonresponse_adjustment_receipt",
     "calibration_adjustment": "calibration_adjustment_receipt",
@@ -310,6 +311,83 @@ class TrimmingBoundingAdjustmentReceipt:
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
+@dataclass(frozen=True, slots=True, repr=False)
+class WeightEligibilityReceipt:
+    """Bind one final weight artifact to its valid population and reference duration."""
+
+    tenant_record_id: str
+    receipt_reference: str
+    weight_scope_code: str
+    target_population_reference: str
+    target_population_digest: str
+    reference_duration_reference: str
+    reference_duration_digest: str
+    eligible_case_set_digest: str
+    weight_artifact_digest: str
+    constructed_at: datetime
+    evidence_version: int = 1
+
+    def __post_init__(self) -> None:
+        """Reject ambiguous cross-sectional or longitudinal weight eligibility."""
+        _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
+        _validate_reference(
+            self.receipt_reference,
+            "weight_eligibility_receipt",
+            "receipt_reference",
+        )
+        if (
+            type(self.weight_scope_code) is not str
+            or self.weight_scope_code not in _WEIGHT_SCOPE_CODES
+        ):
+            raise ValueError("weight_scope_code must be cross_sectional or longitudinal")
+        _validate_reference(
+            self.target_population_reference,
+            "analysis_target_population",
+            "target_population_reference",
+        )
+        _validate_digest(self.target_population_digest, "target_population_digest")
+        _validate_reference(
+            self.reference_duration_reference,
+            "analysis_reference_duration",
+            "reference_duration_reference",
+        )
+        for field_name in (
+            "reference_duration_digest",
+            "eligible_case_set_digest",
+            "weight_artifact_digest",
+        ):
+            _validate_digest(getattr(self, field_name), field_name)
+        constructed_at = _freeze_timestamp(self.constructed_at, "constructed_at")
+        if type(self.evidence_version) is not int or self.evidence_version != 1:
+            raise ValueError("evidence_version must remain 1")
+        object.__setattr__(self, "constructed_at", constructed_at)
+
+    def __repr__(self) -> str:
+        """Return a value-minimized representation for routine logs."""
+        return "WeightEligibilityReceipt(<redacted>)"
+
+    def canonical_json(self) -> str:
+        """Return deterministic eligibility provenance without row-level weight values."""
+        payload = {
+            "constructed_at": _canonical_timestamp(self.constructed_at, "constructed_at"),
+            "eligible_case_set_digest": self.eligible_case_set_digest,
+            "evidence_version": self.evidence_version,
+            "receipt_reference": self.receipt_reference,
+            "reference_duration_digest": self.reference_duration_digest,
+            "reference_duration_reference": self.reference_duration_reference,
+            "target_population_digest": self.target_population_digest,
+            "target_population_reference": self.target_population_reference,
+            "tenant_record_id": self.tenant_record_id,
+            "weight_artifact_digest": self.weight_artifact_digest,
+            "weight_scope_code": self.weight_scope_code,
+        }
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    def sha256_digest(self) -> str:
+        """Return SHA-256 over the exact canonical receipt bytes."""
+        return sha256(self.canonical_json().encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class AnalysisWeightAdjustment:
     """Describe one ordered, digest-linked transformation of analysis weights."""
@@ -373,10 +451,13 @@ class FinalAnalysisWeightReceipt:
     receipt_reference: str
     estimand_reference: str
     estimand_digest: str
+    estimand_scope_code: str
     target_population_reference: str
     target_population_digest: str
     analysis_unit_code: str
     analysis_window_reference: str
+    reference_duration_reference: str
+    reference_duration_digest: str
     eligible_case_set_digest: str
     analytic_case_occurrence_set_digest: str
     source_universe_receipt_digest: str
@@ -387,6 +468,7 @@ class FinalAnalysisWeightReceipt:
     base_weight_artifact_digest: str
     adjustments: tuple[AnalysisWeightAdjustment, ...]
     final_weight_artifact_digest: str
+    weight_eligibility: WeightEligibilityReceipt
     analytic_case_count: int
     constructed_at: datetime
     correction_sequence: int = 1
@@ -401,6 +483,11 @@ class FinalAnalysisWeightReceipt:
         )
         _validate_reference(self.estimand_reference, "validation_estimand", "estimand_reference")
         _validate_digest(self.estimand_digest, "estimand_digest")
+        if (
+            type(self.estimand_scope_code) is not str
+            or self.estimand_scope_code not in _WEIGHT_SCOPE_CODES
+        ):
+            raise ValueError("estimand_scope_code must be cross_sectional or longitudinal")
         _validate_reference(
             self.target_population_reference,
             "analysis_target_population",
@@ -411,6 +498,12 @@ class FinalAnalysisWeightReceipt:
         _validate_reference(
             self.analysis_window_reference, "analysis_window", "analysis_window_reference"
         )
+        _validate_reference(
+            self.reference_duration_reference,
+            "analysis_reference_duration",
+            "reference_duration_reference",
+        )
+        _validate_digest(self.reference_duration_digest, "reference_duration_digest")
         for field_name in (
             "eligible_case_set_digest",
             "analytic_case_occurrence_set_digest",
@@ -425,6 +518,26 @@ class FinalAnalysisWeightReceipt:
         _positive_integer(self.base_weight_method_version, "base_weight_method_version")
         _positive_integer(self.analytic_case_count, "analytic_case_count")
         constructed_at = _freeze_timestamp(self.constructed_at, "constructed_at")
+        if type(self.weight_eligibility) is not WeightEligibilityReceipt:
+            raise ValueError("weight_eligibility must be a WeightEligibilityReceipt")
+        if self.weight_eligibility.tenant_record_id != self.tenant_record_id:
+            raise ValueError("weight_eligibility tenant_record_id must match the analysis receipt")
+        if self.weight_eligibility.weight_scope_code != self.estimand_scope_code:
+            raise ValueError("weight scope must match estimand_scope_code")
+        if (
+            self.weight_eligibility.target_population_reference
+            != self.target_population_reference
+            or self.weight_eligibility.target_population_digest != self.target_population_digest
+        ):
+            raise ValueError("weight target population must match the estimand target population")
+        if (
+            self.weight_eligibility.reference_duration_reference
+            != self.reference_duration_reference
+            or self.weight_eligibility.reference_duration_digest != self.reference_duration_digest
+        ):
+            raise ValueError("weight reference duration must match the estimand reference duration")
+        if self.weight_eligibility.eligible_case_set_digest != self.eligible_case_set_digest:
+            raise ValueError("weight eligible case set must match the analysis eligible case set")
         if type(self.adjustments) is not tuple:
             raise ValueError("adjustments must be an immutable tuple")
 
@@ -440,6 +553,10 @@ class FinalAnalysisWeightReceipt:
         if expected_input != self.final_weight_artifact_digest:
             raise ValueError(
                 "final_weight_artifact_digest must equal the ordered adjustment chain output"
+            )
+        if self.weight_eligibility.weight_artifact_digest != self.final_weight_artifact_digest:
+            raise ValueError(
+                "weight eligibility must identify the final point-estimation weight artifact"
             )
 
         _positive_integer(self.correction_sequence, "correction_sequence")
@@ -479,14 +596,18 @@ class FinalAnalysisWeightReceipt:
             "eligible_case_set_digest": self.eligible_case_set_digest,
             "estimand_digest": self.estimand_digest,
             "estimand_reference": self.estimand_reference,
+            "estimand_scope_code": self.estimand_scope_code,
             "evidence_version": self.evidence_version,
             "final_weight_artifact_digest": self.final_weight_artifact_digest,
             "receipt_reference": self.receipt_reference,
+            "reference_duration_digest": self.reference_duration_digest,
+            "reference_duration_reference": self.reference_duration_reference,
             "sampling_design_receipt_digest": self.sampling_design_receipt_digest,
             "source_universe_receipt_digest": self.source_universe_receipt_digest,
             "target_population_digest": self.target_population_digest,
             "target_population_reference": self.target_population_reference,
             "tenant_record_id": self.tenant_record_id,
+            "weight_eligibility_receipt_digest": self.weight_eligibility.sha256_digest(),
         }
         if self.supersedes_receipt_digest is not None:
             payload["supersedes_receipt_digest"] = self.supersedes_receipt_digest
@@ -503,4 +624,5 @@ __all__ = [
     "FinalAnalysisWeightReceipt",
     "NonresponseAdjustmentReceipt",
     "TrimmingBoundingAdjustmentReceipt",
+    "WeightEligibilityReceipt",
 ]
