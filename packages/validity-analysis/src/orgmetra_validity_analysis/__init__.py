@@ -12,6 +12,7 @@ from .weights import (
     FinalAnalysisWeightReceipt,
     NonresponseAdjustmentReceipt,
     TrimmingBoundingAdjustmentReceipt,
+    WeightEligibilityReceipt,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "FinalAnalysisWeightReceipt",
     "NonresponseAdjustmentReceipt",
     "TrimmingBoundingAdjustmentReceipt",
+    "WeightEligibilityReceipt",
 ]
