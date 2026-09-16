@@ -1,4 +1,4 @@
-"""RED contract for binding weighted scientific results to exact weight evidence."""
+"""Regression contract for binding weighted results to exact weight evidence."""
 
 from datetime import datetime, timezone
 
@@ -91,7 +91,15 @@ def test_weighted_result_binds_point_and_variance_receipts_separately() -> None:
             },
             "unweighted",
         ),
+        (
+            {
+                "point_estimation_mode": "unweighted",
+                "variance_design_receipt_digest": VARIANCE_DIGEST,
+            },
+            "unweighted",
+        ),
         ({"point_estimation_mode": "opaque_weighted"}, "point_estimation_mode"),
+        ({"point_estimation_mode": None}, "point_estimation_mode"),
     ],
 )
 def test_result_rejects_unverifiable_weight_binding(
@@ -100,3 +108,19 @@ def test_result_rejects_unverifiable_weight_binding(
     """Fail closed when result and point/variance weight provenance disagree."""
     with pytest.raises(ValueError, match=match):
         result(**overrides)
+
+
+def test_weighted_result_rejects_malformed_receipt_digests() -> None:
+    """Do not permit opaque labels to stand in for immutable weight evidence."""
+    with pytest.raises(ValueError, match="analysis_weight_receipt_digest"):
+        result(
+            point_estimation_mode="weighted_design_based",
+            analysis_weight_receipt_digest="weight-v1",
+            variance_design_receipt_digest=VARIANCE_DIGEST,
+        )
+    with pytest.raises(ValueError, match="variance_design_receipt_digest"):
+        result(
+            point_estimation_mode="weighted_design_based",
+            analysis_weight_receipt_digest=WEIGHT_DIGEST,
+            variance_design_receipt_digest="variance-v1",
+        )
