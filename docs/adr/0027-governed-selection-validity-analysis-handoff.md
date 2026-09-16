@@ -30,6 +30,10 @@ Both handoff and result envelopes detach exact timezone-aware timestamps to one 
 
 The same package also validates `ValidationAnalysisResult` envelopes returned by the approved offline worker. A result must link to the handoff digest and the same pinned revision, identify a Rust CPU or GPU backend and precision, provide finite effect and interval values, match its sample size to aggregate missingness counts, reject impossible complete-versus-missing count combinations, and include explicit convergence diagnostics. The canonicalization boundary accepts only the exact governed `MissingnessSummary` and `ConvergenceDiagnostics` runtime types so subclass method overrides cannot add unreviewed or person-level fields to immutable result evidence. A nonconverged result remains typed scientific evidence requiring human review; it cannot be treated as a valid selection procedure or an employment decision.
 
+For #407's weighted design-based inference boundary, the active package now adds a first executable `FinalAnalysisWeightReceipt`. It binds the exact estimand, target population, analysis window, eligible/analytic case-set digests, #404/#405 source/sampling receipt digests, base-weight derivation evidence, an ordered immutable adjustment chain, the final point-weight artifact digest, construction time, and append-only correction lineage without storing row-level weights. Each adjustment must be contiguous and digest-linked from the previous artifact to the declared final artifact. `ValidationAnalysisResult` explicitly distinguishes `unweighted` from `weighted_design_based`; a weighted result fails closed unless it separately binds both the final analysis-weight receipt digest and the #406 variance-design receipt digest. An unweighted result cannot carry either receipt and thereby masquerade as weighted scientific evidence.
+
+This executable slice does not yet claim #407 complete. Adjustment-specific owner receipts still need executable contracts for nonresponse dispositions, calibration/raking benchmark totals and constraints, trimming/bounding rules, longitudinal eligibility, convergence/fallback semantics, and released auxiliary-owner evidence. Those remain `workforce_validation` scientific truth rather than Talent truth or cross-context SQL reconstruction.
+
 The package does not invoke fast-mlsirm. An approved offline worker is the later execution boundary. Before execution, the Orgmetra host must re-resolve every reference inside the tenant, verify exact study/Job membership and evidence provenance, and prove requester/reviewer identities are distinct authoritative actors.
 
 ## Consequences
@@ -41,6 +45,8 @@ The package does not invoke fast-mlsirm. An approved offline worker is the later
 - Aggregate missingness evidence cannot claim all observations are complete while simultaneously reporting predictor- or criterion-missing observations.
 - Result canonicalization cannot be extended by an unreviewed subclass to serialize extra decision-like or person-level fields.
 - Caller-controlled timestamp and numeric runtime behavior cannot rewrite an accepted canonical digest after construction or turn malformed oversized worker output into an uncaught exception type.
+- Weighted design-based results can no longer identify only a sample while omitting which final point-weight evidence and variance-design evidence were actually used.
+- The ordered weight transformation chain is independently digest-correlatable without centralizing case-level weights or auxiliary attributes.
 - Human interpretation remains explicit and separate from numerical output.
 - The dedicated-writer boundary remains intact: Orgmetra consumes only a pinned foreign revision/contract boundary and never mutates fast-mlsirm.
 
@@ -48,12 +54,13 @@ The package does not invoke fast-mlsirm. An approved offline worker is the later
 
 - This slice does not execute a statistical model, estimate validity, correct for measurement error/range restriction, evaluate adverse impact, or assert legal compliance.
 - Sampling design, estimator choice, missing-data treatment, reliability evidence, multiplicity, transportability, fairness analysis, and model diagnostics must be encoded in the referenced analysis plan and reviewed before execution.
+- The first #407 slice validates generic ordered weight provenance and result binding; it does not yet make nonresponse, calibration/raking, trimming, longitudinal, or sensitive auxiliary-owner evidence fully executable.
 - The generic result envelope does not invent an estimator-specific minimum complete-case count. Whether a converged estimator is identified under a particular missing-data design belongs to the reviewed analysis plan and numerical-worker contract; Orgmetra fails closed on impossible aggregate counts without silently replacing that foreign scientific contract with complete-case analysis.
 - The package validates the result envelope, but a future execution adapter must still re-resolve the handoff references, verify the result provenance artifact, and attach evidence only after accountable human review.
 
 ## Verification
 
-The package regression suite starts RED when the public handoff contract is absent and covers canonical operational tenant UUIDs, opaque UUIDv4 references, exact evidence digests, distinct human actors, exact dependency pinning, timezone-aware event time, immutable governance constants, value minimization, deterministic canonicalization, SHA-256 correlation, impossible aggregate missingness rejection, oversized numeric conversion rejection, exact governed aggregate-evidence runtime types, and 100% owned production statement/branch coverage. The repository-wide ADR numbering regression also fails closed if integration reuses an existing decision number, and the validity quality workflow contract requires any `docs/adr/**` change to execute that regression.
+The package regression suite starts RED when the public handoff contract is absent and covers canonical operational tenant UUIDs, opaque UUIDv4 references, exact evidence digests, distinct human actors, exact dependency pinning, timezone-aware event time, immutable governance constants, value minimization, deterministic canonicalization, SHA-256 correlation, impossible aggregate missingness rejection, oversized numeric conversion rejection, exact governed aggregate-evidence runtime types, and 100% owned production statement/branch coverage. #407 adds RED/GREEN coverage for deterministic value-minimized final-weight receipts, exact sampling-receipt binding, contiguous transformation lineage, append-only correction linkage, and fail-closed weighted-result binding to separate point-weight and variance-design receipts. The repository-wide ADR numbering regression also fails closed if integration reuses an existing decision number, and the validity quality workflow contract requires any `docs/adr/**` change to execute that regression.
 
 ## References
 
