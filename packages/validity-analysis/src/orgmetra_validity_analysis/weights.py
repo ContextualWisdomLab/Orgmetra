@@ -20,11 +20,222 @@ from .handoff import (
     _validate_reference,
 )
 
+_CALIBRATION_TERMINATION_CODES = frozenset({"converged", "fallback_applied"})
+_SPECIALIZED_EVIDENCE_KIND_BY_ADJUSTMENT_CODE = {
+    "nonresponse_adjustment": "nonresponse_adjustment_receipt",
+    "calibration_adjustment": "calibration_adjustment_receipt",
+    "raking_adjustment": "calibration_adjustment_receipt",
+    "poststratification_adjustment": "calibration_adjustment_receipt",
+}
+
 
 def _positive_integer(value: object, field_name: str) -> None:
     """Require a strict positive integer without accepting booleans."""
     if type(value) is not int or value <= 0:
         raise ValueError(f"{field_name} must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class NonresponseAdjustmentReceipt:
+    """Bind one nonresponse adjustment to explicit disposition-aware evidence."""
+
+    tenant_record_id: str
+    receipt_reference: str
+    response_disposition_receipt_digest: str
+    adjustment_population_digest: str
+    method_reference: str
+    method_version: int
+    configuration_digest: str
+    ineligible_treatment_code: str
+    unknown_treatment_code: str
+    unavailable_treatment_code: str
+    input_weight_artifact_digest: str
+    output_weight_artifact_digest: str
+    constructed_at: datetime
+    evidence_version: int = 1
+
+    def __post_init__(self) -> None:
+        """Reject undocumented filters or mutable nonresponse evidence."""
+        _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
+        _validate_reference(
+            self.receipt_reference,
+            "nonresponse_adjustment_receipt",
+            "receipt_reference",
+        )
+        for field_name in (
+            "response_disposition_receipt_digest",
+            "adjustment_population_digest",
+            "configuration_digest",
+            "input_weight_artifact_digest",
+            "output_weight_artifact_digest",
+        ):
+            _validate_digest(getattr(self, field_name), field_name)
+        _validate_reference(self.method_reference, "weight_method", "method_reference")
+        _positive_integer(self.method_version, "method_version")
+        for field_name in (
+            "ineligible_treatment_code",
+            "unknown_treatment_code",
+            "unavailable_treatment_code",
+        ):
+            _validate_code(getattr(self, field_name), field_name)
+        if self.input_weight_artifact_digest == self.output_weight_artifact_digest:
+            raise ValueError(
+                "output_weight_artifact_digest must identify the adjusted weight artifact"
+            )
+        constructed_at = _freeze_timestamp(self.constructed_at, "constructed_at")
+        if type(self.evidence_version) is not int or self.evidence_version != 1:
+            raise ValueError("evidence_version must remain 1")
+        object.__setattr__(self, "constructed_at", constructed_at)
+
+    def __repr__(self) -> str:
+        """Return a value-minimized representation for routine logs."""
+        return "NonresponseAdjustmentReceipt(<redacted>)"
+
+    def canonical_json(self) -> str:
+        """Return deterministic disposition-aware provenance without source attributes."""
+        payload = {
+            "adjustment_population_digest": self.adjustment_population_digest,
+            "configuration_digest": self.configuration_digest,
+            "constructed_at": _canonical_timestamp(self.constructed_at, "constructed_at"),
+            "evidence_version": self.evidence_version,
+            "ineligible_treatment_code": self.ineligible_treatment_code,
+            "input_weight_artifact_digest": self.input_weight_artifact_digest,
+            "method_reference": self.method_reference,
+            "method_version": self.method_version,
+            "output_weight_artifact_digest": self.output_weight_artifact_digest,
+            "receipt_reference": self.receipt_reference,
+            "response_disposition_receipt_digest": self.response_disposition_receipt_digest,
+            "tenant_record_id": self.tenant_record_id,
+            "unavailable_treatment_code": self.unavailable_treatment_code,
+            "unknown_treatment_code": self.unknown_treatment_code,
+        }
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    def sha256_digest(self) -> str:
+        """Return SHA-256 over the exact canonical receipt bytes."""
+        return sha256(self.canonical_json().encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class CalibrationAdjustmentReceipt:
+    """Bind calibration or raking to immutable owner benchmarks and termination evidence."""
+
+    tenant_record_id: str
+    receipt_reference: str
+    target_population_digest: str
+    analysis_window_reference: str
+    auxiliary_projection_reference: str
+    auxiliary_projection_digest: str
+    benchmark_receipt_reference: str
+    benchmark_receipt_digest: str
+    algorithm_reference: str
+    algorithm_version: int
+    constraints_digest: str
+    termination_code: str
+    input_weight_artifact_digest: str
+    output_weight_artifact_digest: str
+    constructed_at: datetime
+    fallback_rule_reference: str | None = None
+    fallback_rule_digest: str | None = None
+    evidence_version: int = 1
+
+    def __post_init__(self) -> None:
+        """Fail closed on floating benchmarks, hidden fallback, or nonconverged output."""
+        _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
+        _validate_reference(
+            self.receipt_reference,
+            "calibration_adjustment_receipt",
+            "receipt_reference",
+        )
+        _validate_reference(
+            self.analysis_window_reference,
+            "analysis_window",
+            "analysis_window_reference",
+        )
+        _validate_reference(
+            self.auxiliary_projection_reference,
+            "calibration_auxiliary_projection",
+            "auxiliary_projection_reference",
+        )
+        _validate_reference(
+            self.benchmark_receipt_reference,
+            "calibration_benchmark_receipt",
+            "benchmark_receipt_reference",
+        )
+        _validate_reference(
+            self.algorithm_reference,
+            "calibration_algorithm",
+            "algorithm_reference",
+        )
+        for field_name in (
+            "target_population_digest",
+            "auxiliary_projection_digest",
+            "benchmark_receipt_digest",
+            "constraints_digest",
+            "input_weight_artifact_digest",
+            "output_weight_artifact_digest",
+        ):
+            _validate_digest(getattr(self, field_name), field_name)
+        _positive_integer(self.algorithm_version, "algorithm_version")
+        if (
+            type(self.termination_code) is not str
+            or self.termination_code not in _CALIBRATION_TERMINATION_CODES
+        ):
+            raise ValueError("termination_code must be converged or fallback_applied")
+        if self.termination_code == "fallback_applied":
+            if self.fallback_rule_reference is None or self.fallback_rule_digest is None:
+                raise ValueError(
+                    "fallback_rule_reference and fallback_rule_digest are required for fallback_applied"
+                )
+            _validate_reference(
+                self.fallback_rule_reference,
+                "calibration_fallback_rule",
+                "fallback_rule_reference",
+            )
+            _validate_digest(self.fallback_rule_digest, "fallback_rule_digest")
+        elif self.fallback_rule_reference is not None or self.fallback_rule_digest is not None:
+            raise ValueError("fallback_rule evidence must be absent when calibration converged")
+        if self.input_weight_artifact_digest == self.output_weight_artifact_digest:
+            raise ValueError(
+                "output_weight_artifact_digest must identify the calibrated weight artifact"
+            )
+        constructed_at = _freeze_timestamp(self.constructed_at, "constructed_at")
+        if type(self.evidence_version) is not int or self.evidence_version != 1:
+            raise ValueError("evidence_version must remain 1")
+        object.__setattr__(self, "constructed_at", constructed_at)
+
+    def __repr__(self) -> str:
+        """Return a value-minimized representation for routine logs."""
+        return "CalibrationAdjustmentReceipt(<redacted>)"
+
+    def canonical_json(self) -> str:
+        """Return deterministic owner-benchmark provenance without auxiliary values."""
+        payload: dict[str, object] = {
+            "algorithm_reference": self.algorithm_reference,
+            "algorithm_version": self.algorithm_version,
+            "analysis_window_reference": self.analysis_window_reference,
+            "auxiliary_projection_digest": self.auxiliary_projection_digest,
+            "auxiliary_projection_reference": self.auxiliary_projection_reference,
+            "benchmark_receipt_digest": self.benchmark_receipt_digest,
+            "benchmark_receipt_reference": self.benchmark_receipt_reference,
+            "constraints_digest": self.constraints_digest,
+            "constructed_at": _canonical_timestamp(self.constructed_at, "constructed_at"),
+            "evidence_version": self.evidence_version,
+            "input_weight_artifact_digest": self.input_weight_artifact_digest,
+            "output_weight_artifact_digest": self.output_weight_artifact_digest,
+            "receipt_reference": self.receipt_reference,
+            "target_population_digest": self.target_population_digest,
+            "tenant_record_id": self.tenant_record_id,
+            "termination_code": self.termination_code,
+        }
+        if self.fallback_rule_reference is not None:
+            payload["fallback_rule_digest"] = self.fallback_rule_digest
+            payload["fallback_rule_reference"] = self.fallback_rule_reference
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    def sha256_digest(self) -> str:
+        """Return SHA-256 over the exact canonical receipt bytes."""
+        return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +250,7 @@ class AnalysisWeightAdjustment:
     output_weight_artifact_digest: str
     configuration_digest: str
     evidence_receipt_digest: str
+    evidence_kind: str
 
     def __post_init__(self) -> None:
         """Reject unordered, opaque, or unverifiable adjustment evidence."""
@@ -53,6 +265,14 @@ class AnalysisWeightAdjustment:
             "evidence_receipt_digest",
         ):
             _validate_digest(getattr(self, field_name), field_name)
+        _validate_code(self.evidence_kind, "evidence_kind")
+        required_evidence_kind = _SPECIALIZED_EVIDENCE_KIND_BY_ADJUSTMENT_CODE.get(
+            self.adjustment_code
+        )
+        if required_evidence_kind is not None and self.evidence_kind != required_evidence_kind:
+            raise ValueError(
+                f"{self.adjustment_code} requires evidence_kind {required_evidence_kind}"
+            )
         if self.input_weight_artifact_digest == self.output_weight_artifact_digest:
             raise ValueError(
                 "output_weight_artifact_digest must identify the transformed weight artifact"
@@ -63,6 +283,7 @@ class AnalysisWeightAdjustment:
         return {
             "adjustment_code": self.adjustment_code,
             "configuration_digest": self.configuration_digest,
+            "evidence_kind": self.evidence_kind,
             "evidence_receipt_digest": self.evidence_receipt_digest,
             "input_weight_artifact_digest": self.input_weight_artifact_digest,
             "method_reference": self.method_reference,
@@ -204,4 +425,9 @@ class FinalAnalysisWeightReceipt:
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
-__all__ = ["AnalysisWeightAdjustment", "FinalAnalysisWeightReceipt"]
+__all__ = [
+    "AnalysisWeightAdjustment",
+    "CalibrationAdjustmentReceipt",
+    "FinalAnalysisWeightReceipt",
+    "NonresponseAdjustmentReceipt",
+]
