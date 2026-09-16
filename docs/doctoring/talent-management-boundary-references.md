@@ -1,6 +1,6 @@
 # Talent Management boundary references
 
-Reference doctoring for ADR 0292, issue #292, and repair issue #294. Checked against public source metadata on 2026-09-10. The ISO entries below describe scope/authority only; possession of this bibliography is not a certification or evidence that Orgmetra conforms to a paid standard's complete normative text. The legal entries constrain provenance and rights-path design only; they do not establish that a particular tenant, worker, decision, stage, or deployment is legally in scope.
+Reference doctoring for ADR 0292, issue #292, and repair issues #294 and #396. Checked against public source metadata on 2026-09-16. The ISO entries below describe scope/authority only; possession of this bibliography is not a certification or evidence that Orgmetra conforms to a paid standard's complete normative text. The legal entries constrain provenance and rights-path design only; they do not establish that a particular tenant, worker, decision, stage, or deployment is legally in scope.
 
 ## Standards and primary sources
 
@@ -20,6 +20,12 @@ International Organization for Standardization. (n.d.). *ISO/AWI 10667-2 Assessm
 - Traceability rule: this AWI is evidence that revision work exists, not normative authority for an implementation or conformance claim. Until a successor edition is published, cite ISO 10667-2:2020 for current published scope and record its “to be revised” lifecycle status.
 - Re-check both the 2020 edition and the Edition 3 work item before ADR acceptance, assessment-contract changes, or release/compliance claims; do not silently import draft/work-item language into Orgmetra contracts.
 
+International Organization for Standardization. (2021). *ISO 30415:2021 Human resource management—Diversity and inclusion*. https://www.iso.org/standard/71164.html
+
+- ISO lists Edition 1 as Published. The lifecycle shows systematic review opened on 2026-04-15 and closed on 2026-09-03 at stage 90.60; the public page still reports the standard as Published and under review, so the resulting confirmation/revision disposition must be re-checked before ADR acceptance or release claims.
+- The public abstract describes D&I governance, accountabilities, responsibilities, recommended actions, suggested measures, and potential outcomes, while explicitly excluding country-specific legal requirements.
+- Scientific/governance relevance: stage-denominator evidence can support accountable D&I analysis, but ISO 30415 does not make `talent_management` the owner of protected attributes, fairness verdicts, or jurisdiction-specific legal conclusions.
+
 International Organization for Standardization. (2023). *ISO 30405:2023 Human resource management—Guidelines on recruitment*. https://www.iso.org/standard/79488.html
 
 - ISO lists Edition 2 as the current published recruitment standard.
@@ -34,6 +40,12 @@ International Organization for Standardization. (2025). *ISO 30414:2025 Human re
 International Organization for Standardization. (2025, August 24). *ISO 30414:2025—Strengthening human capital reporting and disclosure*. ISO/TC 260. https://committee.iso.org/sites/tc260/home/news/content-left-area/news-and-updates/iso-30414-2025-strengthening-hum.html
 
 - Primary publication announcement for the second edition; useful for edition/date traceability. The standard page remains the authority for current lifecycle status.
+
+U.S. Equal Employment Opportunity Commission. (1979). *Questions and Answers to Clarify and Provide a Common Interpretation of the Uniform Guidelines on Employee Selection Procedures*. https://www.eeoc.gov/laws/guidance/questions-and-answers-clarify-and-provide-common-interpretation-uniform-guidelines
+
+- The EEOC page identifies this as technical assistance interpreting the 1978 Uniform Guidelines and states expressly that the document does not itself have the force and effect of law.
+- It treats hiring, promotion, transfer, retention and related employment decisions as selection processes, distinguishes the total selection process from component procedures, and defines adverse impact in terms of materially different selection rates. Those rates necessarily depend on a preserved numerator and denominator rather than only on the records that survive to a later stage.
+- Scientific-design relevance: Orgmetra must retain the exact stage opportunity set and transition denominator if it wants later `workforce_validation` analysis to reconstruct a stage-level selection rate or attrition pattern. This is evidence-design guidance, not a universal legal-applicability declaration.
 
 ## Privacy and AI decision-rights primary sources
 
@@ -94,12 +106,24 @@ Alon-Barkat, S., & Busuioc, M. (2023). Human–AI interactions in public sector 
 - Design relevance: “human in the loop” must not be treated as a binary compliance signal. Human–algorithm interaction can depend on context and can still be selectively biased. For Orgmetra, the appropriate control is to preserve material-stage provenance and test what evidence, alternatives, limitations, override/reversal paths, and actual human disposition existed before lock-in rather than inferring effective oversight from actor presence alone.
 - Scope limit: these public-sector experiments do not validate an Orgmetra employment model, quantify employment-domain automation bias, or establish legal compliance. They support the narrower human-factors claim that actual interaction behavior and decision path matter.
 
+Alexander, L., III, Song, Q. C., Hickman, L., & Shin, H. J. (2025). Sourcing algorithms: Rethinking fairness in hiring in the era of algorithmic recruitment. *International Journal of Selection and Assessment, 33*, e12499. https://doi.org/10.1111/ijsa.12499
+
+- The study models sourcing as an upstream prescreen and shows why applicant-only adverse-impact measures can miss disparities created before people enter the observed applicant pool.
+- Design relevance: preserving only shortlisted/selected records can make a later fairness analysis look well formed while its relevant opportunity denominator has already been lost. A material-stage contract therefore needs a versioned opportunity-set manifest and transition counts, not only per-person decision records.
+- Scope limit: the simulation study motivates end-to-end denominator preservation; it does not establish that every Orgmetra Talent workflow has the same legal protected-group reporting obligation.
+
+Xu, H., & Zhang, N. (2024). Goal orientation for fair machine learning algorithms. *Production and Operations Management*. https://doi.org/10.1177/10591478241234998
+
+- The paper notes that organizational-selection ML outputs are often intermediate inputs to a broader decision process rather than the final decision itself.
+- Design relevance: fairness evidence must follow the decision process and its stage-specific opportunity sets instead of treating one model score or final outcome set as the whole population at risk.
+
 ## Evidence-handling notes
 
-- These references constrain terminology, scope, measurement claims, provenance, human-oversight testability, and interfaces. They do not replace Orgmetra's protected PRD/TRD/ARCHITECTURE or an accepted owner ADR.
+- These references constrain terminology, scope, measurement claims, provenance, human-oversight testability, denominator preservation, and interfaces. They do not replace Orgmetra's protected PRD/TRD/ARCHITECTURE or an accepted owner ADR.
 - ISO public abstracts are sufficient to support the scope statements recorded here, but implementation must not claim full conformance to normative requirements that have not been reviewed from licensed/current standard text.
-- Re-check current ISO lifecycle/edition status when ADR 0292 is proposed for acceptance or when release/compliance documentation is produced. For ISO 10667-2, inspect both the current published 2020 edition and the active Edition 3 work item.
+- Re-check current ISO lifecycle/edition status when ADR 0292 is proposed for acceptance or when release/compliance documentation is produced. For ISO 10667-2, inspect both the current published 2020 edition and the active Edition 3 work item. For ISO 30415:2021, re-check the post-review disposition after the recorded 2026-09-03 close of review.
 - The Korean and EU legal sources are jurisdiction- and fact-dependent. They justify a versioned decision-production, material-stage provenance, effective-oversight, and rights-response boundary; they do not establish that a particular Orgmetra decision is fully automated, high-risk, adverse, subject to Article 14/86, or otherwise legally covered.
 - A compliance-policy owner must resolve then-current jurisdiction, effective dates, lawful exceptions, deadlines, and response/oversight obligations. `talent_management` consumes that released/versioned determination and preserves the evidence needed to execute it; it does not infer legal applicability from a score, model call, human name, UI event, or final decision label.
 - A stage-level `fully_automated_decision` marker is process provenance, not itself a statutory classification. An upstream automated stage can remain in an AI-assisted path only if its material effect remains inspectable, reconstructable, and genuinely reversible before high-impact finalization under the Proposed product contract.
-- Psychometric or predictive claims require study-specific evidence. Conceptual talent-management papers and human–algorithm interaction studies do not establish validity, fairness, utility, or transportability of any particular Orgmetra decision rule.
+- Opportunity-set and stage-transition provenance belongs to the Talent process owner only to the extent required to reconstruct that process. Protected-group attributes and fairness/validity verdicts remain outside Talent and must be joined through purpose-authorized released contracts or approved analysis snapshots.
+- Psychometric or predictive claims require study-specific evidence. Conceptual talent-management papers, sourcing simulations, fairness-optimization research, and human–algorithm interaction studies do not establish validity, fairness, utility, or transportability of any particular Orgmetra decision rule.
