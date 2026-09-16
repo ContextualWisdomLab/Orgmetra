@@ -11,12 +11,15 @@ from orgmetra_validity_analysis import (
 )
 
 TENANT = "10000000-0000-7000-8000-000000000001"
+OTHER_TENANT = "10000000-0000-7000-8000-000000000002"
 RECEIPT = "analysis_weight_receipt:11111111-1111-4111-8111-111111111111"
 ELIGIBILITY_RECEIPT = "weight_eligibility_receipt:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 ESTIMAND = "validation_estimand:22222222-2222-4222-8222-222222222222"
 TARGET = "analysis_target_population:33333333-3333-4333-8333-333333333333"
+OTHER_TARGET = "analysis_target_population:33333333-3333-4333-8333-333333333334"
 WINDOW = "analysis_window:44444444-4444-4444-8444-444444444444"
 DURATION = "analysis_reference_duration:77777777-7777-4777-8777-777777777777"
+OTHER_DURATION = "analysis_reference_duration:77777777-7777-4777-8777-777777777778"
 DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64
 DIGEST_C = "c" * 64
@@ -150,12 +153,27 @@ def test_probability_design_receipt_is_required() -> None:
         receipt(sampling_design_receipt_digest="not-a-digest")
 
 
+@pytest.mark.parametrize("scope", [None, "panel"])
+def test_estimand_scope_is_closed_to_cross_sectional_or_longitudinal(scope: object) -> None:
+    """Reject non-string and caller-defined estimand scope labels."""
+    with pytest.raises(ValueError, match="estimand_scope_code"):
+        receipt(estimand_scope_code=scope)
+
+
 def test_weight_eligibility_must_match_estimand_scope_population_duration_and_cases() -> None:
     """Reject cross-sectional/longitudinal or target-window mismatches before release."""
+    with pytest.raises(ValueError, match="WeightEligibilityReceipt"):
+        receipt(weight_eligibility=object())
+    with pytest.raises(ValueError, match="tenant_record_id"):
+        receipt(weight_eligibility=eligibility(tenant_record_id=OTHER_TENANT))
     with pytest.raises(ValueError, match="weight scope"):
         receipt(weight_eligibility=eligibility(weight_scope_code="longitudinal"))
     with pytest.raises(ValueError, match="target population"):
+        receipt(weight_eligibility=eligibility(target_population_reference=OTHER_TARGET))
+    with pytest.raises(ValueError, match="target population"):
         receipt(weight_eligibility=eligibility(target_population_digest=DIGEST_A))
+    with pytest.raises(ValueError, match="reference duration"):
+        receipt(weight_eligibility=eligibility(reference_duration_reference=OTHER_DURATION))
     with pytest.raises(ValueError, match="reference duration"):
         receipt(weight_eligibility=eligibility(reference_duration_digest=DIGEST_A))
     with pytest.raises(ValueError, match="eligible case set"):
