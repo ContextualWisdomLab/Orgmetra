@@ -1,6 +1,6 @@
 # Talent Management boundary references
 
-Reference doctoring for ADR 0292, issue #292, and repair issues #294 and #396. Checked against public source metadata on 2026-09-16. The ISO entries below describe scope/authority only; possession of this bibliography is not a certification or evidence that Orgmetra conforms to a paid standard's complete normative text. The legal entries constrain provenance and rights-path design only; they do not establish that a particular tenant, worker, decision, stage, or deployment is legally in scope.
+Reference doctoring for ADR 0292, issue #292, and repair issues #294, #396, and #397. Checked against public source metadata on 2026-09-16. The ISO entries below describe scope/authority only; possession of this bibliography is not a certification or evidence that Orgmetra conforms to a paid standard's complete normative text. The legal entries constrain provenance and rights-path design only; they do not establish that a particular tenant, worker, decision, stage, or deployment is legally in scope.
 
 ## Standards and primary sources
 
@@ -100,6 +100,12 @@ Gallardo-Gallardo, E., Dries, N., & González-Cruz, T. F. (2013). What is the me
 
 - Relevance: distinguishes “talent as characteristics” from “talent as people” and inclusive from exclusive approaches. ADR implication: `TalentPoolMembership` is an organizational planning relation, not proof that an individual possesses a timeless latent trait called talent.
 
+Dunleavy, E. M., Mueller, L. M., Buonasera, A. K., Kuang, D. C., & Dunleavy, D. G. (2008). On the consequences of frequent applicants in adverse impact analyses: A demonstration study. *International Journal of Selection and Assessment, 16*(4), 333–344. https://doi.org/10.1111/j.1468-2389.2008.00439.x
+
+- The demonstration study examines frequent applicants in adverse-impact analysis and shows that repeated applications by even one frequent applicant can materially create or mask statistically significant adverse-impact results under the studied conditions.
+- Scientific-design relevance: a stage denominator cannot be represented only by worker identity or aggregate counts. Orgmetra must preserve an occurrence-level opportunity identity stable across retry/replay but distinct across legitimate repeated opportunities, plus an explicit counting unit. `workforce_validation` then chooses and records whether an authorized analysis estimates at opportunity/application, case, or person level.
+- Scope limit: the paper demonstrates a statistical counting-unit problem; it does not prescribe Orgmetra's legal reporting unit for every tenant or jurisdiction and does not make `talent_management` the fairness-analysis owner.
+
 Alon-Barkat, S., & Busuioc, M. (2023). Human–AI interactions in public sector decision making: “Automation bias” and “selective adherence” to algorithmic advice. *Journal of Public Administration Research and Theory, 33*(1), 153–169. https://doi.org/10.1093/jopart/muac007
 
 - The article reports three experimental studies with an aggregate sample of 2,854 participants. It did not find a general pattern of stronger automatic adherence to algorithmic advice than equivalent human-expert advice, while it did find evidence of selective adherence to advice consistent with pre-existing stereotypes in the studied settings.
@@ -119,11 +125,11 @@ Xu, H., & Zhang, N. (2024). Goal orientation for fair machine learning algorithm
 
 ## Evidence-handling notes
 
-- These references constrain terminology, scope, measurement claims, provenance, human-oversight testability, denominator preservation, and interfaces. They do not replace Orgmetra's protected PRD/TRD/ARCHITECTURE or an accepted owner ADR.
+- These references constrain terminology, scope, measurement claims, provenance, human-oversight testability, denominator preservation, counting-unit traceability, and interfaces. They do not replace Orgmetra's protected PRD/TRD/ARCHITECTURE or an accepted owner ADR.
 - ISO public abstracts are sufficient to support the scope statements recorded here, but implementation must not claim full conformance to normative requirements that have not been reviewed from licensed/current standard text.
 - Re-check current ISO lifecycle/edition status when ADR 0292 is proposed for acceptance or when release/compliance documentation is produced. For ISO 10667-2, inspect both the current published 2020 edition and the active Edition 3 work item. For ISO 30415:2021, re-check the post-review disposition after the recorded 2026-09-03 close of review.
 - The Korean and EU legal sources are jurisdiction- and fact-dependent. They justify a versioned decision-production, material-stage provenance, effective-oversight, and rights-response boundary; they do not establish that a particular Orgmetra decision is fully automated, high-risk, adverse, subject to Article 14/86, or otherwise legally covered.
 - A compliance-policy owner must resolve then-current jurisdiction, effective dates, lawful exceptions, deadlines, and response/oversight obligations. `talent_management` consumes that released/versioned determination and preserves the evidence needed to execute it; it does not infer legal applicability from a score, model call, human name, UI event, or final decision label.
 - A stage-level `fully_automated_decision` marker is process provenance, not itself a statutory classification. An upstream automated stage can remain in an AI-assisted path only if its material effect remains inspectable, reconstructable, and genuinely reversible before high-impact finalization under the Proposed product contract.
-- Opportunity-set and stage-transition provenance belongs to the Talent process owner only to the extent required to reconstruct that process. Protected-group attributes and fairness/validity verdicts remain outside Talent and must be joined through purpose-authorized released contracts or approved analysis snapshots.
-- Psychometric or predictive claims require study-specific evidence. Conceptual talent-management papers, sourcing simulations, fairness-optimization research, and human–algorithm interaction studies do not establish validity, fairness, utility, or transportability of any particular Orgmetra decision rule.
+- Opportunity-set and stage-transition provenance belongs to the Talent process owner only to the extent required to reconstruct that process. Exact entry membership and counting-unit evidence must be retained without copying protected-group attributes; retry/replay attempts cannot become extra observations, and distinct legitimate repeated opportunities cannot be silently collapsed. Protected-group attributes and fairness/validity verdicts remain outside Talent and must be joined through purpose-authorized released contracts or approved analysis snapshots.
+- Psychometric or predictive claims require study-specific evidence. Conceptual talent-management papers, repeated-applicant demonstrations, sourcing simulations, fairness-optimization research, and human–algorithm interaction studies do not establish validity, fairness, utility, or transportability of any particular Orgmetra decision rule.
