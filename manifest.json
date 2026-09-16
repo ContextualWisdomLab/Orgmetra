@@ -5,9 +5,9 @@
   "files": [
     {
       "path": ".github/workflows/foundation-ci.yml",
-      "sha256": "b6a4365936b66803a8112f034c77d53d33301a7a798ed4f68746a4f2d8b081d7",
-      "bytes": 6651,
-      "lines": 125
+      "sha256": "69e35b7a12e7ebcbe039ef349e2311702fdbfeee8916d4c78a64cf8bd8a1f430",
+      "bytes": 6853,
+      "lines": 126
     },
     {
       "path": ".gitignore",
@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "f2d2e0b488c0440533effa821808f2f17e37d92f8fb586174c2fdb594f760ca5",
-      "bytes": 17539,
-      "lines": 77
+      "sha256": "4669c7ab654afce04898baa7af37ced058a14d2d9aa42bc4bee712a45b8038bf",
+      "bytes": 17868,
+      "lines": 78
     },
     {
       "path": "CLAUDE.md",
