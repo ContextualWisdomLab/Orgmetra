@@ -1,6 +1,6 @@
 # Talent Management boundary references
 
-Reference doctoring for ADR 0292, issue #292, and repair issues #294, #396, #397, #398, #399, #400, and #401. Checked against public source metadata on 2026-09-16. The ISO entries below describe scope/authority only; possession of this bibliography is not a certification or evidence that Orgmetra conforms to a paid standard's complete normative text. The legal entries constrain provenance and rights-path design only; they do not establish that a particular tenant, worker, decision, stage, or deployment is legally in scope.
+Reference doctoring for ADR 0292, issue #292, and repair issues #294, #396, #397, #398, #399, #400, #401, #402, and #403. Checked against public source metadata on 2026-09-16. The ISO entries below describe scope/authority only; possession of this bibliography is not a certification or evidence that Orgmetra conforms to a paid standard's complete normative text. The legal entries constrain provenance and rights-path design only; they do not establish that a particular tenant, worker, decision, stage, or deployment is legally in scope.
 
 ## Standards and primary sources
 
@@ -65,6 +65,22 @@ National Institute of Standards and Technology. (n.d.). *AI Risk Management Fram
 - MANAGE 3.1 addresses monitoring, control, and documentation of risks and benefits from third-party resources. The current Playbook notes that AI systems can depend on third-party data, software, hardware, tools, services, and expertise, and recommends documenting third-party systems/components and applying risk controls.
 - NIST also states that the Playbook is voluntary guidance rather than a checklist that must be followed in its entirety, and the site currently notes that AI RMF 1.0 is being revised.
 - #401 uses this as dependency-provenance/risk-management evidence only. It supports pinning material released dependencies that affect a policy regime; it does not establish validity, fairness, or legal compliance for an Orgmetra Talent procedure.
+- #402 and #403 reuse the narrower dependency-governance point: a third-party or separately owned dependency needs explicit owner provenance and runtime monitoring. The Playbook does not say a cryptographic artifact digest is semantic equivalence, nor does it establish that a declared dependency is the one actually consumed during a specific Talent stage.
+
+Supply-chain Levels for Software Artifacts. (2026). *SLSA v1.2: Provenance*. https://slsa.dev/spec/v1.2/provenance
+
+- SLSA v1.2 is the current Approved specification on the public SLSA site as checked on 2026-09-16.
+- #403 uses SLSA only as an engineering provenance analogy. It supports distinguishing declared configuration from evidence about a concrete execution; it is not an HR selection-validity, fairness, employment-law, or Orgmetra conformance authority.
+
+Supply-chain Levels for Software Artifacts. (2026). *SLSA v1.2: Build provenance*. https://slsa.dev/spec/v1.2/build-provenance
+
+- Build Provenance distinguishes parameters declared to the build from `resolvedDependencies`, the concrete artifacts resolved or fetched during execution. That distinction is useful by analogy for Orgmetra's intended `PolicySemanticProjection` versus trusted observed-resolved dependency evidence for one material Talent stage.
+- Orgmetra does not import SLSA's build schema wholesale. The domain requirement is narrower: before an outcome can authorize a material HR stage, the trusted Talent boundary must be able to bind the terminal stage attempt to the immutable owner contracts/artifacts and material parameters actually used, compare them with the intended policy projection, and preserve any mismatch explicitly.
+
+### Scope note for #402 and #403
+
+- #402 is an ownership/semantic-authority rule, not a demand for duplicate hashes. An upstream owner's existing canonical content digest can serve both integrity and downstream semantic identity only when the released owner contract explicitly defines the addressed canonical projection as the downstream-material semantics and publishes its stability/equivalence rules. Otherwise the owner supplies a narrower semantic projection/receipt or versioned equivalence evidence; Talent may not reconstruct foreign source truth.
+- #403 is an execution-provenance rule. SLSA's declared-versus-resolved distinction and NIST's third-party-resource monitoring support the engineering need to record what was actually resolved, but neither source proves that an HR procedure is valid, fair, legally compliant, or scientifically transportable. `workforce_validation` retains those judgments.
 
 ## Privacy and AI decision-rights primary sources
 
@@ -144,7 +160,7 @@ Xu, H., & Zhang, N. (2024). Goal orientation for fair machine learning algorithm
 
 ## Evidence-handling notes
 
-- These references constrain terminology, scope, measurement claims, provenance, human-oversight testability, denominator preservation, counting-unit traceability, manifest replacement views, policy-regime compatibility, and reproducible policy-semantic identity. They do not replace Orgmetra's protected PRD/TRD/ARCHITECTURE or an accepted owner ADR.
+- These references constrain terminology, scope, measurement claims, provenance, human-oversight testability, denominator preservation, counting-unit traceability, manifest replacement views, policy-regime compatibility, reproducible policy-semantic identity, cross-owner semantic authority, and intended-versus-actual execution provenance. They do not replace Orgmetra's protected PRD/TRD/ARCHITECTURE or an accepted owner ADR.
 - ISO public abstracts are sufficient to support the scope statements recorded here, but implementation must not claim full conformance to normative requirements that have not been reviewed from licensed/current standard text.
 - Re-check current ISO lifecycle/edition status when ADR 0292 is proposed for acceptance or when release/compliance documentation is produced. For ISO 10667-2, inspect both the current published 2020 edition and the active Edition 3 work item. For ISO 30415:2021, re-check the post-review disposition after the recorded 2026-09-03 close of review.
 - The Korean and EU legal sources are jurisdiction- and fact-dependent. They justify a versioned decision-production, material-stage provenance, effective-oversight, and rights-response boundary; they do not establish that a particular Orgmetra decision is fully automated, high-risk, adverse, subject to Article 14/86, or otherwise legally covered.
@@ -153,4 +169,6 @@ Xu, H., & Zhang, N. (2024). Goal orientation for fair machine learning algorithm
 - Opportunity-set and stage-transition provenance belongs to the Talent process owner only to the extent required to reconstruct that process. Exact entry membership and counting-unit evidence must be retained without copying protected-group attributes; retry/replay attempts cannot become extra observations, and distinct legitimate repeated opportunities cannot be silently collapsed. Protected-group attributes and fairness/validity verdicts remain outside Talent and must be joined through purpose-authorized released contracts or approved analysis snapshots.
 - Manifest-correction provenance and policy-semantic provenance are separate. An immutable replacement lineage can resolve record corrections without establishing that a materially changed eligibility, cut-score, ranking, evidence, suppression/routing or equivalent procedure is scientifically the same procedure. Talent must expose the exact governing policy-regime/semantic identity; `workforce_validation` decides whether scientific evidence supports transport or comparison across procedures.
 - #401's RFC/W3C/NIST sources are engineering/provenance evidence, not HR-selection validity standards. They support deterministic canonical representation, material upstream dependency provenance, and documented third-party-resource control. They do not decide which Talent fields are material, whether a changed procedure is valid or fair, or whether two regimes are scientifically transportable.
+- #402 further limits that interpretation: an immutable artifact/version digest proves identity/integrity only to the extent its owner contract defines. Semantic compatibility across bounded contexts must come from the authoritative owner's released semantic projection/receipt or equivalence evidence; Talent must not infer it from generic digests or foreign source internals.
+- #403 uses SLSA v1.2 and NIST MANAGE 3.1 only as engineering precedents for separating declared configuration from actual resolved execution and monitoring external resources. They do not establish HR-selection validity, fairness, legal applicability, or compliance. The domain contract requires trusted observed-resolved evidence because `workforce_validation` must be able to distinguish the intended procedure from the one actually executed.
 - Psychometric or predictive claims require study-specific evidence. Conceptual talent-management papers, repeated-applicant demonstrations, sourcing simulations, fairness-optimization research, and human–algorithm interaction studies do not establish validity, fairness, utility, or transportability of any particular Orgmetra decision rule.
