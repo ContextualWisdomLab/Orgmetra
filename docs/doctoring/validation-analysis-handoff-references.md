@@ -1,12 +1,18 @@
 # Validation-analysis handoff references
 
-Material decisions for ADR 0027 were checked against the following primary/authoritative sources on 2026-08-21. Regulatory currency was rechecked on 2026-08-29; fixed publication identifiers are retained so an auditor can reproduce the cited text even when agency web pages change.
+Material decisions for ADR 0027 were checked against the following primary/authoritative sources on 2026-08-21. Regulatory currency was rechecked on 2026-08-29. The #407 analysis-weight evidence boundary was checked on 2026-09-17 against the primary calibration paper and current U.S. Census methodological/quality documentation. Fixed publication identifiers are retained where possible so an auditor can reproduce the cited text even when agency web pages change.
 
 ## APA 7 references
 
 Equal Employment Opportunity Commission, Civil Service Commission, Department of Justice, & Department of Labor. (1978). *Uniform Guidelines on Employee Selection Procedures (1978)*, 43 Fed. Reg. 38,290 (August 25, 1978) (codified at 29 C.F.R. pt. 1607). The EEOC continues to list 29 C.F.R. pt. 1607 among its Title VII regulations: https://www.eeoc.gov/regulations-and-guidelines
 
 Society for Industrial and Organizational Psychology. (2018). Principles for the validation and use of personnel selection procedures. *Industrial and Organizational Psychology, 11*(S1), 1–97. https://doi.org/10.1017/iop.2018.195
+
+Deville, J.-C., & Särndal, C.-E. (1992). Calibration estimators in survey sampling. *Journal of the American Statistical Association, 87*(418), 376–382. https://doi.org/10.1080/01621459.1992.10475217
+
+U.S. Census Bureau. (2021). *Statistical Quality Standard D1: Producing direct estimates from samples*. https://www.census.gov/about/policies/quality/standards/standardd1.html
+
+U.S. Census Bureau. (2022, August 18). *Survey of Income and Program Participation: Weighting*. https://www.census.gov/programs-surveys/sipp/methodology/weighting.html
 
 ContextualWisdomLab. (2026). *fast-mlsirm* (Commit 04d0bc21a2a20693bcf16108cd76d394fe844d23) [Computer software]. GitHub. https://github.com/ContextualWisdomLab/fast-mlsirm/tree/04d0bc21a2a20693bcf16108cd76d394fe844d23
 
@@ -19,5 +25,7 @@ Office of Personnel Management. (2026). *Removal of references to the Uniform Gu
 - 43 Fed. Reg. 38,290 and the still-listed EEOC 29 C.F.R. pt. 1607 source support keeping criterion-related validity evidence tied to an explicit study design, job relevance, accuracy, reporting, and documentation rather than treating a bare coefficient as sufficient evidence. The fixed Federal Register identifier, not a mutable `/current/` eCFR URL, is the reproducible source for the 1978 text cited by this ADR.
 - The July 31, 2026 OPM interim final rule removed UGESP references from specified federal civil-service regulations. Orgmetra therefore does not present UGESP as an undifferentiated government-wide mandate; applicability must be evaluated for the employer, jurisdiction, decision, and governing law at use time.
 - The SIOP Principles are the professional validation baseline used for the handoff's evidence-and-human-review posture. The journal citation above fixes volume 11, Supplement S1, pages 1–97, and DOI 10.1017/iop.2018.195.
+- Deville and Särndal show that calibrated weights are produced by modifying ordinary inverse-inclusion-probability weights under explicit distance measures and calibration equations. ADR 0027 uses that narrow result to justify treating final adjusted point weights as a separately versioned scientific artifact rather than assuming `1/π_i` and calibrated weights are interchangeable. It does not mandate one calibration estimator for Orgmetra.
+- Census Statistical Quality Standard D1 requires estimates and variances to account for sample design and post-sampling weighting adjustments. The SIPP methodology illustrates that final weights can combine base selection, nonresponse, longitudinal/panel, and post-stratification/calibration adjustments and that the appropriate weight depends on target population and reference duration. These sources support provenance/reproducibility requirements only; SIPP-specific weights are not imported as Orgmetra rules.
 - The fast-mlsirm commit is recorded as a read-only dependency coordinate only. This Orgmetra slice does not modify or duplicate its numerical implementation.
 - NIST AI RMF's govern, map, measure, and manage functions support preserving backend, precision, provenance, convergence, and human-review fields as inspectable result evidence rather than treating a model response as an autonomous decision.
