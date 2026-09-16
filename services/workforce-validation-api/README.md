@@ -1,8 +1,8 @@
 # Orgmetra Workforce Validation API
 
-This package is the application boundary for the `workforce_validation` bounded context. The current slice exposes one purpose-bound read use case for the existing validity-study registry header and establishes the context-local PostgreSQL ownership bootstrap.
+This package is the application boundary for the `workforce_validation` bounded context. The current slice exposes purpose-bound owner reads for the existing validity-study registry header and for value-minimized scientific auxiliary-use authority, while establishing the context-local PostgreSQL ownership bootstrap.
 
-It does **not** query People, Talent Acquisition, Performance Management, Job Architecture, Psychometrics Commons, fast-mlsirm, or TEPP tables. Those contexts remain separate owners. Exact foreign identifiers and immutable specialist result references cross the boundary only through published contracts.
+It does **not** query People, Talent Acquisition, Performance Management, Job Architecture, Psychometrics Commons, fast-mlsirm, TEPP, or another bounded context's application tables. Those contexts remain separate owners. Exact foreign identifiers and immutable specialist/scientific evidence cross this boundary only through released/versioned contracts and owner ports.
 
 ## Current slice
 
@@ -22,11 +22,23 @@ It does **not** query People, Talent Acquisition, Performance Management, Job Ar
 
 `ValidityStudyView` is a data projection, not a durable authorization credential or cryptographic capability. Downstream consequential actions must perform their own purpose-bound authorization and authoritative re-resolution rather than treating the Python runtime type as reusable authority. Low-level interpreter construction is outside the supported public API and is not accepted as proof that authorization occurred.
 
+`resolve_calibration_auxiliary_authority(...)` is the first executable owner-side slice for #407's durable scientific-evidence resolution gap. It does **not** import or copy the mutable validity-analysis implementation. Instead it defines the `workforce_validation` application contract that a later durable adapter must satisfy:
+
+- authorize the exact tenant/study scientific read before invoking the owner port;
+- carry only opaque projection/purpose/owner/authorization references, SHA-256 evidence digests, immutable contract versions, and authorization time bounds—never calibration source attributes, protected characteristics, benchmark values, or row-level weights;
+- require a released-owner-contract reference/version and corroborating owner-contract digest rather than treating a caller-supplied version label as release authority;
+- resolve through one statically captured `CalibrationAuxiliaryAuthorityReadPort` capability and reject inherited Protocol placeholders or descriptors before authorization;
+- reconstruct the returned evidence into an exact tuple-backed `CalibrationAuxiliaryAuthorityRecord` and require tenant, study, projection, scientific purpose, released owner contract, and authorization-receipt digest to match the requested coordinates;
+- require the exact scientific-use instant to fall inside the owner-resolved authorization interval;
+- issue only a minimized `CalibrationAuxiliaryAuthorityView`. The view is corroborating data, not a reusable authorization credential or proof that an arbitrary injected port is a production owner.
+
+This closes the leaf false-GREEN where opaque coordinates could be accepted without any owner-resolution contract. It does **not** complete #407: the current branch has no durable scientific-authority relation or released auxiliary-evidence adapter. After the canonical owner persistence path is protected truth, #248 or its verified successor must implement the schema-qualified, least-privilege durable port and prove that the resolved owner evidence is itself released/versioned and purpose-authorized. Mutable #57 source is not a dependency of this service.
+
 `services/workforce-validation-api/database/migrations/0001_owner_schema.sql` starts this bounded context's own migration history. It creates the `workforce_validation` schema and deny-default `workforce_validation_role`, revokes public schema access, and intentionally creates or moves no application table yet. The role is a **NOLOGIN migration/schema owner only**; runtime principals must not be granted that owner role. PostgreSQL applies role-level configuration defaults at login and does not re-apply them on `SET ROLE`, so an `ALTER ROLE ... SET search_path` entry on this NOLOGIN role is not treated as a runtime isolation control. The later durable adapter must use a distinct least-privilege runtime role, schema-qualified `workforce_validation` relations, and explicit function-level `search_path` where `SECURITY DEFINER` code is introduced.
 
 Protected foundation migrations still create validity-study tables in the legacy foundation schema, so the next forward-only persistence increment must adopt those records without normalizing `public.validity_study` as a long-lived service contract or breaking existing linkage evidence.
 
-Issue #234 owns the remaining order: durable owner-schema adoption and PostgreSQL adapter, idempotent registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, OpenAPI/gateway exposure, and realistic p95 measurement. Issues #236–#244 retain the current bootstrap trust-boundary findings through exact-head acceptance and protected integration: persisted-record immutability, principal immutability and constructor revalidation, owner-role/runtime-role separation, inert repository-capability validation, immutable minimized output, non-public issuance of that output, detached UUID storage/target snapshots, and exact validation of UUID internal payloads before comparison.
+Issue #234 owns the remaining order: durable owner-schema adoption and PostgreSQL adapter, idempotent registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, OpenAPI/gateway exposure, and realistic p95 measurement. Issues #236–#244 retain the current bootstrap trust-boundary findings through exact-head acceptance and protected integration: persisted-record immutability, principal immutability and constructor revalidation, owner-role/runtime-role separation, inert repository-capability validation, immutable minimized output, non-public issuance of that output, detached UUID storage/target snapshots, and exact validation of UUID internal payloads before comparison. Issue #407 additionally keeps durable scientific-authority resolution open until owner persistence/released evidence, exact-head GREEN, independent review, and protected integration are real.
 
 ## Test
 
@@ -38,6 +50,8 @@ PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src \
   python -m pytest -c services/workforce-validation-api/pyproject.toml \
   services/workforce-validation-api/tests
 ```
+
+The service package keeps an exact 100% owned statement/branch threshold. The calibration-authority contract adds hostile coverage for authorization-before-owner-read, non-concrete/dynamic owner capabilities, malformed references/digests/versions/timestamps, foreign/mismatched owner evidence, authorization-window mismatch, UUID alias mutation, structural immutability, and non-public view issuance.
 
 The same Foundation job also runs `tests/test_workforce_validation_owner_schema_postgres.sh` in its own pinned PostgreSQL 16.14 container. That contract executes the service-local owner migration and checks the exact deny-default role flags, schema owner, absence of ineffective login-only `rolconfig`, actual `SET ROLE` search-path behavior, absence of inherited PUBLIC `USAGE`/`CREATE`, and absence of application relations in the bootstrap schema. The test intentionally demonstrates that `SET ROLE` retains the caller's existing `search_path`; runtime isolation therefore cannot be inferred from owner-role metadata.
 
