@@ -1,6 +1,6 @@
 # Talent Management boundary references
 
-Reference doctoring for ADR 0292, issue #292, and repair issues #294, #396, #397, #398, #399, and #400. Checked against public source metadata on 2026-09-16. The ISO entries below describe scope/authority only; possession of this bibliography is not a certification or evidence that Orgmetra conforms to a paid standard's complete normative text. The legal entries constrain provenance and rights-path design only; they do not establish that a particular tenant, worker, decision, stage, or deployment is legally in scope.
+Reference doctoring for ADR 0292, issue #292, and repair issues #294, #396, #397, #398, #399, #400, and #401. Checked against public source metadata on 2026-09-16. The ISO entries below describe scope/authority only; possession of this bibliography is not a certification or evidence that Orgmetra conforms to a paid standard's complete normative text. The legal entries constrain provenance and rights-path design only; they do not establish that a particular tenant, worker, decision, stage, or deployment is legally in scope.
 
 ## Standards and primary sources
 
@@ -47,6 +47,24 @@ U.S. Equal Employment Opportunity Commission. (1979). *Questions and Answers to 
 - It treats hiring, promotion, transfer, retention and related employment decisions as selection processes, distinguishes the total selection process from component procedures, and defines adverse impact in terms of materially different selection rates. Those rates necessarily depend on a preserved numerator and denominator rather than only on the records that survive to a later stage.
 - Question 47 is also relevant to #400's narrower evidence-design boundary: validity evidence must correspond to the selection procedure actually used; evidence for one passing score/use does not automatically justify a substantially different passing score or ranking use. Orgmetra therefore must not let a materially changed eligibility, cut-score, ranking, required-evidence, suppression/routing or equivalent selection procedure masquerade as an ordinary denominator correction merely because it shares a business stage or version lineage.
 - Scientific-design relevance: Orgmetra must retain the exact stage opportunity set and transition denominator if it wants later `workforce_validation` analysis to reconstruct a stage-level selection rate or attrition pattern, and it must identify the governing material policy regime when interpreting or comparing those denominators. This is evidence-design guidance, not a universal legal-applicability declaration.
+
+## Engineering and provenance primary sources
+
+Rundgren, A., Jordan, B., & Erdtman, S. (2020). *JSON Canonicalization Scheme (JCS)* (RFC 8785). RFC Editor. https://www.rfc-editor.org/rfc/rfc8785.html
+
+- RFC 8785 is an **Informational** RFC, not an IETF Standards Track requirement. It explains why cryptographic hashing/signing needs an invariant representation so producer and consumer can repeat the same operation over semantically identical JSON.
+- #401 uses this only as engineering evidence that a policy-regime digest needs an explicit deterministic representation and version. ADR 0292 does not mandate JCS, JSON, SHA-256, or any particular digest algorithm; the owner may choose another suitable canonical representation if its algorithm/domain/version and semantic input set are explicit and reproducible.
+
+Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV Data Model*. W3C Recommendation. World Wide Web Consortium. https://www.w3.org/TR/prov-dm/
+
+- W3C published PROV-DM as a Recommendation on 2013-04-30. It models provenance through entities, activities, agents, usage and derivation relationships rather than treating an output identifier as self-explanatory.
+- #401 uses PROV-DM as provenance-design evidence: an Orgmetra policy-regime identity must retain the material upstream released entities/dependencies that contributed to the selection procedure. PROV-DM does not define Orgmetra HR semantics or decide which external dependency is materially relevant; that remains an owner-domain contract.
+
+National Institute of Standards and Technology. (n.d.). *AI Risk Management Framework Playbook: MANAGE 3.1*. AI Resource Center. https://airc.nist.gov/airmf-resources/playbook/manage/
+
+- MANAGE 3.1 addresses monitoring, control, and documentation of risks and benefits from third-party resources. The current Playbook notes that AI systems can depend on third-party data, software, hardware, tools, services, and expertise, and recommends documenting third-party systems/components and applying risk controls.
+- NIST also states that the Playbook is voluntary guidance rather than a checklist that must be followed in its entirety, and the site currently notes that AI RMF 1.0 is being revised.
+- #401 uses this as dependency-provenance/risk-management evidence only. It supports pinning material released dependencies that affect a policy regime; it does not establish validity, fairness, or legal compliance for an Orgmetra Talent procedure.
 
 ## Privacy and AI decision-rights primary sources
 
@@ -126,7 +144,7 @@ Xu, H., & Zhang, N. (2024). Goal orientation for fair machine learning algorithm
 
 ## Evidence-handling notes
 
-- These references constrain terminology, scope, measurement claims, provenance, human-oversight testability, denominator preservation, counting-unit traceability, manifest replacement views, and policy-regime compatibility. They do not replace Orgmetra's protected PRD/TRD/ARCHITECTURE or an accepted owner ADR.
+- These references constrain terminology, scope, measurement claims, provenance, human-oversight testability, denominator preservation, counting-unit traceability, manifest replacement views, policy-regime compatibility, and reproducible policy-semantic identity. They do not replace Orgmetra's protected PRD/TRD/ARCHITECTURE or an accepted owner ADR.
 - ISO public abstracts are sufficient to support the scope statements recorded here, but implementation must not claim full conformance to normative requirements that have not been reviewed from licensed/current standard text.
 - Re-check current ISO lifecycle/edition status when ADR 0292 is proposed for acceptance or when release/compliance documentation is produced. For ISO 10667-2, inspect both the current published 2020 edition and the active Edition 3 work item. For ISO 30415:2021, re-check the post-review disposition after the recorded 2026-09-03 close of review.
 - The Korean and EU legal sources are jurisdiction- and fact-dependent. They justify a versioned decision-production, material-stage provenance, effective-oversight, and rights-response boundary; they do not establish that a particular Orgmetra decision is fully automated, high-risk, adverse, subject to Article 14/86, or otherwise legally covered.
@@ -134,4 +152,5 @@ Xu, H., & Zhang, N. (2024). Goal orientation for fair machine learning algorithm
 - A stage-level `fully_automated_decision` marker is process provenance, not itself a statutory classification. An upstream automated stage can remain in an AI-assisted path only if its material effect remains inspectable, reconstructable, and genuinely reversible before high-impact finalization under the Proposed product contract.
 - Opportunity-set and stage-transition provenance belongs to the Talent process owner only to the extent required to reconstruct that process. Exact entry membership and counting-unit evidence must be retained without copying protected-group attributes; retry/replay attempts cannot become extra observations, and distinct legitimate repeated opportunities cannot be silently collapsed. Protected-group attributes and fairness/validity verdicts remain outside Talent and must be joined through purpose-authorized released contracts or approved analysis snapshots.
 - Manifest-correction provenance and policy-semantic provenance are separate. An immutable replacement lineage can resolve record corrections without establishing that a materially changed eligibility, cut-score, ranking, evidence, suppression/routing or equivalent procedure is scientifically the same procedure. Talent must expose the exact governing policy-regime/semantic identity; `workforce_validation` decides whether scientific evidence supports transport or comparison across procedures.
+- #401's RFC/W3C/NIST sources are engineering/provenance evidence, not HR-selection validity standards. They support deterministic canonical representation, material upstream dependency provenance, and documented third-party-resource control. They do not decide which Talent fields are material, whether a changed procedure is valid or fair, or whether two regimes are scientifically transportable.
 - Psychometric or predictive claims require study-specific evidence. Conceptual talent-management papers, repeated-applicant demonstrations, sourcing simulations, fairness-optimization research, and human–algorithm interaction studies do not establish validity, fairness, utility, or transportability of any particular Orgmetra decision rule.
