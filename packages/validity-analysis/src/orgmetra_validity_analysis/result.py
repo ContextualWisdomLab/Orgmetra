@@ -221,6 +221,11 @@ class ValidationAnalysisResult:
             _validate_digest(
                 self.variance_design_receipt_digest, "variance_design_receipt_digest"
             )
+            if self.analysis_weight_receipt_digest == self.variance_design_receipt_digest:
+                raise ValueError(
+                    "analysis_weight_receipt_digest and variance_design_receipt_digest "
+                    "must identify different evidence"
+                )
         elif (
             self.analysis_weight_receipt_digest is not None
             or self.variance_design_receipt_digest is not None
