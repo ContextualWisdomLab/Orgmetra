@@ -11,9 +11,10 @@
 - Require exact governed missingness/convergence runtime types so subclass method overrides cannot inject unreviewed or person-level fields into canonical result evidence.
 - Freeze exact UTC timestamps and finite numeric values at construction, and reject runtime-type forgery before canonical evidence serialization.
 - Add a deterministic, row-value-minimized `FinalAnalysisWeightReceipt` that binds an exact estimand to source/sampling evidence, base-weight provenance, an ordered digest-linked adjustment chain, the final point-weight artifact, and append-only correction lineage.
+- Add `WeightEligibilityReceipt` and fail closed unless cross-sectional/longitudinal scope, target population, reference duration, eligible case set, and final point-weight artifact match the estimand-side final-weight receipt exactly.
 - Distinguish unweighted from weighted design-based results and fail closed unless a weighted result separately binds the exact final analysis-weight receipt and variance-design receipt used.
 - Add typed `NonresponseAdjustmentReceipt` evidence with explicit disposition treatment and typed `CalibrationAdjustmentReceipt` evidence bound to purpose-limited auxiliary projections, authoritative benchmark receipts, constraints, and explicit convergence/fallback state.
 - Add typed `TrimmingBoundingAdjustmentReceipt` evidence that binds a versioned rule/configuration, exact affected semantic occurrence set and count, and input/output weight artifacts; known trimming/bounding/winsorization adjustments must name that evidence family.
 - Require known nonresponse, calibration/raking/post-stratification, and trimming/bounding/winsorization adjustment codes to identify the matching typed evidence kind rather than collapse into a generic opaque adjustment digest.
-- Keep longitudinal eligibility, durable owner-side typed-receipt resolution, sensitive auxiliary purpose enforcement, and released auxiliary evidence exchange explicitly incomplete under #407.
+- Keep durable owner-side typed-receipt resolution, sensitive auxiliary purpose enforcement, and released auxiliary evidence exchange explicitly incomplete under #407.
 - Make `Validity Analysis Handoff Quality` retrigger on shared repository Python/test/clean-checkout configuration, with an executable regression preventing stale package-quality evidence after shared tooling changes.
