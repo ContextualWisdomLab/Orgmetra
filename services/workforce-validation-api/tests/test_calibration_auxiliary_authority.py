@@ -37,10 +37,14 @@ OWNER_CONTRACT_REFERENCE = (
 AUTHORIZATION_REFERENCE = (
     "scientific_data_authorization:55555555-5555-4555-8555-555555555555"
 )
+SCIENTIFIC_USE_REFERENCE = (
+    "scientific_use_receipt:66666666-6666-4666-8666-666666666666"
+)
 PROJECTION_DIGEST = "1" * 64
 PURPOSE_DIGEST = "2" * 64
 OWNER_CONTRACT_DIGEST = "3" * 64
 AUTHORIZATION_DIGEST = "4" * 64
+SCIENTIFIC_USE_DIGEST = "5" * 64
 AUTHORIZED_FROM = datetime(2026, 9, 1, tzinfo=timezone.utc)
 AUTHORIZED_TO = datetime(2026, 10, 1, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, tzinfo=timezone.utc)
@@ -56,6 +60,9 @@ READ_FIELDS = frozenset(
         "owner_contract_digest",
         "authorization_receipt_reference",
         "authorization_receipt_digest",
+        "scientific_use_receipt_reference",
+        "scientific_use_receipt_digest",
+        "scientific_use_at",
         "authorized_from",
         "authorized_to",
     }
@@ -81,6 +88,7 @@ class _ReadPort:
         owner_contract_reference: str,
         owner_contract_version: int,
         authorization_receipt_digest: str,
+        scientific_use_receipt_digest: str,
     ) -> object:
         """Capture the owner lookup and return the configured result."""
         self.calls.append(
@@ -94,6 +102,7 @@ class _ReadPort:
                 owner_contract_reference,
                 owner_contract_version,
                 authorization_receipt_digest,
+                scientific_use_receipt_digest,
             )
         )
         return self.result
@@ -149,6 +158,9 @@ def _record(**overrides: object) -> CalibrationAuxiliaryAuthorityRecord:
         "owner_contract_digest": OWNER_CONTRACT_DIGEST,
         "authorization_receipt_reference": AUTHORIZATION_REFERENCE,
         "authorization_receipt_digest": AUTHORIZATION_DIGEST,
+        "scientific_use_receipt_reference": SCIENTIFIC_USE_REFERENCE,
+        "scientific_use_receipt_digest": SCIENTIFIC_USE_DIGEST,
+        "scientific_use_at": USED_AT,
         "authorized_from": AUTHORIZED_FROM,
         "authorized_to": AUTHORIZED_TO,
     }
@@ -168,6 +180,7 @@ def _resolve(*, read_port: object, **overrides: object) -> CalibrationAuxiliaryA
         "owner_contract_reference": OWNER_CONTRACT_REFERENCE,
         "owner_contract_version": 7,
         "authorization_receipt_digest": AUTHORIZATION_DIGEST,
+        "scientific_use_receipt_digest": SCIENTIFIC_USE_DIGEST,
         "used_at": USED_AT,
         "purpose_code": "selection_validity_analysis",
         "policy": _policy(),
@@ -194,6 +207,7 @@ def test_resolution_authorizes_then_returns_minimized_corroborated_evidence() ->
             OWNER_CONTRACT_REFERENCE,
             7,
             AUTHORIZATION_DIGEST,
+            SCIENTIFIC_USE_DIGEST,
         )
     ]
     assert view.tenant_record_id == TENANT
@@ -211,6 +225,9 @@ def test_resolution_authorizes_then_returns_minimized_corroborated_evidence() ->
         ("owner_contract_version", 7),
         ("scientific_purpose_digest", PURPOSE_DIGEST),
         ("scientific_purpose_reference", PURPOSE_REFERENCE),
+        ("scientific_use_at", USED_AT),
+        ("scientific_use_receipt_digest", SCIENTIFIC_USE_DIGEST),
+        ("scientific_use_receipt_reference", SCIENTIFIC_USE_REFERENCE),
     )
 
 
@@ -236,15 +253,36 @@ def test_missing_or_noncanonical_owner_evidence_fails_closed() -> None:
     [
         ({"tenant_record_id": OTHER_TENANT}, {}),
         ({"validity_study_id": OTHER_STUDY}, {}),
-        ({"auxiliary_projection_reference": "calibration_auxiliary_projection:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}, {}),
+        (
+            {
+                "auxiliary_projection_reference": (
+                    "calibration_auxiliary_projection:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+                )
+            },
+            {},
+        ),
         ({"auxiliary_projection_digest": "a" * 64}, {}),
-        ({"scientific_purpose_reference": "scientific_data_use_purpose:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"}, {}),
+        (
+            {
+                "scientific_purpose_reference": (
+                    "scientific_data_use_purpose:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+                )
+            },
+            {},
+        ),
         ({"scientific_purpose_digest": "b" * 64}, {}),
-        ({"owner_contract_reference": "released_owner_contract:cccccccc-cccc-4ccc-8ccc-cccccccccccc"}, {}),
+        (
+            {
+                "owner_contract_reference": (
+                    "released_owner_contract:cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+                )
+            },
+            {},
+        ),
         ({"owner_contract_version": 8}, {}),
         ({"authorization_receipt_digest": "c" * 64}, {}),
-        ({"authorized_from": USED_AT + timedelta(seconds=1)}, {}),
-        ({"authorized_to": USED_AT}, {}),
+        ({"scientific_use_receipt_digest": "d" * 64}, {}),
+        ({}, {"used_at": USED_AT + timedelta(seconds=1)}),
     ],
 )
 def test_resolved_authority_must_match_every_requested_coordinate_and_use_time(
@@ -254,9 +292,28 @@ def test_resolved_authority_must_match_every_requested_coordinate_and_use_time(
         _resolve(read_port=_ReadPort(_record(**record_overrides)), **request_overrides)
 
 
-def test_open_ended_authority_interval_accepts_later_use() -> None:
-    view = _resolve(read_port=_ReadPort(_record(authorized_to=None)))
+def test_record_requires_owner_resolved_use_time_inside_authorization_interval() -> None:
+    for invalid_use in (
+        AUTHORIZED_FROM - timedelta(seconds=1),
+        AUTHORIZED_TO,
+    ):
+        with pytest.raises(ValueError):
+            _record(scientific_use_at=invalid_use)
+
+
+def test_open_ended_authority_interval_accepts_later_owner_resolved_use() -> None:
+    later_use = AUTHORIZED_TO + timedelta(days=30)
+    view = _resolve(
+        read_port=_ReadPort(
+            _record(
+                scientific_use_at=later_use,
+                authorized_to=None,
+            )
+        ),
+        used_at=later_use,
+    )
     assert dict(view.fields)["authorized_to"] is None
+    assert dict(view.fields)["scientific_use_at"] == later_use
 
 
 @pytest.mark.parametrize(
@@ -276,6 +333,7 @@ def test_open_ended_authority_interval_accepts_later_use() -> None:
         ("owner_contract_reference", "wrong:contract", ValueError),
         ("owner_contract_version", True, ValueError),
         ("authorization_receipt_digest", "4" * 65, ValueError),
+        ("scientific_use_receipt_digest", "5" * 65, ValueError),
         ("used_at", datetime(2026, 9, 17), ValueError),
         ("purpose_code", "Selection Validity Analysis", ValueError),
     ],
@@ -309,6 +367,9 @@ def test_invalid_request_or_dependency_fails_before_owner_resolution(
         ("owner_contract_digest", "3" * 63),
         ("authorization_receipt_reference", "wrong:authorization"),
         ("authorization_receipt_digest", "4" * 63),
+        ("scientific_use_receipt_reference", "wrong:use"),
+        ("scientific_use_receipt_digest", "5" * 63),
+        ("scientific_use_at", datetime(2026, 9, 17)),
         ("authorized_from", datetime(2026, 9, 1)),
         ("authorized_to", "not-a-datetime"),
     ],
