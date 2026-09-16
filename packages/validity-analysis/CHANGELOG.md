@@ -12,5 +12,7 @@
 - Freeze exact UTC timestamps and finite numeric values at construction, and reject runtime-type forgery before canonical evidence serialization.
 - Add a deterministic, row-value-minimized `FinalAnalysisWeightReceipt` that binds an exact estimand to source/sampling evidence, base-weight provenance, an ordered digest-linked adjustment chain, the final point-weight artifact, and append-only correction lineage.
 - Distinguish unweighted from weighted design-based results and fail closed unless a weighted result separately binds the exact final analysis-weight receipt and variance-design receipt used.
-- Keep adjustment-specific nonresponse, calibration/raking, trimming/bounding, longitudinal and auxiliary-owner contracts explicitly incomplete under #407 rather than promoting the first executable weight-lineage slice to scientific completion.
+- Add typed `NonresponseAdjustmentReceipt` evidence with explicit disposition treatment and typed `CalibrationAdjustmentReceipt` evidence bound to purpose-limited auxiliary projections, authoritative benchmark receipts, constraints, and explicit convergence/fallback state.
+- Require known nonresponse and calibration/raking/post-stratification adjustment codes to identify the matching typed evidence kind rather than collapse into a generic opaque adjustment digest.
+- Keep trimming/bounding, longitudinal eligibility, durable owner-side typed-receipt resolution, sensitive auxiliary purpose enforcement, and released auxiliary evidence exchange explicitly incomplete under #407.
 - Make `Validity Analysis Handoff Quality` retrigger on shared repository Python/test/clean-checkout configuration, with an executable regression preventing stale package-quality evidence after shared tooling changes.
