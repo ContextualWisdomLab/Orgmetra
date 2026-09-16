@@ -43,9 +43,9 @@ def test_weight_eligibility_receipt_is_deterministic_and_value_minimized() -> No
     assert repr(candidate) == "WeightEligibilityReceipt(<redacted>)"
 
 
-@pytest.mark.parametrize("scope", ["monthly", "panel", "opaque", ""])
-def test_weight_scope_is_closed_to_cross_sectional_or_longitudinal(scope: str) -> None:
-    """Reject caller-defined labels that hide longitudinal/cross-sectional semantics."""
+@pytest.mark.parametrize("scope", [None, "monthly", "panel", "opaque", ""])
+def test_weight_scope_is_closed_to_cross_sectional_or_longitudinal(scope: object) -> None:
+    """Reject caller-defined labels and non-strings that hide weight-scope semantics."""
     with pytest.raises(ValueError, match="weight_scope_code"):
         eligibility(weight_scope_code=scope)
 
