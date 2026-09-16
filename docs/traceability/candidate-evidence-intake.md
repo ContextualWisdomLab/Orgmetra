@@ -1,6 +1,6 @@
 # Candidate evidence intake traceability
 
-- **Maturity:** `implemented_on_protected_main`
+- **Maturity:** `implemented_on_protected_main` — canonical traceability vocabulary for implementation on this repository's protected default branch; in Orgmetra that branch is `develop`, not a literal branch named `main`.
 - **Buyer capability:** Candidate Evidence workspace governance boundary
 - **Owned contract:** `CandidateEvidenceIntakePacket`
 
