@@ -65,6 +65,16 @@ def test_weighted_result_binds_point_and_variance_receipts_separately() -> None:
     assert f'"variance_design_receipt_digest":"{VARIANCE_DIGEST}"' in payload
 
 
+def test_weighted_result_rejects_same_point_and_variance_receipt() -> None:
+    """A variance-design receipt cannot silently stand in for the point-weight receipt."""
+    with pytest.raises(ValueError, match="must identify different evidence"):
+        result(
+            point_estimation_mode="weighted_design_based",
+            analysis_weight_receipt_digest=WEIGHT_DIGEST,
+            variance_design_receipt_digest=WEIGHT_DIGEST,
+        )
+
+
 @pytest.mark.parametrize(
     "overrides,match",
     [
