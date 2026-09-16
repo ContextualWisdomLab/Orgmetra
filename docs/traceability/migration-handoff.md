@@ -2,7 +2,7 @@
 
 ## Status
 
-Active-PR only. This evidence does not describe protected-`develop` product truth until the owning PR integrates.
+Implemented on protected `develop`; this remains a pre-write handoff boundary rather than a migration executor.
 
 | Requirement | Decision / owner contract | Production implementation | Executable evidence |
 |---|---|---|---|

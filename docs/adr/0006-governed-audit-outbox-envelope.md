@@ -1,6 +1,6 @@
 # ADR-0006: Governed audit/outbox envelope and durable persistence
 
-- **Status:** Accepted for the stacked implementation branch; not protected-main truth until merged.
+- **Status:** Accepted on protected `develop`.
 - **Decision date:** 2026-08-17
 - **Scope:** Orgmetra-owned audit envelope, immutable audit persistence, guarded outbox delivery state, tenant-safe atomic dispatcher claiming, expired-lease takeover, owner-bound completion/retry, database-budget-governed terminal dead-letter escalation, review hardening, and privileged recovery of an expired exhausted lease when its recorded final worker identity is permanently unavailable. Exponential retry policy, retention/export workflows, and external delivery receipts remain subsequent work.
 

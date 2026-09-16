@@ -1,6 +1,6 @@
 # Governed offer approval traceability
 
-Status: **active PR / proposed capability**, not protected-main truth.
+Status: **implemented on protected `develop`**; downstream offer persistence/execution remains a separate authority.
 
 | Buyer requirement | Executable evidence | Contract outcome |
 | --- | --- | --- |

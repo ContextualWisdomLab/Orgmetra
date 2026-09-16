@@ -35,3 +35,6 @@ secrets/
 artifacts/
 reports/
 *.log
+
+# Local code-intelligence index (colbymchenry/codegraph); never committed
+.codegraph/
