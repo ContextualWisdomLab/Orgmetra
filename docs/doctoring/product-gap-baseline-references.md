@@ -42,7 +42,7 @@ GitHub. (n.d.). *Dependency graph*. GitHub Docs. https://docs.github.com/en/code
 
 ### Applied boundary
 
-The current one-human-maintainer governance decision uses the documented ability to set the generic required approving-review count to zero; it also disables latest-push approval because that rule requires approval from someone other than the latest pusher. The repair does **not** manufacture independence through bot/service-account approvals and does not weaken required review-thread resolution or deterministic required workflows.
+The live inherited organization ruleset currently requires one approving review, dismisses stale approvals on push, requires review-thread resolution and extra approval for unattributed changes, and does not require approval from someone other than the latest pusher. `ContextualWisdomLab/.github#772` owns a proposed central repair for the structurally unsatisfiable generic approval-count requirement in a one-human-maintainer organization. That proposal is not current Orgmetra policy: until the central ruleset is changed and re-read, the one-approval requirement remains authoritative. Any central repair must keep self-approval and fabricated bot/service-account independence forbidden and preserve deterministic required workflows, security gates, thread resolution, deletion protection and non-fast-forward protection.
 
 For Dependency Review, an HTTP failure from the exact dependency comparison is treated as missing authoritative evidence and fails closed. Independent OSV/Trivy/SAST/Scorecard evidence is retained but is not promoted to a semantic substitute for GitHub Dependency Review.
 
