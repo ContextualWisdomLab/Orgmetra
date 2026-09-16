@@ -122,7 +122,7 @@ class NonresponseAdjustmentReceipt:
 
 @dataclass(frozen=True, slots=True, repr=False)
 class CalibrationAdjustmentReceipt:
-    """Bind calibration or raking to immutable owner benchmarks and termination evidence."""
+    """Bind calibration to owner benchmarks, purpose authority, and termination evidence."""
 
     tenant_record_id: str
     receipt_reference: str
@@ -130,6 +130,11 @@ class CalibrationAdjustmentReceipt:
     analysis_window_reference: str
     auxiliary_projection_reference: str
     auxiliary_projection_digest: str
+    auxiliary_purpose_reference: str
+    auxiliary_purpose_digest: str
+    auxiliary_owner_contract_reference: str
+    auxiliary_owner_contract_version: int
+    auxiliary_authorization_receipt_digest: str
     benchmark_receipt_reference: str
     benchmark_receipt_digest: str
     algorithm_reference: str
@@ -144,7 +149,7 @@ class CalibrationAdjustmentReceipt:
     evidence_version: int = 1
 
     def __post_init__(self) -> None:
-        """Fail closed on floating benchmarks, hidden fallback, or nonconverged output."""
+        """Fail closed on floating authority, hidden fallback, or nonconverged output."""
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.receipt_reference,
@@ -162,6 +167,20 @@ class CalibrationAdjustmentReceipt:
             "auxiliary_projection_reference",
         )
         _validate_reference(
+            self.auxiliary_purpose_reference,
+            "scientific_data_use_purpose",
+            "auxiliary_purpose_reference",
+        )
+        _validate_reference(
+            self.auxiliary_owner_contract_reference,
+            "released_owner_contract",
+            "auxiliary_owner_contract_reference",
+        )
+        _positive_integer(
+            self.auxiliary_owner_contract_version,
+            "auxiliary_owner_contract_version",
+        )
+        _validate_reference(
             self.benchmark_receipt_reference,
             "calibration_benchmark_receipt",
             "benchmark_receipt_reference",
@@ -174,6 +193,8 @@ class CalibrationAdjustmentReceipt:
         for field_name in (
             "target_population_digest",
             "auxiliary_projection_digest",
+            "auxiliary_purpose_digest",
+            "auxiliary_authorization_receipt_digest",
             "benchmark_receipt_digest",
             "constraints_digest",
             "input_weight_artifact_digest",
@@ -213,13 +234,18 @@ class CalibrationAdjustmentReceipt:
         return "CalibrationAdjustmentReceipt(<redacted>)"
 
     def canonical_json(self) -> str:
-        """Return deterministic owner-benchmark provenance without auxiliary values."""
+        """Return deterministic purpose-bound provenance without auxiliary values."""
         payload: dict[str, object] = {
             "algorithm_reference": self.algorithm_reference,
             "algorithm_version": self.algorithm_version,
             "analysis_window_reference": self.analysis_window_reference,
+            "auxiliary_authorization_receipt_digest": self.auxiliary_authorization_receipt_digest,
+            "auxiliary_owner_contract_reference": self.auxiliary_owner_contract_reference,
+            "auxiliary_owner_contract_version": self.auxiliary_owner_contract_version,
             "auxiliary_projection_digest": self.auxiliary_projection_digest,
             "auxiliary_projection_reference": self.auxiliary_projection_reference,
+            "auxiliary_purpose_digest": self.auxiliary_purpose_digest,
+            "auxiliary_purpose_reference": self.auxiliary_purpose_reference,
             "benchmark_receipt_digest": self.benchmark_receipt_digest,
             "benchmark_receipt_reference": self.benchmark_receipt_reference,
             "constraints_digest": self.constraints_digest,
