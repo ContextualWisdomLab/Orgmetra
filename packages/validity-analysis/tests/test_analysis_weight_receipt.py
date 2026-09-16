@@ -1,4 +1,4 @@
-"""RED contract for reproducible point-estimation weight lineage."""
+"""Regression contracts for reproducible point-estimation weight lineage."""
 
 from datetime import datetime, timezone
 
@@ -24,18 +24,20 @@ DIGEST_4 = "4" * 64
 DIGEST_5 = "5" * 64
 
 
-def adjustment() -> AnalysisWeightAdjustment:
-    """Return one governed nonresponse adjustment without copying case weights."""
-    return AnalysisWeightAdjustment(
-        sequence_number=1,
-        adjustment_code="nonresponse_adjustment",
-        method_reference="weight_method:55555555-5555-4555-8555-555555555555",
-        method_version=1,
-        input_weight_artifact_digest=DIGEST_D,
-        output_weight_artifact_digest=DIGEST_E,
-        configuration_digest=DIGEST_F,
-        evidence_receipt_digest=DIGEST_1,
-    )
+def adjustment(**overrides: object) -> AnalysisWeightAdjustment:
+    """Return one governed adjustment without copying case-level weight values."""
+    values: dict[str, object] = {
+        "sequence_number": 1,
+        "adjustment_code": "nonresponse_adjustment",
+        "method_reference": "weight_method:55555555-5555-4555-8555-555555555555",
+        "method_version": 1,
+        "input_weight_artifact_digest": DIGEST_D,
+        "output_weight_artifact_digest": DIGEST_E,
+        "configuration_digest": DIGEST_F,
+        "evidence_receipt_digest": DIGEST_1,
+    }
+    values.update(overrides)
+    return AnalysisWeightAdjustment(**values)
 
 
 def receipt(**overrides: object) -> FinalAnalysisWeightReceipt:
@@ -66,13 +68,21 @@ def receipt(**overrides: object) -> FinalAnalysisWeightReceipt:
     return FinalAnalysisWeightReceipt(**values)
 
 
-def test_receipt_is_deterministic_and_value_minimized() -> None:
+def test_receipt_is_deterministic_value_minimized_and_redacted() -> None:
     """Bind exact estimand and ordered weight lineage without embedding row weights."""
     candidate = receipt()
     assert candidate.sha256_digest() == receipt().sha256_digest()
     assert candidate.final_weight_artifact_digest == DIGEST_E
     assert "person_record" not in candidate.canonical_json()
     assert "weight_value" not in candidate.canonical_json()
+    assert repr(candidate) == "FinalAnalysisWeightReceipt(<redacted>)"
+
+
+def test_no_adjustment_receipt_can_bind_base_weight_as_final_weight() -> None:
+    """Allow an explicit base-weight-only analysis without inventing a transform."""
+    candidate = receipt(adjustments=(), final_weight_artifact_digest=DIGEST_D)
+    assert '"adjustments":[]' in candidate.canonical_json()
+    assert candidate.final_weight_artifact_digest == DIGEST_D
 
 
 def test_adjustment_chain_must_reach_final_weight_artifact() -> None:
@@ -81,13 +91,54 @@ def test_adjustment_chain_must_reach_final_weight_artifact() -> None:
         receipt(final_weight_artifact_digest=DIGEST_F)
 
 
+def test_adjustment_rejects_noop_artifact_identity() -> None:
+    """Require each declared transform to produce a distinct artifact identity."""
+    with pytest.raises(ValueError, match="output_weight_artifact_digest"):
+        adjustment(output_weight_artifact_digest=DIGEST_D)
+
+
+def test_adjustments_must_be_immutable_exact_and_contiguous() -> None:
+    """Reject mutable, foreign, skipped, or disconnected adjustment chains."""
+    with pytest.raises(ValueError, match="immutable tuple"):
+        receipt(adjustments=[adjustment()])
+    with pytest.raises(ValueError, match="AnalysisWeightAdjustment"):
+        receipt(adjustments=(object(),))
+    with pytest.raises(ValueError, match="sequence_number"):
+        receipt(adjustments=(adjustment(sequence_number=2),))
+    with pytest.raises(ValueError, match="breaks the weight chain"):
+        receipt(adjustments=(adjustment(input_weight_artifact_digest=DIGEST_C),))
+
+
 def test_probability_design_receipt_is_required() -> None:
     """Do not allow point weights to detach from the sampled design evidence."""
     with pytest.raises(ValueError, match="sampling_design_receipt_digest"):
         receipt(sampling_design_receipt_digest="not-a-digest")
 
 
-def test_correction_must_link_to_the_superseded_receipt() -> None:
-    """Require append-only correction lineage instead of overwriting prior weight evidence."""
+def test_positive_versions_and_counts_fail_closed() -> None:
+    """Reject sentinel sequence, method-version, count, and correction values."""
+    with pytest.raises(ValueError, match="sequence_number"):
+        adjustment(sequence_number=0)
+    with pytest.raises(ValueError, match="method_version"):
+        adjustment(method_version=0)
+    with pytest.raises(ValueError, match="analytic_case_count"):
+        receipt(analytic_case_count=0)
+    with pytest.raises(ValueError, match="correction_sequence"):
+        receipt(correction_sequence=0)
+
+
+def test_correction_lineage_is_append_only_and_canonicalized() -> None:
+    """Require successor evidence rather than overwriting a prior weight receipt."""
     with pytest.raises(ValueError, match="supersedes_receipt_digest"):
         receipt(correction_sequence=2)
+    with pytest.raises(ValueError, match="must be absent"):
+        receipt(supersedes_receipt_digest=DIGEST_A)
+
+    corrected = receipt(correction_sequence=2, supersedes_receipt_digest=DIGEST_A)
+    assert f'"supersedes_receipt_digest":"{DIGEST_A}"' in corrected.canonical_json()
+
+
+def test_evidence_version_is_not_caller_extensible() -> None:
+    """Prevent callers from inventing a new receipt schema without a reviewed contract."""
+    with pytest.raises(ValueError, match="evidence_version"):
+        receipt(evidence_version=2)
