@@ -35,6 +35,7 @@ def adjustment(**overrides: object) -> AnalysisWeightAdjustment:
         "output_weight_artifact_digest": DIGEST_E,
         "configuration_digest": DIGEST_F,
         "evidence_receipt_digest": DIGEST_1,
+        "evidence_kind": "nonresponse_adjustment_receipt",
     }
     values.update(overrides)
     return AnalysisWeightAdjustment(**values)
