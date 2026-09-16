@@ -26,6 +26,9 @@ _SPECIALIZED_EVIDENCE_KIND_BY_ADJUSTMENT_CODE = {
     "calibration_adjustment": "calibration_adjustment_receipt",
     "raking_adjustment": "calibration_adjustment_receipt",
     "poststratification_adjustment": "calibration_adjustment_receipt",
+    "weight_trimming_adjustment": "trimming_bounding_adjustment_receipt",
+    "weight_bounding_adjustment": "trimming_bounding_adjustment_receipt",
+    "weight_winsorization_adjustment": "trimming_bounding_adjustment_receipt",
 }
 
 
@@ -238,6 +241,75 @@ class CalibrationAdjustmentReceipt:
         return sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
+@dataclass(frozen=True, slots=True, repr=False)
+class TrimmingBoundingAdjustmentReceipt:
+    """Bind trimming or bounding to an immutable rule and affected-case evidence."""
+
+    tenant_record_id: str
+    receipt_reference: str
+    rule_reference: str
+    rule_version: int
+    rule_configuration_digest: str
+    affected_case_occurrence_set_digest: str
+    affected_case_count: int
+    input_weight_artifact_digest: str
+    output_weight_artifact_digest: str
+    constructed_at: datetime
+    evidence_version: int = 1
+
+    def __post_init__(self) -> None:
+        """Reject hidden thresholds, unknown affected cases, or no-op transforms."""
+        _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
+        _validate_reference(
+            self.receipt_reference,
+            "trimming_bounding_adjustment_receipt",
+            "receipt_reference",
+        )
+        _validate_reference(self.rule_reference, "weight_trimming_rule", "rule_reference")
+        _positive_integer(self.rule_version, "rule_version")
+        _validate_digest(self.rule_configuration_digest, "rule_configuration_digest")
+        _validate_digest(
+            self.affected_case_occurrence_set_digest,
+            "affected_case_occurrence_set_digest",
+        )
+        _positive_integer(self.affected_case_count, "affected_case_count")
+        _validate_digest(self.input_weight_artifact_digest, "input_weight_artifact_digest")
+        _validate_digest(self.output_weight_artifact_digest, "output_weight_artifact_digest")
+        if self.input_weight_artifact_digest == self.output_weight_artifact_digest:
+            raise ValueError(
+                "output_weight_artifact_digest must identify the trimmed or bounded weight artifact"
+            )
+        constructed_at = _freeze_timestamp(self.constructed_at, "constructed_at")
+        if type(self.evidence_version) is not int or self.evidence_version != 1:
+            raise ValueError("evidence_version must remain 1")
+        object.__setattr__(self, "constructed_at", constructed_at)
+
+    def __repr__(self) -> str:
+        """Return a value-minimized representation for routine logs."""
+        return "TrimmingBoundingAdjustmentReceipt(<redacted>)"
+
+    def canonical_json(self) -> str:
+        """Return deterministic rule provenance without case-level weight values."""
+        payload = {
+            "affected_case_count": self.affected_case_count,
+            "affected_case_occurrence_set_digest": self.affected_case_occurrence_set_digest,
+            "constructed_at": _canonical_timestamp(self.constructed_at, "constructed_at"),
+            "evidence_version": self.evidence_version,
+            "input_weight_artifact_digest": self.input_weight_artifact_digest,
+            "output_weight_artifact_digest": self.output_weight_artifact_digest,
+            "receipt_reference": self.receipt_reference,
+            "rule_configuration_digest": self.rule_configuration_digest,
+            "rule_reference": self.rule_reference,
+            "rule_version": self.rule_version,
+            "tenant_record_id": self.tenant_record_id,
+        }
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+    def sha256_digest(self) -> str:
+        """Return SHA-256 over the exact canonical receipt bytes."""
+        return sha256(self.canonical_json().encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class AnalysisWeightAdjustment:
     """Describe one ordered, digest-linked transformation of analysis weights."""
@@ -430,4 +502,5 @@ __all__ = [
     "CalibrationAdjustmentReceipt",
     "FinalAnalysisWeightReceipt",
     "NonresponseAdjustmentReceipt",
+    "TrimmingBoundingAdjustmentReceipt",
 ]
