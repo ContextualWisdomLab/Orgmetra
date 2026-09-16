@@ -6,6 +6,7 @@ from .handoff import (
     build_validation_analysis_handoff,
 )
 from .result import ConvergenceDiagnostics, MissingnessSummary, ValidationAnalysisResult
+from .weights import AnalysisWeightAdjustment, FinalAnalysisWeightReceipt
 
 __all__ = [
     "REVIEWED_FAST_MLSIRM_REVISION",
@@ -14,4 +15,6 @@ __all__ = [
     "ConvergenceDiagnostics",
     "MissingnessSummary",
     "ValidationAnalysisResult",
+    "AnalysisWeightAdjustment",
+    "FinalAnalysisWeightReceipt",
 ]
