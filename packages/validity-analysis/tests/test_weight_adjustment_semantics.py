@@ -90,6 +90,7 @@ def test_nonresponse_receipt_is_value_minimized_and_disposition_aware() -> None:
     assert '"unknown_treatment_code":"retain_in_unknown_class"' in candidate.canonical_json()
     assert "person_record" not in candidate.canonical_json()
     assert "protected_attribute" not in candidate.canonical_json()
+    assert repr(candidate) == "NonresponseAdjustmentReceipt(<redacted>)"
 
     with pytest.raises(ValueError, match="unknown_treatment_code"):
         nonresponse_receipt(unknown_treatment_code="")
@@ -97,6 +98,8 @@ def test_nonresponse_receipt_is_value_minimized_and_disposition_aware() -> None:
         nonresponse_receipt(output_weight_artifact_digest=DIGEST_D)
     with pytest.raises(ValueError, match="evidence_version"):
         nonresponse_receipt(evidence_version=2)
+    with pytest.raises(ValueError, match="evidence_version"):
+        nonresponse_receipt(evidence_version=True)
 
 
 def test_calibration_receipt_binds_owner_benchmark_and_termination_state() -> None:
@@ -105,27 +108,40 @@ def test_calibration_receipt_binds_owner_benchmark_and_termination_state() -> No
     assert candidate.sha256_digest() == calibration_receipt().sha256_digest()
     assert f'"benchmark_receipt_digest":"{DIGEST_C}"' in candidate.canonical_json()
     assert '"termination_code":"converged"' in candidate.canonical_json()
+    assert repr(candidate) == "CalibrationAdjustmentReceipt(<redacted>)"
 
+    fallback_reference = "calibration_fallback_rule:99999999-9999-4999-8999-999999999999"
     fallback = calibration_receipt(
         termination_code="fallback_applied",
-        fallback_rule_reference="calibration_fallback_rule:99999999-9999-4999-8999-999999999999",
+        fallback_rule_reference=fallback_reference,
         fallback_rule_digest=DIGEST_2,
     )
     assert f'"fallback_rule_digest":"{DIGEST_2}"' in fallback.canonical_json()
 
     with pytest.raises(ValueError, match="termination_code"):
         calibration_receipt(termination_code="failed")
+    with pytest.raises(ValueError, match="termination_code"):
+        calibration_receipt(termination_code=1)
     with pytest.raises(ValueError, match="fallback_rule"):
         calibration_receipt(termination_code="fallback_applied")
+    with pytest.raises(ValueError, match="fallback_rule"):
+        calibration_receipt(
+            termination_code="fallback_applied",
+            fallback_rule_reference=fallback_reference,
+        )
     with pytest.raises(ValueError, match="must be absent"):
         calibration_receipt(
-            fallback_rule_reference="calibration_fallback_rule:99999999-9999-4999-8999-999999999999",
+            fallback_rule_reference=fallback_reference,
             fallback_rule_digest=DIGEST_2,
         )
+    with pytest.raises(ValueError, match="must be absent"):
+        calibration_receipt(fallback_rule_digest=DIGEST_2)
     with pytest.raises(ValueError, match="output_weight_artifact_digest"):
         calibration_receipt(output_weight_artifact_digest=DIGEST_D)
     with pytest.raises(ValueError, match="evidence_version"):
         calibration_receipt(evidence_version=2)
+    with pytest.raises(ValueError, match="evidence_version"):
+        calibration_receipt(evidence_version=True)
 
 
 def test_specialized_adjustments_require_matching_evidence_kind() -> None:
