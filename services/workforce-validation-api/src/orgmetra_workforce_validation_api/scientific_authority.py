@@ -47,6 +47,9 @@ _READ_FIELDS = frozenset(
         "owner_contract_digest",
         "authorization_receipt_reference",
         "authorization_receipt_digest",
+        "scientific_use_receipt_reference",
+        "scientific_use_receipt_digest",
+        "scientific_use_at",
         "authorized_from",
         "authorized_to",
     }
@@ -89,10 +92,10 @@ def _require_positive_integer(field_name: str, value: object) -> int:
 class CalibrationAuxiliaryAuthorityRecord(tuple):
     """Immutable owner projection corroborating one auxiliary-use authorization.
 
-    Only opaque references, digests, versions, target identities, and the exact
-    authorization interval cross this boundary. Raw calibration attributes,
-    benchmark values, protected characteristics, and row-level weights remain
-    behind their authoritative owners.
+    Only opaque references, digests, versions, target identities, the exact
+    scientific-use instant, and its authorization interval cross this boundary.
+    Raw calibration attributes, benchmark values, protected characteristics, and
+    row-level weights remain behind their authoritative owners.
     """
 
     __slots__ = ()
@@ -112,6 +115,9 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         owner_contract_digest: str,
         authorization_receipt_reference: str,
         authorization_receipt_digest: str,
+        scientific_use_receipt_reference: str,
+        scientific_use_receipt_digest: str,
+        scientific_use_at: datetime,
         authorized_from: datetime,
         authorized_to: datetime | None,
     ) -> CalibrationAuxiliaryAuthorityRecord:
@@ -150,6 +156,15 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         authorization_digest = _require_digest(
             "authorization_receipt_digest", authorization_receipt_digest
         )
+        scientific_use_ref = _require_reference(
+            "scientific_use_receipt_reference",
+            scientific_use_receipt_reference,
+            "scientific_use_receipt",
+        )
+        scientific_use_digest = _require_digest(
+            "scientific_use_receipt_digest", scientific_use_receipt_digest
+        )
+        use_instant = _require_aware_datetime("scientific_use_at", scientific_use_at)
         authorization_start = _require_aware_datetime("authorized_from", authorized_from)
         authorization_end = (
             None
@@ -158,6 +173,12 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         )
         if authorization_end is not None and authorization_end <= authorization_start:
             raise ValueError("authorized_to must be later than authorized_from.")
+        if use_instant < authorization_start or (
+            authorization_end is not None and use_instant >= authorization_end
+        ):
+            raise ValueError(
+                "scientific_use_at must fall inside the authorization interval."
+            )
         return tuple.__new__(
             cls,
             (
@@ -173,6 +194,9 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
                 owner_digest,
                 authorization_ref,
                 authorization_digest,
+                scientific_use_ref,
+                scientific_use_digest,
+                use_instant,
                 authorization_start,
                 authorization_end,
             ),
@@ -239,14 +263,29 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         return self[11]
 
     @property
+    def scientific_use_receipt_reference(self) -> str:
+        """Return the immutable scientific-use receipt reference."""
+        return self[12]
+
+    @property
+    def scientific_use_receipt_digest(self) -> str:
+        """Return the immutable scientific-use receipt digest."""
+        return self[13]
+
+    @property
+    def scientific_use_at(self) -> datetime:
+        """Return the owner-resolved UTC instant for the exact scientific use."""
+        return self[14]
+
+    @property
     def authorized_from(self) -> datetime:
         """Return the UTC instant when this scientific use became authorized."""
-        return self[12]
+        return self[15]
 
     @property
     def authorized_to(self) -> datetime | None:
         """Return the exclusive UTC authorization end when one exists."""
-        return self[13]
+        return self[16]
 
 
 class CalibrationAuxiliaryAuthorityView(tuple):
@@ -299,6 +338,7 @@ class CalibrationAuxiliaryAuthorityReadPort(Protocol):
         owner_contract_reference: str,
         owner_contract_version: int,
         authorization_receipt_digest: str,
+        scientific_use_receipt_digest: str,
     ) -> CalibrationAuxiliaryAuthorityRecord | None:
         """Return matching released authority evidence or ``None`` through an owner ACL."""
         ...
@@ -321,6 +361,7 @@ def resolve_calibration_auxiliary_authority(
     owner_contract_reference: str,
     owner_contract_version: int,
     authorization_receipt_digest: str,
+    scientific_use_receipt_digest: str,
     used_at: datetime,
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
@@ -330,9 +371,9 @@ def resolve_calibration_auxiliary_authority(
 
     The exact owner capability is captured inertly before authorization and the
     same function is invoked afterward. The request carries no protected source
-    values. Owner evidence must then reproduce every caller-supplied coordinate
-    and cover the exact scientific-use instant before any corroborating fields
-    are returned.
+    values. Owner evidence must reproduce every caller-supplied coordinate and
+    independently bind the scientific-use receipt to the same use instant before
+    any corroborating fields are returned.
     """
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
@@ -380,6 +421,9 @@ def resolve_calibration_auxiliary_authority(
     authorization_digest = _require_digest(
         "authorization_receipt_digest", authorization_receipt_digest
     )
+    scientific_use_digest = _require_digest(
+        "scientific_use_receipt_digest", scientific_use_receipt_digest
+    )
     use_instant = _require_aware_datetime("used_at", used_at)
     purpose = _require_code("purpose_code", purpose_code)
     detached_policy = _detach_policy(policy)
@@ -411,6 +455,7 @@ def resolve_calibration_auxiliary_authority(
         owner_contract_reference=owner_ref,
         owner_contract_version=owner_version,
         authorization_receipt_digest=authorization_digest,
+        scientific_use_receipt_digest=scientific_use_digest,
     )
     if persisted is None:
         raise CalibrationAuxiliaryAuthorityNotFound(str(study_id))
@@ -432,6 +477,9 @@ def resolve_calibration_auxiliary_authority(
         owner_contract_digest=persisted.owner_contract_digest,
         authorization_receipt_reference=persisted.authorization_receipt_reference,
         authorization_receipt_digest=persisted.authorization_receipt_digest,
+        scientific_use_receipt_reference=persisted.scientific_use_receipt_reference,
+        scientific_use_receipt_digest=persisted.scientific_use_receipt_digest,
+        scientific_use_at=persisted.scientific_use_at,
         authorized_from=persisted.authorized_from,
         authorized_to=persisted.authorized_to,
     )
@@ -447,15 +495,11 @@ def resolve_calibration_auxiliary_authority(
         or record.owner_contract_reference != owner_ref
         or record.owner_contract_version != owner_version
         or record.authorization_receipt_digest != authorization_digest
+        or record.scientific_use_receipt_digest != scientific_use_digest
+        or record.scientific_use_at != use_instant
     ):
         raise CalibrationAuxiliaryAuthorityIntegrityError(
             "owner evidence does not match the requested calibration auxiliary authority"
-        )
-    if use_instant < record.authorized_from or (
-        record.authorized_to is not None and use_instant >= record.authorized_to
-    ):
-        raise CalibrationAuxiliaryAuthorityIntegrityError(
-            "scientific use falls outside the resolved authorization interval"
         )
 
     values = {
@@ -469,6 +513,9 @@ def resolve_calibration_auxiliary_authority(
         "owner_contract_digest": record.owner_contract_digest,
         "authorization_receipt_reference": record.authorization_receipt_reference,
         "authorization_receipt_digest": record.authorization_receipt_digest,
+        "scientific_use_receipt_reference": record.scientific_use_receipt_reference,
+        "scientific_use_receipt_digest": record.scientific_use_receipt_digest,
+        "scientific_use_at": record.scientific_use_at,
         "authorized_from": record.authorized_from,
         "authorized_to": record.authorized_to,
     }
