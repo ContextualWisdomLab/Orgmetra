@@ -28,6 +28,7 @@ _RESULT_AUTHORITY = "scientific_evidence_only"
 _EXECUTION_STATE = "completed"
 _ALLOWED_BACKENDS = frozenset({"rust_cpu", "rust_gpu"})
 _ALLOWED_PRECISIONS = frozenset({"f64", "f32"})
+_ALLOWED_POINT_ESTIMATION_MODES = frozenset({"unweighted", "weighted_design_based"})
 
 
 def _validate_nonnegative_integer(value: object, field_name: str) -> None:
@@ -162,6 +163,9 @@ class ValidationAnalysisResult:
     missingness_summary: MissingnessSummary
     convergence_diagnostics: ConvergenceDiagnostics
     completed_at: datetime
+    point_estimation_mode: str = "unweighted"
+    analysis_weight_receipt_digest: str | None = None
+    variance_design_receipt_digest: str | None = None
     result_authority: str = _RESULT_AUTHORITY
     execution_state: str = _EXECUTION_STATE
     contains_raw_person_level_values: bool = False
@@ -195,6 +199,35 @@ class ValidationAnalysisResult:
         if self.sample_size != self.missingness_summary.total_observations:
             raise ValueError("sample_size must match total_observations")
         completed_at = _freeze_timestamp(self.completed_at, "completed_at")
+        if (
+            type(self.point_estimation_mode) is not str
+            or self.point_estimation_mode not in _ALLOWED_POINT_ESTIMATION_MODES
+        ):
+            raise ValueError(
+                "point_estimation_mode must be unweighted or weighted_design_based"
+            )
+        if self.point_estimation_mode == "weighted_design_based":
+            if self.analysis_weight_receipt_digest is None:
+                raise ValueError(
+                    "analysis_weight_receipt_digest is required for weighted_design_based"
+                )
+            if self.variance_design_receipt_digest is None:
+                raise ValueError(
+                    "variance_design_receipt_digest is required for weighted_design_based"
+                )
+            _validate_digest(
+                self.analysis_weight_receipt_digest, "analysis_weight_receipt_digest"
+            )
+            _validate_digest(
+                self.variance_design_receipt_digest, "variance_design_receipt_digest"
+            )
+        elif (
+            self.analysis_weight_receipt_digest is not None
+            or self.variance_design_receipt_digest is not None
+        ):
+            raise ValueError(
+                "unweighted result must not bind analysis or variance weight receipts"
+            )
         if type(self.result_authority) is not str or self.result_authority != _RESULT_AUTHORITY:
             raise ValueError("result_authority must remain scientific_evidence_only")
         if type(self.execution_state) is not str or self.execution_state != _EXECUTION_STATE:
@@ -229,6 +262,7 @@ class ValidationAnalysisResult:
             "human_review_required": self.human_review_required,
             "missingness_summary": self.missingness_summary.to_dict(),
             "model_code": self.model_code,
+            "point_estimation_mode": self.point_estimation_mode,
             "precision": self.precision,
             "provenance_digest": self.provenance_digest,
             "result_authority": self.result_authority,
@@ -238,6 +272,10 @@ class ValidationAnalysisResult:
             "uncertainty_lower": float(self.uncertainty_lower),
             "uncertainty_upper": float(self.uncertainty_upper),
         }
+        if self.analysis_weight_receipt_digest is not None:
+            payload["analysis_weight_receipt_digest"] = self.analysis_weight_receipt_digest
+        if self.variance_design_receipt_digest is not None:
+            payload["variance_design_receipt_digest"] = self.variance_design_receipt_digest
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
     def sha256_digest(self) -> str:
