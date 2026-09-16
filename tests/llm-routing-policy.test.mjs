@@ -8,10 +8,21 @@ function repositoryText(relativePath) {
 
 test('consumer guidance routes model-backed Actions only through contextual-orchestrator free', () => {
   const agents = repositoryText('AGENTS.md');
+  const modelRoutingRule = agents
+    .split('\n')
+    .find((line) => line.startsWith('- Model-backed GitHub Actions'));
 
-  assert.match(agents, /`orchestrator\/free`/);
-  assert.match(agents, /contextual-orchestrator/);
-  assert.match(agents, /gateway token/i);
+  assert.ok(modelRoutingRule, 'AGENTS.md must retain the model-backed Actions routing rule');
+  assert.match(modelRoutingRule, /`orchestrator\/free`/);
+  assert.match(modelRoutingRule, /contextual-orchestrator/);
+  assert.match(modelRoutingRule, /gateway token/i);
+  assert.match(modelRoutingRule, /must not select a provider, provider group, paid fallback/i);
+  assert.match(modelRoutingRule, /`COPILOT_GITHUB_TOKEN`/);
+
+  const guidanceOutsideRoutingRule = agents.replace(modelRoutingRule, '');
+  assert.doesNotMatch(guidanceOutsideRoutingRule, /COPILOT_GITHUB_TOKEN/);
+  assert.doesNotMatch(guidanceOutsideRoutingRule, /provider group/i);
+  assert.doesNotMatch(guidanceOutsideRoutingRule, /paid fallback/i);
   assert.doesNotMatch(agents, /NVIDIA_NIM_API_KEY/);
   assert.doesNotMatch(agents, /OPENAI_API_KEY/);
   assert.doesNotMatch(agents, /OPENROUTER_API_KEY/);
