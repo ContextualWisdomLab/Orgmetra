@@ -50,6 +50,7 @@ ELIGIBILITY_DIGEST = "e" * 64
 OWNER_DIGEST = "f" * 64
 SUPERSEDES_DIGEST = "0" * 64
 CONSTRUCTED_AT = datetime(2026, 9, 17, 8, 0, tzinfo=timezone.utc)
+OWNER_RELEASED_AT = datetime(2026, 9, 17, 8, 10, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 17, 8, 30, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, 9, 0, tzinfo=timezone.utc)
 READ_FIELDS = frozenset(
@@ -89,7 +90,9 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -197,7 +200,9 @@ def _record(**overrides: object) -> FinalAnalysisWeightAuthorityRecord:
         "owner_contract_reference": OWNER_REFERENCE,
         "owner_contract_version": 7,
         "owner_contract_digest": OWNER_DIGEST,
+        "owner_contract_released_at": OWNER_RELEASED_AT,
         "released_at": RELEASED_AT,
+        "superseded_at": None,
     }
     values.update(overrides)
     return FinalAnalysisWeightAuthorityRecord(**values)
@@ -235,7 +240,9 @@ def test_resolution_binds_complete_estimand_source_base_adjustment_and_final_art
     assert ("source_universe_receipt_digest", SOURCE_DIGEST) in view.fields
     assert ("base_weight_evidence_digest", BASE_EVIDENCE_DIGEST) in view.fields
     assert ("final_weight_artifact_digest", ADJUSTED_ARTIFACT_DIGEST) in view.fields
+    assert ("owner_contract_released_at", OWNER_RELEASED_AT) in view.fields
     assert ("released_at", RELEASED_AT) in view.fields
+    assert ("superseded_at", None) in view.fields
     adjustment = dict(view.fields)["adjustments"][0]
     assert tuple(adjustment) == tuple(_adjustment())
     assert adjustment.sequence_number == 1
@@ -405,7 +412,9 @@ def test_record_adjustment_and_view_are_structurally_immutable() -> None:
     object.__setattr__(tenant, "int", OTHER_TENANT.int)
     assert record.tenant_record_id == TENANT
     assert record.validity_study_id == STUDY
+    assert record.owner_contract_released_at == OWNER_RELEASED_AT
     assert record.released_at == RELEASED_AT
+    assert record.superseded_at is None
     with pytest.raises(AttributeError):
         object.__setattr__(record, "fields", ())
 
