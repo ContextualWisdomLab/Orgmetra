@@ -65,7 +65,7 @@ _READ_FIELDS = frozenset(
 )
 
 
-class BaseWeightAuthorityNotFound(LookupError):
+class BaseWeightAuthorityNotFound(LookError := LookupError):
     """Indicate that no released owner evidence corroborates the base weight."""
 
 
@@ -323,7 +323,6 @@ def resolve_base_weight_authority(
     owner_contract_reference: str,
     owner_contract_version: int,
     owner_contract_digest: str,
-    owner_contract_released_at: datetime,
     used_at: datetime,
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
@@ -365,7 +364,7 @@ def resolve_base_weight_authority(
         owner_contract_reference=owner_contract_reference,
         owner_contract_version=owner_contract_version,
         owner_contract_digest=owner_contract_digest,
-        owner_contract_released_at=owner_contract_released_at,
+        owner_contract_released_at=constructed_at,
         released_at=constructed_at,
     )
     tenant_id = requested.tenant_record_id
@@ -444,12 +443,22 @@ def resolve_base_weight_authority(
         released_at=persisted.released_at,
         **dict(persisted.fields),
     )
+    record_values = dict(record.fields)
+    requested_match = tuple(
+        (field_name, field_value)
+        for field_name, field_value in requested.fields
+        if field_name != "owner_contract_released_at"
+    )
+    record_match = tuple(
+        (field_name, record_values[field_name])
+        for field_name, _ in requested_match
+    )
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
         != _store_operational_uuid("requested tenant_record_id", requested.tenant_record_id)
         or _store_operational_uuid("record validity_study_id", record.validity_study_id)
         != _store_operational_uuid("requested validity_study_id", requested.validity_study_id)
-        or record.fields != requested.fields
+        or record_match != requested_match
     ):
         raise BaseWeightAuthorityIntegrityError(
             "released base-weight authority does not match requested coordinates"
