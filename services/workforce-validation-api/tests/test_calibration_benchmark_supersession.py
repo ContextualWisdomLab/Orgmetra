@@ -140,7 +140,7 @@ def test_historical_use_before_supersession_remains_verifiable_without_leaking_l
             successor_reference=SUCCESSOR_REFERENCE,
             successor_version=5,
             successor_digest=SUCCESSOR_DIGEST,
-            successor_released_at=USED_AT + timedelta(hours=12),
+            successor_released_at=superseded_at,
         )
     )
 
@@ -189,7 +189,7 @@ def test_benchmark_superseded_by_scientific_use_is_not_authoritative() -> None:
         successor_reference=SUCCESSOR_REFERENCE,
         successor_version=5,
         successor_digest=SUCCESSOR_DIGEST,
-        successor_released_at=USED_AT - timedelta(hours=1),
+        successor_released_at=USED_AT,
     )
 
     with pytest.raises(CalibrationBenchmarkAuthorityIntegrityError):
