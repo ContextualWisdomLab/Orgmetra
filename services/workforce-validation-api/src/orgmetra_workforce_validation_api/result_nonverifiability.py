@@ -61,6 +61,7 @@ _READ_FIELDS = frozenset(
         "owner_contract_released_at",
         "evaluated_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -114,8 +115,9 @@ class ValidationResultNonVerifiabilityRecord(tuple):
         owner_contract_released_at: datetime,
         evaluated_at: datetime,
         released_at: datetime,
+        superseded_at: datetime | None = None,
     ) -> ValidationResultNonVerifiabilityRecord:
-        """Validate a minimal, reproducible explanation for non-verifiability."""
+        """Validate a minimal, reproducible explanation and its authority interval."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
         study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
         result_ref = _require_reference(
@@ -186,6 +188,15 @@ class ValidationResultNonVerifiabilityRecord(tuple):
             )
         if evaluation_instant > release_instant:
             raise ValueError("evaluated_at cannot be later than released_at.")
+        cutover = (
+            None
+            if superseded_at is None
+            else _require_aware_datetime("superseded_at", superseded_at)
+        )
+        if cutover is not None and cutover <= release_instant:
+            raise ValueError(
+                "superseded_at must be later than non-verifiability release."
+            )
 
         return tuple.__new__(
             cls,
@@ -206,6 +217,7 @@ class ValidationResultNonVerifiabilityRecord(tuple):
                 owner_released,
                 evaluation_instant,
                 release_instant,
+                cutover,
             ),
         )
 
@@ -293,6 +305,11 @@ class ValidationResultNonVerifiabilityRecord(tuple):
     def released_at(self) -> datetime:
         """Return when this non-verifiability outcome became released evidence."""
         return self[15]
+
+    @property
+    def superseded_at(self) -> datetime | None:
+        """Return the exclusive end of this outcome's owner-resolved authority."""
+        return self[16]
 
 
 class ValidationResultNonVerifiabilityView(tuple):
@@ -468,6 +485,7 @@ def resolve_validation_result_nonverifiability(
         owner_contract_released_at=persisted.owner_contract_released_at,
         evaluated_at=persisted.evaluated_at,
         released_at=persisted.released_at,
+        superseded_at=persisted.superseded_at,
     )
     requested_identity = (
         tenant_identity,
@@ -499,6 +517,10 @@ def resolve_validation_result_nonverifiability(
         raise ValidationResultNonVerifiabilityIntegrityError(
             "validation-result non-verifiability cannot be used before its release instant"
         )
+    if record.superseded_at is not None and use_instant >= record.superseded_at:
+        raise ValidationResultNonVerifiabilityIntegrityError(
+            "validation-result non-verifiability ended at its owner-resolved supersession instant"
+        )
 
     values = {
         "result_reference": record.result_reference,
@@ -516,6 +538,7 @@ def resolve_validation_result_nonverifiability(
         "owner_contract_released_at": record.owner_contract_released_at,
         "evaluated_at": record.evaluated_at,
         "released_at": record.released_at,
+        "superseded_at": record.superseded_at,
     }
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
     return tuple.__new__(
