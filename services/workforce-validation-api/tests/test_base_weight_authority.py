@@ -150,7 +150,12 @@ def _record(**overrides: object) -> BaseWeightAuthorityRecord:
 
 def _resolve(*, read_port: object, **overrides: object) -> BaseWeightAuthorityView:
     values = dict(_record().fields)
-    values.pop("owner_contract_released_at")
+    for owner_resolved_field in (
+        "source_universe_released_at",
+        "sampling_design_released_at",
+        "owner_contract_released_at",
+    ):
+        values.pop(owner_resolved_field)
     values.update(
         {
             "principal": _principal(),
@@ -176,20 +181,34 @@ def test_resolution_binds_sampling_stage_probabilities_to_base_weight_artifact()
     assert port.calls[0]["source_universe_receipt_version"] == 4
     assert port.calls[0]["sampling_design_receipt_version"] == 3
     assert port.calls[0]["selection_probability_set_digest"] == SELECTION_PROBABILITY_SET_DIGEST
+    assert "source_universe_released_at" not in port.calls[0]
+    assert "sampling_design_released_at" not in port.calls[0]
     assert "owner_contract_released_at" not in port.calls[0]
     assert ("sampled_occurrence_set_digest", SAMPLED_SET_DIGEST) in view.fields
     assert ("selection_stage_count", 2) in view.fields
     assert ("base_weight_artifact_digest", BASE_ARTIFACT_DIGEST) in view.fields
+    assert ("source_universe_released_at", SOURCE_RELEASED_AT) in view.fields
+    assert ("sampling_design_released_at", SAMPLING_RELEASED_AT) in view.fields
     assert ("owner_contract_released_at", OWNER_CONTRACT_RELEASED_AT) in view.fields
     assert ("released_at", RELEASED_AT) in view.fields
 
 
-def test_owner_contract_release_is_resolved_from_owner_evidence() -> None:
+def test_prerequisite_releases_are_resolved_from_owner_evidence() -> None:
+    source_release = SOURCE_RELEASED_AT + timedelta(seconds=1)
+    sampling_release = SAMPLING_RELEASED_AT + timedelta(seconds=1)
     owner_release = OWNER_CONTRACT_RELEASED_AT + timedelta(seconds=1)
     view = _resolve(
-        read_port=_ReadPort(_record(owner_contract_released_at=owner_release))
+        read_port=_ReadPort(
+            _record(
+                source_universe_released_at=source_release,
+                sampling_design_released_at=sampling_release,
+                owner_contract_released_at=owner_release,
+            )
+        )
     )
 
+    assert ("source_universe_released_at", source_release) in view.fields
+    assert ("sampling_design_released_at", sampling_release) in view.fields
     assert ("owner_contract_released_at", owner_release) in view.fields
 
 
