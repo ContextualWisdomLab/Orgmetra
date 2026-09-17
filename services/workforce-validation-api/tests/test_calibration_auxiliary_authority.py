@@ -81,13 +81,17 @@ class _ReadPort:
         *,
         tenant_record_id: UUID,
         validity_study_id: UUID,
+        authority_reference: str,
         auxiliary_projection_reference: str,
         auxiliary_projection_digest: str,
         scientific_purpose_reference: str,
         scientific_purpose_digest: str,
         owner_contract_reference: str,
         owner_contract_version: int,
+        owner_contract_digest: str,
+        authorization_receipt_reference: str,
         authorization_receipt_digest: str,
+        scientific_use_receipt_reference: str,
         scientific_use_receipt_digest: str,
     ) -> object:
         """Capture the owner lookup and return the configured result."""
@@ -95,13 +99,17 @@ class _ReadPort:
             (
                 tenant_record_id,
                 validity_study_id,
+                authority_reference,
                 auxiliary_projection_reference,
                 auxiliary_projection_digest,
                 scientific_purpose_reference,
                 scientific_purpose_digest,
                 owner_contract_reference,
                 owner_contract_version,
+                owner_contract_digest,
+                authorization_receipt_reference,
                 authorization_receipt_digest,
+                scientific_use_receipt_reference,
                 scientific_use_receipt_digest,
             )
         )
@@ -173,13 +181,17 @@ def _resolve(*, read_port: object, **overrides: object) -> CalibrationAuxiliaryA
         "principal": _principal(),
         "tenant_record_id": TENANT,
         "validity_study_id": STUDY,
+        "authority_reference": AUTHORITY_REFERENCE,
         "auxiliary_projection_reference": PROJECTION_REFERENCE,
         "auxiliary_projection_digest": PROJECTION_DIGEST,
         "scientific_purpose_reference": PURPOSE_REFERENCE,
         "scientific_purpose_digest": PURPOSE_DIGEST,
         "owner_contract_reference": OWNER_CONTRACT_REFERENCE,
         "owner_contract_version": 7,
+        "owner_contract_digest": OWNER_CONTRACT_DIGEST,
+        "authorization_receipt_reference": AUTHORIZATION_REFERENCE,
         "authorization_receipt_digest": AUTHORIZATION_DIGEST,
+        "scientific_use_receipt_reference": SCIENTIFIC_USE_REFERENCE,
         "scientific_use_receipt_digest": SCIENTIFIC_USE_DIGEST,
         "used_at": USED_AT,
         "purpose_code": "selection_validity_analysis",
@@ -200,13 +212,17 @@ def test_resolution_authorizes_then_returns_minimized_corroborated_evidence() ->
         (
             TENANT,
             STUDY,
+            AUTHORITY_REFERENCE,
             PROJECTION_REFERENCE,
             PROJECTION_DIGEST,
             PURPOSE_REFERENCE,
             PURPOSE_DIGEST,
             OWNER_CONTRACT_REFERENCE,
             7,
+            OWNER_CONTRACT_DIGEST,
+            AUTHORIZATION_REFERENCE,
             AUTHORIZATION_DIGEST,
+            SCIENTIFIC_USE_REFERENCE,
             SCIENTIFIC_USE_DIGEST,
         )
     ]
@@ -255,6 +271,14 @@ def test_missing_or_noncanonical_owner_evidence_fails_closed() -> None:
         ({"validity_study_id": OTHER_STUDY}, {}),
         (
             {
+                "authority_reference": (
+                    "scientific_auxiliary_authority:dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+                )
+            },
+            {},
+        ),
+        (
+            {
                 "auxiliary_projection_reference": (
                     "calibration_auxiliary_projection:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
                 )
@@ -280,7 +304,24 @@ def test_missing_or_noncanonical_owner_evidence_fails_closed() -> None:
             {},
         ),
         ({"owner_contract_version": 8}, {}),
+        ({"owner_contract_digest": "c" * 64}, {}),
+        (
+            {
+                "authorization_receipt_reference": (
+                    "scientific_data_authorization:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+                )
+            },
+            {},
+        ),
         ({"authorization_receipt_digest": "c" * 64}, {}),
+        (
+            {
+                "scientific_use_receipt_reference": (
+                    "scientific_use_receipt:ffffffff-ffff-4fff-8fff-ffffffffffff"
+                )
+            },
+            {},
+        ),
         ({"scientific_use_receipt_digest": "d" * 64}, {}),
         ({}, {"used_at": USED_AT + timedelta(seconds=1)}),
     ],
@@ -326,13 +367,17 @@ def test_open_ended_authority_interval_accepts_later_owner_resolved_use() -> Non
         ("read_port", _DescriptorReadPort(), TypeError),
         ("tenant_record_id", "not-a-uuid", ValueError),
         ("validity_study_id", UUID(int=0), ValueError),
+        ("authority_reference", "wrong:authority", ValueError),
         ("auxiliary_projection_reference", "wrong:projection", ValueError),
         ("auxiliary_projection_digest", "ABC", ValueError),
         ("scientific_purpose_reference", "wrong:purpose", ValueError),
         ("scientific_purpose_digest", "2" * 63, ValueError),
         ("owner_contract_reference", "wrong:contract", ValueError),
         ("owner_contract_version", True, ValueError),
+        ("owner_contract_digest", "3" * 63, ValueError),
+        ("authorization_receipt_reference", "wrong:authorization", ValueError),
         ("authorization_receipt_digest", "4" * 65, ValueError),
+        ("scientific_use_receipt_reference", "wrong:use", ValueError),
         ("scientific_use_receipt_digest", "5" * 65, ValueError),
         ("used_at", datetime(2026, 9, 17), ValueError),
         ("purpose_code", "Selection Validity Analysis", ValueError),
