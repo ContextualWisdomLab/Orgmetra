@@ -240,7 +240,10 @@ def test_owner_evidence_must_match_every_leaf_benchmark_coordinate(
 def test_owner_evidence_must_have_existed_before_scientific_use() -> None:
     for overrides in (
         {"benchmark_receipt_released_at": USED_AT + timedelta(seconds=1)},
-        {"owner_contract_released_at": USED_AT + timedelta(seconds=1)},
+        {
+            "benchmark_receipt_released_at": USED_AT + timedelta(seconds=1),
+            "owner_contract_released_at": USED_AT + timedelta(seconds=1),
+        },
         {"benchmark_reference_at": USED_AT + timedelta(seconds=1)},
     ):
         port = _ReadPort(_record(**overrides))
