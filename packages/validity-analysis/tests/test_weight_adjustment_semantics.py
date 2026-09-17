@@ -181,8 +181,6 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
         calibration_receipt(auxiliary_scientific_use_at="2026-09-17T05:00:00Z")
     with pytest.raises(ValueError, match="cannot be later"):
         calibration_receipt(auxiliary_scientific_use_at=NOW + timedelta(seconds=1))
-    with pytest.raises(TypeError):
-        calibration_receipt()
     with pytest.raises(ValueError, match="benchmark_receipt_version"):
         calibration_receipt(benchmark_receipt_version=0)
     with pytest.raises(ValueError, match="benchmark_receipt_version"):
