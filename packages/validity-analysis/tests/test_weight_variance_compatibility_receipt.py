@@ -155,6 +155,24 @@ def test_compatibility_receipt_rejects_foreign_point_weight_or_tenant() -> None:
         compatibility(analysis_weight_receipt=foreign)
 
 
+def test_compatibility_receipt_rejects_point_receipt_as_variance_receipt() -> None:
+    """Point-weight evidence cannot masquerade as the distinct variance-design receipt."""
+    point_weight = weight_receipt()
+    with pytest.raises(ValueError, match="distinct from the analysis weight receipt"):
+        compatibility(
+            analysis_weight_receipt=point_weight,
+            variance_design_receipt_digest=point_weight.sha256_digest(),
+        )
+
+
+def test_compatibility_receipt_rejects_time_reversal_and_schema_forgery() -> None:
+    """Compatibility evidence cannot predate its point weight or invent a schema version."""
+    with pytest.raises(ValueError, match="cannot precede"):
+        compatibility(constructed_at=datetime(2026, 9, 17, 0, 29, tzinfo=timezone.utc))
+    with pytest.raises(ValueError, match="evidence_version"):
+        compatibility(evidence_version=2)
+
+
 @pytest.mark.parametrize("version", [0, True])
 def test_variance_design_receipt_version_is_strictly_positive(version: object) -> None:
     """Reject unversioned or boolean variance owner evidence."""
