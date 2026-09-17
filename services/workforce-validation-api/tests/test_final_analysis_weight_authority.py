@@ -345,6 +345,7 @@ def test_adjustment_semantics_are_typed_and_no_op_transform_is_rejected() -> Non
         ("analysis_weight_receipt_reference", "wrong:receipt", ValueError),
         ("analysis_weight_receipt_digest", "ABC", ValueError),
         ("evidence_version", False, ValueError),
+        ("evidence_version", 2, ValueError),
         ("estimand_reference", "wrong:estimand", ValueError),
         ("estimand_digest", "2" * 63, ValueError),
         ("estimand_scope_code", "panel", ValueError),
