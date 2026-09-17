@@ -37,10 +37,6 @@ READ_FIELDS = frozenset(
         "benchmark_owner_contract_digest",
         "benchmark_reference_at",
         "benchmark_receipt_released_at",
-        "benchmark_receipt_superseded_at",
-        "successor_benchmark_receipt_reference",
-        "successor_benchmark_receipt_version",
-        "successor_benchmark_receipt_digest",
         "owner_contract_released_at",
     }
 )
@@ -107,11 +103,11 @@ def _record(
         benchmark_owner_contract_digest=OWNER_CONTRACT_DIGEST,
         benchmark_reference_at=BENCHMARK_REFERENCE_AT,
         benchmark_receipt_released_at=BENCHMARK_RELEASED_AT,
+        owner_contract_released_at=OWNER_CONTRACT_RELEASED_AT,
         benchmark_receipt_superseded_at=superseded_at,
         successor_benchmark_receipt_reference=successor_reference,
         successor_benchmark_receipt_version=successor_version,
         successor_benchmark_receipt_digest=successor_digest,
-        owner_contract_released_at=OWNER_CONTRACT_RELEASED_AT,
     )
 
 
@@ -134,11 +130,10 @@ def _resolve(record: CalibrationBenchmarkAuthorityRecord, *, used_at: datetime =
     )
 
 
-def test_historical_use_before_supersession_remains_verifiable_with_successor_lineage() -> None:
-    superseded_at = USED_AT + timedelta(days=1)
+def test_historical_use_before_supersession_remains_verifiable_without_leaking_lineage() -> None:
     view = _resolve(
         _record(
-            superseded_at=superseded_at,
+            superseded_at=USED_AT + timedelta(days=1),
             successor_reference=SUCCESSOR_REFERENCE,
             successor_version=5,
             successor_digest=SUCCESSOR_DIGEST,
@@ -146,10 +141,9 @@ def test_historical_use_before_supersession_remains_verifiable_with_successor_li
     )
 
     fields = dict(view.fields)
-    assert fields["benchmark_receipt_superseded_at"] == superseded_at
-    assert fields["successor_benchmark_receipt_reference"] == SUCCESSOR_REFERENCE
-    assert fields["successor_benchmark_receipt_version"] == 5
-    assert fields["successor_benchmark_receipt_digest"] == SUCCESSOR_DIGEST
+    assert fields["benchmark_receipt_reference"] == BENCHMARK_REFERENCE
+    assert "benchmark_receipt_superseded_at" not in fields
+    assert "successor_benchmark_receipt_reference" not in fields
 
 
 def test_benchmark_superseded_by_scientific_use_is_not_authoritative() -> None:
