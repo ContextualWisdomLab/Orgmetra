@@ -30,7 +30,7 @@ SAMPLING_DIGEST = "1" * 64
 ANALYSIS_WEIGHT_DIGEST = "2" * 64
 CASE_SET_DIGEST = "3" * 64
 ELIGIBILITY_DIGEST = "4" * 64
-CORRECTION_DIGEST = "5" * 64
+CORRECTION_SEQUENCE = 9
 FINAL_WEIGHT_DIGEST = "6" * 64
 VARIANCE_DIGEST = "7" * 64
 OWNER_DIGEST = "8" * 64
@@ -43,9 +43,9 @@ READ_FIELDS = frozenset(
         "sampling_receipt_version",
         "sampling_receipt_digest",
         "analysis_weight_receipt_digest",
-        "analytic_case_set_digest",
+        "analytic_case_occurrence_set_digest",
         "weight_eligibility_receipt_digest",
-        "correction_sequence_digest",
+        "weight_correction_sequence",
         "final_weight_artifact_digest",
         "variance_design_receipt_reference",
         "variance_design_receipt_version",
@@ -63,7 +63,7 @@ READ_FIELDS = frozenset(
 
 
 class _ReadPort:
-    """Return one configured owner record and retain exact lookup coordinates."""
+    """Return one configured owner record and retain the exact lookup coordinates."""
 
     def __init__(self, result: object) -> None:
         self.result = result
@@ -84,7 +84,7 @@ class _ReadPort:
         owner_contract_reference: str,
         owner_contract_version: int,
     ) -> object:
-        """Capture the immutable owner lookup and return the configured result."""
+        """Capture the owner lookup and return the configured result."""
         self.calls.append(
             (
                 tenant_record_id,
@@ -136,9 +136,9 @@ def _record(**overrides: object) -> WeightVarianceAuthorityRecord:
         "sampling_receipt_version": 3,
         "sampling_receipt_digest": SAMPLING_DIGEST,
         "analysis_weight_receipt_digest": ANALYSIS_WEIGHT_DIGEST,
-        "analytic_case_set_digest": CASE_SET_DIGEST,
+        "analytic_case_occurrence_set_digest": CASE_SET_DIGEST,
         "weight_eligibility_receipt_digest": ELIGIBILITY_DIGEST,
-        "correction_sequence_digest": CORRECTION_DIGEST,
+        "weight_correction_sequence": CORRECTION_SEQUENCE,
         "final_weight_artifact_digest": FINAL_WEIGHT_DIGEST,
         "variance_design_receipt_reference": VARIANCE_REFERENCE,
         "variance_design_receipt_version": 5,
@@ -165,9 +165,9 @@ def _resolve(*, read_port: object, **overrides: object) -> WeightVarianceAuthori
         "sampling_receipt_version": 3,
         "sampling_receipt_digest": SAMPLING_DIGEST,
         "analysis_weight_receipt_digest": ANALYSIS_WEIGHT_DIGEST,
-        "analytic_case_set_digest": CASE_SET_DIGEST,
+        "analytic_case_occurrence_set_digest": CASE_SET_DIGEST,
         "weight_eligibility_receipt_digest": ELIGIBILITY_DIGEST,
-        "correction_sequence_digest": CORRECTION_DIGEST,
+        "weight_correction_sequence": CORRECTION_SEQUENCE,
         "final_weight_artifact_digest": FINAL_WEIGHT_DIGEST,
         "variance_design_receipt_reference": VARIANCE_REFERENCE,
         "variance_design_receipt_version": 5,
@@ -212,6 +212,7 @@ def test_resolution_authorizes_then_returns_owner_corroborated_compatibility() -
     assert view.validity_study_id == STUDY
     fields = dict(view.fields)
     assert fields["final_weight_artifact_digest"] == FINAL_WEIGHT_DIGEST
+    assert fields["weight_correction_sequence"] == CORRECTION_SEQUENCE
     assert fields["variance_design_receipt_digest"] == VARIANCE_DIGEST
     assert fields["owner_contract_digest"] == OWNER_DIGEST
     assert fields["released_at"] == RELEASED_AT
@@ -232,9 +233,23 @@ def test_missing_noncanonical_or_mismatched_owner_evidence_fails_closed() -> Non
     with pytest.raises(WeightVarianceAuthorityIntegrityError):
         _resolve(read_port=_ReadPort(object()))
     with pytest.raises(WeightVarianceAuthorityIntegrityError):
-        _resolve(read_port=_ReadPort(_record(analytic_case_set_digest="a" * 64)))
+        _resolve(
+            read_port=_ReadPort(
+                _record(analytic_case_occurrence_set_digest="a" * 64)
+            )
+        )
     with pytest.raises(WeightVarianceAuthorityIntegrityError):
         _resolve(read_port=_ReadPort(_record(final_weight_artifact_digest="b" * 64)))
+
+
+def test_point_and_variance_receipts_must_be_distinct() -> None:
+    with pytest.raises(ValueError):
+        _record(variance_design_receipt_digest=ANALYSIS_WEIGHT_DIGEST)
+    with pytest.raises(ValueError):
+        _resolve(
+            read_port=_ReadPort(_record()),
+            variance_design_receipt_digest=ANALYSIS_WEIGHT_DIGEST,
+        )
 
 
 def test_approximation_mode_cannot_claim_exact_variance_semantics() -> None:
@@ -242,7 +257,7 @@ def test_approximation_mode_cannot_claim_exact_variance_semantics() -> None:
         _record(variance_evidence_mode="approximation", variance_semantics="exact")
 
 
-def test_invalid_dependency_and_pre_release_use_fail_before_owner_read() -> None:
+def test_invalid_dependency_and_pre_release_use_fail_closed() -> None:
     with pytest.raises(TypeError):
         _resolve(read_port=_ProtocolOnly())
 
