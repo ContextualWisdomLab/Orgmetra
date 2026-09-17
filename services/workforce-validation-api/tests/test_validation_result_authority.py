@@ -31,6 +31,7 @@ COMPATIBILITY_DIGEST = "2" * 64
 ANALYSIS_WEIGHT_DIGEST = "3" * 64
 VARIANCE_DIGEST = "4" * 64
 OWNER_DIGEST = "5" * 64
+OWNER_RELEASED_AT = datetime(2026, 9, 17, 4, 0, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 17, 5, 0, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
 READ_FIELDS = frozenset(
@@ -45,7 +46,9 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -107,7 +110,7 @@ def _principal() -> ValidationPrincipal:
 def _policy(*, purpose_code: str = "selection_validity_analysis") -> PurposeBoundAccessPolicy:
     return PurposeBoundAccessPolicy(
         tenant_record_id=TENANT,
-        policy_version_code="validation-result-authority-read-v1",
+        policy_version_code="validation-result-authority-read-v2",
         resource_kind="validation_result_authority",
         purpose_code=purpose_code,
         operation_code="read",
@@ -130,6 +133,7 @@ def _record(**overrides: object) -> ValidationResultAuthorityRecord:
         "owner_contract_reference": OWNER_REFERENCE,
         "owner_contract_version": 7,
         "owner_contract_digest": OWNER_DIGEST,
+        "owner_contract_released_at": OWNER_RELEASED_AT,
         "released_at": RELEASED_AT,
     }
     values.update(overrides)
@@ -191,7 +195,9 @@ def test_resolution_binds_result_to_exact_compatibility_and_owner_evidence() -> 
     assert fields["variance_design_receipt_digest"] == VARIANCE_DIGEST
     assert fields["verification_status"] == "verification_pending"
     assert fields["owner_contract_digest"] == OWNER_DIGEST
+    assert fields["owner_contract_released_at"] == OWNER_RELEASED_AT
     assert fields["released_at"] == RELEASED_AT
+    assert fields["superseded_at"] is None
 
 
 def test_not_verifiable_result_remains_released_non_authorizing_evidence() -> None:
