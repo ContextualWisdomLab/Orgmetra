@@ -34,6 +34,7 @@ OWNER_DIGEST = "4" * 64
 OWNER_CONTRACT_RELEASED_AT = datetime(2026, 9, 17, 5, 55, tzinfo=timezone.utc)
 FAILED_EVIDENCE_RELEASED_AT = datetime(2026, 9, 17, 5, 59, tzinfo=timezone.utc)
 EVALUATED_AT = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
+ATTEMPT_RELEASED_AT = datetime(2026, 9, 17, 6, 2, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 17, 6, 5, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, 6, 10, tzinfo=timezone.utc)
 READ_FIELDS = frozenset(
@@ -48,6 +49,7 @@ READ_FIELDS = frozenset(
         "failed_evidence_released_at",
         "verification_attempt_reference",
         "verification_attempt_digest",
+        "verification_attempt_released_at",
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
@@ -132,6 +134,7 @@ def _record(**overrides: object) -> ValidationResultNonVerifiabilityRecord:
         "failed_evidence_released_at": None,
         "verification_attempt_reference": ATTEMPT_REFERENCE,
         "verification_attempt_digest": ATTEMPT_DIGEST,
+        "verification_attempt_released_at": ATTEMPT_RELEASED_AT,
         "owner_contract_reference": OWNER_REFERENCE,
         "owner_contract_version": 7,
         "owner_contract_digest": OWNER_DIGEST,
@@ -196,6 +199,7 @@ def test_missing_final_weight_evidence_is_released_as_not_verifiable() -> None:
     assert fields["failed_evidence_released_at"] is None
     assert fields["verification_attempt_reference"] == ATTEMPT_REFERENCE
     assert fields["verification_attempt_digest"] == ATTEMPT_DIGEST
+    assert fields["verification_attempt_released_at"] == ATTEMPT_RELEASED_AT
     assert fields["owner_contract_released_at"] == OWNER_CONTRACT_RELEASED_AT
     assert fields["evaluated_at"] == EVALUATED_AT
     assert fields["released_at"] == RELEASED_AT
@@ -291,6 +295,9 @@ def test_evaluation_must_precede_release() -> None:
     with pytest.raises(ValueError, match="evaluated_at"):
         _record(
             evaluated_at=datetime(2026, 9, 17, 6, 6, tzinfo=timezone.utc),
+            verification_attempt_released_at=datetime(
+                2026, 9, 17, 6, 6, tzinfo=timezone.utc
+            ),
             released_at=RELEASED_AT,
         )
 
