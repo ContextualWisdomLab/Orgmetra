@@ -135,7 +135,7 @@ class NonresponseAdjustmentReceipt:
 
 @dataclass(frozen=True, slots=True, repr=False)
 class CalibrationAdjustmentReceipt:
-    """Bind calibration to owner authority, benchmarks, and termination evidence."""
+    """Bind calibration to owner authority, benchmark authority, and termination evidence."""
 
     tenant_record_id: str
     receipt_reference: str
@@ -155,7 +155,12 @@ class CalibrationAdjustmentReceipt:
     auxiliary_scientific_use_receipt_digest: str
     auxiliary_scientific_use_at: datetime
     benchmark_receipt_reference: str
+    benchmark_receipt_version: int
     benchmark_receipt_digest: str
+    benchmark_owner_contract_reference: str
+    benchmark_owner_contract_version: int
+    benchmark_owner_contract_digest: str
+    benchmark_reference_at: datetime
     algorithm_reference: str
     algorithm_version: int
     constraints_digest: str
@@ -168,7 +173,7 @@ class CalibrationAdjustmentReceipt:
     evidence_version: int = 1
 
     def __post_init__(self) -> None:
-        """Fail closed on floating authority, hidden fallback, or nonconverged output."""
+        """Fail closed on floating authority, benchmark time, hidden fallback, or nonconvergence."""
         _validate_operational_uuid(self.tenant_record_id, "tenant_record_id")
         _validate_reference(
             self.receipt_reference,
@@ -219,6 +224,16 @@ class CalibrationAdjustmentReceipt:
             "calibration_benchmark_receipt",
             "benchmark_receipt_reference",
         )
+        _positive_integer(self.benchmark_receipt_version, "benchmark_receipt_version")
+        _validate_reference(
+            self.benchmark_owner_contract_reference,
+            "released_owner_contract",
+            "benchmark_owner_contract_reference",
+        )
+        _positive_integer(
+            self.benchmark_owner_contract_version,
+            "benchmark_owner_contract_version",
+        )
         _validate_reference(
             self.algorithm_reference,
             "calibration_algorithm",
@@ -232,6 +247,7 @@ class CalibrationAdjustmentReceipt:
             "auxiliary_authorization_receipt_digest",
             "auxiliary_scientific_use_receipt_digest",
             "benchmark_receipt_digest",
+            "benchmark_owner_contract_digest",
             "constraints_digest",
             "input_weight_artifact_digest",
             "output_weight_artifact_digest",
@@ -264,12 +280,19 @@ class CalibrationAdjustmentReceipt:
             self.auxiliary_scientific_use_at,
             "auxiliary_scientific_use_at",
         )
+        benchmark_reference_at = _freeze_timestamp(
+            self.benchmark_reference_at,
+            "benchmark_reference_at",
+        )
         constructed_at = _freeze_timestamp(self.constructed_at, "constructed_at")
         if scientific_use_at > constructed_at:
             raise ValueError("auxiliary_scientific_use_at cannot be later than constructed_at")
+        if benchmark_reference_at > constructed_at:
+            raise ValueError("benchmark_reference_at cannot be later than constructed_at")
         if type(self.evidence_version) is not int or self.evidence_version != 1:
             raise ValueError("evidence_version must remain 1")
         object.__setattr__(self, "auxiliary_scientific_use_at", scientific_use_at)
+        object.__setattr__(self, "benchmark_reference_at", benchmark_reference_at)
         object.__setattr__(self, "constructed_at", constructed_at)
 
     def __repr__(self) -> str:
@@ -298,8 +321,16 @@ class CalibrationAdjustmentReceipt:
             ),
             "auxiliary_scientific_use_receipt_digest": self.auxiliary_scientific_use_receipt_digest,
             "auxiliary_scientific_use_receipt_reference": self.auxiliary_scientific_use_receipt_reference,
+            "benchmark_owner_contract_digest": self.benchmark_owner_contract_digest,
+            "benchmark_owner_contract_reference": self.benchmark_owner_contract_reference,
+            "benchmark_owner_contract_version": self.benchmark_owner_contract_version,
             "benchmark_receipt_digest": self.benchmark_receipt_digest,
             "benchmark_receipt_reference": self.benchmark_receipt_reference,
+            "benchmark_receipt_version": self.benchmark_receipt_version,
+            "benchmark_reference_at": _canonical_timestamp(
+                self.benchmark_reference_at,
+                "benchmark_reference_at",
+            ),
             "constraints_digest": self.constraints_digest,
             "constructed_at": _canonical_timestamp(self.constructed_at, "constructed_at"),
             "evidence_version": self.evidence_version,
