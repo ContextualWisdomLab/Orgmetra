@@ -143,6 +143,7 @@ class CalibrationAdjustmentReceipt:
     analysis_window_reference: str
     auxiliary_authority_reference: str
     auxiliary_projection_reference: str
+    auxiliary_projection_version: int
     auxiliary_projection_digest: str
     auxiliary_purpose_reference: str
     auxiliary_purpose_digest: str
@@ -194,6 +195,10 @@ class CalibrationAdjustmentReceipt:
             self.auxiliary_projection_reference,
             "calibration_auxiliary_projection",
             "auxiliary_projection_reference",
+        )
+        _positive_integer(
+            self.auxiliary_projection_version,
+            "auxiliary_projection_version",
         )
         _validate_reference(
             self.auxiliary_purpose_reference,
@@ -313,6 +318,7 @@ class CalibrationAdjustmentReceipt:
             "auxiliary_owner_contract_version": self.auxiliary_owner_contract_version,
             "auxiliary_projection_digest": self.auxiliary_projection_digest,
             "auxiliary_projection_reference": self.auxiliary_projection_reference,
+            "auxiliary_projection_version": self.auxiliary_projection_version,
             "auxiliary_purpose_digest": self.auxiliary_purpose_digest,
             "auxiliary_purpose_reference": self.auxiliary_purpose_reference,
             "auxiliary_scientific_use_at": _canonical_timestamp(
