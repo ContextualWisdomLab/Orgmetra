@@ -57,6 +57,14 @@ from orgmetra_workforce_validation_api.scientific_authority import (
     CalibrationAuxiliaryAuthorityView,
     resolve_calibration_auxiliary_authority,
 )
+from orgmetra_workforce_validation_api.trimming_bounding_authority import (
+    TrimmingBoundingAuthorityIntegrityError,
+    TrimmingBoundingAuthorityNotFound,
+    TrimmingBoundingAuthorityReadPort,
+    TrimmingBoundingAuthorityRecord,
+    TrimmingBoundingAuthorityView,
+    resolve_trimming_bounding_authority,
+)
 from orgmetra_workforce_validation_api.variance_authority import (
     WeightVarianceAuthorityIntegrityError,
     WeightVarianceAuthorityNotFound,
@@ -95,6 +103,11 @@ __all__ = [
     "NonresponseAdjustmentAuthorityReadPort",
     "NonresponseAdjustmentAuthorityRecord",
     "NonresponseAdjustmentAuthorityView",
+    "TrimmingBoundingAuthorityIntegrityError",
+    "TrimmingBoundingAuthorityNotFound",
+    "TrimmingBoundingAuthorityReadPort",
+    "TrimmingBoundingAuthorityRecord",
+    "TrimmingBoundingAuthorityView",
     "ValidationPrincipal",
     "ValidationResultAuthorityIntegrityError",
     "ValidationResultAuthorityNotFound",
@@ -126,6 +139,7 @@ __all__ = [
     "resolve_calibration_auxiliary_authority",
     "resolve_calibration_benchmark_authority",
     "resolve_nonresponse_adjustment_authority",
+    "resolve_trimming_bounding_authority",
     "resolve_validation_result_authority",
     "resolve_validation_result_nonverifiability",
     "resolve_weight_eligibility_authority",
