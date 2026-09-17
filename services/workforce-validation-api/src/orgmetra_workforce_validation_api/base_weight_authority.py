@@ -59,6 +59,7 @@ _READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
     }
 )
@@ -103,6 +104,7 @@ class BaseWeightAuthorityRecord(tuple):
         owner_contract_reference: str,
         owner_contract_version: int,
         owner_contract_digest: str,
+        owner_contract_released_at: datetime,
         released_at: datetime,
     ) -> BaseWeightAuthorityRecord:
         """Validate the minimum released provenance needed to reproduce a base weight."""
@@ -173,9 +175,16 @@ class BaseWeightAuthorityRecord(tuple):
             "owner_contract_version", owner_contract_version
         )
         owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
+        contract_released_at = _require_aware_datetime(
+            "owner_contract_released_at", owner_contract_released_at
+        )
         release_instant = _require_aware_datetime("released_at", released_at)
         if release_instant < constructed:
             raise ValueError("released_at cannot precede constructed_at.")
+        if contract_released_at > release_instant:
+            raise ValueError(
+                "owner contract must be released no later than base-weight evidence receipt."
+            )
 
         fields: tuple[tuple[str, object], ...] = (
             ("base_weight_artifact_digest", artifact_digest),
@@ -187,6 +196,7 @@ class BaseWeightAuthorityRecord(tuple):
             ("evidence_version", version),
             ("owner_contract_digest", owner_digest),
             ("owner_contract_reference", owner_ref),
+            ("owner_contract_released_at", contract_released_at),
             ("owner_contract_version", owner_version),
             ("sampled_occurrence_set_digest", sampled_digest),
             ("sampling_design_receipt_digest", sampling_digest),
@@ -313,6 +323,7 @@ def resolve_base_weight_authority(
     owner_contract_reference: str,
     owner_contract_version: int,
     owner_contract_digest: str,
+    owner_contract_released_at: datetime,
     used_at: datetime,
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
@@ -354,6 +365,7 @@ def resolve_base_weight_authority(
         owner_contract_reference=owner_contract_reference,
         owner_contract_version=owner_contract_version,
         owner_contract_digest=owner_contract_digest,
+        owner_contract_released_at=owner_contract_released_at,
         released_at=constructed_at,
     )
     tenant_id = requested.tenant_record_id
