@@ -32,6 +32,7 @@ FAILED_WEIGHT_DIGEST = "2" * 64
 ATTEMPT_DIGEST = "3" * 64
 OWNER_DIGEST = "4" * 64
 OWNER_CONTRACT_RELEASED_AT = datetime(2026, 9, 17, 5, 55, tzinfo=timezone.utc)
+FAILED_EVIDENCE_RELEASED_AT = datetime(2026, 9, 17, 5, 59, tzinfo=timezone.utc)
 EVALUATED_AT = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 17, 6, 5, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, 6, 10, tzinfo=timezone.utc)
@@ -44,6 +45,7 @@ READ_FIELDS = frozenset(
         "failure_mode",
         "failed_evidence_reference",
         "failed_evidence_digest",
+        "failed_evidence_released_at",
         "verification_attempt_reference",
         "verification_attempt_digest",
         "owner_contract_reference",
@@ -127,6 +129,7 @@ def _record(**overrides: object) -> ValidationResultNonVerifiabilityRecord:
         "failure_mode": "missing",
         "failed_evidence_reference": None,
         "failed_evidence_digest": None,
+        "failed_evidence_released_at": None,
         "verification_attempt_reference": ATTEMPT_REFERENCE,
         "verification_attempt_digest": ATTEMPT_DIGEST,
         "owner_contract_reference": OWNER_REFERENCE,
@@ -190,6 +193,7 @@ def test_missing_final_weight_evidence_is_released_as_not_verifiable() -> None:
     assert fields["failure_mode"] == "missing"
     assert fields["failed_evidence_reference"] is None
     assert fields["failed_evidence_digest"] is None
+    assert fields["failed_evidence_released_at"] is None
     assert fields["verification_attempt_reference"] == ATTEMPT_REFERENCE
     assert fields["verification_attempt_digest"] == ATTEMPT_DIGEST
     assert fields["owner_contract_released_at"] == OWNER_CONTRACT_RELEASED_AT
@@ -203,6 +207,7 @@ def test_non_reproducible_weight_evidence_keeps_exact_failed_receipt() -> None:
         failure_mode="non_reproducible",
         failed_evidence_reference=FAILED_WEIGHT_REFERENCE,
         failed_evidence_digest=FAILED_WEIGHT_DIGEST,
+        failed_evidence_released_at=FAILED_EVIDENCE_RELEASED_AT,
     )
 
     view = _resolve(
@@ -214,6 +219,7 @@ def test_non_reproducible_weight_evidence_keeps_exact_failed_receipt() -> None:
     assert fields["verification_status"] == "not_verifiable"
     assert fields["failed_evidence_reference"] == FAILED_WEIGHT_REFERENCE
     assert fields["failed_evidence_digest"] == FAILED_WEIGHT_DIGEST
+    assert fields["failed_evidence_released_at"] == FAILED_EVIDENCE_RELEASED_AT
 
 
 @pytest.mark.parametrize(
@@ -239,6 +245,7 @@ def test_non_reproducible_evidence_kind_uses_its_typed_reference(
         failure_mode="non_reproducible",
         failed_evidence_reference=failed_reference,
         failed_evidence_digest=FAILED_WEIGHT_DIGEST,
+        failed_evidence_released_at=FAILED_EVIDENCE_RELEASED_AT,
     )
     view = _resolve(
         read_port=_ReadPort(record),
@@ -263,6 +270,7 @@ def test_missing_and_non_reproducible_modes_fail_closed_on_incoherent_evidence()
                 "variance_design_receipt:22222222-2222-4222-8222-222222222222"
             ),
             failed_evidence_digest=FAILED_WEIGHT_DIGEST,
+            failed_evidence_released_at=FAILED_EVIDENCE_RELEASED_AT,
         )
 
 
