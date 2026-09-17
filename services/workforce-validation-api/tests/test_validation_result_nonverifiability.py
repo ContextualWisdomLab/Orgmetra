@@ -31,6 +31,7 @@ RESULT_DIGEST = "1" * 64
 FAILED_WEIGHT_DIGEST = "2" * 64
 ATTEMPT_DIGEST = "3" * 64
 OWNER_DIGEST = "4" * 64
+OWNER_CONTRACT_RELEASED_AT = datetime(2026, 9, 17, 5, 55, tzinfo=timezone.utc)
 EVALUATED_AT = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 17, 6, 5, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, 6, 10, tzinfo=timezone.utc)
@@ -48,6 +49,7 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "evaluated_at",
         "released_at",
     }
@@ -129,6 +131,7 @@ def _record(**overrides: object) -> ValidationResultNonVerifiabilityRecord:
         "owner_contract_reference": OWNER_REFERENCE,
         "owner_contract_version": 7,
         "owner_contract_digest": OWNER_DIGEST,
+        "owner_contract_released_at": OWNER_CONTRACT_RELEASED_AT,
         "evaluated_at": EVALUATED_AT,
         "released_at": RELEASED_AT,
     }
@@ -188,6 +191,7 @@ def test_missing_final_weight_evidence_is_released_as_not_verifiable() -> None:
     assert fields["failed_evidence_digest"] is None
     assert fields["verification_attempt_reference"] == ATTEMPT_REFERENCE
     assert fields["verification_attempt_digest"] == ATTEMPT_DIGEST
+    assert fields["owner_contract_released_at"] == OWNER_CONTRACT_RELEASED_AT
     assert fields["evaluated_at"] == EVALUATED_AT
     assert fields["released_at"] == RELEASED_AT
 
