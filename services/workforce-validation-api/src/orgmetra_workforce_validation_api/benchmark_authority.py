@@ -146,6 +146,10 @@ class CalibrationBenchmarkAuthorityRecord(tuple):
         contract_released_at = _require_aware_datetime(
             "owner_contract_released_at", owner_contract_released_at
         )
+        if contract_released_at > benchmark_released_at:
+            raise ValueError(
+                "owner contract must be released no later than benchmark receipt."
+            )
 
         supersession_values = (
             benchmark_receipt_superseded_at,
