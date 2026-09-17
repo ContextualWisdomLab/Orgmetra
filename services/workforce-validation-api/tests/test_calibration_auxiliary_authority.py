@@ -28,6 +28,7 @@ AUTHORITY_REFERENCE = (
 PROJECTION_REFERENCE = (
     "calibration_auxiliary_projection:22222222-2222-4222-8222-222222222222"
 )
+PROJECTION_VERSION = 4
 PURPOSE_REFERENCE = (
     "scientific_data_use_purpose:33333333-3333-4333-8333-333333333333"
 )
@@ -52,6 +53,7 @@ READ_FIELDS = frozenset(
     {
         "authority_reference",
         "auxiliary_projection_reference",
+        "auxiliary_projection_version",
         "auxiliary_projection_digest",
         "scientific_purpose_reference",
         "scientific_purpose_digest",
@@ -83,6 +85,7 @@ class _ReadPort:
         validity_study_id: UUID,
         authority_reference: str,
         auxiliary_projection_reference: str,
+        auxiliary_projection_version: int,
         auxiliary_projection_digest: str,
         scientific_purpose_reference: str,
         scientific_purpose_digest: str,
@@ -101,6 +104,7 @@ class _ReadPort:
                 validity_study_id,
                 authority_reference,
                 auxiliary_projection_reference,
+                auxiliary_projection_version,
                 auxiliary_projection_digest,
                 scientific_purpose_reference,
                 scientific_purpose_digest,
@@ -158,6 +162,7 @@ def _record(**overrides: object) -> CalibrationAuxiliaryAuthorityRecord:
         "validity_study_id": STUDY,
         "authority_reference": AUTHORITY_REFERENCE,
         "auxiliary_projection_reference": PROJECTION_REFERENCE,
+        "auxiliary_projection_version": PROJECTION_VERSION,
         "auxiliary_projection_digest": PROJECTION_DIGEST,
         "scientific_purpose_reference": PURPOSE_REFERENCE,
         "scientific_purpose_digest": PURPOSE_DIGEST,
@@ -183,6 +188,7 @@ def _resolve(*, read_port: object, **overrides: object) -> CalibrationAuxiliaryA
         "validity_study_id": STUDY,
         "authority_reference": AUTHORITY_REFERENCE,
         "auxiliary_projection_reference": PROJECTION_REFERENCE,
+        "auxiliary_projection_version": PROJECTION_VERSION,
         "auxiliary_projection_digest": PROJECTION_DIGEST,
         "scientific_purpose_reference": PURPOSE_REFERENCE,
         "scientific_purpose_digest": PURPOSE_DIGEST,
@@ -214,6 +220,7 @@ def test_resolution_authorizes_then_returns_minimized_corroborated_evidence() ->
             STUDY,
             AUTHORITY_REFERENCE,
             PROJECTION_REFERENCE,
+            PROJECTION_VERSION,
             PROJECTION_DIGEST,
             PURPOSE_REFERENCE,
             PURPOSE_DIGEST,
@@ -236,6 +243,7 @@ def test_resolution_authorizes_then_returns_minimized_corroborated_evidence() ->
         ("authorized_to", AUTHORIZED_TO),
         ("auxiliary_projection_digest", PROJECTION_DIGEST),
         ("auxiliary_projection_reference", PROJECTION_REFERENCE),
+        ("auxiliary_projection_version", PROJECTION_VERSION),
         ("owner_contract_digest", OWNER_CONTRACT_DIGEST),
         ("owner_contract_reference", OWNER_CONTRACT_REFERENCE),
         ("owner_contract_version", 7),
@@ -285,6 +293,7 @@ def test_missing_or_noncanonical_owner_evidence_fails_closed() -> None:
             },
             {},
         ),
+        ({"auxiliary_projection_version": PROJECTION_VERSION + 1}, {}),
         ({"auxiliary_projection_digest": "a" * 64}, {}),
         (
             {
@@ -369,6 +378,8 @@ def test_open_ended_authority_interval_accepts_later_owner_resolved_use() -> Non
         ("validity_study_id", UUID(int=0), ValueError),
         ("authority_reference", "wrong:authority", ValueError),
         ("auxiliary_projection_reference", "wrong:projection", ValueError),
+        ("auxiliary_projection_version", 0, ValueError),
+        ("auxiliary_projection_version", True, ValueError),
         ("auxiliary_projection_digest", "ABC", ValueError),
         ("scientific_purpose_reference", "wrong:purpose", ValueError),
         ("scientific_purpose_digest", "2" * 63, ValueError),
@@ -404,6 +415,8 @@ def test_invalid_request_or_dependency_fails_before_owner_resolution(
         ("validity_study_id", "not-a-uuid"),
         ("authority_reference", "wrong:authority"),
         ("auxiliary_projection_reference", "wrong:projection"),
+        ("auxiliary_projection_version", 0),
+        ("auxiliary_projection_version", True),
         ("auxiliary_projection_digest", "1" * 63),
         ("scientific_purpose_reference", "wrong:purpose"),
         ("scientific_purpose_digest", "2" * 65),
