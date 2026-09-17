@@ -64,6 +64,14 @@ _READ_FIELDS = frozenset(
     }
 )
 
+_OWNER_RESOLVED_RELEASE_FIELDS = frozenset(
+    {
+        "source_universe_released_at",
+        "sampling_design_released_at",
+        "owner_contract_released_at",
+    }
+)
+
 
 class BaseWeightAuthorityNotFound(LookupError):
     """Indicate that no released owner evidence corroborates the base weight."""
@@ -308,11 +316,9 @@ def resolve_base_weight_authority(
     source_universe_receipt_reference: str,
     source_universe_receipt_version: int,
     source_universe_receipt_digest: str,
-    source_universe_released_at: datetime,
     sampling_design_receipt_reference: str,
     sampling_design_receipt_version: int,
     sampling_design_receipt_digest: str,
-    sampling_design_released_at: datetime,
     sampled_occurrence_set_digest: str,
     selection_probability_set_digest: str,
     selection_stage_count: int,
@@ -349,11 +355,11 @@ def resolve_base_weight_authority(
         source_universe_receipt_reference=source_universe_receipt_reference,
         source_universe_receipt_version=source_universe_receipt_version,
         source_universe_receipt_digest=source_universe_receipt_digest,
-        source_universe_released_at=source_universe_released_at,
+        source_universe_released_at=constructed_at,
         sampling_design_receipt_reference=sampling_design_receipt_reference,
         sampling_design_receipt_version=sampling_design_receipt_version,
         sampling_design_receipt_digest=sampling_design_receipt_digest,
-        sampling_design_released_at=sampling_design_released_at,
+        sampling_design_released_at=constructed_at,
         sampled_occurrence_set_digest=sampled_occurrence_set_digest,
         selection_probability_set_digest=selection_probability_set_digest,
         selection_stage_count=selection_stage_count,
@@ -447,7 +453,7 @@ def resolve_base_weight_authority(
     requested_match = tuple(
         (field_name, field_value)
         for field_name, field_value in requested.fields
-        if field_name != "owner_contract_released_at"
+        if field_name not in _OWNER_RESOLVED_RELEASE_FIELDS
     )
     record_match = tuple(
         (field_name, record_values[field_name])
