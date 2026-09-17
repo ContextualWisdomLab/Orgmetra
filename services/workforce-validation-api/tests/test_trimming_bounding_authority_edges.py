@@ -32,6 +32,7 @@ def _record(*, evidence_version: object = 1) -> TrimmingBoundingAuthorityRecord:
         ),
         owner_contract_version=3,
         owner_contract_digest="6" * 64,
+        owner_contract_released_at=datetime(2026, 9, 16, 12, 30, tzinfo=timezone.utc),
         released_at=datetime(2026, 9, 16, 13, 0, tzinfo=timezone.utc),
     )
 
