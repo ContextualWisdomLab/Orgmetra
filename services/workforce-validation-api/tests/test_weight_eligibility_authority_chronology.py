@@ -29,6 +29,7 @@ CASE_SET_DIGEST = "4" * 64
 ARTIFACT_DIGEST = "5" * 64
 OWNER_DIGEST = "6" * 64
 CONSTRUCTED_AT = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
+OWNER_RELEASED_AT = datetime(2026, 9, 16, 12, 30, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 16, 13, 0, tzinfo=timezone.utc)
 SUPERSEDED_AT = datetime(2026, 9, 17, 13, 0, tzinfo=timezone.utc)
 READ_FIELDS = frozenset(
@@ -47,7 +48,9 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -60,7 +63,11 @@ class _ReadPort:
         return self.record
 
 
-def _record(*, superseded_at: datetime | None = SUPERSEDED_AT) -> WeightEligibilityAuthorityRecord:
+def _record(
+    *,
+    owner_contract_released_at: datetime = OWNER_RELEASED_AT,
+    superseded_at: datetime | None = SUPERSEDED_AT,
+) -> WeightEligibilityAuthorityRecord:
     return WeightEligibilityAuthorityRecord(
         tenant_record_id=TENANT,
         validity_study_id=STUDY,
@@ -78,6 +85,7 @@ def _record(*, superseded_at: datetime | None = SUPERSEDED_AT) -> WeightEligibil
         owner_contract_reference=OWNER_REFERENCE,
         owner_contract_version=1,
         owner_contract_digest=OWNER_DIGEST,
+        owner_contract_released_at=owner_contract_released_at,
         released_at=RELEASED_AT,
         superseded_at=superseded_at,
     )
@@ -86,7 +94,7 @@ def _record(*, superseded_at: datetime | None = SUPERSEDED_AT) -> WeightEligibil
 def _policy() -> PurposeBoundAccessPolicy:
     return PurposeBoundAccessPolicy(
         tenant_record_id=TENANT,
-        policy_version_code="weight-eligibility-chronology-v1",
+        policy_version_code="weight-eligibility-chronology-v2",
         resource_kind="weight_eligibility_authority",
         purpose_code="selection_validity_analysis",
         operation_code="read",
@@ -125,13 +133,23 @@ def _resolve(*, used_at: datetime, record: WeightEligibilityAuthorityRecord) -> 
     )
 
 
-def test_supersession_cutover_is_owner_evidence_not_caller_input() -> None:
-    assert "superseded_at" not in signature(resolve_weight_eligibility_authority).parameters
+def test_chronology_is_owner_evidence_not_caller_input() -> None:
+    parameters = signature(resolve_weight_eligibility_authority).parameters
+    assert "owner_contract_released_at" not in parameters
+    assert "superseded_at" not in parameters
+
+
+def test_owner_contract_cannot_retroactively_authorize_eligibility() -> None:
+    with pytest.raises(ValueError, match="owner contract"):
+        _record(owner_contract_released_at=RELEASED_AT + timedelta(microseconds=1))
 
 
 def test_historical_use_before_cutover_remains_reproducible() -> None:
     view = _resolve(used_at=SUPERSEDED_AT - timedelta(microseconds=1), record=_record())
-    assert dict(view.fields)["released_at"] == RELEASED_AT
+    fields = dict(view.fields)
+    assert fields["owner_contract_released_at"] == OWNER_RELEASED_AT
+    assert fields["released_at"] == RELEASED_AT
+    assert fields["superseded_at"] == SUPERSEDED_AT
 
 
 def test_use_at_or_after_owner_cutover_fails_closed() -> None:
