@@ -65,7 +65,7 @@ _READ_FIELDS = frozenset(
 )
 
 
-class BaseWeightAuthorityNotFound(LookError := LookupError):
+class BaseWeightAuthorityNotFound(LookupError):
     """Indicate that no released owner evidence corroborates the base weight."""
 
 
