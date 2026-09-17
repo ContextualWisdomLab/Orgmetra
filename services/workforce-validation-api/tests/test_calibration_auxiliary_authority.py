@@ -46,6 +46,7 @@ PURPOSE_DIGEST = "2" * 64
 OWNER_CONTRACT_DIGEST = "3" * 64
 AUTHORIZATION_DIGEST = "4" * 64
 SCIENTIFIC_USE_DIGEST = "5" * 64
+OWNER_CONTRACT_RELEASED_AT = datetime(2026, 8, 31, tzinfo=timezone.utc)
 AUTHORIZED_FROM = datetime(2026, 9, 1, tzinfo=timezone.utc)
 AUTHORIZED_TO = datetime(2026, 10, 1, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, tzinfo=timezone.utc)
@@ -60,6 +61,7 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "authorization_receipt_reference",
         "authorization_receipt_digest",
         "scientific_use_receipt_reference",
@@ -169,6 +171,7 @@ def _record(**overrides: object) -> CalibrationAuxiliaryAuthorityRecord:
         "owner_contract_reference": OWNER_CONTRACT_REFERENCE,
         "owner_contract_version": 7,
         "owner_contract_digest": OWNER_CONTRACT_DIGEST,
+        "owner_contract_released_at": OWNER_CONTRACT_RELEASED_AT,
         "authorization_receipt_reference": AUTHORIZATION_REFERENCE,
         "authorization_receipt_digest": AUTHORIZATION_DIGEST,
         "scientific_use_receipt_reference": SCIENTIFIC_USE_REFERENCE,
@@ -246,6 +249,7 @@ def test_resolution_authorizes_then_returns_minimized_corroborated_evidence() ->
         ("auxiliary_projection_version", PROJECTION_VERSION),
         ("owner_contract_digest", OWNER_CONTRACT_DIGEST),
         ("owner_contract_reference", OWNER_CONTRACT_REFERENCE),
+        ("owner_contract_released_at", OWNER_CONTRACT_RELEASED_AT),
         ("owner_contract_version", 7),
         ("scientific_purpose_digest", PURPOSE_DIGEST),
         ("scientific_purpose_reference", PURPOSE_REFERENCE),
@@ -423,6 +427,7 @@ def test_invalid_request_or_dependency_fails_before_owner_resolution(
         ("owner_contract_reference", "wrong:contract"),
         ("owner_contract_version", 0),
         ("owner_contract_digest", "3" * 63),
+        ("owner_contract_released_at", datetime(2026, 8, 31)),
         ("authorization_receipt_reference", "wrong:authorization"),
         ("authorization_receipt_digest", "4" * 63),
         ("scientific_use_receipt_reference", "wrong:use"),
