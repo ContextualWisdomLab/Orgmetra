@@ -72,6 +72,8 @@ def test_owner_contract_release_is_not_a_caller_asserted_resolver_coordinate() -
     assert "owner_contract_released_at" not in signature(resolve_base_weight_authority).parameters
 
 
-def test_owner_contract_cannot_postdate_base_weight_receipt_release() -> None:
+def test_owner_contract_release_timestamp_and_chronology_fail_closed() -> None:
+    with pytest.raises(ValueError):
+        _record(owner_contract_released_at=datetime(2026, 9, 17, 6, 45))
     with pytest.raises(ValueError, match="owner contract"):
         _record(owner_contract_released_at=RELEASED_AT + timedelta(seconds=1))
