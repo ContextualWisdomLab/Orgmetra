@@ -58,6 +58,7 @@ _READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "evaluated_at",
         "released_at",
     }
@@ -110,6 +111,7 @@ class ValidationResultNonVerifiabilityRecord(tuple):
         owner_contract_reference: str,
         owner_contract_version: int,
         owner_contract_digest: str,
+        owner_contract_released_at: datetime,
         evaluated_at: datetime,
         released_at: datetime,
     ) -> ValidationResultNonVerifiabilityRecord:
@@ -163,6 +165,9 @@ class ValidationResultNonVerifiabilityRecord(tuple):
             "owner_contract_version", owner_contract_version
         )
         owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
+        owner_released = _require_aware_datetime(
+            "owner_contract_released_at", owner_contract_released_at
+        )
 
         digests = [result_evidence_digest, attempt_digest, owner_digest]
         if failed_digest is not None:
@@ -175,6 +180,10 @@ class ValidationResultNonVerifiabilityRecord(tuple):
 
         evaluation_instant = _require_aware_datetime("evaluated_at", evaluated_at)
         release_instant = _require_aware_datetime("released_at", released_at)
+        if owner_released > evaluation_instant:
+            raise ValueError(
+                "owner_contract_released_at cannot be later than evaluated_at."
+            )
         if evaluation_instant > release_instant:
             raise ValueError("evaluated_at cannot be later than released_at.")
 
@@ -194,6 +203,7 @@ class ValidationResultNonVerifiabilityRecord(tuple):
                 owner_ref,
                 owner_version,
                 owner_digest,
+                owner_released,
                 evaluation_instant,
                 release_instant,
             ),
@@ -270,14 +280,19 @@ class ValidationResultNonVerifiabilityRecord(tuple):
         return self[12]
 
     @property
+    def owner_contract_released_at(self) -> datetime:
+        """Return when the governing owner contract became released authority."""
+        return self[13]
+
+    @property
     def evaluated_at(self) -> datetime:
         """Return when the evidence-verification attempt was evaluated."""
-        return self[13]
+        return self[14]
 
     @property
     def released_at(self) -> datetime:
         """Return when this non-verifiability outcome became released evidence."""
-        return self[14]
+        return self[15]
 
 
 class ValidationResultNonVerifiabilityView(tuple):
@@ -450,6 +465,7 @@ def resolve_validation_result_nonverifiability(
         owner_contract_reference=persisted.owner_contract_reference,
         owner_contract_version=persisted.owner_contract_version,
         owner_contract_digest=persisted.owner_contract_digest,
+        owner_contract_released_at=persisted.owner_contract_released_at,
         evaluated_at=persisted.evaluated_at,
         released_at=persisted.released_at,
     )
@@ -497,6 +513,7 @@ def resolve_validation_result_nonverifiability(
         "owner_contract_reference": record.owner_contract_reference,
         "owner_contract_version": record.owner_contract_version,
         "owner_contract_digest": record.owner_contract_digest,
+        "owner_contract_released_at": record.owner_contract_released_at,
         "evaluated_at": record.evaluated_at,
         "released_at": record.released_at,
     }
