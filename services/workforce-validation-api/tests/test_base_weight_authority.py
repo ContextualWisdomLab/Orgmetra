@@ -35,6 +35,7 @@ BASE_ARTIFACT_DIGEST = "6" * 64
 OWNER_DIGEST = "7" * 64
 SOURCE_RELEASED_AT = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
 SAMPLING_RELEASED_AT = datetime(2026, 9, 17, 6, 30, tzinfo=timezone.utc)
+OWNER_CONTRACT_RELEASED_AT = datetime(2026, 9, 17, 6, 45, tzinfo=timezone.utc)
 CONSTRUCTED_AT = datetime(2026, 9, 17, 7, 0, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 17, 7, 30, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, 8, 0, tzinfo=timezone.utc)
@@ -61,6 +62,7 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
     }
 )
@@ -139,6 +141,7 @@ def _record(**overrides: object) -> BaseWeightAuthorityRecord:
         "owner_contract_reference": OWNER_REFERENCE,
         "owner_contract_version": 6,
         "owner_contract_digest": OWNER_DIGEST,
+        "owner_contract_released_at": OWNER_CONTRACT_RELEASED_AT,
         "released_at": RELEASED_AT,
     }
     values.update(overrides)
@@ -175,6 +178,7 @@ def test_resolution_binds_sampling_stage_probabilities_to_base_weight_artifact()
     assert ("sampled_occurrence_set_digest", SAMPLED_SET_DIGEST) in view.fields
     assert ("selection_stage_count", 2) in view.fields
     assert ("base_weight_artifact_digest", BASE_ARTIFACT_DIGEST) in view.fields
+    assert ("owner_contract_released_at", OWNER_CONTRACT_RELEASED_AT) in view.fields
     assert ("released_at", RELEASED_AT) in view.fields
 
 
@@ -198,6 +202,12 @@ def test_missing_noncanonical_or_mismatched_owner_evidence_fails_closed() -> Non
         _resolve(read_port=_ReadPort(_record(tenant_record_id=OTHER_TENANT)))
     with pytest.raises(BaseWeightAuthorityIntegrityError):
         _resolve(read_port=_ReadPort(_record(validity_study_id=OTHER_STUDY)))
+    with pytest.raises(BaseWeightAuthorityIntegrityError):
+        _resolve(
+            read_port=_ReadPort(
+                _record(owner_contract_released_at=OWNER_CONTRACT_RELEASED_AT + timedelta(seconds=1))
+            )
+        )
 
 
 def test_source_sampling_and_release_chronology_fail_closed() -> None:
@@ -207,6 +217,8 @@ def test_source_sampling_and_release_chronology_fail_closed() -> None:
         _record(sampling_design_released_at=CONSTRUCTED_AT + timedelta(seconds=1))
     with pytest.raises(ValueError):
         _record(released_at=CONSTRUCTED_AT - timedelta(seconds=1))
+    with pytest.raises(ValueError, match="owner contract"):
+        _record(owner_contract_released_at=RELEASED_AT + timedelta(seconds=1))
     with pytest.raises(BaseWeightAuthorityIntegrityError):
         _resolve(read_port=_ReadPort(_record(released_at=USED_AT + timedelta(seconds=1))))
 
@@ -240,6 +252,7 @@ def test_source_sampling_and_release_chronology_fail_closed() -> None:
         ("owner_contract_reference", "wrong:owner", ValueError),
         ("owner_contract_version", 0, ValueError),
         ("owner_contract_digest", "7" * 63, ValueError),
+        ("owner_contract_released_at", datetime(2026, 9, 17, 6, 45), ValueError),
     ],
 )
 def test_hostile_coordinates_fail_closed(key: str, value: object, error: type[Exception]) -> None:
