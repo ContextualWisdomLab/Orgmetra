@@ -331,13 +331,17 @@ class CalibrationAuxiliaryAuthorityReadPort(Protocol):
         *,
         tenant_record_id: UUID,
         validity_study_id: UUID,
+        authority_reference: str,
         auxiliary_projection_reference: str,
         auxiliary_projection_digest: str,
         scientific_purpose_reference: str,
         scientific_purpose_digest: str,
         owner_contract_reference: str,
         owner_contract_version: int,
+        owner_contract_digest: str,
+        authorization_receipt_reference: str,
         authorization_receipt_digest: str,
+        scientific_use_receipt_reference: str,
         scientific_use_receipt_digest: str,
     ) -> CalibrationAuxiliaryAuthorityRecord | None:
         """Return matching released authority evidence or ``None`` through an owner ACL."""
@@ -354,24 +358,29 @@ def resolve_calibration_auxiliary_authority(
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
     validity_study_id: UUID,
+    authority_reference: str,
     auxiliary_projection_reference: str,
     auxiliary_projection_digest: str,
     scientific_purpose_reference: str,
     scientific_purpose_digest: str,
     owner_contract_reference: str,
     owner_contract_version: int,
+    owner_contract_digest: str,
+    authorization_receipt_reference: str,
     authorization_receipt_digest: str,
+    scientific_use_receipt_reference: str,
     scientific_use_receipt_digest: str,
     used_at: datetime,
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: CalibrationAuxiliaryAuthorityReadPort,
 ) -> CalibrationAuxiliaryAuthorityView:
-    """Authorize and corroborate one calibration auxiliary-use authority tuple.
+    """Authorize and corroborate one exact calibration auxiliary-use authority tuple.
 
     The exact owner capability is captured inertly before authorization and the
     same function is invoked afterward. The request carries no protected source
-    values. Owner evidence must reproduce every caller-supplied coordinate and
+    values. Owner evidence must reproduce every caller-supplied leaf coordinate,
+    including receipt references and the released owner-contract digest, and
     independently bind the scientific-use receipt to the same use instant before
     any corroborating fields are returned.
     """
@@ -400,6 +409,9 @@ def resolve_calibration_auxiliary_authority(
     study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
     tenant_id = _restore_operational_uuid("tenant_record_id", tenant_identity)
     study_id = _restore_operational_uuid("validity_study_id", study_identity)
+    authority_ref = _require_reference(
+        "authority_reference", authority_reference, "scientific_auxiliary_authority"
+    )
     projection_ref = _require_reference(
         "auxiliary_projection_reference",
         auxiliary_projection_reference,
@@ -418,8 +430,19 @@ def resolve_calibration_auxiliary_authority(
         "owner_contract_reference", owner_contract_reference, "released_owner_contract"
     )
     owner_version = _require_positive_integer("owner_contract_version", owner_contract_version)
+    owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
+    authorization_ref = _require_reference(
+        "authorization_receipt_reference",
+        authorization_receipt_reference,
+        "scientific_data_authorization",
+    )
     authorization_digest = _require_digest(
         "authorization_receipt_digest", authorization_receipt_digest
+    )
+    scientific_use_ref = _require_reference(
+        "scientific_use_receipt_reference",
+        scientific_use_receipt_reference,
+        "scientific_use_receipt",
     )
     scientific_use_digest = _require_digest(
         "scientific_use_receipt_digest", scientific_use_receipt_digest
@@ -448,13 +471,17 @@ def resolve_calibration_auxiliary_authority(
         read_port,
         tenant_record_id=_restore_operational_uuid("tenant_record_id", tenant_identity),
         validity_study_id=_restore_operational_uuid("validity_study_id", study_identity),
+        authority_reference=authority_ref,
         auxiliary_projection_reference=projection_ref,
         auxiliary_projection_digest=projection_digest,
         scientific_purpose_reference=purpose_ref,
         scientific_purpose_digest=purpose_digest,
         owner_contract_reference=owner_ref,
         owner_contract_version=owner_version,
+        owner_contract_digest=owner_digest,
+        authorization_receipt_reference=authorization_ref,
         authorization_receipt_digest=authorization_digest,
+        scientific_use_receipt_reference=scientific_use_ref,
         scientific_use_receipt_digest=scientific_use_digest,
     )
     if persisted is None:
@@ -488,13 +515,17 @@ def resolve_calibration_auxiliary_authority(
         != tenant_identity
         or _store_operational_uuid("record validity_study_id", record.validity_study_id)
         != study_identity
+        or record.authority_reference != authority_ref
         or record.auxiliary_projection_reference != projection_ref
         or record.auxiliary_projection_digest != projection_digest
         or record.scientific_purpose_reference != purpose_ref
         or record.scientific_purpose_digest != purpose_digest
         or record.owner_contract_reference != owner_ref
         or record.owner_contract_version != owner_version
+        or record.owner_contract_digest != owner_digest
+        or record.authorization_receipt_reference != authorization_ref
         or record.authorization_receipt_digest != authorization_digest
+        or record.scientific_use_receipt_reference != scientific_use_ref
         or record.scientific_use_receipt_digest != scientific_use_digest
         or record.scientific_use_at != use_instant
     ):
