@@ -32,6 +32,7 @@ INPUT_WEIGHT_DIGEST = "4" * 64
 OUTPUT_WEIGHT_DIGEST = "5" * 64
 OWNER_CONTRACT_DIGEST = "6" * 64
 CONSTRUCTED_AT = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
+OWNER_CONTRACT_RELEASED_AT = datetime(2026, 9, 16, 12, 30, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 16, 13, 0, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, tzinfo=timezone.utc)
 READ_FIELDS = frozenset(
@@ -50,6 +51,7 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
     }
 )
@@ -122,6 +124,7 @@ def _record(**overrides: object) -> TrimmingBoundingAuthorityRecord:
         "owner_contract_reference": OWNER_CONTRACT_REFERENCE,
         "owner_contract_version": 3,
         "owner_contract_digest": OWNER_CONTRACT_DIGEST,
+        "owner_contract_released_at": OWNER_CONTRACT_RELEASED_AT,
         "released_at": RELEASED_AT,
     }
     values.update(overrides)
@@ -172,6 +175,7 @@ def test_resolution_binds_rule_affected_cases_and_artifact_lineage() -> None:
     assert ("affected_case_count", 17) in view.fields
     assert ("affected_case_occurrence_set_digest", AFFECTED_CASE_SET_DIGEST) in view.fields
     assert ("output_weight_artifact_digest", OUTPUT_WEIGHT_DIGEST) in view.fields
+    assert ("owner_contract_released_at", OWNER_CONTRACT_RELEASED_AT) in view.fields
 
 
 def test_authorization_denial_happens_before_owner_resolution() -> None:
