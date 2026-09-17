@@ -205,9 +205,9 @@ class CalibrationBenchmarkAuthorityRecord(tuple):
                 raise ValueError(
                     "successor benchmark receipt must be released after its predecessor."
                 )
-            if successor_released_at > superseded_at:
+            if successor_released_at != superseded_at:
                 raise ValueError(
-                    "successor benchmark receipt must be released no later than supersession."
+                    "successor benchmark receipt must be released exactly at supersession."
                 )
 
         return tuple.__new__(
