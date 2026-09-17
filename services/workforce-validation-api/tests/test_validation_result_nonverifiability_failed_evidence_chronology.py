@@ -19,6 +19,7 @@ STUDY = UUID("00000000-0000-7000-8000-0000000000d1")
 OWNER_RELEASED_AT = datetime(2026, 9, 17, 5, 45, tzinfo=timezone.utc)
 FAILED_EVIDENCE_RELEASED_AT = datetime(2026, 9, 17, 5, 50, tzinfo=timezone.utc)
 EVALUATED_AT = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
+ATTEMPT_RELEASED_AT = datetime(2026, 9, 17, 6, 2, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 17, 6, 5, tzinfo=timezone.utc)
 
 
@@ -41,6 +42,7 @@ def _record(**overrides: object) -> ValidationResultNonVerifiabilityRecord:
             "33333333-3333-4333-8333-333333333333"
         ),
         "verification_attempt_digest": "3" * 64,
+        "verification_attempt_released_at": ATTEMPT_RELEASED_AT,
         "owner_contract_reference": (
             "released_owner_contract:44444444-4444-4444-8444-444444444444"
         ),
