@@ -3,8 +3,8 @@
 This application boundary binds one immutable validation result to the exact
 point-weight/variance compatibility evidence it claims to use. It keeps the
 scientific leaf non-authorizing: only ``verification_pending`` or
-``not_verifiable`` may cross this owner boundary, and durable PostgreSQL/release
-resolution remains a child persistence responsibility after this service lands.
+``not_verifiable`` may cross this owner boundary. Release and supersession
+instants are owner evidence, never caller assertions.
 """
 
 from __future__ import annotations
@@ -50,7 +50,9 @@ _READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -73,7 +75,7 @@ def _require_verification_status(value: object) -> str:
 
 
 class ValidationResultAuthorityRecord(tuple):
-    """Immutable owner projection binding result, weight, and variance evidence."""
+    """Immutable owner projection binding result, weight, variance, and chronology."""
 
     __slots__ = ()
 
@@ -92,9 +94,11 @@ class ValidationResultAuthorityRecord(tuple):
         owner_contract_reference: str,
         owner_contract_version: int,
         owner_contract_digest: str,
+        owner_contract_released_at: datetime,
         released_at: datetime,
+        superseded_at: datetime | None = None,
     ) -> ValidationResultAuthorityRecord:
-        """Validate and detach the minimum released result-provenance coordinates."""
+        """Validate the released binding and its owner-resolved authority interval."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
         study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
         result_ref = _require_reference(
@@ -134,7 +138,21 @@ class ValidationResultAuthorityRecord(tuple):
             "owner_contract_version", owner_contract_version
         )
         owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
+        contract_release = _require_aware_datetime(
+            "owner_contract_released_at", owner_contract_released_at
+        )
         release_instant = _require_aware_datetime("released_at", released_at)
+        if contract_release > release_instant:
+            raise ValueError(
+                "owner contract must be released no later than validation result."
+            )
+        cutover = (
+            None
+            if superseded_at is None
+            else _require_aware_datetime("superseded_at", superseded_at)
+        )
+        if cutover is not None and cutover <= release_instant:
+            raise ValueError("superseded_at must be later than validation-result release.")
         return tuple.__new__(
             cls,
             (
@@ -150,7 +168,9 @@ class ValidationResultAuthorityRecord(tuple):
                 owner_ref,
                 owner_version,
                 owner_digest,
+                contract_release,
                 release_instant,
+                cutover,
             ),
         )
 
@@ -215,9 +235,19 @@ class ValidationResultAuthorityRecord(tuple):
         return self[11]
 
     @property
+    def owner_contract_released_at(self) -> datetime:
+        """Return when the owner contract became released authority."""
+        return self[12]
+
+    @property
     def released_at(self) -> datetime:
         """Return when this result-authority evidence became released."""
-        return self[12]
+        return self[13]
+
+    @property
+    def superseded_at(self) -> datetime | None:
+        """Return the exclusive end of this result binding's authority interval."""
+        return self[14]
 
 
 class ValidationResultAuthorityView(tuple):
@@ -416,7 +446,9 @@ def resolve_validation_result_authority(
         owner_contract_reference=persisted.owner_contract_reference,
         owner_contract_version=persisted.owner_contract_version,
         owner_contract_digest=persisted.owner_contract_digest,
+        owner_contract_released_at=persisted.owner_contract_released_at,
         released_at=persisted.released_at,
+        superseded_at=persisted.superseded_at,
     )
     requested_identity = (
         tenant_identity,
@@ -454,6 +486,10 @@ def resolve_validation_result_authority(
         raise ValidationResultAuthorityIntegrityError(
             "validation-result authority cannot be used before its release instant"
         )
+    if record.superseded_at is not None and use_instant >= record.superseded_at:
+        raise ValidationResultAuthorityIntegrityError(
+            "validation-result authority ended at its owner-resolved supersession instant"
+        )
 
     values = {
         "result_reference": record.result_reference,
@@ -466,7 +502,9 @@ def resolve_validation_result_authority(
         "owner_contract_reference": record.owner_contract_reference,
         "owner_contract_version": record.owner_contract_version,
         "owner_contract_digest": record.owner_contract_digest,
+        "owner_contract_released_at": record.owner_contract_released_at,
         "released_at": record.released_at,
+        "superseded_at": record.superseded_at,
     }
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
     return tuple.__new__(
