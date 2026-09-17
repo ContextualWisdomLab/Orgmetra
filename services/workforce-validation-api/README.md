@@ -36,25 +36,19 @@ Foreign domain truth crosses this boundary only through released/versioned contr
 
 `resolve_nonresponse_adjustment_authority(...)` corroborates the exact released disposition-aware nonresponse receipt. It binds receipt/evidence version, exact response/disposition receipt reference/version/digest, owner-resolved disposition release time, adjustment population, method/version/configuration, explicit ineligible/unknown/unavailable treatments, input/output weight artifacts, construction time, and released owner contract. The disposition input must already exist by adjustment construction and scientific use cannot precede the typed receipt's release. Response values, source attributes, protected attributes, and row-level weights are excluded.
 
+## Trimming/bounding adjustment authority
+
+`resolve_trimming_bounding_authority(...)` corroborates the exact released trimming or bounding receipt rather than trusting an adjustment-chain digest alone. It binds the typed receipt reference/digest/evidence version to the governed `weight_trimming_rule` reference/version, immutable rule configuration, exact affected-case occurrence-set digest and positive affected-case count, input/output weight-artifact transition, construction time and released owner-contract tuple. Input and output artifacts may not alias; release cannot precede construction or scientific use. Case identities and row-level weights are excluded from the projection.
+
+This preserves the evidence needed to reproduce which governed trimming/bounding rule changed which case occurrence set without copying those cases into `workforce_validation`. PR #248 or a verified successor must later re-resolve the same tuple from released owner evidence.
+
 ## Weight-eligibility authority
 
-`resolve_weight_eligibility_authority(...)` corroborates #407 RED #9 instead of treating an eligibility digest as sufficient authority. It binds the exact `weight_eligibility_receipt` reference/digest/evidence version to:
-
-- explicit `cross_sectional | longitudinal` scope;
-- governed target-population reference/digest;
-- governed reference-duration reference/digest;
-- exact eligible-case set digest;
-- exact point-weight artifact digest;
-- construction time and released owner-contract reference/version/digest;
-- owner-resolved eligibility-receipt release instant.
-
-Every requested coordinate must match released owner evidence. Cross-sectional and longitudinal eligibility are distinct authority states; a different target population, reference duration, eligible-case set, or weight artifact cannot be silently reused. Release cannot precede receipt construction and scientific use cannot precede release. The projection carries no person attributes or row-level weights.
-
-This is application-owner corroboration only. PR #248 or a verified successor must later re-resolve the same eligibility tuple from schema-qualified least-privilege released evidence after normal protected integration.
+`resolve_weight_eligibility_authority(...)` corroborates #407 RED #9 instead of treating an eligibility digest as sufficient authority. It binds the exact `weight_eligibility_receipt` reference/digest/evidence version to explicit `cross_sectional | longitudinal` scope, governed target-population and reference-duration coordinates, exact eligible-case set, exact point-weight artifact, construction time, released owner-contract tuple, and owner-resolved receipt release time. Cross-sectional and longitudinal eligibility are distinct authority states; a different population, duration, case set, or artifact cannot be silently reused. Person attributes and row-level weights are excluded.
 
 ## Point-weight / variance authority
 
-`resolve_weight_variance_authority(...)` corroborates released #405 sampling evidence, final analysis-weight receipt, analytic-case occurrence set, weight-eligibility receipt digest, correction sequence, final point-weight artifact, separate #406 variance-design evidence, variance method/evidence semantics, and released owner contract. A variance receipt cannot alias the point-weight receipt, and approximation evidence cannot be represented as exact. The newly separate weight-eligibility owner boundary supplies the durable scope/population/duration semantics behind the eligibility digest.
+`resolve_weight_variance_authority(...)` corroborates released #405 sampling evidence, final analysis-weight receipt, analytic-case occurrence set, weight-eligibility receipt digest, correction sequence, final point-weight artifact, separate #406 variance-design evidence, variance method/evidence semantics, and released owner contract. A variance receipt cannot alias the point-weight receipt, and approximation evidence cannot be represented as exact. The separate eligibility authority supplies the durable scope/population/duration semantics behind the eligibility digest.
 
 ## Released validation-result authority
 
@@ -70,7 +64,7 @@ This is application-owner corroboration only. PR #248 or a verified successor mu
 
 The schema owner is NOLOGIN and is not a runtime isolation control. PostgreSQL role-level `search_path` defaults are applied at login and are not re-applied by `SET ROLE`. A durable runtime adapter therefore needs a distinct least-privilege runtime role, schema-qualified relations, and explicit function-level `search_path` for any future `SECURITY DEFINER` function.
 
-Protected foundation migrations still hold validity-study relations in the legacy foundation schema. PR #248 or a verified successor owns forward owner-schema adoption after this application owner reaches normal protected integration. It must preserve valid persistence/FK/RLS/ACL evidence and implement durable released-evidence ports for calibration auxiliary, calibration benchmark, typed calibration adjustment, typed nonresponse adjustment, weight eligibility, point-weight/variance, validation-result binding, and validation-result non-verifiability.
+Protected foundation migrations still hold validity-study relations in the legacy foundation schema. PR #248 or a verified successor owns forward owner-schema adoption after this application owner reaches normal protected integration. It must preserve valid persistence/FK/RLS/ACL evidence and implement durable released-evidence ports for calibration auxiliary, calibration benchmark, typed calibration adjustment, typed nonresponse adjustment, trimming/bounding adjustment, weight eligibility, point-weight/variance, validation-result binding, and validation-result non-verifiability.
 
 ## Test contract
 
@@ -85,6 +79,6 @@ PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src \
 
 `tests/test_workforce_validation_owner_schema_postgres.sh` separately executes the service-local migration against pinned PostgreSQL 16.14 and checks deny-default owner-role/schema behavior, actual `SET ROLE` search-path behavior, PUBLIC privileges, and absence of application relations in the bootstrap schema.
 
-Scientific-authority tests cover authorization-before-owner-read, static port validation, malformed references/digests/versions/timestamps, exact owner-coordinate matching, UUID detachment/alias attacks, structural immutability, non-public view issuance, benchmark correction chronology, typed calibration fallback provenance, typed nonresponse disposition/treatment provenance and chronology, cross-sectional/longitudinal weight eligibility, point/variance compatibility, validation-result binding, and explicit missing/non-reproducible result evidence.
+Scientific-authority tests cover authorization-before-owner-read, static port validation, malformed references/digests/versions/timestamps, exact owner-coordinate matching, UUID detachment/alias attacks, structural immutability, non-public view issuance, benchmark correction chronology, typed calibration fallback provenance, typed nonresponse disposition/treatment provenance and chronology, trimming/bounding rule and affected-case provenance, cross-sectional/longitudinal weight eligibility, point/variance compatibility, validation-result binding, and explicit missing/non-reproducible result evidence.
 
 These source contracts are not terminal acceptance by themselves. The PR remains Draft until the exact current head executes with 100% owned statement/branch coverage, the PostgreSQL owner-schema contract is GREEN, applicable security workflows are terminal, and normal independent review/governance requirements are satisfied. Only protected/released owner evidence may be consumed as durable scientific authority.
