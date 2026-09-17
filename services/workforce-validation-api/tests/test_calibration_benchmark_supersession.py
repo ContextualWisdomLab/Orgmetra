@@ -151,6 +151,21 @@ def test_historical_use_before_supersession_remains_verifiable_without_leaking_l
     assert "successor_benchmark_receipt_released_at" not in fields
 
 
+def test_successor_benchmark_release_must_equal_predecessor_cutover() -> None:
+    superseded_at = USED_AT + timedelta(days=1)
+    with pytest.raises(
+        ValueError,
+        match="successor benchmark receipt must be released exactly at supersession",
+    ):
+        _record(
+            superseded_at=superseded_at,
+            successor_reference=SUCCESSOR_REFERENCE,
+            successor_version=5,
+            successor_digest=SUCCESSOR_DIGEST,
+            successor_released_at=superseded_at - timedelta(seconds=1),
+        )
+
+
 def test_benchmark_receipt_cannot_predate_its_released_owner_contract() -> None:
     with pytest.raises(ValueError, match="owner contract must be released no later than benchmark receipt"):
         CalibrationBenchmarkAuthorityRecord(
