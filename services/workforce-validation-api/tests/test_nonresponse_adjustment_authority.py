@@ -34,6 +34,7 @@ OUTPUT_WEIGHT_DIGEST = "6" * 64
 OWNER_CONTRACT_DIGEST = "7" * 64
 DISPOSITION_RELEASED_AT = datetime(2026, 9, 16, 10, 0, tzinfo=timezone.utc)
 CONSTRUCTED_AT = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
+OWNER_CONTRACT_RELEASED_AT = datetime(2026, 9, 16, 12, 30, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 16, 13, 0, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, tzinfo=timezone.utc)
 READ_FIELDS = frozenset(
@@ -58,6 +59,7 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
     }
 )
@@ -136,6 +138,7 @@ def _record(**overrides: object) -> NonresponseAdjustmentAuthorityRecord:
         "owner_contract_reference": OWNER_CONTRACT_REFERENCE,
         "owner_contract_version": 5,
         "owner_contract_digest": OWNER_CONTRACT_DIGEST,
+        "owner_contract_released_at": OWNER_CONTRACT_RELEASED_AT,
         "released_at": RELEASED_AT,
     }
     values.update(overrides)
@@ -192,6 +195,7 @@ def test_resolution_binds_versioned_disposition_and_treatment_evidence() -> None
     assert ("unknown_treatment_code", "retain_unknown_class") in view.fields
     assert ("unavailable_treatment_code", "retain_unavailable_class") in view.fields
     assert ("response_disposition_receipt_released_at", DISPOSITION_RELEASED_AT) in view.fields
+    assert ("owner_contract_released_at", OWNER_CONTRACT_RELEASED_AT) in view.fields
 
 
 def test_authorization_denial_happens_before_owner_resolution() -> None:
