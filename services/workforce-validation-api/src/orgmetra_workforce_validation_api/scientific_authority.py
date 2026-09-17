@@ -39,6 +39,7 @@ _READ_FIELDS = frozenset(
     {
         "authority_reference",
         "auxiliary_projection_reference",
+        "auxiliary_projection_version",
         "auxiliary_projection_digest",
         "scientific_purpose_reference",
         "scientific_purpose_digest",
@@ -107,6 +108,7 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         validity_study_id: UUID,
         authority_reference: str,
         auxiliary_projection_reference: str,
+        auxiliary_projection_version: int,
         auxiliary_projection_digest: str,
         scientific_purpose_reference: str,
         scientific_purpose_digest: str,
@@ -131,6 +133,9 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
             "auxiliary_projection_reference",
             auxiliary_projection_reference,
             "calibration_auxiliary_projection",
+        )
+        projection_version = _require_positive_integer(
+            "auxiliary_projection_version", auxiliary_projection_version
         )
         projection_digest = _require_digest(
             "auxiliary_projection_digest", auxiliary_projection_digest
@@ -186,6 +191,7 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
                 study_identity,
                 authority_ref,
                 projection_ref,
+                projection_version,
                 projection_digest,
                 purpose_ref,
                 purpose_digest,
@@ -223,69 +229,74 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         return self[3]
 
     @property
+    def auxiliary_projection_version(self) -> int:
+        """Return the positive version of the purpose-limited auxiliary projection."""
+        return self[4]
+
+    @property
     def auxiliary_projection_digest(self) -> str:
         """Return the projection evidence digest without exposing source attributes."""
-        return self[4]
+        return self[5]
 
     @property
     def scientific_purpose_reference(self) -> str:
         """Return the governed scientific-use purpose reference."""
-        return self[5]
+        return self[6]
 
     @property
     def scientific_purpose_digest(self) -> str:
         """Return the exact scientific-use purpose evidence digest."""
-        return self[6]
+        return self[7]
 
     @property
     def owner_contract_reference(self) -> str:
         """Return the released owner-contract reference."""
-        return self[7]
+        return self[8]
 
     @property
     def owner_contract_version(self) -> int:
         """Return the positive released owner-contract version."""
-        return self[8]
+        return self[9]
 
     @property
     def owner_contract_digest(self) -> str:
         """Return the immutable bytes digest for the released owner contract."""
-        return self[9]
+        return self[10]
 
     @property
     def authorization_receipt_reference(self) -> str:
         """Return the authoritative scientific-use authorization receipt reference."""
-        return self[10]
+        return self[11]
 
     @property
     def authorization_receipt_digest(self) -> str:
         """Return the authorization receipt digest used for exact correlation."""
-        return self[11]
+        return self[12]
 
     @property
     def scientific_use_receipt_reference(self) -> str:
         """Return the immutable scientific-use receipt reference."""
-        return self[12]
+        return self[13]
 
     @property
     def scientific_use_receipt_digest(self) -> str:
         """Return the immutable scientific-use receipt digest."""
-        return self[13]
+        return self[14]
 
     @property
     def scientific_use_at(self) -> datetime:
         """Return the owner-resolved UTC instant for the exact scientific use."""
-        return self[14]
+        return self[15]
 
     @property
     def authorized_from(self) -> datetime:
         """Return the UTC instant when this scientific use became authorized."""
-        return self[15]
+        return self[16]
 
     @property
     def authorized_to(self) -> datetime | None:
         """Return the exclusive UTC authorization end when one exists."""
-        return self[16]
+        return self[17]
 
 
 class CalibrationAuxiliaryAuthorityView(tuple):
@@ -333,6 +344,7 @@ class CalibrationAuxiliaryAuthorityReadPort(Protocol):
         validity_study_id: UUID,
         authority_reference: str,
         auxiliary_projection_reference: str,
+        auxiliary_projection_version: int,
         auxiliary_projection_digest: str,
         scientific_purpose_reference: str,
         scientific_purpose_digest: str,
@@ -360,6 +372,7 @@ def resolve_calibration_auxiliary_authority(
     validity_study_id: UUID,
     authority_reference: str,
     auxiliary_projection_reference: str,
+    auxiliary_projection_version: int,
     auxiliary_projection_digest: str,
     scientific_purpose_reference: str,
     scientific_purpose_digest: str,
@@ -380,9 +393,9 @@ def resolve_calibration_auxiliary_authority(
     The exact owner capability is captured inertly before authorization and the
     same function is invoked afterward. The request carries no protected source
     values. Owner evidence must reproduce every caller-supplied leaf coordinate,
-    including receipt references and the released owner-contract digest, and
-    independently bind the scientific-use receipt to the same use instant before
-    any corroborating fields are returned.
+    including the projection reference/version/digest, receipt references and the
+    released owner-contract digest, and independently bind the scientific-use
+    receipt to the same use instant before any corroborating fields are returned.
     """
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
@@ -416,6 +429,9 @@ def resolve_calibration_auxiliary_authority(
         "auxiliary_projection_reference",
         auxiliary_projection_reference,
         "calibration_auxiliary_projection",
+    )
+    projection_version = _require_positive_integer(
+        "auxiliary_projection_version", auxiliary_projection_version
     )
     projection_digest = _require_digest(
         "auxiliary_projection_digest", auxiliary_projection_digest
@@ -473,6 +489,7 @@ def resolve_calibration_auxiliary_authority(
         validity_study_id=_restore_operational_uuid("validity_study_id", study_identity),
         authority_reference=authority_ref,
         auxiliary_projection_reference=projection_ref,
+        auxiliary_projection_version=projection_version,
         auxiliary_projection_digest=projection_digest,
         scientific_purpose_reference=purpose_ref,
         scientific_purpose_digest=purpose_digest,
@@ -496,6 +513,7 @@ def resolve_calibration_auxiliary_authority(
         validity_study_id=persisted.validity_study_id,
         authority_reference=persisted.authority_reference,
         auxiliary_projection_reference=persisted.auxiliary_projection_reference,
+        auxiliary_projection_version=persisted.auxiliary_projection_version,
         auxiliary_projection_digest=persisted.auxiliary_projection_digest,
         scientific_purpose_reference=persisted.scientific_purpose_reference,
         scientific_purpose_digest=persisted.scientific_purpose_digest,
@@ -517,6 +535,7 @@ def resolve_calibration_auxiliary_authority(
         != study_identity
         or record.authority_reference != authority_ref
         or record.auxiliary_projection_reference != projection_ref
+        or record.auxiliary_projection_version != projection_version
         or record.auxiliary_projection_digest != projection_digest
         or record.scientific_purpose_reference != purpose_ref
         or record.scientific_purpose_digest != purpose_digest
@@ -536,6 +555,7 @@ def resolve_calibration_auxiliary_authority(
     values = {
         "authority_reference": record.authority_reference,
         "auxiliary_projection_reference": record.auxiliary_projection_reference,
+        "auxiliary_projection_version": record.auxiliary_projection_version,
         "auxiliary_projection_digest": record.auxiliary_projection_digest,
         "scientific_purpose_reference": record.scientific_purpose_reference,
         "scientific_purpose_digest": record.scientific_purpose_digest,
