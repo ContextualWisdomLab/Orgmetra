@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from inspect import signature
 from uuid import UUID
 
 import pytest
 
-from orgmetra_workforce_validation_api.base_weight_authority import BaseWeightAuthorityRecord
+from orgmetra_workforce_validation_api.base_weight_authority import (
+    BaseWeightAuthorityRecord,
+    resolve_base_weight_authority,
+)
 
 TENANT = UUID("10000000-0000-7000-8000-000000000001")
 STUDY = UUID("00000000-0000-7000-8000-0000000000f1")
@@ -62,6 +66,10 @@ def test_owner_contract_release_is_preserved_as_authority_provenance() -> None:
     record = _record()
 
     assert dict(record.fields)["owner_contract_released_at"] == OWNER_CONTRACT_RELEASED_AT
+
+
+def test_owner_contract_release_is_not_a_caller_asserted_resolver_coordinate() -> None:
+    assert "owner_contract_released_at" not in signature(resolve_base_weight_authority).parameters
 
 
 def test_owner_contract_cannot_postdate_base_weight_receipt_release() -> None:
