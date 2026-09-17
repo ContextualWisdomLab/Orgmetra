@@ -33,6 +33,7 @@ ELIGIBLE_CASE_SET_DIGEST = "4" * 64
 WEIGHT_ARTIFACT_DIGEST = "5" * 64
 OWNER_CONTRACT_DIGEST = "6" * 64
 CONSTRUCTED_AT = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
+OWNER_CONTRACT_RELEASED_AT = datetime(2026, 9, 16, 12, 30, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 16, 13, 0, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, tzinfo=timezone.utc)
 READ_FIELDS = frozenset(
@@ -51,7 +52,9 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -96,7 +99,7 @@ def _principal(*, tenant_record_id: UUID = TENANT) -> ValidationPrincipal:
 def _policy(*, purpose_code: str = "selection_validity_analysis") -> PurposeBoundAccessPolicy:
     return PurposeBoundAccessPolicy(
         tenant_record_id=TENANT,
-        policy_version_code="weight-eligibility-authority-read-v1",
+        policy_version_code="weight-eligibility-authority-read-v2",
         resource_kind="weight_eligibility_authority",
         purpose_code=purpose_code,
         operation_code="read",
@@ -123,7 +126,9 @@ def _record(**overrides: object) -> WeightEligibilityAuthorityRecord:
         "owner_contract_reference": OWNER_CONTRACT_REFERENCE,
         "owner_contract_version": 3,
         "owner_contract_digest": OWNER_CONTRACT_DIGEST,
+        "owner_contract_released_at": OWNER_CONTRACT_RELEASED_AT,
         "released_at": RELEASED_AT,
+        "superseded_at": None,
     }
     values.update(overrides)
     return WeightEligibilityAuthorityRecord(**values)
@@ -175,6 +180,9 @@ def test_longitudinal_resolution_binds_population_duration_case_set_and_artifact
     assert ("reference_duration_reference", REFERENCE_DURATION_REFERENCE) in view.fields
     assert ("eligible_case_set_digest", ELIGIBLE_CASE_SET_DIGEST) in view.fields
     assert ("weight_artifact_digest", WEIGHT_ARTIFACT_DIGEST) in view.fields
+    assert ("owner_contract_released_at", OWNER_CONTRACT_RELEASED_AT) in view.fields
+    assert ("released_at", RELEASED_AT) in view.fields
+    assert ("superseded_at", None) in view.fields
 
 
 def test_cross_sectional_scope_is_distinct_released_authority() -> None:
@@ -276,6 +284,8 @@ def test_record_and_view_are_structurally_immutable_and_uuid_views_are_detached(
     record = _record(tenant_record_id=tenant)
     object.__setattr__(tenant, "int", OTHER_TENANT.int)
     assert record.tenant_record_id == TENANT
+    assert record.owner_contract_released_at == OWNER_CONTRACT_RELEASED_AT
+    assert record.superseded_at is None
     with pytest.raises(AttributeError):
         object.__setattr__(record, "weight_scope_code", "cross_sectional")
 
