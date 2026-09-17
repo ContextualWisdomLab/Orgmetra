@@ -44,6 +44,14 @@ Caller `used_at` must equal the owner-resolved scientific-use instant, and that 
 
 The owner contract must already be released when the benchmark receipt becomes released evidence. A successor must advance the version, identify new evidence, be released after its predecessor, and exist no later than the predecessor's supersession instant. A predecessor is authoritative only on its owner-resolved half-open interval `[benchmark_receipt_released_at, benchmark_receipt_superseded_at)`.
 
+## Typed calibration-adjustment authority
+
+`resolve_calibration_adjustment_authority(...)` corroborates the exact released calibration receipt that produced a point-weight artifact. It binds the receipt digest and evidence version to the purpose-limited auxiliary projection digest, benchmark receipt digest, primary algorithm/version, constraints, input/output weight artifact digests, construction time, and released owner-contract evidence.
+
+For `termination_code="fallback_applied"`, owner evidence must additionally preserve the primary failure reason, immutable fallback-rule reference/digest, and the actual fallback calibration algorithm/version/configuration that produced the output weights. `converged` rejects all fallback-only coordinates. The two weight-artifact digests must differ, release cannot precede construction, and the receipt cannot authorize scientific use before its owner-resolved release. Auxiliary values, benchmark totals, protected attributes, and row-level weights are excluded from the projection.
+
+This closes the application-owner side of #407 RED #7 without importing mutable `validity-analysis` source. It does not make caller-supplied leaf evidence self-authenticating; the durable adapter must re-resolve released typed calibration evidence from its owner.
+
 ## Point-weight / variance authority
 
 `resolve_weight_variance_authority(...)` corroborates point-estimation and variance evidence without treating leaf-provided digests as owner authority. It binds:
@@ -97,7 +105,7 @@ This is still application-boundary corroboration, not durable scientific authori
 
 The schema owner is NOLOGIN and is not a runtime isolation control. PostgreSQL role-level `search_path` defaults are applied at login and are not re-applied by `SET ROLE`. A durable runtime adapter therefore needs a distinct least-privilege runtime role, schema-qualified relations, and explicit function-level `search_path` for any future `SECURITY DEFINER` function.
 
-Protected foundation migrations still hold validity-study relations in the legacy foundation schema. PR #248 or a verified successor owns forward owner-schema adoption after this application owner reaches normal protected integration. It must preserve valid persistence/FK/RLS/ACL evidence and implement durable released-evidence ports for calibration auxiliary, calibration benchmark, point-weight/variance, validation-result binding, and validation-result non-verifiability.
+Protected foundation migrations still hold validity-study relations in the legacy foundation schema. PR #248 or a verified successor owns forward owner-schema adoption after this application owner reaches normal protected integration. It must preserve valid persistence/FK/RLS/ACL evidence and implement durable released-evidence ports for calibration auxiliary, calibration benchmark, typed calibration adjustment, point-weight/variance, validation-result binding, and validation-result non-verifiability.
 
 ## Test contract
 
@@ -112,6 +120,6 @@ PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src \
 
 `tests/test_workforce_validation_owner_schema_postgres.sh` separately executes the service-local migration against pinned PostgreSQL 16.14 and checks deny-default owner-role/schema behavior, actual `SET ROLE` search-path behavior, PUBLIC privileges, and absence of application relations in the bootstrap schema.
 
-Scientific-authority tests cover authorization-before-owner-read, static port validation, malformed references/digests/versions/timestamps, exact owner-coordinate matching, UUID detachment/alias attacks, structural immutability, non-public view issuance, benchmark correction chronology, point/variance evidence compatibility, validation-result binding, and explicit missing/non-reproducible result evidence.
+Scientific-authority tests cover authorization-before-owner-read, static port validation, malformed references/digests/versions/timestamps, exact owner-coordinate matching, UUID detachment/alias attacks, structural immutability, non-public view issuance, benchmark correction chronology, typed calibration fallback generating-method provenance, point/variance evidence compatibility, validation-result binding, and explicit missing/non-reproducible result evidence.
 
 These source contracts are not terminal acceptance by themselves. The PR remains Draft until the exact current head executes with 100% owned statement/branch coverage, the PostgreSQL owner-schema contract is GREEN, applicable security workflows are terminal, and normal independent review/governance requirements are satisfied. Only protected/released owner evidence may be consumed as durable scientific authority.
