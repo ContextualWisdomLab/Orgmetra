@@ -404,6 +404,8 @@ class ValidationResultNonVerifiabilityReadPort(Protocol):
         result_digest: str,
         failed_evidence_kind: str,
         failure_mode: str,
+        verification_attempt_reference: str,
+        verification_attempt_digest: str,
         owner_contract_reference: str,
         owner_contract_version: int,
         owner_contract_digest: str,
@@ -427,6 +429,8 @@ def resolve_validation_result_nonverifiability(
     result_digest: str,
     failed_evidence_kind: str,
     failure_mode: str,
+    verification_attempt_reference: str,
+    verification_attempt_digest: str,
     owner_contract_reference: str,
     owner_contract_version: int,
     owner_contract_digest: str,
@@ -435,7 +439,7 @@ def resolve_validation_result_nonverifiability(
     policy: PurposeBoundAccessPolicy,
     read_port: ValidationResultNonVerifiabilityReadPort,
 ) -> ValidationResultNonVerifiabilityView:
-    """Authorize then corroborate one released, explicitly non-authorizing outcome."""
+    """Authorize then corroborate one exact released, non-authorizing verification attempt."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
     if type(policy) is not PurposeBoundAccessPolicy:
@@ -467,6 +471,14 @@ def resolve_validation_result_nonverifiability(
     result_evidence_digest = _require_digest("result_digest", result_digest)
     evidence_kind = _require_failed_evidence_kind(failed_evidence_kind)
     mode = _require_failure_mode(failure_mode)
+    attempt_ref = _require_reference(
+        "verification_attempt_reference",
+        verification_attempt_reference,
+        "validation_evidence_verification_attempt",
+    )
+    attempt_digest = _require_digest(
+        "verification_attempt_digest", verification_attempt_digest
+    )
     owner_ref = _require_reference(
         "owner_contract_reference", owner_contract_reference, "released_owner_contract"
     )
@@ -502,6 +514,8 @@ def resolve_validation_result_nonverifiability(
         result_digest=result_evidence_digest,
         failed_evidence_kind=evidence_kind,
         failure_mode=mode,
+        verification_attempt_reference=attempt_ref,
+        verification_attempt_digest=attempt_digest,
         owner_contract_reference=owner_ref,
         owner_contract_version=owner_version,
         owner_contract_digest=owner_digest,
@@ -541,6 +555,8 @@ def resolve_validation_result_nonverifiability(
         result_evidence_digest,
         evidence_kind,
         mode,
+        attempt_ref,
+        attempt_digest,
         owner_ref,
         owner_version,
         owner_digest,
@@ -552,13 +568,15 @@ def resolve_validation_result_nonverifiability(
         record.result_digest,
         record.failed_evidence_kind,
         record.failure_mode,
+        record.verification_attempt_reference,
+        record.verification_attempt_digest,
         record.owner_contract_reference,
         record.owner_contract_version,
         record.owner_contract_digest,
     )
     if record_identity != requested_identity:
         raise ValidationResultNonVerifiabilityIntegrityError(
-            "owner evidence does not match the requested non-verifiability outcome"
+            "owner evidence does not match the requested non-verifiability attempt"
         )
     if use_instant < record.released_at:
         raise ValidationResultNonVerifiabilityIntegrityError(
