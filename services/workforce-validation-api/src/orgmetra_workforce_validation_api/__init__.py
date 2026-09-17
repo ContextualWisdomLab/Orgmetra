@@ -74,6 +74,14 @@ from orgmetra_workforce_validation_api.result_nonverifiability import (
     ValidationResultNonVerifiabilityView,
     resolve_validation_result_nonverifiability,
 )
+from orgmetra_workforce_validation_api.result_supersession_authority import (
+    ValidationResultSupersessionAuthorityIntegrityError,
+    ValidationResultSupersessionAuthorityNotFound,
+    ValidationResultSupersessionAuthorityReadPort,
+    ValidationResultSupersessionAuthorityRecord,
+    ValidationResultSupersessionAuthorityView,
+    resolve_validation_result_supersession_authority,
+)
 from orgmetra_workforce_validation_api.scientific_authority import (
     CalibrationAuxiliaryAuthorityIntegrityError,
     CalibrationAuxiliaryAuthorityNotFound,
@@ -160,6 +168,11 @@ __all__ = [
     "ValidationResultNonVerifiabilityReadPort",
     "ValidationResultNonVerifiabilityRecord",
     "ValidationResultNonVerifiabilityView",
+    "ValidationResultSupersessionAuthorityIntegrityError",
+    "ValidationResultSupersessionAuthorityNotFound",
+    "ValidationResultSupersessionAuthorityReadPort",
+    "ValidationResultSupersessionAuthorityRecord",
+    "ValidationResultSupersessionAuthorityView",
     "ValidityStudyIntegrityError",
     "ValidityStudyNotFound",
     "ValidityStudyReadPort",
@@ -186,6 +199,7 @@ __all__ = [
     "resolve_trimming_bounding_authority",
     "resolve_validation_result_authority",
     "resolve_validation_result_nonverifiability",
+    "resolve_validation_result_supersession_authority",
     "resolve_weight_eligibility_authority",
     "resolve_weight_variance_authority",
 ]
