@@ -17,6 +17,14 @@ from orgmetra_workforce_validation_api.registry import (
     ValidityStudyView,
     read_validity_study,
 )
+from orgmetra_workforce_validation_api.result_authority import (
+    ValidationResultAuthorityIntegrityError,
+    ValidationResultAuthorityNotFound,
+    ValidationResultAuthorityReadPort,
+    ValidationResultAuthorityRecord,
+    ValidationResultAuthorityView,
+    resolve_validation_result_authority,
+)
 from orgmetra_workforce_validation_api.scientific_authority import (
     CalibrationAuxiliaryAuthorityIntegrityError,
     CalibrationAuxiliaryAuthorityNotFound,
@@ -46,6 +54,11 @@ __all__ = [
     "CalibrationBenchmarkAuthorityRecord",
     "CalibrationBenchmarkAuthorityView",
     "ValidationPrincipal",
+    "ValidationResultAuthorityIntegrityError",
+    "ValidationResultAuthorityNotFound",
+    "ValidationResultAuthorityReadPort",
+    "ValidationResultAuthorityRecord",
+    "ValidationResultAuthorityView",
     "ValidityStudyIntegrityError",
     "ValidityStudyNotFound",
     "ValidityStudyReadPort",
@@ -59,5 +72,6 @@ __all__ = [
     "read_validity_study",
     "resolve_calibration_auxiliary_authority",
     "resolve_calibration_benchmark_authority",
+    "resolve_validation_result_authority",
     "resolve_weight_variance_authority",
 ]
