@@ -22,6 +22,7 @@ DIGEST_1 = "1" * 64
 DIGEST_2 = "2" * 64
 DIGEST_3 = "3" * 64
 DIGEST_4 = "4" * 64
+DIGEST_5 = "5" * 64
 
 
 def nonresponse_receipt(**overrides: object) -> NonresponseAdjustmentReceipt:
@@ -68,7 +69,12 @@ def calibration_receipt(**overrides: object) -> CalibrationAdjustmentReceipt:
         "auxiliary_scientific_use_receipt_digest": DIGEST_2,
         "auxiliary_scientific_use_at": NOW,
         "benchmark_receipt_reference": "calibration_benchmark_receipt:66666666-6666-4666-8666-666666666666",
+        "benchmark_receipt_version": 2,
         "benchmark_receipt_digest": DIGEST_C,
+        "benchmark_owner_contract_reference": "released_owner_contract:66666666-6666-4666-8666-666666666667",
+        "benchmark_owner_contract_version": 3,
+        "benchmark_owner_contract_digest": DIGEST_5,
+        "benchmark_reference_at": NOW - timedelta(days=1),
         "algorithm_reference": "calibration_algorithm:77777777-7777-4777-8777-777777777777",
         "algorithm_version": 1,
         "constraints_digest": DIGEST_F,
@@ -134,7 +140,10 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
     candidate = calibration_receipt()
     canonical = candidate.canonical_json()
     assert candidate.sha256_digest() == calibration_receipt().sha256_digest()
+    assert '"benchmark_receipt_version":2' in canonical
     assert f'"benchmark_receipt_digest":"{DIGEST_C}"' in canonical
+    assert f'"benchmark_owner_contract_digest":"{DIGEST_5}"' in canonical
+    assert '"benchmark_reference_at":"2026-09-16T05:00:00Z"' in canonical
     assert f'"auxiliary_purpose_digest":"{DIGEST_3}"' in canonical
     assert f'"auxiliary_owner_contract_digest":"{DIGEST_1}"' in canonical
     assert f'"auxiliary_authorization_receipt_digest":"{DIGEST_4}"' in canonical
@@ -172,6 +181,22 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
         calibration_receipt(auxiliary_scientific_use_at="2026-09-17T05:00:00Z")
     with pytest.raises(ValueError, match="cannot be later"):
         calibration_receipt(auxiliary_scientific_use_at=NOW + timedelta(seconds=1))
+    with pytest.raises(TypeError):
+        calibration_receipt()
+    with pytest.raises(ValueError, match="benchmark_receipt_version"):
+        calibration_receipt(benchmark_receipt_version=0)
+    with pytest.raises(ValueError, match="benchmark_receipt_version"):
+        calibration_receipt(benchmark_receipt_version=True)
+    with pytest.raises(ValueError, match="benchmark_owner_contract_reference"):
+        calibration_receipt(benchmark_owner_contract_reference="benchmark-owner-v3")
+    with pytest.raises(ValueError, match="benchmark_owner_contract_version"):
+        calibration_receipt(benchmark_owner_contract_version=0)
+    with pytest.raises(ValueError, match="benchmark_owner_contract_digest"):
+        calibration_receipt(benchmark_owner_contract_digest="owner-v3")
+    with pytest.raises(ValueError, match="benchmark_reference_at"):
+        calibration_receipt(benchmark_reference_at="2026-09-16T05:00:00Z")
+    with pytest.raises(ValueError, match="benchmark_reference_at cannot be later"):
+        calibration_receipt(benchmark_reference_at=NOW + timedelta(seconds=1))
     with pytest.raises(ValueError, match="termination_code"):
         calibration_receipt(termination_code="failed")
     with pytest.raises(ValueError, match="termination_code"):
