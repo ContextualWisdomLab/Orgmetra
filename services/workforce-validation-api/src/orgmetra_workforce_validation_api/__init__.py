@@ -65,6 +65,14 @@ from orgmetra_workforce_validation_api.variance_authority import (
     WeightVarianceAuthorityView,
     resolve_weight_variance_authority,
 )
+from orgmetra_workforce_validation_api.weight_eligibility_authority import (
+    WeightEligibilityAuthorityIntegrityError,
+    WeightEligibilityAuthorityNotFound,
+    WeightEligibilityAuthorityReadPort,
+    WeightEligibilityAuthorityRecord,
+    WeightEligibilityAuthorityView,
+    resolve_weight_eligibility_authority,
+)
 
 __all__ = [
     "CalibrationAdjustmentAuthorityIntegrityError",
@@ -103,6 +111,11 @@ __all__ = [
     "ValidityStudyReadPort",
     "ValidityStudyRecord",
     "ValidityStudyView",
+    "WeightEligibilityAuthorityIntegrityError",
+    "WeightEligibilityAuthorityNotFound",
+    "WeightEligibilityAuthorityReadPort",
+    "WeightEligibilityAuthorityRecord",
+    "WeightEligibilityAuthorityView",
     "WeightVarianceAuthorityIntegrityError",
     "WeightVarianceAuthorityNotFound",
     "WeightVarianceAuthorityReadPort",
@@ -115,5 +128,6 @@ __all__ = [
     "resolve_nonresponse_adjustment_authority",
     "resolve_validation_result_authority",
     "resolve_validation_result_nonverifiability",
+    "resolve_weight_eligibility_authority",
     "resolve_weight_variance_authority",
 ]
