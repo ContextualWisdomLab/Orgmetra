@@ -277,6 +277,11 @@ class ValidationAnalysisResult:
         object.__setattr__(self, "uncertainty_upper", upper)
         object.__setattr__(self, "completed_at", completed_at)
 
+    @property
+    def verification_status(self) -> str:
+        """Return whether the completed scientific result is currently verifiable."""
+        return "verified" if self.convergence_diagnostics.converged else "not_verifiable"
+
     def __repr__(self) -> str:
         """Return a redacted representation suitable for routine application logs."""
         return "ValidationAnalysisResult(<redacted>)"
@@ -305,6 +310,7 @@ class ValidationAnalysisResult:
             "tenant_record_id": self.tenant_record_id,
             "uncertainty_lower": float(self.uncertainty_lower),
             "uncertainty_upper": float(self.uncertainty_upper),
+            "verification_status": self.verification_status,
         }
         if self.analysis_weight_receipt_digest is not None:
             payload["analysis_weight_receipt_digest"] = self.analysis_weight_receipt_digest
