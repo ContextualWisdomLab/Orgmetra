@@ -97,6 +97,7 @@ class WeightEligibilityAuthorityRecord(tuple):
         owner_contract_version: int,
         owner_contract_digest: str,
         released_at: datetime,
+        superseded_at: datetime | None = None,
     ) -> WeightEligibilityAuthorityRecord:
         """Validate and detach the minimum immutable eligibility authority."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
@@ -144,8 +145,15 @@ class WeightEligibilityAuthorityRecord(tuple):
         )
         owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
         release_instant = _require_aware_datetime("released_at", released_at)
+        supersession_instant = (
+            None
+            if superseded_at is None
+            else _require_aware_datetime("superseded_at", superseded_at)
+        )
         if release_instant < constructed:
             raise ValueError("released_at cannot precede constructed_at.")
+        if supersession_instant is not None and supersession_instant <= release_instant:
+            raise ValueError("superseded_at must be later than released_at.")
         return tuple.__new__(
             cls,
             (
@@ -166,6 +174,7 @@ class WeightEligibilityAuthorityRecord(tuple):
                 owner_version,
                 owner_digest,
                 release_instant,
+                supersession_instant,
             ),
         )
 
@@ -253,6 +262,11 @@ class WeightEligibilityAuthorityRecord(tuple):
     def released_at(self) -> datetime:
         """Return when this eligibility evidence became released authority."""
         return self[16]
+
+    @property
+    def superseded_at(self) -> datetime | None:
+        """Return the exclusive owner-resolved cutover when this authority is superseded."""
+        return self[17]
 
 
 class WeightEligibilityAuthorityView(tuple):
@@ -450,14 +464,19 @@ def resolve_weight_eligibility_authority(
         owner_contract_version=persisted.owner_contract_version,
         owner_contract_digest=persisted.owner_contract_digest,
         released_at=persisted.released_at,
+        superseded_at=persisted.superseded_at,
     )
-    if record[:-1] != requested[:-1]:
+    if record[:-2] != requested[:-2]:
         raise WeightEligibilityAuthorityIntegrityError(
             "released weight-eligibility authority does not match requested coordinates"
         )
     if record.released_at > use_instant:
         raise WeightEligibilityAuthorityIntegrityError(
             "weight-eligibility evidence must be released before scientific use"
+        )
+    if record.superseded_at is not None and use_instant >= record.superseded_at:
+        raise WeightEligibilityAuthorityIntegrityError(
+            "weight-eligibility evidence is superseded for this scientific-use instant"
         )
 
     fields: tuple[tuple[str, object], ...] = (
