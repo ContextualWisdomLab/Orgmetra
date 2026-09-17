@@ -279,8 +279,12 @@ class ValidationAnalysisResult:
 
     @property
     def verification_status(self) -> str:
-        """Return whether the completed scientific result is currently verifiable."""
-        return "verified" if self.convergence_diagnostics.converged else "not_verifiable"
+        """Return a non-authorizing leaf verification state for this result."""
+        return (
+            "verification_pending"
+            if self.convergence_diagnostics.converged
+            else "not_verifiable"
+        )
 
     def __repr__(self) -> str:
         """Return a redacted representation suitable for routine application logs."""
