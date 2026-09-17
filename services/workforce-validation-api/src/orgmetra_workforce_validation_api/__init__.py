@@ -16,6 +16,15 @@ from orgmetra_workforce_validation_api.calibration_adjustment_authority import (
     CalibrationAdjustmentAuthorityView,
     resolve_calibration_adjustment_authority,
 )
+from orgmetra_workforce_validation_api.final_weight_authority import (
+    FinalAnalysisWeightAuthorityIntegrityError,
+    FinalAnalysisWeightAuthorityNotFound,
+    FinalAnalysisWeightAuthorityReadPort,
+    FinalAnalysisWeightAuthorityRecord,
+    FinalAnalysisWeightAuthorityView,
+    FinalWeightAdjustmentCoordinate,
+    resolve_final_analysis_weight_authority,
+)
 from orgmetra_workforce_validation_api.nonresponse_adjustment_authority import (
     NonresponseAdjustmentAuthorityIntegrityError,
     NonresponseAdjustmentAuthorityNotFound,
@@ -98,6 +107,12 @@ __all__ = [
     "CalibrationBenchmarkAuthorityReadPort",
     "CalibrationBenchmarkAuthorityRecord",
     "CalibrationBenchmarkAuthorityView",
+    "FinalAnalysisWeightAuthorityIntegrityError",
+    "FinalAnalysisWeightAuthorityNotFound",
+    "FinalAnalysisWeightAuthorityReadPort",
+    "FinalAnalysisWeightAuthorityRecord",
+    "FinalAnalysisWeightAuthorityView",
+    "FinalWeightAdjustmentCoordinate",
     "NonresponseAdjustmentAuthorityIntegrityError",
     "NonresponseAdjustmentAuthorityNotFound",
     "NonresponseAdjustmentAuthorityReadPort",
@@ -138,6 +153,7 @@ __all__ = [
     "resolve_calibration_adjustment_authority",
     "resolve_calibration_auxiliary_authority",
     "resolve_calibration_benchmark_authority",
+    "resolve_final_analysis_weight_authority",
     "resolve_nonresponse_adjustment_authority",
     "resolve_trimming_bounding_authority",
     "resolve_validation_result_authority",
