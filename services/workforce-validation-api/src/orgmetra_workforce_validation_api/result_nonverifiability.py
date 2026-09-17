@@ -53,6 +53,7 @@ _READ_FIELDS = frozenset(
         "failure_mode",
         "failed_evidence_reference",
         "failed_evidence_digest",
+        "failed_evidence_released_at",
         "verification_attempt_reference",
         "verification_attempt_digest",
         "owner_contract_reference",
@@ -116,8 +117,9 @@ class ValidationResultNonVerifiabilityRecord(tuple):
         evaluated_at: datetime,
         released_at: datetime,
         superseded_at: datetime | None = None,
+        failed_evidence_released_at: datetime | None = None,
     ) -> ValidationResultNonVerifiabilityRecord:
-        """Validate a minimal, reproducible explanation and its authority interval."""
+        """Validate a reproducible failure explanation and its authority chronology."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
         study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
         result_ref = _require_reference(
@@ -129,17 +131,28 @@ class ValidationResultNonVerifiabilityRecord(tuple):
 
         failed_reference: str | None
         failed_digest: str | None
+        failed_release: datetime | None
         if mode == "missing":
-            if failed_evidence_reference is not None or failed_evidence_digest is not None:
+            if (
+                failed_evidence_reference is not None
+                or failed_evidence_digest is not None
+                or failed_evidence_released_at is not None
+            ):
                 raise ValueError(
-                    "failed evidence reference and digest must be absent when evidence is missing."
+                    "failed evidence reference, digest, and release chronology must be absent "
+                    "when evidence is missing."
                 )
             failed_reference = None
             failed_digest = None
+            failed_release = None
         else:
             if failed_evidence_reference is None or failed_evidence_digest is None:
                 raise ValueError(
                     "failed evidence reference and digest are required for non_reproducible evidence."
+                )
+            if failed_evidence_released_at is None:
+                raise ValueError(
+                    "failed_evidence_released_at is required for non_reproducible evidence."
                 )
             failed_reference = _require_reference(
                 "failed_evidence_reference",
@@ -148,6 +161,9 @@ class ValidationResultNonVerifiabilityRecord(tuple):
             )
             failed_digest = _require_digest(
                 "failed_evidence_digest", failed_evidence_digest
+            )
+            failed_release = _require_aware_datetime(
+                "failed_evidence_released_at", failed_evidence_released_at
             )
 
         attempt_ref = _require_reference(
@@ -186,6 +202,10 @@ class ValidationResultNonVerifiabilityRecord(tuple):
             raise ValueError(
                 "owner_contract_released_at cannot be later than evaluated_at."
             )
+        if failed_release is not None and failed_release > evaluation_instant:
+            raise ValueError(
+                "failed_evidence_released_at cannot be later than evaluated_at."
+            )
         if evaluation_instant > release_instant:
             raise ValueError("evaluated_at cannot be later than released_at.")
         cutover = (
@@ -218,6 +238,7 @@ class ValidationResultNonVerifiabilityRecord(tuple):
                 evaluation_instant,
                 release_instant,
                 cutover,
+                failed_release,
             ),
         )
 
@@ -310,6 +331,11 @@ class ValidationResultNonVerifiabilityRecord(tuple):
     def superseded_at(self) -> datetime | None:
         """Return the exclusive end of this outcome's owner-resolved authority."""
         return self[16]
+
+    @property
+    def failed_evidence_released_at(self) -> datetime | None:
+        """Return when non-reproducible evidence became available for verification."""
+        return self[17]
 
 
 class ValidationResultNonVerifiabilityView(tuple):
@@ -486,6 +512,7 @@ def resolve_validation_result_nonverifiability(
         evaluated_at=persisted.evaluated_at,
         released_at=persisted.released_at,
         superseded_at=persisted.superseded_at,
+        failed_evidence_released_at=persisted.failed_evidence_released_at,
     )
     requested_identity = (
         tenant_identity,
@@ -530,6 +557,7 @@ def resolve_validation_result_nonverifiability(
         "failure_mode": record.failure_mode,
         "failed_evidence_reference": record.failed_evidence_reference,
         "failed_evidence_digest": record.failed_evidence_digest,
+        "failed_evidence_released_at": record.failed_evidence_released_at,
         "verification_attempt_reference": record.verification_attempt_reference,
         "verification_attempt_digest": record.verification_attempt_digest,
         "owner_contract_reference": record.owner_contract_reference,
