@@ -77,6 +77,8 @@ class _ReadPort:
         result_digest: str,
         failed_evidence_kind: str,
         failure_mode: str,
+        verification_attempt_reference: str,
+        verification_attempt_digest: str,
         owner_contract_reference: str,
         owner_contract_version: int,
         owner_contract_digest: str,
@@ -89,6 +91,8 @@ class _ReadPort:
                 result_digest,
                 failed_evidence_kind,
                 failure_mode,
+                verification_attempt_reference,
+                verification_attempt_digest,
                 owner_contract_reference,
                 owner_contract_version,
                 owner_contract_digest,
@@ -157,6 +161,8 @@ def _resolve(
         "result_digest": RESULT_DIGEST,
         "failed_evidence_kind": "analysis_weight_receipt",
         "failure_mode": "missing",
+        "verification_attempt_reference": ATTEMPT_REFERENCE,
+        "verification_attempt_digest": ATTEMPT_DIGEST,
         "owner_contract_reference": OWNER_REFERENCE,
         "owner_contract_version": 7,
         "owner_contract_digest": OWNER_DIGEST,
@@ -183,6 +189,8 @@ def test_missing_final_weight_evidence_is_released_as_not_verifiable() -> None:
             RESULT_DIGEST,
             "analysis_weight_receipt",
             "missing",
+            ATTEMPT_REFERENCE,
+            ATTEMPT_DIGEST,
             OWNER_REFERENCE,
             7,
             OWNER_DIGEST,
@@ -316,6 +324,8 @@ def test_missing_noncanonical_or_mismatched_owner_outcome_fails_closed() -> None
         _resolve(read_port=_ReadPort(object()))
     with pytest.raises(ValidationResultNonVerifiabilityIntegrityError):
         _resolve(read_port=_ReadPort(_record(result_digest="a" * 64)))
+    with pytest.raises(ValidationResultNonVerifiabilityIntegrityError):
+        _resolve(read_port=_ReadPort(_record(verification_attempt_digest="a" * 64)))
 
 
 def test_invalid_dependencies_and_pre_release_use_fail_closed() -> None:
