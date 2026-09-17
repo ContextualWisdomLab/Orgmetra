@@ -33,6 +33,7 @@ CORRECTION_SEQUENCE = 9
 FINAL_WEIGHT_DIGEST = "6" * 64
 VARIANCE_DIGEST = "7" * 64
 OWNER_DIGEST = "8" * 64
+OWNER_RELEASED_AT = datetime(2026, 9, 17, 0, 30, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 17, 1, 0, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, 2, 0, tzinfo=timezone.utc)
 READ_FIELDS = frozenset(
@@ -56,7 +57,9 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -96,7 +99,7 @@ def _principal() -> ValidationPrincipal:
 def _policy() -> PurposeBoundAccessPolicy:
     return PurposeBoundAccessPolicy(
         tenant_record_id=TENANT,
-        policy_version_code="weight-variance-authority-read-v1",
+        policy_version_code="weight-variance-authority-read-v2",
         resource_kind="weight_variance_authority",
         purpose_code="selection_validity_analysis",
         operation_code="read",
@@ -128,7 +131,9 @@ def _record(**overrides: object) -> WeightVarianceAuthorityRecord:
         "owner_contract_reference": OWNER_REFERENCE,
         "owner_contract_version": 4,
         "owner_contract_digest": OWNER_DIGEST,
+        "owner_contract_released_at": OWNER_RELEASED_AT,
         "released_at": RELEASED_AT,
+        "superseded_at": None,
     }
     values.update(overrides)
     return WeightVarianceAuthorityRecord(**values)
@@ -197,7 +202,10 @@ def _resolve(*, result: object | None = None, read_port: object | None = None, *
         ("owner_contract_reference", "wrong:owner"),
         ("owner_contract_version", 0),
         ("owner_contract_digest", "8" * 63),
+        ("owner_contract_released_at", datetime(2026, 9, 17, 0, 30)),
         ("released_at", datetime(2026, 9, 17, 1, 0)),
+        ("superseded_at", datetime(2026, 9, 17, 3, 0)),
+        ("superseded_at", RELEASED_AT),
     ],
 )
 def test_record_rejects_malformed_authority_evidence(key: str, value: object) -> None:
