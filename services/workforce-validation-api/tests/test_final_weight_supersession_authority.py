@@ -37,6 +37,11 @@ READ_FIELDS = frozenset(
         "owner_contract_digest",
         "owner_contract_released_at",
         "released_at",
+        "superseded_at",
+        "successor_analysis_weight_receipt_reference",
+        "successor_correction_sequence",
+        "successor_analysis_weight_receipt_digest",
+        "successor_released_at",
     }
 )
 
