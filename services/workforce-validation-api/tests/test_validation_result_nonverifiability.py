@@ -52,6 +52,7 @@ READ_FIELDS = frozenset(
         "owner_contract_released_at",
         "evaluated_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -194,6 +195,7 @@ def test_missing_final_weight_evidence_is_released_as_not_verifiable() -> None:
     assert fields["owner_contract_released_at"] == OWNER_CONTRACT_RELEASED_AT
     assert fields["evaluated_at"] == EVALUATED_AT
     assert fields["released_at"] == RELEASED_AT
+    assert fields["superseded_at"] is None
 
 
 def test_non_reproducible_weight_evidence_keeps_exact_failed_receipt() -> None:
