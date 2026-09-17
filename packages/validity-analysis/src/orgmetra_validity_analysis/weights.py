@@ -122,19 +122,25 @@ class NonresponseAdjustmentReceipt:
 
 @dataclass(frozen=True, slots=True, repr=False)
 class CalibrationAdjustmentReceipt:
-    """Bind calibration to owner benchmarks, purpose authority, and termination evidence."""
+    """Bind calibration to owner authority, benchmarks, and termination evidence."""
 
     tenant_record_id: str
     receipt_reference: str
     target_population_digest: str
     analysis_window_reference: str
+    auxiliary_authority_reference: str
     auxiliary_projection_reference: str
     auxiliary_projection_digest: str
     auxiliary_purpose_reference: str
     auxiliary_purpose_digest: str
     auxiliary_owner_contract_reference: str
     auxiliary_owner_contract_version: int
+    auxiliary_owner_contract_digest: str
+    auxiliary_authorization_receipt_reference: str
     auxiliary_authorization_receipt_digest: str
+    auxiliary_scientific_use_receipt_reference: str
+    auxiliary_scientific_use_receipt_digest: str
+    auxiliary_scientific_use_at: datetime
     benchmark_receipt_reference: str
     benchmark_receipt_digest: str
     algorithm_reference: str
@@ -162,6 +168,11 @@ class CalibrationAdjustmentReceipt:
             "analysis_window_reference",
         )
         _validate_reference(
+            self.auxiliary_authority_reference,
+            "scientific_auxiliary_authority",
+            "auxiliary_authority_reference",
+        )
+        _validate_reference(
             self.auxiliary_projection_reference,
             "calibration_auxiliary_projection",
             "auxiliary_projection_reference",
@@ -181,6 +192,16 @@ class CalibrationAdjustmentReceipt:
             "auxiliary_owner_contract_version",
         )
         _validate_reference(
+            self.auxiliary_authorization_receipt_reference,
+            "scientific_data_authorization",
+            "auxiliary_authorization_receipt_reference",
+        )
+        _validate_reference(
+            self.auxiliary_scientific_use_receipt_reference,
+            "scientific_use_receipt",
+            "auxiliary_scientific_use_receipt_reference",
+        )
+        _validate_reference(
             self.benchmark_receipt_reference,
             "calibration_benchmark_receipt",
             "benchmark_receipt_reference",
@@ -194,7 +215,9 @@ class CalibrationAdjustmentReceipt:
             "target_population_digest",
             "auxiliary_projection_digest",
             "auxiliary_purpose_digest",
+            "auxiliary_owner_contract_digest",
             "auxiliary_authorization_receipt_digest",
+            "auxiliary_scientific_use_receipt_digest",
             "benchmark_receipt_digest",
             "constraints_digest",
             "input_weight_artifact_digest",
@@ -224,9 +247,16 @@ class CalibrationAdjustmentReceipt:
             raise ValueError(
                 "output_weight_artifact_digest must identify the calibrated weight artifact"
             )
+        scientific_use_at = _freeze_timestamp(
+            self.auxiliary_scientific_use_at,
+            "auxiliary_scientific_use_at",
+        )
         constructed_at = _freeze_timestamp(self.constructed_at, "constructed_at")
+        if scientific_use_at > constructed_at:
+            raise ValueError("auxiliary_scientific_use_at cannot be later than constructed_at")
         if type(self.evidence_version) is not int or self.evidence_version != 1:
             raise ValueError("evidence_version must remain 1")
+        object.__setattr__(self, "auxiliary_scientific_use_at", scientific_use_at)
         object.__setattr__(self, "constructed_at", constructed_at)
 
     def __repr__(self) -> str:
@@ -239,13 +269,22 @@ class CalibrationAdjustmentReceipt:
             "algorithm_reference": self.algorithm_reference,
             "algorithm_version": self.algorithm_version,
             "analysis_window_reference": self.analysis_window_reference,
+            "auxiliary_authority_reference": self.auxiliary_authority_reference,
             "auxiliary_authorization_receipt_digest": self.auxiliary_authorization_receipt_digest,
+            "auxiliary_authorization_receipt_reference": self.auxiliary_authorization_receipt_reference,
+            "auxiliary_owner_contract_digest": self.auxiliary_owner_contract_digest,
             "auxiliary_owner_contract_reference": self.auxiliary_owner_contract_reference,
             "auxiliary_owner_contract_version": self.auxiliary_owner_contract_version,
             "auxiliary_projection_digest": self.auxiliary_projection_digest,
             "auxiliary_projection_reference": self.auxiliary_projection_reference,
             "auxiliary_purpose_digest": self.auxiliary_purpose_digest,
             "auxiliary_purpose_reference": self.auxiliary_purpose_reference,
+            "auxiliary_scientific_use_at": _canonical_timestamp(
+                self.auxiliary_scientific_use_at,
+                "auxiliary_scientific_use_at",
+            ),
+            "auxiliary_scientific_use_receipt_digest": self.auxiliary_scientific_use_receipt_digest,
+            "auxiliary_scientific_use_receipt_reference": self.auxiliary_scientific_use_receipt_reference,
             "benchmark_receipt_digest": self.benchmark_receipt_digest,
             "benchmark_receipt_reference": self.benchmark_receipt_reference,
             "constraints_digest": self.constraints_digest,
