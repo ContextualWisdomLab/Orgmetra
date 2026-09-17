@@ -178,6 +178,8 @@ def test_missing_final_weight_evidence_is_released_as_not_verifiable() -> None:
             OWNER_DIGEST,
         )
     ]
+    assert view.tenant_record_id == TENANT
+    assert view.validity_study_id == STUDY
     fields = dict(view.fields)
     assert fields["verification_status"] == "not_verifiable"
     assert fields["failed_evidence_kind"] == "analysis_weight_receipt"
