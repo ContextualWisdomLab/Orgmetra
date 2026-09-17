@@ -83,7 +83,9 @@ _READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -248,7 +250,9 @@ class FinalAnalysisWeightAuthorityRecord(tuple):
         owner_contract_reference: str,
         owner_contract_version: int,
         owner_contract_digest: str,
+        owner_contract_released_at: datetime,
         released_at: datetime,
+        superseded_at: datetime | None = None,
     ) -> FinalAnalysisWeightAuthorityRecord:
         """Validate and detach the complete scientific point-weight lineage."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
@@ -397,9 +401,21 @@ class FinalAnalysisWeightAuthorityRecord(tuple):
             "owner_contract_version", owner_contract_version
         )
         owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
+        owner_release_instant = _require_aware_datetime(
+            "owner_contract_released_at", owner_contract_released_at
+        )
         release_instant = _require_aware_datetime("released_at", released_at)
         if release_instant < constructed:
             raise ValueError("released_at cannot precede constructed_at.")
+        if owner_release_instant > release_instant:
+            raise ValueError(
+                "owner contract must be released no later than the final analysis-weight authority"
+            )
+        supersession_instant = None
+        if superseded_at is not None:
+            supersession_instant = _require_aware_datetime("superseded_at", superseded_at)
+            if supersession_instant <= release_instant:
+                raise ValueError("superseded_at must be later than released_at")
 
         fields: tuple[tuple[str, object], ...] = (
             ("adjustments", tuple(detached_adjustments)),
@@ -440,7 +456,14 @@ class FinalAnalysisWeightAuthorityRecord(tuple):
         )
         return tuple.__new__(
             cls,
-            (tenant_identity, study_identity, fields, release_instant),
+            (
+                tenant_identity,
+                study_identity,
+                fields,
+                release_instant,
+                owner_release_instant,
+                supersession_instant,
+            ),
         )
 
     @property
@@ -462,6 +485,16 @@ class FinalAnalysisWeightAuthorityRecord(tuple):
     def released_at(self) -> datetime:
         """Return the owner-resolved release instant."""
         return self[3]
+
+    @property
+    def owner_contract_released_at(self) -> datetime:
+        """Return when the governing owner contract became released authority."""
+        return self[4]
+
+    @property
+    def superseded_at(self) -> datetime | None:
+        """Return the exclusive owner-resolved cutover instant, when one exists."""
+        return self[5]
 
 
 class FinalAnalysisWeightAuthorityView(tuple):
@@ -628,7 +661,9 @@ def resolve_final_analysis_weight_authority(
         owner_contract_reference=owner_contract_reference,
         owner_contract_version=owner_contract_version,
         owner_contract_digest=owner_contract_digest,
+        owner_contract_released_at=constructed_at,
         released_at=constructed_at,
+        superseded_at=None,
     )
     tenant_id = requested.tenant_record_id
     study_id = requested.validity_study_id
@@ -700,7 +735,9 @@ def resolve_final_analysis_weight_authority(
     record = FinalAnalysisWeightAuthorityRecord(
         tenant_record_id=persisted.tenant_record_id,
         validity_study_id=persisted.validity_study_id,
+        owner_contract_released_at=persisted.owner_contract_released_at,
         released_at=persisted.released_at,
+        superseded_at=persisted.superseded_at,
         **dict(persisted.fields),
     )
     if (
@@ -717,9 +754,15 @@ def resolve_final_analysis_weight_authority(
         raise FinalAnalysisWeightAuthorityIntegrityError(
             "final analysis-weight authority cannot be used before its release instant"
         )
+    if record.superseded_at is not None and use_instant >= record.superseded_at:
+        raise FinalAnalysisWeightAuthorityIntegrityError(
+            "final analysis-weight authority cannot be used at or after supersession"
+        )
 
     values = dict(record.fields)
+    values["owner_contract_released_at"] = record.owner_contract_released_at
     values["released_at"] = record.released_at
+    values["superseded_at"] = record.superseded_at
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
     return tuple.__new__(
         FinalAnalysisWeightAuthorityView,
