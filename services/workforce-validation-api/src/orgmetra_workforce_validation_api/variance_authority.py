@@ -65,7 +65,9 @@ _READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -146,7 +148,9 @@ class WeightVarianceAuthorityRecord(tuple):
         owner_contract_reference: str,
         owner_contract_version: int,
         owner_contract_digest: str,
+        owner_contract_released_at: datetime,
         released_at: datetime,
+        superseded_at: datetime | None = None,
     ) -> WeightVarianceAuthorityRecord:
         """Validate and detach the minimum immutable compatibility coordinates."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
@@ -202,7 +206,19 @@ class WeightVarianceAuthorityRecord(tuple):
         )
         owner_version = _require_positive_integer("owner_contract_version", owner_contract_version)
         owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
+        owner_release_instant = _require_aware_datetime(
+            "owner_contract_released_at", owner_contract_released_at
+        )
         release_instant = _require_aware_datetime("released_at", released_at)
+        if owner_release_instant > release_instant:
+            raise ValueError(
+                "owner contract must be released no later than the compatibility authority"
+            )
+        supersession_instant = None
+        if superseded_at is not None:
+            supersession_instant = _require_aware_datetime("superseded_at", superseded_at)
+            if supersession_instant <= release_instant:
+                raise ValueError("superseded_at must be later than released_at")
         return tuple.__new__(
             cls,
             (
@@ -228,6 +244,8 @@ class WeightVarianceAuthorityRecord(tuple):
                 owner_version,
                 owner_digest,
                 release_instant,
+                owner_release_instant,
+                supersession_instant,
             ),
         )
 
@@ -340,6 +358,16 @@ class WeightVarianceAuthorityRecord(tuple):
     def released_at(self) -> datetime:
         """Return the owner-resolved release instant for this authority evidence."""
         return self[21]
+
+    @property
+    def owner_contract_released_at(self) -> datetime:
+        """Return the owner-resolved release instant for the governing owner contract."""
+        return self[22]
+
+    @property
+    def superseded_at(self) -> datetime | None:
+        """Return the exclusive owner-resolved cutover instant, when one exists."""
+        return self[23]
 
 
 class WeightVarianceAuthorityView(tuple):
@@ -558,7 +586,9 @@ def resolve_weight_variance_authority(
         owner_contract_reference=persisted.owner_contract_reference,
         owner_contract_version=persisted.owner_contract_version,
         owner_contract_digest=persisted.owner_contract_digest,
+        owner_contract_released_at=persisted.owner_contract_released_at,
         released_at=persisted.released_at,
+        superseded_at=persisted.superseded_at,
     )
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
@@ -590,6 +620,10 @@ def resolve_weight_variance_authority(
         raise WeightVarianceAuthorityIntegrityError(
             "weight/variance authority cannot be used before its owner-resolved release instant"
         )
+    if record.superseded_at is not None and use_instant >= record.superseded_at:
+        raise WeightVarianceAuthorityIntegrityError(
+            "weight/variance authority cannot be used at or after owner-resolved supersession"
+        )
 
     values = {
         "authority_reference": record.authority_reference,
@@ -611,7 +645,9 @@ def resolve_weight_variance_authority(
         "owner_contract_reference": record.owner_contract_reference,
         "owner_contract_version": record.owner_contract_version,
         "owner_contract_digest": record.owner_contract_digest,
+        "owner_contract_released_at": record.owner_contract_released_at,
         "released_at": record.released_at,
+        "superseded_at": record.superseded_at,
     }
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
     return tuple.__new__(WeightVarianceAuthorityView, (tenant_identity, study_identity, fields))
