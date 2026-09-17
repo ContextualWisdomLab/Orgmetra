@@ -211,6 +211,8 @@ class ValidationResultNonVerifiabilityRecord(tuple):
             raise ValueError(
                 "failed_evidence_released_at cannot be later than evaluated_at."
             )
+        if evaluation_instant > release_instant:
+            raise ValueError("evaluated_at cannot be later than released_at.")
         if attempt_release < evaluation_instant:
             raise ValueError(
                 "verification_attempt_released_at cannot precede evaluated_at."
@@ -219,8 +221,6 @@ class ValidationResultNonVerifiabilityRecord(tuple):
             raise ValueError(
                 "verification_attempt_released_at cannot be later than released_at."
             )
-        if evaluation_instant > release_instant:
-            raise ValueError("evaluated_at cannot be later than released_at.")
         cutover = (
             None
             if superseded_at is None
