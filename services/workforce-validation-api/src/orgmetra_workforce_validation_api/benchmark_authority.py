@@ -86,8 +86,8 @@ class CalibrationBenchmarkAuthorityRecord(tuple):
     """Immutable owner projection for one released calibration benchmark.
 
     The record contains only opaque references, versions, digests, and temporal
-    release evidence. Benchmark totals and protected source attributes never cross
-    this application boundary.
+    release/correction evidence. Benchmark totals and protected source attributes
+    never cross this application boundary.
     """
 
     __slots__ = ()
@@ -106,6 +106,10 @@ class CalibrationBenchmarkAuthorityRecord(tuple):
         benchmark_reference_at: datetime,
         benchmark_receipt_released_at: datetime,
         owner_contract_released_at: datetime,
+        benchmark_receipt_superseded_at: datetime | None = None,
+        successor_benchmark_receipt_reference: str | None = None,
+        successor_benchmark_receipt_version: int | None = None,
+        successor_benchmark_receipt_digest: str | None = None,
     ) -> CalibrationBenchmarkAuthorityRecord:
         """Validate and detach all authority-bearing benchmark evidence."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
@@ -141,6 +145,52 @@ class CalibrationBenchmarkAuthorityRecord(tuple):
         contract_released_at = _require_aware_datetime(
             "owner_contract_released_at", owner_contract_released_at
         )
+
+        supersession_values = (
+            benchmark_receipt_superseded_at,
+            successor_benchmark_receipt_reference,
+            successor_benchmark_receipt_version,
+            successor_benchmark_receipt_digest,
+        )
+        if all(value is None for value in supersession_values):
+            superseded_at = None
+            successor_ref = None
+            successor_version = None
+            successor_digest = None
+        elif any(value is None for value in supersession_values):
+            raise ValueError(
+                "benchmark supersession requires time and complete successor receipt coordinates."
+            )
+        else:
+            superseded_at = _require_aware_datetime(
+                "benchmark_receipt_superseded_at", benchmark_receipt_superseded_at
+            )
+            successor_ref = _require_reference(
+                "successor_benchmark_receipt_reference",
+                successor_benchmark_receipt_reference,
+                "calibration_benchmark_receipt",
+            )
+            successor_version = _require_positive_integer(
+                "successor_benchmark_receipt_version",
+                successor_benchmark_receipt_version,
+            )
+            successor_digest = _require_digest(
+                "successor_benchmark_receipt_digest",
+                successor_benchmark_receipt_digest,
+            )
+            if superseded_at < benchmark_released_at:
+                raise ValueError(
+                    "benchmark_receipt_superseded_at cannot precede release."
+                )
+            if successor_version <= benchmark_version:
+                raise ValueError(
+                    "successor benchmark receipt version must advance monotonically."
+                )
+            if successor_digest == benchmark_digest:
+                raise ValueError(
+                    "successor benchmark receipt digest must identify new evidence."
+                )
+
         return tuple.__new__(
             cls,
             (
@@ -155,6 +205,10 @@ class CalibrationBenchmarkAuthorityRecord(tuple):
                 reference_at,
                 benchmark_released_at,
                 contract_released_at,
+                superseded_at,
+                successor_ref,
+                successor_version,
+                successor_digest,
             ),
         )
 
@@ -212,6 +266,26 @@ class CalibrationBenchmarkAuthorityRecord(tuple):
     def owner_contract_released_at(self) -> datetime:
         """Return when the benchmark-owner contract became released evidence."""
         return self[10]
+
+    @property
+    def benchmark_receipt_superseded_at(self) -> datetime | None:
+        """Return when this receipt stopped authorizing new scientific use."""
+        return self[11]
+
+    @property
+    def successor_benchmark_receipt_reference(self) -> str | None:
+        """Return the append-only successor receipt reference when corrected."""
+        return self[12]
+
+    @property
+    def successor_benchmark_receipt_version(self) -> int | None:
+        """Return the monotonically advanced successor receipt version."""
+        return self[13]
+
+    @property
+    def successor_benchmark_receipt_digest(self) -> str | None:
+        """Return the immutable successor evidence digest when corrected."""
+        return self[14]
 
 
 class CalibrationBenchmarkAuthorityView(tuple):
@@ -293,10 +367,11 @@ def resolve_calibration_benchmark_authority(
 ) -> CalibrationBenchmarkAuthorityView:
     """Authorize then corroborate the exact released benchmark tuple.
 
-    The owner must independently resolve both immutable release coordinates and
-    their release instants. ``used_at`` is the scientific receipt's use instant;
-    it cannot precede the benchmark receipt, owner contract, or benchmark
-    reference instant. No benchmark totals are returned.
+    The owner must independently resolve immutable release coordinates, release
+    instants, and append-only correction lineage. ``used_at`` is the scientific
+    receipt's use instant; it cannot precede release/reference authority or fall
+    on/after the receipt's owner-resolved supersession instant. No benchmark totals
+    or successor coordinates are returned to the caller.
     """
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
@@ -399,6 +474,14 @@ def resolve_calibration_benchmark_authority(
         benchmark_reference_at=persisted.benchmark_reference_at,
         benchmark_receipt_released_at=persisted.benchmark_receipt_released_at,
         owner_contract_released_at=persisted.owner_contract_released_at,
+        benchmark_receipt_superseded_at=persisted.benchmark_receipt_superseded_at,
+        successor_benchmark_receipt_reference=(
+            persisted.successor_benchmark_receipt_reference
+        ),
+        successor_benchmark_receipt_version=(
+            persisted.successor_benchmark_receipt_version
+        ),
+        successor_benchmark_receipt_digest=persisted.successor_benchmark_receipt_digest,
     )
     expected = (
         tenant_id,
@@ -433,6 +516,13 @@ def resolve_calibration_benchmark_authority(
     ):
         raise CalibrationBenchmarkAuthorityIntegrityError(
             "benchmark and owner evidence must exist no later than the scientific use instant"
+        )
+    if (
+        record.benchmark_receipt_superseded_at is not None
+        and record.benchmark_receipt_superseded_at <= use_instant
+    ):
+        raise CalibrationBenchmarkAuthorityIntegrityError(
+            "superseded benchmark evidence cannot authorize scientific use at or after correction"
         )
 
     fields: tuple[tuple[str, object], ...] = (
