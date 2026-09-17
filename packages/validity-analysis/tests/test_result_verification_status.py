@@ -43,11 +43,14 @@ def _result(*, converged: bool) -> ValidationAnalysisResult:
     )
 
 
-def test_converged_result_is_explicitly_verified() -> None:
+def test_converged_leaf_result_remains_verification_pending() -> None:
     candidate = _result(converged=True)
 
-    assert candidate.verification_status == "verified"
-    assert json.loads(candidate.canonical_json())["verification_status"] == "verified"
+    assert candidate.verification_status == "verification_pending"
+    assert (
+        json.loads(candidate.canonical_json())["verification_status"]
+        == "verification_pending"
+    )
 
 
 def test_nonconverged_result_is_explicitly_not_verifiable() -> None:
