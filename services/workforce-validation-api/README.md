@@ -1,84 +1,107 @@
 # Orgmetra Workforce Validation API
 
-This package is the application boundary for the `workforce_validation` bounded context. The current slice exposes purpose-bound owner reads for the existing validity-study registry header, value-minimized scientific auxiliary-use authority, released calibration-benchmark authority, point-weight/variance-design compatibility authority, and released validation-result binding while establishing the context-local PostgreSQL ownership bootstrap.
+This package is the canonical application boundary for the `workforce_validation` bounded context. It owns purpose-bound validation-study reads and scientific-evidence corroboration without copying People, Talent Acquisition, Performance Management, Job Architecture, Psychometrics Commons, fast-mlsirm, TEPP, or another bounded context's application tables.
 
-It does **not** query People, Talent Acquisition, Performance Management, Job Architecture, Psychometrics Commons, fast-mlsirm, TEPP, or another bounded context's application tables. Those contexts remain separate owners. Exact foreign identifiers and immutable specialist/scientific evidence cross this boundary only through released/versioned contracts and owner ports.
+Foreign domain truth crosses this boundary only through released/versioned contracts, opaque references, immutable evidence digests, and owner ports. Mutable `validity-analysis` source is not a runtime or source dependency of this service.
 
-## Current slice
+## Boundary invariants
 
-`read_validity_study(...)`:
+- Keyverse identity is consumed as structurally immutable authenticated identity attributes, never credentials.
+- Authorization is evaluated before an owner read.
+- Repository capabilities are checked with inert static lookup; inherited Protocol placeholders and executable descriptors are not accepted as owner implementations.
+- Tenant/study UUID identities are detached to exact integer payloads and reconstructed at public boundaries so retained UUID aliases cannot rewrite accepted authority.
+- Owner evidence is reconstructed into exact tuple-backed records before comparison or projection.
+- Returned views are field-minimized corroborating data. Their public constructors fail closed, and a view is not a reusable authorization credential.
+- Cross-context SQL, mutable branch dependencies, row-level statistical weights, replicate vectors, protected attributes, and foreign application-table values do not cross this application boundary.
 
-- accepts structurally immutable authenticated Keyverse identity attributes, not credentials;
-- reconstructs and revalidates principal storage before building the access request, so exact tuple type alone is not treated as identity authority;
-- requires both exact `UUID` outer type and exact built-in integer UUID payload before any sentinel/range comparison, so a forged exact UUID with executable internal storage is rejected without invoking caller-defined equality behavior;
-- stores UUID identity evidence behind the tuple-backed principal/record/view as exact integer payloads and reconstructs fresh UUID objects at public boundaries, so a retained UUID reference cannot rewrite accepted tenant/study/criterion identity through `object.__setattr__`;
-- preserves tenant/study authorization targets as immutable integer snapshots across the executable repository call, so a repository cannot make a foreign record self-consistent by mutating the UUID objects it receives;
-- inertly verifies that the owner repository exposes a statically callable `read_validity_study` capability before authorization, without executing caller-controlled descriptors;
-- evaluates tenant, purpose, operation, scope, resource, and requested fields before persistence;
-- calls only a `ValidityStudyReadPort` owned by this context;
-- reconstructs persisted registry scalars into structurally immutable owner evidence before target validation and output;
-- returns only the fields authorized for the exact study record; UUID-valued projected fields are reconstituted fresh rather than exposing mutable internal UUID aliases;
-- issues `ValidityStudyView` only from the authorized read path. Its public constructor fails closed, and the returned tuple-backed projection cannot be rewritten through ordinary assignment or `object.__setattr__`.
+## Validity-study registry
 
-`ValidityStudyView` is a data projection, not a durable authorization credential or cryptographic capability. Downstream consequential actions must perform their own purpose-bound authorization and authoritative re-resolution rather than treating the Python runtime type as reusable authority. Low-level interpreter construction is outside the supported public API and is not accepted as proof that authorization occurred.
+`read_validity_study(...)` authorizes the exact tenant/study/purpose/operation/field request, then reads through `ValidityStudyReadPort`. Persisted registry evidence is reconstructed before tenant/study validation and only authorized fields are returned.
 
-`resolve_calibration_auxiliary_authority(...)` is an executable owner-side slice for #407's durable scientific-evidence resolution gap. It does **not** import or copy the mutable validity-analysis implementation. Instead it defines the `workforce_validation` application contract that a later durable adapter must satisfy:
+`ValidityStudyView` is a minimized projection. Downstream consequential actions must perform their own purpose-bound authorization and authoritative re-resolution.
 
-- authorize the exact tenant/study scientific read before invoking the owner port;
-- carry only opaque projection/purpose/owner/authorization/scientific-use references, SHA-256 evidence digests, immutable projection/contract versions, the owner-resolved scientific-use instant, and authorization time bounds—never calibration source attributes, protected characteristics, benchmark values, or row-level weights;
-- require the exact purpose-limited auxiliary projection reference/version/digest rather than allowing a projection identity to float behind a digest or reference alone;
-- require a released-owner-contract reference/version and corroborating owner-contract digest rather than treating a caller-supplied version label as release authority;
-- require an immutable scientific-use receipt digest in the lookup and reconstruct the corresponding owner record, so a caller cannot choose a convenient historical `used_at` merely to fit a stale authorization interval;
-- require the caller's exact `used_at` coordinate to equal the owner-resolved `scientific_use_at`, while the record itself requires that instant to fall inside the owner-resolved authorization interval;
-- resolve through one statically captured `CalibrationAuxiliaryAuthorityReadPort` capability and reject inherited Protocol placeholders or descriptors before authorization;
-- reconstruct the returned evidence into an exact tuple-backed `CalibrationAuxiliaryAuthorityRecord` and require tenant, study, projection reference/version/digest, scientific purpose, released owner contract, authorization receipt, scientific-use receipt, and use time to match the requested coordinates;
-- issue only a minimized `CalibrationAuxiliaryAuthorityView`. The view is corroborating data, not a reusable authorization credential or proof that an arbitrary injected port is a production owner.
+## Calibration auxiliary authority
 
-`resolve_calibration_benchmark_authority(...)` addresses #407 RED #5 at the canonical service boundary. The scientific leaf carries benchmark receipt reference/version/digest, released benchmark-owner contract reference/version/digest, and benchmark reference time; this resolver requires an owner port to corroborate those exact coordinates rather than accepting the leaf tuple as authority. It:
+`resolve_calibration_auxiliary_authority(...)` corroborates #407's purpose-limited calibration input without copying protected source attributes. It binds:
 
-- authorizes the exact tenant/study read before any owner resolution and rejects inherited Protocol placeholders or descriptors as concrete repository capabilities;
-- verifies the calibration-benchmark receipt and its released owner contract through opaque references, positive versions, SHA-256 digests, and the exact benchmark reference instant;
-- obtains `benchmark_receipt_released_at` and `owner_contract_released_at` from owner evidence rather than from the caller, and rejects scientific use that predates either release or the benchmark reference instant;
-- requires the referenced owner contract to have been released no later than the benchmark receipt itself, so a receipt cannot retroactively claim authority from a contract that did not yet exist when the receipt became released evidence;
-- resolves append-only benchmark correction lineage from the owner: a superseded receipt carries a complete successor receipt reference/version/digest plus its owner-resolved release instant, the successor version must advance, and the successor digest must identify new evidence;
-- requires the successor receipt to be released after its predecessor and no later than the predecessor's supersession instant, so correction lineage cannot point to unavailable future evidence or reverse version chronology;
-- treats each benchmark receipt as authoritative only on its owner-resolved half-open interval `[benchmark_receipt_released_at, benchmark_receipt_superseded_at)`. Historical use before a later correction remains reproducible, while use at or after supersession fails closed;
-- keeps supersession/successor coordinates inside the authority check rather than expanding the public projection. The caller receives only the minimized benchmark evidence it requested, not correction-ledger internals;
-- reconstructs returned evidence into an exact tuple-backed `CalibrationBenchmarkAuthorityRecord` and fails closed on any tenant, study, receipt, owner-contract, digest, version, or reference-time mismatch;
-- returns only a minimized `CalibrationBenchmarkAuthorityView`; benchmark totals, protected auxiliary values, row-level weights, and foreign application-table values do not cross this boundary.
+- auxiliary authority reference;
+- auxiliary projection reference/version/digest;
+- scientific-use purpose reference/digest;
+- released owner-contract reference/version/digest;
+- authorization receipt reference/digest and owner-resolved authorization interval;
+- scientific-use receipt reference/digest and owner-resolved scientific-use instant.
 
-`resolve_weight_variance_authority(...)` closes a separate #406/#407 application false-GREEN: a scientific leaf can prove internally that a point-weight receipt and variance receipt have compatible digests, yet a durable service must not treat those caller-supplied coordinates as owner authority. This resolver therefore:
+Caller `used_at` must equal the owner-resolved scientific-use instant, and that instant must fall inside the owner-resolved authorization interval.
 
-- authorizes the exact tenant/study scientific read before invoking one statically captured `WeightVarianceAuthorityReadPort`, rejecting inherited Protocol placeholders and descriptors;
-- binds the released #405 sampling receipt reference/version/digest to the final analysis-weight receipt digest and the separate #406 variance-design receipt reference/version/digest;
-- mirrors the active scientific compatibility contract's decisive basis: exact analytic-case occurrence set, weight-eligibility receipt, integer correction sequence, and final point-weight artifact;
-- requires a controlled variance method reference/version, a controlled evidence mode (`joint_inclusion`, `reproducible_design_algorithm`, `replicate_weights`, or explicit `approximation`), and exact-versus-approximate semantics; an approximation cannot be labelled exact;
-- rejects a variance-design receipt digest that aliases the final point-weight receipt digest;
-- requires a released owner-contract reference/version/digest and owner-resolved `released_at`, rejecting use before that release instant;
-- reconstructs owner evidence into an exact tuple-backed `WeightVarianceAuthorityRecord` and fails closed if any requested scientific coordinate differs from the owner projection;
-- returns only a minimized `WeightVarianceAuthorityView`. It never copies row-level point weights, replicate vectors, frame/cluster/stratum variables, protected characteristics, or foreign application-table values.
+## Calibration benchmark authority
 
-`resolve_validation_result_authority(...)` closes the next #407 result-binding gap. The scientific leaf's canonical result serializes a digest of the exact `WeightVarianceCompatibilityReceipt`, but point/variance corroboration alone does not prove which compatibility receipt one released result actually bound. The result resolver therefore:
+`resolve_calibration_benchmark_authority(...)` corroborates the benchmark tuple used by a calibration receipt:
 
-- authorizes the exact tenant/study scientific read before invoking one statically captured `ValidationResultAuthorityReadPort`;
-- binds the immutable validation-result reference/digest to the exact compatibility-receipt reference/digest and, independently, the final analysis-weight and variance-design receipt digests;
-- requires those four evidence digests to be distinct so a result, compatibility receipt, point-weight receipt, and variance receipt cannot alias one another;
-- preserves only the scientific leaf's non-authorizing verification states: `verification_pending` and `not_verifiable`. A caller or owner port cannot promote convergence to `verified` at this boundary;
-- requires an exact released owner-contract reference/version/digest and owner-resolved release instant, rejecting use before release;
-- passes every caller coordinate into the owner lookup, reconstructs the returned tuple-backed record, then exact-matches tenant, study, result, compatibility, point-weight, variance, status, and owner-contract coordinates before issuing a view;
-- returns only a minimized `ValidationResultAuthorityView`. Effect estimates, uncertainty values, row-level weights, replicate vectors, protected attributes, and foreign application-table values do not cross this owner-corroboration boundary.
+- benchmark receipt reference/version/digest;
+- released benchmark-owner contract reference/version/digest;
+- benchmark reference instant and owner-resolved release instants;
+- append-only predecessor/successor correction lineage when a benchmark is superseded.
 
-These application contracts do **not** complete #407 and do not make an arbitrary injected Python port durable scientific authority. The current branch has no durable scientific-authority relation or released auxiliary/benchmark/variance/result-evidence adapter. After the canonical owner persistence path is protected truth, #248 or its verified successor must implement schema-qualified least-privilege durable ports and prove that resolved owner evidence is itself released/versioned, append-only where corrected, purpose-authorized, and result-bound. Mutable #57 source is not a runtime or source dependency of this service; its active compatibility, benchmark, and result contracts were used only to align the application boundary's evidence coordinates.
+The owner contract must already be released when the benchmark receipt becomes released evidence. A successor must advance the version, identify new evidence, be released after its predecessor, and exist no later than the predecessor's supersession instant. A predecessor is authoritative only on its owner-resolved half-open interval `[benchmark_receipt_released_at, benchmark_receipt_superseded_at)`.
 
-`services/workforce-validation-api/database/migrations/0001_owner_schema.sql` starts this bounded context's own migration history. It creates the `workforce_validation` schema and deny-default `workforce_validation_role`, revokes public schema access, and intentionally creates or moves no application table yet. The role is a **NOLOGIN migration/schema owner only**; runtime principals must not be granted that owner role. PostgreSQL applies role-level configuration defaults at login and does not re-apply them on `SET ROLE`, so an `ALTER ROLE ... SET search_path` entry on this NOLOGIN role is not treated as a runtime isolation control. The later durable adapter must use a distinct least-privilege runtime role, schema-qualified `workforce_validation` relations, and explicit function-level `search_path` where `SECURITY DEFINER` code is introduced.
+## Point-weight / variance authority
 
-Protected foundation migrations still create validity-study tables in the legacy foundation schema, so the next forward-only persistence increment must adopt those records without normalizing `public.validity_study` as a long-lived service contract or breaking existing linkage evidence.
+`resolve_weight_variance_authority(...)` corroborates point-estimation and variance evidence without treating leaf-provided digests as owner authority. It binds:
 
-Issue #234 owns the remaining order: durable owner-schema adoption and PostgreSQL adapter, idempotent registration, explicit predictor/sample/decision-policy/analysis-protocol versions, scientific adapters, OpenAPI/gateway exposure, and realistic p95 measurement. Issues #236–#244 retain the current bootstrap trust-boundary findings through exact-head acceptance and protected integration: persisted-record immutability, principal immutability and constructor revalidation, owner-role/runtime-role separation, inert repository-capability validation, immutable minimized output, non-public issuance of that output, detached UUID storage/target snapshots, and exact validation of UUID internal payloads before comparison. Issue #407 additionally keeps durable scientific-authority resolution open until owner persistence/released evidence, exact result-to-weight/variance binding, exact-head GREEN, independent review, and protected integration are real.
+- released #405 sampling receipt reference/version/digest;
+- final analysis-weight receipt digest;
+- exact analytic-case occurrence set;
+- weight-eligibility receipt digest;
+- integer correction sequence;
+- final point-weight artifact digest;
+- distinct #406 variance-design receipt reference/version/digest;
+- controlled variance method/version, evidence mode, and exact/approximate semantics;
+- released owner-contract reference/version/digest and owner-resolved release instant.
 
-## Test
+A variance receipt cannot alias the point-weight receipt, and an approximation cannot be represented as exact evidence.
 
-The Draft branch is admitted to the canonical Foundation quality workflow with the same hash-locked test toolchain and direct source-tree dependency policy used by the existing owner services:
+## Released validation-result authority
+
+`resolve_validation_result_authority(...)` binds one immutable validation result to the exact weight/variance evidence it claims to use. It requires:
+
+- result reference/digest;
+- exact `WeightVarianceCompatibilityReceipt` reference/digest;
+- final analysis-weight receipt digest;
+- separate variance-design receipt digest;
+- non-authorizing `verification_pending | not_verifiable` state;
+- released owner-contract reference/version/digest and owner-resolved release instant.
+
+Result, compatibility, point-weight, and variance digests must be pairwise distinct. Numerical convergence cannot be promoted to `verified` at this boundary.
+
+## Released non-verifiability outcome
+
+`resolve_validation_result_nonverifiability(...)` is the application repair for #407 RED #12. The ordinary result-authority contract requires exact compatibility/point-weight/variance digests, so it cannot represent the case where required evidence itself is missing or cannot be reproduced. This separate contract makes that failure explicit and non-authorizing instead of allowing callers to treat lookup failure as scientific GREEN.
+
+`ValidationResultNonVerifiabilityRecord` fixes `verification_status` to `not_verifiable` and records exactly one failed evidence family:
+
+- `analysis_weight_receipt`;
+- `weight_variance_compatibility_receipt`; or
+- `variance_design_receipt`.
+
+`failure_mode` is `missing` or `non_reproducible`.
+
+For `missing`, failed-evidence reference/digest must both be absent; the service does not fabricate an opaque identity for evidence that does not exist. For `non_reproducible`, the exact typed failed-evidence reference and digest are required. Every released outcome additionally binds an immutable `validation_evidence_verification_attempt` reference/digest, released owner-contract reference/version/digest, `evaluated_at`, and `released_at`. Result, failed-evidence when present, verification-attempt, and owner-contract digests must be distinct. Evaluation may not occur after release, and the outcome cannot be consumed before release.
+
+Authorization occurs before `ValidationResultNonVerifiabilityReadPort` resolution. Returned `ValidationResultNonVerifiabilityView` contains only the minimized reason/provenance tuple; effect estimates, uncertainty values, row-level weights, replicate vectors, protected attributes, and foreign application data are excluded.
+
+This is still application-boundary corroboration, not durable scientific authority. A later owner persistence adapter must establish missing/non-reproducible evidence from released owner/verification-attempt evidence rather than from cross-context SQL, missing joins, or swallowed exceptions.
+
+## Persistence state
+
+`services/workforce-validation-api/database/migrations/0001_owner_schema.sql` starts this bounded context's migration history. It creates the `workforce_validation` schema and a deny-default `workforce_validation_role`, revokes public schema access, and intentionally creates or moves no application table yet.
+
+The schema owner is NOLOGIN and is not a runtime isolation control. PostgreSQL role-level `search_path` defaults are applied at login and are not re-applied by `SET ROLE`. A durable runtime adapter therefore needs a distinct least-privilege runtime role, schema-qualified relations, and explicit function-level `search_path` for any future `SECURITY DEFINER` function.
+
+Protected foundation migrations still hold validity-study relations in the legacy foundation schema. PR #248 or a verified successor owns forward owner-schema adoption after this application owner reaches normal protected integration. It must preserve valid persistence/FK/RLS/ACL evidence and implement durable released-evidence ports for calibration auxiliary, calibration benchmark, point-weight/variance, validation-result binding, and validation-result non-verifiability.
+
+## Test contract
+
+The service is admitted to the canonical Foundation quality workflow with a 100% owned statement and branch threshold:
 
 ```bash
 PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src \
@@ -87,8 +110,8 @@ PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src \
   services/workforce-validation-api/tests
 ```
 
-The service package keeps an exact 100% owned statement/branch threshold. Calibration-authority coverage exercises authorization-before-owner-read, non-concrete/dynamic owner capabilities, malformed references/digests/versions/timestamps, projection-version mismatch, foreign/mismatched owner evidence, caller/owner scientific-use-time mismatch, authorization-window mismatch, UUID alias mutation, structural immutability, and non-public view issuance. Calibration-benchmark coverage additionally exercises exact receipt/owner-contract coordinate mismatch, owner-resolved release-time enforcement, owner-contract-before-receipt chronology, future-reference rejection, append-only supersession completeness and monotonicity, successor release ordering, historical pre-supersession use, rejection at/after supersession, malformed references/digests/versions/timestamps, foreign tenant/study evidence, detached UUID views, structural immutability, and non-public output issuance. Weight/variance-authority coverage exercises every owner-coordinate mismatch, point/variance evidence aliasing, unsupported evidence modes and semantics, approximation-labelled-as-exact, pre-release use, foreign tenant/study evidence, integer correction-sequence mismatches, detached UUID views, and non-public output issuance. Result-authority coverage adds exact result/compatibility/point-weight/variance tuple lookup, digest-alias rejection, non-authorizing status enforcement, authorization-before-owner-read, non-concrete capability rejection, owner-coordinate mismatch, pre-release use, cross-tenant evidence rejection, structural immutability, and non-public output issuance.
+`tests/test_workforce_validation_owner_schema_postgres.sh` separately executes the service-local migration against pinned PostgreSQL 16.14 and checks deny-default owner-role/schema behavior, actual `SET ROLE` search-path behavior, PUBLIC privileges, and absence of application relations in the bootstrap schema.
 
-The same Foundation job also runs `tests/test_workforce_validation_owner_schema_postgres.sh` in its own pinned PostgreSQL 16.14 container. That contract executes the service-local owner migration and checks the exact deny-default role flags, schema owner, absence of ineffective login-only `rolconfig`, actual `SET ROLE` search-path behavior, absence of inherited PUBLIC `USAGE`/`CREATE`, and absence of application relations in the bootstrap schema. The test intentionally demonstrates that `SET ROLE` retains the caller's existing `search_path`; runtime isolation therefore cannot be inferred from owner-role metadata.
+Scientific-authority tests cover authorization-before-owner-read, static port validation, malformed references/digests/versions/timestamps, exact owner-coordinate matching, UUID detachment/alias attacks, structural immutability, non-public view issuance, benchmark correction chronology, point/variance evidence compatibility, validation-result binding, and explicit missing/non-reproducible result evidence.
 
-Those source contracts are not terminal acceptance by themselves. The slice remains Draft until the exact current head actually executes with 100% owned statement/branch coverage, the PostgreSQL owner-schema contract is GREEN, applicable security workflows are terminal, and the normal review/governance requirements are satisfied. Only then may the next forward-only owner-table adoption and durable adapter be treated as eligible for integration.
+These source contracts are not terminal acceptance by themselves. The PR remains Draft until the exact current head executes with 100% owned statement/branch coverage, the PostgreSQL owner-schema contract is GREEN, applicable security workflows are terminal, and normal independent review/governance requirements are satisfied. Only protected/released owner evidence may be consumed as durable scientific authority.
