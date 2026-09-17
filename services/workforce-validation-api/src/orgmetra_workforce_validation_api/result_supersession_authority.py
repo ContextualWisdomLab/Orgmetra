@@ -176,9 +176,9 @@ class ValidationResultSupersessionAuthorityRecord(tuple):
                 raise ValueError(
                     "successor validation result must be released after its predecessor."
                 )
-            if successor_release > cutover:
+            if successor_release != cutover:
                 raise ValueError(
-                    "successor validation result must be released no later than supersession."
+                    "successor validation result must be released exactly at supersession."
                 )
 
         current_fields: tuple[tuple[str, object], ...] = (
