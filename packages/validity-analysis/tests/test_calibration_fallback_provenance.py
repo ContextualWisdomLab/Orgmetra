@@ -100,6 +100,28 @@ def test_fallback_rejects_incomplete_actual_method_provenance(
         calibration_receipt(**{field_name: value})
 
 
+@pytest.mark.parametrize(
+    ("field_name", "value", "message"),
+    [
+        ("fallback_reason_code", "", "fallback_reason_code"),
+        ("fallback_rule_reference", "fallback-rule-v1", "fallback_rule_reference"),
+        ("fallback_rule_digest", "not-a-digest", "fallback_rule_digest"),
+        ("fallback_algorithm_reference", "weight_method:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "fallback_algorithm_reference"),
+        ("fallback_algorithm_version", 0, "fallback_algorithm_version"),
+        ("fallback_algorithm_version", True, "fallback_algorithm_version"),
+        ("fallback_configuration_digest", "not-a-digest", "fallback_configuration_digest"),
+    ],
+)
+def test_fallback_rejects_malformed_generating_method_provenance(
+    field_name: str,
+    value: object,
+    message: str,
+) -> None:
+    """Fallback provenance must be typed and reproducible, not merely present."""
+    with pytest.raises(ValueError, match=message):
+        calibration_receipt(**{field_name: value})
+
+
 def test_converged_calibration_rejects_fallback_only_fields() -> None:
     """Fallback evidence must not contaminate a genuinely converged primary algorithm."""
     with pytest.raises(ValueError, match="fallback"):
