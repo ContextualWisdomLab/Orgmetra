@@ -1,5 +1,13 @@
 """Canonical workforce-validation application contracts for Orgmetra."""
 
+from orgmetra_workforce_validation_api.benchmark_authority import (
+    CalibrationBenchmarkAuthorityIntegrityError,
+    CalibrationBenchmarkAuthorityNotFound,
+    CalibrationBenchmarkAuthorityReadPort,
+    CalibrationBenchmarkAuthorityRecord,
+    CalibrationBenchmarkAuthorityView,
+    resolve_calibration_benchmark_authority,
+)
 from orgmetra_workforce_validation_api.registry import (
     ValidationPrincipal,
     ValidityStudyIntegrityError,
@@ -32,6 +40,11 @@ __all__ = [
     "CalibrationAuxiliaryAuthorityReadPort",
     "CalibrationAuxiliaryAuthorityRecord",
     "CalibrationAuxiliaryAuthorityView",
+    "CalibrationBenchmarkAuthorityIntegrityError",
+    "CalibrationBenchmarkAuthorityNotFound",
+    "CalibrationBenchmarkAuthorityReadPort",
+    "CalibrationBenchmarkAuthorityRecord",
+    "CalibrationBenchmarkAuthorityView",
     "ValidationPrincipal",
     "ValidityStudyIntegrityError",
     "ValidityStudyNotFound",
@@ -45,5 +58,6 @@ __all__ = [
     "WeightVarianceAuthorityView",
     "read_validity_study",
     "resolve_calibration_auxiliary_authority",
+    "resolve_calibration_benchmark_authority",
     "resolve_weight_variance_authority",
 ]
