@@ -173,6 +173,9 @@ class ValidationAnalysisResult:
     contains_raw_person_level_values: bool = False
     human_review_required: bool = True
     evidence_version: int = 1
+    correction_sequence: int = 1
+    supersedes_result_reference: str | None = None
+    supersedes_result_digest: str | None = None
 
     def __post_init__(self) -> None:
         """Fail closed on malformed, unlinked, or decision-like result data."""
@@ -197,7 +200,7 @@ class ValidationAnalysisResult:
         if type(self.missingness_summary) is not MissingnessSummary:
             raise ValueError("missingness_summary must be a MissingnessSummary")
         if type(self.convergence_diagnostics) is not ConvergenceDiagnostics:
-            raise ValueError("convergence_diagnostics must be ConvergenceDiagnostics")
+            raise ValueError("convergence_diagnostics must be a ConvergenceDiagnostics")
         if self.sample_size != self.missingness_summary.total_observations:
             raise ValueError("sample_size must match total_observations")
         completed_at = _freeze_timestamp(self.completed_at, "completed_at")
@@ -272,6 +275,28 @@ class ValidationAnalysisResult:
             raise ValueError("human review is mandatory for validity interpretation")
         if type(self.evidence_version) is not int or self.evidence_version != 1:
             raise ValueError("evidence_version must remain 1")
+        _validate_positive_integer(self.correction_sequence, "correction_sequence")
+        if self.correction_sequence == 1:
+            if (
+                self.supersedes_result_reference is not None
+                or self.supersedes_result_digest is not None
+            ):
+                raise ValueError(
+                    "correction_sequence 1 must not identify superseded result evidence"
+                )
+        else:
+            if self.supersedes_result_reference is None or self.supersedes_result_digest is None:
+                raise ValueError(
+                    "corrected result requires supersedes_result_reference and supersedes_result_digest"
+                )
+            _validate_reference(
+                self.supersedes_result_reference,
+                "validation_analysis_result",
+                "supersedes_result_reference",
+            )
+            _validate_digest(self.supersedes_result_digest, "supersedes_result_digest")
+            if self.supersedes_result_reference == self.result_reference:
+                raise ValueError("corrected result must use a new result_reference")
         object.__setattr__(self, "effect_estimate", estimate)
         object.__setattr__(self, "uncertainty_lower", lower)
         object.__setattr__(self, "uncertainty_upper", upper)
@@ -297,6 +322,7 @@ class ValidationAnalysisResult:
             "completed_at": _canonical_timestamp(self.completed_at, "completed_at"),
             "contains_raw_person_level_values": self.contains_raw_person_level_values,
             "convergence_diagnostics": self.convergence_diagnostics.to_dict(),
+            "correction_sequence": self.correction_sequence,
             "effect_estimate": float(self.effect_estimate),
             "evidence_version": self.evidence_version,
             "execution_state": self.execution_state,
@@ -324,6 +350,9 @@ class ValidationAnalysisResult:
             payload["weight_variance_compatibility_receipt_digest"] = (
                 self.weight_variance_compatibility.sha256_digest()
             )
+        if self.supersedes_result_reference is not None:
+            payload["supersedes_result_reference"] = self.supersedes_result_reference
+            payload["supersedes_result_digest"] = self.supersedes_result_digest
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
     def sha256_digest(self) -> str:
