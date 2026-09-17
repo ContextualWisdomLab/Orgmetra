@@ -51,9 +51,9 @@ _READ_FIELDS = frozenset(
         "sampling_receipt_version",
         "sampling_receipt_digest",
         "analysis_weight_receipt_digest",
-        "analytic_case_set_digest",
+        "analytic_case_occurrence_set_digest",
         "weight_eligibility_receipt_digest",
-        "correction_sequence_digest",
+        "weight_correction_sequence",
         "final_weight_artifact_digest",
         "variance_design_receipt_reference",
         "variance_design_receipt_version",
@@ -132,9 +132,9 @@ class WeightVarianceAuthorityRecord(tuple):
         sampling_receipt_version: int,
         sampling_receipt_digest: str,
         analysis_weight_receipt_digest: str,
-        analytic_case_set_digest: str,
+        analytic_case_occurrence_set_digest: str,
         weight_eligibility_receipt_digest: str,
-        correction_sequence_digest: str,
+        weight_correction_sequence: int,
         final_weight_artifact_digest: str,
         variance_design_receipt_reference: str,
         variance_design_receipt_version: int,
@@ -164,12 +164,14 @@ class WeightVarianceAuthorityRecord(tuple):
         point_digest = _require_digest(
             "analysis_weight_receipt_digest", analysis_weight_receipt_digest
         )
-        case_digest = _require_digest("analytic_case_set_digest", analytic_case_set_digest)
+        case_digest = _require_digest(
+            "analytic_case_occurrence_set_digest", analytic_case_occurrence_set_digest
+        )
         eligibility_digest = _require_digest(
             "weight_eligibility_receipt_digest", weight_eligibility_receipt_digest
         )
-        correction_digest = _require_digest(
-            "correction_sequence_digest", correction_sequence_digest
+        correction_sequence = _require_positive_integer(
+            "weight_correction_sequence", weight_correction_sequence
         )
         final_digest = _require_digest("final_weight_artifact_digest", final_weight_artifact_digest)
         variance_ref = _require_reference(
@@ -183,6 +185,10 @@ class WeightVarianceAuthorityRecord(tuple):
         variance_digest = _require_digest(
             "variance_design_receipt_digest", variance_design_receipt_digest
         )
+        if variance_digest == point_digest:
+            raise ValueError(
+                "variance_design_receipt_digest must identify evidence distinct from the analysis weight receipt."
+            )
         method_ref = _require_reference(
             "variance_method_reference", variance_method_reference, "variance_method"
         )
@@ -209,7 +215,7 @@ class WeightVarianceAuthorityRecord(tuple):
                 point_digest,
                 case_digest,
                 eligibility_digest,
-                correction_digest,
+                correction_sequence,
                 final_digest,
                 variance_ref,
                 variance_version,
@@ -261,8 +267,8 @@ class WeightVarianceAuthorityRecord(tuple):
         return self[6]
 
     @property
-    def analytic_case_set_digest(self) -> str:
-        """Return the exact ordered analytic-case evidence digest."""
+    def analytic_case_occurrence_set_digest(self) -> str:
+        """Return the exact ordered analytic-case occurrence-set digest."""
         return self[7]
 
     @property
@@ -271,8 +277,8 @@ class WeightVarianceAuthorityRecord(tuple):
         return self[8]
 
     @property
-    def correction_sequence_digest(self) -> str:
-        """Return the append-only point-weight correction sequence digest."""
+    def weight_correction_sequence(self) -> int:
+        """Return the append-only point-weight correction sequence."""
         return self[9]
 
     @property
@@ -406,9 +412,9 @@ def resolve_weight_variance_authority(
     sampling_receipt_version: int,
     sampling_receipt_digest: str,
     analysis_weight_receipt_digest: str,
-    analytic_case_set_digest: str,
+    analytic_case_occurrence_set_digest: str,
     weight_eligibility_receipt_digest: str,
-    correction_sequence_digest: str,
+    weight_correction_sequence: int,
     final_weight_artifact_digest: str,
     variance_design_receipt_reference: str,
     variance_design_receipt_version: int,
@@ -452,11 +458,15 @@ def resolve_weight_variance_authority(
     )
     sampling_digest = _require_digest("sampling_receipt_digest", sampling_receipt_digest)
     point_digest = _require_digest("analysis_weight_receipt_digest", analysis_weight_receipt_digest)
-    case_digest = _require_digest("analytic_case_set_digest", analytic_case_set_digest)
+    case_digest = _require_digest(
+        "analytic_case_occurrence_set_digest", analytic_case_occurrence_set_digest
+    )
     eligibility_digest = _require_digest(
         "weight_eligibility_receipt_digest", weight_eligibility_receipt_digest
     )
-    correction_digest = _require_digest("correction_sequence_digest", correction_sequence_digest)
+    correction_sequence = _require_positive_integer(
+        "weight_correction_sequence", weight_correction_sequence
+    )
     final_digest = _require_digest("final_weight_artifact_digest", final_weight_artifact_digest)
     variance_ref = _require_reference(
         "variance_design_receipt_reference",
@@ -469,6 +479,10 @@ def resolve_weight_variance_authority(
     variance_digest = _require_digest(
         "variance_design_receipt_digest", variance_design_receipt_digest
     )
+    if variance_digest == point_digest:
+        raise ValueError(
+            "variance_design_receipt_digest must identify evidence distinct from the analysis weight receipt."
+        )
     method_ref = _require_reference(
         "variance_method_reference", variance_method_reference, "variance_method"
     )
@@ -530,9 +544,9 @@ def resolve_weight_variance_authority(
         sampling_receipt_version=persisted.sampling_receipt_version,
         sampling_receipt_digest=persisted.sampling_receipt_digest,
         analysis_weight_receipt_digest=persisted.analysis_weight_receipt_digest,
-        analytic_case_set_digest=persisted.analytic_case_set_digest,
+        analytic_case_occurrence_set_digest=persisted.analytic_case_occurrence_set_digest,
         weight_eligibility_receipt_digest=persisted.weight_eligibility_receipt_digest,
-        correction_sequence_digest=persisted.correction_sequence_digest,
+        weight_correction_sequence=persisted.weight_correction_sequence,
         final_weight_artifact_digest=persisted.final_weight_artifact_digest,
         variance_design_receipt_reference=persisted.variance_design_receipt_reference,
         variance_design_receipt_version=persisted.variance_design_receipt_version,
@@ -555,9 +569,9 @@ def resolve_weight_variance_authority(
         or record.sampling_receipt_version != sampling_version
         or record.sampling_receipt_digest != sampling_digest
         or record.analysis_weight_receipt_digest != point_digest
-        or record.analytic_case_set_digest != case_digest
+        or record.analytic_case_occurrence_set_digest != case_digest
         or record.weight_eligibility_receipt_digest != eligibility_digest
-        or record.correction_sequence_digest != correction_digest
+        or record.weight_correction_sequence != correction_sequence
         or record.final_weight_artifact_digest != final_digest
         or record.variance_design_receipt_reference != variance_ref
         or record.variance_design_receipt_version != variance_version
@@ -583,9 +597,9 @@ def resolve_weight_variance_authority(
         "sampling_receipt_version": record.sampling_receipt_version,
         "sampling_receipt_digest": record.sampling_receipt_digest,
         "analysis_weight_receipt_digest": record.analysis_weight_receipt_digest,
-        "analytic_case_set_digest": record.analytic_case_set_digest,
+        "analytic_case_occurrence_set_digest": record.analytic_case_occurrence_set_digest,
         "weight_eligibility_receipt_digest": record.weight_eligibility_receipt_digest,
-        "correction_sequence_digest": record.correction_sequence_digest,
+        "weight_correction_sequence": record.weight_correction_sequence,
         "final_weight_artifact_digest": record.final_weight_artifact_digest,
         "variance_design_receipt_reference": record.variance_design_receipt_reference,
         "variance_design_receipt_version": record.variance_design_receipt_version,
