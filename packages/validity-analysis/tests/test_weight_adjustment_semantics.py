@@ -29,6 +29,8 @@ def nonresponse_receipt(**overrides: object) -> NonresponseAdjustmentReceipt:
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
         "receipt_reference": "nonresponse_adjustment_receipt:11111111-1111-4111-8111-111111111111",
+        "response_disposition_receipt_reference": "response_disposition_receipt:11111111-1111-4111-8111-111111111112",
+        "response_disposition_receipt_version": 3,
         "response_disposition_receipt_digest": DIGEST_A,
         "adjustment_population_digest": DIGEST_B,
         "method_reference": "weight_method:22222222-2222-4222-8222-222222222222",
@@ -95,14 +97,28 @@ def adjustment(*, code: str, evidence_kind: str) -> AnalysisWeightAdjustment:
 
 
 def test_nonresponse_receipt_is_value_minimized_and_disposition_aware() -> None:
-    """Preserve explicit disposition treatment without copying source attributes."""
+    """Preserve exact versioned disposition input without copying source attributes."""
     candidate = nonresponse_receipt()
+    canonical = candidate.canonical_json()
     assert candidate.sha256_digest() == nonresponse_receipt().sha256_digest()
-    assert '"unknown_treatment_code":"retain_in_unknown_class"' in candidate.canonical_json()
-    assert "person_record" not in candidate.canonical_json()
-    assert "protected_attribute" not in candidate.canonical_json()
+    assert (
+        '"response_disposition_receipt_reference":'
+        '"response_disposition_receipt:11111111-1111-4111-8111-111111111112"'
+        in canonical
+    )
+    assert '"response_disposition_receipt_version":3' in canonical
+    assert f'"response_disposition_receipt_digest":"{DIGEST_A}"' in canonical
+    assert '"unknown_treatment_code":"retain_in_unknown_class"' in canonical
+    assert "person_record" not in canonical
+    assert "protected_attribute" not in canonical
     assert repr(candidate) == "NonresponseAdjustmentReceipt(<redacted>)"
 
+    with pytest.raises(ValueError, match="response_disposition_receipt_reference"):
+        nonresponse_receipt(response_disposition_receipt_reference="dispositions-v3")
+    with pytest.raises(ValueError, match="response_disposition_receipt_version"):
+        nonresponse_receipt(response_disposition_receipt_version=0)
+    with pytest.raises(ValueError, match="response_disposition_receipt_version"):
+        nonresponse_receipt(response_disposition_receipt_version=True)
     with pytest.raises(ValueError, match="unknown_treatment_code"):
         nonresponse_receipt(unknown_treatment_code="")
     with pytest.raises(ValueError, match="output_weight_artifact_digest"):
