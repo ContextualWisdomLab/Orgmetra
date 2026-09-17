@@ -543,14 +543,38 @@ class FinalAnalysisWeightAuthorityReadPort(Protocol):
         analysis_weight_receipt_reference: str,
         analysis_weight_receipt_digest: str,
         evidence_version: int,
+        estimand_reference: str,
+        estimand_digest: str,
+        estimand_scope_code: str,
+        target_population_reference: str,
+        target_population_digest: str,
+        analysis_unit_code: str,
+        analysis_window_reference: str,
+        reference_duration_reference: str,
+        reference_duration_digest: str,
+        eligible_case_set_digest: str,
+        analytic_case_occurrence_set_digest: str,
         source_universe_receipt_reference: str,
         source_universe_receipt_version: int,
         source_universe_receipt_digest: str,
         sampling_design_receipt_reference: str,
         sampling_design_receipt_version: int,
         sampling_design_receipt_digest: str,
+        base_weight_method_code: str,
+        base_weight_method_version: int,
+        base_weight_evidence_digest: str,
+        base_weight_artifact_digest: str,
+        adjustments: tuple[FinalWeightAdjustmentCoordinate, ...],
+        final_weight_artifact_digest: str,
+        weight_eligibility_receipt_reference: str,
+        weight_eligibility_receipt_digest: str,
+        analytic_case_count: int,
+        constructed_at: datetime,
+        correction_sequence: int,
+        supersedes_receipt_digest: str | None,
         owner_contract_reference: str,
         owner_contract_version: int,
+        owner_contract_digest: str,
     ) -> FinalAnalysisWeightAuthorityRecord | None:
         """Return matching released final-weight evidence or ``None``."""
         ...
@@ -704,6 +728,19 @@ def resolve_final_analysis_weight_authority(
             "analysis_weight_receipt_digest"
         ],
         evidence_version=requested_values["evidence_version"],
+        estimand_reference=requested_values["estimand_reference"],
+        estimand_digest=requested_values["estimand_digest"],
+        estimand_scope_code=requested_values["estimand_scope_code"],
+        target_population_reference=requested_values["target_population_reference"],
+        target_population_digest=requested_values["target_population_digest"],
+        analysis_unit_code=requested_values["analysis_unit_code"],
+        analysis_window_reference=requested_values["analysis_window_reference"],
+        reference_duration_reference=requested_values["reference_duration_reference"],
+        reference_duration_digest=requested_values["reference_duration_digest"],
+        eligible_case_set_digest=requested_values["eligible_case_set_digest"],
+        analytic_case_occurrence_set_digest=requested_values[
+            "analytic_case_occurrence_set_digest"
+        ],
         source_universe_receipt_reference=requested_values[
             "source_universe_receipt_reference"
         ],
@@ -722,8 +759,25 @@ def resolve_final_analysis_weight_authority(
         sampling_design_receipt_digest=requested_values[
             "sampling_design_receipt_digest"
         ],
+        base_weight_method_code=requested_values["base_weight_method_code"],
+        base_weight_method_version=requested_values["base_weight_method_version"],
+        base_weight_evidence_digest=requested_values["base_weight_evidence_digest"],
+        base_weight_artifact_digest=requested_values["base_weight_artifact_digest"],
+        adjustments=requested_values["adjustments"],
+        final_weight_artifact_digest=requested_values["final_weight_artifact_digest"],
+        weight_eligibility_receipt_reference=requested_values[
+            "weight_eligibility_receipt_reference"
+        ],
+        weight_eligibility_receipt_digest=requested_values[
+            "weight_eligibility_receipt_digest"
+        ],
+        analytic_case_count=requested_values["analytic_case_count"],
+        constructed_at=requested_values["constructed_at"],
+        correction_sequence=requested_values["correction_sequence"],
+        supersedes_receipt_digest=requested_values["supersedes_receipt_digest"],
         owner_contract_reference=requested_values["owner_contract_reference"],
         owner_contract_version=requested_values["owner_contract_version"],
+        owner_contract_digest=requested_values["owner_contract_digest"],
     )
     if persisted is None:
         raise FinalAnalysisWeightAuthorityNotFound(str(study_id))
