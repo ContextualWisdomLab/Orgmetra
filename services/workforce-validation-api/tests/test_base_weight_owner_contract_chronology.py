@@ -1,4 +1,4 @@
-"""Fail closed when base-weight evidence predates its released owner contract."""
+"""Fail closed when base-weight evidence predates its released prerequisites."""
 
 from __future__ import annotations
 
@@ -62,18 +62,32 @@ def _record(**overrides: object) -> BaseWeightAuthorityRecord:
     return BaseWeightAuthorityRecord(**values)
 
 
-def test_owner_contract_release_is_preserved_as_authority_provenance() -> None:
-    record = _record()
+def test_release_instants_are_preserved_as_authority_provenance() -> None:
+    fields = dict(_record().fields)
 
-    assert dict(record.fields)["owner_contract_released_at"] == OWNER_CONTRACT_RELEASED_AT
-
-
-def test_owner_contract_release_is_not_a_caller_asserted_resolver_coordinate() -> None:
-    assert "owner_contract_released_at" not in signature(resolve_base_weight_authority).parameters
+    assert fields["source_universe_released_at"] == SOURCE_RELEASED_AT
+    assert fields["sampling_design_released_at"] == SAMPLING_RELEASED_AT
+    assert fields["owner_contract_released_at"] == OWNER_CONTRACT_RELEASED_AT
 
 
-def test_owner_contract_release_timestamp_and_chronology_fail_closed() -> None:
+def test_release_instants_are_not_caller_asserted_resolver_coordinates() -> None:
+    parameters = signature(resolve_base_weight_authority).parameters
+
+    assert "source_universe_released_at" not in parameters
+    assert "sampling_design_released_at" not in parameters
+    assert "owner_contract_released_at" not in parameters
+
+
+def test_released_prerequisite_timestamp_and_chronology_fail_closed() -> None:
+    with pytest.raises(ValueError):
+        _record(source_universe_released_at=datetime(2026, 9, 17, 6, 0))
+    with pytest.raises(ValueError):
+        _record(sampling_design_released_at=datetime(2026, 9, 17, 6, 30))
     with pytest.raises(ValueError):
         _record(owner_contract_released_at=datetime(2026, 9, 17, 6, 45))
+    with pytest.raises(ValueError):
+        _record(source_universe_released_at=CONSTRUCTED_AT + timedelta(seconds=1))
+    with pytest.raises(ValueError):
+        _record(sampling_design_released_at=CONSTRUCTED_AT + timedelta(seconds=1))
     with pytest.raises(ValueError, match="owner contract"):
         _record(owner_contract_released_at=RELEASED_AT + timedelta(seconds=1))
