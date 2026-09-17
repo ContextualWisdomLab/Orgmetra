@@ -91,6 +91,7 @@ def _record(
     successor_reference: str | None,
     successor_version: int | None,
     successor_digest: str | None,
+    successor_released_at: datetime | None,
 ) -> CalibrationBenchmarkAuthorityRecord:
     return CalibrationBenchmarkAuthorityRecord(
         tenant_record_id=TENANT,
@@ -108,6 +109,7 @@ def _record(
         successor_benchmark_receipt_reference=successor_reference,
         successor_benchmark_receipt_version=successor_version,
         successor_benchmark_receipt_digest=successor_digest,
+        successor_benchmark_receipt_released_at=successor_released_at,
     )
 
 
@@ -131,12 +133,14 @@ def _resolve(record: CalibrationBenchmarkAuthorityRecord, *, used_at: datetime =
 
 
 def test_historical_use_before_supersession_remains_verifiable_without_leaking_lineage() -> None:
+    superseded_at = USED_AT + timedelta(days=1)
     view = _resolve(
         _record(
-            superseded_at=USED_AT + timedelta(days=1),
+            superseded_at=superseded_at,
             successor_reference=SUCCESSOR_REFERENCE,
             successor_version=5,
             successor_digest=SUCCESSOR_DIGEST,
+            successor_released_at=USED_AT + timedelta(hours=12),
         )
     )
 
@@ -144,6 +148,7 @@ def test_historical_use_before_supersession_remains_verifiable_without_leaking_l
     assert fields["benchmark_receipt_reference"] == BENCHMARK_REFERENCE
     assert "benchmark_receipt_superseded_at" not in fields
     assert "successor_benchmark_receipt_reference" not in fields
+    assert "successor_benchmark_receipt_released_at" not in fields
 
 
 def test_benchmark_superseded_by_scientific_use_is_not_authoritative() -> None:
@@ -152,6 +157,7 @@ def test_benchmark_superseded_by_scientific_use_is_not_authoritative() -> None:
         successor_reference=SUCCESSOR_REFERENCE,
         successor_version=5,
         successor_digest=SUCCESSOR_DIGEST,
+        successor_released_at=USED_AT - timedelta(hours=1),
     )
 
     with pytest.raises(CalibrationBenchmarkAuthorityIntegrityError):
@@ -159,13 +165,39 @@ def test_benchmark_superseded_by_scientific_use_is_not_authoritative() -> None:
 
 
 @pytest.mark.parametrize(
-    ("superseded_at", "successor_reference", "successor_version", "successor_digest"),
+    (
+        "superseded_at",
+        "successor_reference",
+        "successor_version",
+        "successor_digest",
+        "successor_released_at",
+    ),
     [
-        (USED_AT, None, 5, SUCCESSOR_DIGEST),
-        (None, SUCCESSOR_REFERENCE, 5, SUCCESSOR_DIGEST),
-        (USED_AT, SUCCESSOR_REFERENCE, 4, SUCCESSOR_DIGEST),
-        (USED_AT, SUCCESSOR_REFERENCE, 5, BENCHMARK_DIGEST),
-        (BENCHMARK_RELEASED_AT - timedelta(seconds=1), SUCCESSOR_REFERENCE, 5, SUCCESSOR_DIGEST),
+        (USED_AT, None, 5, SUCCESSOR_DIGEST, USED_AT),
+        (None, SUCCESSOR_REFERENCE, 5, SUCCESSOR_DIGEST, USED_AT),
+        (USED_AT, SUCCESSOR_REFERENCE, 4, SUCCESSOR_DIGEST, USED_AT),
+        (USED_AT, SUCCESSOR_REFERENCE, 5, BENCHMARK_DIGEST, USED_AT),
+        (
+            BENCHMARK_RELEASED_AT - timedelta(seconds=1),
+            SUCCESSOR_REFERENCE,
+            5,
+            SUCCESSOR_DIGEST,
+            BENCHMARK_RELEASED_AT - timedelta(seconds=1),
+        ),
+        (
+            USED_AT,
+            SUCCESSOR_REFERENCE,
+            5,
+            SUCCESSOR_DIGEST,
+            USED_AT + timedelta(seconds=1),
+        ),
+        (
+            USED_AT,
+            SUCCESSOR_REFERENCE,
+            5,
+            SUCCESSOR_DIGEST,
+            BENCHMARK_RELEASED_AT,
+        ),
     ],
 )
 def test_owner_record_rejects_incomplete_or_non_append_only_supersession_lineage(
@@ -173,6 +205,7 @@ def test_owner_record_rejects_incomplete_or_non_append_only_supersession_lineage
     successor_reference: str | None,
     successor_version: int | None,
     successor_digest: str | None,
+    successor_released_at: datetime | None,
 ) -> None:
     with pytest.raises(ValueError):
         _record(
@@ -180,4 +213,5 @@ def test_owner_record_rejects_incomplete_or_non_append_only_supersession_lineage
             successor_reference=successor_reference,
             successor_version=successor_version,
             successor_digest=successor_digest,
+            successor_released_at=successor_released_at,
         )
