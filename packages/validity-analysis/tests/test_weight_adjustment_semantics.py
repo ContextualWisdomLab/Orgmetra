@@ -156,12 +156,22 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
     assert repr(candidate) == "CalibrationAdjustmentReceipt(<redacted>)"
 
     fallback_reference = "calibration_fallback_rule:99999999-9999-4999-8999-999999999999"
+    fallback_algorithm_reference = "calibration_algorithm:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     fallback = calibration_receipt(
         termination_code="fallback_applied",
+        fallback_reason_code="primary_nonconvergence",
         fallback_rule_reference=fallback_reference,
         fallback_rule_digest=DIGEST_2,
+        fallback_algorithm_reference=fallback_algorithm_reference,
+        fallback_algorithm_version=2,
+        fallback_configuration_digest=DIGEST_4,
     )
-    assert f'"fallback_rule_digest":"{DIGEST_2}"' in fallback.canonical_json()
+    fallback_json = fallback.canonical_json()
+    assert f'"fallback_rule_digest":"{DIGEST_2}"' in fallback_json
+    assert '"fallback_reason_code":"primary_nonconvergence"' in fallback_json
+    assert f'"fallback_algorithm_reference":"{fallback_algorithm_reference}"' in fallback_json
+    assert '"fallback_algorithm_version":2' in fallback_json
+    assert f'"fallback_configuration_digest":"{DIGEST_4}"' in fallback_json
 
     with pytest.raises(ValueError, match="auxiliary_authority_reference"):
         calibration_receipt(auxiliary_authority_reference="authority-v1")
@@ -205,19 +215,23 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
         calibration_receipt(termination_code="failed")
     with pytest.raises(ValueError, match="termination_code"):
         calibration_receipt(termination_code=1)
-    with pytest.raises(ValueError, match="fallback_rule"):
+    with pytest.raises(ValueError, match="fallback"):
         calibration_receipt(termination_code="fallback_applied")
-    with pytest.raises(ValueError, match="fallback_rule"):
+    with pytest.raises(ValueError, match="fallback"):
         calibration_receipt(
             termination_code="fallback_applied",
             fallback_rule_reference=fallback_reference,
         )
-    with pytest.raises(ValueError, match="must be absent"):
+    with pytest.raises(ValueError, match="fallback"):
         calibration_receipt(
+            fallback_reason_code="primary_nonconvergence",
             fallback_rule_reference=fallback_reference,
             fallback_rule_digest=DIGEST_2,
+            fallback_algorithm_reference=fallback_algorithm_reference,
+            fallback_algorithm_version=2,
+            fallback_configuration_digest=DIGEST_4,
         )
-    with pytest.raises(ValueError, match="must be absent"):
+    with pytest.raises(ValueError, match="fallback"):
         calibration_receipt(fallback_rule_digest=DIGEST_2)
     with pytest.raises(ValueError, match="output_weight_artifact_digest"):
         calibration_receipt(output_weight_artifact_digest=DIGEST_D)
