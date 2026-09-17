@@ -45,6 +45,8 @@ class NonresponseAdjustmentReceipt:
 
     tenant_record_id: str
     receipt_reference: str
+    response_disposition_receipt_reference: str
+    response_disposition_receipt_version: int
     response_disposition_receipt_digest: str
     adjustment_population_digest: str
     method_reference: str
@@ -65,6 +67,15 @@ class NonresponseAdjustmentReceipt:
             self.receipt_reference,
             "nonresponse_adjustment_receipt",
             "receipt_reference",
+        )
+        _validate_reference(
+            self.response_disposition_receipt_reference,
+            "response_disposition_receipt",
+            "response_disposition_receipt_reference",
+        )
+        _positive_integer(
+            self.response_disposition_receipt_version,
+            "response_disposition_receipt_version",
         )
         for field_name in (
             "response_disposition_receipt_digest",
@@ -109,6 +120,8 @@ class NonresponseAdjustmentReceipt:
             "output_weight_artifact_digest": self.output_weight_artifact_digest,
             "receipt_reference": self.receipt_reference,
             "response_disposition_receipt_digest": self.response_disposition_receipt_digest,
+            "response_disposition_receipt_reference": self.response_disposition_receipt_reference,
+            "response_disposition_receipt_version": self.response_disposition_receipt_version,
             "tenant_record_id": self.tenant_record_id,
             "unavailable_treatment_code": self.unavailable_treatment_code,
             "unknown_treatment_code": self.unknown_treatment_code,
