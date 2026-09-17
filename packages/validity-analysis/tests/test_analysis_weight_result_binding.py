@@ -206,6 +206,38 @@ def test_weighted_result_rejects_compatibility_for_other_point_or_variance_evide
         )
 
 
+def test_weighted_result_rechecks_compatibility_tenant_and_time_boundary() -> None:
+    """Forged compatibility state cannot cross tenant or result-time boundaries."""
+    weight = point_weight()
+    correlation = compatibility(weight)
+    object.__setattr__(
+        correlation,
+        "tenant_record_id",
+        "10000000-0000-7000-8000-000000000002",
+    )
+    with pytest.raises(ValueError, match="tenant_record_id"):
+        result(
+            point_estimation_mode="weighted_design_based",
+            analysis_weight_receipt_digest=weight.sha256_digest(),
+            variance_design_receipt_digest=VARIANCE_DIGEST,
+            weight_variance_compatibility=correlation,
+        )
+
+    later = compatibility(weight)
+    object.__setattr__(
+        later,
+        "constructed_at",
+        datetime(2026, 9, 17, 4, 11, tzinfo=timezone.utc),
+    )
+    with pytest.raises(ValueError, match="cannot be constructed after"):
+        result(
+            point_estimation_mode="weighted_design_based",
+            analysis_weight_receipt_digest=weight.sha256_digest(),
+            variance_design_receipt_digest=VARIANCE_DIGEST,
+            weight_variance_compatibility=later,
+        )
+
+
 @pytest.mark.parametrize(
     "overrides,match",
     [
