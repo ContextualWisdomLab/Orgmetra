@@ -29,6 +29,7 @@ ATTEMPT_DIGEST = "3" * 64
 OWNER_DIGEST = "4" * 64
 OWNER_RELEASED_AT = datetime(2026, 9, 17, 5, 55, tzinfo=timezone.utc)
 EVALUATED_AT = datetime(2026, 9, 17, 6, 0, tzinfo=timezone.utc)
+ATTEMPT_RELEASED_AT = datetime(2026, 9, 17, 6, 2, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 17, 6, 5, tzinfo=timezone.utc)
 SUPERSEDED_AT = datetime(2026, 9, 17, 6, 20, tzinfo=timezone.utc)
 READ_FIELDS = frozenset(
@@ -40,8 +41,10 @@ READ_FIELDS = frozenset(
         "failure_mode",
         "failed_evidence_reference",
         "failed_evidence_digest",
+        "failed_evidence_released_at",
         "verification_attempt_reference",
         "verification_attempt_digest",
+        "verification_attempt_released_at",
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
@@ -87,6 +90,7 @@ def _record(*, superseded_at: datetime | None = SUPERSEDED_AT) -> ValidationResu
         failed_evidence_digest=None,
         verification_attempt_reference=ATTEMPT_REFERENCE,
         verification_attempt_digest=ATTEMPT_DIGEST,
+        verification_attempt_released_at=ATTEMPT_RELEASED_AT,
         owner_contract_reference=OWNER_REFERENCE,
         owner_contract_version=7,
         owner_contract_digest=OWNER_DIGEST,
