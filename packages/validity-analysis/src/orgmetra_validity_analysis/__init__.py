@@ -1,5 +1,6 @@
 """Public governed selection-validity analysis handoff and result contracts."""
 
+from .compatibility import WeightVarianceCompatibilityReceipt
 from .handoff import (
     REVIEWED_FAST_MLSIRM_REVISION,
     ValidationAnalysisHandoff,
@@ -28,4 +29,5 @@ __all__ = [
     "NonresponseAdjustmentReceipt",
     "TrimmingBoundingAdjustmentReceipt",
     "WeightEligibilityReceipt",
+    "WeightVarianceCompatibilityReceipt",
 ]
