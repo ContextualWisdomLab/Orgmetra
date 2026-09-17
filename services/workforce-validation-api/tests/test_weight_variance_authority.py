@@ -34,6 +34,7 @@ CORRECTION_SEQUENCE = 9
 FINAL_WEIGHT_DIGEST = "6" * 64
 VARIANCE_DIGEST = "7" * 64
 OWNER_DIGEST = "8" * 64
+OWNER_RELEASED_AT = datetime(2026, 9, 17, 0, 30, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 17, 1, 0, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, 2, 0, tzinfo=timezone.utc)
 READ_FIELDS = frozenset(
@@ -57,7 +58,9 @@ READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -118,7 +121,7 @@ def _principal() -> ValidationPrincipal:
 def _policy(*, purpose_code: str = "selection_validity_analysis") -> PurposeBoundAccessPolicy:
     return PurposeBoundAccessPolicy(
         tenant_record_id=TENANT,
-        policy_version_code="weight-variance-authority-read-v1",
+        policy_version_code="weight-variance-authority-read-v2",
         resource_kind="weight_variance_authority",
         purpose_code=purpose_code,
         operation_code="read",
@@ -150,7 +153,9 @@ def _record(**overrides: object) -> WeightVarianceAuthorityRecord:
         "owner_contract_reference": OWNER_REFERENCE,
         "owner_contract_version": 4,
         "owner_contract_digest": OWNER_DIGEST,
+        "owner_contract_released_at": OWNER_RELEASED_AT,
         "released_at": RELEASED_AT,
+        "superseded_at": None,
     }
     values.update(overrides)
     return WeightVarianceAuthorityRecord(**values)
@@ -215,7 +220,9 @@ def test_resolution_authorizes_then_returns_owner_corroborated_compatibility() -
     assert fields["weight_correction_sequence"] == CORRECTION_SEQUENCE
     assert fields["variance_design_receipt_digest"] == VARIANCE_DIGEST
     assert fields["owner_contract_digest"] == OWNER_DIGEST
+    assert fields["owner_contract_released_at"] == OWNER_RELEASED_AT
     assert fields["released_at"] == RELEASED_AT
+    assert fields["superseded_at"] is None
 
 
 def test_authorization_denial_happens_before_owner_resolution() -> None:
