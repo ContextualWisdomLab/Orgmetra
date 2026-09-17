@@ -56,6 +56,7 @@ _READ_FIELDS = frozenset(
         "failed_evidence_released_at",
         "verification_attempt_reference",
         "verification_attempt_digest",
+        "verification_attempt_released_at",
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
@@ -110,6 +111,7 @@ class ValidationResultNonVerifiabilityRecord(tuple):
         failed_evidence_digest: str | None,
         verification_attempt_reference: str,
         verification_attempt_digest: str,
+        verification_attempt_released_at: datetime,
         owner_contract_reference: str,
         owner_contract_version: int,
         owner_contract_digest: str,
@@ -174,6 +176,9 @@ class ValidationResultNonVerifiabilityRecord(tuple):
         attempt_digest = _require_digest(
             "verification_attempt_digest", verification_attempt_digest
         )
+        attempt_release = _require_aware_datetime(
+            "verification_attempt_released_at", verification_attempt_released_at
+        )
         owner_ref = _require_reference(
             "owner_contract_reference",
             owner_contract_reference,
@@ -205,6 +210,14 @@ class ValidationResultNonVerifiabilityRecord(tuple):
         if failed_release is not None and failed_release > evaluation_instant:
             raise ValueError(
                 "failed_evidence_released_at cannot be later than evaluated_at."
+            )
+        if attempt_release < evaluation_instant:
+            raise ValueError(
+                "verification_attempt_released_at cannot precede evaluated_at."
+            )
+        if attempt_release > release_instant:
+            raise ValueError(
+                "verification_attempt_released_at cannot be later than released_at."
             )
         if evaluation_instant > release_instant:
             raise ValueError("evaluated_at cannot be later than released_at.")
@@ -239,6 +252,7 @@ class ValidationResultNonVerifiabilityRecord(tuple):
                 release_instant,
                 cutover,
                 failed_release,
+                attempt_release,
             ),
         )
 
@@ -336,6 +350,11 @@ class ValidationResultNonVerifiabilityRecord(tuple):
     def failed_evidence_released_at(self) -> datetime | None:
         """Return when non-reproducible evidence became available for verification."""
         return self[17]
+
+    @property
+    def verification_attempt_released_at(self) -> datetime:
+        """Return when the immutable verification-attempt receipt became released evidence."""
+        return self[18]
 
 
 class ValidationResultNonVerifiabilityView(tuple):
@@ -505,6 +524,7 @@ def resolve_validation_result_nonverifiability(
         failed_evidence_digest=persisted.failed_evidence_digest,
         verification_attempt_reference=persisted.verification_attempt_reference,
         verification_attempt_digest=persisted.verification_attempt_digest,
+        verification_attempt_released_at=persisted.verification_attempt_released_at,
         owner_contract_reference=persisted.owner_contract_reference,
         owner_contract_version=persisted.owner_contract_version,
         owner_contract_digest=persisted.owner_contract_digest,
@@ -560,6 +580,7 @@ def resolve_validation_result_nonverifiability(
         "failed_evidence_released_at": record.failed_evidence_released_at,
         "verification_attempt_reference": record.verification_attempt_reference,
         "verification_attempt_digest": record.verification_attempt_digest,
+        "verification_attempt_released_at": record.verification_attempt_released_at,
         "owner_contract_reference": record.owner_contract_reference,
         "owner_contract_version": record.owner_contract_version,
         "owner_contract_digest": record.owner_contract_digest,
