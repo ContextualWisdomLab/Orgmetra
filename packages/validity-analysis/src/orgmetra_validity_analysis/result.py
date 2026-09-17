@@ -14,6 +14,7 @@ import json
 from math import isfinite
 from numbers import Real
 
+from .compatibility import WeightVarianceCompatibilityReceipt
 from .handoff import (
     _canonical_timestamp,
     _freeze_timestamp,
@@ -166,6 +167,7 @@ class ValidationAnalysisResult:
     point_estimation_mode: str = "unweighted"
     analysis_weight_receipt_digest: str | None = None
     variance_design_receipt_digest: str | None = None
+    weight_variance_compatibility: WeightVarianceCompatibilityReceipt | None = None
     result_authority: str = _RESULT_AUTHORITY
     execution_state: str = _EXECUTION_STATE
     contains_raw_person_level_values: bool = False
@@ -226,9 +228,36 @@ class ValidationAnalysisResult:
                     "analysis_weight_receipt_digest and variance_design_receipt_digest "
                     "must identify different evidence"
                 )
+            if type(self.weight_variance_compatibility) is not WeightVarianceCompatibilityReceipt:
+                raise ValueError(
+                    "weight_variance_compatibility is required for weighted_design_based"
+                )
+            if self.weight_variance_compatibility.tenant_record_id != self.tenant_record_id:
+                raise ValueError(
+                    "weight_variance_compatibility tenant_record_id must match the result"
+                )
+            if (
+                self.weight_variance_compatibility.analysis_weight_receipt.sha256_digest()
+                != self.analysis_weight_receipt_digest
+            ):
+                raise ValueError(
+                    "weight_variance_compatibility must identify the result analysis weight receipt"
+                )
+            if (
+                self.weight_variance_compatibility.variance_design_receipt_digest
+                != self.variance_design_receipt_digest
+            ):
+                raise ValueError(
+                    "weight_variance_compatibility must identify the result variance design receipt"
+                )
+            if self.weight_variance_compatibility.constructed_at > completed_at:
+                raise ValueError(
+                    "weight_variance_compatibility cannot be constructed after the result"
+                )
         elif (
             self.analysis_weight_receipt_digest is not None
             or self.variance_design_receipt_digest is not None
+            or self.weight_variance_compatibility is not None
         ):
             raise ValueError(
                 "unweighted result must not bind analysis or variance weight receipts"
@@ -281,6 +310,10 @@ class ValidationAnalysisResult:
             payload["analysis_weight_receipt_digest"] = self.analysis_weight_receipt_digest
         if self.variance_design_receipt_digest is not None:
             payload["variance_design_receipt_digest"] = self.variance_design_receipt_digest
+        if self.weight_variance_compatibility is not None:
+            payload["weight_variance_compatibility_receipt_digest"] = (
+                self.weight_variance_compatibility.sha256_digest()
+            )
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
     def sha256_digest(self) -> str:
