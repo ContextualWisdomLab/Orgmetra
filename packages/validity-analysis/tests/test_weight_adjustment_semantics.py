@@ -57,6 +57,7 @@ def calibration_receipt(**overrides: object) -> CalibrationAdjustmentReceipt:
         "analysis_window_reference": "analysis_window:44444444-4444-4444-8444-444444444444",
         "auxiliary_authority_reference": "scientific_auxiliary_authority:55555555-5555-4555-8555-555555555550",
         "auxiliary_projection_reference": "calibration_auxiliary_projection:55555555-5555-4555-8555-555555555555",
+        "auxiliary_projection_version": 4,
         "auxiliary_projection_digest": DIGEST_B,
         "auxiliary_purpose_reference": "scientific_data_use_purpose:55555555-5555-4555-8555-555555555556",
         "auxiliary_purpose_digest": DIGEST_3,
@@ -144,6 +145,7 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
     assert f'"benchmark_receipt_digest":"{DIGEST_C}"' in canonical
     assert f'"benchmark_owner_contract_digest":"{DIGEST_5}"' in canonical
     assert '"benchmark_reference_at":"2026-09-16T05:00:00Z"' in canonical
+    assert '"auxiliary_projection_version":4' in canonical
     assert f'"auxiliary_purpose_digest":"{DIGEST_3}"' in canonical
     assert f'"auxiliary_owner_contract_digest":"{DIGEST_1}"' in canonical
     assert f'"auxiliary_authorization_receipt_digest":"{DIGEST_4}"' in canonical
@@ -163,6 +165,10 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
 
     with pytest.raises(ValueError, match="auxiliary_authority_reference"):
         calibration_receipt(auxiliary_authority_reference="authority-v1")
+    with pytest.raises(ValueError, match="auxiliary_projection_version"):
+        calibration_receipt(auxiliary_projection_version=0)
+    with pytest.raises(ValueError, match="auxiliary_projection_version"):
+        calibration_receipt(auxiliary_projection_version=True)
     with pytest.raises(ValueError, match="auxiliary_purpose_digest"):
         calibration_receipt(auxiliary_purpose_digest="purpose-v1")
     with pytest.raises(ValueError, match="auxiliary_owner_contract_version"):
