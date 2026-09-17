@@ -169,8 +169,12 @@ class CalibrationAdjustmentReceipt:
     input_weight_artifact_digest: str
     output_weight_artifact_digest: str
     constructed_at: datetime
+    fallback_reason_code: str | None = None
     fallback_rule_reference: str | None = None
     fallback_rule_digest: str | None = None
+    fallback_algorithm_reference: str | None = None
+    fallback_algorithm_version: int | None = None
+    fallback_configuration_digest: str | None = None
     evidence_version: int = 1
 
     def __post_init__(self) -> None:
@@ -264,19 +268,42 @@ class CalibrationAdjustmentReceipt:
             or self.termination_code not in _CALIBRATION_TERMINATION_CODES
         ):
             raise ValueError("termination_code must be converged or fallback_applied")
+        fallback_fields = (
+            self.fallback_reason_code,
+            self.fallback_rule_reference,
+            self.fallback_rule_digest,
+            self.fallback_algorithm_reference,
+            self.fallback_algorithm_version,
+            self.fallback_configuration_digest,
+        )
         if self.termination_code == "fallback_applied":
-            if self.fallback_rule_reference is None or self.fallback_rule_digest is None:
+            if any(value is None for value in fallback_fields):
                 raise ValueError(
-                    "fallback_rule_reference and fallback_rule_digest are required for fallback_applied"
+                    "fallback reason, rule, algorithm, version, and configuration evidence "
+                    "are required for fallback_applied"
                 )
+            _validate_code(self.fallback_reason_code, "fallback_reason_code")
             _validate_reference(
                 self.fallback_rule_reference,
                 "calibration_fallback_rule",
                 "fallback_rule_reference",
             )
             _validate_digest(self.fallback_rule_digest, "fallback_rule_digest")
-        elif self.fallback_rule_reference is not None or self.fallback_rule_digest is not None:
-            raise ValueError("fallback_rule evidence must be absent when calibration converged")
+            _validate_reference(
+                self.fallback_algorithm_reference,
+                "calibration_algorithm",
+                "fallback_algorithm_reference",
+            )
+            _positive_integer(
+                self.fallback_algorithm_version,
+                "fallback_algorithm_version",
+            )
+            _validate_digest(
+                self.fallback_configuration_digest,
+                "fallback_configuration_digest",
+            )
+        elif any(value is not None for value in fallback_fields):
+            raise ValueError("fallback evidence must be absent when calibration converged")
         if self.input_weight_artifact_digest == self.output_weight_artifact_digest:
             raise ValueError(
                 "output_weight_artifact_digest must identify the calibrated weight artifact"
@@ -348,6 +375,10 @@ class CalibrationAdjustmentReceipt:
             "termination_code": self.termination_code,
         }
         if self.fallback_rule_reference is not None:
+            payload["fallback_algorithm_reference"] = self.fallback_algorithm_reference
+            payload["fallback_algorithm_version"] = self.fallback_algorithm_version
+            payload["fallback_configuration_digest"] = self.fallback_configuration_digest
+            payload["fallback_reason_code"] = self.fallback_reason_code
             payload["fallback_rule_digest"] = self.fallback_rule_digest
             payload["fallback_rule_reference"] = self.fallback_rule_reference
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
