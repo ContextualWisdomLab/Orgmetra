@@ -148,7 +148,7 @@ def test_historical_use_before_supersession_remains_verifiable_without_leaking_s
             successor_reference=SUCCESSOR_REFERENCE,
             successor_correction_sequence=3,
             successor_digest=SUCCESSOR_DIGEST,
-            successor_released_at=USED_AT + timedelta(hours=12),
+            successor_released_at=superseded_at,
         )
     )
 
@@ -166,7 +166,7 @@ def test_superseded_final_weight_is_not_authoritative_at_or_after_cutover() -> N
         successor_reference=SUCCESSOR_REFERENCE,
         successor_correction_sequence=3,
         successor_digest=SUCCESSOR_DIGEST,
-        successor_released_at=USED_AT - timedelta(hours=1),
+        successor_released_at=USED_AT,
     )
 
     with pytest.raises(FinalWeightSupersessionAuthorityIntegrityError):
