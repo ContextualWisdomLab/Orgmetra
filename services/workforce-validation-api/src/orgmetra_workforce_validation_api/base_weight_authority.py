@@ -292,9 +292,16 @@ class BaseWeightAuthorityReadPort(Protocol):
         sampling_design_receipt_reference: str,
         sampling_design_receipt_version: int,
         sampling_design_receipt_digest: str,
+        sampled_occurrence_set_digest: str,
         selection_probability_set_digest: str,
+        selection_stage_count: int,
+        base_weight_method_code: str,
+        base_weight_method_version: int,
+        base_weight_artifact_digest: str,
+        constructed_at: datetime,
         owner_contract_reference: str,
         owner_contract_version: int,
+        owner_contract_digest: str,
     ) -> BaseWeightAuthorityRecord | None:
         """Return matching released base-weight evidence or ``None``."""
         ...
@@ -430,11 +437,18 @@ def resolve_base_weight_authority(
         sampling_design_receipt_digest=requested_values[
             "sampling_design_receipt_digest"
         ],
+        sampled_occurrence_set_digest=requested_values["sampled_occurrence_set_digest"],
         selection_probability_set_digest=requested_values[
             "selection_probability_set_digest"
         ],
+        selection_stage_count=requested_values["selection_stage_count"],
+        base_weight_method_code=requested_values["base_weight_method_code"],
+        base_weight_method_version=requested_values["base_weight_method_version"],
+        base_weight_artifact_digest=requested_values["base_weight_artifact_digest"],
+        constructed_at=requested_values["constructed_at"],
         owner_contract_reference=requested_values["owner_contract_reference"],
         owner_contract_version=requested_values["owner_contract_version"],
+        owner_contract_digest=requested_values["owner_contract_digest"],
     )
     if persisted is None:
         raise BaseWeightAuthorityNotFound(str(study_id))
