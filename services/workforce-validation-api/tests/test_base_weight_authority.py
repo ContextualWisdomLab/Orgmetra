@@ -150,6 +150,7 @@ def _record(**overrides: object) -> BaseWeightAuthorityRecord:
 
 def _resolve(*, read_port: object, **overrides: object) -> BaseWeightAuthorityView:
     values = dict(_record().fields)
+    values.pop("owner_contract_released_at")
     values.update(
         {
             "principal": _principal(),
@@ -175,11 +176,21 @@ def test_resolution_binds_sampling_stage_probabilities_to_base_weight_artifact()
     assert port.calls[0]["source_universe_receipt_version"] == 4
     assert port.calls[0]["sampling_design_receipt_version"] == 3
     assert port.calls[0]["selection_probability_set_digest"] == SELECTION_PROBABILITY_SET_DIGEST
+    assert "owner_contract_released_at" not in port.calls[0]
     assert ("sampled_occurrence_set_digest", SAMPLED_SET_DIGEST) in view.fields
     assert ("selection_stage_count", 2) in view.fields
     assert ("base_weight_artifact_digest", BASE_ARTIFACT_DIGEST) in view.fields
     assert ("owner_contract_released_at", OWNER_CONTRACT_RELEASED_AT) in view.fields
     assert ("released_at", RELEASED_AT) in view.fields
+
+
+def test_owner_contract_release_is_resolved_from_owner_evidence() -> None:
+    owner_release = OWNER_CONTRACT_RELEASED_AT + timedelta(seconds=1)
+    view = _resolve(
+        read_port=_ReadPort(_record(owner_contract_released_at=owner_release))
+    )
+
+    assert ("owner_contract_released_at", owner_release) in view.fields
 
 
 def test_authorization_denial_happens_before_owner_resolution() -> None:
@@ -202,12 +213,6 @@ def test_missing_noncanonical_or_mismatched_owner_evidence_fails_closed() -> Non
         _resolve(read_port=_ReadPort(_record(tenant_record_id=OTHER_TENANT)))
     with pytest.raises(BaseWeightAuthorityIntegrityError):
         _resolve(read_port=_ReadPort(_record(validity_study_id=OTHER_STUDY)))
-    with pytest.raises(BaseWeightAuthorityIntegrityError):
-        _resolve(
-            read_port=_ReadPort(
-                _record(owner_contract_released_at=OWNER_CONTRACT_RELEASED_AT + timedelta(seconds=1))
-            )
-        )
 
 
 def test_source_sampling_and_release_chronology_fail_closed() -> None:
@@ -252,7 +257,6 @@ def test_source_sampling_and_release_chronology_fail_closed() -> None:
         ("owner_contract_reference", "wrong:owner", ValueError),
         ("owner_contract_version", 0, ValueError),
         ("owner_contract_digest", "7" * 63, ValueError),
-        ("owner_contract_released_at", datetime(2026, 9, 17, 6, 45), ValueError),
     ],
 )
 def test_hostile_coordinates_fail_closed(key: str, value: object, error: type[Exception]) -> None:
