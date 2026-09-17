@@ -1,6 +1,6 @@
 """Scientific contracts for nonresponse and calibration weight adjustments."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -46,19 +46,25 @@ def nonresponse_receipt(**overrides: object) -> NonresponseAdjustmentReceipt:
 
 
 def calibration_receipt(**overrides: object) -> CalibrationAdjustmentReceipt:
-    """Return one benchmark- and purpose-bound converged calibration receipt."""
+    """Return one owner-corroboratable converged calibration receipt."""
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
         "receipt_reference": "calibration_adjustment_receipt:33333333-3333-4333-8333-333333333333",
         "target_population_digest": DIGEST_A,
         "analysis_window_reference": "analysis_window:44444444-4444-4444-8444-444444444444",
+        "auxiliary_authority_reference": "scientific_auxiliary_authority:55555555-5555-4555-8555-555555555550",
         "auxiliary_projection_reference": "calibration_auxiliary_projection:55555555-5555-4555-8555-555555555555",
         "auxiliary_projection_digest": DIGEST_B,
         "auxiliary_purpose_reference": "scientific_data_use_purpose:55555555-5555-4555-8555-555555555556",
         "auxiliary_purpose_digest": DIGEST_3,
         "auxiliary_owner_contract_reference": "released_owner_contract:55555555-5555-4555-8555-555555555557",
         "auxiliary_owner_contract_version": 1,
+        "auxiliary_owner_contract_digest": DIGEST_1,
+        "auxiliary_authorization_receipt_reference": "scientific_data_authorization:55555555-5555-4555-8555-555555555558",
         "auxiliary_authorization_receipt_digest": DIGEST_4,
+        "auxiliary_scientific_use_receipt_reference": "scientific_use_receipt:55555555-5555-4555-8555-555555555559",
+        "auxiliary_scientific_use_receipt_digest": DIGEST_2,
+        "auxiliary_scientific_use_at": NOW,
         "benchmark_receipt_reference": "calibration_benchmark_receipt:66666666-6666-4666-8666-666666666666",
         "benchmark_receipt_digest": DIGEST_C,
         "algorithm_reference": "calibration_algorithm:77777777-7777-4777-8777-777777777777",
@@ -107,15 +113,19 @@ def test_nonresponse_receipt_is_value_minimized_and_disposition_aware() -> None:
         nonresponse_receipt(evidence_version=True)
 
 
-def test_calibration_receipt_binds_owner_benchmark_purpose_and_termination_state() -> None:
-    """Keep benchmark, purpose authorization, and fallback semantics explicit and immutable."""
+def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -> None:
+    """Keep owner-corroboratable authority, benchmark, and fallback semantics explicit."""
     candidate = calibration_receipt()
+    canonical = candidate.canonical_json()
     assert candidate.sha256_digest() == calibration_receipt().sha256_digest()
-    assert f'"benchmark_receipt_digest":"{DIGEST_C}"' in candidate.canonical_json()
-    assert f'"auxiliary_purpose_digest":"{DIGEST_3}"' in candidate.canonical_json()
-    assert f'"auxiliary_authorization_receipt_digest":"{DIGEST_4}"' in candidate.canonical_json()
-    assert '"termination_code":"converged"' in candidate.canonical_json()
-    assert "protected_attribute" not in candidate.canonical_json()
+    assert f'"benchmark_receipt_digest":"{DIGEST_C}"' in canonical
+    assert f'"auxiliary_purpose_digest":"{DIGEST_3}"' in canonical
+    assert f'"auxiliary_owner_contract_digest":"{DIGEST_1}"' in canonical
+    assert f'"auxiliary_authorization_receipt_digest":"{DIGEST_4}"' in canonical
+    assert f'"auxiliary_scientific_use_receipt_digest":"{DIGEST_2}"' in canonical
+    assert '"auxiliary_scientific_use_at":"2026-09-17T05:00:00Z"' in canonical
+    assert '"termination_code":"converged"' in canonical
+    assert "protected_attribute" not in canonical
     assert repr(candidate) == "CalibrationAdjustmentReceipt(<redacted>)"
 
     fallback_reference = "calibration_fallback_rule:99999999-9999-4999-8999-999999999999"
@@ -126,12 +136,26 @@ def test_calibration_receipt_binds_owner_benchmark_purpose_and_termination_state
     )
     assert f'"fallback_rule_digest":"{DIGEST_2}"' in fallback.canonical_json()
 
+    with pytest.raises(ValueError, match="auxiliary_authority_reference"):
+        calibration_receipt(auxiliary_authority_reference="authority-v1")
     with pytest.raises(ValueError, match="auxiliary_purpose_digest"):
         calibration_receipt(auxiliary_purpose_digest="purpose-v1")
     with pytest.raises(ValueError, match="auxiliary_owner_contract_version"):
         calibration_receipt(auxiliary_owner_contract_version=0)
+    with pytest.raises(ValueError, match="auxiliary_owner_contract_digest"):
+        calibration_receipt(auxiliary_owner_contract_digest="owner-v1")
+    with pytest.raises(ValueError, match="auxiliary_authorization_receipt_reference"):
+        calibration_receipt(auxiliary_authorization_receipt_reference="authorization-v1")
     with pytest.raises(ValueError, match="auxiliary_authorization_receipt_digest"):
         calibration_receipt(auxiliary_authorization_receipt_digest="authorization-v1")
+    with pytest.raises(ValueError, match="auxiliary_scientific_use_receipt_reference"):
+        calibration_receipt(auxiliary_scientific_use_receipt_reference="use-v1")
+    with pytest.raises(ValueError, match="auxiliary_scientific_use_receipt_digest"):
+        calibration_receipt(auxiliary_scientific_use_receipt_digest="use-v1")
+    with pytest.raises(ValueError, match="auxiliary_scientific_use_at"):
+        calibration_receipt(auxiliary_scientific_use_at="2026-09-17T05:00:00Z")
+    with pytest.raises(ValueError, match="cannot be later"):
+        calibration_receipt(auxiliary_scientific_use_at=NOW + timedelta(seconds=1))
     with pytest.raises(ValueError, match="termination_code"):
         calibration_receipt(termination_code="failed")
     with pytest.raises(ValueError, match="termination_code"):
