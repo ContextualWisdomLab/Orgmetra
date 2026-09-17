@@ -1,5 +1,13 @@
 """Canonical workforce-validation application contracts for Orgmetra."""
 
+from orgmetra_workforce_validation_api.base_weight_authority import (
+    BaseWeightAuthorityIntegrityError,
+    BaseWeightAuthorityNotFound,
+    BaseWeightAuthorityReadPort,
+    BaseWeightAuthorityRecord,
+    BaseWeightAuthorityView,
+    resolve_base_weight_authority,
+)
 from orgmetra_workforce_validation_api.benchmark_authority import (
     CalibrationBenchmarkAuthorityIntegrityError,
     CalibrationBenchmarkAuthorityNotFound,
@@ -92,6 +100,11 @@ from orgmetra_workforce_validation_api.weight_eligibility_authority import (
 )
 
 __all__ = [
+    "BaseWeightAuthorityIntegrityError",
+    "BaseWeightAuthorityNotFound",
+    "BaseWeightAuthorityReadPort",
+    "BaseWeightAuthorityRecord",
+    "BaseWeightAuthorityView",
     "CalibrationAdjustmentAuthorityIntegrityError",
     "CalibrationAdjustmentAuthorityNotFound",
     "CalibrationAdjustmentAuthorityReadPort",
@@ -150,6 +163,7 @@ __all__ = [
     "WeightVarianceAuthorityRecord",
     "WeightVarianceAuthorityView",
     "read_validity_study",
+    "resolve_base_weight_authority",
     "resolve_calibration_adjustment_authority",
     "resolve_calibration_auxiliary_authority",
     "resolve_calibration_benchmark_authority",
