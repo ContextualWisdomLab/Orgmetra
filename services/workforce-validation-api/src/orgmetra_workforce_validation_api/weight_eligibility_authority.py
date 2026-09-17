@@ -52,7 +52,9 @@ _READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -96,6 +98,7 @@ class WeightEligibilityAuthorityRecord(tuple):
         owner_contract_reference: str,
         owner_contract_version: int,
         owner_contract_digest: str,
+        owner_contract_released_at: datetime,
         released_at: datetime,
         superseded_at: datetime | None = None,
     ) -> WeightEligibilityAuthorityRecord:
@@ -144,6 +147,9 @@ class WeightEligibilityAuthorityRecord(tuple):
             "owner_contract_version", owner_contract_version
         )
         owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
+        owner_release_instant = _require_aware_datetime(
+            "owner_contract_released_at", owner_contract_released_at
+        )
         release_instant = _require_aware_datetime("released_at", released_at)
         supersession_instant = (
             None
@@ -152,6 +158,10 @@ class WeightEligibilityAuthorityRecord(tuple):
         )
         if release_instant < constructed:
             raise ValueError("released_at cannot precede constructed_at.")
+        if owner_release_instant > release_instant:
+            raise ValueError(
+                "owner contract must be released no later than the weight-eligibility authority"
+            )
         if supersession_instant is not None and supersession_instant <= release_instant:
             raise ValueError("superseded_at must be later than released_at.")
         return tuple.__new__(
@@ -174,6 +184,7 @@ class WeightEligibilityAuthorityRecord(tuple):
                 owner_version,
                 owner_digest,
                 release_instant,
+                owner_release_instant,
                 supersession_instant,
             ),
         )
@@ -264,9 +275,14 @@ class WeightEligibilityAuthorityRecord(tuple):
         return self[16]
 
     @property
+    def owner_contract_released_at(self) -> datetime:
+        """Return when the governing owner contract became released authority."""
+        return self[17]
+
+    @property
     def superseded_at(self) -> datetime | None:
         """Return the exclusive owner-resolved cutover when this authority is superseded."""
-        return self[17]
+        return self[18]
 
 
 class WeightEligibilityAuthorityView(tuple):
@@ -391,7 +407,9 @@ def resolve_weight_eligibility_authority(
         owner_contract_reference=owner_contract_reference,
         owner_contract_version=owner_contract_version,
         owner_contract_digest=owner_contract_digest,
+        owner_contract_released_at=constructed_at,
         released_at=constructed_at,
+        superseded_at=None,
     )
     tenant_id = requested.tenant_record_id
     study_id = requested.validity_study_id
@@ -463,10 +481,11 @@ def resolve_weight_eligibility_authority(
         owner_contract_reference=persisted.owner_contract_reference,
         owner_contract_version=persisted.owner_contract_version,
         owner_contract_digest=persisted.owner_contract_digest,
+        owner_contract_released_at=persisted.owner_contract_released_at,
         released_at=persisted.released_at,
         superseded_at=persisted.superseded_at,
     )
-    if record[:-2] != requested[:-2]:
+    if record[:-3] != requested[:-3]:
         raise WeightEligibilityAuthorityIntegrityError(
             "released weight-eligibility authority does not match requested coordinates"
         )
@@ -487,10 +506,12 @@ def resolve_weight_eligibility_authority(
         ("evidence_version", record.evidence_version),
         ("owner_contract_digest", record.owner_contract_digest),
         ("owner_contract_reference", record.owner_contract_reference),
+        ("owner_contract_released_at", record.owner_contract_released_at),
         ("owner_contract_version", record.owner_contract_version),
         ("reference_duration_digest", record.reference_duration_digest),
         ("reference_duration_reference", record.reference_duration_reference),
         ("released_at", record.released_at),
+        ("superseded_at", record.superseded_at),
         ("target_population_digest", record.target_population_digest),
         ("target_population_reference", record.target_population_reference),
         ("weight_artifact_digest", record.weight_artifact_digest),
