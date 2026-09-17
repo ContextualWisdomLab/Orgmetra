@@ -61,6 +61,7 @@ _READ_FIELDS = frozenset(
         "owner_contract_reference",
         "owner_contract_version",
         "owner_contract_digest",
+        "owner_contract_released_at",
         "released_at",
     }
 )
@@ -112,6 +113,7 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
         owner_contract_reference: str,
         owner_contract_version: int,
         owner_contract_digest: str,
+        owner_contract_released_at: datetime,
         released_at: datetime,
     ) -> CalibrationAdjustmentAuthorityRecord:
         """Validate and detach the minimum receipt-level scientific authority."""
@@ -203,9 +205,16 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
             "owner_contract_version", owner_contract_version
         )
         owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
+        owner_released = _require_aware_datetime(
+            "owner_contract_released_at", owner_contract_released_at
+        )
         release_instant = _require_aware_datetime("released_at", released_at)
         if release_instant < constructed:
             raise ValueError("released_at cannot precede constructed_at.")
+        if owner_released > release_instant:
+            raise ValueError(
+                "owner_contract_released_at cannot be later than released_at."
+            )
 
         return tuple.__new__(
             cls,
@@ -233,6 +242,7 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
                 owner_ref,
                 owner_version,
                 owner_digest,
+                owner_released,
                 release_instant,
             ),
         )
@@ -353,9 +363,14 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
         return self[22]
 
     @property
+    def owner_contract_released_at(self) -> datetime:
+        """Return when the governing owner contract became released authority."""
+        return self[23]
+
+    @property
     def released_at(self) -> datetime:
         """Return when this typed calibration evidence became released authority."""
-        return self[23]
+        return self[24]
 
 
 class CalibrationAdjustmentAuthorityView(tuple):
@@ -430,6 +445,11 @@ class CalibrationAdjustmentAuthorityReadPort(Protocol):
 _PROTOCOL_READ_CAPABILITY = getattr_static(
     CalibrationAdjustmentAuthorityReadPort, "read_calibration_adjustment_authority"
 )
+
+
+def _coordinate_tuple(record: CalibrationAdjustmentAuthorityRecord) -> tuple[object, ...]:
+    """Return caller-known coordinates, excluding owner-resolved release instants."""
+    return record[:23]
 
 
 def resolve_calibration_adjustment_authority(
@@ -509,6 +529,7 @@ def resolve_calibration_adjustment_authority(
         owner_contract_reference=owner_contract_reference,
         owner_contract_version=owner_contract_version,
         owner_contract_digest=owner_contract_digest,
+        owner_contract_released_at=constructed_at,
         released_at=constructed_at,
     )
     tenant_id = requested.tenant_record_id
@@ -590,11 +611,10 @@ def resolve_calibration_adjustment_authority(
         owner_contract_reference=persisted.owner_contract_reference,
         owner_contract_version=persisted.owner_contract_version,
         owner_contract_digest=persisted.owner_contract_digest,
+        owner_contract_released_at=persisted.owner_contract_released_at,
         released_at=persisted.released_at,
     )
-    expected = requested[:-1]
-    observed = record[:-1]
-    if observed != expected:
+    if _coordinate_tuple(record) != _coordinate_tuple(requested):
         raise CalibrationAdjustmentAuthorityIntegrityError(
             "released calibration-adjustment authority does not match requested coordinates"
         )
@@ -617,6 +637,7 @@ def resolve_calibration_adjustment_authority(
         ("output_weight_artifact_digest", record.output_weight_artifact_digest),
         ("owner_contract_digest", record.owner_contract_digest),
         ("owner_contract_reference", record.owner_contract_reference),
+        ("owner_contract_released_at", record.owner_contract_released_at),
         ("owner_contract_version", record.owner_contract_version),
         ("released_at", record.released_at),
         ("termination_code", record.termination_code),
