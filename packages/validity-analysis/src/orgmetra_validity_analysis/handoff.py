@@ -18,7 +18,7 @@ _CODE_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _REFERENCE_PATTERN = re.compile(
-    r"^[a-z][a-z0-9_]{1,31}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
+    r"^[a-z][a-z0-9_]{1,63}:[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$"
 )
 _PURPOSE_CODE = "selection_validity_analysis"
 _REASON_CODE = "criterion_related_validation"
