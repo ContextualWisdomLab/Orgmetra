@@ -79,6 +79,7 @@ def calibration_receipt(**overrides: object) -> CalibrationAdjustmentReceipt:
         "algorithm_reference": "calibration_algorithm:77777777-7777-4777-8777-777777777777",
         "algorithm_version": 1,
         "constraints_digest": DIGEST_F,
+        "applied_constraints_digest": DIGEST_F,
         "termination_code": "converged",
         "input_weight_artifact_digest": DIGEST_D,
         "output_weight_artifact_digest": DIGEST_E,
@@ -137,7 +138,7 @@ def test_nonresponse_receipt_is_value_minimized_and_disposition_aware() -> None:
 
 
 def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -> None:
-    """Keep owner-corroboratable authority, benchmark, and fallback semantics explicit."""
+    """Keep owner-corroboratable authority, benchmark, and generating constraints explicit."""
     candidate = calibration_receipt()
     canonical = candidate.canonical_json()
     assert candidate.sha256_digest() == calibration_receipt().sha256_digest()
@@ -151,6 +152,8 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
     assert f'"auxiliary_authorization_receipt_digest":"{DIGEST_4}"' in canonical
     assert f'"auxiliary_scientific_use_receipt_digest":"{DIGEST_2}"' in canonical
     assert '"auxiliary_scientific_use_at":"2026-09-17T05:00:00Z"' in canonical
+    assert f'"constraints_digest":"{DIGEST_F}"' in canonical
+    assert f'"applied_constraints_digest":"{DIGEST_F}"' in canonical
     assert '"termination_code":"converged"' in canonical
     assert "protected_attribute" not in canonical
     assert repr(candidate) == "CalibrationAdjustmentReceipt(<redacted>)"
@@ -159,7 +162,8 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
     fallback_algorithm_reference = "calibration_algorithm:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     fallback = calibration_receipt(
         termination_code="fallback_applied",
-        fallback_reason_code="primary_nonconvergence",
+        applied_constraints_digest=DIGEST_1,
+        fallback_reason_code="constraint_relaxation",
         fallback_rule_reference=fallback_reference,
         fallback_rule_digest=DIGEST_2,
         fallback_algorithm_reference=fallback_algorithm_reference,
@@ -168,10 +172,11 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
     )
     fallback_json = fallback.canonical_json()
     assert f'"fallback_rule_digest":"{DIGEST_2}"' in fallback_json
-    assert '"fallback_reason_code":"primary_nonconvergence"' in fallback_json
+    assert '"fallback_reason_code":"constraint_relaxation"' in fallback_json
     assert f'"fallback_algorithm_reference":"{fallback_algorithm_reference}"' in fallback_json
     assert '"fallback_algorithm_version":2' in fallback_json
     assert f'"fallback_configuration_digest":"{DIGEST_4}"' in fallback_json
+    assert f'"applied_constraints_digest":"{DIGEST_1}"' in fallback_json
 
     with pytest.raises(ValueError, match="auxiliary_authority_reference"):
         calibration_receipt(auxiliary_authority_reference="authority-v1")
@@ -216,6 +221,8 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
     with pytest.raises(ValueError, match="termination_code"):
         calibration_receipt(termination_code=1)
     with pytest.raises(ValueError, match="fallback"):
+        calibration_receipt(applied_constraints_digest=DIGEST_1)
+    with pytest.raises(ValueError, match="fallback"):
         calibration_receipt(termination_code="fallback_applied")
     with pytest.raises(ValueError, match="fallback"):
         calibration_receipt(
@@ -233,6 +240,8 @@ def test_calibration_receipt_binds_owner_authority_use_and_termination_state() -
         )
     with pytest.raises(ValueError, match="fallback"):
         calibration_receipt(fallback_rule_digest=DIGEST_2)
+    with pytest.raises(ValueError, match="applied_constraints_digest"):
+        calibration_receipt(applied_constraints_digest="not-a-digest")
     with pytest.raises(ValueError, match="output_weight_artifact_digest"):
         calibration_receipt(output_weight_artifact_digest=DIGEST_D)
     with pytest.raises(ValueError, match="evidence_version"):
