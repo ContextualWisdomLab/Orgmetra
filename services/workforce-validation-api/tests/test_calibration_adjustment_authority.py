@@ -25,6 +25,8 @@ OTHER_STUDY = UUID("00000000-0000-7000-8000-0000000000d2")
 RECEIPT_REFERENCE = "calibration_adjustment_receipt:11111111-1111-4111-8111-111111111111"
 OWNER_CONTRACT_REFERENCE = "released_owner_contract:22222222-2222-4222-8222-222222222222"
 RECEIPT_DIGEST = "1" * 64
+TARGET_POPULATION_DIGEST = "a" * 64
+ANALYSIS_WINDOW_REFERENCE = "analysis_window:2026q3"
 AUXILIARY_PROJECTION_DIGEST = "2" * 64
 BENCHMARK_RECEIPT_DIGEST = "3" * 64
 CONSTRAINTS_DIGEST = "4" * 64
@@ -42,6 +44,8 @@ READ_FIELDS = frozenset(
         "calibration_receipt_reference",
         "calibration_receipt_digest",
         "evidence_version",
+        "target_population_digest",
+        "analysis_window_reference",
         "auxiliary_projection_digest",
         "benchmark_receipt_digest",
         "algorithm_reference",
@@ -134,6 +138,8 @@ def _record(**overrides: object) -> CalibrationAdjustmentAuthorityRecord:
         "calibration_receipt_reference": RECEIPT_REFERENCE,
         "calibration_receipt_digest": RECEIPT_DIGEST,
         "evidence_version": 1,
+        "target_population_digest": TARGET_POPULATION_DIGEST,
+        "analysis_window_reference": ANALYSIS_WINDOW_REFERENCE,
         "auxiliary_projection_digest": AUXILIARY_PROJECTION_DIGEST,
         "benchmark_receipt_digest": BENCHMARK_RECEIPT_DIGEST,
         "algorithm_reference": "calibration_algorithm:generalized_regression",
@@ -167,6 +173,8 @@ def _resolve(*, read_port: object, **overrides: object) -> CalibrationAdjustment
         "calibration_receipt_reference": RECEIPT_REFERENCE,
         "calibration_receipt_digest": RECEIPT_DIGEST,
         "evidence_version": 1,
+        "target_population_digest": TARGET_POPULATION_DIGEST,
+        "analysis_window_reference": ANALYSIS_WINDOW_REFERENCE,
         "auxiliary_projection_digest": AUXILIARY_PROJECTION_DIGEST,
         "benchmark_receipt_digest": BENCHMARK_RECEIPT_DIGEST,
         "algorithm_reference": "calibration_algorithm:generalized_regression",
@@ -204,9 +212,13 @@ def test_fallback_resolution_binds_actual_generating_method() -> None:
     assert isinstance(port, CalibrationAdjustmentAuthorityReadPort)
     assert len(port.calls) == 1
     assert port.calls[0]["calibration_receipt_digest"] == RECEIPT_DIGEST
+    assert port.calls[0]["target_population_digest"] == TARGET_POPULATION_DIGEST
+    assert port.calls[0]["analysis_window_reference"] == ANALYSIS_WINDOW_REFERENCE
     assert port.calls[0]["fallback_algorithm_reference"] == "calibration_algorithm:raking"
     assert view.tenant_record_id == TENANT
     assert view.validity_study_id == STUDY
+    assert ("target_population_digest", TARGET_POPULATION_DIGEST) in view.fields
+    assert ("analysis_window_reference", ANALYSIS_WINDOW_REFERENCE) in view.fields
     assert ("termination_code", "fallback_applied") in view.fields
     assert ("fallback_reason_code", "primary_nonconvergence") in view.fields
     assert ("fallback_rule_reference", "calibration_fallback_rule:cell-collapse-v2") in view.fields
@@ -245,16 +257,18 @@ def test_missing_or_noncanonical_owner_evidence_fails_closed() -> None:
     [
         {"tenant_record_id": OTHER_TENANT},
         {"validity_study_id": OTHER_STUDY},
-        {"calibration_receipt_digest": "a" * 64},
-        {"auxiliary_projection_digest": "b" * 64},
-        {"benchmark_receipt_digest": "c" * 64},
+        {"calibration_receipt_digest": "b" * 64},
+        {"target_population_digest": "c" * 64},
+        {"analysis_window_reference": "analysis_window:2026q4"},
+        {"auxiliary_projection_digest": "d" * 64},
+        {"benchmark_receipt_digest": "e" * 64},
         {"algorithm_reference": "calibration_algorithm:raking"},
         {"algorithm_version": 9},
-        {"constraints_digest": "d" * 64},
-        {"input_weight_artifact_digest": "e" * 64},
-        {"output_weight_artifact_digest": "f" * 64},
+        {"constraints_digest": "f" * 64},
+        {"input_weight_artifact_digest": "0" * 64},
+        {"output_weight_artifact_digest": "a" * 64},
         {"owner_contract_version": 7},
-        {"owner_contract_digest": "0" * 64},
+        {"owner_contract_digest": "b" * 64},
     ],
 )
 def test_owner_evidence_must_match_every_requested_coordinate(
@@ -298,6 +312,8 @@ def test_converged_receipt_rejects_fallback_only_evidence() -> None:
     ("key", "value"),
     [
         ("evidence_version", 2),
+        ("target_population_digest", "a" * 63),
+        ("analysis_window_reference", "wrong:window"),
         ("termination_code", "nonconverged"),
         ("algorithm_reference", "wrong:method"),
         ("algorithm_version", True),
@@ -339,6 +355,8 @@ def test_weight_artifact_and_release_chronology_fail_closed() -> None:
         ("calibration_receipt_reference", "wrong:receipt", ValueError),
         ("calibration_receipt_digest", "ABC", ValueError),
         ("evidence_version", False, ValueError),
+        ("target_population_digest", "a" * 63, ValueError),
+        ("analysis_window_reference", "wrong:window", ValueError),
         ("auxiliary_projection_digest", "2" * 63, ValueError),
         ("benchmark_receipt_digest", "3" * 65, ValueError),
         ("algorithm_reference", "wrong:algorithm", ValueError),
