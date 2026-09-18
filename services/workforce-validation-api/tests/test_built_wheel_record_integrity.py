@@ -13,7 +13,6 @@ from packaging.version import Version
 
 _TEST_ROOT = Path(__file__).resolve().parent
 _METADATA_PATH = _TEST_ROOT / "test_package_metadata_compatibility.py"
-_RECORD_PATH = _TEST_ROOT / "test_built_wheel_metadata_contract.py"
 
 _METADATA_SPEC = importlib.util.spec_from_file_location(
     "_workforce_package_metadata_contract_for_record",
@@ -22,14 +21,6 @@ _METADATA_SPEC = importlib.util.spec_from_file_location(
 assert _METADATA_SPEC is not None and _METADATA_SPEC.loader is not None
 _METADATA_CONTRACT = importlib.util.module_from_spec(_METADATA_SPEC)
 _METADATA_SPEC.loader.exec_module(_METADATA_CONTRACT)
-
-_RECORD_SPEC = importlib.util.spec_from_file_location(
-    "_workforce_built_wheel_record_contract",
-    _RECORD_PATH,
-)
-assert _RECORD_SPEC is not None and _RECORD_SPEC.loader is not None
-_RECORD_CONTRACT = importlib.util.module_from_spec(_RECORD_SPEC)
-_RECORD_SPEC.loader.exec_module(_RECORD_CONTRACT)
 
 
 def test_built_owned_wheels_have_complete_verified_records(tmp_path: Path) -> None:
@@ -68,4 +59,4 @@ def test_built_owned_wheels_have_complete_verified_records(tmp_path: Path) -> No
     wheel_paths = tuple(sorted(wheelhouse.iterdir()))
     assert len(wheel_paths) == 2, "RECORD acceptance must inspect both owned built wheels"
     for wheel_path in wheel_paths:
-        _RECORD_CONTRACT._validate_wheel_record(wheel_path)
+        _METADATA_CONTRACT._validate_wheel_record(wheel_path)
