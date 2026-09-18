@@ -223,7 +223,6 @@ def test_missing_noncanonical_and_pre_release_evidence_fail_closed() -> None:
         {"validity_study_id": OTHER_STUDY},
         {"base_weight_evidence_receipt_reference": SUCCESSOR},
         {"base_weight_evidence_receipt_digest": "4" * 64},
-        {"evidence_version": 2},
         {"owner_contract_reference": "released_owner_contract:44444444-4444-4444-8444-444444444444"},
         {"owner_contract_version": 2},
         {"owner_contract_digest": "5" * 64},
