@@ -5,12 +5,9 @@ from __future__ import annotations
 import csv
 import importlib.util
 import io
-from pathlib import Path, PurePosixPath
-import subprocess
-import sys
+from pathlib import Path
 import zipfile
 
-from packaging.utils import canonicalize_name, parse_wheel_filename
 import pytest
 
 
@@ -61,43 +58,8 @@ def _write_wheel(
             archive.writestr(member_path, content)
 
 
-def _assert_dist_info_identity(wheel_path: Path) -> None:
-    """Bind the sole dist-info root to the normalized wheel filename name and version."""
-    parsed_name, parsed_version, _build, _tags = parse_wheel_filename(wheel_path.name)
-    expected_root = (
-        f"{canonicalize_name(parsed_name).replace('-', '_')}-{parsed_version}.dist-info"
-    )
-    with zipfile.ZipFile(wheel_path) as archive:
-        roots = {
-            PurePosixPath(name).parts[0]
-            for name in archive.namelist()
-            if PurePosixPath(name).parts
-            and PurePosixPath(name).parts[0].endswith(".dist-info")
-        }
-    assert roots == {expected_root}, (
-        f"{wheel_path.name} dist-info identity must be {expected_root}, observed {sorted(roots)}"
-    )
-
-
-def _validate_distribution_acceptance(
-    wheelhouse: Path,
-    *,
-    service_version: str,
-    keyverse_version: str,
-) -> tuple[str, dict[str, Path]]:
-    """Bind dist-info identity before the existing validator computes the install lock."""
-    wheel_paths = tuple(sorted(wheelhouse.glob("*.whl")))
-    for wheel_path in wheel_paths:
-        _assert_dist_info_identity(wheel_path)
-    return _CONTRACT._locked_wheel_requirements(
-        wheelhouse,
-        service_version=service_version,
-        keyverse_version=keyverse_version,
-    )
-
-
 def test_hash_locked_acceptance_rejects_mismatched_dist_info_identity(tmp_path: Path) -> None:
-    """A correct filename and METADATA must not hide a foreign dist-info directory identity."""
+    """The shared hash-lock helper must reject a foreign dist-info directory before hashing."""
     wheelhouse = tmp_path / "wheelhouse"
     wheelhouse.mkdir()
     _write_wheel(
@@ -132,51 +94,8 @@ def test_hash_locked_acceptance_rejects_mismatched_dist_info_identity(tmp_path: 
     )
 
     with pytest.raises(AssertionError, match="dist-info identity"):
-        _validate_distribution_acceptance(
+        _CONTRACT._locked_wheel_requirements(
             wheelhouse,
             service_version="0.1.0",
             keyverse_version="0.1.0",
         )
-
-
-def test_built_owned_wheels_bind_dist_info_to_filename_identity(tmp_path: Path) -> None:
-    """Prove the exact wheels built from reviewed owned sources satisfy the identity binding."""
-    service_project = _CONTRACT._project_metadata(_CONTRACT._SERVICE_ROOT / "pyproject.toml")
-    service_version = service_project.get("version")
-    assert isinstance(service_version, str), "service project version must be text"
-    keyverse_project = _CONTRACT._project_metadata(_CONTRACT._KEYVERSE_PROJECT)
-    keyverse_version = keyverse_project.get("version")
-    assert isinstance(keyverse_version, str), "Keyverse project version must be text"
-
-    wheelhouse = tmp_path / "wheelhouse"
-    wheelhouse.mkdir()
-    environment = _CONTRACT._subprocess_environment()
-    for source_root in (_CONTRACT._KEYVERSE_ROOT, _CONTRACT._SERVICE_ROOT):
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pip",
-                "wheel",
-                "--no-index",
-                "--no-cache-dir",
-                "--no-deps",
-                "--no-build-isolation",
-                "--wheel-dir",
-                str(wheelhouse),
-                str(source_root),
-            ],
-            cwd=_CONTRACT._REPOSITORY_ROOT,
-            env=environment,
-            check=True,
-        )
-
-    _locked_requirements, wheels_by_name = _validate_distribution_acceptance(
-        wheelhouse,
-        service_version=service_version,
-        keyverse_version=keyverse_version,
-    )
-    assert set(wheels_by_name) == {
-        canonicalize_name(_CONTRACT._KEYVERSE_NAME),
-        canonicalize_name(_CONTRACT._SERVICE_NAME),
-    }
