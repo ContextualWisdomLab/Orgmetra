@@ -106,6 +106,14 @@ from orgmetra_workforce_validation_api.trimming_bounding_authority import (
     TrimmingBoundingAuthorityView,
     resolve_trimming_bounding_authority,
 )
+from orgmetra_workforce_validation_api.trimming_bounding_supersession_authority import (
+    TrimmingBoundingSupersessionAuthorityIntegrityError,
+    TrimmingBoundingSupersessionAuthorityNotFound,
+    TrimmingBoundingSupersessionAuthorityReadPort,
+    TrimmingBoundingSupersessionAuthorityRecord,
+    TrimmingBoundingSupersessionAuthorityView,
+    resolve_trimming_bounding_supersession_authority,
+)
 from orgmetra_workforce_validation_api.variance_authority import (
     WeightVarianceAuthorityIntegrityError,
     WeightVarianceAuthorityNotFound,
@@ -178,6 +186,11 @@ __all__ = [
     "TrimmingBoundingAuthorityReadPort",
     "TrimmingBoundingAuthorityRecord",
     "TrimmingBoundingAuthorityView",
+    "TrimmingBoundingSupersessionAuthorityIntegrityError",
+    "TrimmingBoundingSupersessionAuthorityNotFound",
+    "TrimmingBoundingSupersessionAuthorityReadPort",
+    "TrimmingBoundingSupersessionAuthorityRecord",
+    "TrimmingBoundingSupersessionAuthorityView",
     "ValidationPrincipal",
     "ValidationResultAuthorityIntegrityError",
     "ValidationResultAuthorityNotFound",
@@ -224,6 +237,7 @@ __all__ = [
     "resolve_nonresponse_adjustment_authority",
     "resolve_nonresponse_adjustment_supersession_authority",
     "resolve_trimming_bounding_authority",
+    "resolve_trimming_bounding_supersession_authority",
     "resolve_validation_result_authority",
     "resolve_validation_result_nonverifiability",
     "resolve_validation_result_supersession_authority",
