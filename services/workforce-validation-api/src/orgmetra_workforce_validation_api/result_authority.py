@@ -433,23 +433,33 @@ def resolve_validation_result_authority(
             "owner port returned non-canonical validation-result authority evidence"
         )
 
-    record = ValidationResultAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        result_reference=persisted.result_reference,
-        result_digest=persisted.result_digest,
-        compatibility_receipt_reference=persisted.compatibility_receipt_reference,
-        compatibility_receipt_digest=persisted.compatibility_receipt_digest,
-        analysis_weight_receipt_digest=persisted.analysis_weight_receipt_digest,
-        variance_design_receipt_digest=persisted.variance_design_receipt_digest,
-        verification_status=persisted.verification_status,
-        owner_contract_reference=persisted.owner_contract_reference,
-        owner_contract_version=persisted.owner_contract_version,
-        owner_contract_digest=persisted.owner_contract_digest,
-        owner_contract_released_at=persisted.owner_contract_released_at,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-    )
+    try:
+        record = ValidationResultAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            result_reference=persisted.result_reference,
+            result_digest=persisted.result_digest,
+            compatibility_receipt_reference=persisted.compatibility_receipt_reference,
+            compatibility_receipt_digest=persisted.compatibility_receipt_digest,
+            analysis_weight_receipt_digest=persisted.analysis_weight_receipt_digest,
+            variance_design_receipt_digest=persisted.variance_design_receipt_digest,
+            verification_status=persisted.verification_status,
+            owner_contract_reference=persisted.owner_contract_reference,
+            owner_contract_version=persisted.owner_contract_version,
+            owner_contract_digest=persisted.owner_contract_digest,
+            owner_contract_released_at=persisted.owner_contract_released_at,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise ValidationResultAuthorityIntegrityError(
+            "owner port returned malformed validation-result authority evidence"
+        ) from exc
+    if record != persisted:
+        raise ValidationResultAuthorityIntegrityError(
+            "owner port returned non-canonical validation-result authority structure"
+        )
+
     requested_identity = (
         tenant_identity,
         study_identity,
