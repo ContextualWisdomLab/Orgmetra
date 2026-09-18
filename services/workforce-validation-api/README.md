@@ -132,7 +132,11 @@ The typed-calibration adapter must exact-key the complete target-population/wind
 
 ## Test contract
 
-The service is admitted to the canonical Foundation quality workflow with a 100% owned statement and branch threshold:
+The canonical Foundation quality workflow still invokes this service's pytest lane from the checkout, including a source-tree `PYTHONPATH` for ordinary unit/import coverage. That invocation is **not** accepted as packaging evidence by itself.
+
+`tests/test_package_metadata_compatibility.py` and `tests/test_built_wheel_metadata_contract.py` establish the separate installed-distribution boundary. They remove inherited `PIP_*`, `PYTHONPATH`, and `PYTHONHOME`, disable ambient pip configuration, build the Keyverse and Workforce Validation wheels from the exact checkout with reviewed tooling and no dependency/index acquisition, reject unexpected wheel identities/content/package-data, parse the exact built `.dist-info/METADATA`, and bind built `Name`, `Version`, `Requires-Python`, plus Workforce Validation's mandatory unconditional exact `orgmetra-keyverse-adapter==0.1.0` `Requires-Dist` to reviewed project metadata. Each wheel is SHA-256-bound before installation; a fresh venv consumes only the local wheelhouse under pip hash-checking mode, then runs `pip check` and proves imports resolve under the isolated prefix. Directly installing Keyverse as a top-level lock entry must never mask a service wheel that dropped or altered its dependency declaration.
+
+The Foundation pytest invocation remains:
 
 ```bash
 PYTHONPATH=services/workforce-validation-api/src:packages/keyverse-adapter/src \
