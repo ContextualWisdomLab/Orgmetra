@@ -3,8 +3,8 @@
 The typed calibration receipt carries the identities of the auxiliary and benchmark
 inputs used to construct weights. This boundary separately proves that those exact
 supporting authorities were released and current when the calibration was
-constructed. Owner-resolved release/cutover instants are evidence, never caller
-lookup coordinates.
+constructed. Owner-resolved release, effective-interval, and cutover instants are
+evidence rather than caller lookup coordinates.
 """
 
 from __future__ import annotations
@@ -90,6 +90,16 @@ class CalibrationSupportAuthorityIntegrityError(RuntimeError):
     """Indicate that returned support evidence does not match the requested binding."""
 
 
+def _tuple_property(index: int, doc: str) -> property:
+    """Create a documented immutable tuple projection for one public evidence field."""
+
+    def getter(record: tuple[object, ...]) -> object:
+        """Return one already-validated immutable evidence coordinate."""
+        return record[index]
+
+    return property(getter, doc=doc)
+
+
 class CalibrationSupportAuthorityRecord(tuple):
     """Immutable released proof that calibration support was valid at construction."""
 
@@ -140,11 +150,13 @@ class CalibrationSupportAuthorityRecord(tuple):
         owner_contract_released_at: datetime,
         released_at: datetime,
     ) -> CalibrationSupportAuthorityRecord:
-        """Validate support identities and owner-resolved chronology before storage."""
+        """Validate identities and chronology before storing detached owner evidence."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
         study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
         support_ref = _require_reference(
-            "support_authority_reference", support_authority_reference, "calibration_support_authority"
+            "support_authority_reference",
+            support_authority_reference,
+            "calibration_support_authority",
         )
         support_digest = _require_digest("support_authority_digest", support_authority_digest)
         version = _require_positive_integer("evidence_version", evidence_version)
@@ -231,10 +243,16 @@ class CalibrationSupportAuthorityRecord(tuple):
             raise ValueError(
                 "authorization receipt must be released no later than auxiliary scientific use."
             )
+        if authorization_released > authorized_from:
+            raise ValueError(
+                "authorization receipt must exist before authorization begins."
+            )
         if authorized_to is not None and authorized_to <= authorized_from:
             raise ValueError("auxiliary_authorized_to must be later than auxiliary_authorized_from.")
         if use_at < authorized_from or (authorized_to is not None and use_at >= authorized_to):
-            raise ValueError("auxiliary scientific use must fall inside owner-resolved authorization interval.")
+            raise ValueError(
+                "auxiliary scientific use must fall inside owner-resolved authorization interval."
+            )
 
         benchmark_ref = _require_reference(
             "benchmark_receipt_reference",
@@ -285,7 +303,9 @@ class CalibrationSupportAuthorityRecord(tuple):
         if benchmark_released > constructed:
             raise ValueError("benchmark receipt must be released no later than calibration construction.")
         if benchmark_superseded is not None and constructed >= benchmark_superseded:
-            raise ValueError("superseded benchmark cannot support calibration construction at or after cutover.")
+            raise ValueError(
+                "superseded benchmark cannot support calibration construction at or after cutover."
+            )
 
         owner_ref = _require_reference(
             "owner_contract_reference", owner_contract_reference, "released_owner_contract"
@@ -350,55 +370,57 @@ class CalibrationSupportAuthorityRecord(tuple):
 
     @property
     def tenant_record_id(self) -> UUID:
+        """Return a fresh tenant identity for this support authority."""
         return _restore_operational_uuid("tenant_record_id", self[0])
 
     @property
     def validity_study_id(self) -> UUID:
+        """Return a fresh validity-study identity for this support authority."""
         return _restore_operational_uuid("validity_study_id", self[1])
 
-    support_authority_reference = property(lambda self: self[2])
-    support_authority_digest = property(lambda self: self[3])
-    evidence_version = property(lambda self: self[4])
-    calibration_receipt_reference = property(lambda self: self[5])
-    calibration_receipt_digest = property(lambda self: self[6])
-    auxiliary_authority_reference = property(lambda self: self[7])
-    auxiliary_projection_reference = property(lambda self: self[8])
-    auxiliary_projection_version = property(lambda self: self[9])
-    auxiliary_projection_digest = property(lambda self: self[10])
-    auxiliary_purpose_reference = property(lambda self: self[11])
-    auxiliary_purpose_digest = property(lambda self: self[12])
-    auxiliary_owner_contract_reference = property(lambda self: self[13])
-    auxiliary_owner_contract_version = property(lambda self: self[14])
-    auxiliary_owner_contract_digest = property(lambda self: self[15])
-    auxiliary_owner_contract_released_at = property(lambda self: self[16])
-    auxiliary_authorization_receipt_reference = property(lambda self: self[17])
-    auxiliary_authorization_receipt_digest = property(lambda self: self[18])
-    auxiliary_authorization_receipt_released_at = property(lambda self: self[19])
-    auxiliary_scientific_use_receipt_reference = property(lambda self: self[20])
-    auxiliary_scientific_use_receipt_digest = property(lambda self: self[21])
-    auxiliary_scientific_use_at = property(lambda self: self[22])
-    auxiliary_authorized_from = property(lambda self: self[23])
-    auxiliary_authorized_to = property(lambda self: self[24])
-    benchmark_receipt_reference = property(lambda self: self[25])
-    benchmark_receipt_version = property(lambda self: self[26])
-    benchmark_receipt_digest = property(lambda self: self[27])
-    benchmark_owner_contract_reference = property(lambda self: self[28])
-    benchmark_owner_contract_version = property(lambda self: self[29])
-    benchmark_owner_contract_digest = property(lambda self: self[30])
-    benchmark_owner_contract_released_at = property(lambda self: self[31])
-    benchmark_reference_at = property(lambda self: self[32])
-    benchmark_receipt_released_at = property(lambda self: self[33])
-    benchmark_receipt_superseded_at = property(lambda self: self[34])
-    constructed_at = property(lambda self: self[35])
-    owner_contract_reference = property(lambda self: self[36])
-    owner_contract_version = property(lambda self: self[37])
-    owner_contract_digest = property(lambda self: self[38])
-    owner_contract_released_at = property(lambda self: self[39])
-    released_at = property(lambda self: self[40])
+    support_authority_reference = _tuple_property(2, "Return the immutable support-authority reference.")
+    support_authority_digest = _tuple_property(3, "Return the digest of the exact support-authority evidence.")
+    evidence_version = _tuple_property(4, "Return the governed support-authority evidence version.")
+    calibration_receipt_reference = _tuple_property(5, "Return the typed calibration receipt this support proof corroborates.")
+    calibration_receipt_digest = _tuple_property(6, "Return the digest of the typed calibration receipt.")
+    auxiliary_authority_reference = _tuple_property(7, "Return the scientific auxiliary-authority identity used by calibration.")
+    auxiliary_projection_reference = _tuple_property(8, "Return the purpose-limited auxiliary projection reference.")
+    auxiliary_projection_version = _tuple_property(9, "Return the exact auxiliary projection version.")
+    auxiliary_projection_digest = _tuple_property(10, "Return the digest of the auxiliary projection used by calibration.")
+    auxiliary_purpose_reference = _tuple_property(11, "Return the governed scientific-use purpose reference.")
+    auxiliary_purpose_digest = _tuple_property(12, "Return the digest of the governed scientific-use purpose.")
+    auxiliary_owner_contract_reference = _tuple_property(13, "Return the released auxiliary-owner contract reference.")
+    auxiliary_owner_contract_version = _tuple_property(14, "Return the released auxiliary-owner contract version.")
+    auxiliary_owner_contract_digest = _tuple_property(15, "Return the released auxiliary-owner contract digest.")
+    auxiliary_owner_contract_released_at = _tuple_property(16, "Return when the auxiliary-owner contract became released evidence.")
+    auxiliary_authorization_receipt_reference = _tuple_property(17, "Return the purpose-bound authorization receipt reference.")
+    auxiliary_authorization_receipt_digest = _tuple_property(18, "Return the digest of the purpose-bound authorization receipt.")
+    auxiliary_authorization_receipt_released_at = _tuple_property(19, "Return when the authorization receipt became released evidence.")
+    auxiliary_scientific_use_receipt_reference = _tuple_property(20, "Return the immutable scientific-use receipt reference.")
+    auxiliary_scientific_use_receipt_digest = _tuple_property(21, "Return the digest of the scientific-use receipt.")
+    auxiliary_scientific_use_at = _tuple_property(22, "Return the scientific-use instant committed by the calibration lineage.")
+    auxiliary_authorized_from = _tuple_property(23, "Return the inclusive start of the owner-resolved authorization interval.")
+    auxiliary_authorized_to = _tuple_property(24, "Return the optional exclusive end of the owner-resolved authorization interval.")
+    benchmark_receipt_reference = _tuple_property(25, "Return the calibration benchmark receipt reference.")
+    benchmark_receipt_version = _tuple_property(26, "Return the exact calibration benchmark receipt version.")
+    benchmark_receipt_digest = _tuple_property(27, "Return the digest of the exact calibration benchmark receipt.")
+    benchmark_owner_contract_reference = _tuple_property(28, "Return the released benchmark-owner contract reference.")
+    benchmark_owner_contract_version = _tuple_property(29, "Return the released benchmark-owner contract version.")
+    benchmark_owner_contract_digest = _tuple_property(30, "Return the released benchmark-owner contract digest.")
+    benchmark_owner_contract_released_at = _tuple_property(31, "Return when the benchmark-owner contract became released evidence.")
+    benchmark_reference_at = _tuple_property(32, "Return the benchmark reference instant committed by calibration.")
+    benchmark_receipt_released_at = _tuple_property(33, "Return when the benchmark receipt became released evidence.")
+    benchmark_receipt_superseded_at = _tuple_property(34, "Return the optional exclusive cutover that ended benchmark authority.")
+    constructed_at = _tuple_property(35, "Return when the typed calibration receipt was constructed.")
+    owner_contract_reference = _tuple_property(36, "Return the released application owner-contract reference.")
+    owner_contract_version = _tuple_property(37, "Return the released application owner-contract version.")
+    owner_contract_digest = _tuple_property(38, "Return the digest of the released application owner contract.")
+    owner_contract_released_at = _tuple_property(39, "Return when the application owner contract became released evidence.")
+    released_at = _tuple_property(40, "Return when this support proof became released application evidence.")
 
 
 class CalibrationSupportAuthorityView(tuple):
-    """Field-minimized support evidence issued only after authorization."""
+    """Field-minimized support evidence issued only after purpose-bound authorization."""
 
     __slots__ = ()
 
@@ -409,20 +431,24 @@ class CalibrationSupportAuthorityView(tuple):
         validity_study_id: UUID,
         fields: tuple[tuple[str, object], ...],
     ) -> CalibrationSupportAuthorityView:
+        """Reject direct construction so callers cannot mint reusable authority views."""
         raise TypeError(
             "CalibrationSupportAuthorityView is issued only by resolve_calibration_support_authority."
         )
 
     @property
     def tenant_record_id(self) -> UUID:
+        """Return a fresh authorized tenant identity."""
         return _restore_operational_uuid("tenant_record_id", self[0])
 
     @property
     def validity_study_id(self) -> UUID:
+        """Return a fresh authorized validity-study identity."""
         return _restore_operational_uuid("validity_study_id", self[1])
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
+        """Return immutable corroborating support evidence without source values."""
         return self[2]
 
 
@@ -463,6 +489,7 @@ class CalibrationSupportAuthorityReadPort(Protocol):
         owner_contract_version: int,
         owner_contract_digest: str,
     ) -> CalibrationSupportAuthorityRecord | None:
+        """Return matching released support evidence or ``None`` through an owner ACL."""
         ...
 
 
@@ -472,7 +499,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 
 
 def _caller_coordinates(record: CalibrationSupportAuthorityRecord) -> tuple[object, ...]:
-    """Return immutable caller-known coordinates, excluding owner chronology."""
+    """Return immutable caller-known coordinates while excluding owner chronology."""
     return (
         record.tenant_record_id,
         record.validity_study_id,
@@ -550,7 +577,9 @@ def resolve_calibration_support_authority(
         raise TypeError("policy must be an exact PurposeBoundAccessPolicy.")
     read_capability = getattr_static(type(read_port), "read_calibration_support_authority", None)
     if type(read_capability) is not FunctionType or read_capability is _PROTOCOL_READ_CAPABILITY:
-        raise TypeError("read_port must expose a statically callable read_calibration_support_authority.")
+        raise TypeError(
+            "read_port must expose a statically callable read_calibration_support_authority."
+        )
 
     tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
     study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
@@ -565,7 +594,6 @@ def resolve_calibration_support_authority(
     )
     detached_policy = _detach_policy(policy)
 
-    # Validate every caller-known coordinate before invoking authorization or persistence.
     calibration_ref = _require_reference(
         "calibration_receipt_reference", calibration_receipt_reference, "calibration_adjustment_receipt"
     )
@@ -576,7 +604,9 @@ def resolve_calibration_support_authority(
     projection_ref = _require_reference(
         "auxiliary_projection_reference", auxiliary_projection_reference, "calibration_auxiliary_projection"
     )
-    projection_version = _require_positive_integer("auxiliary_projection_version", auxiliary_projection_version)
+    projection_version = _require_positive_integer(
+        "auxiliary_projection_version", auxiliary_projection_version
+    )
     projection_digest = _require_digest("auxiliary_projection_digest", auxiliary_projection_digest)
     purpose_ref = _require_reference(
         "auxiliary_purpose_reference", auxiliary_purpose_reference, "scientific_data_use_purpose"
