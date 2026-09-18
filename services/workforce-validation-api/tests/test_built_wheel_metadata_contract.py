@@ -78,7 +78,10 @@ def test_hash_locked_acceptance_rejects_service_wheel_missing_keyverse_dependenc
             "Metadata-Version: 2.4\n"
             "Name: orgmetra-keyverse-adapter\n"
             "Version: 0.1.0\n"
-            "Requires-Python: >=3.12\n\n"
+            "Requires-Python: >=3.12\n"
+            "Provides-Extra: test\n"
+            "Requires-Dist: pytest>=8.3; extra == 'test'\n"
+            "Requires-Dist: pytest-cov>=5.0; extra == 'test'\n\n"
         ),
         include_py_typed=False,
     )
@@ -119,7 +122,10 @@ def test_hash_locked_acceptance_rejects_unreviewed_inactive_dependency(
             "Metadata-Version: 2.4\n"
             "Name: orgmetra-keyverse-adapter\n"
             "Version: 0.1.0\n"
-            "Requires-Python: >=3.12\n\n"
+            "Requires-Python: >=3.12\n"
+            "Provides-Extra: test\n"
+            "Requires-Dist: pytest>=8.3; extra == 'test'\n"
+            "Requires-Dist: pytest-cov>=5.0; extra == 'test'\n\n"
         ),
         include_py_typed=False,
     )
@@ -147,6 +153,56 @@ def test_hash_locked_acceptance_rejects_unreviewed_inactive_dependency(
         )
 
 
+def test_hash_locked_acceptance_preserves_reviewed_optional_dependencies(
+    tmp_path: Path,
+) -> None:
+    """PEP 621 optional dependencies must remain reviewed metadata, not false positives."""
+    wheelhouse = tmp_path / "wheelhouse"
+    wheelhouse.mkdir()
+    _write_wheel(
+        wheelhouse,
+        filename="orgmetra_keyverse_adapter-0.1.0-py3-none-any.whl",
+        package_root="orgmetra_keyverse_adapter",
+        dist_info_root="orgmetra_keyverse_adapter-0.1.0.dist-info",
+        metadata=(
+            "Metadata-Version: 2.4\n"
+            "Name: orgmetra-keyverse-adapter\n"
+            "Version: 0.1.0\n"
+            "Requires-Python: >=3.12\n"
+            "Provides-Extra: test\n"
+            "Requires-Dist: pytest>=8.3; extra == 'test'\n"
+            "Requires-Dist: pytest-cov>=5.0; extra == 'test'\n\n"
+        ),
+        include_py_typed=False,
+    )
+    _write_wheel(
+        wheelhouse,
+        filename="orgmetra_workforce_validation_api-0.1.0-py3-none-any.whl",
+        package_root="orgmetra_workforce_validation_api",
+        dist_info_root="orgmetra_workforce_validation_api-0.1.0.dist-info",
+        metadata=(
+            "Metadata-Version: 2.4\n"
+            "Name: orgmetra-workforce-validation-api\n"
+            "Version: 0.1.0\n"
+            "Requires-Python: >=3.12\n"
+            "Requires-Dist: orgmetra-keyverse-adapter==0.1.0\n\n"
+        ),
+        include_py_typed=True,
+    )
+
+    locked_requirements, wheels_by_name = _CONTRACT._locked_wheel_requirements(
+        wheelhouse,
+        service_version="0.1.0",
+        keyverse_version="0.1.0",
+    )
+
+    assert "orgmetra-keyverse-adapter==0.1.0" in locked_requirements
+    assert set(wheels_by_name) == {
+        "orgmetra-keyverse-adapter",
+        "orgmetra-workforce-validation-api",
+    }
+
+
 def test_hash_locked_acceptance_rejects_wheel_with_invalid_record_hash(
     tmp_path: Path,
 ) -> None:
@@ -162,7 +218,10 @@ def test_hash_locked_acceptance_rejects_wheel_with_invalid_record_hash(
             "Metadata-Version: 2.4\n"
             "Name: orgmetra-keyverse-adapter\n"
             "Version: 0.1.0\n"
-            "Requires-Python: >=3.12\n\n"
+            "Requires-Python: >=3.12\n"
+            "Provides-Extra: test\n"
+            "Requires-Dist: pytest>=8.3; extra == 'test'\n"
+            "Requires-Dist: pytest-cov>=5.0; extra == 'test'\n\n"
         ),
         include_py_typed=False,
     )
