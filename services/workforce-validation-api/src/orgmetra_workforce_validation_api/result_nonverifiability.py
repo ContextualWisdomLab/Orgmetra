@@ -551,27 +551,37 @@ def resolve_validation_result_nonverifiability(
             "owner port returned non-canonical validation-result non-verifiability evidence"
         )
 
-    record = ValidationResultNonVerifiabilityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        result_reference=persisted.result_reference,
-        result_digest=persisted.result_digest,
-        failed_evidence_kind=persisted.failed_evidence_kind,
-        failure_mode=persisted.failure_mode,
-        failed_evidence_reference=persisted.failed_evidence_reference,
-        failed_evidence_digest=persisted.failed_evidence_digest,
-        verification_attempt_reference=persisted.verification_attempt_reference,
-        verification_attempt_digest=persisted.verification_attempt_digest,
-        verification_attempt_released_at=persisted.verification_attempt_released_at,
-        owner_contract_reference=persisted.owner_contract_reference,
-        owner_contract_version=persisted.owner_contract_version,
-        owner_contract_digest=persisted.owner_contract_digest,
-        owner_contract_released_at=persisted.owner_contract_released_at,
-        evaluated_at=persisted.evaluated_at,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-        failed_evidence_released_at=persisted.failed_evidence_released_at,
-    )
+    try:
+        record = ValidationResultNonVerifiabilityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            result_reference=persisted.result_reference,
+            result_digest=persisted.result_digest,
+            failed_evidence_kind=persisted.failed_evidence_kind,
+            failure_mode=persisted.failure_mode,
+            failed_evidence_reference=persisted.failed_evidence_reference,
+            failed_evidence_digest=persisted.failed_evidence_digest,
+            verification_attempt_reference=persisted.verification_attempt_reference,
+            verification_attempt_digest=persisted.verification_attempt_digest,
+            verification_attempt_released_at=persisted.verification_attempt_released_at,
+            owner_contract_reference=persisted.owner_contract_reference,
+            owner_contract_version=persisted.owner_contract_version,
+            owner_contract_digest=persisted.owner_contract_digest,
+            owner_contract_released_at=persisted.owner_contract_released_at,
+            evaluated_at=persisted.evaluated_at,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+            failed_evidence_released_at=persisted.failed_evidence_released_at,
+        )
+    except (IndexError, TypeError, ValueError) as exc:
+        raise ValidationResultNonVerifiabilityIntegrityError(
+            "owner port returned structurally invalid validation-result non-verifiability evidence"
+        ) from exc
+    if record != persisted:
+        raise ValidationResultNonVerifiabilityIntegrityError(
+            "owner port returned non-canonical validation-result non-verifiability structure"
+        )
+
     requested_identity = (
         tenant_identity,
         study_identity,
