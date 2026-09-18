@@ -464,27 +464,36 @@ def resolve_weight_eligibility_authority(
             "owner port returned non-canonical weight-eligibility authority evidence"
         )
 
-    record = WeightEligibilityAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        eligibility_receipt_reference=persisted.eligibility_receipt_reference,
-        eligibility_receipt_digest=persisted.eligibility_receipt_digest,
-        evidence_version=persisted.evidence_version,
-        weight_scope_code=persisted.weight_scope_code,
-        target_population_reference=persisted.target_population_reference,
-        target_population_digest=persisted.target_population_digest,
-        reference_duration_reference=persisted.reference_duration_reference,
-        reference_duration_digest=persisted.reference_duration_digest,
-        eligible_case_set_digest=persisted.eligible_case_set_digest,
-        weight_artifact_digest=persisted.weight_artifact_digest,
-        constructed_at=persisted.constructed_at,
-        owner_contract_reference=persisted.owner_contract_reference,
-        owner_contract_version=persisted.owner_contract_version,
-        owner_contract_digest=persisted.owner_contract_digest,
-        owner_contract_released_at=persisted.owner_contract_released_at,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-    )
+    try:
+        record = WeightEligibilityAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            eligibility_receipt_reference=persisted.eligibility_receipt_reference,
+            eligibility_receipt_digest=persisted.eligibility_receipt_digest,
+            evidence_version=persisted.evidence_version,
+            weight_scope_code=persisted.weight_scope_code,
+            target_population_reference=persisted.target_population_reference,
+            target_population_digest=persisted.target_population_digest,
+            reference_duration_reference=persisted.reference_duration_reference,
+            reference_duration_digest=persisted.reference_duration_digest,
+            eligible_case_set_digest=persisted.eligible_case_set_digest,
+            weight_artifact_digest=persisted.weight_artifact_digest,
+            constructed_at=persisted.constructed_at,
+            owner_contract_reference=persisted.owner_contract_reference,
+            owner_contract_version=persisted.owner_contract_version,
+            owner_contract_digest=persisted.owner_contract_digest,
+            owner_contract_released_at=persisted.owner_contract_released_at,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise WeightEligibilityAuthorityIntegrityError(
+            "owner port returned structurally invalid weight-eligibility authority evidence"
+        ) from exc
+    if record != persisted:
+        raise WeightEligibilityAuthorityIntegrityError(
+            "owner port returned non-canonical weight-eligibility authority structure"
+        )
     if record[:-3] != requested[:-3]:
         raise WeightEligibilityAuthorityIntegrityError(
             "released weight-eligibility authority does not match requested coordinates"
