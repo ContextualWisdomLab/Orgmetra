@@ -105,7 +105,8 @@ def _record(
     successor_digest: str | None,
     successor_released_at: datetime | None,
 ) -> ValidationResultNonVerifiabilitySupersessionAuthorityRecord:
-    """Build one canonical predecessor and optional successor verification attempt."""
+    """Build one canonical predecessor and optional same-result successor attempt."""
+    has_successor = successor_reference is not None
     return ValidationResultNonVerifiabilitySupersessionAuthorityRecord(
         tenant_record_id=TENANT,
         validity_study_id=STUDY,
@@ -122,6 +123,8 @@ def _record(
         owner_contract_released_at=OWNER_CONTRACT_RELEASED_AT,
         released_at=RELEASED_AT,
         superseded_at=superseded_at,
+        successor_target_result_reference=(RESULT_REFERENCE if has_successor else None),
+        successor_target_result_digest=(RESULT_DIGEST if has_successor else None),
         successor_verification_attempt_reference=successor_reference,
         successor_verification_attempt_digest=successor_digest,
         successor_verification_attempt_released_at=successor_released_at,
