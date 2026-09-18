@@ -294,3 +294,22 @@ def test_record_and_view_are_immutable_and_uuid_views_detached() -> None:
             validity_study_id=STUDY,
             fields=(),
         )
+
+
+def test_exact_typed_hidden_tail_record_fails_closed() -> None:
+    canonical = _record()
+    forged = tuple.__new__(
+        BaseWeightSupersessionAuthorityRecord,
+        tuple(canonical) + (("hidden_owner_coordinate", "must-not-normalize-away"),),
+    )
+
+    with pytest.raises(BaseWeightSupersessionAuthorityIntegrityError):
+        _resolve(read_port=_ReadPort(forged), used_at=RELEASED)
+
+
+def test_exact_typed_truncated_record_maps_to_integrity_error() -> None:
+    canonical = _record()
+    forged = tuple.__new__(BaseWeightSupersessionAuthorityRecord, tuple(canonical)[:-1])
+
+    with pytest.raises(BaseWeightSupersessionAuthorityIntegrityError):
+        _resolve(read_port=_ReadPort(forged), used_at=RELEASED)
