@@ -58,8 +58,11 @@ def _write_wheel(
             archive.writestr(member_path, content)
 
 
-def test_hash_locked_acceptance_rejects_mismatched_dist_info_identity(tmp_path: Path) -> None:
-    """The shared hash-lock helper must reject a foreign dist-info directory before hashing."""
+def test_hash_locked_acceptance_rejects_mismatched_dist_info_identity_before_hashing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A foreign dist-info directory must fail before outer artifact hashing can run."""
     wheelhouse = tmp_path / "wheelhouse"
     wheelhouse.mkdir()
     _write_wheel(
@@ -93,6 +96,10 @@ def test_hash_locked_acceptance_rejects_mismatched_dist_info_identity(tmp_path: 
         include_py_typed=True,
     )
 
+    def _forbid_outer_hash(_path: Path) -> str:
+        raise AssertionError("outer hash must not run for a foreign dist-info root")
+
+    monkeypatch.setattr(_CONTRACT, "_sha256", _forbid_outer_hash)
     with pytest.raises(AssertionError, match="dist-info identity"):
         _CONTRACT._locked_wheel_requirements(
             wheelhouse,
