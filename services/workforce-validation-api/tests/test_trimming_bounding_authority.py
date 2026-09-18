@@ -53,6 +53,7 @@ READ_FIELDS = frozenset(
         "owner_contract_digest",
         "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -176,6 +177,7 @@ def test_resolution_binds_rule_affected_cases_and_artifact_lineage() -> None:
     assert ("affected_case_occurrence_set_digest", AFFECTED_CASE_SET_DIGEST) in view.fields
     assert ("output_weight_artifact_digest", OUTPUT_WEIGHT_DIGEST) in view.fields
     assert ("owner_contract_released_at", OWNER_CONTRACT_RELEASED_AT) in view.fields
+    assert ("superseded_at", None) in view.fields
 
 
 def test_authorization_denial_happens_before_owner_resolution() -> None:
@@ -217,13 +219,32 @@ def test_owner_evidence_must_match_every_requested_coordinate(
         _resolve(read_port=_ReadPort(_record(**record_overrides)))
 
 
-def test_artifact_alias_and_release_chronology_fail_closed() -> None:
+def test_artifact_release_and_currentness_chronology_fail_closed() -> None:
     with pytest.raises(ValueError):
         _record(output_weight_artifact_digest=INPUT_WEIGHT_DIGEST)
     with pytest.raises(ValueError):
         _record(released_at=CONSTRUCTED_AT - timedelta(seconds=1))
+    with pytest.raises(ValueError, match="superseded_at must be later"):
+        _record(superseded_at=RELEASED_AT)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        _record(superseded_at=datetime(2026, 9, 16, 14, 0))
     with pytest.raises(TrimmingBoundingAuthorityIntegrityError):
         _resolve(read_port=_ReadPort(_record(released_at=USED_AT + timedelta(seconds=1))))
+
+    cutover = RELEASED_AT + timedelta(hours=1)
+    historical = _resolve(
+        read_port=_ReadPort(_record(superseded_at=cutover)),
+        used_at=cutover - timedelta(seconds=1),
+    )
+    assert ("superseded_at", cutover) in historical.fields
+    with pytest.raises(
+        TrimmingBoundingAuthorityIntegrityError,
+        match="superseded for this scientific-use instant",
+    ):
+        _resolve(
+            read_port=_ReadPort(_record(superseded_at=cutover)),
+            used_at=cutover,
+        )
 
 
 @pytest.mark.parametrize(
