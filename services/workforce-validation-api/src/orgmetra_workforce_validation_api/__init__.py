@@ -24,6 +24,14 @@ from orgmetra_workforce_validation_api.calibration_adjustment_authority import (
     CalibrationAdjustmentAuthorityView,
     resolve_calibration_adjustment_authority,
 )
+from orgmetra_workforce_validation_api.calibration_adjustment_supersession_authority import (
+    CalibrationAdjustmentSupersessionAuthorityIntegrityError,
+    CalibrationAdjustmentSupersessionAuthorityNotFound,
+    CalibrationAdjustmentSupersessionAuthorityReadPort,
+    CalibrationAdjustmentSupersessionAuthorityRecord,
+    CalibrationAdjustmentSupersessionAuthorityView,
+    resolve_calibration_adjustment_supersession_authority,
+)
 from orgmetra_workforce_validation_api.final_weight_authority import (
     FinalAnalysisWeightAuthorityIntegrityError,
     FinalAnalysisWeightAuthorityNotFound,
@@ -150,6 +158,11 @@ __all__ = [
     "CalibrationAdjustmentAuthorityReadPort",
     "CalibrationAdjustmentAuthorityRecord",
     "CalibrationAdjustmentAuthorityView",
+    "CalibrationAdjustmentSupersessionAuthorityIntegrityError",
+    "CalibrationAdjustmentSupersessionAuthorityNotFound",
+    "CalibrationAdjustmentSupersessionAuthorityReadPort",
+    "CalibrationAdjustmentSupersessionAuthorityRecord",
+    "CalibrationAdjustmentSupersessionAuthorityView",
     "CalibrationAuxiliaryAuthorityIntegrityError",
     "CalibrationAuxiliaryAuthorityNotFound",
     "CalibrationAuxiliaryAuthorityReadPort",
@@ -230,6 +243,7 @@ __all__ = [
     "read_validity_study",
     "resolve_base_weight_authority",
     "resolve_calibration_adjustment_authority",
+    "resolve_calibration_adjustment_supersession_authority",
     "resolve_calibration_auxiliary_authority",
     "resolve_calibration_benchmark_authority",
     "resolve_final_analysis_weight_authority",
