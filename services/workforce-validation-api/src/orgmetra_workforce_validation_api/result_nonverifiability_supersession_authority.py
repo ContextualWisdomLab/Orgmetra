@@ -128,6 +128,11 @@ class ValidationResultNonVerifiabilitySupersessionAuthorityRecord(tuple):
         result_evidence_digest = _require_digest("result_digest", result_digest)
         evidence_kind = _require_failed_evidence_kind(failed_evidence_kind)
         mode = _require_failure_mode(failure_mode)
+        if mode == "non_reproducible":
+            raise ValueError(
+                "non_reproducible supersession requires exact failed-evidence identity; "
+                "the v1 supersession contract fails closed instead of dropping it."
+            )
         attempt_ref = _require_reference(
             "verification_attempt_reference",
             verification_attempt_reference,
