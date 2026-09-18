@@ -70,11 +70,16 @@ def _service_build_backend_requirement() -> Requirement:
 
 
 def _subprocess_environment() -> dict[str, str]:
-    """Remove checkout import leakage and prohibit package-index fallback."""
+    """Remove checkout and ambient pip discovery inputs before offline acceptance."""
     environment = os.environ.copy()
     environment.pop("PYTHONPATH", None)
     environment.pop("PYTHONHOME", None)
+    for name in tuple(environment):
+        if name.startswith("PIP_"):
+            environment.pop(name)
+    environment["PIP_CONFIG_FILE"] = os.devnull
     environment["PIP_NO_INDEX"] = "1"
+    environment["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"
     return environment
 
 
@@ -114,6 +119,7 @@ def test_subprocess_environment_blocks_ambient_package_discovery(
         assert name not in environment, f"ambient package source leaked through {name}"
     assert environment["PIP_NO_INDEX"] == "1"
     assert environment["PIP_CONFIG_FILE"] == os.devnull
+    assert environment["PIP_DISABLE_PIP_VERSION_CHECK"] == "1"
 
 
 def test_service_python_floor_covers_mandatory_keyverse_dependency() -> None:
@@ -173,6 +179,8 @@ def test_built_distribution_closure_installs_without_checkout_imports(tmp_path: 
                 "-m",
                 "pip",
                 "wheel",
+                "--no-index",
+                "--no-cache-dir",
                 "--no-deps",
                 "--no-build-isolation",
                 "--wheel-dir",
@@ -199,6 +207,7 @@ def test_built_distribution_closure_installs_without_checkout_imports(tmp_path: 
             "pip",
             "install",
             "--no-index",
+            "--no-cache-dir",
             f"--find-links={wheelhouse}",
             f"{_SERVICE_NAME}=={service_version}",
         ],
