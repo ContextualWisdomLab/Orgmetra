@@ -296,7 +296,21 @@ def test_exact_artifact_successor_preserves_historical_use_but_ends_at_cutover()
         "successor_verification_attempt_released_at": CUTOVER,
     }
     view = _resolve(read_port=_ReadPort(record), used_at=CUTOVER - timedelta(seconds=1))
-    assert dict(view.fields)["result_reference"] == RESULT_REFERENCE
+    fields = dict(view.fields)
+    assert fields["result_reference"] == RESULT_REFERENCE
+    hidden_owner_coordinates = {
+        "superseded_at",
+        "successor_target_result_reference",
+        "successor_target_result_digest",
+        "successor_failed_evidence_kind",
+        "successor_target_failed_evidence_reference",
+        "successor_target_failed_evidence_digest",
+        "successor_target_failed_evidence_released_at",
+        "successor_verification_attempt_reference",
+        "successor_verification_attempt_digest",
+        "successor_verification_attempt_released_at",
+    }
+    assert hidden_owner_coordinates.isdisjoint(fields)
     with pytest.raises(ValidationResultNonVerifiabilitySupersessionV2AuthorityIntegrityError):
         _resolve(read_port=_ReadPort(record), used_at=CUTOVER)
 
