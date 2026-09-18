@@ -30,6 +30,22 @@ def _record_hash(content: bytes) -> str:
     return f"sha256={encoded}"
 
 
+def _canonical_wheel_member_path(member_path: str, *, wheel_name: str) -> str:
+    """Return one canonical relative POSIX wheel member path or fail closed."""
+    path = PurePosixPath(member_path)
+    assert path.parts and not path.is_absolute(), (
+        f"{wheel_name} contains an absolute or empty wheel member path"
+    )
+    assert ".." not in path.parts and "\\" not in member_path, (
+        f"{wheel_name} contains a non-canonical wheel member path"
+    )
+    canonical = path.as_posix()
+    assert member_path == canonical, (
+        f"{wheel_name} contains a non-canonical wheel member path"
+    )
+    return canonical
+
+
 def _validate_wheel_record(wheel_path: Path) -> None:
     """Require one complete sha256 RECORD that exactly covers installed wheel members."""
     with zipfile.ZipFile(wheel_path) as archive:
@@ -38,9 +54,16 @@ def _validate_wheel_record(wheel_path: Path) -> None:
         assert len(archive_paths) == len(set(archive_paths)), (
             f"{wheel_path.name} contains duplicate archive member paths"
         )
+        canonical_archive_paths = [
+            _canonical_wheel_member_path(path, wheel_name=wheel_path.name)
+            for path in archive_paths
+        ]
+        assert len(canonical_archive_paths) == len(set(canonical_archive_paths)), (
+            f"{wheel_path.name} contains normalization-colliding archive member paths"
+        )
         record_paths = [
             path
-            for path in archive_paths
+            for path in canonical_archive_paths
             if len(PurePosixPath(path).parts) == 2
             and PurePosixPath(path).parts[0].endswith(".dist-info")
             and PurePosixPath(path).name == "RECORD"
@@ -57,24 +80,25 @@ def _validate_wheel_record(wheel_path: Path) -> None:
         for row in rows:
             assert len(row) == 3, f"{wheel_path.name} RECORD rows must have three columns"
             member_path, member_hash, member_size = row
-            parts = PurePosixPath(member_path).parts
-            assert parts and not PurePosixPath(member_path).is_absolute(), (
-                f"{wheel_path.name} RECORD contains an absolute or empty path"
+            canonical_member_path = _canonical_wheel_member_path(
+                member_path,
+                wheel_name=wheel_path.name,
             )
-            assert ".." not in parts and "\\" not in member_path, (
-                f"{wheel_path.name} RECORD contains a non-canonical member path"
-            )
-            assert member_path not in recorded, (
+            assert canonical_member_path not in recorded, (
                 f"{wheel_path.name} RECORD contains duplicate path {member_path}"
             )
-            recorded[member_path] = (member_hash, member_size)
+            recorded[canonical_member_path] = (member_hash, member_size)
 
-        assert set(recorded) == set(archive_paths), (
+        assert set(recorded) == set(canonical_archive_paths), (
             f"{wheel_path.name} RECORD must cover every wheel member exactly once"
         )
         for info in infos:
-            member_hash, member_size = recorded[info.filename]
-            if info.filename == record_path:
+            canonical_info_path = _canonical_wheel_member_path(
+                info.filename,
+                wheel_name=wheel_path.name,
+            )
+            member_hash, member_size = recorded[canonical_info_path]
+            if canonical_info_path == record_path:
                 assert member_hash == "" and member_size == "", (
                     f"{wheel_path.name} RECORD self-entry must leave hash and size empty"
                 )
