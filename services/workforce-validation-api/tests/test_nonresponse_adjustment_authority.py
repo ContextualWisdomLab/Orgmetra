@@ -61,6 +61,7 @@ READ_FIELDS = frozenset(
         "owner_contract_digest",
         "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -196,6 +197,7 @@ def test_resolution_binds_versioned_disposition_and_treatment_evidence() -> None
     assert ("unavailable_treatment_code", "retain_unavailable_class") in view.fields
     assert ("response_disposition_receipt_released_at", DISPOSITION_RELEASED_AT) in view.fields
     assert ("owner_contract_released_at", OWNER_CONTRACT_RELEASED_AT) in view.fields
+    assert ("superseded_at", None) in view.fields
 
 
 def test_authorization_denial_happens_before_owner_resolution() -> None:
@@ -242,15 +244,37 @@ def test_owner_evidence_must_match_every_requested_coordinate(
         _resolve(read_port=_ReadPort(_record(**record_overrides)))
 
 
-def test_owner_resolved_input_and_release_chronology_fail_closed() -> None:
+def test_owner_resolved_input_release_and_currentness_chronology_fail_closed() -> None:
     with pytest.raises(ValueError):
         _record(response_disposition_receipt_released_at=CONSTRUCTED_AT + timedelta(seconds=1))
 
     with pytest.raises(ValueError):
         _record(released_at=CONSTRUCTED_AT - timedelta(seconds=1))
 
+    with pytest.raises(ValueError, match="superseded_at must be later"):
+        _record(superseded_at=RELEASED_AT)
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        _record(superseded_at=datetime(2026, 9, 16, 14, 0))
+
     with pytest.raises(NonresponseAdjustmentAuthorityIntegrityError):
         _resolve(read_port=_ReadPort(_record(released_at=USED_AT + timedelta(seconds=1))))
+
+    cutover = RELEASED_AT + timedelta(hours=1)
+    historical = _resolve(
+        read_port=_ReadPort(_record(superseded_at=cutover)),
+        used_at=cutover - timedelta(seconds=1),
+    )
+    assert ("superseded_at", cutover) in historical.fields
+
+    with pytest.raises(
+        NonresponseAdjustmentAuthorityIntegrityError,
+        match="superseded for this scientific-use instant",
+    ):
+        _resolve(
+            read_port=_ReadPort(_record(superseded_at=cutover)),
+            used_at=cutover,
+        )
 
 
 def test_weight_artifact_aliasing_fails_closed() -> None:
