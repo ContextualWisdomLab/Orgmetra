@@ -370,6 +370,8 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityReadPort(Protocol):
         result_reference: str,
         result_digest: str,
         failed_evidence_kind: str,
+        failed_evidence_reference: str,
+        failed_evidence_digest: str,
         verification_attempt_reference: str,
         verification_attempt_digest: str,
         evidence_version: int,
@@ -395,6 +397,8 @@ def resolve_validation_result_nonverifiability_supersession_v2_authority(
     result_reference: str,
     result_digest: str,
     failed_evidence_kind: str,
+    failed_evidence_reference: str,
+    failed_evidence_digest: str,
     verification_attempt_reference: str,
     verification_attempt_digest: str,
     evidence_version: int,
@@ -434,6 +438,12 @@ def resolve_validation_result_nonverifiability_supersession_v2_authority(
     )
     result_evidence_digest = _require_digest("result_digest", result_digest)
     evidence_kind = _require_failed_evidence_kind(failed_evidence_kind)
+    failed_reference = _require_reference(
+        "failed_evidence_reference",
+        failed_evidence_reference,
+        _FAILED_REFERENCE_KIND_BY_EVIDENCE_KIND[evidence_kind],
+    )
+    failed_digest = _require_digest("failed_evidence_digest", failed_evidence_digest)
     attempt_ref = _require_reference(
         "verification_attempt_reference",
         verification_attempt_reference,
@@ -481,6 +491,8 @@ def resolve_validation_result_nonverifiability_supersession_v2_authority(
         result_reference=result_ref,
         result_digest=result_evidence_digest,
         failed_evidence_kind=evidence_kind,
+        failed_evidence_reference=failed_reference,
+        failed_evidence_digest=failed_digest,
         verification_attempt_reference=attempt_ref,
         verification_attempt_digest=attempt_digest,
         evidence_version=version,
@@ -517,7 +529,9 @@ def resolve_validation_result_nonverifiability_supersession_v2_authority(
     values = dict(persisted.fields)
     requested_values = {
         "evidence_version": version,
+        "failed_evidence_digest": failed_digest,
         "failed_evidence_kind": evidence_kind,
+        "failed_evidence_reference": failed_reference,
         "owner_contract_digest": owner_digest,
         "owner_contract_reference": owner_ref,
         "owner_contract_version": owner_version,
