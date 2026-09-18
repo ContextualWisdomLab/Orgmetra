@@ -15,6 +15,7 @@ import sys
 import tomllib
 import zipfile
 
+from packaging.markers import Marker
 from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.utils import canonicalize_name, parse_wheel_filename
@@ -246,16 +247,52 @@ def _requirement_identity(requirement: Requirement) -> tuple[str, tuple[str, ...
     )
 
 
+def _reviewed_dependency_metadata(
+    project: dict[str, object],
+    *,
+    owner: str,
+) -> tuple[tuple[Requirement, ...], tuple[str, ...]]:
+    """Expand reviewed base and optional dependencies into built METADATA semantics."""
+    raw_dependencies = project.get("dependencies", [])
+    assert isinstance(raw_dependencies, list) and all(
+        isinstance(value, str) for value in raw_dependencies
+    ), f"{owner} project dependencies must be a text list"
+    requirements = [Requirement(value) for value in raw_dependencies]
+
+    raw_optional = project.get("optional-dependencies", {})
+    assert isinstance(raw_optional, dict), f"{owner} optional-dependencies must be a table"
+    extras: list[str] = []
+    for raw_extra, raw_requirements in raw_optional.items():
+        assert isinstance(raw_extra, str), f"{owner} optional dependency names must be text"
+        assert isinstance(raw_requirements, list) and all(
+            isinstance(value, str) for value in raw_requirements
+        ), f"{owner} optional dependency group {raw_extra} must be a text list"
+        normalized_extra = canonicalize_name(raw_extra)
+        extras.append(normalized_extra)
+        for value in raw_requirements:
+            requirement = Requirement(value)
+            extra_marker = f"extra == {normalized_extra!r}"
+            if requirement.marker is None:
+                requirement.marker = Marker(extra_marker)
+            else:
+                requirement.marker = Marker(f"({requirement.marker}) and {extra_marker}")
+            requirements.append(requirement)
+
+    assert len(extras) == len(set(extras)), f"{owner} optional dependency extras must be unique"
+    return tuple(requirements), tuple(sorted(extras))
+
+
 def _validate_wheel_metadata(
     wheel_path: Path,
     *,
     expected_name: str,
     expected_version: str,
     expected_requires_python: str,
-    expected_dependencies: tuple[str, ...],
+    expected_dependencies: tuple[Requirement, ...],
+    expected_extras: tuple[str, ...],
     required_dependency: tuple[str, str] | None = None,
 ) -> None:
-    """Bind built METADATA to reviewed project identity, runtime, and dependencies."""
+    """Bind built METADATA to reviewed project identity, runtime, dependencies, and extras."""
     with zipfile.ZipFile(wheel_path) as archive:
         metadata_paths = [
             name
@@ -309,10 +346,16 @@ def _validate_wheel_metadata(
             f"{wheel_path.name} mandatory Keyverse dependency must remain unconditional"
         )
 
-    reviewed_dependencies = [Requirement(value) for value in expected_dependencies]
     assert sorted(_requirement_identity(value) for value in parsed_dependencies) == sorted(
-        _requirement_identity(value) for value in reviewed_dependencies
+        _requirement_identity(value) for value in expected_dependencies
     ), f"{wheel_path.name} METADATA dependencies do not match reviewed project dependencies"
+
+    built_extras = tuple(
+        sorted(canonicalize_name(value) for value in metadata.get_all("Provides-Extra", failobj=[]))
+    )
+    assert built_extras == expected_extras, (
+        f"{wheel_path.name} METADATA extras do not match reviewed optional dependencies"
+    )
 
 
 def _locked_wheel_requirements(
@@ -362,10 +405,10 @@ def _locked_wheel_requirements(
         assert isinstance(requires_python, str), (
             f"{canonical_name} project requires-python must be text"
         )
-        raw_dependencies = project.get("dependencies", [])
-        assert isinstance(raw_dependencies, list) and all(
-            isinstance(value, str) for value in raw_dependencies
-        ), f"{canonical_name} project dependencies must be a text list"
+        reviewed_dependencies, reviewed_extras = _reviewed_dependency_metadata(
+            project,
+            owner=canonical_name,
+        )
         _validate_wheel_record(wheel_path)
         wheels_by_name[canonical_name] = wheel_path
         hashes_by_name[canonical_name] = _sha256(wheel_path)
@@ -383,7 +426,8 @@ def _locked_wheel_requirements(
             ),
             expected_version=str(expected_versions[canonical_name]),
             expected_requires_python=requires_python,
-            expected_dependencies=tuple(raw_dependencies),
+            expected_dependencies=reviewed_dependencies,
+            expected_extras=reviewed_extras,
             required_dependency=(
                 (_KEYVERSE_NAME, keyverse_version)
                 if canonical_name == canonicalize_name(_SERVICE_NAME)
