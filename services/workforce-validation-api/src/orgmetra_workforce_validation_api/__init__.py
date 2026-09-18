@@ -49,6 +49,14 @@ from orgmetra_workforce_validation_api.nonresponse_adjustment_authority import (
     NonresponseAdjustmentAuthorityView,
     resolve_nonresponse_adjustment_authority,
 )
+from orgmetra_workforce_validation_api.nonresponse_adjustment_supersession_authority import (
+    NonresponseAdjustmentSupersessionAuthorityIntegrityError,
+    NonresponseAdjustmentSupersessionAuthorityNotFound,
+    NonresponseAdjustmentSupersessionAuthorityReadPort,
+    NonresponseAdjustmentSupersessionAuthorityRecord,
+    NonresponseAdjustmentSupersessionAuthorityView,
+    resolve_nonresponse_adjustment_supersession_authority,
+)
 from orgmetra_workforce_validation_api.registry import (
     ValidationPrincipal,
     ValidityStudyIntegrityError,
@@ -160,6 +168,11 @@ __all__ = [
     "NonresponseAdjustmentAuthorityReadPort",
     "NonresponseAdjustmentAuthorityRecord",
     "NonresponseAdjustmentAuthorityView",
+    "NonresponseAdjustmentSupersessionAuthorityIntegrityError",
+    "NonresponseAdjustmentSupersessionAuthorityNotFound",
+    "NonresponseAdjustmentSupersessionAuthorityReadPort",
+    "NonresponseAdjustmentSupersessionAuthorityRecord",
+    "NonresponseAdjustmentSupersessionAuthorityView",
     "TrimmingBoundingAuthorityIntegrityError",
     "TrimmingBoundingAuthorityNotFound",
     "TrimmingBoundingAuthorityReadPort",
@@ -209,6 +222,7 @@ __all__ = [
     "resolve_final_analysis_weight_authority",
     "resolve_final_weight_supersession_authority",
     "resolve_nonresponse_adjustment_authority",
+    "resolve_nonresponse_adjustment_supersession_authority",
     "resolve_trimming_bounding_authority",
     "resolve_validation_result_authority",
     "resolve_validation_result_nonverifiability",
