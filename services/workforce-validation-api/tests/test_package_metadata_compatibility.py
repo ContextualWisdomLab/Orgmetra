@@ -235,15 +235,27 @@ def _validate_wheel_contents(
         )
 
 
+def _requirement_identity(requirement: Requirement) -> tuple[str, tuple[str, ...], str, str, str]:
+    """Normalize one dependency declaration without dropping extras, markers, or direct URLs."""
+    return (
+        canonicalize_name(requirement.name),
+        tuple(sorted(canonicalize_name(extra) for extra in requirement.extras)),
+        str(requirement.specifier),
+        str(requirement.marker) if requirement.marker is not None else "",
+        requirement.url or "",
+    )
+
+
 def _validate_wheel_metadata(
     wheel_path: Path,
     *,
     expected_name: str,
     expected_version: str,
     expected_requires_python: str,
+    expected_dependencies: tuple[str, ...],
     required_dependency: tuple[str, str] | None = None,
 ) -> None:
-    """Bind built METADATA to reviewed project identity, runtime, and owned dependencies."""
+    """Bind built METADATA to reviewed project identity, runtime, and dependencies."""
     with zipfile.ZipFile(wheel_path) as archive:
         metadata_paths = [
             name
@@ -276,27 +288,31 @@ def _validate_wheel_metadata(
         f"{wheel_path.name} METADATA Requires-Python does not match reviewed project runtime"
     )
 
-    if required_dependency is None:
-        return
-    dependency_name, dependency_version = required_dependency
     parsed_dependencies = [
         Requirement(value) for value in metadata.get_all("Requires-Dist", failobj=[])
     ]
-    matching_dependencies = [
-        requirement
-        for requirement in parsed_dependencies
-        if canonicalize_name(requirement.name) == canonicalize_name(dependency_name)
-    ]
-    assert len(matching_dependencies) == 1, (
-        f"{wheel_path.name} METADATA must preserve the mandatory Keyverse dependency"
-    )
-    requirement = matching_dependencies[0]
-    assert requirement.specifier == SpecifierSet(f"=={dependency_version}"), (
-        f"{wheel_path.name} METADATA must preserve the exact owned Keyverse version"
-    )
-    assert not requirement.extras and requirement.marker is None and requirement.url is None, (
-        f"{wheel_path.name} mandatory Keyverse dependency must remain unconditional"
-    )
+    if required_dependency is not None:
+        dependency_name, dependency_version = required_dependency
+        matching_dependencies = [
+            requirement
+            for requirement in parsed_dependencies
+            if canonicalize_name(requirement.name) == canonicalize_name(dependency_name)
+        ]
+        assert len(matching_dependencies) == 1, (
+            f"{wheel_path.name} METADATA must preserve the mandatory Keyverse dependency"
+        )
+        requirement = matching_dependencies[0]
+        assert requirement.specifier == SpecifierSet(f"=={dependency_version}"), (
+            f"{wheel_path.name} METADATA must preserve the exact owned Keyverse version"
+        )
+        assert not requirement.extras and requirement.marker is None and requirement.url is None, (
+            f"{wheel_path.name} mandatory Keyverse dependency must remain unconditional"
+        )
+
+    reviewed_dependencies = [Requirement(value) for value in expected_dependencies]
+    assert sorted(_requirement_identity(value) for value in parsed_dependencies) == sorted(
+        _requirement_identity(value) for value in reviewed_dependencies
+    ), f"{wheel_path.name} METADATA dependencies do not match reviewed project dependencies"
 
 
 def _locked_wheel_requirements(
@@ -346,6 +362,10 @@ def _locked_wheel_requirements(
         assert isinstance(requires_python, str), (
             f"{canonical_name} project requires-python must be text"
         )
+        raw_dependencies = project.get("dependencies", [])
+        assert isinstance(raw_dependencies, list) and all(
+            isinstance(value, str) for value in raw_dependencies
+        ), f"{canonical_name} project dependencies must be a text list"
         _validate_wheel_record(wheel_path)
         wheels_by_name[canonical_name] = wheel_path
         hashes_by_name[canonical_name] = _sha256(wheel_path)
@@ -363,6 +383,7 @@ def _locked_wheel_requirements(
             ),
             expected_version=str(expected_versions[canonical_name]),
             expected_requires_python=requires_python,
+            expected_dependencies=tuple(raw_dependencies),
             required_dependency=(
                 (_KEYVERSE_NAME, keyverse_version)
                 if canonical_name == canonicalize_name(_SERVICE_NAME)
