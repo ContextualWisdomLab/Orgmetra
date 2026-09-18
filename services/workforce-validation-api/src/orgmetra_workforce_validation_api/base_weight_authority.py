@@ -472,13 +472,23 @@ def resolve_base_weight_authority(
             "owner port returned non-canonical base-weight authority evidence"
         )
 
-    record = BaseWeightAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-        **dict(persisted.fields),
-    )
+    try:
+        record = BaseWeightAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+            **dict(persisted.fields),
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise BaseWeightAuthorityIntegrityError(
+            "owner port returned structurally invalid base-weight authority evidence"
+        ) from exc
+    if record != persisted:
+        raise BaseWeightAuthorityIntegrityError(
+            "owner port returned non-canonical base-weight authority structure"
+        )
+
     record_values = dict(record.fields)
     requested_match = tuple(
         (field_name, field_value)
