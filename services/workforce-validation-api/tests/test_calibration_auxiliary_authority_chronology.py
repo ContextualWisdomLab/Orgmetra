@@ -19,6 +19,7 @@ AUTHORIZED_FROM = datetime(2026, 9, 1, tzinfo=timezone.utc)
 AUTHORIZED_TO = datetime(2026, 10, 1, tzinfo=timezone.utc)
 USED_AT = datetime(2026, 9, 17, tzinfo=timezone.utc)
 OWNER_CONTRACT_RELEASED_AT = AUTHORIZED_FROM - timedelta(days=1)
+AUTHORIZATION_RECEIPT_RELEASED_AT = AUTHORIZED_FROM - timedelta(hours=12)
 
 
 def _record(*, owner_contract_released_at: object) -> CalibrationAuxiliaryAuthorityRecord:
@@ -47,6 +48,7 @@ def _record(*, owner_contract_released_at: object) -> CalibrationAuxiliaryAuthor
             "scientific_data_authorization:55555555-5555-4555-8555-555555555555"
         ),
         authorization_receipt_digest="4" * 64,
+        authorization_receipt_released_at=AUTHORIZATION_RECEIPT_RELEASED_AT,
         scientific_use_receipt_reference=(
             "scientific_use_receipt:66666666-6666-4666-8666-666666666666"
         ),
