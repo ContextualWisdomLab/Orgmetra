@@ -109,11 +109,13 @@ class ValidationResultNonVerifiabilitySupersessionAuthorityRecord(tuple):
         owner_contract_released_at: datetime,
         released_at: datetime,
         superseded_at: datetime | None = None,
+        successor_target_result_reference: str | None = None,
+        successor_target_result_digest: str | None = None,
         successor_verification_attempt_reference: str | None = None,
         successor_verification_attempt_digest: str | None = None,
         successor_verification_attempt_released_at: datetime | None = None,
     ) -> ValidationResultNonVerifiabilitySupersessionAuthorityRecord:
-        """Validate predecessor chronology and one complete immutable successor attempt."""
+        """Validate predecessor chronology and one complete same-result successor attempt."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
         study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
         result_ref = _require_reference(
@@ -155,21 +157,35 @@ class ValidationResultNonVerifiabilitySupersessionAuthorityRecord(tuple):
 
         successor_values = (
             superseded_at,
+            successor_target_result_reference,
+            successor_target_result_digest,
             successor_verification_attempt_reference,
             successor_verification_attempt_digest,
             successor_verification_attempt_released_at,
         )
         if all(value is None for value in successor_values):
             cutover = None
+            successor_target_ref = None
+            successor_target_digest = None
             successor_ref = None
             successor_digest = None
             successor_release = None
         elif any(value is None for value in successor_values):
             raise ValueError(
-                "non-verifiability supersession requires cutover and complete successor attempt."
+                "non-verifiability supersession requires cutover, same-result binding, and "
+                "complete successor attempt."
             )
         else:
             cutover = _require_aware_datetime("superseded_at", superseded_at)
+            successor_target_ref = _require_reference(
+                "successor_target_result_reference",
+                successor_target_result_reference,
+                "validation_analysis_result",
+            )
+            successor_target_digest = _require_digest(
+                "successor_target_result_digest",
+                successor_target_result_digest,
+            )
             successor_ref = _require_reference(
                 "successor_verification_attempt_reference",
                 successor_verification_attempt_reference,
@@ -186,6 +202,13 @@ class ValidationResultNonVerifiabilitySupersessionAuthorityRecord(tuple):
             if cutover <= release_instant:
                 raise ValueError(
                     "superseded_at must be later than non-verifiability release."
+                )
+            if (
+                successor_target_ref != result_ref
+                or successor_target_digest != result_evidence_digest
+            ):
+                raise ValueError(
+                    "successor verification attempt must target the exact predecessor result."
                 )
             if successor_ref == attempt_ref:
                 raise ValueError("successor verification attempt must use a new reference.")
@@ -214,6 +237,8 @@ class ValidationResultNonVerifiabilitySupersessionAuthorityRecord(tuple):
             successor_fields = None
         else:
             successor_fields = (
+                ("successor_target_result_digest", successor_target_digest),
+                ("successor_target_result_reference", successor_target_ref),
                 ("successor_verification_attempt_digest", successor_digest),
                 ("successor_verification_attempt_reference", successor_ref),
                 ("successor_verification_attempt_released_at", successor_release),
@@ -257,7 +282,7 @@ class ValidationResultNonVerifiabilitySupersessionAuthorityRecord(tuple):
 
     @property
     def successor_fields(self) -> tuple[tuple[str, object], ...] | None:
-        """Return owner-internal successor verification-attempt coordinates."""
+        """Return owner-internal successor attempt and exact target-result coordinates."""
         return self[5]
 
 
@@ -461,6 +486,16 @@ def resolve_validation_result_nonverifiability_supersession_authority(
         owner_contract_released_at=persisted_fields["owner_contract_released_at"],
         released_at=persisted.released_at,
         superseded_at=persisted.superseded_at,
+        successor_target_result_reference=(
+            None
+            if persisted_successor is None
+            else persisted_successor["successor_target_result_reference"]
+        ),
+        successor_target_result_digest=(
+            None
+            if persisted_successor is None
+            else persisted_successor["successor_target_result_digest"]
+        ),
         successor_verification_attempt_reference=(
             None
             if persisted_successor is None
