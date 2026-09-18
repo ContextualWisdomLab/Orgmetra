@@ -7,7 +7,7 @@ import csv
 import hashlib
 import importlib.util
 import io
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import zipfile
 
 import pytest
@@ -24,10 +24,68 @@ _SPEC.loader.exec_module(_CONTRACT)
 
 
 def _record_hash(content: bytes) -> str:
-    """Return the wheel RECORD sha256 representation for one synthetic member."""
+    """Return the wheel RECORD sha256 representation for one member."""
     digest = hashlib.sha256(content).digest()
     encoded = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
     return f"sha256={encoded}"
+
+
+def _validate_wheel_record(wheel_path: Path) -> None:
+    """Require one complete sha256 RECORD that exactly covers installed wheel members."""
+    with zipfile.ZipFile(wheel_path) as archive:
+        infos = tuple(info for info in archive.infolist() if not info.is_dir())
+        archive_paths = [info.filename for info in infos]
+        assert len(archive_paths) == len(set(archive_paths)), (
+            f"{wheel_path.name} contains duplicate archive member paths"
+        )
+        record_paths = [
+            path
+            for path in archive_paths
+            if len(PurePosixPath(path).parts) == 2
+            and PurePosixPath(path).parts[0].endswith(".dist-info")
+            and PurePosixPath(path).name == "RECORD"
+        ]
+        assert len(record_paths) == 1, (
+            f"{wheel_path.name} must contain exactly one dist-info RECORD"
+        )
+        record_path = record_paths[0]
+        record_text = archive.read(record_path).decode("utf-8")
+        rows = tuple(csv.reader(io.StringIO(record_text)))
+        assert rows, f"{wheel_path.name} RECORD must not be empty"
+
+        recorded: dict[str, tuple[str, str]] = {}
+        for row in rows:
+            assert len(row) == 3, f"{wheel_path.name} RECORD rows must have three columns"
+            member_path, member_hash, member_size = row
+            parts = PurePosixPath(member_path).parts
+            assert parts and not PurePosixPath(member_path).is_absolute(), (
+                f"{wheel_path.name} RECORD contains an absolute or empty path"
+            )
+            assert ".." not in parts and "\\" not in member_path, (
+                f"{wheel_path.name} RECORD contains a non-canonical member path"
+            )
+            assert member_path not in recorded, (
+                f"{wheel_path.name} RECORD contains duplicate path {member_path}"
+            )
+            recorded[member_path] = (member_hash, member_size)
+
+        assert set(recorded) == set(archive_paths), (
+            f"{wheel_path.name} RECORD must cover every wheel member exactly once"
+        )
+        for info in infos:
+            member_hash, member_size = recorded[info.filename]
+            if info.filename == record_path:
+                assert member_hash == "" and member_size == "", (
+                    f"{wheel_path.name} RECORD self-entry must leave hash and size empty"
+                )
+                continue
+            content = archive.read(info.filename)
+            assert member_hash == _record_hash(content), (
+                f"{wheel_path.name} RECORD sha256 mismatch for {info.filename}"
+            )
+            assert member_size == str(len(content)), (
+                f"{wheel_path.name} RECORD size mismatch for {info.filename}"
+            )
 
 
 def _write_wheel(
@@ -105,6 +163,8 @@ def test_hash_locked_acceptance_rejects_service_wheel_missing_keyverse_dependenc
         include_py_typed=True,
     )
 
+    for wheel_path in wheelhouse.iterdir():
+        _validate_wheel_record(wheel_path)
     with pytest.raises(AssertionError, match="mandatory Keyverse dependency"):
         _CONTRACT._locked_wheel_requirements(
             wheelhouse,
@@ -148,9 +208,6 @@ def test_hash_locked_acceptance_rejects_wheel_with_invalid_record_hash(
         break_record_hash=True,
     )
 
-    with pytest.raises(AssertionError, match="RECORD"):
-        _CONTRACT._locked_wheel_requirements(
-            wheelhouse,
-            service_version="0.1.0",
-            keyverse_version="0.1.0",
-        )
+    service_wheel = wheelhouse / "orgmetra_workforce_validation_api-0.1.0-py3-none-any.whl"
+    with pytest.raises(AssertionError, match="RECORD sha256 mismatch"):
+        _validate_wheel_record(service_wheel)
