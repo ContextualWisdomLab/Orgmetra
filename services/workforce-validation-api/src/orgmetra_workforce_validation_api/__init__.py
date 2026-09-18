@@ -8,6 +8,14 @@ from orgmetra_workforce_validation_api.base_weight_authority import (
     BaseWeightAuthorityView,
     resolve_base_weight_authority,
 )
+from orgmetra_workforce_validation_api.base_weight_supersession_authority import (
+    BaseWeightSupersessionAuthorityIntegrityError,
+    BaseWeightSupersessionAuthorityNotFound,
+    BaseWeightSupersessionAuthorityReadPort,
+    BaseWeightSupersessionAuthorityRecord,
+    BaseWeightSupersessionAuthorityView,
+    resolve_base_weight_supersession_authority,
+)
 from orgmetra_workforce_validation_api.benchmark_authority import (
     CalibrationBenchmarkAuthorityIntegrityError,
     CalibrationBenchmarkAuthorityNotFound,
@@ -153,6 +161,11 @@ __all__ = [
     "BaseWeightAuthorityReadPort",
     "BaseWeightAuthorityRecord",
     "BaseWeightAuthorityView",
+    "BaseWeightSupersessionAuthorityIntegrityError",
+    "BaseWeightSupersessionAuthorityNotFound",
+    "BaseWeightSupersessionAuthorityReadPort",
+    "BaseWeightSupersessionAuthorityRecord",
+    "BaseWeightSupersessionAuthorityView",
     "CalibrationAdjustmentAuthorityIntegrityError",
     "CalibrationAdjustmentAuthorityNotFound",
     "CalibrationAdjustmentAuthorityReadPort",
@@ -242,6 +255,7 @@ __all__ = [
     "WeightVarianceAuthorityView",
     "read_validity_study",
     "resolve_base_weight_authority",
+    "resolve_base_weight_supersession_authority",
     "resolve_calibration_adjustment_authority",
     "resolve_calibration_adjustment_supersession_authority",
     "resolve_calibration_auxiliary_authority",
