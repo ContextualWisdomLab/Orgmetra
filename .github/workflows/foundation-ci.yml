@@ -56,6 +56,28 @@ jobs:
         run: |
           python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt
           python -m pip check
+      - name: Prove installable Workforce Validation distribution closure
+        run: |
+          rm -rf /tmp/orgmetra-wheelhouse /tmp/orgmetra-install-venv
+          mkdir -p /tmp/orgmetra-wheelhouse
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-wheelhouse packages/keyverse-adapter
+          python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-wheelhouse services/workforce-validation-api
+          python -m venv /tmp/orgmetra-install-venv
+          /tmp/orgmetra-install-venv/bin/python -m pip install --no-index --find-links=/tmp/orgmetra-wheelhouse orgmetra-workforce-validation-api==0.1.0
+          (
+            cd /tmp
+            /tmp/orgmetra-install-venv/bin/python - <<'PY'
+          from importlib.metadata import version
+          import orgmetra_keyverse_adapter
+          import orgmetra_workforce_validation_api
+
+          assert version("orgmetra-keyverse-adapter") == "0.1.0"
+          assert version("orgmetra-workforce-validation-api") == "0.1.0"
+          assert orgmetra_keyverse_adapter.__file__ is not None
+          assert orgmetra_workforce_validation_api.__file__ is not None
+          PY
+          )
+          /tmp/orgmetra-install-venv/bin/python -m pip check
       - name: Run owned unit and service contracts once
         run: |
           PYTHONPATH=packages/candidate-evidence/src COVERAGE_FILE=/tmp/orgmetra-candidate-evidence.coverage python -m pytest -c packages/candidate-evidence/pyproject.toml packages/candidate-evidence/tests
