@@ -158,6 +158,7 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
         owner_contract_digest: str,
         owner_contract_released_at: datetime,
         released_at: datetime,
+        superseded_at: datetime | None = None,
     ) -> CalibrationAdjustmentAuthorityRecord:
         """Validate and detach the receipt-level scientific authority."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
@@ -177,9 +178,7 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
             "target_population_digest", target_population_digest
         )
         analysis_window_ref = _require_reference(
-            "analysis_window_reference",
-            analysis_window_reference,
-            "analysis_window",
+            "analysis_window_reference", analysis_window_reference, "analysis_window"
         )
         auxiliary_authority_ref = _require_reference(
             "auxiliary_authority_reference",
@@ -341,12 +340,19 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
             "owner_contract_released_at", owner_contract_released_at
         )
         release_instant = _require_aware_datetime("released_at", released_at)
+        supersession_instant = (
+            None
+            if superseded_at is None
+            else _require_aware_datetime("superseded_at", superseded_at)
+        )
         if release_instant < constructed:
             raise ValueError("released_at cannot precede constructed_at.")
         if owner_released > release_instant:
             raise ValueError(
                 "owner_contract_released_at cannot be later than released_at."
             )
+        if supersession_instant is not None and supersession_instant <= release_instant:
+            raise ValueError("superseded_at must be later than released_at.")
 
         return tuple.__new__(
             cls,
@@ -397,6 +403,7 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
                 benchmark_owner_ver,
                 benchmark_owner_evidence,
                 benchmark_at,
+                supersession_instant,
             ),
         )
 
@@ -630,6 +637,11 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
         """Return the exact benchmark reference instant committed by the receipt."""
         return self[45]
 
+    @property
+    def superseded_at(self) -> datetime | None:
+        """Return the exclusive owner-resolved cutover for this calibration receipt."""
+        return self[46]
+
 
 class CalibrationAdjustmentAuthorityView(tuple):
     """Field-minimized typed calibration evidence issued only after authorization."""
@@ -727,7 +739,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 
 
 def _coordinate_tuple(record: CalibrationAdjustmentAuthorityRecord) -> tuple[object, ...]:
-    """Return caller-known coordinates, excluding owner-resolved release instants."""
+    """Return caller-known coordinates, excluding owner-resolved chronology."""
     return record[:23] + record[25:46]
 
 
@@ -852,6 +864,7 @@ def resolve_calibration_adjustment_authority(
         owner_contract_digest=owner_contract_digest,
         owner_contract_released_at=constructed_at,
         released_at=constructed_at,
+        superseded_at=None,
     )
     tenant_id = requested.tenant_record_id
     study_id = requested.validity_study_id
@@ -976,6 +989,7 @@ def resolve_calibration_adjustment_authority(
         owner_contract_digest=persisted.owner_contract_digest,
         owner_contract_released_at=persisted.owner_contract_released_at,
         released_at=persisted.released_at,
+        superseded_at=persisted.superseded_at,
     )
     if _coordinate_tuple(record) != _coordinate_tuple(requested):
         raise CalibrationAdjustmentAuthorityIntegrityError(
@@ -984,6 +998,10 @@ def resolve_calibration_adjustment_authority(
     if record.released_at > use_instant:
         raise CalibrationAdjustmentAuthorityIntegrityError(
             "calibration-adjustment evidence must be released before scientific use"
+        )
+    if record.superseded_at is not None and use_instant >= record.superseded_at:
+        raise CalibrationAdjustmentAuthorityIntegrityError(
+            "calibration-adjustment evidence is superseded for this scientific-use instant"
         )
 
     fields: tuple[tuple[str, object], ...] = (
