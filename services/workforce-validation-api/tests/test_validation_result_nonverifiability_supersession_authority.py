@@ -43,6 +43,8 @@ READ_FIELDS = frozenset(
         "owner_contract_released_at",
         "released_at",
         "superseded_at",
+        "successor_target_result_reference",
+        "successor_target_result_digest",
         "successor_verification_attempt_reference",
         "successor_verification_attempt_digest",
         "successor_verification_attempt_released_at",
@@ -175,6 +177,7 @@ def test_historical_negative_outcome_hides_successor_attempt() -> None:
     assert fields["failed_evidence_kind"] == "analysis_weight_receipt"
     assert "superseded_at" not in fields
     assert "successor_verification_attempt_reference" not in fields
+    assert "successor_target_result_reference" not in fields
 
 
 def test_negative_outcome_fails_closed_at_successor_cutover() -> None:
