@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from email.parser import Parser
 import hashlib
 from importlib.metadata import version as installed_version
 import os
@@ -142,6 +143,70 @@ def _validate_wheel_contents(
         )
 
 
+def _validate_wheel_metadata(
+    wheel_path: Path,
+    *,
+    expected_name: str,
+    expected_version: str,
+    expected_requires_python: str,
+    required_dependency: tuple[str, str] | None = None,
+) -> None:
+    """Bind built METADATA to reviewed project identity, runtime, and owned dependencies."""
+    with zipfile.ZipFile(wheel_path) as archive:
+        metadata_paths = [
+            name
+            for name in archive.namelist()
+            if PurePosixPath(name).name == "METADATA"
+            and len(PurePosixPath(name).parts) == 2
+            and PurePosixPath(name).parts[0].endswith(".dist-info")
+        ]
+        assert len(metadata_paths) == 1, (
+            f"{wheel_path.name} must contain exactly one dist-info METADATA file"
+        )
+        raw_metadata = archive.read(metadata_paths[0]).decode("utf-8")
+
+    metadata = Parser().parsestr(raw_metadata)
+    raw_name = metadata.get("Name")
+    raw_version = metadata.get("Version")
+    raw_requires_python = metadata.get("Requires-Python")
+    assert raw_name is not None, f"{wheel_path.name} METADATA must declare Name"
+    assert raw_version is not None, f"{wheel_path.name} METADATA must declare Version"
+    assert raw_requires_python is not None, (
+        f"{wheel_path.name} METADATA must declare Requires-Python"
+    )
+    assert canonicalize_name(raw_name) == canonicalize_name(expected_name), (
+        f"{wheel_path.name} METADATA Name does not match reviewed project identity"
+    )
+    assert Version(raw_version) == Version(expected_version), (
+        f"{wheel_path.name} METADATA Version does not match reviewed project version"
+    )
+    assert SpecifierSet(raw_requires_python) == SpecifierSet(expected_requires_python), (
+        f"{wheel_path.name} METADATA Requires-Python does not match reviewed project runtime"
+    )
+
+    if required_dependency is None:
+        return
+    dependency_name, dependency_version = required_dependency
+    parsed_dependencies = [
+        Requirement(value) for value in metadata.get_all("Requires-Dist", failobj=[])
+    ]
+    matching_dependencies = [
+        requirement
+        for requirement in parsed_dependencies
+        if canonicalize_name(requirement.name) == canonicalize_name(dependency_name)
+    ]
+    assert len(matching_dependencies) == 1, (
+        f"{wheel_path.name} METADATA must preserve the mandatory Keyverse dependency"
+    )
+    requirement = matching_dependencies[0]
+    assert requirement.specifier == SpecifierSet(f"=={dependency_version}"), (
+        f"{wheel_path.name} METADATA must preserve the exact owned Keyverse version"
+    )
+    assert not requirement.extras and requirement.marker is None and requirement.url is None, (
+        f"{wheel_path.name} mandatory Keyverse dependency must remain unconditional"
+    )
+
+
 def _locked_wheel_requirements(
     wheelhouse: Path,
     *,
@@ -156,6 +221,10 @@ def _locked_wheel_requirements(
     package_roots = {
         canonicalize_name(_KEYVERSE_NAME): "orgmetra_keyverse_adapter",
         canonicalize_name(_SERVICE_NAME): "orgmetra_workforce_validation_api",
+    }
+    source_projects = {
+        canonicalize_name(_KEYVERSE_NAME): _project_metadata(_KEYVERSE_PROJECT),
+        canonicalize_name(_SERVICE_NAME): _project_metadata(_SERVICE_ROOT / "pyproject.toml"),
     }
     wheels_by_name: dict[str, Path] = {}
     hashes_by_name: dict[str, str] = {}
@@ -180,12 +249,32 @@ def _locked_wheel_requirements(
         assert canonical_name not in wheels_by_name, (
             f"duplicate wheel identity for {canonical_name}"
         )
+        project = source_projects[canonical_name]
+        requires_python = project.get("requires-python")
+        assert isinstance(requires_python, str), (
+            f"{canonical_name} project requires-python must be text"
+        )
         wheels_by_name[canonical_name] = wheel_path
         hashes_by_name[canonical_name] = _sha256(wheel_path)
         _validate_wheel_contents(
             wheel_path,
             package_root=package_roots[canonical_name],
             require_py_typed=canonical_name == canonicalize_name(_SERVICE_NAME),
+        )
+        _validate_wheel_metadata(
+            wheel_path,
+            expected_name=(
+                _SERVICE_NAME
+                if canonical_name == canonicalize_name(_SERVICE_NAME)
+                else _KEYVERSE_NAME
+            ),
+            expected_version=str(expected_versions[canonical_name]),
+            expected_requires_python=requires_python,
+            required_dependency=(
+                (_KEYVERSE_NAME, keyverse_version)
+                if canonical_name == canonicalize_name(_SERVICE_NAME)
+                else None
+            ),
         )
 
     assert set(wheels_by_name) == set(expected_versions)
