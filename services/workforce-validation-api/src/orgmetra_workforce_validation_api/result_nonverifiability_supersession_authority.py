@@ -55,6 +55,8 @@ _READ_FIELDS = frozenset(
         "owner_contract_released_at",
         "released_at",
         "superseded_at",
+        "successor_target_result_reference",
+        "successor_target_result_digest",
         "successor_verification_attempt_reference",
         "successor_verification_attempt_digest",
         "successor_verification_attempt_released_at",
