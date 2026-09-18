@@ -496,6 +496,23 @@ def resolve_validation_result_nonverifiability_supersession_v2_authority(
         raise ValidationResultNonVerifiabilitySupersessionV2AuthorityIntegrityError(
             "owner port returned non-canonical v2 non-verifiability supersession evidence"
         )
+    try:
+        successor_coordinates = dict(persisted.successor_fields or ())
+        canonical = ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord(
+            predecessor=persisted.predecessor,
+            evidence_version=persisted.evidence_version,
+            superseded_at=persisted.superseded_at,
+            **successor_coordinates,
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise ValidationResultNonVerifiabilitySupersessionV2AuthorityIntegrityError(
+            "owner port returned structurally invalid v2 non-verifiability supersession evidence"
+        ) from exc
+    if canonical != persisted:
+        raise ValidationResultNonVerifiabilitySupersessionV2AuthorityIntegrityError(
+            "owner port returned non-canonical v2 non-verifiability supersession structure"
+        )
+    persisted = canonical
     predecessor = persisted.predecessor
     values = dict(persisted.fields)
     requested_values = {
