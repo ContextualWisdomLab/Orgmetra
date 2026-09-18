@@ -104,6 +104,49 @@ def test_hash_locked_acceptance_rejects_service_wheel_missing_keyverse_dependenc
         )
 
 
+def test_hash_locked_acceptance_rejects_unreviewed_inactive_dependency(
+    tmp_path: Path,
+) -> None:
+    """Built metadata must not gain a marker-disabled dependency absent from source truth."""
+    wheelhouse = tmp_path / "wheelhouse"
+    wheelhouse.mkdir()
+    _write_wheel(
+        wheelhouse,
+        filename="orgmetra_keyverse_adapter-0.1.0-py3-none-any.whl",
+        package_root="orgmetra_keyverse_adapter",
+        dist_info_root="orgmetra_keyverse_adapter-0.1.0.dist-info",
+        metadata=(
+            "Metadata-Version: 2.4\n"
+            "Name: orgmetra-keyverse-adapter\n"
+            "Version: 0.1.0\n"
+            "Requires-Python: >=3.12\n\n"
+        ),
+        include_py_typed=False,
+    )
+    _write_wheel(
+        wheelhouse,
+        filename="orgmetra_workforce_validation_api-0.1.0-py3-none-any.whl",
+        package_root="orgmetra_workforce_validation_api",
+        dist_info_root="orgmetra_workforce_validation_api-0.1.0.dist-info",
+        metadata=(
+            "Metadata-Version: 2.4\n"
+            "Name: orgmetra-workforce-validation-api\n"
+            "Version: 0.1.0\n"
+            "Requires-Python: >=3.12\n"
+            "Requires-Dist: orgmetra-keyverse-adapter==0.1.0\n"
+            "Requires-Dist: unreviewed-package>=1; python_version < '3.0'\n\n"
+        ),
+        include_py_typed=True,
+    )
+
+    with pytest.raises(AssertionError, match="reviewed project dependencies"):
+        _CONTRACT._locked_wheel_requirements(
+            wheelhouse,
+            service_version="0.1.0",
+            keyverse_version="0.1.0",
+        )
+
+
 def test_hash_locked_acceptance_rejects_wheel_with_invalid_record_hash(
     tmp_path: Path,
 ) -> None:
