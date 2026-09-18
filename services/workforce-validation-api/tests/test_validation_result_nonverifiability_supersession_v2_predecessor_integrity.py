@@ -151,6 +151,8 @@ def test_resolver_revalidates_exact_typed_owner_evidence() -> None:
             result_reference=RESULT_REFERENCE,
             result_digest=RESULT_DIGEST,
             failed_evidence_kind="analysis_weight_receipt",
+            failed_evidence_reference=FAILED_REFERENCE,
+            failed_evidence_digest=FAILED_DIGEST,
             verification_attempt_reference=ATTEMPT_REFERENCE,
             verification_attempt_digest=ATTEMPT_DIGEST,
             evidence_version=2,
