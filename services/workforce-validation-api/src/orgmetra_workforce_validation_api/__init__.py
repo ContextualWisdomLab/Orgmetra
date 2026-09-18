@@ -138,6 +138,14 @@ from orgmetra_workforce_validation_api.variance_authority import (
     WeightVarianceAuthorityView,
     resolve_weight_variance_authority,
 )
+from orgmetra_workforce_validation_api.weight_variance_supersession_authority import (
+    WeightVarianceSupersessionAuthorityIntegrityError,
+    WeightVarianceSupersessionAuthorityNotFound,
+    WeightVarianceSupersessionAuthorityReadPort,
+    WeightVarianceSupersessionAuthorityRecord,
+    WeightVarianceSupersessionAuthorityView,
+    resolve_weight_variance_supersession_authority,
+)
 from orgmetra_workforce_validation_api.weight_eligibility_authority import (
     WeightEligibilityAuthorityIntegrityError,
     WeightEligibilityAuthorityNotFound,
@@ -253,6 +261,11 @@ __all__ = [
     "WeightVarianceAuthorityReadPort",
     "WeightVarianceAuthorityRecord",
     "WeightVarianceAuthorityView",
+    "WeightVarianceSupersessionAuthorityIntegrityError",
+    "WeightVarianceSupersessionAuthorityNotFound",
+    "WeightVarianceSupersessionAuthorityReadPort",
+    "WeightVarianceSupersessionAuthorityRecord",
+    "WeightVarianceSupersessionAuthorityView",
     "read_validity_study",
     "resolve_base_weight_authority",
     "resolve_base_weight_supersession_authority",
@@ -272,4 +285,5 @@ __all__ = [
     "resolve_weight_eligibility_authority",
     "resolve_weight_eligibility_supersession_authority",
     "resolve_weight_variance_authority",
+    "resolve_weight_variance_supersession_authority",
 ]
