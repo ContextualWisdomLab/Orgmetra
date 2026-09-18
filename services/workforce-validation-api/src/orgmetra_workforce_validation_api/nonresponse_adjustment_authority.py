@@ -61,6 +61,7 @@ _READ_FIELDS = frozenset(
         "owner_contract_digest",
         "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -105,6 +106,7 @@ class NonresponseAdjustmentAuthorityRecord(tuple):
         owner_contract_digest: str,
         owner_contract_released_at: datetime,
         released_at: datetime,
+        superseded_at: datetime | None = None,
     ) -> NonresponseAdjustmentAuthorityRecord:
         """Validate and detach the minimum disposition-aware scientific authority."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
@@ -176,12 +178,19 @@ class NonresponseAdjustmentAuthorityRecord(tuple):
             "owner_contract_released_at", owner_contract_released_at
         )
         release_instant = _require_aware_datetime("released_at", released_at)
+        supersession_instant = (
+            None
+            if superseded_at is None
+            else _require_aware_datetime("superseded_at", superseded_at)
+        )
         if release_instant < constructed:
             raise ValueError("released_at cannot precede constructed_at.")
         if owner_released > release_instant:
             raise ValueError(
                 "owner_contract_released_at cannot be later than released_at."
             )
+        if supersession_instant is not None and supersession_instant <= release_instant:
+            raise ValueError("superseded_at must be later than released_at.")
 
         return tuple.__new__(
             cls,
@@ -210,6 +219,7 @@ class NonresponseAdjustmentAuthorityRecord(tuple):
                 owner_digest,
                 owner_released,
                 release_instant,
+                supersession_instant,
             ),
         )
 
@@ -332,6 +342,11 @@ class NonresponseAdjustmentAuthorityRecord(tuple):
     def released_at(self) -> datetime:
         """Return when this typed nonresponse evidence became released authority."""
         return self[23]
+
+    @property
+    def superseded_at(self) -> datetime | None:
+        """Return the exclusive owner-resolved cutover for this receipt."""
+        return self[24]
 
 
 class NonresponseAdjustmentAuthorityView(tuple):
@@ -483,6 +498,7 @@ def resolve_nonresponse_adjustment_authority(
         owner_contract_digest=owner_contract_digest,
         owner_contract_released_at=constructed,
         released_at=constructed,
+        superseded_at=None,
     )
     tenant_id = requested.tenant_record_id
     study_id = requested.validity_study_id
@@ -567,6 +583,7 @@ def resolve_nonresponse_adjustment_authority(
         owner_contract_digest=persisted.owner_contract_digest,
         owner_contract_released_at=persisted.owner_contract_released_at,
         released_at=persisted.released_at,
+        superseded_at=persisted.superseded_at,
     )
     if _coordinate_tuple(record) != _coordinate_tuple(requested):
         raise NonresponseAdjustmentAuthorityIntegrityError(
@@ -575,6 +592,10 @@ def resolve_nonresponse_adjustment_authority(
     if record.released_at > use_instant:
         raise NonresponseAdjustmentAuthorityIntegrityError(
             "nonresponse-adjustment evidence must be released before scientific use"
+        )
+    if record.superseded_at is not None and use_instant >= record.superseded_at:
+        raise NonresponseAdjustmentAuthorityIntegrityError(
+            "nonresponse-adjustment evidence is superseded for this scientific-use instant"
         )
 
     fields: tuple[tuple[str, object], ...] = (
@@ -598,6 +619,7 @@ def resolve_nonresponse_adjustment_authority(
         ("response_disposition_receipt_reference", record.response_disposition_receipt_reference),
         ("response_disposition_receipt_released_at", record.response_disposition_receipt_released_at),
         ("response_disposition_receipt_version", record.response_disposition_receipt_version),
+        ("superseded_at", record.superseded_at),
         ("unavailable_treatment_code", record.unavailable_treatment_code),
         ("unknown_treatment_code", record.unknown_treatment_code),
     )
