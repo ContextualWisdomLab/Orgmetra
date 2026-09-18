@@ -24,17 +24,32 @@ STUDY = UUID("00000000-0000-7000-8000-0000000000d1")
 OTHER_STUDY = UUID("00000000-0000-7000-8000-0000000000d2")
 RECEIPT_REFERENCE = "calibration_adjustment_receipt:11111111-1111-4111-8111-111111111111"
 OWNER_CONTRACT_REFERENCE = "released_owner_contract:22222222-2222-4222-8222-222222222222"
+AUXILIARY_AUTHORITY_REFERENCE = "scientific_auxiliary_authority:33333333-3333-4333-8333-333333333333"
+AUXILIARY_PROJECTION_REFERENCE = "calibration_auxiliary_projection:44444444-4444-4444-8444-444444444444"
+AUXILIARY_PURPOSE_REFERENCE = "scientific_data_use_purpose:55555555-5555-4555-8555-555555555555"
+AUXILIARY_OWNER_CONTRACT_REFERENCE = "released_owner_contract:66666666-6666-4666-8666-666666666666"
+AUXILIARY_AUTHORIZATION_REFERENCE = "scientific_data_authorization:77777777-7777-4777-8777-777777777777"
+AUXILIARY_USE_REFERENCE = "scientific_use_receipt:88888888-8888-4888-8888-888888888888"
+BENCHMARK_RECEIPT_REFERENCE = "calibration_benchmark_receipt:99999999-9999-4999-8999-999999999999"
+BENCHMARK_OWNER_CONTRACT_REFERENCE = "released_owner_contract:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 RECEIPT_DIGEST = "1" * 64
 TARGET_POPULATION_DIGEST = "a" * 64
-ANALYSIS_WINDOW_REFERENCE = "analysis_window:2026q3"
 AUXILIARY_PROJECTION_DIGEST = "2" * 64
-BENCHMARK_RECEIPT_DIGEST = "3" * 64
-CONSTRAINTS_DIGEST = "4" * 64
-INPUT_WEIGHT_DIGEST = "5" * 64
-OUTPUT_WEIGHT_DIGEST = "6" * 64
-FALLBACK_RULE_DIGEST = "7" * 64
-FALLBACK_CONFIGURATION_DIGEST = "8" * 64
-OWNER_CONTRACT_DIGEST = "9" * 64
+AUXILIARY_PURPOSE_DIGEST = "3" * 64
+AUXILIARY_OWNER_CONTRACT_DIGEST = "4" * 64
+AUXILIARY_AUTHORIZATION_DIGEST = "5" * 64
+AUXILIARY_USE_DIGEST = "6" * 64
+BENCHMARK_RECEIPT_DIGEST = "7" * 64
+BENCHMARK_OWNER_CONTRACT_DIGEST = "8" * 64
+CONSTRAINTS_DIGEST = "9" * 64
+INPUT_WEIGHT_DIGEST = "b" * 64
+OUTPUT_WEIGHT_DIGEST = "c" * 64
+FALLBACK_RULE_DIGEST = "d" * 64
+FALLBACK_CONFIGURATION_DIGEST = "e" * 64
+OWNER_CONTRACT_DIGEST = "f" * 64
+ANALYSIS_WINDOW_REFERENCE = "analysis_window:2026q3"
+AUXILIARY_USE_AT = datetime(2026, 9, 16, 11, 0, tzinfo=timezone.utc)
+BENCHMARK_REFERENCE_AT = datetime(2026, 9, 16, 11, 30, tzinfo=timezone.utc)
 CONSTRUCTED_AT = datetime(2026, 9, 16, 12, 0, tzinfo=timezone.utc)
 OWNER_CONTRACT_RELEASED_AT = datetime(2026, 9, 16, 12, 30, tzinfo=timezone.utc)
 RELEASED_AT = datetime(2026, 9, 16, 13, 0, tzinfo=timezone.utc)
@@ -46,8 +61,27 @@ READ_FIELDS = frozenset(
         "evidence_version",
         "target_population_digest",
         "analysis_window_reference",
+        "auxiliary_authority_reference",
+        "auxiliary_projection_reference",
+        "auxiliary_projection_version",
         "auxiliary_projection_digest",
+        "auxiliary_purpose_reference",
+        "auxiliary_purpose_digest",
+        "auxiliary_owner_contract_reference",
+        "auxiliary_owner_contract_version",
+        "auxiliary_owner_contract_digest",
+        "auxiliary_authorization_receipt_reference",
+        "auxiliary_authorization_receipt_digest",
+        "auxiliary_scientific_use_receipt_reference",
+        "auxiliary_scientific_use_receipt_digest",
+        "auxiliary_scientific_use_at",
+        "benchmark_receipt_reference",
+        "benchmark_receipt_version",
         "benchmark_receipt_digest",
+        "benchmark_owner_contract_reference",
+        "benchmark_owner_contract_version",
+        "benchmark_owner_contract_digest",
+        "benchmark_reference_at",
         "algorithm_reference",
         "algorithm_version",
         "constraints_digest",
@@ -140,8 +174,27 @@ def _record(**overrides: object) -> CalibrationAdjustmentAuthorityRecord:
         "evidence_version": 1,
         "target_population_digest": TARGET_POPULATION_DIGEST,
         "analysis_window_reference": ANALYSIS_WINDOW_REFERENCE,
+        "auxiliary_authority_reference": AUXILIARY_AUTHORITY_REFERENCE,
+        "auxiliary_projection_reference": AUXILIARY_PROJECTION_REFERENCE,
+        "auxiliary_projection_version": 2,
         "auxiliary_projection_digest": AUXILIARY_PROJECTION_DIGEST,
+        "auxiliary_purpose_reference": AUXILIARY_PURPOSE_REFERENCE,
+        "auxiliary_purpose_digest": AUXILIARY_PURPOSE_DIGEST,
+        "auxiliary_owner_contract_reference": AUXILIARY_OWNER_CONTRACT_REFERENCE,
+        "auxiliary_owner_contract_version": 3,
+        "auxiliary_owner_contract_digest": AUXILIARY_OWNER_CONTRACT_DIGEST,
+        "auxiliary_authorization_receipt_reference": AUXILIARY_AUTHORIZATION_REFERENCE,
+        "auxiliary_authorization_receipt_digest": AUXILIARY_AUTHORIZATION_DIGEST,
+        "auxiliary_scientific_use_receipt_reference": AUXILIARY_USE_REFERENCE,
+        "auxiliary_scientific_use_receipt_digest": AUXILIARY_USE_DIGEST,
+        "auxiliary_scientific_use_at": AUXILIARY_USE_AT,
+        "benchmark_receipt_reference": BENCHMARK_RECEIPT_REFERENCE,
+        "benchmark_receipt_version": 4,
         "benchmark_receipt_digest": BENCHMARK_RECEIPT_DIGEST,
+        "benchmark_owner_contract_reference": BENCHMARK_OWNER_CONTRACT_REFERENCE,
+        "benchmark_owner_contract_version": 5,
+        "benchmark_owner_contract_digest": BENCHMARK_OWNER_CONTRACT_DIGEST,
+        "benchmark_reference_at": BENCHMARK_REFERENCE_AT,
         "algorithm_reference": "calibration_algorithm:generalized_regression",
         "algorithm_version": 3,
         "constraints_digest": CONSTRAINTS_DIGEST,
@@ -175,8 +228,27 @@ def _resolve(*, read_port: object, **overrides: object) -> CalibrationAdjustment
         "evidence_version": 1,
         "target_population_digest": TARGET_POPULATION_DIGEST,
         "analysis_window_reference": ANALYSIS_WINDOW_REFERENCE,
+        "auxiliary_authority_reference": AUXILIARY_AUTHORITY_REFERENCE,
+        "auxiliary_projection_reference": AUXILIARY_PROJECTION_REFERENCE,
+        "auxiliary_projection_version": 2,
         "auxiliary_projection_digest": AUXILIARY_PROJECTION_DIGEST,
+        "auxiliary_purpose_reference": AUXILIARY_PURPOSE_REFERENCE,
+        "auxiliary_purpose_digest": AUXILIARY_PURPOSE_DIGEST,
+        "auxiliary_owner_contract_reference": AUXILIARY_OWNER_CONTRACT_REFERENCE,
+        "auxiliary_owner_contract_version": 3,
+        "auxiliary_owner_contract_digest": AUXILIARY_OWNER_CONTRACT_DIGEST,
+        "auxiliary_authorization_receipt_reference": AUXILIARY_AUTHORIZATION_REFERENCE,
+        "auxiliary_authorization_receipt_digest": AUXILIARY_AUTHORIZATION_DIGEST,
+        "auxiliary_scientific_use_receipt_reference": AUXILIARY_USE_REFERENCE,
+        "auxiliary_scientific_use_receipt_digest": AUXILIARY_USE_DIGEST,
+        "auxiliary_scientific_use_at": AUXILIARY_USE_AT,
+        "benchmark_receipt_reference": BENCHMARK_RECEIPT_REFERENCE,
+        "benchmark_receipt_version": 4,
         "benchmark_receipt_digest": BENCHMARK_RECEIPT_DIGEST,
+        "benchmark_owner_contract_reference": BENCHMARK_OWNER_CONTRACT_REFERENCE,
+        "benchmark_owner_contract_version": 5,
+        "benchmark_owner_contract_digest": BENCHMARK_OWNER_CONTRACT_DIGEST,
+        "benchmark_reference_at": BENCHMARK_REFERENCE_AT,
         "algorithm_reference": "calibration_algorithm:generalized_regression",
         "algorithm_version": 3,
         "constraints_digest": CONSTRAINTS_DIGEST,
@@ -214,11 +286,15 @@ def test_fallback_resolution_binds_actual_generating_method() -> None:
     assert port.calls[0]["calibration_receipt_digest"] == RECEIPT_DIGEST
     assert port.calls[0]["target_population_digest"] == TARGET_POPULATION_DIGEST
     assert port.calls[0]["analysis_window_reference"] == ANALYSIS_WINDOW_REFERENCE
+    assert port.calls[0]["auxiliary_projection_reference"] == AUXILIARY_PROJECTION_REFERENCE
+    assert port.calls[0]["benchmark_receipt_reference"] == BENCHMARK_RECEIPT_REFERENCE
     assert port.calls[0]["fallback_algorithm_reference"] == "calibration_algorithm:raking"
     assert view.tenant_record_id == TENANT
     assert view.validity_study_id == STUDY
     assert ("target_population_digest", TARGET_POPULATION_DIGEST) in view.fields
     assert ("analysis_window_reference", ANALYSIS_WINDOW_REFERENCE) in view.fields
+    assert ("auxiliary_projection_reference", AUXILIARY_PROJECTION_REFERENCE) in view.fields
+    assert ("benchmark_receipt_reference", BENCHMARK_RECEIPT_REFERENCE) in view.fields
     assert ("termination_code", "fallback_applied") in view.fields
     assert ("fallback_reason_code", "primary_nonconvergence") in view.fields
     assert ("fallback_rule_reference", "calibration_fallback_rule:cell-collapse-v2") in view.fields
@@ -257,18 +333,30 @@ def test_missing_or_noncanonical_owner_evidence_fails_closed() -> None:
     [
         {"tenant_record_id": OTHER_TENANT},
         {"validity_study_id": OTHER_STUDY},
-        {"calibration_receipt_digest": "b" * 64},
-        {"target_population_digest": "c" * 64},
+        {"calibration_receipt_digest": "0" * 64},
+        {"target_population_digest": "1" * 64},
         {"analysis_window_reference": "analysis_window:2026q4"},
-        {"auxiliary_projection_digest": "d" * 64},
-        {"benchmark_receipt_digest": "e" * 64},
+        {"auxiliary_authority_reference": "scientific_auxiliary_authority:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"},
+        {"auxiliary_projection_reference": "calibration_auxiliary_projection:cccccccc-cccc-4ccc-8ccc-cccccccccccc"},
+        {"auxiliary_projection_version": 8},
+        {"auxiliary_projection_digest": "3" * 64},
+        {"auxiliary_purpose_digest": "4" * 64},
+        {"auxiliary_owner_contract_digest": "5" * 64},
+        {"auxiliary_authorization_receipt_digest": "6" * 64},
+        {"auxiliary_scientific_use_receipt_digest": "7" * 64},
+        {"auxiliary_scientific_use_at": AUXILIARY_USE_AT - timedelta(seconds=1)},
+        {"benchmark_receipt_reference": "calibration_benchmark_receipt:dddddddd-dddd-4ddd-8ddd-dddddddddddd"},
+        {"benchmark_receipt_version": 9},
+        {"benchmark_receipt_digest": "8" * 64},
+        {"benchmark_owner_contract_digest": "9" * 64},
+        {"benchmark_reference_at": BENCHMARK_REFERENCE_AT - timedelta(seconds=1)},
         {"algorithm_reference": "calibration_algorithm:raking"},
         {"algorithm_version": 9},
-        {"constraints_digest": "f" * 64},
-        {"input_weight_artifact_digest": "0" * 64},
-        {"output_weight_artifact_digest": "a" * 64},
+        {"constraints_digest": "0" * 64},
+        {"input_weight_artifact_digest": "1" * 64},
+        {"output_weight_artifact_digest": "2" * 64},
         {"owner_contract_version": 7},
-        {"owner_contract_digest": "b" * 64},
+        {"owner_contract_digest": "3" * 64},
     ],
 )
 def test_owner_evidence_must_match_every_requested_coordinate(
@@ -314,15 +402,34 @@ def test_converged_receipt_rejects_fallback_only_evidence() -> None:
         ("evidence_version", 2),
         ("target_population_digest", "a" * 63),
         ("analysis_window_reference", "wrong:window"),
+        ("auxiliary_authority_reference", "wrong:authority"),
+        ("auxiliary_projection_reference", "wrong:projection"),
+        ("auxiliary_projection_version", 0),
+        ("auxiliary_purpose_reference", "wrong:purpose"),
+        ("auxiliary_purpose_digest", "3" * 63),
+        ("auxiliary_owner_contract_reference", "wrong:contract"),
+        ("auxiliary_owner_contract_version", 0),
+        ("auxiliary_owner_contract_digest", "4" * 63),
+        ("auxiliary_authorization_receipt_reference", "wrong:authorization"),
+        ("auxiliary_authorization_receipt_digest", "5" * 63),
+        ("auxiliary_scientific_use_receipt_reference", "wrong:use"),
+        ("auxiliary_scientific_use_receipt_digest", "6" * 63),
+        ("auxiliary_scientific_use_at", datetime(2026, 9, 16, 11, 0)),
+        ("benchmark_receipt_reference", "wrong:benchmark"),
+        ("benchmark_receipt_version", 0),
+        ("benchmark_owner_contract_reference", "wrong:contract"),
+        ("benchmark_owner_contract_version", 0),
+        ("benchmark_owner_contract_digest", "8" * 63),
+        ("benchmark_reference_at", datetime(2026, 9, 16, 11, 30)),
         ("termination_code", "nonconverged"),
         ("algorithm_reference", "wrong:method"),
         ("algorithm_version", True),
         ("fallback_reason_code", "Primary Failure"),
         ("fallback_rule_reference", "wrong:rule"),
-        ("fallback_rule_digest", "7" * 63),
+        ("fallback_rule_digest", "d" * 63),
         ("fallback_algorithm_reference", "wrong:algorithm"),
         ("fallback_algorithm_version", 0),
-        ("fallback_configuration_digest", "8" * 65),
+        ("fallback_configuration_digest", "e" * 65),
     ],
 )
 def test_malformed_calibration_or_fallback_evidence_fails_closed(
@@ -332,6 +439,13 @@ def test_malformed_calibration_or_fallback_evidence_fails_closed(
     overrides[key] = value
     with pytest.raises(ValueError):
         _record(**overrides)
+
+
+def test_supporting_evidence_cannot_postdate_calibration_construction() -> None:
+    with pytest.raises(ValueError):
+        _record(auxiliary_scientific_use_at=CONSTRUCTED_AT + timedelta(seconds=1))
+    with pytest.raises(ValueError):
+        _record(benchmark_reference_at=CONSTRUCTED_AT + timedelta(seconds=1))
 
 
 def test_weight_artifact_and_release_chronology_fail_closed() -> None:
@@ -358,15 +472,15 @@ def test_weight_artifact_and_release_chronology_fail_closed() -> None:
         ("target_population_digest", "a" * 63, ValueError),
         ("analysis_window_reference", "wrong:window", ValueError),
         ("auxiliary_projection_digest", "2" * 63, ValueError),
-        ("benchmark_receipt_digest", "3" * 65, ValueError),
+        ("benchmark_receipt_digest", "7" * 65, ValueError),
         ("algorithm_reference", "wrong:algorithm", ValueError),
         ("algorithm_version", 0, ValueError),
-        ("constraints_digest", "4" * 63, ValueError),
+        ("constraints_digest", "9" * 63, ValueError),
         ("termination_code", "failed", ValueError),
         ("constructed_at", datetime(2026, 9, 16, 12, 0), ValueError),
         ("owner_contract_reference", "wrong:contract", ValueError),
         ("owner_contract_version", 0, ValueError),
-        ("owner_contract_digest", "9" * 63, ValueError),
+        ("owner_contract_digest", "f" * 63, ValueError),
         ("used_at", datetime(2026, 9, 17), ValueError),
         ("purpose_code", "Selection Validity Analysis", ValueError),
     ],
