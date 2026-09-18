@@ -164,9 +164,8 @@ def _record(
     predecessor: ValidationResultNonVerifiabilityRecord | None = None,
     **overrides: object,
 ) -> ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord:
-    """Build current v2 authority with optional owner-supplied successor coordinates."""
+    """Build v2 authority while keeping the ordinary cutover and explicit edge aligned."""
     values: dict[str, object] = {
-        "predecessor": _predecessor() if predecessor is None else predecessor,
         "evidence_version": 2,
         "superseded_at": None,
         "successor_target_result_reference": None,
@@ -180,6 +179,18 @@ def _record(
         "successor_verification_attempt_released_at": None,
     }
     values.update(overrides)
+    if predecessor is None:
+        requested_cutover = values["superseded_at"]
+        if (
+            type(requested_cutover) is datetime
+            and requested_cutover.tzinfo is not None
+            and requested_cutover.utcoffset() is not None
+            and requested_cutover > RELEASED_AT
+        ):
+            predecessor = _predecessor(superseded_at=requested_cutover)
+        else:
+            predecessor = _predecessor()
+    values["predecessor"] = predecessor
     return ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord(**values)
 
 
@@ -272,6 +283,7 @@ def test_current_non_reproducible_outcome_resolves_with_exact_failed_artifact() 
 def test_exact_artifact_successor_preserves_historical_use_but_ends_at_cutover() -> None:
     """Require one atomic same-result, same-artifact successor attempt."""
     record = _record(**_successor_overrides())
+    assert record.predecessor.superseded_at == CUTOVER
     assert dict(record.successor_fields or ()) == {
         "successor_failed_evidence_kind": "analysis_weight_receipt",
         "successor_target_failed_evidence_digest": FAILED_DIGEST,
