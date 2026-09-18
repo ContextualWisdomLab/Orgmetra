@@ -45,6 +45,7 @@ READ_FIELDS = frozenset(
         "superseded_at",
         "successor_target_result_reference",
         "successor_target_result_digest",
+        "successor_failed_evidence_kind",
         "successor_verification_attempt_reference",
         "successor_verification_attempt_digest",
         "successor_verification_attempt_released_at",
@@ -107,7 +108,7 @@ def _record(
     successor_digest: str | None,
     successor_released_at: datetime | None,
 ) -> ValidationResultNonVerifiabilitySupersessionAuthorityRecord:
-    """Build one canonical predecessor and optional same-result successor attempt."""
+    """Build one canonical predecessor and optional same-obligation successor attempt."""
     has_successor = successor_reference is not None
     return ValidationResultNonVerifiabilitySupersessionAuthorityRecord(
         tenant_record_id=TENANT,
@@ -127,6 +128,7 @@ def _record(
         superseded_at=superseded_at,
         successor_target_result_reference=(RESULT_REFERENCE if has_successor else None),
         successor_target_result_digest=(RESULT_DIGEST if has_successor else None),
+        successor_failed_evidence_kind=("analysis_weight_receipt" if has_successor else None),
         successor_verification_attempt_reference=successor_reference,
         successor_verification_attempt_digest=successor_digest,
         successor_verification_attempt_released_at=successor_released_at,
@@ -178,6 +180,7 @@ def test_historical_negative_outcome_hides_successor_attempt() -> None:
     assert "superseded_at" not in fields
     assert "successor_verification_attempt_reference" not in fields
     assert "successor_target_result_reference" not in fields
+    assert "successor_failed_evidence_kind" not in fields
 
 
 def test_negative_outcome_fails_closed_at_successor_cutover() -> None:
