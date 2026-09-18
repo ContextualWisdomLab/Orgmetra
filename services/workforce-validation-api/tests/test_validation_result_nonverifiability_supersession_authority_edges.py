@@ -51,6 +51,8 @@ READ_FIELDS = frozenset(
         "owner_contract_released_at",
         "released_at",
         "superseded_at",
+        "successor_target_result_reference",
+        "successor_target_result_digest",
         "successor_verification_attempt_reference",
         "successor_verification_attempt_digest",
         "successor_verification_attempt_released_at",
@@ -195,6 +197,7 @@ def test_current_negative_outcome_resolves_without_successor_coordinates() -> No
     assert fields["released_at"] == RELEASED_AT
     assert "superseded_at" not in fields
     assert "successor_verification_attempt_reference" not in fields
+    assert "successor_target_result_reference" not in fields
 
 
 def test_authorization_denial_happens_before_owner_resolution() -> None:
