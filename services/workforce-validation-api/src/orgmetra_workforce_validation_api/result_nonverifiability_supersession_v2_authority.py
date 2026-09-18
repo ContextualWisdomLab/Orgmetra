@@ -115,6 +115,33 @@ def _predecessor_fields(
     )
 
 
+def _revalidate_predecessor(
+    predecessor: ValidationResultNonVerifiabilityRecord,
+) -> ValidationResultNonVerifiabilityRecord:
+    """Reconstruct the predecessor so tuple-level forgery cannot bypass owner invariants."""
+    return ValidationResultNonVerifiabilityRecord(
+        tenant_record_id=predecessor.tenant_record_id,
+        validity_study_id=predecessor.validity_study_id,
+        result_reference=predecessor.result_reference,
+        result_digest=predecessor.result_digest,
+        failed_evidence_kind=predecessor.failed_evidence_kind,
+        failure_mode=predecessor.failure_mode,
+        failed_evidence_reference=predecessor.failed_evidence_reference,
+        failed_evidence_digest=predecessor.failed_evidence_digest,
+        failed_evidence_released_at=predecessor.failed_evidence_released_at,
+        verification_attempt_reference=predecessor.verification_attempt_reference,
+        verification_attempt_digest=predecessor.verification_attempt_digest,
+        verification_attempt_released_at=predecessor.verification_attempt_released_at,
+        owner_contract_reference=predecessor.owner_contract_reference,
+        owner_contract_version=predecessor.owner_contract_version,
+        owner_contract_digest=predecessor.owner_contract_digest,
+        owner_contract_released_at=predecessor.owner_contract_released_at,
+        evaluated_at=predecessor.evaluated_at,
+        released_at=predecessor.released_at,
+        superseded_at=predecessor.superseded_at,
+    )
+
+
 class ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord(tuple):
     """Bind a non-reproducible predecessor to an exact-artifact successor attempt."""
 
@@ -139,6 +166,7 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord(tuple):
         """Validate exact predecessor provenance and an optional atomic successor cutover."""
         if type(predecessor) is not ValidationResultNonVerifiabilityRecord:
             raise TypeError("predecessor must be an exact ValidationResultNonVerifiabilityRecord.")
+        predecessor = _revalidate_predecessor(predecessor)
         if predecessor.failure_mode != "non_reproducible":
             raise ValueError("v2 supersession is reserved for non_reproducible predecessors.")
         version = _require_positive_integer("evidence_version", evidence_version)
