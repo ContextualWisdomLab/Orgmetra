@@ -404,44 +404,54 @@ def resolve_validation_result_supersession_authority(
             "owner port returned non-canonical validation-result supersession evidence"
         )
 
-    persisted_fields = dict(persisted.fields)
-    persisted_successor = (
-        None if persisted.successor_fields is None else dict(persisted.successor_fields)
-    )
-    record = ValidationResultSupersessionAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        result_reference=persisted_fields["result_reference"],
-        result_digest=persisted_fields["result_digest"],
-        evidence_version=persisted_fields["evidence_version"],
-        correction_sequence=persisted_fields["correction_sequence"],
-        owner_contract_reference=persisted_fields["owner_contract_reference"],
-        owner_contract_version=persisted_fields["owner_contract_version"],
-        owner_contract_digest=persisted_fields["owner_contract_digest"],
-        owner_contract_released_at=persisted_fields["owner_contract_released_at"],
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-        successor_result_reference=(
-            None
-            if persisted_successor is None
-            else persisted_successor["successor_result_reference"]
-        ),
-        successor_correction_sequence=(
-            None
-            if persisted_successor is None
-            else persisted_successor["successor_correction_sequence"]
-        ),
-        successor_result_digest=(
-            None
-            if persisted_successor is None
-            else persisted_successor["successor_result_digest"]
-        ),
-        successor_released_at=(
-            None
-            if persisted_successor is None
-            else persisted_successor["successor_released_at"]
-        ),
-    )
+    try:
+        persisted_fields = dict(persisted.fields)
+        persisted_successor = (
+            None if persisted.successor_fields is None else dict(persisted.successor_fields)
+        )
+        record = ValidationResultSupersessionAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            result_reference=persisted_fields["result_reference"],
+            result_digest=persisted_fields["result_digest"],
+            evidence_version=persisted_fields["evidence_version"],
+            correction_sequence=persisted_fields["correction_sequence"],
+            owner_contract_reference=persisted_fields["owner_contract_reference"],
+            owner_contract_version=persisted_fields["owner_contract_version"],
+            owner_contract_digest=persisted_fields["owner_contract_digest"],
+            owner_contract_released_at=persisted_fields["owner_contract_released_at"],
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+            successor_result_reference=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_result_reference"]
+            ),
+            successor_correction_sequence=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_correction_sequence"]
+            ),
+            successor_result_digest=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_result_digest"]
+            ),
+            successor_released_at=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_released_at"]
+            ),
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise ValidationResultSupersessionAuthorityIntegrityError(
+            "owner port returned malformed validation-result supersession evidence"
+        ) from exc
+    if record != persisted:
+        raise ValidationResultSupersessionAuthorityIntegrityError(
+            "owner port returned non-canonical validation-result supersession structure"
+        )
+
     record_values = dict(record.fields)
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
