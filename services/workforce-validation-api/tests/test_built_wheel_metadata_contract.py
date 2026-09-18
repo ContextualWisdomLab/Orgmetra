@@ -63,6 +63,21 @@ def _write_wheel(
             archive.writestr(member_path, member)
 
 
+def _keyverse_metadata(*provides_extra_lines: str) -> str:
+    """Build Keyverse Core Metadata while varying only the declared extra ledger."""
+    return "".join(
+        (
+            "Metadata-Version: 2.4\n",
+            "Name: orgmetra-keyverse-adapter\n",
+            "Version: 0.1.0\n",
+            "Requires-Python: >=3.12\n",
+            *(f"Provides-Extra: {value}\n" for value in provides_extra_lines),
+            "Requires-Dist: pytest>=8.3; extra == 'test'\n",
+            "Requires-Dist: pytest-cov>=5.0; extra == 'test'\n\n",
+        )
+    )
+
+
 def test_hash_locked_acceptance_rejects_service_wheel_missing_keyverse_dependency(
     tmp_path: Path,
 ) -> None:
@@ -74,15 +89,7 @@ def test_hash_locked_acceptance_rejects_service_wheel_missing_keyverse_dependenc
         filename="orgmetra_keyverse_adapter-0.1.0-py3-none-any.whl",
         package_root="orgmetra_keyverse_adapter",
         dist_info_root="orgmetra_keyverse_adapter-0.1.0.dist-info",
-        metadata=(
-            "Metadata-Version: 2.4\n"
-            "Name: orgmetra-keyverse-adapter\n"
-            "Version: 0.1.0\n"
-            "Requires-Python: >=3.12\n"
-            "Provides-Extra: test\n"
-            "Requires-Dist: pytest>=8.3; extra == 'test'\n"
-            "Requires-Dist: pytest-cov>=5.0; extra == 'test'\n\n"
-        ),
+        metadata=_keyverse_metadata("test"),
         include_py_typed=False,
     )
     _write_wheel(
@@ -118,15 +125,7 @@ def test_hash_locked_acceptance_rejects_unreviewed_inactive_dependency(
         filename="orgmetra_keyverse_adapter-0.1.0-py3-none-any.whl",
         package_root="orgmetra_keyverse_adapter",
         dist_info_root="orgmetra_keyverse_adapter-0.1.0.dist-info",
-        metadata=(
-            "Metadata-Version: 2.4\n"
-            "Name: orgmetra-keyverse-adapter\n"
-            "Version: 0.1.0\n"
-            "Requires-Python: >=3.12\n"
-            "Provides-Extra: test\n"
-            "Requires-Dist: pytest>=8.3; extra == 'test'\n"
-            "Requires-Dist: pytest-cov>=5.0; extra == 'test'\n\n"
-        ),
+        metadata=_keyverse_metadata("test"),
         include_py_typed=False,
     )
     _write_wheel(
@@ -164,15 +163,7 @@ def test_hash_locked_acceptance_preserves_reviewed_optional_dependencies(
         filename="orgmetra_keyverse_adapter-0.1.0-py3-none-any.whl",
         package_root="orgmetra_keyverse_adapter",
         dist_info_root="orgmetra_keyverse_adapter-0.1.0.dist-info",
-        metadata=(
-            "Metadata-Version: 2.4\n"
-            "Name: orgmetra-keyverse-adapter\n"
-            "Version: 0.1.0\n"
-            "Requires-Python: >=3.12\n"
-            "Provides-Extra: test\n"
-            "Requires-Dist: pytest>=8.3; extra == 'test'\n"
-            "Requires-Dist: pytest-cov>=5.0; extra == 'test'\n\n"
-        ),
+        metadata=_keyverse_metadata("test"),
         include_py_typed=False,
     )
     _write_wheel(
@@ -203,6 +194,53 @@ def test_hash_locked_acceptance_preserves_reviewed_optional_dependencies(
     }
 
 
+@pytest.mark.parametrize(
+    "provides_extra_lines",
+    [
+        (),
+        ("testing",),
+        ("test", "test"),
+    ],
+    ids=("missing", "different-name", "duplicate"),
+)
+def test_hash_locked_acceptance_rejects_optional_extra_ledger_drift(
+    tmp_path: Path,
+    provides_extra_lines: tuple[str, ...],
+) -> None:
+    """Extra-gated requirements cannot substitute for the reviewed Provides-Extra ledger."""
+    wheelhouse = tmp_path / "wheelhouse"
+    wheelhouse.mkdir()
+    _write_wheel(
+        wheelhouse,
+        filename="orgmetra_keyverse_adapter-0.1.0-py3-none-any.whl",
+        package_root="orgmetra_keyverse_adapter",
+        dist_info_root="orgmetra_keyverse_adapter-0.1.0.dist-info",
+        metadata=_keyverse_metadata(*provides_extra_lines),
+        include_py_typed=False,
+    )
+    _write_wheel(
+        wheelhouse,
+        filename="orgmetra_workforce_validation_api-0.1.0-py3-none-any.whl",
+        package_root="orgmetra_workforce_validation_api",
+        dist_info_root="orgmetra_workforce_validation_api-0.1.0.dist-info",
+        metadata=(
+            "Metadata-Version: 2.4\n"
+            "Name: orgmetra-workforce-validation-api\n"
+            "Version: 0.1.0\n"
+            "Requires-Python: >=3.12\n"
+            "Requires-Dist: orgmetra-keyverse-adapter==0.1.0\n\n"
+        ),
+        include_py_typed=True,
+    )
+
+    with pytest.raises(AssertionError, match="METADATA extras"):
+        _CONTRACT._locked_wheel_requirements(
+            wheelhouse,
+            service_version="0.1.0",
+            keyverse_version="0.1.0",
+        )
+
+
 def test_hash_locked_acceptance_rejects_wheel_with_invalid_record_hash(
     tmp_path: Path,
 ) -> None:
@@ -214,15 +252,7 @@ def test_hash_locked_acceptance_rejects_wheel_with_invalid_record_hash(
         filename="orgmetra_keyverse_adapter-0.1.0-py3-none-any.whl",
         package_root="orgmetra_keyverse_adapter",
         dist_info_root="orgmetra_keyverse_adapter-0.1.0.dist-info",
-        metadata=(
-            "Metadata-Version: 2.4\n"
-            "Name: orgmetra-keyverse-adapter\n"
-            "Version: 0.1.0\n"
-            "Requires-Python: >=3.12\n"
-            "Provides-Extra: test\n"
-            "Requires-Dist: pytest>=8.3; extra == 'test'\n"
-            "Requires-Dist: pytest-cov>=5.0; extra == 'test'\n\n"
-        ),
+        metadata=_keyverse_metadata("test"),
         include_py_typed=False,
     )
     _write_wheel(
