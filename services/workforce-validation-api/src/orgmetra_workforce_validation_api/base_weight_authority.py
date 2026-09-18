@@ -61,6 +61,7 @@ _READ_FIELDS = frozenset(
         "owner_contract_digest",
         "owner_contract_released_at",
         "released_at",
+        "superseded_at",
     }
 )
 
@@ -114,6 +115,7 @@ class BaseWeightAuthorityRecord(tuple):
         owner_contract_digest: str,
         owner_contract_released_at: datetime,
         released_at: datetime,
+        superseded_at: datetime | None = None,
     ) -> BaseWeightAuthorityRecord:
         """Validate the minimum released provenance needed to reproduce a base weight."""
         tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
@@ -193,6 +195,11 @@ class BaseWeightAuthorityRecord(tuple):
             raise ValueError(
                 "owner contract must be released no later than base-weight evidence receipt."
             )
+        cutover = None
+        if superseded_at is not None:
+            cutover = _require_aware_datetime("superseded_at", superseded_at)
+            if cutover <= release_instant:
+                raise ValueError("superseded_at must be later than released_at.")
 
         fields: tuple[tuple[str, object], ...] = (
             ("base_weight_artifact_digest", artifact_digest),
@@ -218,7 +225,9 @@ class BaseWeightAuthorityRecord(tuple):
             ("source_universe_receipt_version", source_version),
             ("source_universe_released_at", source_released),
         )
-        return tuple.__new__(cls, (tenant_identity, study_identity, fields, release_instant))
+        return tuple.__new__(
+            cls, (tenant_identity, study_identity, fields, release_instant, cutover)
+        )
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -239,6 +248,11 @@ class BaseWeightAuthorityRecord(tuple):
     def released_at(self) -> datetime:
         """Return when the base-weight evidence became released authority."""
         return self[3]
+
+    @property
+    def superseded_at(self) -> datetime | None:
+        """Return the exclusive end of this base-weight receipt's authority interval."""
+        return self[4]
 
 
 class BaseWeightAuthorityView(tuple):
@@ -379,6 +393,7 @@ def resolve_base_weight_authority(
         owner_contract_digest=owner_contract_digest,
         owner_contract_released_at=constructed_at,
         released_at=constructed_at,
+        superseded_at=None,
     )
     tenant_id = requested.tenant_record_id
     study_id = requested.validity_study_id
@@ -461,6 +476,7 @@ def resolve_base_weight_authority(
         tenant_record_id=persisted.tenant_record_id,
         validity_study_id=persisted.validity_study_id,
         released_at=persisted.released_at,
+        superseded_at=persisted.superseded_at,
         **dict(persisted.fields),
     )
     record_values = dict(record.fields)
@@ -487,9 +503,14 @@ def resolve_base_weight_authority(
         raise BaseWeightAuthorityIntegrityError(
             "base-weight authority cannot be used before its release instant"
         )
+    if record.superseded_at is not None and use_instant >= record.superseded_at:
+        raise BaseWeightAuthorityIntegrityError(
+            "base-weight authority is superseded for this scientific-use instant"
+        )
 
     values = dict(record.fields)
     values["released_at"] = record.released_at
+    values["superseded_at"] = record.superseded_at
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
     return tuple.__new__(
         BaseWeightAuthorityView,
