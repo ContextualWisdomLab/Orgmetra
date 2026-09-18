@@ -179,12 +179,12 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord(tuple):
             )
         else:
             cutover = _require_aware_datetime("superseded_at", superseded_at)
+            if cutover <= predecessor.released_at:
+                raise ValueError("superseded_at must be later than predecessor release.")
             if ordinary_cutover is None or cutover != ordinary_cutover:
                 raise ValueError(
                     "v2 supersession must equal the ordinary predecessor cutover."
                 )
-            if cutover <= predecessor.released_at:
-                raise ValueError("superseded_at must be later than predecessor release.")
             target_result_reference = _require_reference(
                 "successor_target_result_reference",
                 successor_target_result_reference,
