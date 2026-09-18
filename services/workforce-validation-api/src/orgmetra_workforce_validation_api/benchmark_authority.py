@@ -487,30 +487,40 @@ def resolve_calibration_benchmark_authority(
             "owner port returned non-canonical calibration benchmark evidence"
         )
 
-    record = CalibrationBenchmarkAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        benchmark_receipt_reference=persisted.benchmark_receipt_reference,
-        benchmark_receipt_version=persisted.benchmark_receipt_version,
-        benchmark_receipt_digest=persisted.benchmark_receipt_digest,
-        benchmark_owner_contract_reference=persisted.benchmark_owner_contract_reference,
-        benchmark_owner_contract_version=persisted.benchmark_owner_contract_version,
-        benchmark_owner_contract_digest=persisted.benchmark_owner_contract_digest,
-        benchmark_reference_at=persisted.benchmark_reference_at,
-        benchmark_receipt_released_at=persisted.benchmark_receipt_released_at,
-        owner_contract_released_at=persisted.owner_contract_released_at,
-        benchmark_receipt_superseded_at=persisted.benchmark_receipt_superseded_at,
-        successor_benchmark_receipt_reference=(
-            persisted.successor_benchmark_receipt_reference
-        ),
-        successor_benchmark_receipt_version=(
-            persisted.successor_benchmark_receipt_version
-        ),
-        successor_benchmark_receipt_digest=persisted.successor_benchmark_receipt_digest,
-        successor_benchmark_receipt_released_at=(
-            persisted.successor_benchmark_receipt_released_at
-        ),
-    )
+    try:
+        record = CalibrationBenchmarkAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            benchmark_receipt_reference=persisted.benchmark_receipt_reference,
+            benchmark_receipt_version=persisted.benchmark_receipt_version,
+            benchmark_receipt_digest=persisted.benchmark_receipt_digest,
+            benchmark_owner_contract_reference=persisted.benchmark_owner_contract_reference,
+            benchmark_owner_contract_version=persisted.benchmark_owner_contract_version,
+            benchmark_owner_contract_digest=persisted.benchmark_owner_contract_digest,
+            benchmark_reference_at=persisted.benchmark_reference_at,
+            benchmark_receipt_released_at=persisted.benchmark_receipt_released_at,
+            owner_contract_released_at=persisted.owner_contract_released_at,
+            benchmark_receipt_superseded_at=persisted.benchmark_receipt_superseded_at,
+            successor_benchmark_receipt_reference=(
+                persisted.successor_benchmark_receipt_reference
+            ),
+            successor_benchmark_receipt_version=(
+                persisted.successor_benchmark_receipt_version
+            ),
+            successor_benchmark_receipt_digest=persisted.successor_benchmark_receipt_digest,
+            successor_benchmark_receipt_released_at=(
+                persisted.successor_benchmark_receipt_released_at
+            ),
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise CalibrationBenchmarkAuthorityIntegrityError(
+            "owner port returned malformed calibration benchmark evidence"
+        ) from exc
+    if record != persisted:
+        raise CalibrationBenchmarkAuthorityIntegrityError(
+            "owner port returned non-canonical calibration benchmark structure"
+        )
+
     expected = (
         tenant_id,
         study_id,
