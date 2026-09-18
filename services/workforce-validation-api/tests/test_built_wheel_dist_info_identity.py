@@ -85,15 +85,15 @@ def _validate_distribution_acceptance(
     service_version: str,
     keyverse_version: str,
 ) -> tuple[str, dict[str, Path]]:
-    """Run the existing wheel lock contract plus exact dist-info directory identity binding."""
-    locked_requirements, wheels_by_name = _CONTRACT._locked_wheel_requirements(
+    """Bind dist-info identity before the existing validator computes the install lock."""
+    wheel_paths = tuple(sorted(wheelhouse.glob("*.whl")))
+    for wheel_path in wheel_paths:
+        _assert_dist_info_identity(wheel_path)
+    return _CONTRACT._locked_wheel_requirements(
         wheelhouse,
         service_version=service_version,
         keyverse_version=keyverse_version,
     )
-    for wheel_path in wheels_by_name.values():
-        _assert_dist_info_identity(wheel_path)
-    return locked_requirements, wheels_by_name
 
 
 def test_hash_locked_acceptance_rejects_mismatched_dist_info_identity(tmp_path: Path) -> None:
