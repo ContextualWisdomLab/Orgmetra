@@ -130,11 +130,23 @@ def _record(**overrides: object) -> ValidationResultNonVerifiabilitySupersession
         "owner_contract_released_at": OWNER_CONTRACT_RELEASED_AT,
         "released_at": RELEASED_AT,
         "superseded_at": None,
+        "successor_target_result_reference": None,
+        "successor_target_result_digest": None,
         "successor_verification_attempt_reference": None,
         "successor_verification_attempt_digest": None,
         "successor_verification_attempt_released_at": None,
     }
     values.update(overrides)
+    if (
+        "successor_target_result_reference" not in overrides
+        and values["successor_verification_attempt_reference"] is not None
+    ):
+        values["successor_target_result_reference"] = values["result_reference"]
+    if (
+        "successor_target_result_digest" not in overrides
+        and values["successor_verification_attempt_reference"] is not None
+    ):
+        values["successor_target_result_digest"] = values["result_digest"]
     return ValidationResultNonVerifiabilitySupersessionAuthorityRecord(**values)
 
 
