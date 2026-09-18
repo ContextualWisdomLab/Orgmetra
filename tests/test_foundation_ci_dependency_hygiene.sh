@@ -6,6 +6,10 @@ workflow_path="${repository_root}/.github/workflows/foundation-ci.yml"
 requirements_path="${repository_root}/.github/requirements/foundation-test.txt"
 
 expected_install="python -m pip install --require-hashes --no-deps --only-binary=:all: -r .github/requirements/foundation-test.txt"
+expected_keyverse_wheel="python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-wheelhouse packages/keyverse-adapter"
+expected_workforce_wheel="python -m pip wheel --no-deps --no-build-isolation --wheel-dir /tmp/orgmetra-wheelhouse services/workforce-validation-api"
+expected_distribution_install="/tmp/orgmetra-install-venv/bin/python -m pip install --no-index --find-links=/tmp/orgmetra-wheelhouse orgmetra-workforce-validation-api==0.1.0"
+expected_distribution_check="/tmp/orgmetra-install-venv/bin/python -m pip check"
 expected_default_pr_target=$'  pull_request:\n    branches:\n      - develop\n'
 expected_pythonpaths=(
   "packages/candidate-evidence/src"
@@ -22,14 +26,25 @@ expected_pythonpaths=(
 )
 
 if ! grep -Fq -- "${expected_install}" "${workflow_path}"; then
-  printf 'Foundation CI must install only the hash-locked test toolchain.\n' >&2
+  printf 'Foundation CI must install only the hash-locked test/build toolchain.\n' >&2
   exit 1
 fi
 
 if grep -Eq -- 'python -m pip install .*packages/' "${workflow_path}"; then
-  printf 'Foundation CI must not build/install repository-local packages into the checkout.\n' >&2
+  printf 'Foundation CI must not install repository-local source trees into the checkout interpreter.\n' >&2
   exit 1
 fi
+
+for expected_distribution_command in \
+  "${expected_keyverse_wheel}" \
+  "${expected_workforce_wheel}" \
+  "${expected_distribution_install}" \
+  "${expected_distribution_check}"; do
+  if ! grep -Fq -- "${expected_distribution_command}" "${workflow_path}"; then
+    printf 'Foundation CI must prove the built Workforce Validation distribution closure: %s\n' "${expected_distribution_command}" >&2
+    exit 1
+  fi
+done
 
 for expected_pythonpath in "${expected_pythonpaths[@]}"; do
   if ! grep -Fq -- "PYTHONPATH=${expected_pythonpath} COVERAGE_FILE=" "${workflow_path}"; then
@@ -73,8 +88,8 @@ if [[ ! -f "${requirements_path}" ]]; then
 fi
 
 mapfile -t package_lines < <(grep -Ev '^[[:space:]]*(#|$)' "${requirements_path}")
-if [[ "${#package_lines[@]}" -ne 7 ]]; then
-  printf 'Foundation CI requirements must contain the seven reviewed direct/runtime test packages.\n' >&2
+if [[ "${#package_lines[@]}" -ne 8 ]]; then
+  printf 'Foundation CI requirements must contain the eight reviewed test/build packages.\n' >&2
   exit 1
 fi
 
@@ -85,7 +100,7 @@ for package_line in "${package_lines[@]}"; do
   fi
 done
 
-for package_name in coverage iniconfig packaging pluggy Pygments pytest pytest-cov; do
+for package_name in coverage iniconfig packaging pluggy Pygments pytest pytest-cov setuptools; do
   if ! printf '%s\n' "${package_lines[@]}" | grep -Eq "^${package_name}=="; then
     printf 'Foundation CI requirement is missing: %s\n' "${package_name}" >&2
     exit 1
