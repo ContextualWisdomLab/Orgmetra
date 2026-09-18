@@ -196,9 +196,11 @@ def _validate_wheel_contents(
     wheel_path: Path,
     *,
     package_root: str,
+    expected_name: str,
+    expected_version: str,
     require_py_typed: bool,
 ) -> None:
-    """Reject repository leakage, sibling source, or missing declared package data."""
+    """Reject repository leakage, foreign dist-info identity, or missing package data."""
     with zipfile.ZipFile(wheel_path) as archive:
         names = tuple(archive.namelist())
 
@@ -221,6 +223,14 @@ def _validate_wheel_contents(
 
     assert len(dist_info_roots) == 1, (
         f"{wheel_path.name} must contain exactly one .dist-info root"
+    )
+    expected_dist_info_root = (
+        f"{canonicalize_name(expected_name).replace('-', '_')}-"
+        f"{Version(expected_version)}.dist-info"
+    )
+    assert dist_info_roots == {expected_dist_info_root}, (
+        f"{wheel_path.name} dist-info identity must be {expected_dist_info_root}, "
+        f"observed {sorted(dist_info_roots)}"
     )
     allowed_top_levels = {package_root, *dist_info_roots}
     assert top_levels <= allowed_top_levels, (
@@ -409,21 +419,24 @@ def _locked_wheel_requirements(
             project,
             owner=canonical_name,
         )
+        expected_name = (
+            _SERVICE_NAME
+            if canonical_name == canonicalize_name(_SERVICE_NAME)
+            else _KEYVERSE_NAME
+        )
         _validate_wheel_record(wheel_path)
-        wheels_by_name[canonical_name] = wheel_path
-        hashes_by_name[canonical_name] = _sha256(wheel_path)
         _validate_wheel_contents(
             wheel_path,
             package_root=package_roots[canonical_name],
+            expected_name=expected_name,
+            expected_version=str(expected_versions[canonical_name]),
             require_py_typed=canonical_name == canonicalize_name(_SERVICE_NAME),
         )
+        wheels_by_name[canonical_name] = wheel_path
+        hashes_by_name[canonical_name] = _sha256(wheel_path)
         _validate_wheel_metadata(
             wheel_path,
-            expected_name=(
-                _SERVICE_NAME
-                if canonical_name == canonicalize_name(_SERVICE_NAME)
-                else _KEYVERSE_NAME
-            ),
+            expected_name=expected_name,
             expected_version=str(expected_versions[canonical_name]),
             expected_requires_python=requires_python,
             expected_dependencies=reviewed_dependencies,
