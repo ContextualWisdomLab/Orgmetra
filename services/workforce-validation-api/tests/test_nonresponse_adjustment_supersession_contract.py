@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from orgmetra_workforce_validation_api.nonresponse_adjustment_authority import (
+    NonresponseAdjustmentAuthorityReadPort,
     NonresponseAdjustmentAuthorityRecord,
 )
 from orgmetra_workforce_validation_api.nonresponse_adjustment_supersession_authority import (
@@ -48,7 +49,13 @@ def _supersession_record(**overrides: object) -> NonresponseAdjustmentSupersessi
 def test_ordinary_nonresponse_authority_keeps_cutover_owner_resolved() -> None:
     """Ordinary currentness accepts a cutover but never makes it a lookup coordinate."""
     record_parameters = signature(NonresponseAdjustmentAuthorityRecord).parameters
+    read_parameters = signature(
+        NonresponseAdjustmentAuthorityReadPort.read_nonresponse_adjustment_authority
+    ).parameters
     assert "superseded_at" in record_parameters
+    assert "superseded_at" not in read_parameters
+    assert "owner_contract_released_at" not in read_parameters
+    assert "released_at" not in read_parameters
 
 
 def test_nonresponse_supersession_requires_atomic_successor_release() -> None:
@@ -60,6 +67,12 @@ def test_nonresponse_supersession_requires_atomic_successor_release() -> None:
         )
 
 
+def test_nonresponse_supersession_requires_complete_successor_coordinates() -> None:
+    """A cutover without a complete released successor is not correction authority."""
+    with pytest.raises(ValueError, match="complete released successor"):
+        _supersession_record(successor_released_at=None)
+
+
 def test_nonresponse_supersession_requires_new_immutable_evidence() -> None:
     """A predecessor cannot supersede itself or reuse its evidence digest."""
     with pytest.raises(ValueError, match="new reference"):
@@ -68,3 +81,9 @@ def test_nonresponse_supersession_requires_new_immutable_evidence() -> None:
         )
     with pytest.raises(ValueError, match="new evidence"):
         _supersession_record(successor_nonresponse_receipt_digest="a" * 64)
+
+
+def test_nonresponse_supersession_rejects_naive_cutover() -> None:
+    """Correction chronology must remain timezone-aware owner evidence."""
+    with pytest.raises(ValueError, match="timezone-aware"):
+        _supersession_record(superseded_at=datetime(2026, 9, 18, 1, 10))
