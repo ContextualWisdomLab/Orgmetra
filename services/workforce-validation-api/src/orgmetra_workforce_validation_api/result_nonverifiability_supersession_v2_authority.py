@@ -34,25 +34,52 @@ _OPERATION = "read"
 _VERSION = 2
 _READ_FIELDS = frozenset(
     {
-        "result_reference", "result_digest", "failed_evidence_kind", "failure_mode",
-        "failed_evidence_reference", "failed_evidence_digest", "failed_evidence_released_at",
-        "verification_attempt_reference", "verification_attempt_digest",
-        "verification_attempt_released_at", "evidence_version", "owner_contract_reference",
-        "owner_contract_version", "owner_contract_digest", "owner_contract_released_at",
-        "released_at", "superseded_at", "successor_target_result_reference",
-        "successor_target_result_digest", "successor_failed_evidence_kind",
-        "successor_target_failed_evidence_reference", "successor_target_failed_evidence_digest",
-        "successor_target_failed_evidence_released_at", "successor_verification_attempt_reference",
-        "successor_verification_attempt_digest", "successor_verification_attempt_released_at",
+        "result_reference",
+        "result_digest",
+        "failed_evidence_kind",
+        "failure_mode",
+        "failed_evidence_reference",
+        "failed_evidence_digest",
+        "failed_evidence_released_at",
+        "verification_attempt_reference",
+        "verification_attempt_digest",
+        "verification_attempt_released_at",
+        "evidence_version",
+        "owner_contract_reference",
+        "owner_contract_version",
+        "owner_contract_digest",
+        "owner_contract_released_at",
+        "released_at",
+        "superseded_at",
+        "successor_target_result_reference",
+        "successor_target_result_digest",
+        "successor_failed_evidence_kind",
+        "successor_target_failed_evidence_reference",
+        "successor_target_failed_evidence_digest",
+        "successor_target_failed_evidence_released_at",
+        "successor_verification_attempt_reference",
+        "successor_verification_attempt_digest",
+        "successor_verification_attempt_released_at",
     }
 )
 _VIEW_FIELDS = frozenset(
     {
-        "result_reference", "result_digest", "failed_evidence_kind", "failure_mode",
-        "failed_evidence_reference", "failed_evidence_digest", "failed_evidence_released_at",
-        "verification_attempt_reference", "verification_attempt_digest",
-        "verification_attempt_released_at", "evidence_version", "owner_contract_reference",
-        "owner_contract_version", "owner_contract_digest", "owner_contract_released_at", "released_at",
+        "result_reference",
+        "result_digest",
+        "failed_evidence_kind",
+        "failure_mode",
+        "failed_evidence_reference",
+        "failed_evidence_digest",
+        "failed_evidence_released_at",
+        "verification_attempt_reference",
+        "verification_attempt_digest",
+        "verification_attempt_released_at",
+        "evidence_version",
+        "owner_contract_reference",
+        "owner_contract_version",
+        "owner_contract_digest",
+        "owner_contract_released_at",
+        "released_at",
     }
 )
 
@@ -121,16 +148,28 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord(tuple):
         failed_digest = predecessor.failed_evidence_digest
         failed_release = predecessor.failed_evidence_released_at
         if failed_reference is None or failed_digest is None or failed_release is None:
-            raise ValueError("non_reproducible predecessor must retain exact failed-artifact evidence.")
+            raise ValueError(
+                "non_reproducible predecessor must retain exact failed-artifact evidence."
+            )
 
         successor_values = (
-            superseded_at, successor_target_result_reference, successor_target_result_digest,
-            successor_failed_evidence_kind, successor_target_failed_evidence_reference,
-            successor_target_failed_evidence_digest, successor_target_failed_evidence_released_at,
-            successor_verification_attempt_reference, successor_verification_attempt_digest,
+            superseded_at,
+            successor_target_result_reference,
+            successor_target_result_digest,
+            successor_failed_evidence_kind,
+            successor_target_failed_evidence_reference,
+            successor_target_failed_evidence_digest,
+            successor_target_failed_evidence_released_at,
+            successor_verification_attempt_reference,
+            successor_verification_attempt_digest,
             successor_verification_attempt_released_at,
         )
+        ordinary_cutover = predecessor.superseded_at
         if all(value is None for value in successor_values):
+            if ordinary_cutover is not None:
+                raise ValueError(
+                    "v2 correction coordinates must match the ordinary predecessor cutover."
+                )
             cutover = None
             successor_fields = None
         elif any(value is None for value in successor_values):
@@ -140,10 +179,15 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord(tuple):
             )
         else:
             cutover = _require_aware_datetime("superseded_at", superseded_at)
+            if ordinary_cutover is None or cutover != ordinary_cutover:
+                raise ValueError(
+                    "v2 supersession must equal the ordinary predecessor cutover."
+                )
             if cutover <= predecessor.released_at:
                 raise ValueError("superseded_at must be later than predecessor release.")
             target_result_reference = _require_reference(
-                "successor_target_result_reference", successor_target_result_reference,
+                "successor_target_result_reference",
+                successor_target_result_reference,
                 "validation_analysis_result",
             )
             target_result_digest = _require_digest(
@@ -151,22 +195,26 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord(tuple):
             )
             target_kind = _require_failed_evidence_kind(successor_failed_evidence_kind)
             target_failed_reference = _require_reference(
-                "successor_target_failed_evidence_reference", successor_target_failed_evidence_reference,
+                "successor_target_failed_evidence_reference",
+                successor_target_failed_evidence_reference,
                 _FAILED_REFERENCE_KIND_BY_EVIDENCE_KIND[predecessor.failed_evidence_kind],
             )
             target_failed_digest = _require_digest(
-                "successor_target_failed_evidence_digest", successor_target_failed_evidence_digest
+                "successor_target_failed_evidence_digest",
+                successor_target_failed_evidence_digest,
             )
             target_failed_release = _require_aware_datetime(
                 "successor_target_failed_evidence_released_at",
                 successor_target_failed_evidence_released_at,
             )
             successor_reference = _require_reference(
-                "successor_verification_attempt_reference", successor_verification_attempt_reference,
+                "successor_verification_attempt_reference",
+                successor_verification_attempt_reference,
                 "validation_evidence_verification_attempt",
             )
             successor_digest = _require_digest(
-                "successor_verification_attempt_digest", successor_verification_attempt_digest
+                "successor_verification_attempt_digest",
+                successor_verification_attempt_digest,
             )
             successor_release = _require_aware_datetime(
                 "successor_verification_attempt_released_at",
@@ -178,22 +226,32 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord(tuple):
             ):
                 raise ValueError("successor attempt must target the exact predecessor result.")
             if target_kind != predecessor.failed_evidence_kind:
-                raise ValueError("successor attempt must re-evaluate the same failed-evidence family.")
+                raise ValueError(
+                    "successor attempt must re-evaluate the same failed-evidence family."
+                )
             if (
                 target_failed_reference != failed_reference
                 or target_failed_digest != failed_digest
                 or target_failed_release != failed_release
             ):
-                raise ValueError("successor attempt must target the exact failed artifact and release chronology.")
+                raise ValueError(
+                    "successor attempt must target the exact failed artifact and release chronology."
+                )
             if successor_reference == predecessor.verification_attempt_reference:
                 raise ValueError("successor verification attempt must use a new reference.")
             if successor_digest in {
-                predecessor.result_digest, failed_digest, predecessor.verification_attempt_digest,
+                predecessor.result_digest,
+                failed_digest,
+                predecessor.verification_attempt_digest,
                 predecessor.owner_contract_digest,
             }:
-                raise ValueError("successor verification attempt must identify new evidence.")
+                raise ValueError(
+                    "successor verification attempt must identify new evidence."
+                )
             if successor_release != cutover:
-                raise ValueError("successor verification attempt must be released exactly at supersession.")
+                raise ValueError(
+                    "successor verification attempt must be released exactly at supersession."
+                )
             successor_fields = (
                 ("successor_failed_evidence_kind", target_kind),
                 ("successor_target_failed_evidence_digest", target_failed_digest),
@@ -244,7 +302,10 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityView(tuple):
     __slots__ = ()
 
     def __new__(
-        cls, *, tenant_record_id: UUID, validity_study_id: UUID,
+        cls,
+        *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
         fields: tuple[tuple[str, object], ...],
     ) -> ValidationResultNonVerifiabilitySupersessionV2AuthorityView:
         """Reject public construction so only the resolver can issue an authorized view."""
@@ -274,10 +335,19 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityReadPort(Protocol):
     """Read exact-artifact supersession evidence through the workforce-validation ACL."""
 
     def read_validation_result_nonverifiability_supersession_v2_authority(
-        self, *, tenant_record_id: UUID, validity_study_id: UUID, result_reference: str,
-        result_digest: str, failed_evidence_kind: str, verification_attempt_reference: str,
-        verification_attempt_digest: str, evidence_version: int, owner_contract_reference: str,
-        owner_contract_version: int, owner_contract_digest: str,
+        self,
+        *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        result_reference: str,
+        result_digest: str,
+        failed_evidence_kind: str,
+        verification_attempt_reference: str,
+        verification_attempt_digest: str,
+        evidence_version: int,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        owner_contract_digest: str,
     ) -> ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord | None:
         """Return one released v2 correction record or ``None``."""
         ...
@@ -290,11 +360,22 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 
 
 def resolve_validation_result_nonverifiability_supersession_v2_authority(
-    *, principal: ValidationPrincipal, tenant_record_id: UUID, validity_study_id: UUID,
-    result_reference: str, result_digest: str, failed_evidence_kind: str,
-    verification_attempt_reference: str, verification_attempt_digest: str, evidence_version: int,
-    owner_contract_reference: str, owner_contract_version: int, owner_contract_digest: str,
-    used_at: datetime, purpose_code: str, policy: PurposeBoundAccessPolicy,
+    *,
+    principal: ValidationPrincipal,
+    tenant_record_id: UUID,
+    validity_study_id: UUID,
+    result_reference: str,
+    result_digest: str,
+    failed_evidence_kind: str,
+    verification_attempt_reference: str,
+    verification_attempt_digest: str,
+    evidence_version: int,
+    owner_contract_reference: str,
+    owner_contract_version: int,
+    owner_contract_digest: str,
+    used_at: datetime,
+    purpose_code: str,
+    policy: PurposeBoundAccessPolicy,
     read_port: ValidationResultNonVerifiabilitySupersessionV2AuthorityReadPort,
 ) -> ValidationResultNonVerifiabilitySupersessionV2AuthorityView:
     """Authorize then resolve one exact-artifact non-reproducible correction interval."""
@@ -303,7 +384,9 @@ def resolve_validation_result_nonverifiability_supersession_v2_authority(
     if type(policy) is not PurposeBoundAccessPolicy:
         raise TypeError("policy must be an exact PurposeBoundAccessPolicy.")
     read_capability = getattr_static(
-        type(read_port), "read_validation_result_nonverifiability_supersession_v2_authority", None
+        type(read_port),
+        "read_validation_result_nonverifiability_supersession_v2_authority",
+        None,
     )
     if type(read_capability) is not FunctionType or read_capability is _PROTOCOL_READ_CAPABILITY:
         raise TypeError(
@@ -315,50 +398,72 @@ def resolve_validation_result_nonverifiability_supersession_v2_authority(
         "tenant_record_id", _store_operational_uuid("tenant_record_id", tenant_record_id)
     )
     study_id = _restore_operational_uuid(
-        "validity_study_id", _store_operational_uuid("validity_study_id", validity_study_id)
+        "validity_study_id",
+        _store_operational_uuid("validity_study_id", validity_study_id),
     )
-    result_ref = _require_reference("result_reference", result_reference, "validation_analysis_result")
+    result_ref = _require_reference(
+        "result_reference", result_reference, "validation_analysis_result"
+    )
     result_evidence_digest = _require_digest("result_digest", result_digest)
     evidence_kind = _require_failed_evidence_kind(failed_evidence_kind)
     attempt_ref = _require_reference(
-        "verification_attempt_reference", verification_attempt_reference,
+        "verification_attempt_reference",
+        verification_attempt_reference,
         "validation_evidence_verification_attempt",
     )
-    attempt_digest = _require_digest("verification_attempt_digest", verification_attempt_digest)
+    attempt_digest = _require_digest(
+        "verification_attempt_digest", verification_attempt_digest
+    )
     version = _require_positive_integer("evidence_version", evidence_version)
     if version != _VERSION:
         raise ValueError("evidence_version must be 2 for exact-artifact supersession.")
     owner_ref = _require_reference(
         "owner_contract_reference", owner_contract_reference, "released_owner_contract"
     )
-    owner_version = _require_positive_integer("owner_contract_version", owner_contract_version)
+    owner_version = _require_positive_integer(
+        "owner_contract_version", owner_contract_version
+    )
     owner_digest = _require_digest("owner_contract_digest", owner_contract_digest)
     use_instant = _require_aware_datetime("used_at", used_at)
     purpose = _require_code("purpose_code", purpose_code)
     detached_principal = ValidationPrincipal(
-        tenant_record_id=principal.tenant_record_id, actor_reference=principal.actor_reference,
+        tenant_record_id=principal.tenant_record_id,
+        actor_reference=principal.actor_reference,
         granted_scope_codes=principal.granted_scope_codes,
     )
     require_purpose_bound_access(
         request=PurposeBoundAccessRequest(
-            tenant_record_id=tenant_id, actor_tenant_record_id=detached_principal.tenant_record_id,
-            resource_tenant_record_id=tenant_id, actor_reference=detached_principal.actor_reference,
-            resource_reference=f"{_RESOURCE_KIND}:{study_id}", purpose_code=purpose,
-            operation_code=_OPERATION, resource_kind=_RESOURCE_KIND, requested_fields=_READ_FIELDS,
+            tenant_record_id=tenant_id,
+            actor_tenant_record_id=detached_principal.tenant_record_id,
+            resource_tenant_record_id=tenant_id,
+            actor_reference=detached_principal.actor_reference,
+            resource_reference=f"{_RESOURCE_KIND}:{study_id}",
+            purpose_code=purpose,
+            operation_code=_OPERATION,
+            resource_kind=_RESOURCE_KIND,
+            requested_fields=_READ_FIELDS,
             granted_scope_codes=detached_principal.granted_scope_codes,
         ),
         policy=_detach_policy(policy),
     )
     persisted = read_capability(
-        read_port, tenant_record_id=tenant_id, validity_study_id=study_id,
-        result_reference=result_ref, result_digest=result_evidence_digest,
-        failed_evidence_kind=evidence_kind, verification_attempt_reference=attempt_ref,
-        verification_attempt_digest=attempt_digest, evidence_version=version,
-        owner_contract_reference=owner_ref, owner_contract_version=owner_version,
+        read_port,
+        tenant_record_id=tenant_id,
+        validity_study_id=study_id,
+        result_reference=result_ref,
+        result_digest=result_evidence_digest,
+        failed_evidence_kind=evidence_kind,
+        verification_attempt_reference=attempt_ref,
+        verification_attempt_digest=attempt_digest,
+        evidence_version=version,
+        owner_contract_reference=owner_ref,
+        owner_contract_version=owner_version,
         owner_contract_digest=owner_digest,
     )
     if persisted is None:
-        raise ValidationResultNonVerifiabilitySupersessionV2AuthorityNotFound(str(study_id))
+        raise ValidationResultNonVerifiabilitySupersessionV2AuthorityNotFound(
+            str(study_id)
+        )
     if type(persisted) is not ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord:
         raise ValidationResultNonVerifiabilitySupersessionV2AuthorityIntegrityError(
             "owner port returned non-canonical v2 non-verifiability supersession evidence"
@@ -377,9 +482,13 @@ def resolve_validation_result_nonverifiability_supersession_v2_authority(
         "verification_attempt_reference": attempt_ref,
     }
     if (
-        _store_operational_uuid("record tenant_record_id", predecessor.tenant_record_id)
+        _store_operational_uuid(
+            "record tenant_record_id", predecessor.tenant_record_id
+        )
         != _store_operational_uuid("requested tenant_record_id", tenant_id)
-        or _store_operational_uuid("record validity_study_id", predecessor.validity_study_id)
+        or _store_operational_uuid(
+            "record validity_study_id", predecessor.validity_study_id
+        )
         != _store_operational_uuid("requested validity_study_id", study_id)
         or any(values[name] != value for name, value in requested_values.items())
     ):
@@ -398,8 +507,11 @@ def resolve_validation_result_nonverifiability_supersession_v2_authority(
     fields = tuple((name, projection_values[name]) for name in sorted(_VIEW_FIELDS))
     return tuple.__new__(
         ValidationResultNonVerifiabilitySupersessionV2AuthorityView,
-        (_store_operational_uuid("tenant_record_id", tenant_id),
-         _store_operational_uuid("validity_study_id", study_id), fields),
+        (
+            _store_operational_uuid("tenant_record_id", tenant_id),
+            _store_operational_uuid("validity_study_id", study_id),
+            fields,
+        ),
     )
 
 
