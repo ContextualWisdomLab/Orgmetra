@@ -388,34 +388,61 @@ def resolve_base_weight_supersession_authority(
             "owner port returned non-canonical base-weight supersession evidence"
         )
 
-    successor_values = (
-        None if persisted.successor_fields is None else dict(persisted.successor_fields)
-    )
-    record = BaseWeightSupersessionAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-        successor_base_weight_evidence_receipt_reference=(
-            None
-            if successor_values is None
-            else successor_values["successor_base_weight_evidence_receipt_reference"]
-        ),
-        successor_base_weight_evidence_receipt_digest=(
-            None
-            if successor_values is None
-            else successor_values["successor_base_weight_evidence_receipt_digest"]
-        ),
-        successor_evidence_version=(
-            None
-            if successor_values is None
-            else successor_values["successor_evidence_version"]
-        ),
-        successor_released_at=(
-            None if successor_values is None else successor_values["successor_released_at"]
-        ),
-        **dict(persisted.fields),
-    )
+    try:
+        persisted_fields = dict(persisted.fields)
+        persisted_successor = (
+            None if persisted.successor_fields is None else dict(persisted.successor_fields)
+        )
+        record = BaseWeightSupersessionAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            base_weight_evidence_receipt_reference=persisted_fields[
+                "base_weight_evidence_receipt_reference"
+            ],
+            base_weight_evidence_receipt_digest=persisted_fields[
+                "base_weight_evidence_receipt_digest"
+            ],
+            evidence_version=persisted_fields["evidence_version"],
+            owner_contract_reference=persisted_fields["owner_contract_reference"],
+            owner_contract_version=persisted_fields["owner_contract_version"],
+            owner_contract_digest=persisted_fields["owner_contract_digest"],
+            owner_contract_released_at=persisted_fields["owner_contract_released_at"],
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+            successor_base_weight_evidence_receipt_reference=(
+                None
+                if persisted_successor is None
+                else persisted_successor[
+                    "successor_base_weight_evidence_receipt_reference"
+                ]
+            ),
+            successor_base_weight_evidence_receipt_digest=(
+                None
+                if persisted_successor is None
+                else persisted_successor[
+                    "successor_base_weight_evidence_receipt_digest"
+                ]
+            ),
+            successor_evidence_version=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_evidence_version"]
+            ),
+            successor_released_at=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_released_at"]
+            ),
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise BaseWeightSupersessionAuthorityIntegrityError(
+            "owner port returned malformed base-weight supersession evidence"
+        ) from exc
+    if record != persisted:
+        raise BaseWeightSupersessionAuthorityIntegrityError(
+            "owner port returned non-canonical base-weight supersession structure"
+        )
+
     record_values = dict(record.fields)
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
