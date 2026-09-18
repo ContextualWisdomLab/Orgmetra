@@ -165,6 +165,7 @@ class CalibrationAdjustmentReceipt:
     algorithm_reference: str
     algorithm_version: int
     constraints_digest: str
+    applied_constraints_digest: str
     termination_code: str
     input_weight_artifact_digest: str
     output_weight_artifact_digest: str
@@ -258,6 +259,7 @@ class CalibrationAdjustmentReceipt:
             "benchmark_receipt_digest",
             "benchmark_owner_contract_digest",
             "constraints_digest",
+            "applied_constraints_digest",
             "input_weight_artifact_digest",
             "output_weight_artifact_digest",
         ):
@@ -302,8 +304,13 @@ class CalibrationAdjustmentReceipt:
                 self.fallback_configuration_digest,
                 "fallback_configuration_digest",
             )
-        elif any(value is not None for value in fallback_fields):
-            raise ValueError("fallback evidence must be absent when calibration converged")
+        else:
+            if self.applied_constraints_digest != self.constraints_digest:
+                raise ValueError(
+                    "changed applied calibration constraints require explicit fallback provenance"
+                )
+            if any(value is not None for value in fallback_fields):
+                raise ValueError("fallback evidence must be absent when calibration converged")
         if self.input_weight_artifact_digest == self.output_weight_artifact_digest:
             raise ValueError(
                 "output_weight_artifact_digest must identify the calibrated weight artifact"
@@ -337,6 +344,7 @@ class CalibrationAdjustmentReceipt:
             "algorithm_reference": self.algorithm_reference,
             "algorithm_version": self.algorithm_version,
             "analysis_window_reference": self.analysis_window_reference,
+            "applied_constraints_digest": self.applied_constraints_digest,
             "auxiliary_authority_reference": self.auxiliary_authority_reference,
             "auxiliary_authorization_receipt_digest": self.auxiliary_authorization_receipt_digest,
             "auxiliary_authorization_receipt_reference": self.auxiliary_authorization_receipt_reference,
@@ -509,7 +517,7 @@ class WeightEligibilityReceipt:
         object.__setattr__(self, "constructed_at", constructed_at)
 
     def __repr__(self) -> str:
-        """Return a value-minimized representation for routine logs."""
+        """Return a value-minimized representation suitable for routine logs."""
         return "WeightEligibilityReceipt(<redacted>)"
 
     def canonical_json(self) -> str:
