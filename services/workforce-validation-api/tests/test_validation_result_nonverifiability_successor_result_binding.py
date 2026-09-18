@@ -50,6 +50,7 @@ def _record(
         superseded_at=CUTOVER,
         successor_target_result_reference=successor_target_result_reference,
         successor_target_result_digest=successor_target_result_digest,
+        successor_failed_evidence_kind="analysis_weight_receipt",
         successor_verification_attempt_reference=SUCCESSOR_ATTEMPT_REFERENCE,
         successor_verification_attempt_digest=SUCCESSOR_ATTEMPT_DIGEST,
         successor_verification_attempt_released_at=CUTOVER,
@@ -63,6 +64,7 @@ def test_successor_attempt_is_bound_to_the_exact_predecessor_result() -> None:
     successor = dict(record.successor_fields or ())
     assert successor["successor_target_result_reference"] == RESULT_REFERENCE
     assert successor["successor_target_result_digest"] == RESULT_DIGEST
+    assert successor["successor_failed_evidence_kind"] == "analysis_weight_receipt"
 
 
 @pytest.mark.parametrize(
