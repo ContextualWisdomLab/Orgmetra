@@ -363,29 +363,39 @@ def resolve_weight_variance_supersession_authority(
             "owner port returned non-canonical weight/variance supersession evidence"
         )
 
-    successor_values = (
-        None if persisted.successor_fields is None else dict(persisted.successor_fields)
-    )
-    record = WeightVarianceSupersessionAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-        successor_authority_reference=(
-            None
-            if successor_values is None
-            else successor_values["successor_authority_reference"]
-        ),
-        successor_evidence_version=(
-            None
-            if successor_values is None
-            else successor_values["successor_evidence_version"]
-        ),
-        successor_released_at=(
-            None if successor_values is None else successor_values["successor_released_at"]
-        ),
-        **dict(persisted.fields),
-    )
+    try:
+        successor_values = (
+            None if persisted.successor_fields is None else dict(persisted.successor_fields)
+        )
+        record = WeightVarianceSupersessionAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+            successor_authority_reference=(
+                None
+                if successor_values is None
+                else successor_values["successor_authority_reference"]
+            ),
+            successor_evidence_version=(
+                None
+                if successor_values is None
+                else successor_values["successor_evidence_version"]
+            ),
+            successor_released_at=(
+                None if successor_values is None else successor_values["successor_released_at"]
+            ),
+            **dict(persisted.fields),
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise WeightVarianceSupersessionAuthorityIntegrityError(
+            "owner port returned structurally invalid weight/variance supersession evidence"
+        ) from exc
+    if record != persisted:
+        raise WeightVarianceSupersessionAuthorityIntegrityError(
+            "owner port returned non-canonical weight/variance supersession structure"
+        )
+
     record_values = dict(record.fields)
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
