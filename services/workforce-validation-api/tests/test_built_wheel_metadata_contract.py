@@ -211,3 +211,26 @@ def test_hash_locked_acceptance_rejects_wheel_with_invalid_record_hash(
     service_wheel = wheelhouse / "orgmetra_workforce_validation_api-0.1.0-py3-none-any.whl"
     with pytest.raises(AssertionError, match="RECORD sha256 mismatch"):
         _validate_wheel_record(service_wheel)
+
+
+def test_record_rejects_normalization_alias_member_paths(tmp_path: Path) -> None:
+    """Raw-distinct ZIP paths that normalize to one install path must fail closed."""
+    wheel_path = tmp_path / "alias-0.1.0-py3-none-any.whl"
+    members = {
+        "alias/__init__.py": b"canonical",
+        "./alias/__init__.py": b"ambiguous",
+    }
+    record_path = "alias-0.1.0.dist-info/RECORD"
+    output = io.StringIO()
+    writer = csv.writer(output, lineterminator="\n")
+    for member_path, content in members.items():
+        writer.writerow((member_path, _record_hash(content), str(len(content))))
+    writer.writerow((record_path, "", ""))
+
+    with zipfile.ZipFile(wheel_path, "w") as archive:
+        for member_path, content in members.items():
+            archive.writestr(member_path, content)
+        archive.writestr(record_path, output.getvalue().encode("utf-8"))
+
+    with pytest.raises(AssertionError, match="non-canonical"):
+        _validate_wheel_record(wheel_path)
