@@ -53,6 +53,7 @@ READ_FIELDS = frozenset(
         "superseded_at",
         "successor_target_result_reference",
         "successor_target_result_digest",
+        "successor_failed_evidence_kind",
         "successor_verification_attempt_reference",
         "successor_verification_attempt_digest",
         "successor_verification_attempt_released_at",
@@ -134,6 +135,7 @@ def _record(**overrides: object) -> ValidationResultNonVerifiabilitySupersession
         "superseded_at": None,
         "successor_target_result_reference": None,
         "successor_target_result_digest": None,
+        "successor_failed_evidence_kind": None,
         "successor_verification_attempt_reference": None,
         "successor_verification_attempt_digest": None,
         "successor_verification_attempt_released_at": None,
@@ -149,6 +151,11 @@ def _record(**overrides: object) -> ValidationResultNonVerifiabilitySupersession
         and values["successor_verification_attempt_reference"] is not None
     ):
         values["successor_target_result_digest"] = values["result_digest"]
+    if (
+        "successor_failed_evidence_kind" not in overrides
+        and values["successor_verification_attempt_reference"] is not None
+    ):
+        values["successor_failed_evidence_kind"] = values["failed_evidence_kind"]
     return ValidationResultNonVerifiabilitySupersessionAuthorityRecord(**values)
 
 
@@ -198,6 +205,7 @@ def test_current_negative_outcome_resolves_without_successor_coordinates() -> No
     assert "superseded_at" not in fields
     assert "successor_verification_attempt_reference" not in fields
     assert "successor_target_result_reference" not in fields
+    assert "successor_failed_evidence_kind" not in fields
 
 
 def test_authorization_denial_happens_before_owner_resolution() -> None:
