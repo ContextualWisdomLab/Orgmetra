@@ -52,6 +52,7 @@ def calibration_receipt(**overrides: object) -> CalibrationAdjustmentReceipt:
         "algorithm_reference": "calibration_algorithm:77777777-7777-4777-8777-777777777777",
         "algorithm_version": 1,
         "constraints_digest": DIGEST_F,
+        "applied_constraints_digest": DIGEST_F,
         "termination_code": "fallback_applied",
         "fallback_reason_code": "primary_nonconvergence",
         "fallback_rule_reference": "calibration_fallback_rule:99999999-9999-4999-8999-999999999999",
@@ -67,9 +68,9 @@ def calibration_receipt(**overrides: object) -> CalibrationAdjustmentReceipt:
     return CalibrationAdjustmentReceipt(**values)
 
 
-def test_fallback_identifies_reason_rule_and_algorithm_that_produced_weights() -> None:
-    """Do not label fallback output as if the primary calibration algorithm succeeded."""
-    candidate = calibration_receipt()
+def test_fallback_identifies_reason_rule_algorithm_and_applied_constraints() -> None:
+    """Do not label fallback output as if the primary calibration specification succeeded."""
+    candidate = calibration_receipt(applied_constraints_digest=DIGEST_1)
     canonical = candidate.canonical_json()
 
     assert '"termination_code":"fallback_applied"' in canonical
@@ -78,6 +79,8 @@ def test_fallback_identifies_reason_rule_and_algorithm_that_produced_weights() -
     assert '"fallback_algorithm_version":2' in canonical
     assert f'"fallback_configuration_digest":"{DIGEST_4}"' in canonical
     assert f'"fallback_rule_digest":"{DIGEST_2}"' in canonical
+    assert f'"constraints_digest":"{DIGEST_F}"' in canonical
+    assert f'"applied_constraints_digest":"{DIGEST_1}"' in canonical
 
 
 @pytest.mark.parametrize(
@@ -110,6 +113,7 @@ def test_fallback_rejects_incomplete_actual_method_provenance(
         ("fallback_algorithm_version", 0, "fallback_algorithm_version"),
         ("fallback_algorithm_version", True, "fallback_algorithm_version"),
         ("fallback_configuration_digest", "not-a-digest", "fallback_configuration_digest"),
+        ("applied_constraints_digest", "not-a-digest", "applied_constraints_digest"),
     ],
 )
 def test_fallback_rejects_malformed_generating_method_provenance(
