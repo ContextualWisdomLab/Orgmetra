@@ -71,6 +71,8 @@ class _ReadPort:
         result_digest: str,
         failed_evidence_kind: str,
         failure_mode: str,
+        failed_evidence_reference: str | None,
+        failed_evidence_digest: str | None,
         verification_attempt_reference: str,
         verification_attempt_digest: str,
         owner_contract_reference: str,
