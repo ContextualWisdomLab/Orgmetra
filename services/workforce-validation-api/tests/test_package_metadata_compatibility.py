@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import base64
+import csv
 from email.parser import Parser
 import hashlib
 from importlib.metadata import version as installed_version
+import io
 import os
 from pathlib import Path, PurePosixPath
 import subprocess
@@ -97,6 +100,95 @@ def _sha256(path: Path) -> str:
     """Hash one built artifact before it becomes an installation candidate."""
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def _record_hash(content: bytes) -> str:
+    """Return the URL-safe unpadded sha256 representation required by wheel RECORD."""
+    digest = hashlib.sha256(content).digest()
+    encoded = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    return f"sha256={encoded}"
+
+
+def _canonical_wheel_member_path(member_path: str, *, wheel_name: str) -> str:
+    """Return one canonical relative POSIX wheel member path or fail closed."""
+    path = PurePosixPath(member_path)
+    assert path.parts and not path.is_absolute(), (
+        f"{wheel_name} contains an absolute or empty wheel member path"
+    )
+    assert ".." not in path.parts and "\\" not in member_path, (
+        f"{wheel_name} contains a non-canonical wheel member path"
+    )
+    canonical = path.as_posix()
+    assert member_path == canonical, (
+        f"{wheel_name} contains a non-canonical wheel member path"
+    )
+    return canonical
+
+
+def _validate_wheel_record(wheel_path: Path) -> None:
+    """Verify canonical member identity and the complete wheel installation RECORD."""
+    with zipfile.ZipFile(wheel_path) as archive:
+        infos = tuple(info for info in archive.infolist() if not info.is_dir())
+        archive_paths = [info.filename for info in infos]
+        assert len(archive_paths) == len(set(archive_paths)), (
+            f"{wheel_path.name} contains duplicate archive member paths"
+        )
+        canonical_archive_paths = [
+            _canonical_wheel_member_path(path, wheel_name=wheel_path.name)
+            for path in archive_paths
+        ]
+        assert len(canonical_archive_paths) == len(set(canonical_archive_paths)), (
+            f"{wheel_path.name} contains normalization-colliding archive member paths"
+        )
+        record_paths = [
+            path
+            for path in canonical_archive_paths
+            if len(PurePosixPath(path).parts) == 2
+            and PurePosixPath(path).parts[0].endswith(".dist-info")
+            and PurePosixPath(path).name == "RECORD"
+        ]
+        assert len(record_paths) == 1, (
+            f"{wheel_path.name} must contain exactly one dist-info RECORD"
+        )
+        record_path = record_paths[0]
+        record_text = archive.read(record_path).decode("utf-8")
+        rows = tuple(csv.reader(io.StringIO(record_text)))
+        assert rows, f"{wheel_path.name} RECORD must not be empty"
+
+        recorded: dict[str, tuple[str, str]] = {}
+        for row in rows:
+            assert len(row) == 3, f"{wheel_path.name} RECORD rows must have three columns"
+            member_path, member_hash, member_size = row
+            canonical_member_path = _canonical_wheel_member_path(
+                member_path,
+                wheel_name=wheel_path.name,
+            )
+            assert canonical_member_path not in recorded, (
+                f"{wheel_path.name} RECORD contains duplicate path {member_path}"
+            )
+            recorded[canonical_member_path] = (member_hash, member_size)
+
+        assert set(recorded) == set(canonical_archive_paths), (
+            f"{wheel_path.name} RECORD must cover every wheel member exactly once"
+        )
+        for info in infos:
+            canonical_info_path = _canonical_wheel_member_path(
+                info.filename,
+                wheel_name=wheel_path.name,
+            )
+            member_hash, member_size = recorded[canonical_info_path]
+            if canonical_info_path == record_path:
+                assert member_hash == "" and member_size == "", (
+                    f"{wheel_path.name} RECORD self-entry must leave hash and size empty"
+                )
+                continue
+            content = archive.read(info.filename)
+            assert member_hash == _record_hash(content), (
+                f"{wheel_path.name} RECORD sha256 mismatch for {info.filename}"
+            )
+            assert member_size == str(len(content)), (
+                f"{wheel_path.name} RECORD size mismatch for {info.filename}"
+            )
 
 
 def _validate_wheel_contents(
@@ -254,6 +346,7 @@ def _locked_wheel_requirements(
         assert isinstance(requires_python, str), (
             f"{canonical_name} project requires-python must be text"
         )
+        _validate_wheel_record(wheel_path)
         wheels_by_name[canonical_name] = wheel_path
         hashes_by_name[canonical_name] = _sha256(wheel_path)
         _validate_wheel_contents(
