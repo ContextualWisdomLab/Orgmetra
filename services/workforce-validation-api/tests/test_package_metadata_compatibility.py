@@ -13,6 +13,7 @@ from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.utils import canonicalize_name
 from packaging.version import Version
+import pytest
 
 
 _SERVICE_ROOT = Path(__file__).resolve().parents[1]
@@ -82,6 +83,37 @@ def _venv_python(venv_root: Path) -> Path:
     if os.name == "nt":
         return venv_root / "Scripts" / "python.exe"
     return venv_root / "bin" / "python"
+
+
+def test_subprocess_environment_blocks_ambient_package_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject inherited pip sources or configuration that could escape the wheelhouse."""
+    poisoned = {
+        "PYTHONPATH": "https://example.invalid/pythonpath",
+        "PYTHONHOME": "/tmp/example-python-home",
+        "PIP_FIND_LINKS": "https://example.invalid/find-links",
+        "PIP_INDEX_URL": "https://example.invalid/simple",
+        "PIP_EXTRA_INDEX_URL": "https://example.invalid/extra",
+        "PIP_CONFIG_FILE": "/tmp/example-pip.conf",
+        "PIP_TRUSTED_HOST": "example.invalid",
+    }
+    for name, value in poisoned.items():
+        monkeypatch.setenv(name, value)
+
+    environment = _subprocess_environment()
+
+    for name in (
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "PIP_FIND_LINKS",
+        "PIP_INDEX_URL",
+        "PIP_EXTRA_INDEX_URL",
+        "PIP_TRUSTED_HOST",
+    ):
+        assert name not in environment, f"ambient package source leaked through {name}"
+    assert environment["PIP_NO_INDEX"] == "1"
+    assert environment["PIP_CONFIG_FILE"] == os.devnull
 
 
 def test_service_python_floor_covers_mandatory_keyverse_dependency() -> None:
