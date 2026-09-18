@@ -77,6 +77,8 @@ class _ReadPort:
         result_digest: str,
         failed_evidence_kind: str,
         failure_mode: str,
+        failed_evidence_reference: str | None,
+        failed_evidence_digest: str | None,
         verification_attempt_reference: str,
         verification_attempt_digest: str,
         owner_contract_reference: str,
@@ -91,6 +93,8 @@ class _ReadPort:
                 result_digest,
                 failed_evidence_kind,
                 failure_mode,
+                failed_evidence_reference,
+                failed_evidence_digest,
                 verification_attempt_reference,
                 verification_attempt_digest,
                 owner_contract_reference,
@@ -161,6 +165,8 @@ def _resolve(
         "result_digest": RESULT_DIGEST,
         "failed_evidence_kind": "analysis_weight_receipt",
         "failure_mode": "missing",
+        "failed_evidence_reference": None,
+        "failed_evidence_digest": None,
         "verification_attempt_reference": ATTEMPT_REFERENCE,
         "verification_attempt_digest": ATTEMPT_DIGEST,
         "owner_contract_reference": OWNER_REFERENCE,
@@ -189,6 +195,8 @@ def test_missing_final_weight_evidence_is_released_as_not_verifiable() -> None:
             RESULT_DIGEST,
             "analysis_weight_receipt",
             "missing",
+            None,
+            None,
             ATTEMPT_REFERENCE,
             ATTEMPT_DIGEST,
             OWNER_REFERENCE,
@@ -221,12 +229,16 @@ def test_non_reproducible_weight_evidence_keeps_exact_failed_receipt() -> None:
         failed_evidence_digest=FAILED_WEIGHT_DIGEST,
         failed_evidence_released_at=FAILED_EVIDENCE_RELEASED_AT,
     )
+    port = _ReadPort(record)
 
     view = _resolve(
-        read_port=_ReadPort(record),
+        read_port=port,
         failure_mode="non_reproducible",
+        failed_evidence_reference=FAILED_WEIGHT_REFERENCE,
+        failed_evidence_digest=FAILED_WEIGHT_DIGEST,
     )
 
+    assert port.calls[0][6:8] == (FAILED_WEIGHT_REFERENCE, FAILED_WEIGHT_DIGEST)
     fields = dict(view.fields)
     assert fields["verification_status"] == "not_verifiable"
     assert fields["failed_evidence_reference"] == FAILED_WEIGHT_REFERENCE
@@ -263,6 +275,8 @@ def test_non_reproducible_evidence_kind_uses_its_typed_reference(
         read_port=_ReadPort(record),
         failed_evidence_kind=failed_evidence_kind,
         failure_mode="non_reproducible",
+        failed_evidence_reference=failed_reference,
+        failed_evidence_digest=FAILED_WEIGHT_DIGEST,
     )
     assert dict(view.fields)["failed_evidence_reference"] == failed_reference
 
@@ -283,6 +297,24 @@ def test_missing_and_non_reproducible_modes_fail_closed_on_incoherent_evidence()
             ),
             failed_evidence_digest=FAILED_WEIGHT_DIGEST,
             failed_evidence_released_at=FAILED_EVIDENCE_RELEASED_AT,
+        )
+    with pytest.raises(ValueError, match="required"):
+        _resolve(
+            read_port=_ReadPort(
+                _record(
+                    failure_mode="non_reproducible",
+                    failed_evidence_reference=FAILED_WEIGHT_REFERENCE,
+                    failed_evidence_digest=FAILED_WEIGHT_DIGEST,
+                    failed_evidence_released_at=FAILED_EVIDENCE_RELEASED_AT,
+                )
+            ),
+            failure_mode="non_reproducible",
+        )
+    with pytest.raises(ValueError, match="must be absent"):
+        _resolve(
+            read_port=_ReadPort(_record()),
+            failed_evidence_reference=FAILED_WEIGHT_REFERENCE,
+            failed_evidence_digest=FAILED_WEIGHT_DIGEST,
         )
 
 
@@ -326,6 +358,22 @@ def test_missing_noncanonical_or_mismatched_owner_outcome_fails_closed() -> None
         _resolve(read_port=_ReadPort(_record(result_digest="a" * 64)))
     with pytest.raises(ValidationResultNonVerifiabilityIntegrityError):
         _resolve(read_port=_ReadPort(_record(verification_attempt_digest="a" * 64)))
+
+    non_reproducible = _record(
+        failure_mode="non_reproducible",
+        failed_evidence_reference=FAILED_WEIGHT_REFERENCE,
+        failed_evidence_digest=FAILED_WEIGHT_DIGEST,
+        failed_evidence_released_at=FAILED_EVIDENCE_RELEASED_AT,
+    )
+    with pytest.raises(ValidationResultNonVerifiabilityIntegrityError):
+        _resolve(
+            read_port=_ReadPort(non_reproducible),
+            failure_mode="non_reproducible",
+            failed_evidence_reference=(
+                "analysis_weight_receipt:77777777-7777-4777-8777-777777777777"
+            ),
+            failed_evidence_digest="7" * 64,
+        )
 
 
 def test_invalid_dependencies_and_pre_release_use_fail_closed() -> None:
