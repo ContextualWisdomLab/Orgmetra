@@ -404,6 +404,8 @@ class ValidationResultNonVerifiabilityReadPort(Protocol):
         result_digest: str,
         failed_evidence_kind: str,
         failure_mode: str,
+        failed_evidence_reference: str | None,
+        failed_evidence_digest: str | None,
         verification_attempt_reference: str,
         verification_attempt_digest: str,
         owner_contract_reference: str,
@@ -429,6 +431,8 @@ def resolve_validation_result_nonverifiability(
     result_digest: str,
     failed_evidence_kind: str,
     failure_mode: str,
+    failed_evidence_reference: str | None = None,
+    failed_evidence_digest: str | None = None,
     verification_attempt_reference: str,
     verification_attempt_digest: str,
     owner_contract_reference: str,
@@ -471,6 +475,24 @@ def resolve_validation_result_nonverifiability(
     result_evidence_digest = _require_digest("result_digest", result_digest)
     evidence_kind = _require_failed_evidence_kind(failed_evidence_kind)
     mode = _require_failure_mode(failure_mode)
+    if mode == "missing":
+        if failed_evidence_reference is not None or failed_evidence_digest is not None:
+            raise ValueError(
+                "failed evidence reference and digest must be absent when evidence is missing."
+            )
+        failed_reference = None
+        failed_digest = None
+    else:
+        if failed_evidence_reference is None or failed_evidence_digest is None:
+            raise ValueError(
+                "failed evidence reference and digest are required for non_reproducible lookup."
+            )
+        failed_reference = _require_reference(
+            "failed_evidence_reference",
+            failed_evidence_reference,
+            _FAILED_REFERENCE_KIND_BY_EVIDENCE_KIND[evidence_kind],
+        )
+        failed_digest = _require_digest("failed_evidence_digest", failed_evidence_digest)
     attempt_ref = _require_reference(
         "verification_attempt_reference",
         verification_attempt_reference,
@@ -514,6 +536,8 @@ def resolve_validation_result_nonverifiability(
         result_digest=result_evidence_digest,
         failed_evidence_kind=evidence_kind,
         failure_mode=mode,
+        failed_evidence_reference=failed_reference,
+        failed_evidence_digest=failed_digest,
         verification_attempt_reference=attempt_ref,
         verification_attempt_digest=attempt_digest,
         owner_contract_reference=owner_ref,
@@ -555,6 +579,8 @@ def resolve_validation_result_nonverifiability(
         result_evidence_digest,
         evidence_kind,
         mode,
+        failed_reference,
+        failed_digest,
         attempt_ref,
         attempt_digest,
         owner_ref,
@@ -568,6 +594,8 @@ def resolve_validation_result_nonverifiability(
         record.result_digest,
         record.failed_evidence_kind,
         record.failure_mode,
+        record.failed_evidence_reference,
+        record.failed_evidence_digest,
         record.verification_attempt_reference,
         record.verification_attempt_digest,
         record.owner_contract_reference,
