@@ -1,10 +1,10 @@
 """Corroborate released typed calibration-adjustment evidence through an owner port.
 
 This application boundary binds the exact calibration receipt that produced a
-point-weight artifact to its primary or fallback generating method. It does not
-copy auxiliary values, benchmark totals, protected attributes, or row-level
-weights. Durable PostgreSQL/release resolution remains a persistence-owner task
-after this service reaches protected truth.
+point-weight artifact to its target population, analysis window, and primary or
+fallback generating method. It does not copy auxiliary values, benchmark totals,
+protected attributes, or row-level weights. Durable PostgreSQL/release resolution
+remains a persistence-owner task after this service reaches protected truth.
 """
 
 from __future__ import annotations
@@ -43,6 +43,8 @@ _READ_FIELDS = frozenset(
         "calibration_receipt_reference",
         "calibration_receipt_digest",
         "evidence_version",
+        "target_population_digest",
+        "analysis_window_reference",
         "auxiliary_projection_digest",
         "benchmark_receipt_digest",
         "algorithm_reference",
@@ -95,6 +97,8 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
         calibration_receipt_reference: str,
         calibration_receipt_digest: str,
         evidence_version: int,
+        target_population_digest: str,
+        analysis_window_reference: str,
         auxiliary_projection_digest: str,
         benchmark_receipt_digest: str,
         algorithm_reference: str,
@@ -130,6 +134,14 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
         version = _require_positive_integer("evidence_version", evidence_version)
         if version != 1:
             raise ValueError("evidence_version must remain 1.")
+        target_digest = _require_digest(
+            "target_population_digest", target_population_digest
+        )
+        analysis_window_ref = _require_reference(
+            "analysis_window_reference",
+            analysis_window_reference,
+            "analysis_window",
+        )
         projection_digest = _require_digest(
             "auxiliary_projection_digest", auxiliary_projection_digest
         )
@@ -244,6 +256,8 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
                 owner_digest,
                 owner_released,
                 release_instant,
+                target_digest,
+                analysis_window_ref,
             ),
         )
 
@@ -372,6 +386,16 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
         """Return when this typed calibration evidence became released authority."""
         return self[24]
 
+    @property
+    def target_population_digest(self) -> str:
+        """Return the exact target population governed by the calibration receipt."""
+        return self[25]
+
+    @property
+    def analysis_window_reference(self) -> str:
+        """Return the analysis window governed by the calibration receipt."""
+        return self[26]
+
 
 class CalibrationAdjustmentAuthorityView(tuple):
     """Field-minimized typed calibration evidence issued only after authorization."""
@@ -419,6 +443,8 @@ class CalibrationAdjustmentAuthorityReadPort(Protocol):
         calibration_receipt_reference: str,
         calibration_receipt_digest: str,
         evidence_version: int,
+        target_population_digest: str,
+        analysis_window_reference: str,
         auxiliary_projection_digest: str,
         benchmark_receipt_digest: str,
         algorithm_reference: str,
@@ -449,7 +475,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 
 def _coordinate_tuple(record: CalibrationAdjustmentAuthorityRecord) -> tuple[object, ...]:
     """Return caller-known coordinates, excluding owner-resolved release instants."""
-    return record[:23]
+    return record[:23] + record[25:27]
 
 
 def resolve_calibration_adjustment_authority(
@@ -460,6 +486,8 @@ def resolve_calibration_adjustment_authority(
     calibration_receipt_reference: str,
     calibration_receipt_digest: str,
     evidence_version: int,
+    target_population_digest: str,
+    analysis_window_reference: str,
     auxiliary_projection_digest: str,
     benchmark_receipt_digest: str,
     algorithm_reference: str,
@@ -511,6 +539,8 @@ def resolve_calibration_adjustment_authority(
         calibration_receipt_reference=calibration_receipt_reference,
         calibration_receipt_digest=calibration_receipt_digest,
         evidence_version=evidence_version,
+        target_population_digest=target_population_digest,
+        analysis_window_reference=analysis_window_reference,
         auxiliary_projection_digest=auxiliary_projection_digest,
         benchmark_receipt_digest=benchmark_receipt_digest,
         algorithm_reference=algorithm_reference,
@@ -561,6 +591,8 @@ def resolve_calibration_adjustment_authority(
         calibration_receipt_reference=requested.calibration_receipt_reference,
         calibration_receipt_digest=requested.calibration_receipt_digest,
         evidence_version=requested.evidence_version,
+        target_population_digest=requested.target_population_digest,
+        analysis_window_reference=requested.analysis_window_reference,
         auxiliary_projection_digest=requested.auxiliary_projection_digest,
         benchmark_receipt_digest=requested.benchmark_receipt_digest,
         algorithm_reference=requested.algorithm_reference,
@@ -593,6 +625,8 @@ def resolve_calibration_adjustment_authority(
         calibration_receipt_reference=persisted.calibration_receipt_reference,
         calibration_receipt_digest=persisted.calibration_receipt_digest,
         evidence_version=persisted.evidence_version,
+        target_population_digest=persisted.target_population_digest,
+        analysis_window_reference=persisted.analysis_window_reference,
         auxiliary_projection_digest=persisted.auxiliary_projection_digest,
         benchmark_receipt_digest=persisted.benchmark_receipt_digest,
         algorithm_reference=persisted.algorithm_reference,
@@ -626,6 +660,7 @@ def resolve_calibration_adjustment_authority(
     fields: tuple[tuple[str, object], ...] = (
         ("algorithm_reference", record.algorithm_reference),
         ("algorithm_version", record.algorithm_version),
+        ("analysis_window_reference", record.analysis_window_reference),
         ("auxiliary_projection_digest", record.auxiliary_projection_digest),
         ("benchmark_receipt_digest", record.benchmark_receipt_digest),
         ("calibration_receipt_digest", record.calibration_receipt_digest),
@@ -640,6 +675,7 @@ def resolve_calibration_adjustment_authority(
         ("owner_contract_released_at", record.owner_contract_released_at),
         ("owner_contract_version", record.owner_contract_version),
         ("released_at", record.released_at),
+        ("target_population_digest", record.target_population_digest),
         ("termination_code", record.termination_code),
     )
     if record.termination_code == "fallback_applied":
