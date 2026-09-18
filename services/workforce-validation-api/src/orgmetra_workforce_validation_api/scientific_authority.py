@@ -49,6 +49,7 @@ _READ_FIELDS = frozenset(
         "owner_contract_released_at",
         "authorization_receipt_reference",
         "authorization_receipt_digest",
+        "authorization_receipt_released_at",
         "scientific_use_receipt_reference",
         "scientific_use_receipt_digest",
         "scientific_use_at",
@@ -119,6 +120,7 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         owner_contract_released_at: datetime,
         authorization_receipt_reference: str,
         authorization_receipt_digest: str,
+        authorization_receipt_released_at: datetime,
         scientific_use_receipt_reference: str,
         scientific_use_receipt_digest: str,
         scientific_use_at: datetime,
@@ -166,6 +168,9 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         authorization_digest = _require_digest(
             "authorization_receipt_digest", authorization_receipt_digest
         )
+        authorization_release = _require_aware_datetime(
+            "authorization_receipt_released_at", authorization_receipt_released_at
+        )
         scientific_use_ref = _require_reference(
             "scientific_use_receipt_reference",
             scientific_use_receipt_reference,
@@ -184,6 +189,14 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         if owner_contract_release > authorization_start:
             raise ValueError(
                 "owner contract must be released no later than authorized_from."
+            )
+        if authorization_release < owner_contract_release:
+            raise ValueError(
+                "authorization receipt cannot predate owner contract release."
+            )
+        if authorization_release > authorization_start:
+            raise ValueError(
+                "authorization receipt must be released no later than authorized_from."
             )
         if authorization_end is not None and authorization_end <= authorization_start:
             raise ValueError("authorized_to must be later than authorized_from.")
@@ -210,6 +223,7 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
                 owner_contract_release,
                 authorization_ref,
                 authorization_digest,
+                authorization_release,
                 scientific_use_ref,
                 scientific_use_digest,
                 use_instant,
@@ -289,29 +303,34 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         return self[13]
 
     @property
+    def authorization_receipt_released_at(self) -> datetime:
+        """Return the owner-resolved release instant of the authorization receipt."""
+        return self[14]
+
+    @property
     def scientific_use_receipt_reference(self) -> str:
         """Return the immutable scientific-use receipt reference."""
-        return self[14]
+        return self[15]
 
     @property
     def scientific_use_receipt_digest(self) -> str:
         """Return the immutable scientific-use receipt digest."""
-        return self[15]
+        return self[16]
 
     @property
     def scientific_use_at(self) -> datetime:
         """Return the owner-resolved UTC instant for the exact scientific use."""
-        return self[16]
+        return self[17]
 
     @property
     def authorized_from(self) -> datetime:
         """Return the UTC instant when this scientific use became authorized."""
-        return self[17]
+        return self[18]
 
     @property
     def authorized_to(self) -> datetime | None:
         """Return the exclusive UTC authorization end when one exists."""
-        return self[18]
+        return self[19]
 
 
 class CalibrationAuxiliaryAuthorityView(tuple):
@@ -409,8 +428,9 @@ def resolve_calibration_auxiliary_authority(
     same function is invoked afterward. The request carries no protected source
     values. Owner evidence must reproduce every caller-supplied leaf coordinate,
     including the projection reference/version/digest, receipt references and the
-    released owner-contract digest. The owner contract release instant is resolved
-    only from owner evidence and must not postdate the authorization interval start.
+    released owner-contract digest. Owner evidence must also prove that both the
+    governing contract and authorization receipt existed before the authorization
+    interval became effective; neither release instant is a caller coordinate.
     The scientific-use receipt is independently bound to the same use instant
     before any corroborating fields are returned.
     """
@@ -540,6 +560,7 @@ def resolve_calibration_auxiliary_authority(
         owner_contract_released_at=persisted.owner_contract_released_at,
         authorization_receipt_reference=persisted.authorization_receipt_reference,
         authorization_receipt_digest=persisted.authorization_receipt_digest,
+        authorization_receipt_released_at=persisted.authorization_receipt_released_at,
         scientific_use_receipt_reference=persisted.scientific_use_receipt_reference,
         scientific_use_receipt_digest=persisted.scientific_use_receipt_digest,
         scientific_use_at=persisted.scientific_use_at,
@@ -583,6 +604,7 @@ def resolve_calibration_auxiliary_authority(
         "owner_contract_released_at": record.owner_contract_released_at,
         "authorization_receipt_reference": record.authorization_receipt_reference,
         "authorization_receipt_digest": record.authorization_receipt_digest,
+        "authorization_receipt_released_at": record.authorization_receipt_released_at,
         "scientific_use_receipt_reference": record.scientific_use_receipt_reference,
         "scientific_use_receipt_digest": record.scientific_use_receipt_digest,
         "scientific_use_at": record.scientific_use_at,
