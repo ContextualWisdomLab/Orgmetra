@@ -106,6 +106,14 @@ from orgmetra_workforce_validation_api.result_nonverifiability import (
     ValidationResultNonVerifiabilityView,
     resolve_validation_result_nonverifiability,
 )
+from orgmetra_workforce_validation_api.result_nonverifiability_supersession_authority import (
+    ValidationResultNonVerifiabilitySupersessionAuthorityIntegrityError,
+    ValidationResultNonVerifiabilitySupersessionAuthorityNotFound,
+    ValidationResultNonVerifiabilitySupersessionAuthorityReadPort,
+    ValidationResultNonVerifiabilitySupersessionAuthorityRecord,
+    ValidationResultNonVerifiabilitySupersessionAuthorityView,
+    resolve_validation_result_nonverifiability_supersession_authority,
+)
 from orgmetra_workforce_validation_api.result_supersession_authority import (
     ValidationResultSupersessionAuthorityIntegrityError,
     ValidationResultSupersessionAuthorityNotFound,
@@ -248,6 +256,11 @@ __all__ = [
     "ValidationResultNonVerifiabilityNotFound",
     "ValidationResultNonVerifiabilityReadPort",
     "ValidationResultNonVerifiabilityRecord",
+    "ValidationResultNonVerifiabilitySupersessionAuthorityIntegrityError",
+    "ValidationResultNonVerifiabilitySupersessionAuthorityNotFound",
+    "ValidationResultNonVerifiabilitySupersessionAuthorityReadPort",
+    "ValidationResultNonVerifiabilitySupersessionAuthorityRecord",
+    "ValidationResultNonVerifiabilitySupersessionAuthorityView",
     "ValidationResultNonVerifiabilityView",
     "ValidationResultSupersessionAuthorityIntegrityError",
     "ValidationResultSupersessionAuthorityNotFound",
@@ -295,6 +308,7 @@ __all__ = [
     "resolve_trimming_bounding_supersession_authority",
     "resolve_validation_result_authority",
     "resolve_validation_result_nonverifiability",
+    "resolve_validation_result_nonverifiability_supersession_authority",
     "resolve_validation_result_supersession_authority",
     "resolve_weight_eligibility_authority",
     "resolve_weight_eligibility_supersession_authority",
