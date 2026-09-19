@@ -47,13 +47,17 @@ def _base_only_policy(*, permitted_fields: frozenset[str]) -> PurposeBoundAccess
 
 
 def _corroborate_base_only(*, policy: PurposeBoundAccessPolicy, port: _ReadPort):
+    final_record = _final_weight(
+        adjustments=(),
+        final_weight_artifact_digest=BASE_ARTIFACT_DIGEST,
+    )
+    binding_record = _binding(adjustment_bindings=())
+    port.final_owner = final_record
+    port.binding_owner = binding_record
     return corroborate_final_weight_component_evidence(
         principal=_principal(),
-        final_weight=_final_weight(
-            adjustments=(),
-            final_weight_artifact_digest=BASE_ARTIFACT_DIGEST,
-        ),
-        binding=_binding(adjustment_bindings=()),
+        final_weight=final_record,
+        binding=binding_record,
         used_at=USED_AT,
         purpose_code="selection_validity_analysis",
         policy=policy,
@@ -71,6 +75,8 @@ def test_base_only_resolution_does_not_request_adjustment_only_policy_fields() -
     )
 
     assert resolution.adjustments == ()
+    assert len(port.final_owner_calls) == 1
+    assert len(port.binding_owner_calls) == 1
     assert len(port.base_calls) == 1
     assert port.adjustment_calls == []
 
@@ -89,5 +95,7 @@ def test_base_only_resolution_authorizes_native_owner_scope_fields_before_read(
             port=port,
         )
 
+    assert port.final_owner_calls == []
+    assert port.binding_owner_calls == []
     assert port.base_calls == []
     assert port.adjustment_calls == []
