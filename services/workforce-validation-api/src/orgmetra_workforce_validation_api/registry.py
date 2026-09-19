@@ -37,7 +37,6 @@ _READ_FIELDS = frozenset(
         "recorded_to",
     }
 )
-_VALIDITY_STUDY_VIEW_ISSUANCE_MARKER = object()
 
 
 class ValidityStudyNotFound(LookupError):
@@ -300,10 +299,10 @@ class ValidityStudyView:
     """Sealed field-minimized data view returned only after authorization.
 
     The public constructor is deliberately non-issuing. A raw object allocation
-    remains unusable because every public property verifies the private read-path
-    seal before exposing detached projection state. The runtime type is still
-    data, not a reusable authorization credential; consequential actions must
-    re-authorize and re-resolve owner truth.
+    remains unusable because every public property verifies closure-private
+    read-path issuance before exposing detached projection state. The runtime type
+    is still data, not a reusable authorization credential; consequential actions
+    must re-authorize and re-resolve owner truth.
     """
 
     __slots__ = ("_tenant_identity", "_study_identity", "_fields", "_issuance_marker")
@@ -328,16 +327,7 @@ class ValidityStudyView:
 
     def _require_issued(self) -> None:
         """Reject raw exact-runtime allocations that were not sealed by the read path."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise ValidityStudyIntegrityError(
-                "validity-study view was not issued by read_validity_study"
-            ) from exc
-        if marker is not _VALIDITY_STUDY_VIEW_ISSUANCE_MARKER:
-            raise ValidityStudyIntegrityError(
-                "validity-study view was not issued by read_validity_study"
-            )
+        _require_validity_study_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -379,7 +369,7 @@ class ValidityStudyReadPort(Protocol):
 _PROTOCOL_READ_CAPABILITY = getattr_static(ValidityStudyReadPort, "read_validity_study")
 
 
-def read_validity_study(
+def _read_validity_study_authorized_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -388,8 +378,8 @@ def read_validity_study(
     requested_fields: frozenset[str],
     policy: PurposeBoundAccessPolicy,
     read_port: ValidityStudyReadPort,
-) -> ValidityStudyView:
-    """Authorize and read one validity-study header through the canonical owner port.
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
+    """Authorize and resolve one study into inert state without issuing a public view.
 
     Authorization is completed before persistence. The exact ordinary repository
     method is captured inertly before authorization and that same function is
@@ -397,7 +387,7 @@ def read_validity_study(
     validated capability. Immutable integer snapshots preserve the authorized
     target across the executable repository call. The persistence result is
     reconstructed into an exact immutable value and must match those snapshots
-    before any field is returned.
+    before projected state is returned to the closure-private issuer.
     """
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
@@ -478,9 +468,57 @@ def read_validity_study(
         "recorded_to": record.recorded_to,
     }
     projected_fields = tuple((field_name, values[field_name]) for field_name in sorted(fields))
-    view = object.__new__(ValidityStudyView)
-    object.__setattr__(view, "_tenant_identity", tenant_identity)
-    object.__setattr__(view, "_study_identity", study_identity)
-    object.__setattr__(view, "_fields", _store_view_fields(projected_fields))
-    object.__setattr__(view, "_issuance_marker", _VALIDITY_STUDY_VIEW_ISSUANCE_MARKER)
-    return view
+    return tenant_identity, study_identity, _store_view_fields(projected_fields)
+
+
+def _build_validity_study_view_runtime():
+    """Create closure-private sealing state and the only supported public issuer."""
+    issuance_marker = object()
+
+    def require_issued(view: ValidityStudyView) -> None:
+        """Verify one view against the closure-private issuance capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise ValidityStudyIntegrityError(
+                "validity-study view was not issued by read_validity_study"
+            ) from exc
+        if marker is not issuance_marker:
+            raise ValidityStudyIntegrityError(
+                "validity-study view was not issued by read_validity_study"
+            )
+
+    def issue_after_authorized_read(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        purpose_code: str,
+        requested_fields: frozenset[str],
+        policy: PurposeBoundAccessPolicy,
+        read_port: ValidityStudyReadPort,
+    ) -> ValidityStudyView:
+        """Issue one sealed view only after the canonical authorized owner read succeeds."""
+        tenant_identity, study_identity, projected_fields = (
+            _read_validity_study_authorized_state(
+                principal=principal,
+                tenant_record_id=tenant_record_id,
+                validity_study_id=validity_study_id,
+                purpose_code=purpose_code,
+                requested_fields=requested_fields,
+                policy=policy,
+                read_port=read_port,
+            )
+        )
+        view = object.__new__(ValidityStudyView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", projected_fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, issue_after_authorized_read
+
+
+_require_validity_study_view_issued, read_validity_study = _build_validity_study_view_runtime()
+del _build_validity_study_view_runtime
