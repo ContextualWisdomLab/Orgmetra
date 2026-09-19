@@ -37,7 +37,6 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "validation_result_authority"
 _OPERATION = "read"
-_VALIDATION_RESULT_VIEW_ISSUANCE_MARKER = object()
 _VERIFICATION_STATUSES = frozenset({"verification_pending", "not_verifiable"})
 _READ_FIELDS = frozenset(
     {
@@ -279,18 +278,7 @@ class ValidationResultAuthorityView:
 
     def _require_issued(self) -> None:
         """Reject exact-runtime allocations not sealed by the resolver."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise ValidationResultAuthorityIntegrityError(
-                "validation result view was not issued by "
-                "resolve_validation_result_authority"
-            ) from exc
-        if marker is not _VALIDATION_RESULT_VIEW_ISSUANCE_MARKER:
-            raise ValidationResultAuthorityIntegrityError(
-                "validation result view was not issued by "
-                "resolve_validation_result_authority"
-            )
+        _require_validation_result_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -344,7 +332,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 )
 
 
-def resolve_validation_result_authority(
+def _resolve_validation_result_authority_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -363,7 +351,7 @@ def resolve_validation_result_authority(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: ValidationResultAuthorityReadPort,
-) -> ValidationResultAuthorityView:
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
     """Authorize then corroborate one exact released scientific-result binding."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
@@ -548,13 +536,82 @@ def resolve_validation_result_authority(
         "superseded_at": record.superseded_at,
     }
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
-    view = object.__new__(ValidationResultAuthorityView)
-    object.__setattr__(view, "_tenant_identity", tenant_identity)
-    object.__setattr__(view, "_study_identity", study_identity)
-    object.__setattr__(view, "_fields", fields)
-    object.__setattr__(
-        view,
-        "_issuance_marker",
-        _VALIDATION_RESULT_VIEW_ISSUANCE_MARKER,
-    )
-    return view
+    return tenant_identity, study_identity, fields
+
+
+def _build_validation_result_view_runtime():
+    """Create closure-private sealing state and the authorized public resolver."""
+    issuance_marker = object()
+
+    def require_issued(view: ValidationResultAuthorityView) -> None:
+        """Verify one validation-result view against the private capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise ValidationResultAuthorityIntegrityError(
+                "validation result view was not issued by "
+                "resolve_validation_result_authority"
+            ) from exc
+        if marker is not issuance_marker:
+            raise ValidationResultAuthorityIntegrityError(
+                "validation result view was not issued by "
+                "resolve_validation_result_authority"
+            )
+
+    def resolve(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        result_reference: str,
+        result_digest: str,
+        compatibility_receipt_reference: str,
+        compatibility_receipt_digest: str,
+        analysis_weight_receipt_digest: str,
+        variance_design_receipt_digest: str,
+        verification_status: str,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        owner_contract_digest: str,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: ValidationResultAuthorityReadPort,
+    ) -> ValidationResultAuthorityView:
+        """Authorize then issue one exact released scientific-result binding."""
+        tenant_identity, study_identity, fields = (
+            _resolve_validation_result_authority_state(
+                principal=principal,
+                tenant_record_id=tenant_record_id,
+                validity_study_id=validity_study_id,
+                result_reference=result_reference,
+                result_digest=result_digest,
+                compatibility_receipt_reference=compatibility_receipt_reference,
+                compatibility_receipt_digest=compatibility_receipt_digest,
+                analysis_weight_receipt_digest=analysis_weight_receipt_digest,
+                variance_design_receipt_digest=variance_design_receipt_digest,
+                verification_status=verification_status,
+                owner_contract_reference=owner_contract_reference,
+                owner_contract_version=owner_contract_version,
+                owner_contract_digest=owner_contract_digest,
+                used_at=used_at,
+                purpose_code=purpose_code,
+                policy=policy,
+                read_port=read_port,
+            )
+        )
+        view = object.__new__(ValidationResultAuthorityView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, resolve
+
+
+(
+    _require_validation_result_view_issued,
+    resolve_validation_result_authority,
+) = _build_validation_result_view_runtime()
+del _build_validation_result_view_runtime
