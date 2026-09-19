@@ -37,7 +37,6 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "nonresponse_adjustment_authority"
 _OPERATION = "read"
-_NONRESPONSE_ADJUSTMENT_VIEW_ISSUANCE_MARKER = object()
 _READ_FIELDS = frozenset(
     {
         "nonresponse_receipt_reference",
@@ -378,18 +377,7 @@ class NonresponseAdjustmentAuthorityView:
 
     def _require_issued(self) -> None:
         """Reject exact-runtime allocations not sealed by the resolver."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise NonresponseAdjustmentAuthorityIntegrityError(
-                "nonresponse adjustment view was not issued by "
-                "resolve_nonresponse_adjustment_authority"
-            ) from exc
-        if marker is not _NONRESPONSE_ADJUSTMENT_VIEW_ISSUANCE_MARKER:
-            raise NonresponseAdjustmentAuthorityIntegrityError(
-                "nonresponse adjustment view was not issued by "
-                "resolve_nonresponse_adjustment_authority"
-            )
+        _require_nonresponse_adjustment_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -457,7 +445,7 @@ def _coordinate_tuple(record: NonresponseAdjustmentAuthorityRecord) -> tuple[obj
     return record[:8] + record[9:22]
 
 
-def resolve_nonresponse_adjustment_authority(
+def _resolve_nonresponse_adjustment_authority_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -485,7 +473,7 @@ def resolve_nonresponse_adjustment_authority(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: NonresponseAdjustmentAuthorityReadPort,
-) -> NonresponseAdjustmentAuthorityView:
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
     """Authorize then corroborate the exact released nonresponse receipt."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
@@ -663,21 +651,102 @@ def resolve_nonresponse_adjustment_authority(
         ("unavailable_treatment_code", record.unavailable_treatment_code),
         ("unknown_treatment_code", record.unknown_treatment_code),
     )
-    view = object.__new__(NonresponseAdjustmentAuthorityView)
-    object.__setattr__(
-        view,
-        "_tenant_identity",
+    return (
         _store_operational_uuid("tenant_record_id", tenant_id),
-    )
-    object.__setattr__(
-        view,
-        "_study_identity",
         _store_operational_uuid("validity_study_id", study_id),
+        fields,
     )
-    object.__setattr__(view, "_fields", fields)
-    object.__setattr__(
-        view,
-        "_issuance_marker",
-        _NONRESPONSE_ADJUSTMENT_VIEW_ISSUANCE_MARKER,
-    )
-    return view
+
+
+def _build_nonresponse_adjustment_view_runtime():
+    """Create closure-private sealing state and the authorized public resolver."""
+    issuance_marker = object()
+
+    def require_issued(view: NonresponseAdjustmentAuthorityView) -> None:
+        """Verify one nonresponse-adjustment view against the private capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise NonresponseAdjustmentAuthorityIntegrityError(
+                "nonresponse adjustment view was not issued by "
+                "resolve_nonresponse_adjustment_authority"
+            ) from exc
+        if marker is not issuance_marker:
+            raise NonresponseAdjustmentAuthorityIntegrityError(
+                "nonresponse adjustment view was not issued by "
+                "resolve_nonresponse_adjustment_authority"
+            )
+
+    def resolve(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        nonresponse_receipt_reference: str,
+        nonresponse_receipt_digest: str,
+        evidence_version: int,
+        response_disposition_receipt_reference: str,
+        response_disposition_receipt_version: int,
+        response_disposition_receipt_digest: str,
+        adjustment_population_digest: str,
+        method_reference: str,
+        method_version: int,
+        configuration_digest: str,
+        ineligible_treatment_code: str,
+        unknown_treatment_code: str,
+        unavailable_treatment_code: str,
+        input_weight_artifact_digest: str,
+        output_weight_artifact_digest: str,
+        constructed_at: datetime,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        owner_contract_digest: str,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: NonresponseAdjustmentAuthorityReadPort,
+    ) -> NonresponseAdjustmentAuthorityView:
+        """Authorize then issue the exact released nonresponse receipt projection."""
+        tenant_identity, study_identity, fields = _resolve_nonresponse_adjustment_authority_state(
+            principal=principal,
+            tenant_record_id=tenant_record_id,
+            validity_study_id=validity_study_id,
+            nonresponse_receipt_reference=nonresponse_receipt_reference,
+            nonresponse_receipt_digest=nonresponse_receipt_digest,
+            evidence_version=evidence_version,
+            response_disposition_receipt_reference=response_disposition_receipt_reference,
+            response_disposition_receipt_version=response_disposition_receipt_version,
+            response_disposition_receipt_digest=response_disposition_receipt_digest,
+            adjustment_population_digest=adjustment_population_digest,
+            method_reference=method_reference,
+            method_version=method_version,
+            configuration_digest=configuration_digest,
+            ineligible_treatment_code=ineligible_treatment_code,
+            unknown_treatment_code=unknown_treatment_code,
+            unavailable_treatment_code=unavailable_treatment_code,
+            input_weight_artifact_digest=input_weight_artifact_digest,
+            output_weight_artifact_digest=output_weight_artifact_digest,
+            constructed_at=constructed_at,
+            owner_contract_reference=owner_contract_reference,
+            owner_contract_version=owner_contract_version,
+            owner_contract_digest=owner_contract_digest,
+            used_at=used_at,
+            purpose_code=purpose_code,
+            policy=policy,
+            read_port=read_port,
+        )
+        view = object.__new__(NonresponseAdjustmentAuthorityView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, resolve
+
+
+(
+    _require_nonresponse_adjustment_view_issued,
+    resolve_nonresponse_adjustment_authority,
+) = _build_nonresponse_adjustment_view_runtime()
+del _build_nonresponse_adjustment_view_runtime
