@@ -47,7 +47,7 @@ _READ_FIELDS = frozenset(
         "owner_contract_released_at",
     }
 )
-_CALIBRATION_BENCHMARK_AUTHORITY_VIEW_ISSUANCE_MARKER = object()
+_CALIBRATION_BENCHMARK_VIEW_ISSUANCE_MARKER = object()
 
 
 class CalibrationBenchmarkAuthorityNotFound(LookupError):
@@ -315,13 +315,7 @@ class CalibrationBenchmarkAuthorityRecord(tuple):
 
 
 class CalibrationBenchmarkAuthorityView:
-    """Sealed field-minimized benchmark evidence issued only after authorization.
-
-    The public constructor is deliberately non-issuing. Raw exact-runtime
-    allocations remain unusable because each public property verifies the private
-    resolver seal before exposing detached projection state. Consequential actions
-    must still re-authorize and re-resolve owner truth rather than trusting a view.
-    """
+    """Sealed field-minimized benchmark evidence issued after authorization."""
 
     __slots__ = ("_tenant_identity", "_study_identity", "_fields", "_issuance_marker")
 
@@ -332,7 +326,7 @@ class CalibrationBenchmarkAuthorityView:
         validity_study_id: UUID,
         fields: tuple[tuple[str, object], ...],
     ) -> CalibrationBenchmarkAuthorityView:
-        """Reject public construction; only the resolver may issue this view."""
+        """Reject direct construction; only the resolver may issue this view."""
         raise TypeError(
             "CalibrationBenchmarkAuthorityView is issued only by "
             "resolve_calibration_benchmark_authority."
@@ -347,17 +341,17 @@ class CalibrationBenchmarkAuthorityView:
         raise AttributeError("CalibrationBenchmarkAuthorityView is immutable.")
 
     def _require_issued(self) -> None:
-        """Reject exact-runtime allocations that were not sealed by the resolver."""
+        """Reject exact-runtime allocations not sealed by the resolver."""
         try:
             marker = object.__getattribute__(self, "_issuance_marker")
         except AttributeError as exc:
             raise CalibrationBenchmarkAuthorityIntegrityError(
-                "calibration benchmark authority view was not issued by "
+                "calibration benchmark view was not issued by "
                 "resolve_calibration_benchmark_authority"
             ) from exc
-        if marker is not _CALIBRATION_BENCHMARK_AUTHORITY_VIEW_ISSUANCE_MARKER:
+        if marker is not _CALIBRATION_BENCHMARK_VIEW_ISSUANCE_MARKER:
             raise CalibrationBenchmarkAuthorityIntegrityError(
-                "calibration benchmark authority view was not issued by "
+                "calibration benchmark view was not issued by "
                 "resolve_calibration_benchmark_authority"
             )
 
@@ -626,6 +620,6 @@ def resolve_calibration_benchmark_authority(
     object.__setattr__(
         view,
         "_issuance_marker",
-        _CALIBRATION_BENCHMARK_AUTHORITY_VIEW_ISSUANCE_MARKER,
+        _CALIBRATION_BENCHMARK_VIEW_ISSUANCE_MARKER,
     )
     return view
