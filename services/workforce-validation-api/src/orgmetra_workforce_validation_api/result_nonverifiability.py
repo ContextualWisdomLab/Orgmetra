@@ -38,7 +38,6 @@ from .scientific_authority import (
 _RESOURCE_KIND = "validation_result_nonverifiability"
 _OPERATION = "read"
 _VERIFICATION_STATUS = "not_verifiable"
-_VALIDATION_RESULT_NONVERIFIABILITY_VIEW_ISSUANCE_MARKER = object()
 _FAILED_REFERENCE_KIND_BY_EVIDENCE_KIND = {
     "analysis_weight_receipt": "analysis_weight_receipt",
     "weight_variance_compatibility_receipt": "weight_variance_compatibility_receipt",
@@ -386,18 +385,7 @@ class ValidationResultNonVerifiabilityView:
 
     def _require_issued(self) -> None:
         """Reject exact-runtime allocations not sealed by the resolver."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise ValidationResultNonVerifiabilityIntegrityError(
-                "validation result non-verifiability view was not issued by "
-                "resolve_validation_result_nonverifiability"
-            ) from exc
-        if marker is not _VALIDATION_RESULT_NONVERIFIABILITY_VIEW_ISSUANCE_MARKER:
-            raise ValidationResultNonVerifiabilityIntegrityError(
-                "validation result non-verifiability view was not issued by "
-                "resolve_validation_result_nonverifiability"
-            )
+        _require_validation_result_nonverifiability_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -453,7 +441,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 )
 
 
-def resolve_validation_result_nonverifiability(
+def _resolve_validation_result_nonverifiability_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -473,7 +461,7 @@ def resolve_validation_result_nonverifiability(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: ValidationResultNonVerifiabilityReadPort,
-) -> ValidationResultNonVerifiabilityView:
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
     """Authorize then corroborate one exact released, non-authorizing verification attempt."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
@@ -677,13 +665,84 @@ def resolve_validation_result_nonverifiability(
         "superseded_at": record.superseded_at,
     }
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
-    view = object.__new__(ValidationResultNonVerifiabilityView)
-    object.__setattr__(view, "_tenant_identity", tenant_identity)
-    object.__setattr__(view, "_study_identity", study_identity)
-    object.__setattr__(view, "_fields", fields)
-    object.__setattr__(
-        view,
-        "_issuance_marker",
-        _VALIDATION_RESULT_NONVERIFIABILITY_VIEW_ISSUANCE_MARKER,
-    )
-    return view
+    return tenant_identity, study_identity, fields
+
+
+def _build_validation_result_nonverifiability_view_runtime():
+    """Create closure-private sealing state and the authorized public resolver."""
+    issuance_marker = object()
+
+    def require_issued(view: ValidationResultNonVerifiabilityView) -> None:
+        """Verify one non-verifiability view against the private capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise ValidationResultNonVerifiabilityIntegrityError(
+                "validation result non-verifiability view was not issued by "
+                "resolve_validation_result_nonverifiability"
+            ) from exc
+        if marker is not issuance_marker:
+            raise ValidationResultNonVerifiabilityIntegrityError(
+                "validation result non-verifiability view was not issued by "
+                "resolve_validation_result_nonverifiability"
+            )
+
+    def resolve(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        result_reference: str,
+        result_digest: str,
+        failed_evidence_kind: str,
+        failure_mode: str,
+        failed_evidence_reference: str | None = None,
+        failed_evidence_digest: str | None = None,
+        verification_attempt_reference: str,
+        verification_attempt_digest: str,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        owner_contract_digest: str,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: ValidationResultNonVerifiabilityReadPort,
+    ) -> ValidationResultNonVerifiabilityView:
+        """Authorize then issue one exact non-authorizing verification attempt."""
+        tenant_identity, study_identity, fields = (
+            _resolve_validation_result_nonverifiability_state(
+                principal=principal,
+                tenant_record_id=tenant_record_id,
+                validity_study_id=validity_study_id,
+                result_reference=result_reference,
+                result_digest=result_digest,
+                failed_evidence_kind=failed_evidence_kind,
+                failure_mode=failure_mode,
+                failed_evidence_reference=failed_evidence_reference,
+                failed_evidence_digest=failed_evidence_digest,
+                verification_attempt_reference=verification_attempt_reference,
+                verification_attempt_digest=verification_attempt_digest,
+                owner_contract_reference=owner_contract_reference,
+                owner_contract_version=owner_contract_version,
+                owner_contract_digest=owner_contract_digest,
+                used_at=used_at,
+                purpose_code=purpose_code,
+                policy=policy,
+                read_port=read_port,
+            )
+        )
+        view = object.__new__(ValidationResultNonVerifiabilityView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, resolve
+
+
+(
+    _require_validation_result_nonverifiability_view_issued,
+    resolve_validation_result_nonverifiability,
+) = _build_validation_result_nonverifiability_view_runtime()
+del _build_validation_result_nonverifiability_view_runtime
