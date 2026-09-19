@@ -418,14 +418,23 @@ def read_validity_study(
     if type(persisted) is not ValidityStudyRecord:
         raise ValidityStudyIntegrityError("repository returned a non-canonical validity-study record")
 
-    record = ValidityStudyRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        criterion_blueprint_id=persisted.criterion_blueprint_id,
-        study_status_code=persisted.study_status_code,
-        recorded_from=persisted.recorded_from,
-        recorded_to=persisted.recorded_to,
-    )
+    try:
+        record = ValidityStudyRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            criterion_blueprint_id=persisted.criterion_blueprint_id,
+            study_status_code=persisted.study_status_code,
+            recorded_from=persisted.recorded_from,
+            recorded_to=persisted.recorded_to,
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise ValidityStudyIntegrityError(
+            "repository returned a structurally invalid validity-study record"
+        ) from exc
+    if record != persisted:
+        raise ValidityStudyIntegrityError(
+            "repository returned a non-canonical validity-study record"
+        )
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
         != tenant_identity
