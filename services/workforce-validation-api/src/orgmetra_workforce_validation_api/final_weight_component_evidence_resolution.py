@@ -47,6 +47,8 @@ _RESOURCE_KIND = "final_weight_component_evidence_resolution"
 _OPERATION = "read"
 _BASE_READ_FIELDS = frozenset(
     {
+        "tenant_record_id",
+        "validity_study_id",
         "receipt_reference",
         "receipt_digest",
         "evidence_version",
@@ -59,6 +61,8 @@ _BASE_READ_FIELDS = frozenset(
 )
 _ADJUSTMENT_READ_FIELDS = frozenset(
     {
+        "tenant_record_id",
+        "validity_study_id",
         "receipt_reference",
         "receipt_digest",
         "evidence_version",
