@@ -61,6 +61,7 @@ _READ_FIELDS = frozenset(
         "superseded_at",
     }
 )
+_RESOLUTION_ISSUANCE_MARKER = object()
 
 
 class FinalWeightComponentEvidenceNotFound(LookupError):
@@ -316,10 +317,10 @@ class AdjustmentComponentEvidence(tuple):
         return self[12]
 
 
-class FinalWeightComponentEvidenceResolution(tuple):
-    """Canonical exact component evidence issued only after governed corroboration."""
+class FinalWeightComponentEvidenceResolution:
+    """Immutable proof-bearing component evidence issued only after governed corroboration."""
 
-    __slots__ = ()
+    __slots__ = ("__base_weight", "__adjustments", "__issuance_marker")
 
     def __new__(
         cls,
@@ -328,20 +329,55 @@ class FinalWeightComponentEvidenceResolution(tuple):
         adjustments: tuple[AdjustmentComponentEvidence, ...],
     ) -> FinalWeightComponentEvidenceResolution:
         """Reject public construction so callers cannot mint a corroborated success value."""
+        del base_weight, adjustments
         raise TypeError(
             "FinalWeightComponentEvidenceResolution is issued only by "
             "corroborate_final_weight_component_evidence."
         )
 
+    def __setattr__(self, name: str, value: object) -> None:
+        """Reject mutation; only the private issuer may populate slots with object.__setattr__."""
+        del name, value
+        raise AttributeError("FinalWeightComponentEvidenceResolution is immutable.")
+
+    def __delattr__(self, name: str) -> None:
+        """Reject deletion from an issued corroboration result."""
+        del name
+        raise AttributeError("FinalWeightComponentEvidenceResolution is immutable.")
+
+    def _require_issued(self) -> None:
+        """Fail closed when generic allocation produced an unsealed exact runtime object."""
+        try:
+            marker = object.__getattribute__(
+                self,
+                "_FinalWeightComponentEvidenceResolution__issuance_marker",
+            )
+        except AttributeError as exc:
+            raise FinalWeightComponentEvidenceIntegrityError(
+                "component evidence resolution was not issued by canonical corroboration"
+            ) from exc
+        if marker is not _RESOLUTION_ISSUANCE_MARKER:
+            raise FinalWeightComponentEvidenceIntegrityError(
+                "component evidence resolution was not issued by canonical corroboration"
+            )
+
     @property
     def base_weight(self) -> BaseWeightComponentEvidence:
-        """Return the exact corroborated base-weight component."""
-        return self[0]
+        """Return the exact corroborated base-weight component from a sealed result."""
+        self._require_issued()
+        return object.__getattribute__(
+            self,
+            "_FinalWeightComponentEvidenceResolution__base_weight",
+        )
 
     @property
     def adjustments(self) -> tuple[AdjustmentComponentEvidence, ...]:
-        """Return specialized components in final-weight sequence order."""
-        return self[1]
+        """Return specialized components in final-weight sequence order from a sealed result."""
+        self._require_issued()
+        return object.__getattribute__(
+            self,
+            "_FinalWeightComponentEvidenceResolution__adjustments",
+        )
 
 
 @runtime_checkable
@@ -450,7 +486,7 @@ def _issue_component_evidence_resolution(
     base_weight: BaseWeightComponentEvidence,
     adjustments: tuple[AdjustmentComponentEvidence, ...],
 ) -> FinalWeightComponentEvidenceResolution:
-    """Issue a proof-bearing aggregate only from already corroborated canonical evidence."""
+    """Issue a sealed proof-bearing aggregate only from already corroborated canonical evidence."""
     canonical_base = _canonical_base_evidence(base_weight)
     if type(adjustments) is not tuple:
         raise FinalWeightComponentEvidenceIntegrityError(
@@ -459,10 +495,23 @@ def _issue_component_evidence_resolution(
     canonical_adjustments = tuple(
         _canonical_adjustment_evidence(adjustment) for adjustment in adjustments
     )
-    return tuple.__new__(
-        FinalWeightComponentEvidenceResolution,
-        (canonical_base, canonical_adjustments),
+    resolution = object.__new__(FinalWeightComponentEvidenceResolution)
+    object.__setattr__(
+        resolution,
+        "_FinalWeightComponentEvidenceResolution__base_weight",
+        canonical_base,
     )
+    object.__setattr__(
+        resolution,
+        "_FinalWeightComponentEvidenceResolution__adjustments",
+        canonical_adjustments,
+    )
+    object.__setattr__(
+        resolution,
+        "_FinalWeightComponentEvidenceResolution__issuance_marker",
+        _RESOLUTION_ISSUANCE_MARKER,
+    )
+    return resolution
 
 
 def _canonical_final_weight(value: object) -> FinalAnalysisWeightAuthorityRecord:
