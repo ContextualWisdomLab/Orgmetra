@@ -388,34 +388,43 @@ def resolve_trimming_bounding_supersession_authority(
             "owner port returned non-canonical trimming supersession evidence"
         )
 
-    successor_values = (
-        None if persisted.successor_fields is None else dict(persisted.successor_fields)
-    )
-    record = TrimmingBoundingSupersessionAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-        successor_adjustment_receipt_reference=(
-            None
-            if successor_values is None
-            else successor_values["successor_adjustment_receipt_reference"]
-        ),
-        successor_adjustment_receipt_digest=(
-            None
-            if successor_values is None
-            else successor_values["successor_adjustment_receipt_digest"]
-        ),
-        successor_evidence_version=(
-            None
-            if successor_values is None
-            else successor_values["successor_evidence_version"]
-        ),
-        successor_released_at=(
-            None if successor_values is None else successor_values["successor_released_at"]
-        ),
-        **dict(persisted.fields),
-    )
+    try:
+        successor_values = (
+            None if persisted.successor_fields is None else dict(persisted.successor_fields)
+        )
+        record = TrimmingBoundingSupersessionAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+            successor_adjustment_receipt_reference=(
+                None
+                if successor_values is None
+                else successor_values["successor_adjustment_receipt_reference"]
+            ),
+            successor_adjustment_receipt_digest=(
+                None
+                if successor_values is None
+                else successor_values["successor_adjustment_receipt_digest"]
+            ),
+            successor_evidence_version=(
+                None
+                if successor_values is None
+                else successor_values["successor_evidence_version"]
+            ),
+            successor_released_at=(
+                None if successor_values is None else successor_values["successor_released_at"]
+            ),
+            **dict(persisted.fields),
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise TrimmingBoundingSupersessionAuthorityIntegrityError(
+            "owner port returned malformed trimming supersession evidence"
+        ) from exc
+    if record != persisted:
+        raise TrimmingBoundingSupersessionAuthorityIntegrityError(
+            "owner port returned non-canonical trimming supersession evidence"
+        )
     record_values = dict(record.fields)
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
