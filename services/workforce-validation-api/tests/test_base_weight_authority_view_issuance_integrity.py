@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 
+import orgmetra_workforce_validation_api.base_weight_authority as authority_module
 from orgmetra_workforce_validation_api.base_weight_authority import (
     BaseWeightAuthorityIntegrityError,
     BaseWeightAuthorityView,
@@ -43,6 +44,34 @@ def test_wrong_issuance_marker_cannot_expose_base_weight_view() -> None:
     """Reject marker-shaped raw objects that did not originate from the resolver."""
     forged = object.__new__(BaseWeightAuthorityView)
     object.__setattr__(forged, "_issuance_marker", object())
+
+    with pytest.raises(
+        BaseWeightAuthorityIntegrityError,
+        match="was not issued by resolve_base_weight_authority",
+    ):
+        _ = forged.fields
+
+
+def test_importable_marker_cannot_mint_base_weight_view() -> None:
+    """Reject a caller-populated view and keep its sealing capability out of module state."""
+    assert not hasattr(authority_module, "_BASE_WEIGHT_AUTHORITY_VIEW_ISSUANCE_MARKER")
+    forged = object.__new__(BaseWeightAuthorityView)
+    object.__setattr__(forged, "_tenant_identity", TENANT.int)
+    object.__setattr__(forged, "_study_identity", STUDY.int)
+    object.__setattr__(
+        forged,
+        "_fields",
+        (("base_weight_artifact_digest", "6" * 64),),
+    )
+    object.__setattr__(
+        forged,
+        "_issuance_marker",
+        getattr(
+            authority_module,
+            "_BASE_WEIGHT_AUTHORITY_VIEW_ISSUANCE_MARKER",
+            object(),
+        ),
+    )
 
     with pytest.raises(
         BaseWeightAuthorityIntegrityError,
