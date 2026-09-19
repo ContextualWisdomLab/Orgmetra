@@ -40,7 +40,7 @@ _READ_FIELDS = frozenset(
 _VALIDITY_STUDY_VIEW_ISSUANCE_MARKER = object()
 
 
-class ValidityStudyNotFound(LookError):
+class ValidityStudyNotFound(LookupError):
     """Indicate that an authorized study identity has no visible registry record."""
 
 
