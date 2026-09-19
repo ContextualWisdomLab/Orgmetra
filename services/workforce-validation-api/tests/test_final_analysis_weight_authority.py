@@ -332,11 +332,11 @@ def test_adjustment_semantics_are_typed_and_no_op_transform_is_rejected() -> Non
         _adjustment(evidence_kind="generic_weight_evidence")
     with pytest.raises(ValueError):
         _adjustment(output_weight_artifact_digest=BASE_ARTIFACT_DIGEST)
-    generic = _adjustment(
-        adjustment_code="custom_transform",
-        evidence_kind="custom_transform_receipt",
-    )
-    assert generic.evidence_kind == "custom_transform_receipt"
+    with pytest.raises(ValueError, match="governed adjustment_code"):
+        _adjustment(
+            adjustment_code="custom_transform",
+            evidence_kind="custom_transform_receipt",
+        )
 
 
 @pytest.mark.parametrize(
