@@ -35,7 +35,6 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "weight_eligibility_authority"
 _OPERATION = "read"
-_WEIGHT_ELIGIBILITY_VIEW_ISSUANCE_MARKER = object()
 _WEIGHT_SCOPE_CODES = frozenset({"cross_sectional", "longitudinal"})
 _READ_FIELDS = frozenset(
     {
@@ -314,16 +313,7 @@ class WeightEligibilityAuthorityView:
 
     def _require_issued(self) -> None:
         """Require the exact in-process marker written by the resolver."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise WeightEligibilityAuthorityIntegrityError(
-                "weight-eligibility authority view was not issued by the resolver"
-            ) from exc
-        if marker is not _WEIGHT_ELIGIBILITY_VIEW_ISSUANCE_MARKER:
-            raise WeightEligibilityAuthorityIntegrityError(
-                "weight-eligibility authority view has an invalid issuance marker"
-            )
+        _require_weight_eligibility_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -381,7 +371,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 )
 
 
-def resolve_weight_eligibility_authority(
+def _resolve_weight_eligibility_authority_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -404,8 +394,8 @@ def resolve_weight_eligibility_authority(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: WeightEligibilityAuthorityReadPort,
-) -> WeightEligibilityAuthorityView:
-    """Authorize then corroborate exact released weight-eligibility evidence."""
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
+    """Authorize and corroborate released eligibility into inert projection state."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
     if type(policy) is not PurposeBoundAccessPolicy:
@@ -555,15 +545,90 @@ def resolve_weight_eligibility_authority(
         ("weight_artifact_digest", record.weight_artifact_digest),
         ("weight_scope_code", record.weight_scope_code),
     )
-    view = object.__new__(WeightEligibilityAuthorityView)
-    object.__setattr__(
-        view, "_tenant_identity", _store_operational_uuid("tenant_record_id", tenant_id)
+    return (
+        _store_operational_uuid("tenant_record_id", tenant_id),
+        _store_operational_uuid("validity_study_id", study_id),
+        fields,
     )
-    object.__setattr__(
-        view, "_study_identity", _store_operational_uuid("validity_study_id", study_id)
-    )
-    object.__setattr__(view, "_fields", fields)
-    object.__setattr__(
-        view, "_issuance_marker", _WEIGHT_ELIGIBILITY_VIEW_ISSUANCE_MARKER
-    )
-    return view
+
+
+def _build_weight_eligibility_view_runtime():
+    """Create closure-private sealing state and the authorized public resolver."""
+    issuance_marker = object()
+
+    def require_issued(view: WeightEligibilityAuthorityView) -> None:
+        """Verify one eligibility view against the closure-private capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise WeightEligibilityAuthorityIntegrityError(
+                "weight-eligibility authority view was not issued by the resolver"
+            ) from exc
+        if marker is not issuance_marker:
+            raise WeightEligibilityAuthorityIntegrityError(
+                "weight-eligibility authority view was not issued by the resolver"
+            )
+
+    def resolve(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        eligibility_receipt_reference: str,
+        eligibility_receipt_digest: str,
+        evidence_version: int,
+        weight_scope_code: str,
+        target_population_reference: str,
+        target_population_digest: str,
+        reference_duration_reference: str,
+        reference_duration_digest: str,
+        eligible_case_set_digest: str,
+        weight_artifact_digest: str,
+        constructed_at: datetime,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        owner_contract_digest: str,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: WeightEligibilityAuthorityReadPort,
+    ) -> WeightEligibilityAuthorityView:
+        """Authorize then corroborate exact released weight-eligibility evidence."""
+        tenant_identity, study_identity, fields = _resolve_weight_eligibility_authority_state(
+            principal=principal,
+            tenant_record_id=tenant_record_id,
+            validity_study_id=validity_study_id,
+            eligibility_receipt_reference=eligibility_receipt_reference,
+            eligibility_receipt_digest=eligibility_receipt_digest,
+            evidence_version=evidence_version,
+            weight_scope_code=weight_scope_code,
+            target_population_reference=target_population_reference,
+            target_population_digest=target_population_digest,
+            reference_duration_reference=reference_duration_reference,
+            reference_duration_digest=reference_duration_digest,
+            eligible_case_set_digest=eligible_case_set_digest,
+            weight_artifact_digest=weight_artifact_digest,
+            constructed_at=constructed_at,
+            owner_contract_reference=owner_contract_reference,
+            owner_contract_version=owner_contract_version,
+            owner_contract_digest=owner_contract_digest,
+            used_at=used_at,
+            purpose_code=purpose_code,
+            policy=policy,
+            read_port=read_port,
+        )
+        view = object.__new__(WeightEligibilityAuthorityView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, resolve
+
+
+(
+    _require_weight_eligibility_view_issued,
+    resolve_weight_eligibility_authority,
+) = _build_weight_eligibility_view_runtime()
+del _build_weight_eligibility_view_runtime
