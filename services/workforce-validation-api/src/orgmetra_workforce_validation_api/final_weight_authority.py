@@ -36,6 +36,7 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "final_analysis_weight_authority"
 _OPERATION = "read"
+_FINAL_ANALYSIS_WEIGHT_VIEW_ISSUANCE_MARKER = object()
 _WEIGHT_SCOPE_CODES = frozenset({"cross_sectional", "longitudinal"})
 _SPECIALIZED_EVIDENCE_KIND_BY_ADJUSTMENT_CODE = {
     "nonresponse_adjustment": "nonresponse_adjustment_receipt",
@@ -497,10 +498,10 @@ class FinalAnalysisWeightAuthorityRecord(tuple):
         return self[5]
 
 
-class FinalAnalysisWeightAuthorityView(tuple):
-    """Field-minimized final-weight evidence issued only after authorization."""
+class FinalAnalysisWeightAuthorityView:
+    """Sealed field-minimized final-weight evidence issued only after authorization."""
 
-    __slots__ = ()
+    __slots__ = ("_tenant_identity", "_study_identity", "_fields", "_issuance_marker")
 
     def __new__(
         cls,
@@ -515,20 +516,50 @@ class FinalAnalysisWeightAuthorityView(tuple):
             "resolve_final_analysis_weight_authority."
         )
 
+    def __setattr__(self, name: str, value: object) -> None:
+        """Keep ordinary callers from mutating issued projection state."""
+        raise AttributeError("FinalAnalysisWeightAuthorityView is immutable.")
+
+    def __delattr__(self, name: str) -> None:
+        """Keep ordinary callers from deleting issued projection state."""
+        raise AttributeError("FinalAnalysisWeightAuthorityView is immutable.")
+
+    def _require_issued(self) -> None:
+        """Reject exact-runtime allocations not sealed by the resolver."""
+        try:
+            marker = object.__getattribute__(self, "_issuance_marker")
+        except AttributeError as exc:
+            raise FinalAnalysisWeightAuthorityIntegrityError(
+                "final analysis-weight view was not issued by "
+                "resolve_final_analysis_weight_authority"
+            ) from exc
+        if marker is not _FINAL_ANALYSIS_WEIGHT_VIEW_ISSUANCE_MARKER:
+            raise FinalAnalysisWeightAuthorityIntegrityError(
+                "final analysis-weight view was not issued by "
+                "resolve_final_analysis_weight_authority"
+            )
+
     @property
     def tenant_record_id(self) -> UUID:
         """Return a fresh authorized tenant identity."""
-        return _restore_operational_uuid("tenant_record_id", self[0])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "tenant_record_id", object.__getattribute__(self, "_tenant_identity")
+        )
 
     @property
     def validity_study_id(self) -> UUID:
         """Return a fresh authorized validity-study identity."""
-        return _restore_operational_uuid("validity_study_id", self[1])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "validity_study_id", object.__getattribute__(self, "_study_identity")
+        )
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
         """Return immutable final-weight provenance."""
-        return self[2]
+        self._require_issued()
+        return object.__getattribute__(self, "_fields")
 
 
 @runtime_checkable
@@ -827,11 +858,21 @@ def resolve_final_analysis_weight_authority(
     values["released_at"] = record.released_at
     values["superseded_at"] = record.superseded_at
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
-    return tuple.__new__(
-        FinalAnalysisWeightAuthorityView,
-        (
-            _store_operational_uuid("tenant_record_id", record.tenant_record_id),
-            _store_operational_uuid("validity_study_id", record.validity_study_id),
-            fields,
-        ),
+    view = object.__new__(FinalAnalysisWeightAuthorityView)
+    object.__setattr__(
+        view,
+        "_tenant_identity",
+        _store_operational_uuid("tenant_record_id", record.tenant_record_id),
     )
+    object.__setattr__(
+        view,
+        "_study_identity",
+        _store_operational_uuid("validity_study_id", record.validity_study_id),
+    )
+    object.__setattr__(view, "_fields", fields)
+    object.__setattr__(
+        view,
+        "_issuance_marker",
+        _FINAL_ANALYSIS_WEIGHT_VIEW_ISSUANCE_MARKER,
+    )
+    return view
