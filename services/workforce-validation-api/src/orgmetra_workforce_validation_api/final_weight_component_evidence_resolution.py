@@ -498,6 +498,10 @@ def corroborate_final_weight_component_evidence(
         raise FinalWeightComponentEvidenceIntegrityError(
             "component binding targets a different final-weight receipt"
         )
+    if binding_record.released_at < final_record.released_at:
+        raise FinalWeightComponentEvidenceIntegrityError(
+            "component binding cannot be released before final-weight authority"
+        )
     if use_instant < final_record.released_at or use_instant < binding_record.released_at:
         raise FinalWeightComponentEvidenceIntegrityError(
             "final-weight evidence and component binding must be released before use"
