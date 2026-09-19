@@ -18,7 +18,59 @@ from test_final_weight_component_evidence_resolution import (
     _principal,
 )
 
-BASE_ONLY_READ_FIELDS = frozenset(
+OWNER_PROVENANCE_READ_FIELDS = frozenset(
+    {
+        "tenant_record_id",
+        "validity_study_id",
+        "analysis_weight_receipt_reference",
+        "analysis_weight_receipt_digest",
+        "analysis_weight_evidence_version",
+        "evidence_version",
+        "estimand_reference",
+        "estimand_digest",
+        "estimand_scope_code",
+        "target_population_reference",
+        "target_population_digest",
+        "analysis_unit_code",
+        "analysis_window_reference",
+        "reference_duration_reference",
+        "reference_duration_digest",
+        "eligible_case_set_digest",
+        "analytic_case_occurrence_set_digest",
+        "source_universe_receipt_reference",
+        "source_universe_receipt_version",
+        "source_universe_receipt_digest",
+        "sampling_design_receipt_reference",
+        "sampling_design_receipt_version",
+        "sampling_design_receipt_digest",
+        "base_weight_method_code",
+        "base_weight_method_version",
+        "base_weight_evidence_digest",
+        "base_weight_artifact_digest",
+        "adjustments",
+        "final_weight_artifact_digest",
+        "weight_eligibility_receipt_reference",
+        "weight_eligibility_receipt_digest",
+        "analytic_case_count",
+        "constructed_at",
+        "correction_sequence",
+        "supersedes_receipt_digest",
+        "binding_reference",
+        "binding_digest",
+        "binding_version",
+        "base_weight_evidence_receipt_reference",
+        "base_weight_evidence_receipt_digest",
+        "base_weight_evidence_version",
+        "adjustment_bindings",
+        "owner_contract_reference",
+        "owner_contract_version",
+        "owner_contract_digest",
+        "owner_contract_released_at",
+        "released_at",
+        "superseded_at",
+    }
+)
+BASE_COMPONENT_READ_FIELDS = frozenset(
     {
         "tenant_record_id",
         "validity_study_id",
@@ -32,6 +84,7 @@ BASE_ONLY_READ_FIELDS = frozenset(
         "superseded_at",
     }
 )
+BASE_ONLY_READ_FIELDS = OWNER_PROVENANCE_READ_FIELDS | BASE_COMPONENT_READ_FIELDS
 
 
 def _base_only_policy(*, permitted_fields: frozenset[str]) -> PurposeBoundAccessPolicy:
@@ -66,7 +119,7 @@ def _corroborate_base_only(*, policy: PurposeBoundAccessPolicy, port: _ReadPort)
 
 
 def test_base_only_resolution_does_not_request_adjustment_only_policy_fields() -> None:
-    """Authorize exactly the base projection fields when no adjustment owner is consulted."""
+    """Authorize owner provenance plus base projection fields when no adjustment owner is read."""
     port = _ReadPort()
 
     resolution = _corroborate_base_only(
@@ -78,6 +131,22 @@ def test_base_only_resolution_does_not_request_adjustment_only_policy_fields() -
     assert len(port.final_owner_calls) == 1
     assert len(port.binding_owner_calls) == 1
     assert len(port.base_calls) == 1
+    assert port.adjustment_calls == []
+
+
+def test_component_only_policy_cannot_authorize_owner_provenance_reads() -> None:
+    """Deny before all owner access when final/binding provenance fields are not permitted."""
+    port = _ReadPort()
+
+    with pytest.raises(AuthorizationDeniedError):
+        _corroborate_base_only(
+            policy=_base_only_policy(permitted_fields=BASE_COMPONENT_READ_FIELDS),
+            port=port,
+        )
+
+    assert port.final_owner_calls == []
+    assert port.binding_owner_calls == []
+    assert port.base_calls == []
     assert port.adjustment_calls == []
 
 
