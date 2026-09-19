@@ -40,7 +40,7 @@ _READ_FIELDS = frozenset(
 _VALIDITY_STUDY_VIEW_ISSUANCE_MARKER = object()
 
 
-class ValidityStudyNotFound(LookupError):
+class ValidityStudyNotFound(LookError):
     """Indicate that an authorized study identity has no visible registry record."""
 
 
@@ -296,17 +296,17 @@ def _restore_view_fields(fields: tuple[tuple[str, object], ...]) -> tuple[tuple[
     )
 
 
-class ValidityStudyView(tuple):
-    """Structurally immutable field-minimized view returned after authorization.
+class ValidityStudyView:
+    """Sealed field-minimized data view returned only after authorization.
 
-    Tuple-backed storage keeps target UUIDs and UUID-valued projected evidence as
-    immutable integers. An internal issuance marker additionally prevents a plain
-    base-class tuple construction from exposing caller-authored data through the
-    authorized-view properties. The view remains data, not a reusable credential;
-    consequential actions must re-authorize and re-resolve owner truth.
+    The public constructor is deliberately non-issuing. A raw object allocation
+    remains unusable because every public property verifies the private read-path
+    seal before exposing detached projection state. The runtime type is still
+    data, not a reusable authorization credential; consequential actions must
+    re-authorize and re-resolve owner truth.
     """
 
-    __slots__ = ()
+    __slots__ = ("_tenant_identity", "_study_identity", "_fields", "_issuance_marker")
 
     def __new__(
         cls,
@@ -318,12 +318,23 @@ class ValidityStudyView(tuple):
         """Reject public construction so only the authorized read path issues views."""
         raise TypeError("ValidityStudyView is issued only by read_validity_study.")
 
+    def __setattr__(self, name: str, value: object) -> None:
+        """Keep ordinary callers from mutating issued projection state."""
+        raise AttributeError("ValidityStudyView is immutable.")
+
+    def __delattr__(self, name: str) -> None:
+        """Keep ordinary callers from deleting issued projection state."""
+        raise AttributeError("ValidityStudyView is immutable.")
+
     def _require_issued(self) -> None:
-        """Reject a tuple-shaped value that was not sealed by the authorized read path."""
-        if (
-            tuple.__len__(self) != 4
-            or tuple.__getitem__(self, 0) is not _VALIDITY_STUDY_VIEW_ISSUANCE_MARKER
-        ):
+        """Reject raw exact-runtime allocations that were not sealed by the read path."""
+        try:
+            marker = object.__getattribute__(self, "_issuance_marker")
+        except AttributeError as exc:
+            raise ValidityStudyIntegrityError(
+                "validity-study view was not issued by read_validity_study"
+            ) from exc
+        if marker is not _VALIDITY_STUDY_VIEW_ISSUANCE_MARKER:
             raise ValidityStudyIntegrityError(
                 "validity-study view was not issued by read_validity_study"
             )
@@ -332,19 +343,23 @@ class ValidityStudyView(tuple):
     def tenant_record_id(self) -> UUID:
         """Return a fresh tenant identity authorized for this view."""
         self._require_issued()
-        return _restore_operational_uuid("tenant_record_id", tuple.__getitem__(self, 1))
+        return _restore_operational_uuid(
+            "tenant_record_id", object.__getattribute__(self, "_tenant_identity")
+        )
 
     @property
     def validity_study_id(self) -> UUID:
         """Return a fresh validity-study identity authorized for this view."""
         self._require_issued()
-        return _restore_operational_uuid("validity_study_id", tuple.__getitem__(self, 2))
+        return _restore_operational_uuid(
+            "validity_study_id", object.__getattribute__(self, "_study_identity")
+        )
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
         """Return ordered field-minimized evidence with fresh UUID-valued projections."""
         self._require_issued()
-        return _restore_view_fields(tuple.__getitem__(self, 3))
+        return _restore_view_fields(object.__getattribute__(self, "_fields"))
 
 
 @runtime_checkable
@@ -463,12 +478,9 @@ def read_validity_study(
         "recorded_to": record.recorded_to,
     }
     projected_fields = tuple((field_name, values[field_name]) for field_name in sorted(fields))
-    return tuple.__new__(
-        ValidityStudyView,
-        (
-            _VALIDITY_STUDY_VIEW_ISSUANCE_MARKER,
-            tenant_identity,
-            study_identity,
-            _store_view_fields(projected_fields),
-        ),
-    )
+    view = object.__new__(ValidityStudyView)
+    object.__setattr__(view, "_tenant_identity", tenant_identity)
+    object.__setattr__(view, "_study_identity", study_identity)
+    object.__setattr__(view, "_fields", _store_view_fields(projected_fields))
+    object.__setattr__(view, "_issuance_marker", _VALIDITY_STUDY_VIEW_ISSUANCE_MARKER)
+    return view
