@@ -558,33 +558,42 @@ def resolve_nonresponse_adjustment_authority(
             "owner port returned non-canonical nonresponse-adjustment authority evidence"
         )
 
-    record = NonresponseAdjustmentAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        nonresponse_receipt_reference=persisted.nonresponse_receipt_reference,
-        nonresponse_receipt_digest=persisted.nonresponse_receipt_digest,
-        evidence_version=persisted.evidence_version,
-        response_disposition_receipt_reference=persisted.response_disposition_receipt_reference,
-        response_disposition_receipt_version=persisted.response_disposition_receipt_version,
-        response_disposition_receipt_digest=persisted.response_disposition_receipt_digest,
-        response_disposition_receipt_released_at=persisted.response_disposition_receipt_released_at,
-        adjustment_population_digest=persisted.adjustment_population_digest,
-        method_reference=persisted.method_reference,
-        method_version=persisted.method_version,
-        configuration_digest=persisted.configuration_digest,
-        ineligible_treatment_code=persisted.ineligible_treatment_code,
-        unknown_treatment_code=persisted.unknown_treatment_code,
-        unavailable_treatment_code=persisted.unavailable_treatment_code,
-        input_weight_artifact_digest=persisted.input_weight_artifact_digest,
-        output_weight_artifact_digest=persisted.output_weight_artifact_digest,
-        constructed_at=persisted.constructed_at,
-        owner_contract_reference=persisted.owner_contract_reference,
-        owner_contract_version=persisted.owner_contract_version,
-        owner_contract_digest=persisted.owner_contract_digest,
-        owner_contract_released_at=persisted.owner_contract_released_at,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-    )
+    try:
+        record = NonresponseAdjustmentAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            nonresponse_receipt_reference=persisted.nonresponse_receipt_reference,
+            nonresponse_receipt_digest=persisted.nonresponse_receipt_digest,
+            evidence_version=persisted.evidence_version,
+            response_disposition_receipt_reference=persisted.response_disposition_receipt_reference,
+            response_disposition_receipt_version=persisted.response_disposition_receipt_version,
+            response_disposition_receipt_digest=persisted.response_disposition_receipt_digest,
+            response_disposition_receipt_released_at=persisted.response_disposition_receipt_released_at,
+            adjustment_population_digest=persisted.adjustment_population_digest,
+            method_reference=persisted.method_reference,
+            method_version=persisted.method_version,
+            configuration_digest=persisted.configuration_digest,
+            ineligible_treatment_code=persisted.ineligible_treatment_code,
+            unknown_treatment_code=persisted.unknown_treatment_code,
+            unavailable_treatment_code=persisted.unavailable_treatment_code,
+            input_weight_artifact_digest=persisted.input_weight_artifact_digest,
+            output_weight_artifact_digest=persisted.output_weight_artifact_digest,
+            constructed_at=persisted.constructed_at,
+            owner_contract_reference=persisted.owner_contract_reference,
+            owner_contract_version=persisted.owner_contract_version,
+            owner_contract_digest=persisted.owner_contract_digest,
+            owner_contract_released_at=persisted.owner_contract_released_at,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise NonresponseAdjustmentAuthorityIntegrityError(
+            "owner port returned malformed nonresponse-adjustment authority evidence"
+        ) from exc
+    if record != persisted:
+        raise NonresponseAdjustmentAuthorityIntegrityError(
+            "owner port returned non-canonical nonresponse-adjustment authority evidence"
+        )
     if _coordinate_tuple(record) != _coordinate_tuple(requested):
         raise NonresponseAdjustmentAuthorityIntegrityError(
             "released nonresponse-adjustment authority does not match requested coordinates"
