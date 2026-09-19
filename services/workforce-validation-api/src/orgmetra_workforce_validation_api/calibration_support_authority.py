@@ -37,6 +37,7 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "calibration_support_authority"
 _OPERATION = "read"
+_CALIBRATION_SUPPORT_VIEW_ISSUANCE_MARKER = object()
 _READ_FIELDS = frozenset(
     {
         "support_authority_reference",
@@ -419,10 +420,10 @@ class CalibrationSupportAuthorityRecord(tuple):
     released_at = _tuple_property(40, "Return when this support proof became released application evidence.")
 
 
-class CalibrationSupportAuthorityView(tuple):
-    """Field-minimized support evidence issued only after purpose-bound authorization."""
+class CalibrationSupportAuthorityView:
+    """Sealed support evidence issued only after purpose-bound authorization."""
 
-    __slots__ = ()
+    __slots__ = ("_tenant_identity", "_study_identity", "_fields", "_issuance_marker")
 
     def __new__(
         cls,
@@ -436,20 +437,50 @@ class CalibrationSupportAuthorityView(tuple):
             "CalibrationSupportAuthorityView is issued only by resolve_calibration_support_authority."
         )
 
+    def __setattr__(self, name: str, value: object) -> None:
+        """Keep ordinary callers from mutating issued projection state."""
+        raise AttributeError("CalibrationSupportAuthorityView is immutable.")
+
+    def __delattr__(self, name: str) -> None:
+        """Keep ordinary callers from deleting issued projection state."""
+        raise AttributeError("CalibrationSupportAuthorityView is immutable.")
+
+    def _require_issued(self) -> None:
+        """Reject exact-runtime allocations not sealed by the resolver."""
+        try:
+            marker = object.__getattribute__(self, "_issuance_marker")
+        except AttributeError as exc:
+            raise CalibrationSupportAuthorityIntegrityError(
+                "calibration support view was not issued by "
+                "resolve_calibration_support_authority"
+            ) from exc
+        if marker is not _CALIBRATION_SUPPORT_VIEW_ISSUANCE_MARKER:
+            raise CalibrationSupportAuthorityIntegrityError(
+                "calibration support view was not issued by "
+                "resolve_calibration_support_authority"
+            )
+
     @property
     def tenant_record_id(self) -> UUID:
         """Return a fresh authorized tenant identity."""
-        return _restore_operational_uuid("tenant_record_id", self[0])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "tenant_record_id", object.__getattribute__(self, "_tenant_identity")
+        )
 
     @property
     def validity_study_id(self) -> UUID:
         """Return a fresh authorized validity-study identity."""
-        return _restore_operational_uuid("validity_study_id", self[1])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "validity_study_id", object.__getattribute__(self, "_study_identity")
+        )
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
         """Return immutable corroborating support evidence without source values."""
-        return self[2]
+        self._require_issued()
+        return object.__getattribute__(self, "_fields")
 
 
 @runtime_checkable
@@ -812,7 +843,13 @@ def resolve_calibration_support_authority(
 
     values = {field_name: getattr(record, field_name) for field_name in _READ_FIELDS}
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
-    return tuple.__new__(
-        CalibrationSupportAuthorityView,
-        (tenant_identity, study_identity, fields),
+    view = object.__new__(CalibrationSupportAuthorityView)
+    object.__setattr__(view, "_tenant_identity", tenant_identity)
+    object.__setattr__(view, "_study_identity", study_identity)
+    object.__setattr__(view, "_fields", fields)
+    object.__setattr__(
+        view,
+        "_issuance_marker",
+        _CALIBRATION_SUPPORT_VIEW_ISSUANCE_MARKER,
     )
+    return view
