@@ -66,6 +66,15 @@ from orgmetra_workforce_validation_api.final_weight_component_binding_authority 
     FinalWeightComponentBindingAuthorityView,
     resolve_final_weight_component_binding_authority,
 )
+from orgmetra_workforce_validation_api.final_weight_component_evidence_resolution import (
+    AdjustmentComponentEvidence,
+    BaseWeightComponentEvidence,
+    FinalWeightComponentEvidenceIntegrityError,
+    FinalWeightComponentEvidenceNotFound,
+    FinalWeightComponentEvidenceReadPort,
+    FinalWeightComponentEvidenceResolution,
+    corroborate_final_weight_component_evidence,
+)
 from orgmetra_workforce_validation_api.final_weight_supersession_authority import (
     FinalWeightSupersessionAuthorityIntegrityError,
     FinalWeightSupersessionAuthorityNotFound,
@@ -197,11 +206,13 @@ from orgmetra_workforce_validation_api.weight_eligibility_supersession_authority
 )
 
 __all__ = [
+    "AdjustmentComponentEvidence",
     "BaseWeightAuthorityIntegrityError",
     "BaseWeightAuthorityNotFound",
     "BaseWeightAuthorityReadPort",
     "BaseWeightAuthorityRecord",
     "BaseWeightAuthorityView",
+    "BaseWeightComponentEvidence",
     "BaseWeightSupersessionAuthorityIntegrityError",
     "BaseWeightSupersessionAuthorityNotFound",
     "BaseWeightSupersessionAuthorityReadPort",
@@ -244,6 +255,10 @@ __all__ = [
     "FinalWeightComponentBindingAuthorityReadPort",
     "FinalWeightComponentBindingAuthorityRecord",
     "FinalWeightComponentBindingAuthorityView",
+    "FinalWeightComponentEvidenceIntegrityError",
+    "FinalWeightComponentEvidenceNotFound",
+    "FinalWeightComponentEvidenceReadPort",
+    "FinalWeightComponentEvidenceResolution",
     "FinalWeightSupersessionAuthorityIntegrityError",
     "FinalWeightSupersessionAuthorityNotFound",
     "FinalWeightSupersessionAuthorityReadPort",
@@ -320,6 +335,7 @@ __all__ = [
     "WeightVarianceSupersessionAuthorityReadPort",
     "WeightVarianceSupersessionAuthorityRecord",
     "WeightVarianceSupersessionAuthorityView",
+    "corroborate_final_weight_component_evidence",
     "read_validity_study",
     "resolve_base_weight_authority",
     "resolve_base_weight_supersession_authority",
