@@ -12,7 +12,6 @@ from orgmetra_workforce_validation_api.final_weight_component_evidence_resolutio
     corroborate_final_weight_component_evidence,
 )
 from test_final_weight_component_evidence_resolution import (
-    STUDY,
     TENANT,
     USED_AT,
     _ReadPort,
@@ -91,6 +90,50 @@ def test_cross_tenant_principal_stops_before_any_component_owner_read() -> None:
             used_at=USED_AT,
             purpose_code="selection_validity_analysis",
             policy=_policy(),
+            read_port=port,
+        )
+
+    assert port.base_calls == []
+    assert port.adjustment_calls == []
+
+
+@pytest.mark.parametrize("invalid_principal", [object(), None])
+def test_noncanonical_principal_fails_before_component_owner_read(
+    invalid_principal: object,
+) -> None:
+    """Require an exact principal runtime type before any native owner access."""
+    port = _ReadPort()
+
+    with pytest.raises(TypeError, match="exact ValidationPrincipal"):
+        corroborate_final_weight_component_evidence(
+            principal=invalid_principal,  # type: ignore[arg-type]
+            final_weight=_final_weight(),
+            binding=_binding(),
+            used_at=USED_AT,
+            purpose_code="selection_validity_analysis",
+            policy=_policy(),
+            read_port=port,
+        )
+
+    assert port.base_calls == []
+    assert port.adjustment_calls == []
+
+
+@pytest.mark.parametrize("invalid_policy", [object(), None])
+def test_noncanonical_policy_fails_before_component_owner_read(
+    invalid_policy: object,
+) -> None:
+    """Require an exact policy runtime type before any native owner access."""
+    port = _ReadPort()
+
+    with pytest.raises(TypeError, match="exact PurposeBoundAccessPolicy"):
+        corroborate_final_weight_component_evidence(
+            principal=_principal(),
+            final_weight=_final_weight(),
+            binding=_binding(),
+            used_at=USED_AT,
+            purpose_code="selection_validity_analysis",
+            policy=invalid_policy,  # type: ignore[arg-type]
             read_port=port,
         )
 
