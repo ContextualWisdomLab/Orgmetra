@@ -138,7 +138,11 @@ class FinalWeightAdjustmentCoordinate(tuple):
         evidence_digest = _require_digest("evidence_receipt_digest", evidence_receipt_digest)
         kind = _require_code("evidence_kind", evidence_kind)
         required_kind = _SPECIALIZED_EVIDENCE_KIND_BY_ADJUSTMENT_CODE.get(code)
-        if required_kind is not None and kind != required_kind:
+        if required_kind is None:
+            raise ValueError(
+                "adjustment_code must identify a governed adjustment with released owner evidence."
+            )
+        if kind != required_kind:
             raise ValueError(f"{code} requires evidence_kind {required_kind}.")
         if input_digest == output_digest:
             raise ValueError(
