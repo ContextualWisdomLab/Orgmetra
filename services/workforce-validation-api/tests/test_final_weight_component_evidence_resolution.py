@@ -7,6 +7,8 @@ from uuid import UUID
 
 import pytest
 
+from orgmetra_keyverse_adapter import PurposeBoundAccessPolicy
+from orgmetra_workforce_validation_api import ValidationPrincipal
 from orgmetra_workforce_validation_api.final_weight_authority import (
     FinalAnalysisWeightAuthorityRecord,
     FinalWeightAdjustmentCoordinate,
@@ -46,6 +48,42 @@ ADJUSTMENT_RECEIPT_DIGEST = "4" * 64
 ADJUSTMENT_OUTPUT_DIGEST = "5" * 64
 CONFIGURATION_DIGEST = "6" * 64
 METHOD_REFERENCE = "weight_method:dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+READ_FIELDS = frozenset(
+    {
+        "receipt_reference",
+        "receipt_digest",
+        "evidence_version",
+        "method_code",
+        "method_reference",
+        "method_version",
+        "input_weight_artifact_digest",
+        "output_weight_artifact_digest",
+        "configuration_digest",
+        "evidence_kind",
+        "released_at",
+        "superseded_at",
+    }
+)
+
+
+def _principal(*, tenant_record_id: UUID = TENANT) -> ValidationPrincipal:
+    return ValidationPrincipal(
+        tenant_record_id=tenant_record_id,
+        actor_reference="person:validation-analyst-1",
+        granted_scope_codes=frozenset({"orgmetra.workforce_validation.read"}),
+    )
+
+
+def _policy(*, purpose_code: str = "selection_validity_analysis") -> PurposeBoundAccessPolicy:
+    return PurposeBoundAccessPolicy(
+        tenant_record_id=TENANT,
+        policy_version_code="final-weight-component-evidence-resolution-read-v1",
+        resource_kind="final_weight_component_evidence_resolution",
+        purpose_code=purpose_code,
+        operation_code="read",
+        required_scope_code="orgmetra.workforce_validation.read",
+        permitted_fields=READ_FIELDS,
+    )
 
 
 def _final_weight(**overrides: object) -> FinalAnalysisWeightAuthorityRecord:
@@ -217,14 +255,27 @@ class _ReadPort:
         return self.adjustment
 
 
+def _corroborate(
+    *,
+    read_port: object,
+    final_weight: FinalAnalysisWeightAuthorityRecord | None = None,
+    binding: FinalWeightComponentBindingAuthorityRecord | None = None,
+    used_at: datetime = USED_AT,
+) -> FinalWeightComponentEvidenceResolution:
+    return corroborate_final_weight_component_evidence(
+        principal=_principal(),
+        final_weight=_final_weight() if final_weight is None else final_weight,
+        binding=_binding() if binding is None else binding,
+        used_at=used_at,
+        purpose_code="selection_validity_analysis",
+        policy=_policy(),
+        read_port=read_port,
+    )
+
+
 def test_exact_receipt_identity_resolves_and_cross_checks_component_semantics() -> None:
     port = _ReadPort()
-    resolution = corroborate_final_weight_component_evidence(
-        final_weight=_final_weight(),
-        binding=_binding(),
-        used_at=USED_AT,
-        read_port=port,
-    )
+    resolution = _corroborate(read_port=port)
 
     assert isinstance(resolution, FinalWeightComponentEvidenceResolution)
     assert resolution.base_weight.tenant_record_id == TENANT
@@ -259,12 +310,7 @@ def test_component_method_or_artifact_mismatch_fails_closed() -> None:
         )
     )
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="adjustment semantics"):
-        corroborate_final_weight_component_evidence(
-            final_weight=_final_weight(),
-            binding=_binding(),
-            used_at=USED_AT,
-            read_port=port,
-        )
+        _corroborate(read_port=port)
 
 
 def test_component_not_released_by_final_construction_fails_closed() -> None:
@@ -274,35 +320,20 @@ def test_component_not_released_by_final_construction_fails_closed() -> None:
         )
     )
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="construction"):
-        corroborate_final_weight_component_evidence(
-            final_weight=_final_weight(),
-            binding=_binding(),
-            used_at=USED_AT,
-            read_port=port,
-        )
+        _corroborate(read_port=port)
 
 
 def test_missing_exact_component_receipt_fails_closed() -> None:
     port = _ReadPort()
     port.adjustment = None
     with pytest.raises(FinalWeightComponentEvidenceNotFound):
-        corroborate_final_weight_component_evidence(
-            final_weight=_final_weight(),
-            binding=_binding(),
-            used_at=USED_AT,
-            read_port=port,
-        )
+        _corroborate(read_port=port)
 
 
 def test_binding_cannot_omit_a_specialized_adjustment() -> None:
     binding = _binding(adjustment_bindings=())
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="specialized"):
-        corroborate_final_weight_component_evidence(
-            final_weight=_final_weight(),
-            binding=binding,
-            used_at=USED_AT,
-            read_port=_ReadPort(),
-        )
+        _corroborate(read_port=_ReadPort(), binding=binding)
 
 
 def test_binding_cannot_be_released_before_the_final_weight_authority() -> None:
@@ -312,31 +343,16 @@ def test_binding_cannot_be_released_before_the_final_weight_authority() -> None:
         released_at=binding_release,
     )
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="binding.*final"):
-        corroborate_final_weight_component_evidence(
-            final_weight=_final_weight(),
-            binding=binding,
-            used_at=USED_AT,
-            read_port=_ReadPort(),
-        )
+        _corroborate(read_port=_ReadPort(), binding=binding)
 
 
 def test_base_component_from_another_study_fails_closed() -> None:
     port = _ReadPort(base=_base_evidence(validity_study_id=OTHER_STUDY))
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="tenant or validity study"):
-        corroborate_final_weight_component_evidence(
-            final_weight=_final_weight(),
-            binding=_binding(),
-            used_at=USED_AT,
-            read_port=port,
-        )
+        _corroborate(read_port=port)
 
 
 def test_adjustment_component_from_another_tenant_fails_closed() -> None:
     port = _ReadPort(adjustment=_adjustment_evidence(tenant_record_id=OTHER_TENANT))
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="tenant or validity study"):
-        corroborate_final_weight_component_evidence(
-            final_weight=_final_weight(),
-            binding=_binding(),
-            used_at=USED_AT,
-            read_port=port,
-        )
+        _corroborate(read_port=port)
