@@ -433,7 +433,6 @@ def _locked_wheel_requirements(
             require_py_typed=canonical_name == canonicalize_name(_SERVICE_NAME),
         )
         wheels_by_name[canonical_name] = wheel_path
-        hashes_by_name[canonical_name] = _sha256(wheel_path)
         _validate_wheel_metadata(
             wheel_path,
             expected_name=expected_name,
@@ -449,6 +448,8 @@ def _locked_wheel_requirements(
         )
 
     assert set(wheels_by_name) == set(expected_versions)
+    for canonical_name, wheel_path in wheels_by_name.items():
+        hashes_by_name[canonical_name] = _sha256(wheel_path)
     lock_lines = [
         f"{_KEYVERSE_NAME}=={keyverse_version} --hash=sha256:{hashes_by_name[canonicalize_name(_KEYVERSE_NAME)]}",
         f"{_SERVICE_NAME}=={service_version} --hash=sha256:{hashes_by_name[canonicalize_name(_SERVICE_NAME)]}",

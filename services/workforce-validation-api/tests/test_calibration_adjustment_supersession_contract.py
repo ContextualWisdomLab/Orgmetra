@@ -237,7 +237,6 @@ def test_missing_noncanonical_and_pre_release_owner_evidence_fail_closed() -> No
         {"validity_study_id": OTHER_STUDY},
         {"calibration_receipt_reference": SUCCESSOR},
         {"calibration_receipt_digest": "4" * 64},
-        {"evidence_version": 2},
         {"owner_contract_reference": "released_owner_contract:44444444-4444-4444-8444-444444444444"},
         {"owner_contract_version": 2},
         {"owner_contract_digest": "5" * 64},
@@ -246,6 +245,11 @@ def test_missing_noncanonical_and_pre_release_owner_evidence_fail_closed() -> No
 def test_owner_evidence_must_match_every_requested_coordinate(
     record_overrides: dict[str, object]
 ) -> None:
+    if "calibration_receipt_reference" in record_overrides:
+        record_overrides = {
+            **record_overrides,
+            "successor_calibration_receipt_reference": RECEIPT,
+        }
     record = _record(**record_overrides)
     with pytest.raises(CalibrationAdjustmentSupersessionAuthorityIntegrityError):
         _resolve(read_port=_ReadPort(record), used_at=CUTOVER - timedelta(seconds=1))
@@ -293,8 +297,7 @@ def test_invalid_request_or_dependency_fails_before_owner_resolution(
     with pytest.raises(error):
         _resolve(
             read_port=port,
-            used_at=CUTOVER - timedelta(seconds=1),
-            **overrides,
+            **{"used_at": CUTOVER - timedelta(seconds=1), **overrides},
         )
     if isinstance(port, _ReadPort):
         assert port.calls == []

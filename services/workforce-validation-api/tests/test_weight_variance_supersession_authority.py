@@ -217,6 +217,11 @@ def test_missing_noncanonical_and_pre_release_evidence_fail_closed() -> None:
     ],
 )
 def test_owner_evidence_must_match_every_requested_coordinate(record_overrides: dict[str, object]) -> None:
+    if "authority_reference" in record_overrides:
+        record_overrides = {
+            **record_overrides,
+            "successor_authority_reference": AUTHORITY,
+        }
     with pytest.raises(WeightVarianceSupersessionAuthorityIntegrityError):
         _resolve(read_port=_ReadPort(_record(**record_overrides)), used_at=RELEASED)
 
@@ -256,7 +261,7 @@ def test_invalid_request_or_dependency_fails_before_owner_resolution(
         port = value
         overrides = {}
     with pytest.raises(error):
-        _resolve(read_port=port, used_at=RELEASED, **overrides)
+        _resolve(read_port=port, **{"used_at": RELEASED, **overrides})
     if isinstance(port, _ReadPort):
         assert port.calls == []
 

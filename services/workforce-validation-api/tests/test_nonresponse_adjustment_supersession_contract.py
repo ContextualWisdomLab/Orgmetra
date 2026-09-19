@@ -85,5 +85,5 @@ def test_nonresponse_supersession_requires_new_immutable_evidence() -> None:
 
 def test_nonresponse_supersession_rejects_naive_cutover() -> None:
     """Correction chronology must remain timezone-aware owner evidence."""
-    with pytest.raises(ValueError, match="timezone-aware"):
+    with pytest.raises(ValueError, match="standard-library timezone provider"):
         _supersession_record(superseded_at=datetime(2026, 9, 18, 1, 10))

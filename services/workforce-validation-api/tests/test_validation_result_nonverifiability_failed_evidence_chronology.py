@@ -81,7 +81,7 @@ def test_non_reproducible_evidence_must_exist_before_verification_evaluation() -
 def test_non_reproducible_evidence_requires_release_chronology() -> None:
     with pytest.raises(ValueError, match="failed_evidence_released_at"):
         _record(failed_evidence_released_at=None)
-    with pytest.raises(ValueError, match="timezone-aware"):
+    with pytest.raises(ValueError, match="standard-library timezone provider"):
         _record(failed_evidence_released_at=datetime(2026, 9, 17, 5, 50))
 
 

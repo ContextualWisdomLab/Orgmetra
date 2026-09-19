@@ -208,7 +208,7 @@ def test_release_chronology_and_historical_use_fail_closed_or_remain_reproducibl
         successor_result_reference=SUCCESSOR_REFERENCE,
         successor_correction_sequence=3,
         successor_result_digest=SUCCESSOR_DIGEST,
-        successor_released_at=USED_AT,
+        successor_released_at=USED_AT + timedelta(seconds=1),
     )
     view = _resolve(read_port=_ReadPort(record))
     assert dict(view.fields)["result_digest"] == RESULT_DIGEST

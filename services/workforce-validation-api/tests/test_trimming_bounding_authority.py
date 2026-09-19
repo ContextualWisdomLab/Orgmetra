@@ -226,7 +226,7 @@ def test_artifact_release_and_currentness_chronology_fail_closed() -> None:
         _record(released_at=CONSTRUCTED_AT - timedelta(seconds=1))
     with pytest.raises(ValueError, match="superseded_at must be later"):
         _record(superseded_at=RELEASED_AT)
-    with pytest.raises(ValueError, match="timezone-aware"):
+    with pytest.raises(ValueError, match="standard-library timezone provider"):
         _record(superseded_at=datetime(2026, 9, 16, 14, 0))
     with pytest.raises(TrimmingBoundingAuthorityIntegrityError):
         _resolve(read_port=_ReadPort(_record(released_at=USED_AT + timedelta(seconds=1))))

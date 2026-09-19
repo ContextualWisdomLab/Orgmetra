@@ -84,7 +84,10 @@ def test_hash_locked_install_manifest_rejects_false_record(tmp_path: Path) -> No
             "Metadata-Version: 2.4\n"
             "Name: orgmetra-keyverse-adapter\n"
             "Version: 0.1.0\n"
-            "Requires-Python: >=3.12\n\n"
+            "Requires-Python: >=3.12\n"
+            "Provides-Extra: test\n"
+            "Requires-Dist: pytest>=8.3; extra == 'test'\n"
+            "Requires-Dist: pytest-cov>=5.0; extra == 'test'\n\n"
         ),
         include_py_typed=False,
     )

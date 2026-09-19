@@ -330,7 +330,10 @@ def test_support_binding_must_be_released_before_scientific_use() -> None:
             "owner contract cannot be released after support evidence",
         ),
         (
-            {"released_at": CONSTRUCTED_AT - timedelta(seconds=1)},
+            {
+                "owner_contract_released_at": CONSTRUCTED_AT - timedelta(seconds=2),
+                "released_at": CONSTRUCTED_AT - timedelta(seconds=1),
+            },
             "support evidence cannot be released before calibration construction",
         ),
     ],

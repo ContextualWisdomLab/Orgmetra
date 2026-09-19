@@ -93,5 +93,5 @@ def test_verification_attempt_must_exist_before_outcome_release() -> None:
 
 
 def test_verification_attempt_release_requires_timezone() -> None:
-    with pytest.raises(ValueError, match="timezone-aware"):
+    with pytest.raises(ValueError, match="standard-library timezone provider"):
         _record(verification_attempt_released_at=datetime(2026, 9, 17, 6, 2))

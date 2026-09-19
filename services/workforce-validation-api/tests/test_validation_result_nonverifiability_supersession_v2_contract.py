@@ -52,6 +52,7 @@ def _predecessor() -> ValidationResultNonVerifiabilityRecord:
         owner_contract_released_at=OWNER_RELEASED_AT,
         evaluated_at=EVALUATED_AT,
         released_at=RELEASED_AT,
+        superseded_at=CUTOVER,
     )
 
 

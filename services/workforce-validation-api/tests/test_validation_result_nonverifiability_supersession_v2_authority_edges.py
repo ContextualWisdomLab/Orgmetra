@@ -529,5 +529,5 @@ def test_v2_rejects_structurally_forged_non_reproducible_predecessor() -> None:
     forged_values = list(predecessor)
     forged_values[6] = None
     forged = tuple.__new__(ValidationResultNonVerifiabilityRecord, forged_values)
-    with pytest.raises(ValueError, match="retain exact failed-artifact evidence"):
+    with pytest.raises(ValueError, match="failed evidence reference and digest"):
         _record(predecessor=forged)

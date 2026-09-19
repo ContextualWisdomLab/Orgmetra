@@ -147,7 +147,7 @@ def test_historical_result_use_before_supersession_remains_verifiable_without_le
             successor_reference=SUCCESSOR_REFERENCE,
             successor_correction_sequence=3,
             successor_digest=SUCCESSOR_DIGEST,
-            successor_released_at=USED_AT + timedelta(hours=12),
+            successor_released_at=USED_AT + timedelta(days=1),
         )
     )
 
@@ -165,7 +165,7 @@ def test_superseded_result_is_not_authoritative_at_or_after_cutover() -> None:
         successor_reference=SUCCESSOR_REFERENCE,
         successor_correction_sequence=3,
         successor_digest=SUCCESSOR_DIGEST,
-        successor_released_at=USED_AT - timedelta(minutes=1),
+        successor_released_at=USED_AT,
     )
 
     with pytest.raises(ValidationResultSupersessionAuthorityIntegrityError):

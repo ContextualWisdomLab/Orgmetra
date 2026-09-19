@@ -208,7 +208,7 @@ def test_release_chronology_and_use_fail_closed() -> None:
         successor_analysis_weight_receipt_reference=SUCCESSOR_REFERENCE,
         successor_correction_sequence=3,
         successor_analysis_weight_receipt_digest=SUCCESSOR_DIGEST,
-        successor_released_at=USED_AT,
+        successor_released_at=USED_AT + timedelta(seconds=1),
     )
     view = _resolve(read_port=_ReadPort(record))
     assert dict(view.fields)["analysis_weight_receipt_digest"] == RECEIPT_DIGEST

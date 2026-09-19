@@ -167,5 +167,5 @@ def test_nonverifiability_is_valid_only_before_owner_resolved_cutover() -> None:
 def test_nonverifiability_cutover_must_follow_release_and_be_timezone_aware() -> None:
     with pytest.raises(ValueError, match="later than"):
         _record(superseded_at=RELEASED_AT)
-    with pytest.raises(ValueError, match="timezone-aware"):
+    with pytest.raises(ValueError, match="standard-library timezone provider"):
         _record(superseded_at=datetime(2026, 9, 17, 6, 20))

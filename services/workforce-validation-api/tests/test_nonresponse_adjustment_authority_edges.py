@@ -42,6 +42,7 @@ def _record(*, evidence_version: object = 1) -> NonresponseAdjustmentAuthorityRe
         ),
         owner_contract_version=5,
         owner_contract_digest="7" * 64,
+        owner_contract_released_at=datetime(2026, 9, 16, 12, 30, tzinfo=timezone.utc),
         released_at=datetime(2026, 9, 16, 13, 0, tzinfo=timezone.utc),
     )
 

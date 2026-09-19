@@ -254,7 +254,7 @@ def test_owner_resolved_input_release_and_currentness_chronology_fail_closed() -
     with pytest.raises(ValueError, match="superseded_at must be later"):
         _record(superseded_at=RELEASED_AT)
 
-    with pytest.raises(ValueError, match="timezone-aware"):
+    with pytest.raises(ValueError, match="standard-library timezone provider"):
         _record(superseded_at=datetime(2026, 9, 16, 14, 0))
 
     with pytest.raises(NonresponseAdjustmentAuthorityIntegrityError):
