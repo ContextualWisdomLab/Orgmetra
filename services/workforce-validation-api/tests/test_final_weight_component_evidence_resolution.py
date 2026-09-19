@@ -241,9 +241,11 @@ def test_exact_receipt_identity_resolves_and_cross_checks_component_semantics() 
 
 
 def test_component_method_or_artifact_mismatch_fails_closed() -> None:
-    port = _ReadPort(adjustment=_adjustment_evidence(method_reference=(
-        "weight_method:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
-    )))
+    port = _ReadPort(
+        adjustment=_adjustment_evidence(
+            method_reference="weight_method:eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+        )
+    )
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="adjustment semantics"):
         corroborate_final_weight_component_evidence(
             final_weight=_final_weight(),
@@ -254,9 +256,11 @@ def test_component_method_or_artifact_mismatch_fails_closed() -> None:
 
 
 def test_component_not_released_by_final_construction_fails_closed() -> None:
-    port = _ReadPort(adjustment=_adjustment_evidence(
-        released_at=CONSTRUCTED_AT + timedelta(microseconds=1)
-    ))
+    port = _ReadPort(
+        adjustment=_adjustment_evidence(
+            released_at=CONSTRUCTED_AT + timedelta(microseconds=1)
+        )
+    )
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="construction"):
         corroborate_final_weight_component_evidence(
             final_weight=_final_weight(),
@@ -281,6 +285,21 @@ def test_missing_exact_component_receipt_fails_closed() -> None:
 def test_binding_cannot_omit_a_specialized_adjustment() -> None:
     binding = _binding(adjustment_bindings=())
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="specialized"):
+        corroborate_final_weight_component_evidence(
+            final_weight=_final_weight(),
+            binding=binding,
+            used_at=USED_AT,
+            read_port=_ReadPort(),
+        )
+
+
+def test_binding_cannot_be_released_before_the_final_weight_authority() -> None:
+    binding_release = FINAL_RELEASED_AT - timedelta(microseconds=1)
+    binding = _binding(
+        owner_contract_released_at=binding_release - timedelta(minutes=1),
+        released_at=binding_release,
+    )
+    with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="binding.*final"):
         corroborate_final_weight_component_evidence(
             final_weight=_final_weight(),
             binding=binding,
