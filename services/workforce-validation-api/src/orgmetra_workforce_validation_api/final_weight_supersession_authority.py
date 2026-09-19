@@ -36,6 +36,7 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "final_weight_supersession_authority"
 _OPERATION = "read"
+_FINAL_WEIGHT_SUPERSESSION_VIEW_ISSUANCE_MARKER = object()
 _READ_FIELDS = frozenset(
     {
         "analysis_weight_receipt_reference",
@@ -249,10 +250,10 @@ class FinalWeightSupersessionAuthorityRecord(tuple):
         return self[5]
 
 
-class FinalWeightSupersessionAuthorityView(tuple):
-    """Minimized current-receipt authority issued only after purpose authorization."""
+class FinalWeightSupersessionAuthorityView:
+    """Sealed current-receipt authority issued only after purpose authorization."""
 
-    __slots__ = ()
+    __slots__ = ("_tenant_identity", "_study_identity", "_fields", "_issuance_marker")
 
     def __new__(
         cls,
@@ -267,20 +268,50 @@ class FinalWeightSupersessionAuthorityView(tuple):
             "resolve_final_weight_supersession_authority."
         )
 
+    def __setattr__(self, name: str, value: object) -> None:
+        """Keep ordinary callers from mutating issued projection state."""
+        raise AttributeError("FinalWeightSupersessionAuthorityView is immutable.")
+
+    def __delattr__(self, name: str) -> None:
+        """Keep ordinary callers from deleting issued projection state."""
+        raise AttributeError("FinalWeightSupersessionAuthorityView is immutable.")
+
+    def _require_issued(self) -> None:
+        """Reject exact-runtime allocations not sealed by the resolver."""
+        try:
+            marker = object.__getattribute__(self, "_issuance_marker")
+        except AttributeError as exc:
+            raise FinalWeightSupersessionAuthorityIntegrityError(
+                "final-weight supersession view was not issued by "
+                "resolve_final_weight_supersession_authority"
+            ) from exc
+        if marker is not _FINAL_WEIGHT_SUPERSESSION_VIEW_ISSUANCE_MARKER:
+            raise FinalWeightSupersessionAuthorityIntegrityError(
+                "final-weight supersession view was not issued by "
+                "resolve_final_weight_supersession_authority"
+            )
+
     @property
     def tenant_record_id(self) -> UUID:
         """Return a fresh authorized tenant identity."""
-        return _restore_operational_uuid("tenant_record_id", self[0])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "tenant_record_id", object.__getattribute__(self, "_tenant_identity")
+        )
 
     @property
     def validity_study_id(self) -> UUID:
         """Return a fresh authorized validity-study identity."""
-        return _restore_operational_uuid("validity_study_id", self[1])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "validity_study_id", object.__getattribute__(self, "_study_identity")
+        )
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
         """Return released current-receipt provenance without successor disclosure."""
-        return self[2]
+        self._require_issued()
+        return object.__getattribute__(self, "_fields")
 
 
 @runtime_checkable
@@ -480,14 +511,24 @@ def resolve_final_weight_supersession_authority(
     values = dict(record.fields)
     values["released_at"] = record.released_at
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_VIEW_FIELDS))
-    return tuple.__new__(
-        FinalWeightSupersessionAuthorityView,
-        (
-            _store_operational_uuid("tenant_record_id", record.tenant_record_id),
-            _store_operational_uuid("validity_study_id", record.validity_study_id),
-            fields,
-        ),
+    view = object.__new__(FinalWeightSupersessionAuthorityView)
+    object.__setattr__(
+        view,
+        "_tenant_identity",
+        _store_operational_uuid("tenant_record_id", record.tenant_record_id),
     )
+    object.__setattr__(
+        view,
+        "_study_identity",
+        _store_operational_uuid("validity_study_id", record.validity_study_id),
+    )
+    object.__setattr__(view, "_fields", fields)
+    object.__setattr__(
+        view,
+        "_issuance_marker",
+        _FINAL_WEIGHT_SUPERSESSION_VIEW_ISSUANCE_MARKER,
+    )
+    return view
 
 
 __all__ = [
