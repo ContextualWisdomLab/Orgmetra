@@ -1,11 +1,9 @@
 """Corroborate exact final-weight component receipts against final-weight semantics.
 
 This cross-owner consistency service is used after purpose-authorized final-weight
-and component-binding reads.  It turns the binding's exact receipt locators into
-an executable deterministic resolution contract: adapters must resolve component
-evidence by receipt identity, and this service verifies that the resolved base
-weight and specialized adjustments agree with the released final-weight chain.
-No row-level weights or foreign source values cross this boundary.
+and component-binding reads. It turns exact receipt locators into a deterministic
+resolution contract and verifies both owner scope and scientific transform
+semantics without copying row-level weights or foreign source values.
 """
 
 from __future__ import annotations
@@ -42,17 +40,19 @@ class FinalWeightComponentEvidenceNotFound(LookupError):
 
 
 class FinalWeightComponentEvidenceIntegrityError(RuntimeError):
-    """Indicate that resolved component evidence disagrees with the final-weight lineage."""
+    """Indicate that resolved component evidence disagrees with final-weight authority."""
 
 
 class BaseWeightComponentEvidence(tuple):
-    """Released base-weight receipt projection needed to reproduce the final-weight chain."""
+    """Scope-bound base-weight receipt projection needed to reproduce a final weight."""
 
     __slots__ = ()
 
     def __new__(
         cls,
         *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
         receipt_reference: str,
         receipt_digest: str,
         evidence_version: int,
@@ -62,7 +62,9 @@ class BaseWeightComponentEvidence(tuple):
         released_at: datetime,
         superseded_at: datetime | None = None,
     ) -> BaseWeightComponentEvidence:
-        """Validate a value-minimized exact base-weight component projection."""
+        """Validate immutable owner scope, receipt identity, semantics and chronology."""
+        tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
+        study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
         reference = _require_reference(
             "receipt_reference", receipt_reference, "base_weight_evidence_receipt"
         )
@@ -83,58 +85,81 @@ class BaseWeightComponentEvidence(tuple):
                 raise ValueError("superseded_at must be later than released_at.")
         return tuple.__new__(
             cls,
-            (reference, digest, version, method, method_ver, output_digest, release, cutover),
+            (
+                tenant_identity,
+                study_identity,
+                reference,
+                digest,
+                version,
+                method,
+                method_ver,
+                output_digest,
+                release,
+                cutover,
+            ),
         )
+
+    @property
+    def tenant_record_id(self) -> UUID:
+        """Return a fresh tenant identity from native owner evidence."""
+        return _restore_operational_uuid("tenant_record_id", self[0])
+
+    @property
+    def validity_study_id(self) -> UUID:
+        """Return a fresh validity-study identity from native owner evidence."""
+        return _restore_operational_uuid("validity_study_id", self[1])
 
     @property
     def receipt_reference(self) -> str:
         """Return the exact base-weight evidence receipt reference."""
-        return self[0]
+        return self[2]
 
     @property
     def receipt_digest(self) -> str:
         """Return the immutable base-weight evidence receipt digest."""
-        return self[1]
+        return self[3]
 
     @property
     def evidence_version(self) -> int:
         """Return the governed base-weight evidence version."""
-        return self[2]
+        return self[4]
 
     @property
     def method_code(self) -> str:
         """Return the base-weight method code used by the final-weight chain."""
-        return self[3]
+        return self[5]
 
     @property
     def method_version(self) -> int:
         """Return the base-weight method version."""
-        return self[4]
+        return self[6]
 
     @property
     def output_weight_artifact_digest(self) -> str:
         """Return the resulting base-weight artifact digest."""
-        return self[5]
+        return self[7]
 
     @property
     def released_at(self) -> datetime:
         """Return when this component became released authority."""
-        return self[6]
+        return self[8]
 
     @property
     def superseded_at(self) -> datetime | None:
         """Return the exclusive end of this component's authority interval."""
-        return self[7]
+        return self[9]
 
 
 class AdjustmentComponentEvidence(tuple):
-    """Released specialized-adjustment projection normalized to final-weight semantics."""
+    """Scope-bound specialized-adjustment projection normalized to final-weight semantics."""
 
     __slots__ = ()
 
     def __new__(
         cls,
         *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
         evidence_kind: str,
         receipt_reference: str,
         receipt_digest: str,
@@ -147,7 +172,9 @@ class AdjustmentComponentEvidence(tuple):
         released_at: datetime,
         superseded_at: datetime | None = None,
     ) -> AdjustmentComponentEvidence:
-        """Validate an exact specialized receipt plus its final-weight transform semantics."""
+        """Validate owner scope, exact receipt identity and transform semantics."""
+        tenant_identity = _store_operational_uuid("tenant_record_id", tenant_record_id)
+        study_identity = _store_operational_uuid("validity_study_id", validity_study_id)
         kind = _require_code("evidence_kind", evidence_kind)
         namespace = _EVIDENCE_REFERENCE_NAMESPACE_BY_KIND.get(kind)
         if namespace is None:
@@ -179,6 +206,8 @@ class AdjustmentComponentEvidence(tuple):
         return tuple.__new__(
             cls,
             (
+                tenant_identity,
+                study_identity,
                 kind,
                 reference,
                 digest,
@@ -194,59 +223,69 @@ class AdjustmentComponentEvidence(tuple):
         )
 
     @property
+    def tenant_record_id(self) -> UUID:
+        """Return a fresh tenant identity from native owner evidence."""
+        return _restore_operational_uuid("tenant_record_id", self[0])
+
+    @property
+    def validity_study_id(self) -> UUID:
+        """Return a fresh validity-study identity from native owner evidence."""
+        return _restore_operational_uuid("validity_study_id", self[1])
+
+    @property
     def evidence_kind(self) -> str:
         """Return the governed specialized receipt family."""
-        return self[0]
+        return self[2]
 
     @property
     def receipt_reference(self) -> str:
         """Return the exact specialized receipt reference."""
-        return self[1]
+        return self[3]
 
     @property
     def receipt_digest(self) -> str:
         """Return the immutable specialized receipt digest."""
-        return self[2]
+        return self[4]
 
     @property
     def evidence_version(self) -> int:
         """Return the governed specialized evidence version."""
-        return self[3]
+        return self[5]
 
     @property
     def method_reference(self) -> str:
         """Return the released weight-method semantic used by the final chain."""
-        return self[4]
+        return self[6]
 
     @property
     def method_version(self) -> int:
         """Return the released weight-method version."""
-        return self[5]
+        return self[7]
 
     @property
     def input_weight_artifact_digest(self) -> str:
         """Return the transform input artifact digest."""
-        return self[6]
+        return self[8]
 
     @property
     def output_weight_artifact_digest(self) -> str:
         """Return the transform output artifact digest."""
-        return self[7]
+        return self[9]
 
     @property
     def configuration_digest(self) -> str:
         """Return the immutable transform configuration digest."""
-        return self[8]
+        return self[10]
 
     @property
     def released_at(self) -> datetime:
         """Return when this specialized component became released authority."""
-        return self[9]
+        return self[11]
 
     @property
     def superseded_at(self) -> datetime | None:
         """Return the exclusive end of this component's authority interval."""
-        return self[10]
+        return self[12]
 
 
 class FinalWeightComponentEvidenceResolution(tuple):
@@ -264,6 +303,8 @@ class FinalWeightComponentEvidenceResolution(tuple):
         if type(base_weight) is not BaseWeightComponentEvidence:
             raise TypeError("base_weight must be an exact BaseWeightComponentEvidence.")
         canonical_base = BaseWeightComponentEvidence(
+            tenant_record_id=base_weight.tenant_record_id,
+            validity_study_id=base_weight.validity_study_id,
             receipt_reference=base_weight.receipt_reference,
             receipt_digest=base_weight.receipt_digest,
             evidence_version=base_weight.evidence_version,
@@ -279,8 +320,7 @@ class FinalWeightComponentEvidenceResolution(tuple):
             raise TypeError("adjustments must be an immutable tuple.")
         canonical_adjustments: list[AdjustmentComponentEvidence] = []
         for adjustment in adjustments:
-            canonical = _canonical_adjustment_evidence(adjustment)
-            canonical_adjustments.append(canonical)
+            canonical_adjustments.append(_canonical_adjustment_evidence(adjustment))
         return tuple.__new__(cls, (canonical_base, tuple(canonical_adjustments)))
 
     @property
@@ -296,7 +336,7 @@ class FinalWeightComponentEvidenceResolution(tuple):
 
 @runtime_checkable
 class FinalWeightComponentEvidenceReadPort(Protocol):
-    """Deterministic receipt-identity resolver for final-weight component evidence."""
+    """Deterministic scope-bound receipt-identity resolver for component evidence."""
 
     def read_base_weight_component_evidence(
         self,
@@ -307,7 +347,7 @@ class FinalWeightComponentEvidenceReadPort(Protocol):
         receipt_digest: str,
         evidence_version: int,
     ) -> BaseWeightComponentEvidence | None:
-        """Resolve exactly one canonical base-weight projection by immutable receipt identity."""
+        """Resolve one canonical scope-bound base-weight projection by receipt identity."""
         ...
 
     def read_adjustment_component_evidence(
@@ -320,7 +360,7 @@ class FinalWeightComponentEvidenceReadPort(Protocol):
         receipt_digest: str,
         evidence_version: int,
     ) -> AdjustmentComponentEvidence | None:
-        """Resolve exactly one canonical specialized projection by immutable receipt identity."""
+        """Resolve one canonical scope-bound specialized projection by receipt identity."""
         ...
 
 
@@ -340,6 +380,8 @@ def _canonical_adjustment_evidence(value: object) -> AdjustmentComponentEvidence
         )
     try:
         canonical = AdjustmentComponentEvidence(
+            tenant_record_id=value.tenant_record_id,
+            validity_study_id=value.validity_study_id,
             evidence_kind=value.evidence_kind,
             receipt_reference=value.receipt_reference,
             receipt_digest=value.receipt_digest,
@@ -371,6 +413,8 @@ def _canonical_base_evidence(value: object) -> BaseWeightComponentEvidence:
         )
     try:
         canonical = BaseWeightComponentEvidence(
+            tenant_record_id=value.tenant_record_id,
+            validity_study_id=value.validity_study_id,
             receipt_reference=value.receipt_reference,
             receipt_digest=value.receipt_digest,
             evidence_version=value.evidence_version,
@@ -443,6 +487,27 @@ def _canonical_binding(value: object) -> FinalWeightComponentBindingAuthorityRec
     return canonical
 
 
+def _require_component_scope(
+    *,
+    component_tenant_record_id: UUID,
+    component_validity_study_id: UUID,
+    tenant_record_id: UUID,
+    validity_study_id: UUID,
+) -> None:
+    """Require normalized component evidence to prove the same owner scope as the final weight."""
+    if (
+        _store_operational_uuid("component tenant_record_id", component_tenant_record_id)
+        != _store_operational_uuid("final tenant_record_id", tenant_record_id)
+        or _store_operational_uuid(
+            "component validity_study_id", component_validity_study_id
+        )
+        != _store_operational_uuid("final validity_study_id", validity_study_id)
+    ):
+        raise FinalWeightComponentEvidenceIntegrityError(
+            "component evidence belongs to another tenant or validity study"
+        )
+
+
 def _require_component_valid_at_construction(
     *, released_at: datetime, superseded_at: datetime | None, constructed_at: datetime
 ) -> None:
@@ -464,7 +529,7 @@ def corroborate_final_weight_component_evidence(
     used_at: datetime,
     read_port: FinalWeightComponentEvidenceReadPort,
 ) -> FinalWeightComponentEvidenceResolution:
-    """Resolve exact component receipts and prove their semantics match the final-weight chain."""
+    """Resolve exact component receipts and prove scope and semantics match the final weight."""
     base_capability = getattr_static(type(read_port), "read_base_weight_component_evidence", None)
     adjustment_capability = getattr_static(
         type(read_port), "read_adjustment_component_evidence", None
@@ -534,6 +599,12 @@ def corroborate_final_weight_component_evidence(
             str(binding_values["base_weight_evidence_receipt_reference"])
         )
     base = _canonical_base_evidence(base_value)
+    _require_component_scope(
+        component_tenant_record_id=base.tenant_record_id,
+        component_validity_study_id=base.validity_study_id,
+        tenant_record_id=tenant_id,
+        validity_study_id=study_id,
+    )
     if (
         base.receipt_reference != binding_values["base_weight_evidence_receipt_reference"]
         or base.receipt_digest != binding_values["base_weight_evidence_receipt_digest"]
@@ -602,6 +673,12 @@ def corroborate_final_weight_component_evidence(
         if component_value is None:
             raise FinalWeightComponentEvidenceNotFound(locator.evidence_receipt_reference)
         component = _canonical_adjustment_evidence(component_value)
+        _require_component_scope(
+            component_tenant_record_id=component.tenant_record_id,
+            component_validity_study_id=component.validity_study_id,
+            tenant_record_id=tenant_id,
+            validity_study_id=study_id,
+        )
         if (
             component.evidence_kind != locator.evidence_kind
             or component.receipt_reference != locator.evidence_receipt_reference
