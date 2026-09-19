@@ -50,6 +50,8 @@ CONFIGURATION_DIGEST = "6" * 64
 METHOD_REFERENCE = "weight_method:dddddddd-dddd-4ddd-8ddd-dddddddddddd"
 READ_FIELDS = frozenset(
     {
+        "tenant_record_id",
+        "validity_study_id",
         "receipt_reference",
         "receipt_digest",
         "evidence_version",
