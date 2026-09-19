@@ -32,6 +32,7 @@ from .scientific_authority import _require_digest, _require_positive_integer, _r
 _RESOURCE_KIND = "validation_result_nonverifiability_supersession_authority"
 _OPERATION = "read"
 _VERSION = 2
+_VALIDATION_RESULT_NONVERIFIABILITY_SUPERSESSION_V2_VIEW_ISSUANCE_MARKER = object()
 _READ_FIELDS = frozenset(
     {
         "result_reference",
@@ -324,10 +325,10 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord(tuple):
         return self[3]
 
 
-class ValidationResultNonVerifiabilitySupersessionV2AuthorityView(tuple):
-    """Expose minimized predecessor provenance without reusable successor authority."""
+class ValidationResultNonVerifiabilitySupersessionV2AuthorityView:
+    """Sealed minimized predecessor provenance issued only after authorization."""
 
-    __slots__ = ()
+    __slots__ = ("_tenant_identity", "_study_identity", "_fields", "_issuance_marker")
 
     def __new__(
         cls,
@@ -342,20 +343,54 @@ class ValidationResultNonVerifiabilitySupersessionV2AuthorityView(tuple):
             "resolve_validation_result_nonverifiability_supersession_v2_authority."
         )
 
+    def __setattr__(self, name: str, value: object) -> None:
+        """Keep ordinary callers from mutating issued projection state."""
+        raise AttributeError(
+            "ValidationResultNonVerifiabilitySupersessionV2AuthorityView is immutable."
+        )
+
+    def __delattr__(self, name: str) -> None:
+        """Keep ordinary callers from deleting issued projection state."""
+        raise AttributeError(
+            "ValidationResultNonVerifiabilitySupersessionV2AuthorityView is immutable."
+        )
+
+    def _require_issued(self) -> None:
+        """Reject exact-runtime allocations not sealed by the resolver."""
+        try:
+            marker = object.__getattribute__(self, "_issuance_marker")
+        except AttributeError as exc:
+            raise ValidationResultNonVerifiabilitySupersessionV2AuthorityIntegrityError(
+                "validation result non-verifiability supersession v2 view was not issued by "
+                "resolve_validation_result_nonverifiability_supersession_v2_authority"
+            ) from exc
+        if marker is not _VALIDATION_RESULT_NONVERIFIABILITY_SUPERSESSION_V2_VIEW_ISSUANCE_MARKER:
+            raise ValidationResultNonVerifiabilitySupersessionV2AuthorityIntegrityError(
+                "validation result non-verifiability supersession v2 view was not issued by "
+                "resolve_validation_result_nonverifiability_supersession_v2_authority"
+            )
+
     @property
     def tenant_record_id(self) -> UUID:
         """Return a fresh authorized tenant identity."""
-        return _restore_operational_uuid("tenant_record_id", self[0])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "tenant_record_id", object.__getattribute__(self, "_tenant_identity")
+        )
 
     @property
     def validity_study_id(self) -> UUID:
         """Return a fresh authorized validity-study identity."""
-        return _restore_operational_uuid("validity_study_id", self[1])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "validity_study_id", object.__getattribute__(self, "_study_identity")
+        )
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
         """Return predecessor provenance without cutover or successor coordinates."""
-        return self[2]
+        self._require_issued()
+        return object.__getattribute__(self, "_fields")
 
 
 @runtime_checkable
@@ -564,14 +599,24 @@ def resolve_validation_result_nonverifiability_supersession_v2_authority(
         )
     projection_values = {**values, "released_at": persisted.released_at}
     fields = tuple((name, projection_values[name]) for name in sorted(_VIEW_FIELDS))
-    return tuple.__new__(
-        ValidationResultNonVerifiabilitySupersessionV2AuthorityView,
-        (
-            _store_operational_uuid("tenant_record_id", tenant_id),
-            _store_operational_uuid("validity_study_id", study_id),
-            fields,
-        ),
+    view = object.__new__(ValidationResultNonVerifiabilitySupersessionV2AuthorityView)
+    object.__setattr__(
+        view,
+        "_tenant_identity",
+        _store_operational_uuid("tenant_record_id", tenant_id),
     )
+    object.__setattr__(
+        view,
+        "_study_identity",
+        _store_operational_uuid("validity_study_id", study_id),
+    )
+    object.__setattr__(view, "_fields", fields)
+    object.__setattr__(
+        view,
+        "_issuance_marker",
+        _VALIDATION_RESULT_NONVERIFIABILITY_SUPERSESSION_V2_VIEW_ISSUANCE_MARKER,
+    )
+    return view
 
 
 __all__ = [
