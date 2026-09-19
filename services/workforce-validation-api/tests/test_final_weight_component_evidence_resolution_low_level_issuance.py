@@ -9,6 +9,7 @@ import pytest
 
 from orgmetra_workforce_validation_api.final_weight_component_evidence_resolution import (
     BaseWeightComponentEvidence,
+    FinalWeightComponentEvidenceIntegrityError,
     FinalWeightComponentEvidenceResolution,
 )
 
@@ -36,3 +37,13 @@ def test_tuple_new_cannot_bypass_corroborated_resolution_issuance() -> None:
 
     with pytest.raises(TypeError):
         tuple.__new__(FinalWeightComponentEvidenceResolution, (base, ()))
+
+
+def test_generic_object_allocation_cannot_expose_unsealed_proof() -> None:
+    """Fail closed if generic allocation produces an exact but unissued result object."""
+    forged = object.__new__(FinalWeightComponentEvidenceResolution)
+
+    with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="not issued"):
+        _ = forged.base_weight
+    with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="not issued"):
+        _ = forged.adjustments
