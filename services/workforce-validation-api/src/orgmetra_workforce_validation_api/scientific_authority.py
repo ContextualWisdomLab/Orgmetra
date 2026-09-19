@@ -35,7 +35,6 @@ _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _RESOURCE_KIND = "calibration_auxiliary_authority"
 _OPERATION = "read"
-_CALIBRATION_AUXILIARY_VIEW_ISSUANCE_MARKER = object()
 _READ_FIELDS = frozenset(
     {
         "authority_reference",
@@ -362,16 +361,7 @@ class CalibrationAuxiliaryAuthorityView:
 
     def _require_issued(self) -> None:
         """Reject raw allocations not sealed by the authorized resolver path."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise CalibrationAuxiliaryAuthorityIntegrityError(
-                "calibration auxiliary authority view was not issued by the resolver"
-            ) from exc
-        if marker is not _CALIBRATION_AUXILIARY_VIEW_ISSUANCE_MARKER:
-            raise CalibrationAuxiliaryAuthorityIntegrityError(
-                "calibration auxiliary authority view was not issued by the resolver"
-            )
+        _require_calibration_auxiliary_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -428,7 +418,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 )
 
 
-def resolve_calibration_auxiliary_authority(
+def _resolve_calibration_auxiliary_authority_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -450,7 +440,7 @@ def resolve_calibration_auxiliary_authority(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: CalibrationAuxiliaryAuthorityReadPort,
-) -> CalibrationAuxiliaryAuthorityView:
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
     """Authorize and corroborate one exact calibration auxiliary-use authority tuple.
 
     The exact owner capability is captured inertly before authorization and the
@@ -650,11 +640,71 @@ def resolve_calibration_auxiliary_authority(
         "authorized_to": record.authorized_to,
     }
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
-    view = object.__new__(CalibrationAuxiliaryAuthorityView)
-    object.__setattr__(view, "_tenant_identity", tenant_identity)
-    object.__setattr__(view, "_study_identity", study_identity)
-    object.__setattr__(view, "_fields", fields)
-    object.__setattr__(
-        view, "_issuance_marker", _CALIBRATION_AUXILIARY_VIEW_ISSUANCE_MARKER
-    )
-    return view
+    return tenant_identity, study_identity, fields
+
+
+def _build_calibration_auxiliary_view_runtime():
+    """Create closure-private sealing state and the authorized public resolver."""
+    issuance_marker = object()
+
+    def require_issued(view: CalibrationAuxiliaryAuthorityView) -> None:
+        """Verify one auxiliary view against the closure-private capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise CalibrationAuxiliaryAuthorityIntegrityError(
+                "calibration auxiliary authority view was not issued by the resolver"
+            ) from exc
+        if marker is not issuance_marker:
+            raise CalibrationAuxiliaryAuthorityIntegrityError(
+                "calibration auxiliary authority view was not issued by the resolver"
+            )
+
+    def resolve(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        authority_reference: str,
+        auxiliary_projection_reference: str,
+        auxiliary_projection_version: int,
+        auxiliary_projection_digest: str,
+        scientific_purpose_reference: str,
+        scientific_purpose_digest: str,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        owner_contract_digest: str,
+        authorization_receipt_reference: str,
+        authorization_receipt_digest: str,
+        scientific_use_receipt_reference: str,
+        scientific_use_receipt_digest: str,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: CalibrationAuxiliaryAuthorityReadPort,
+    ) -> CalibrationAuxiliaryAuthorityView:
+        """Authorize and corroborate one exact calibration auxiliary authority tuple."""
+        tenant_identity, study_identity, fields = (
+            _resolve_calibration_auxiliary_authority_state(
+                **{
+                    name: value
+                    for name, value in locals().items()
+                    if name != "issuance_marker"
+                }
+            )
+        )
+        view = object.__new__(CalibrationAuxiliaryAuthorityView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, resolve
+
+
+(
+    _require_calibration_auxiliary_view_issued,
+    resolve_calibration_auxiliary_authority,
+) = _build_calibration_auxiliary_view_runtime()
+del _build_calibration_auxiliary_view_runtime

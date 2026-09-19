@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pytest
 
+import orgmetra_workforce_validation_api.scientific_authority as authority_module
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 from orgmetra_workforce_validation_api import ValidationPrincipal
 from orgmetra_workforce_validation_api.scientific_authority import (
@@ -494,6 +495,34 @@ def test_low_level_view_allocation_cannot_expose_caller_authored_projection() ->
     object.__setattr__(wrong_marker_view, "_issuance_marker", object())
     with pytest.raises(CalibrationAuxiliaryAuthorityIntegrityError):
         _ = wrong_marker_view.validity_study_id
+
+
+def test_importable_marker_cannot_mint_calibration_auxiliary_view() -> None:
+    """Keep auxiliary view-sealing authority out of ordinary module state."""
+    assert not hasattr(
+        authority_module,
+        "_CALIBRATION_AUXILIARY_VIEW_ISSUANCE_MARKER",
+    )
+    forged_view = object.__new__(CalibrationAuxiliaryAuthorityView)
+    object.__setattr__(forged_view, "_tenant_identity", TENANT.int)
+    object.__setattr__(forged_view, "_study_identity", STUDY.int)
+    object.__setattr__(
+        forged_view,
+        "_fields",
+        (("authority_reference", AUTHORITY_REFERENCE),),
+    )
+    object.__setattr__(
+        forged_view,
+        "_issuance_marker",
+        getattr(
+            authority_module,
+            "_CALIBRATION_AUXILIARY_VIEW_ISSUANCE_MARKER",
+            object(),
+        ),
+    )
+
+    with pytest.raises(CalibrationAuxiliaryAuthorityIntegrityError):
+        _ = forged_view.fields
 
 
 def test_issued_view_rejects_attribute_deletion() -> None:
