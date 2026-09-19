@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 
+import orgmetra_workforce_validation_api.result_nonverifiability as authority_module
 from orgmetra_workforce_validation_api.result_nonverifiability import (
     ValidationResultNonVerifiabilityIntegrityError,
     ValidationResultNonVerifiabilityView,
@@ -12,6 +13,21 @@ from orgmetra_workforce_validation_api.result_nonverifiability import (
 
 TENANT = UUID("10000000-0000-7000-8000-000000000001")
 STUDY = UUID("00000000-0000-7000-8000-0000000000f2")
+
+
+def test_importable_marker_cannot_mint_nonverifiability_view() -> None:
+    """Keep the non-verifiability view seal outside importable module state."""
+    marker_name = "_VALIDATION_RESULT_NONVERIFIABILITY_VIEW_ISSUANCE_MARKER"
+    assert not hasattr(authority_module, marker_name)
+
+    forged_view = object.__new__(ValidationResultNonVerifiabilityView)
+    object.__setattr__(forged_view, "_tenant_identity", TENANT.int)
+    object.__setattr__(forged_view, "_study_identity", STUDY.int)
+    object.__setattr__(forged_view, "_fields", ())
+    object.__setattr__(forged_view, "_issuance_marker", object())
+
+    with pytest.raises(ValidationResultNonVerifiabilityIntegrityError):
+        _ = forged_view.fields
 
 
 def test_low_level_tuple_construction_cannot_issue_nonverifiability_view() -> None:
