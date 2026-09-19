@@ -1,10 +1,10 @@
 """Authorize and corroborate exact final-weight component receipt evidence.
 
 This cross-owner consistency service performs its own purpose-bound authorization
-before any component owner read. It turns exact receipt locators into a
-deterministic resolution contract and verifies owner scope, scientific transform
-semantics, construction chronology, and governed-use currentness without copying
-row-level weights or foreign source values.
+before any owner read. It re-resolves final-weight and component-binding authority,
+turns exact component receipt locators into a deterministic resolution contract,
+and verifies owner scope, scientific transform semantics, construction chronology,
+and governed-use currentness without copying row-level weights or foreign source values.
 """
 
 from __future__ import annotations
@@ -80,11 +80,11 @@ _RESOLUTION_ISSUANCE_MARKER = object()
 
 
 class FinalWeightComponentEvidenceNotFound(LookupError):
-    """Indicate that an exact bound component receipt cannot be deterministically resolved."""
+    """Indicate that exact authoritative evidence cannot be deterministically resolved."""
 
 
 class FinalWeightComponentEvidenceIntegrityError(RuntimeError):
-    """Indicate that resolved component evidence disagrees with final-weight authority."""
+    """Indicate that resolved evidence disagrees with final-weight authority."""
 
 
 class BaseWeightComponentEvidence(tuple):
@@ -397,7 +397,31 @@ class FinalWeightComponentEvidenceResolution:
 
 @runtime_checkable
 class FinalWeightComponentEvidenceReadPort(Protocol):
-    """Deterministic scope-bound receipt-identity resolver for component evidence."""
+    """Owner-resolution contract for final-weight provenance and component evidence."""
+
+    def read_final_analysis_weight_authority(
+        self,
+        *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        analysis_weight_receipt_reference: str,
+        analysis_weight_receipt_digest: str,
+        evidence_version: int,
+    ) -> FinalAnalysisWeightAuthorityRecord | None:
+        """Resolve the exact released final-weight owner record by immutable receipt identity."""
+        ...
+
+    def read_final_weight_component_binding_authority(
+        self,
+        *,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        analysis_weight_receipt_reference: str,
+        analysis_weight_receipt_digest: str,
+        analysis_weight_evidence_version: int,
+    ) -> FinalWeightComponentBindingAuthorityRecord | None:
+        """Resolve the exact released binding owner record for the final-weight receipt."""
+        ...
 
     def read_base_weight_component_evidence(
         self,
@@ -425,6 +449,12 @@ class FinalWeightComponentEvidenceReadPort(Protocol):
         ...
 
 
+_FINAL_WEIGHT_READ_CAPABILITY = getattr_static(
+    FinalWeightComponentEvidenceReadPort, "read_final_analysis_weight_authority"
+)
+_BINDING_READ_CAPABILITY = getattr_static(
+    FinalWeightComponentEvidenceReadPort, "read_final_weight_component_binding_authority"
+)
 _BASE_READ_CAPABILITY = getattr_static(
     FinalWeightComponentEvidenceReadPort, "read_base_weight_component_evidence"
 )
@@ -636,15 +666,31 @@ def corroborate_final_weight_component_evidence(
     policy: PurposeBoundAccessPolicy,
     read_port: FinalWeightComponentEvidenceReadPort,
 ) -> FinalWeightComponentEvidenceResolution:
-    """Authorize, resolve exact component receipts, and corroborate final-weight semantics."""
+    """Authorize, owner-resolve final/binding authority, and corroborate component evidence."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
     if type(policy) is not PurposeBoundAccessPolicy:
         raise TypeError("policy must be an exact PurposeBoundAccessPolicy.")
+    final_authority_capability = getattr_static(
+        type(read_port), "read_final_analysis_weight_authority", None
+    )
+    binding_authority_capability = getattr_static(
+        type(read_port), "read_final_weight_component_binding_authority", None
+    )
     base_capability = getattr_static(type(read_port), "read_base_weight_component_evidence", None)
     adjustment_capability = getattr_static(
         type(read_port), "read_adjustment_component_evidence", None
     )
+    if (
+        type(final_authority_capability) is not FunctionType
+        or final_authority_capability is _FINAL_WEIGHT_READ_CAPABILITY
+    ):
+        raise TypeError("read_port must expose read_final_analysis_weight_authority.")
+    if (
+        type(binding_authority_capability) is not FunctionType
+        or binding_authority_capability is _BINDING_READ_CAPABILITY
+    ):
+        raise TypeError("read_port must expose read_final_weight_component_binding_authority.")
     if type(base_capability) is not FunctionType or base_capability is _BASE_READ_CAPABILITY:
         raise TypeError("read_port must expose read_base_weight_component_evidence.")
     if (
@@ -729,6 +775,42 @@ def corroborate_final_weight_component_evidence(
         ),
         policy=detached_policy,
     )
+
+    owner_final_value = final_authority_capability(
+        read_port,
+        tenant_record_id=tenant_id,
+        validity_study_id=study_id,
+        analysis_weight_receipt_reference=final_values["analysis_weight_receipt_reference"],
+        analysis_weight_receipt_digest=final_values["analysis_weight_receipt_digest"],
+        evidence_version=final_values["evidence_version"],
+    )
+    if owner_final_value is None:
+        raise FinalWeightComponentEvidenceNotFound(
+            f"final-weight:{final_values['analysis_weight_receipt_reference']}"
+        )
+    owner_final = _canonical_final_weight(owner_final_value)
+    if owner_final != final_record:
+        raise FinalWeightComponentEvidenceIntegrityError(
+            "final-weight owner authority disagrees with supplied final-weight evidence"
+        )
+
+    owner_binding_value = binding_authority_capability(
+        read_port,
+        tenant_record_id=tenant_id,
+        validity_study_id=study_id,
+        analysis_weight_receipt_reference=final_values["analysis_weight_receipt_reference"],
+        analysis_weight_receipt_digest=final_values["analysis_weight_receipt_digest"],
+        analysis_weight_evidence_version=final_values["evidence_version"],
+    )
+    if owner_binding_value is None:
+        raise FinalWeightComponentEvidenceNotFound(
+            f"binding:{final_values['analysis_weight_receipt_reference']}"
+        )
+    owner_binding = _canonical_binding(owner_binding_value)
+    if owner_binding != binding_record:
+        raise FinalWeightComponentEvidenceIntegrityError(
+            "binding owner authority disagrees with supplied component binding evidence"
+        )
 
     base_value = base_capability(
         read_port,
