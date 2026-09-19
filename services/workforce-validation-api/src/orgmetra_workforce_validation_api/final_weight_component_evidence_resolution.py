@@ -289,7 +289,7 @@ class AdjustmentComponentEvidence(tuple):
 
 
 class FinalWeightComponentEvidenceResolution(tuple):
-    """Canonical exact component evidence corroborated against one final-weight receipt."""
+    """Canonical exact component evidence issued only after governed corroboration."""
 
     __slots__ = ()
 
@@ -299,29 +299,11 @@ class FinalWeightComponentEvidenceResolution(tuple):
         base_weight: BaseWeightComponentEvidence,
         adjustments: tuple[AdjustmentComponentEvidence, ...],
     ) -> FinalWeightComponentEvidenceResolution:
-        """Detach already-corroborated component projections."""
-        if type(base_weight) is not BaseWeightComponentEvidence:
-            raise TypeError("base_weight must be an exact BaseWeightComponentEvidence.")
-        canonical_base = BaseWeightComponentEvidence(
-            tenant_record_id=base_weight.tenant_record_id,
-            validity_study_id=base_weight.validity_study_id,
-            receipt_reference=base_weight.receipt_reference,
-            receipt_digest=base_weight.receipt_digest,
-            evidence_version=base_weight.evidence_version,
-            method_code=base_weight.method_code,
-            method_version=base_weight.method_version,
-            output_weight_artifact_digest=base_weight.output_weight_artifact_digest,
-            released_at=base_weight.released_at,
-            superseded_at=base_weight.superseded_at,
+        """Reject public construction so callers cannot mint a corroborated success value."""
+        raise TypeError(
+            "FinalWeightComponentEvidenceResolution is issued only by "
+            "corroborate_final_weight_component_evidence."
         )
-        if canonical_base != base_weight:
-            raise ValueError("base_weight must be canonical component evidence.")
-        if type(adjustments) is not tuple:
-            raise TypeError("adjustments must be an immutable tuple.")
-        canonical_adjustments: list[AdjustmentComponentEvidence] = []
-        for adjustment in adjustments:
-            canonical_adjustments.append(_canonical_adjustment_evidence(adjustment))
-        return tuple.__new__(cls, (canonical_base, tuple(canonical_adjustments)))
 
     @property
     def base_weight(self) -> BaseWeightComponentEvidence:
@@ -433,6 +415,26 @@ def _canonical_base_evidence(value: object) -> BaseWeightComponentEvidence:
             "component port returned non-canonical base-weight evidence"
         )
     return canonical
+
+
+def _issue_component_evidence_resolution(
+    *,
+    base_weight: BaseWeightComponentEvidence,
+    adjustments: tuple[AdjustmentComponentEvidence, ...],
+) -> FinalWeightComponentEvidenceResolution:
+    """Issue a proof-bearing aggregate only from already corroborated canonical evidence."""
+    canonical_base = _canonical_base_evidence(base_weight)
+    if type(adjustments) is not tuple:
+        raise FinalWeightComponentEvidenceIntegrityError(
+            "corroborated adjustments must be an immutable tuple"
+        )
+    canonical_adjustments = tuple(
+        _canonical_adjustment_evidence(adjustment) for adjustment in adjustments
+    )
+    return tuple.__new__(
+        FinalWeightComponentEvidenceResolution,
+        (canonical_base, canonical_adjustments),
+    )
 
 
 def _canonical_final_weight(value: object) -> FinalAnalysisWeightAuthorityRecord:
@@ -723,7 +725,7 @@ def corroborate_final_weight_component_evidence(
         )
         resolved_adjustments.append(component)
 
-    return FinalWeightComponentEvidenceResolution(
+    return _issue_component_evidence_resolution(
         base_weight=base,
         adjustments=tuple(resolved_adjustments),
     )
