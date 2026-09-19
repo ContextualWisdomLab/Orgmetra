@@ -38,6 +38,7 @@ from .scientific_authority import (
 _RESOURCE_KIND = "validation_result_nonverifiability"
 _OPERATION = "read"
 _VERIFICATION_STATUS = "not_verifiable"
+_VALIDATION_RESULT_NONVERIFIABILITY_VIEW_ISSUANCE_MARKER = object()
 _FAILED_REFERENCE_KIND_BY_EVIDENCE_KIND = {
     "analysis_weight_receipt": "analysis_weight_receipt",
     "weight_variance_compatibility_receipt": "weight_variance_compatibility_receipt",
@@ -357,10 +358,10 @@ class ValidationResultNonVerifiabilityRecord(tuple):
         return self[18]
 
 
-class ValidationResultNonVerifiabilityView(tuple):
-    """Field-minimized non-authorizing outcome issued only after authorization."""
+class ValidationResultNonVerifiabilityView:
+    """Sealed non-authorizing outcome issued only after purpose-bound authorization."""
 
-    __slots__ = ()
+    __slots__ = ("_tenant_identity", "_study_identity", "_fields", "_issuance_marker")
 
     def __new__(
         cls,
@@ -375,20 +376,50 @@ class ValidationResultNonVerifiabilityView(tuple):
             "resolve_validation_result_nonverifiability."
         )
 
+    def __setattr__(self, name: str, value: object) -> None:
+        """Keep ordinary callers from mutating issued projection state."""
+        raise AttributeError("ValidationResultNonVerifiabilityView is immutable.")
+
+    def __delattr__(self, name: str) -> None:
+        """Keep ordinary callers from deleting issued projection state."""
+        raise AttributeError("ValidationResultNonVerifiabilityView is immutable.")
+
+    def _require_issued(self) -> None:
+        """Reject exact-runtime allocations not sealed by the resolver."""
+        try:
+            marker = object.__getattribute__(self, "_issuance_marker")
+        except AttributeError as exc:
+            raise ValidationResultNonVerifiabilityIntegrityError(
+                "validation result non-verifiability view was not issued by "
+                "resolve_validation_result_nonverifiability"
+            ) from exc
+        if marker is not _VALIDATION_RESULT_NONVERIFIABILITY_VIEW_ISSUANCE_MARKER:
+            raise ValidationResultNonVerifiabilityIntegrityError(
+                "validation result non-verifiability view was not issued by "
+                "resolve_validation_result_nonverifiability"
+            )
+
     @property
     def tenant_record_id(self) -> UUID:
         """Return a fresh authorized tenant identity."""
-        return _restore_operational_uuid("tenant_record_id", self[0])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "tenant_record_id", object.__getattribute__(self, "_tenant_identity")
+        )
 
     @property
     def validity_study_id(self) -> UUID:
         """Return a fresh authorized validity-study identity."""
-        return _restore_operational_uuid("validity_study_id", self[1])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "validity_study_id", object.__getattribute__(self, "_study_identity")
+        )
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
         """Return immutable reason/evidence fields without scientific row values."""
-        return self[2]
+        self._require_issued()
+        return object.__getattribute__(self, "_fields")
 
 
 @runtime_checkable
@@ -646,7 +677,13 @@ def resolve_validation_result_nonverifiability(
         "superseded_at": record.superseded_at,
     }
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
-    return tuple.__new__(
-        ValidationResultNonVerifiabilityView,
-        (tenant_identity, study_identity, fields),
+    view = object.__new__(ValidationResultNonVerifiabilityView)
+    object.__setattr__(view, "_tenant_identity", tenant_identity)
+    object.__setattr__(view, "_study_identity", study_identity)
+    object.__setattr__(view, "_fields", fields)
+    object.__setattr__(
+        view,
+        "_issuance_marker",
+        _VALIDATION_RESULT_NONVERIFIABILITY_VIEW_ISSUANCE_MARKER,
     )
+    return view
