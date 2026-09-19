@@ -35,7 +35,6 @@ _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _RESOURCE_KIND = "weight_variance_authority"
 _OPERATION = "read"
-_WEIGHT_VARIANCE_VIEW_ISSUANCE_MARKER = object()
 _VARIANCE_EVIDENCE_MODES = frozenset(
     {
         "joint_inclusion",
@@ -398,16 +397,7 @@ class WeightVarianceAuthorityView:
 
     def _require_issued(self) -> None:
         """Reject exact-runtime allocations not sealed by the resolver."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise WeightVarianceAuthorityIntegrityError(
-                "weight variance view was not issued by resolve_weight_variance_authority"
-            ) from exc
-        if marker is not _WEIGHT_VARIANCE_VIEW_ISSUANCE_MARKER:
-            raise WeightVarianceAuthorityIntegrityError(
-                "weight variance view was not issued by resolve_weight_variance_authority"
-            )
+        _require_weight_variance_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -468,7 +458,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 )
 
 
-def resolve_weight_variance_authority(
+def _resolve_weight_variance_authority_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -494,8 +484,8 @@ def resolve_weight_variance_authority(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: WeightVarianceAuthorityReadPort,
-) -> WeightVarianceAuthorityView:
-    """Authorize then corroborate one released point-weight/variance compatibility tuple."""
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
+    """Authorize and corroborate point/variance compatibility into inert view state."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
     if type(policy) is not PurposeBoundAccessPolicy:
@@ -704,9 +694,92 @@ def resolve_weight_variance_authority(
         "superseded_at": record.superseded_at,
     }
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
-    view = object.__new__(WeightVarianceAuthorityView)
-    object.__setattr__(view, "_tenant_identity", tenant_identity)
-    object.__setattr__(view, "_study_identity", study_identity)
-    object.__setattr__(view, "_fields", fields)
-    object.__setattr__(view, "_issuance_marker", _WEIGHT_VARIANCE_VIEW_ISSUANCE_MARKER)
-    return view
+    return tenant_identity, study_identity, fields
+
+
+def _build_weight_variance_view_runtime():
+    """Create closure-private sealing state and the authorized public resolver."""
+    issuance_marker = object()
+
+    def require_issued(view: WeightVarianceAuthorityView) -> None:
+        """Verify one weight/variance view against the closure-private capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise WeightVarianceAuthorityIntegrityError(
+                "weight variance view was not issued by resolve_weight_variance_authority"
+            ) from exc
+        if marker is not issuance_marker:
+            raise WeightVarianceAuthorityIntegrityError(
+                "weight variance view was not issued by resolve_weight_variance_authority"
+            )
+
+    def resolve(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        sampling_receipt_reference: str,
+        sampling_receipt_version: int,
+        sampling_receipt_digest: str,
+        analysis_weight_receipt_digest: str,
+        analytic_case_occurrence_set_digest: str,
+        weight_eligibility_receipt_digest: str,
+        weight_correction_sequence: int,
+        final_weight_artifact_digest: str,
+        variance_design_receipt_reference: str,
+        variance_design_receipt_version: int,
+        variance_design_receipt_digest: str,
+        variance_method_reference: str,
+        variance_method_version: int,
+        variance_evidence_mode: str,
+        variance_semantics: str,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: WeightVarianceAuthorityReadPort,
+    ) -> WeightVarianceAuthorityView:
+        """Authorize then corroborate one released point/variance compatibility tuple."""
+        tenant_identity, study_identity, fields = _resolve_weight_variance_authority_state(
+            principal=principal,
+            tenant_record_id=tenant_record_id,
+            validity_study_id=validity_study_id,
+            sampling_receipt_reference=sampling_receipt_reference,
+            sampling_receipt_version=sampling_receipt_version,
+            sampling_receipt_digest=sampling_receipt_digest,
+            analysis_weight_receipt_digest=analysis_weight_receipt_digest,
+            analytic_case_occurrence_set_digest=analytic_case_occurrence_set_digest,
+            weight_eligibility_receipt_digest=weight_eligibility_receipt_digest,
+            weight_correction_sequence=weight_correction_sequence,
+            final_weight_artifact_digest=final_weight_artifact_digest,
+            variance_design_receipt_reference=variance_design_receipt_reference,
+            variance_design_receipt_version=variance_design_receipt_version,
+            variance_design_receipt_digest=variance_design_receipt_digest,
+            variance_method_reference=variance_method_reference,
+            variance_method_version=variance_method_version,
+            variance_evidence_mode=variance_evidence_mode,
+            variance_semantics=variance_semantics,
+            owner_contract_reference=owner_contract_reference,
+            owner_contract_version=owner_contract_version,
+            used_at=used_at,
+            purpose_code=purpose_code,
+            policy=policy,
+            read_port=read_port,
+        )
+        view = object.__new__(WeightVarianceAuthorityView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, resolve
+
+
+(
+    _require_weight_variance_view_issued,
+    resolve_weight_variance_authority,
+) = _build_weight_variance_view_runtime()
+del _build_weight_variance_view_runtime
