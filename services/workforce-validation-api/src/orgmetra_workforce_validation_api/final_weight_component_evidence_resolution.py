@@ -45,12 +45,23 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "final_weight_component_evidence_resolution"
 _OPERATION = "read"
-_READ_FIELDS = frozenset(
+_BASE_READ_FIELDS = frozenset(
     {
         "receipt_reference",
         "receipt_digest",
         "evidence_version",
         "method_code",
+        "method_version",
+        "output_weight_artifact_digest",
+        "released_at",
+        "superseded_at",
+    }
+)
+_ADJUSTMENT_READ_FIELDS = frozenset(
+    {
+        "receipt_reference",
+        "receipt_digest",
+        "evidence_version",
         "method_reference",
         "method_version",
         "input_weight_artifact_digest",
@@ -644,6 +655,12 @@ def corroborate_final_weight_component_evidence(
     purpose = _require_code("purpose_code", purpose_code)
     final_values = dict(final_record.fields)
     binding_values = dict(binding_record.fields)
+    requested_fields = _BASE_READ_FIELDS
+    if any(
+        adjustment.evidence_kind in _EVIDENCE_REFERENCE_NAMESPACE_BY_KIND
+        for adjustment in final_values["adjustments"]
+    ):
+        requested_fields = _BASE_READ_FIELDS | _ADJUSTMENT_READ_FIELDS
 
     if (
         _store_operational_uuid("final tenant_record_id", final_record.tenant_record_id)
@@ -703,7 +720,7 @@ def corroborate_final_weight_component_evidence(
             purpose_code=purpose,
             operation_code=_OPERATION,
             resource_kind=_RESOURCE_KIND,
-            requested_fields=_READ_FIELDS,
+            requested_fields=requested_fields,
             granted_scope_codes=detached_principal.granted_scope_codes,
         ),
         policy=detached_policy,
