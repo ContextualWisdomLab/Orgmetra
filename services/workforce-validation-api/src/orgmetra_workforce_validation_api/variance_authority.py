@@ -580,32 +580,41 @@ def resolve_weight_variance_authority(
             "owner port returned non-canonical point-weight/variance authority evidence"
         )
 
-    record = WeightVarianceAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        authority_reference=persisted.authority_reference,
-        sampling_receipt_reference=persisted.sampling_receipt_reference,
-        sampling_receipt_version=persisted.sampling_receipt_version,
-        sampling_receipt_digest=persisted.sampling_receipt_digest,
-        analysis_weight_receipt_digest=persisted.analysis_weight_receipt_digest,
-        analytic_case_occurrence_set_digest=persisted.analytic_case_occurrence_set_digest,
-        weight_eligibility_receipt_digest=persisted.weight_eligibility_receipt_digest,
-        weight_correction_sequence=persisted.weight_correction_sequence,
-        final_weight_artifact_digest=persisted.final_weight_artifact_digest,
-        variance_design_receipt_reference=persisted.variance_design_receipt_reference,
-        variance_design_receipt_version=persisted.variance_design_receipt_version,
-        variance_design_receipt_digest=persisted.variance_design_receipt_digest,
-        variance_method_reference=persisted.variance_method_reference,
-        variance_method_version=persisted.variance_method_version,
-        variance_evidence_mode=persisted.variance_evidence_mode,
-        variance_semantics=persisted.variance_semantics,
-        owner_contract_reference=persisted.owner_contract_reference,
-        owner_contract_version=persisted.owner_contract_version,
-        owner_contract_digest=persisted.owner_contract_digest,
-        owner_contract_released_at=persisted.owner_contract_released_at,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-    )
+    try:
+        record = WeightVarianceAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            authority_reference=persisted.authority_reference,
+            sampling_receipt_reference=persisted.sampling_receipt_reference,
+            sampling_receipt_version=persisted.sampling_receipt_version,
+            sampling_receipt_digest=persisted.sampling_receipt_digest,
+            analysis_weight_receipt_digest=persisted.analysis_weight_receipt_digest,
+            analytic_case_occurrence_set_digest=persisted.analytic_case_occurrence_set_digest,
+            weight_eligibility_receipt_digest=persisted.weight_eligibility_receipt_digest,
+            weight_correction_sequence=persisted.weight_correction_sequence,
+            final_weight_artifact_digest=persisted.final_weight_artifact_digest,
+            variance_design_receipt_reference=persisted.variance_design_receipt_reference,
+            variance_design_receipt_version=persisted.variance_design_receipt_version,
+            variance_design_receipt_digest=persisted.variance_design_receipt_digest,
+            variance_method_reference=persisted.variance_method_reference,
+            variance_method_version=persisted.variance_method_version,
+            variance_evidence_mode=persisted.variance_evidence_mode,
+            variance_semantics=persisted.variance_semantics,
+            owner_contract_reference=persisted.owner_contract_reference,
+            owner_contract_version=persisted.owner_contract_version,
+            owner_contract_digest=persisted.owner_contract_digest,
+            owner_contract_released_at=persisted.owner_contract_released_at,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise WeightVarianceAuthorityIntegrityError(
+            "owner port returned malformed point-weight/variance authority evidence"
+        ) from exc
+    if record != persisted:
+        raise WeightVarianceAuthorityIntegrityError(
+            "owner port returned non-canonical point-weight/variance authority evidence"
+        )
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
         != tenant_identity
