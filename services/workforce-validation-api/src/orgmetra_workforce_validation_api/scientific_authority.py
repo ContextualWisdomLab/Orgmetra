@@ -35,6 +35,7 @@ _DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9._~-]*$")
 _RESOURCE_KIND = "calibration_auxiliary_authority"
 _OPERATION = "read"
+_CALIBRATION_AUXILIARY_VIEW_ISSUANCE_MARKER = object()
 _READ_FIELDS = frozenset(
     {
         "authority_reference",
@@ -333,10 +334,10 @@ class CalibrationAuxiliaryAuthorityRecord(tuple):
         return self[19]
 
 
-class CalibrationAuxiliaryAuthorityView(tuple):
-    """Field-minimized owner evidence issued only after authorization and resolution."""
+class CalibrationAuxiliaryAuthorityView:
+    """Sealed field-minimized data view issued only after owner resolution."""
 
-    __slots__ = ()
+    __slots__ = ("_tenant_identity", "_study_identity", "_fields", "_issuance_marker")
 
     def __new__(
         cls,
@@ -351,20 +352,48 @@ class CalibrationAuxiliaryAuthorityView(tuple):
             "resolve_calibration_auxiliary_authority."
         )
 
+    def __setattr__(self, name: str, value: object) -> None:
+        """Keep ordinary callers from mutating issued projection state."""
+        raise AttributeError("CalibrationAuxiliaryAuthorityView is immutable.")
+
+    def __delattr__(self, name: str) -> None:
+        """Keep ordinary callers from deleting issued projection state."""
+        raise AttributeError("CalibrationAuxiliaryAuthorityView is immutable.")
+
+    def _require_issued(self) -> None:
+        """Reject raw allocations not sealed by the authorized resolver path."""
+        try:
+            marker = object.__getattribute__(self, "_issuance_marker")
+        except AttributeError as exc:
+            raise CalibrationAuxiliaryAuthorityIntegrityError(
+                "calibration auxiliary authority view was not issued by the resolver"
+            ) from exc
+        if marker is not _CALIBRATION_AUXILIARY_VIEW_ISSUANCE_MARKER:
+            raise CalibrationAuxiliaryAuthorityIntegrityError(
+                "calibration auxiliary authority view was not issued by the resolver"
+            )
+
     @property
     def tenant_record_id(self) -> UUID:
         """Return a fresh authorized tenant identity."""
-        return _restore_operational_uuid("tenant_record_id", self[0])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "tenant_record_id", object.__getattribute__(self, "_tenant_identity")
+        )
 
     @property
     def validity_study_id(self) -> UUID:
         """Return a fresh validity-study identity."""
-        return _restore_operational_uuid("validity_study_id", self[1])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "validity_study_id", object.__getattribute__(self, "_study_identity")
+        )
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
         """Return immutable corroborating authority fields without protected values."""
-        return self[2]
+        self._require_issued()
+        return object.__getattribute__(self, "_fields")
 
 
 @runtime_checkable
@@ -621,7 +650,11 @@ def resolve_calibration_auxiliary_authority(
         "authorized_to": record.authorized_to,
     }
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
-    return tuple.__new__(
-        CalibrationAuxiliaryAuthorityView,
-        (tenant_identity, study_identity, fields),
+    view = object.__new__(CalibrationAuxiliaryAuthorityView)
+    object.__setattr__(view, "_tenant_identity", tenant_identity)
+    object.__setattr__(view, "_study_identity", study_identity)
+    object.__setattr__(view, "_fields", fields)
+    object.__setattr__(
+        view, "_issuance_marker", _CALIBRATION_AUXILIARY_VIEW_ISSUANCE_MARKER
     )
+    return view

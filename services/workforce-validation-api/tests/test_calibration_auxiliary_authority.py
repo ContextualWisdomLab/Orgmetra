@@ -475,3 +475,31 @@ def test_record_and_view_are_structurally_immutable_and_uuid_views_are_detached(
             validity_study_id=STUDY,
             fields=(),
         )
+
+
+def test_low_level_view_allocation_cannot_expose_caller_authored_projection() -> None:
+    """Reject exact-runtime views that bypass the authorized resolver path."""
+    with pytest.raises((TypeError, CalibrationAuxiliaryAuthorityIntegrityError)):
+        forged_tuple = tuple.__new__(
+            CalibrationAuxiliaryAuthorityView,
+            (TENANT.int, STUDY.int, (("authority_reference", AUTHORITY_REFERENCE),)),
+        )
+        _ = forged_tuple.tenant_record_id
+
+    with pytest.raises((TypeError, CalibrationAuxiliaryAuthorityIntegrityError)):
+        raw_view = object.__new__(CalibrationAuxiliaryAuthorityView)
+        _ = raw_view.fields
+
+    wrong_marker_view = object.__new__(CalibrationAuxiliaryAuthorityView)
+    object.__setattr__(wrong_marker_view, "_issuance_marker", object())
+    with pytest.raises(CalibrationAuxiliaryAuthorityIntegrityError):
+        _ = wrong_marker_view.validity_study_id
+
+
+def test_issued_view_rejects_attribute_deletion() -> None:
+    """Keep authorized projection state immutable after resolver issuance."""
+    view = _resolve(read_port=_ReadPort(_record()))
+    with pytest.raises(AttributeError, match="immutable"):
+        view._fields = ()
+    with pytest.raises(AttributeError, match="immutable"):
+        del view._fields
