@@ -38,6 +38,7 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "calibration_adjustment_authority"
 _OPERATION = "read"
+_CALIBRATION_ADJUSTMENT_VIEW_ISSUANCE_MARKER = object()
 _TERMINATION_CODES = frozenset({"converged", "fallback_applied"})
 _READ_FIELDS = frozenset(
     {
@@ -643,10 +644,10 @@ class CalibrationAdjustmentAuthorityRecord(tuple):
         return self[46]
 
 
-class CalibrationAdjustmentAuthorityView(tuple):
+class CalibrationAdjustmentAuthorityView:
     """Field-minimized typed calibration evidence issued only after authorization."""
 
-    __slots__ = ()
+    __slots__ = ("_tenant_identity", "_study_identity", "_fields", "_issuance_marker")
 
     def __new__(
         cls,
@@ -661,20 +662,48 @@ class CalibrationAdjustmentAuthorityView(tuple):
             "resolve_calibration_adjustment_authority."
         )
 
+    def __setattr__(self, name: str, value: object) -> None:
+        """Reject mutation after resolver-controlled issuance."""
+        raise AttributeError("CalibrationAdjustmentAuthorityView is immutable.")
+
+    def __delattr__(self, name: str) -> None:
+        """Reject deletion after resolver-controlled issuance."""
+        raise AttributeError("CalibrationAdjustmentAuthorityView is immutable.")
+
+    def _require_issued(self) -> None:
+        """Require the exact in-process marker written by the resolver."""
+        try:
+            marker = object.__getattribute__(self, "_issuance_marker")
+        except AttributeError as exc:
+            raise CalibrationAdjustmentAuthorityIntegrityError(
+                "calibration-adjustment authority view was not issued by the resolver"
+            ) from exc
+        if marker is not _CALIBRATION_ADJUSTMENT_VIEW_ISSUANCE_MARKER:
+            raise CalibrationAdjustmentAuthorityIntegrityError(
+                "calibration-adjustment authority view has an invalid issuance marker"
+            )
+
     @property
     def tenant_record_id(self) -> UUID:
         """Return a fresh authorized tenant identity."""
-        return _restore_operational_uuid("tenant_record_id", self[0])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "tenant_record_id", object.__getattribute__(self, "_tenant_identity")
+        )
 
     @property
     def validity_study_id(self) -> UUID:
         """Return a fresh authorized validity-study identity."""
-        return _restore_operational_uuid("validity_study_id", self[1])
+        self._require_issued()
+        return _restore_operational_uuid(
+            "validity_study_id", object.__getattribute__(self, "_study_identity")
+        )
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
         """Return immutable typed calibration provenance without source values."""
-        return self[2]
+        self._require_issued()
+        return object.__getattribute__(self, "_fields")
 
 
 @runtime_checkable
@@ -1062,11 +1091,15 @@ def resolve_calibration_adjustment_authority(
             ("fallback_rule_digest", record.fallback_rule_digest),
             ("fallback_rule_reference", record.fallback_rule_reference),
         )
-    return tuple.__new__(
-        CalibrationAdjustmentAuthorityView,
-        (
-            _store_operational_uuid("tenant_record_id", tenant_id),
-            _store_operational_uuid("validity_study_id", study_id),
-            fields,
-        ),
+    view = object.__new__(CalibrationAdjustmentAuthorityView)
+    object.__setattr__(
+        view, "_tenant_identity", _store_operational_uuid("tenant_record_id", tenant_id)
     )
+    object.__setattr__(
+        view, "_study_identity", _store_operational_uuid("validity_study_id", study_id)
+    )
+    object.__setattr__(view, "_fields", fields)
+    object.__setattr__(
+        view, "_issuance_marker", _CALIBRATION_ADJUSTMENT_VIEW_ISSUANCE_MARKER
+    )
+    return view
