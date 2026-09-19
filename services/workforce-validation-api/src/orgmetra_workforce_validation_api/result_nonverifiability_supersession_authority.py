@@ -485,57 +485,67 @@ def resolve_validation_result_nonverifiability_supersession_authority(
             "owner port returned non-canonical non-verifiability supersession evidence"
         )
 
-    persisted_fields = dict(persisted.fields)
-    persisted_successor = (
-        None if persisted.successor_fields is None else dict(persisted.successor_fields)
-    )
-    record = ValidationResultNonVerifiabilitySupersessionAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        result_reference=persisted_fields["result_reference"],
-        result_digest=persisted_fields["result_digest"],
-        failed_evidence_kind=persisted_fields["failed_evidence_kind"],
-        failure_mode=persisted_fields["failure_mode"],
-        verification_attempt_reference=persisted_fields["verification_attempt_reference"],
-        verification_attempt_digest=persisted_fields["verification_attempt_digest"],
-        evidence_version=persisted_fields["evidence_version"],
-        owner_contract_reference=persisted_fields["owner_contract_reference"],
-        owner_contract_version=persisted_fields["owner_contract_version"],
-        owner_contract_digest=persisted_fields["owner_contract_digest"],
-        owner_contract_released_at=persisted_fields["owner_contract_released_at"],
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-        successor_target_result_reference=(
-            None
-            if persisted_successor is None
-            else persisted_successor["successor_target_result_reference"]
-        ),
-        successor_target_result_digest=(
-            None
-            if persisted_successor is None
-            else persisted_successor["successor_target_result_digest"]
-        ),
-        successor_failed_evidence_kind=(
-            None
-            if persisted_successor is None
-            else persisted_successor["successor_failed_evidence_kind"]
-        ),
-        successor_verification_attempt_reference=(
-            None
-            if persisted_successor is None
-            else persisted_successor["successor_verification_attempt_reference"]
-        ),
-        successor_verification_attempt_digest=(
-            None
-            if persisted_successor is None
-            else persisted_successor["successor_verification_attempt_digest"]
-        ),
-        successor_verification_attempt_released_at=(
-            None
-            if persisted_successor is None
-            else persisted_successor["successor_verification_attempt_released_at"]
-        ),
-    )
+    try:
+        persisted_fields = dict(persisted.fields)
+        persisted_successor = (
+            None if persisted.successor_fields is None else dict(persisted.successor_fields)
+        )
+        record = ValidationResultNonVerifiabilitySupersessionAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            result_reference=persisted_fields["result_reference"],
+            result_digest=persisted_fields["result_digest"],
+            failed_evidence_kind=persisted_fields["failed_evidence_kind"],
+            failure_mode=persisted_fields["failure_mode"],
+            verification_attempt_reference=persisted_fields["verification_attempt_reference"],
+            verification_attempt_digest=persisted_fields["verification_attempt_digest"],
+            evidence_version=persisted_fields["evidence_version"],
+            owner_contract_reference=persisted_fields["owner_contract_reference"],
+            owner_contract_version=persisted_fields["owner_contract_version"],
+            owner_contract_digest=persisted_fields["owner_contract_digest"],
+            owner_contract_released_at=persisted_fields["owner_contract_released_at"],
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+            successor_target_result_reference=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_target_result_reference"]
+            ),
+            successor_target_result_digest=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_target_result_digest"]
+            ),
+            successor_failed_evidence_kind=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_failed_evidence_kind"]
+            ),
+            successor_verification_attempt_reference=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_verification_attempt_reference"]
+            ),
+            successor_verification_attempt_digest=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_verification_attempt_digest"]
+            ),
+            successor_verification_attempt_released_at=(
+                None
+                if persisted_successor is None
+                else persisted_successor["successor_verification_attempt_released_at"]
+            ),
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise ValidationResultNonVerifiabilitySupersessionAuthorityIntegrityError(
+            "owner port returned structurally invalid non-verifiability supersession evidence"
+        ) from exc
+    if record != persisted:
+        raise ValidationResultNonVerifiabilitySupersessionAuthorityIntegrityError(
+            "owner port returned non-canonical non-verifiability supersession structure"
+        )
+
     record_values = dict(record.fields)
     requested_values = {
         "evidence_version": version,
