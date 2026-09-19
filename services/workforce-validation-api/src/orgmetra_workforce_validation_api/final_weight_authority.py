@@ -36,7 +36,6 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "final_analysis_weight_authority"
 _OPERATION = "read"
-_FINAL_ANALYSIS_WEIGHT_VIEW_ISSUANCE_MARKER = object()
 _WEIGHT_SCOPE_CODES = frozenset({"cross_sectional", "longitudinal"})
 _SPECIALIZED_EVIDENCE_KIND_BY_ADJUSTMENT_CODE = {
     "nonresponse_adjustment": "nonresponse_adjustment_receipt",
@@ -526,18 +525,7 @@ class FinalAnalysisWeightAuthorityView:
 
     def _require_issued(self) -> None:
         """Reject exact-runtime allocations not sealed by the resolver."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise FinalAnalysisWeightAuthorityIntegrityError(
-                "final analysis-weight view was not issued by "
-                "resolve_final_analysis_weight_authority"
-            ) from exc
-        if marker is not _FINAL_ANALYSIS_WEIGHT_VIEW_ISSUANCE_MARKER:
-            raise FinalAnalysisWeightAuthorityIntegrityError(
-                "final analysis-weight view was not issued by "
-                "resolve_final_analysis_weight_authority"
-            )
+        _require_final_analysis_weight_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -616,7 +604,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 )
 
 
-def resolve_final_analysis_weight_authority(
+def _resolve_final_analysis_weight_authority_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -660,7 +648,7 @@ def resolve_final_analysis_weight_authority(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: FinalAnalysisWeightAuthorityReadPort,
-) -> FinalAnalysisWeightAuthorityView:
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
     """Authorize then corroborate the complete released final-weight lineage."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
@@ -858,21 +846,136 @@ def resolve_final_analysis_weight_authority(
     values["released_at"] = record.released_at
     values["superseded_at"] = record.superseded_at
     fields = tuple((field_name, values[field_name]) for field_name in sorted(_READ_FIELDS))
-    view = object.__new__(FinalAnalysisWeightAuthorityView)
-    object.__setattr__(
-        view,
-        "_tenant_identity",
+    return (
         _store_operational_uuid("tenant_record_id", record.tenant_record_id),
-    )
-    object.__setattr__(
-        view,
-        "_study_identity",
         _store_operational_uuid("validity_study_id", record.validity_study_id),
+        fields,
     )
-    object.__setattr__(view, "_fields", fields)
-    object.__setattr__(
-        view,
-        "_issuance_marker",
-        _FINAL_ANALYSIS_WEIGHT_VIEW_ISSUANCE_MARKER,
-    )
-    return view
+
+
+def _build_final_analysis_weight_view_runtime():
+    """Create closure-private sealing state and the authorized public resolver."""
+    issuance_marker = object()
+
+    def require_issued(view: FinalAnalysisWeightAuthorityView) -> None:
+        """Verify one final analysis-weight view against the private capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise FinalAnalysisWeightAuthorityIntegrityError(
+                "final analysis-weight view was not issued by "
+                "resolve_final_analysis_weight_authority"
+            ) from exc
+        if marker is not issuance_marker:
+            raise FinalAnalysisWeightAuthorityIntegrityError(
+                "final analysis-weight view was not issued by "
+                "resolve_final_analysis_weight_authority"
+            )
+
+    def resolve(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        analysis_weight_receipt_reference: str,
+        analysis_weight_receipt_digest: str,
+        evidence_version: int,
+        estimand_reference: str,
+        estimand_digest: str,
+        estimand_scope_code: str,
+        target_population_reference: str,
+        target_population_digest: str,
+        analysis_unit_code: str,
+        analysis_window_reference: str,
+        reference_duration_reference: str,
+        reference_duration_digest: str,
+        eligible_case_set_digest: str,
+        analytic_case_occurrence_set_digest: str,
+        source_universe_receipt_reference: str,
+        source_universe_receipt_version: int,
+        source_universe_receipt_digest: str,
+        sampling_design_receipt_reference: str,
+        sampling_design_receipt_version: int,
+        sampling_design_receipt_digest: str,
+        base_weight_method_code: str,
+        base_weight_method_version: int,
+        base_weight_evidence_digest: str,
+        base_weight_artifact_digest: str,
+        adjustments: tuple[FinalWeightAdjustmentCoordinate, ...],
+        final_weight_artifact_digest: str,
+        weight_eligibility_receipt_reference: str,
+        weight_eligibility_receipt_digest: str,
+        analytic_case_count: int,
+        constructed_at: datetime,
+        correction_sequence: int,
+        supersedes_receipt_digest: str | None,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        owner_contract_digest: str,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: FinalAnalysisWeightAuthorityReadPort,
+    ) -> FinalAnalysisWeightAuthorityView:
+        """Authorize then issue the complete released final-weight projection."""
+        tenant_identity, study_identity, fields = (
+            _resolve_final_analysis_weight_authority_state(
+                principal=principal,
+                tenant_record_id=tenant_record_id,
+                validity_study_id=validity_study_id,
+                analysis_weight_receipt_reference=analysis_weight_receipt_reference,
+                analysis_weight_receipt_digest=analysis_weight_receipt_digest,
+                evidence_version=evidence_version,
+                estimand_reference=estimand_reference,
+                estimand_digest=estimand_digest,
+                estimand_scope_code=estimand_scope_code,
+                target_population_reference=target_population_reference,
+                target_population_digest=target_population_digest,
+                analysis_unit_code=analysis_unit_code,
+                analysis_window_reference=analysis_window_reference,
+                reference_duration_reference=reference_duration_reference,
+                reference_duration_digest=reference_duration_digest,
+                eligible_case_set_digest=eligible_case_set_digest,
+                analytic_case_occurrence_set_digest=analytic_case_occurrence_set_digest,
+                source_universe_receipt_reference=source_universe_receipt_reference,
+                source_universe_receipt_version=source_universe_receipt_version,
+                source_universe_receipt_digest=source_universe_receipt_digest,
+                sampling_design_receipt_reference=sampling_design_receipt_reference,
+                sampling_design_receipt_version=sampling_design_receipt_version,
+                sampling_design_receipt_digest=sampling_design_receipt_digest,
+                base_weight_method_code=base_weight_method_code,
+                base_weight_method_version=base_weight_method_version,
+                base_weight_evidence_digest=base_weight_evidence_digest,
+                base_weight_artifact_digest=base_weight_artifact_digest,
+                adjustments=adjustments,
+                final_weight_artifact_digest=final_weight_artifact_digest,
+                weight_eligibility_receipt_reference=weight_eligibility_receipt_reference,
+                weight_eligibility_receipt_digest=weight_eligibility_receipt_digest,
+                analytic_case_count=analytic_case_count,
+                constructed_at=constructed_at,
+                correction_sequence=correction_sequence,
+                supersedes_receipt_digest=supersedes_receipt_digest,
+                owner_contract_reference=owner_contract_reference,
+                owner_contract_version=owner_contract_version,
+                owner_contract_digest=owner_contract_digest,
+                used_at=used_at,
+                purpose_code=purpose_code,
+                policy=policy,
+                read_port=read_port,
+            )
+        )
+        view = object.__new__(FinalAnalysisWeightAuthorityView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, resolve
+
+
+(
+    _require_final_analysis_weight_view_issued,
+    resolve_final_analysis_weight_authority,
+) = _build_final_analysis_weight_view_runtime()
+del _build_final_analysis_weight_view_runtime
