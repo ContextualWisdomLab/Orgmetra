@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pytest
 
+import orgmetra_workforce_validation_api.calibration_adjustment_authority as authority_module
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 from orgmetra_workforce_validation_api import ValidationPrincipal
 from orgmetra_workforce_validation_api.calibration_adjustment_authority import (
@@ -551,6 +552,30 @@ def test_view_rejects_caller_authored_issuance_marker() -> None:
     object.__setattr__(forged, "_study_identity", STUDY)
     object.__setattr__(forged, "_fields", ())
     object.__setattr__(forged, "_issuance_marker", object())
+
+    with pytest.raises(CalibrationAdjustmentAuthorityIntegrityError):
+        _ = forged.fields
+
+
+def test_importable_marker_cannot_mint_calibration_adjustment_view() -> None:
+    """Keep the resolver's view-sealing capability out of ordinary module state."""
+    assert not hasattr(
+        authority_module,
+        "_CALIBRATION_ADJUSTMENT_VIEW_ISSUANCE_MARKER",
+    )
+    forged = object.__new__(CalibrationAdjustmentAuthorityView)
+    object.__setattr__(forged, "_tenant_identity", TENANT.int)
+    object.__setattr__(forged, "_study_identity", STUDY.int)
+    object.__setattr__(forged, "_fields", (("termination_code", "converged"),))
+    object.__setattr__(
+        forged,
+        "_issuance_marker",
+        getattr(
+            authority_module,
+            "_CALIBRATION_ADJUSTMENT_VIEW_ISSUANCE_MARKER",
+            object(),
+        ),
+    )
 
     with pytest.raises(CalibrationAdjustmentAuthorityIntegrityError):
         _ = forged.fields

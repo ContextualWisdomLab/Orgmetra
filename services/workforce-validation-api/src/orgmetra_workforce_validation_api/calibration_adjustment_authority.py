@@ -38,7 +38,6 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "calibration_adjustment_authority"
 _OPERATION = "read"
-_CALIBRATION_ADJUSTMENT_VIEW_ISSUANCE_MARKER = object()
 _TERMINATION_CODES = frozenset({"converged", "fallback_applied"})
 _READ_FIELDS = frozenset(
     {
@@ -672,16 +671,7 @@ class CalibrationAdjustmentAuthorityView:
 
     def _require_issued(self) -> None:
         """Require the exact in-process marker written by the resolver."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise CalibrationAdjustmentAuthorityIntegrityError(
-                "calibration-adjustment authority view was not issued by the resolver"
-            ) from exc
-        if marker is not _CALIBRATION_ADJUSTMENT_VIEW_ISSUANCE_MARKER:
-            raise CalibrationAdjustmentAuthorityIntegrityError(
-                "calibration-adjustment authority view has an invalid issuance marker"
-            )
+        _require_calibration_adjustment_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -772,7 +762,7 @@ def _coordinate_tuple(record: CalibrationAdjustmentAuthorityRecord) -> tuple[obj
     return record[:23] + record[25:46]
 
 
-def resolve_calibration_adjustment_authority(
+def _resolve_calibration_adjustment_authority_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -823,8 +813,8 @@ def resolve_calibration_adjustment_authority(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: CalibrationAdjustmentAuthorityReadPort,
-) -> CalibrationAdjustmentAuthorityView:
-    """Authorize then corroborate the exact released calibration receipt."""
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
+    """Authorize and corroborate calibration evidence into inert projection state."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
     if type(policy) is not PurposeBoundAccessPolicy:
@@ -1091,15 +1081,104 @@ def resolve_calibration_adjustment_authority(
             ("fallback_rule_digest", record.fallback_rule_digest),
             ("fallback_rule_reference", record.fallback_rule_reference),
         )
-    view = object.__new__(CalibrationAdjustmentAuthorityView)
-    object.__setattr__(
-        view, "_tenant_identity", _store_operational_uuid("tenant_record_id", tenant_id)
+    return (
+        _store_operational_uuid("tenant_record_id", tenant_id),
+        _store_operational_uuid("validity_study_id", study_id),
+        fields,
     )
-    object.__setattr__(
-        view, "_study_identity", _store_operational_uuid("validity_study_id", study_id)
-    )
-    object.__setattr__(view, "_fields", fields)
-    object.__setattr__(
-        view, "_issuance_marker", _CALIBRATION_ADJUSTMENT_VIEW_ISSUANCE_MARKER
-    )
-    return view
+
+
+def _build_calibration_adjustment_view_runtime():
+    """Create closure-private sealing state and the authorized public resolver."""
+    issuance_marker = object()
+
+    def require_issued(view: CalibrationAdjustmentAuthorityView) -> None:
+        """Verify one calibration view against the closure-private capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise CalibrationAdjustmentAuthorityIntegrityError(
+                "calibration-adjustment authority view was not issued by the resolver"
+            ) from exc
+        if marker is not issuance_marker:
+            raise CalibrationAdjustmentAuthorityIntegrityError(
+                "calibration-adjustment authority view has an invalid issuance marker"
+            )
+
+    def resolve(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        calibration_receipt_reference: str,
+        calibration_receipt_digest: str,
+        evidence_version: int,
+        target_population_digest: str,
+        analysis_window_reference: str,
+        auxiliary_authority_reference: str,
+        auxiliary_projection_reference: str,
+        auxiliary_projection_version: int,
+        auxiliary_projection_digest: str,
+        auxiliary_purpose_reference: str,
+        auxiliary_purpose_digest: str,
+        auxiliary_owner_contract_reference: str,
+        auxiliary_owner_contract_version: int,
+        auxiliary_owner_contract_digest: str,
+        auxiliary_authorization_receipt_reference: str,
+        auxiliary_authorization_receipt_digest: str,
+        auxiliary_scientific_use_receipt_reference: str,
+        auxiliary_scientific_use_receipt_digest: str,
+        auxiliary_scientific_use_at: datetime,
+        benchmark_receipt_reference: str,
+        benchmark_receipt_version: int,
+        benchmark_receipt_digest: str,
+        benchmark_owner_contract_reference: str,
+        benchmark_owner_contract_version: int,
+        benchmark_owner_contract_digest: str,
+        benchmark_reference_at: datetime,
+        algorithm_reference: str,
+        algorithm_version: int,
+        constraints_digest: str,
+        termination_code: str,
+        input_weight_artifact_digest: str,
+        output_weight_artifact_digest: str,
+        constructed_at: datetime,
+        fallback_reason_code: str | None,
+        fallback_rule_reference: str | None,
+        fallback_rule_digest: str | None,
+        fallback_algorithm_reference: str | None,
+        fallback_algorithm_version: int | None,
+        fallback_configuration_digest: str | None,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        owner_contract_digest: str,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: CalibrationAdjustmentAuthorityReadPort,
+    ) -> CalibrationAdjustmentAuthorityView:
+        """Authorize then corroborate the exact released calibration receipt."""
+        tenant_identity, study_identity, fields = (
+            _resolve_calibration_adjustment_authority_state(
+                **{
+                    name: value
+                    for name, value in locals().items()
+                    if name != "issuance_marker"
+                }
+            )
+        )
+        view = object.__new__(CalibrationAdjustmentAuthorityView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, resolve
+
+
+(
+    _require_calibration_adjustment_view_issued,
+    resolve_calibration_adjustment_authority,
+) = _build_calibration_adjustment_view_runtime()
+del _build_calibration_adjustment_view_runtime
