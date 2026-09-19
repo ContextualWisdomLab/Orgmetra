@@ -22,7 +22,7 @@ def test_direct_authorized_view_construction_fails_closed() -> None:
 
 
 def test_low_level_tuple_construction_cannot_expose_authorized_view() -> None:
-    """Reject base-constructor views even when a caller mimics the sealed tuple shape."""
+    """Reject base-constructor views before or at public projection access."""
     payloads = (
         (
             TENANT.int,
@@ -38,13 +38,28 @@ def test_low_level_tuple_construction_cannot_expose_authorized_view() -> None:
     )
 
     for payload in payloads:
-        forged = tuple.__new__(registry.ValidityStudyView, payload)
+        try:
+            forged = tuple.__new__(registry.ValidityStudyView, payload)
+        except TypeError:
+            continue
         for attribute in ("tenant_record_id", "validity_study_id", "fields"):
             with pytest.raises(
                 registry.ValidityStudyIntegrityError,
                 match="was not issued by read_validity_study",
             ):
                 getattr(forged, attribute)
+
+
+def test_unsealed_object_allocation_cannot_expose_authorized_view() -> None:
+    """Require the read-path seal even for a raw exact-runtime object allocation."""
+    unsealed = object.__new__(registry.ValidityStudyView)
+
+    for attribute in ("tenant_record_id", "validity_study_id", "fields"):
+        with pytest.raises(
+            registry.ValidityStudyIntegrityError,
+            match="was not issued by read_validity_study",
+        ):
+            getattr(unsealed, attribute)
 
 
 def test_registry_module_exposes_no_unconditional_view_issuer() -> None:
