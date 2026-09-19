@@ -25,7 +25,9 @@ from orgmetra_workforce_validation_api.final_weight_component_evidence_resolutio
 )
 
 TENANT = UUID("10000000-0000-7000-8000-000000000001")
+OTHER_TENANT = UUID("10000000-0000-7000-8000-000000000002")
 STUDY = UUID("00000000-0000-7000-8000-0000000000f1")
+OTHER_STUDY = UUID("00000000-0000-7000-8000-0000000000f2")
 CONSTRUCTED_AT = datetime(2026, 9, 19, 4, 5, tzinfo=timezone.utc)
 FINAL_RELEASED_AT = datetime(2026, 9, 19, 4, 10, tzinfo=timezone.utc)
 BINDING_RELEASED_AT = datetime(2026, 9, 19, 4, 15, tzinfo=timezone.utc)
@@ -155,6 +157,8 @@ def _binding(**overrides: object) -> FinalWeightComponentBindingAuthorityRecord:
 
 def _base_evidence(**overrides: object) -> BaseWeightComponentEvidence:
     values: dict[str, object] = {
+        "tenant_record_id": TENANT,
+        "validity_study_id": STUDY,
         "receipt_reference": BASE_RECEIPT_REFERENCE,
         "receipt_digest": BASE_RECEIPT_DIGEST,
         "evidence_version": 1,
@@ -170,6 +174,8 @@ def _base_evidence(**overrides: object) -> BaseWeightComponentEvidence:
 
 def _adjustment_evidence(**overrides: object) -> AdjustmentComponentEvidence:
     values: dict[str, object] = {
+        "tenant_record_id": TENANT,
+        "validity_study_id": STUDY,
         "evidence_kind": "nonresponse_adjustment_receipt",
         "receipt_reference": ADJUSTMENT_RECEIPT_REFERENCE,
         "receipt_digest": ADJUSTMENT_RECEIPT_DIGEST,
@@ -198,11 +204,15 @@ class _ReadPort:
         self.base_calls: list[dict[str, object]] = []
         self.adjustment_calls: list[dict[str, object]] = []
 
-    def read_base_weight_component_evidence(self, **kwargs: object) -> BaseWeightComponentEvidence | None:
+    def read_base_weight_component_evidence(
+        self, **kwargs: object
+    ) -> BaseWeightComponentEvidence | None:
         self.base_calls.append(dict(kwargs))
         return self.base
 
-    def read_adjustment_component_evidence(self, **kwargs: object) -> AdjustmentComponentEvidence | None:
+    def read_adjustment_component_evidence(
+        self, **kwargs: object
+    ) -> AdjustmentComponentEvidence | None:
         self.adjustment_calls.append(dict(kwargs))
         return self.adjustment
 
@@ -217,6 +227,8 @@ def test_exact_receipt_identity_resolves_and_cross_checks_component_semantics() 
     )
 
     assert isinstance(resolution, FinalWeightComponentEvidenceResolution)
+    assert resolution.base_weight.tenant_record_id == TENANT
+    assert resolution.base_weight.validity_study_id == STUDY
     assert resolution.base_weight.receipt_reference == BASE_RECEIPT_REFERENCE
     assert resolution.adjustments == (_adjustment_evidence(),)
     assert port.base_calls == [
@@ -305,4 +317,26 @@ def test_binding_cannot_be_released_before_the_final_weight_authority() -> None:
             binding=binding,
             used_at=USED_AT,
             read_port=_ReadPort(),
+        )
+
+
+def test_base_component_from_another_study_fails_closed() -> None:
+    port = _ReadPort(base=_base_evidence(validity_study_id=OTHER_STUDY))
+    with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="tenant or validity study"):
+        corroborate_final_weight_component_evidence(
+            final_weight=_final_weight(),
+            binding=_binding(),
+            used_at=USED_AT,
+            read_port=port,
+        )
+
+
+def test_adjustment_component_from_another_tenant_fails_closed() -> None:
+    port = _ReadPort(adjustment=_adjustment_evidence(tenant_record_id=OTHER_TENANT))
+    with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="tenant or validity study"):
+        corroborate_final_weight_component_evidence(
+            final_weight=_final_weight(),
+            binding=_binding(),
+            used_at=USED_AT,
+            read_port=port,
         )
