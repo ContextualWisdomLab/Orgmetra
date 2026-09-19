@@ -22,6 +22,8 @@ from test_final_weight_component_evidence_resolution import (
 
 READ_FIELDS = frozenset(
     {
+        "tenant_record_id",
+        "validity_study_id",
         "receipt_reference",
         "receipt_digest",
         "evidence_version",
