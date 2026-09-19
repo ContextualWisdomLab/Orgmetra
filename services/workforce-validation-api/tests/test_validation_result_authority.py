@@ -237,6 +237,8 @@ def test_distinct_evidence_digests_and_non_authorizing_status_are_required() -> 
         _record(verification_status=1)
     with pytest.raises(ValueError):
         _record(verification_status="verified")
+    with pytest.raises(ValueError, match="superseded_at"):
+        _record(superseded_at=RELEASED_AT)
 
 
 def test_invalid_dependencies_and_pre_release_use_fail_closed() -> None:

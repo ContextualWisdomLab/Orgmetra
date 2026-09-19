@@ -130,6 +130,8 @@ def _resolve(*, read_port: object, used_at: datetime, **overrides: object):
 
 
 def test_successor_edge_requires_complete_atomic_released_coordinates() -> None:
+    with pytest.raises(ValueError, match="evidence_version must remain 1"):
+        _record(evidence_version=2)
     with pytest.raises(ValueError, match="complete released successor coordinates"):
         _record(successor_released_at=None)
     with pytest.raises(ValueError, match="later than compatibility authority release"):
@@ -163,6 +165,8 @@ def test_historical_use_is_allowed_but_cutover_use_fails_closed() -> None:
     record = _record()
     port = _ReadPort(record)
     view = _resolve(read_port=port, used_at=CUTOVER - timedelta(microseconds=1))
+
+    assert view.validity_study_id == STUDY
 
     assert isinstance(port, WeightVarianceSupersessionAuthorityReadPort)
     assert port.calls == [

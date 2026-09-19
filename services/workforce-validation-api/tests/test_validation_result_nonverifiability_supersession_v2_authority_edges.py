@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
+from types import SimpleNamespace
 
 import pytest
+
+import orgmetra_workforce_validation_api.result_nonverifiability_supersession_v2_authority as v2_module
 
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 from orgmetra_workforce_validation_api.registry import ValidationPrincipal
@@ -441,6 +444,22 @@ def test_record_requires_exact_non_reproducible_predecessor_and_v2() -> None:
         )
 
 
+def test_record_rechecks_exact_failed_artifact_after_predecessor_revalidation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Retain the constructor guard if predecessor revalidation ever regresses."""
+    incomplete = SimpleNamespace(
+        failure_mode="non_reproducible",
+        failed_evidence_reference=None,
+        failed_evidence_digest=FAILED_DIGEST,
+        failed_evidence_released_at=FAILED_RELEASED_AT,
+    )
+    monkeypatch.setattr(v2_module, "_revalidate_predecessor", lambda _value: incomplete)
+
+    with pytest.raises(ValueError, match="retain exact failed-artifact evidence"):
+        _record()
+
+
 def test_incomplete_successor_tuple_fails_closed() -> None:
     """Never accept a cutover without every exact-artifact successor coordinate."""
     values = _successor_overrides()
@@ -531,3 +550,18 @@ def test_v2_rejects_structurally_forged_non_reproducible_predecessor() -> None:
     forged = tuple.__new__(ValidationResultNonVerifiabilityRecord, forged_values)
     with pytest.raises(ValueError, match="failed evidence reference and digest"):
         _record(predecessor=forged)
+
+
+def test_owner_record_rejects_hidden_v2_structure() -> None:
+    """Reject hidden tuple coordinates even when visible owner evidence is valid."""
+    record = _record()
+    forged = tuple.__new__(
+        ValidationResultNonVerifiabilitySupersessionV2AuthorityRecord,
+        tuple(record) + ("hidden-coordinate",),
+    )
+
+    with pytest.raises(
+        ValidationResultNonVerifiabilitySupersessionV2AuthorityIntegrityError,
+        match="non-canonical",
+    ):
+        _resolve(read_port=_ReadPort(forged))

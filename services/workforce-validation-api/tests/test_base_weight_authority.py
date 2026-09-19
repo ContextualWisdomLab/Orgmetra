@@ -178,6 +178,8 @@ def test_resolution_binds_sampling_stage_probabilities_to_base_weight_artifact()
     view = _resolve(read_port=port)
 
     assert isinstance(port, BaseWeightAuthorityReadPort)
+    assert view.tenant_record_id == TENANT
+    assert view.validity_study_id == STUDY
     assert len(port.calls) == 1
     assert port.calls[0]["source_universe_receipt_version"] == 4
     assert port.calls[0]["sampling_design_receipt_version"] == 3
@@ -291,3 +293,10 @@ def test_view_cannot_be_constructed_directly() -> None:
             validity_study_id=STUDY,
             fields=(),
         )
+
+
+@pytest.mark.parametrize("read_port", [_NoReadMethod(), _ProtocolOnly(), _DescriptorReadPort()])
+def test_nonconcrete_owner_capabilities_fail_before_resolution(read_port: object) -> None:
+    """Reject absent, protocol-only, and descriptor owner capabilities statically."""
+    with pytest.raises(TypeError, match="statically callable"):
+        _resolve(read_port=read_port)

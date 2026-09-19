@@ -217,6 +217,10 @@ def test_approximation_mode_accepts_only_explicit_approximate_semantics() -> Non
     record = _record(variance_evidence_mode="approximation", variance_semantics="approximate")
     assert record.variance_evidence_mode == "approximation"
     assert record.variance_semantics == "approximate"
+    with pytest.raises(ValueError, match="approximation evidence"):
+        _record(variance_evidence_mode="approximation", variance_semantics="exact")
+    with pytest.raises(ValueError, match="approximation evidence"):
+        _resolve(variance_evidence_mode="approximation", variance_semantics="exact")
 
 
 @pytest.mark.parametrize(

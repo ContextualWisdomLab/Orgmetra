@@ -316,6 +316,8 @@ def test_record_rejects_non_v1_and_public_view_construction() -> None:
             validity_study_id=STUDY,
             fields=(),
         )
+    with pytest.raises(ValueError, match="digests must be distinct"):
+        _record(owner_contract_digest=RESULT_DIGEST)
 
 
 def test_record_rejects_naive_chronology_and_malformed_successor() -> None:

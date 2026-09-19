@@ -29,9 +29,9 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "6415cdc5707d8a5d268659915ecb4b7ca5894ffd2fdc1e37a36c9c211dd92cd7",
-      "bytes": 17851,
-      "lines": 78
+      "sha256": "0b5ce1897d82ed815627658a57cbfcb6a1c65425e119aaffa2d194b79f6b15d7",
+      "bytes": 18288,
+      "lines": 79
     },
     {
       "path": "CLAUDE.md",
