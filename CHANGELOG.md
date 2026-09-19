@@ -18,7 +18,7 @@ All notable changes to Orgmetra will be documented in this file.
 - `employment_record_version.employment_concurrency_code` constrained to `exclusive` or `concurrent`.
 - ADR 0005 for exclusive employment and staffable seats.
 - `orgmetra_hris_kernel` 0.3.0 with identity-scoped bitemporal resolution, assignment-employment coverage, allocation-portfolio checks, and a Memorial Hospital RN correction case at 100% statement and branch coverage.
-- `employment_record_version` and `position_record_version` so employment and position identity stay stable across retroactive corrections.
+- `employment_record_version` and `position_record_version` so corrections no longer mint a new employment or position identifier.
 - `assignment_record.employment_record_id` bound to the same person as the covering employment.
 - `orgmetra_keyverse_adapter` that binds an opaque Keyverse subject to a person and rejects passwords, passkeys, and tokens.
 - Design tokens for the repeating HR actions: approve, review, correct, request evidence, compare, export, and escalate.
@@ -37,6 +37,8 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Changed
 
+- Active-PR Workforce Validation coverage recovery now exercises exact owner-capability admission, immutable release-view identities, version and chronology rejection, digest independence, approximation semantics, final-weight component corroboration, and base/nonresponse/trimming supersession edge contracts. The Python 3.12 pinned suite passes all 1,306 tests with 4,487/4,487 owned statements and 1,070/1,070 owned branches covered.
+- Active-PR Workforce Validation acceptance fixtures now track released owner contracts, supersession cutovers, owner-read field sets, and standard-library timezone-provider failures exactly; wheel acceptance validates every owned wheel's internal identity and metadata before producing any outer artifact hash.
 - Consolidated repository-owned PR validation from twelve workflows into one Foundation CI job, while keeping the dual-cluster recovery rehearsal separately path-scoped. Central required review and security workflows remain organization-owned.
 - New predictive-validity membership must use one normalized worker-level case; the three independent validity-study decision/evidence/outcome link relations are historical read surfaces only and can no longer accept new rows. A case insert also rejects a criterion observation whose recorded interval is already closed at `linked_at`.
 - Canonicalized service identifiers as two-or-more-word `snake_case` across architecture, deployment, ACL, metrics, and client contracts.
@@ -57,6 +59,7 @@ All notable changes to Orgmetra will be documented in this file.
 
 ### Security
 
+- Active-PR Workforce Validation authorized evidence views now reject low-level base-constructor forging: the registry, calibration auxiliary, calibration support, base-weight, base-weight supersession, calibration benchmark, calibration adjustment, calibration-adjustment supersession, final analysis-weight, final-weight component binding, final-weight supersession, weight eligibility, weight-eligibility supersession, weight/variance supersession, trimming/bounding, and trimming/bounding supersession projections are sealed non-tuple data views whose public constructors reject, whose raw allocations cannot expose state, and whose supported issuers remain purpose-authorized owner-resolution paths. The systematic sibling audit remains open for 8 other tuple-backed public views.
 - Predictive-validity cases fail closed when selection evidence, Job scope, study criterion, converted worker, or system-recorded visibility does not match; the normalized case relation is tenant-qualified, append-only, TRUNCATE-protected, and forced through row-level security.
 - Purpose-bound PII authorization now fails closed across active tenant, authenticated actor tenant, resource tenant, resource kind, purpose, operation, operation-specific Keyverse scope, and requested-field subset; malformed/wildcard-like attributes, mutable field/scope collections, reserved UUID sentinels, and cross-tenant confused-deputy contexts are rejected before protected values are returned. Authorization requests and allow/deny evidence now also require and preserve one namespaced opaque target-resource reference, so immutable audit correlation identifies the exact HR record without copying its protected values. Authorization evidence otherwise contains governance metadata and field names only, with stable denial reasons and actionable next steps rather than PII.
 - LLM output constrained to draft evidence.
