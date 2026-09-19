@@ -24,10 +24,12 @@ from orgmetra_keyverse_adapter import (
 from .final_weight_authority import (
     FinalAnalysisWeightAuthorityRecord,
     FinalWeightAdjustmentCoordinate,
+    _READ_FIELDS as _FINAL_WEIGHT_OWNER_READ_FIELDS,
 )
 from .final_weight_component_binding_authority import (
     FinalWeightComponentBindingAuthorityRecord,
     _EVIDENCE_REFERENCE_NAMESPACE_BY_KIND,
+    _READ_FIELDS as _BINDING_OWNER_READ_FIELDS,
 )
 from .registry import (
     ValidationPrincipal,
@@ -45,6 +47,10 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "final_weight_component_evidence_resolution"
 _OPERATION = "read"
+_OWNER_SCOPE_FIELDS = frozenset({"tenant_record_id", "validity_study_id"})
+_OWNER_PROVENANCE_READ_FIELDS = (
+    _OWNER_SCOPE_FIELDS | _FINAL_WEIGHT_OWNER_READ_FIELDS | _BINDING_OWNER_READ_FIELDS
+)
 _BASE_READ_FIELDS = frozenset(
     {
         "tenant_record_id",
@@ -705,12 +711,12 @@ def corroborate_final_weight_component_evidence(
     purpose = _require_code("purpose_code", purpose_code)
     final_values = dict(final_record.fields)
     binding_values = dict(binding_record.fields)
-    requested_fields = _BASE_READ_FIELDS
+    requested_fields = _OWNER_PROVENANCE_READ_FIELDS | _BASE_READ_FIELDS
     if any(
         adjustment.evidence_kind in _EVIDENCE_REFERENCE_NAMESPACE_BY_KIND
         for adjustment in final_values["adjustments"]
     ):
-        requested_fields = _BASE_READ_FIELDS | _ADJUSTMENT_READ_FIELDS
+        requested_fields = requested_fields | _ADJUSTMENT_READ_FIELDS
 
     if (
         _store_operational_uuid("final tenant_record_id", final_record.tenant_record_id)
