@@ -462,27 +462,36 @@ def resolve_trimming_bounding_authority(
             "owner port returned non-canonical trimming/bounding authority evidence"
         )
 
-    record = TrimmingBoundingAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        adjustment_receipt_reference=persisted.adjustment_receipt_reference,
-        adjustment_receipt_digest=persisted.adjustment_receipt_digest,
-        evidence_version=persisted.evidence_version,
-        rule_reference=persisted.rule_reference,
-        rule_version=persisted.rule_version,
-        rule_configuration_digest=persisted.rule_configuration_digest,
-        affected_case_occurrence_set_digest=persisted.affected_case_occurrence_set_digest,
-        affected_case_count=persisted.affected_case_count,
-        input_weight_artifact_digest=persisted.input_weight_artifact_digest,
-        output_weight_artifact_digest=persisted.output_weight_artifact_digest,
-        constructed_at=persisted.constructed_at,
-        owner_contract_reference=persisted.owner_contract_reference,
-        owner_contract_version=persisted.owner_contract_version,
-        owner_contract_digest=persisted.owner_contract_digest,
-        owner_contract_released_at=persisted.owner_contract_released_at,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-    )
+    try:
+        record = TrimmingBoundingAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            adjustment_receipt_reference=persisted.adjustment_receipt_reference,
+            adjustment_receipt_digest=persisted.adjustment_receipt_digest,
+            evidence_version=persisted.evidence_version,
+            rule_reference=persisted.rule_reference,
+            rule_version=persisted.rule_version,
+            rule_configuration_digest=persisted.rule_configuration_digest,
+            affected_case_occurrence_set_digest=persisted.affected_case_occurrence_set_digest,
+            affected_case_count=persisted.affected_case_count,
+            input_weight_artifact_digest=persisted.input_weight_artifact_digest,
+            output_weight_artifact_digest=persisted.output_weight_artifact_digest,
+            constructed_at=persisted.constructed_at,
+            owner_contract_reference=persisted.owner_contract_reference,
+            owner_contract_version=persisted.owner_contract_version,
+            owner_contract_digest=persisted.owner_contract_digest,
+            owner_contract_released_at=persisted.owner_contract_released_at,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise TrimmingBoundingAuthorityIntegrityError(
+            "owner port returned malformed trimming/bounding authority evidence"
+        ) from exc
+    if record != persisted:
+        raise TrimmingBoundingAuthorityIntegrityError(
+            "owner port returned non-canonical trimming/bounding authority evidence"
+        )
     if _coordinate_tuple(record) != _coordinate_tuple(requested):
         raise TrimmingBoundingAuthorityIntegrityError(
             "released trimming/bounding authority does not match requested coordinates"
