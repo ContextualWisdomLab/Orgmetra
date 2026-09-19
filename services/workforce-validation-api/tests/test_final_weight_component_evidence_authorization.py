@@ -12,6 +12,7 @@ from orgmetra_workforce_validation_api.final_weight_component_evidence_resolutio
     corroborate_final_weight_component_evidence,
 )
 from test_final_weight_component_evidence_resolution import (
+    FINAL_REFERENCE,
     TENANT,
     USED_AT,
     _ReadPort,
@@ -58,10 +59,10 @@ def _policy(*, purpose_code: str = "selection_validity_analysis") -> PurposeBoun
 
 
 def test_denied_purpose_stops_before_any_component_owner_read() -> None:
-    """Reject a purpose mismatch before the base or adjustment port is invoked."""
+    """Reject a purpose mismatch and retain the exact final-receipt audit target."""
     port = _ReadPort()
 
-    with pytest.raises(AuthorizationDeniedError):
+    with pytest.raises(AuthorizationDeniedError) as exc_info:
         corroborate_final_weight_component_evidence(
             principal=_principal(),
             final_weight=_final_weight(),
@@ -72,6 +73,10 @@ def test_denied_purpose_stops_before_any_component_owner_read() -> None:
             read_port=port,
         )
 
+    receipt_tail = FINAL_REFERENCE.partition(":")[2]
+    assert exc_info.value.decision.resource_reference == (
+        f"final_weight_component_evidence_resolution:{receipt_tail}"
+    )
     assert port.base_calls == []
     assert port.adjustment_calls == []
 
