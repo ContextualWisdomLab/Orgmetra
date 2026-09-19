@@ -413,37 +413,44 @@ def resolve_final_weight_supersession_authority(
             "owner port returned non-canonical final-weight supersession evidence"
         )
 
-    record = FinalWeightSupersessionAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-        successor_analysis_weight_receipt_reference=(
-            None
-            if persisted.successor_fields is None
-            else dict(persisted.successor_fields)[
-                "successor_analysis_weight_receipt_reference"
-            ]
-        ),
-        successor_correction_sequence=(
-            None
-            if persisted.successor_fields is None
-            else dict(persisted.successor_fields)["successor_correction_sequence"]
-        ),
-        successor_analysis_weight_receipt_digest=(
-            None
-            if persisted.successor_fields is None
-            else dict(persisted.successor_fields)[
-                "successor_analysis_weight_receipt_digest"
-            ]
-        ),
-        successor_released_at=(
-            None
-            if persisted.successor_fields is None
-            else dict(persisted.successor_fields)["successor_released_at"]
-        ),
-        **dict(persisted.fields),
-    )
+    try:
+        successor_values = (
+            None if persisted.successor_fields is None else dict(persisted.successor_fields)
+        )
+        record = FinalWeightSupersessionAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+            successor_analysis_weight_receipt_reference=(
+                None
+                if successor_values is None
+                else successor_values["successor_analysis_weight_receipt_reference"]
+            ),
+            successor_correction_sequence=(
+                None
+                if successor_values is None
+                else successor_values["successor_correction_sequence"]
+            ),
+            successor_analysis_weight_receipt_digest=(
+                None
+                if successor_values is None
+                else successor_values["successor_analysis_weight_receipt_digest"]
+            ),
+            successor_released_at=(
+                None if successor_values is None else successor_values["successor_released_at"]
+            ),
+            **dict(persisted.fields),
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise FinalWeightSupersessionAuthorityIntegrityError(
+            "owner port returned structurally invalid final-weight supersession evidence"
+        ) from exc
+    if record != persisted:
+        raise FinalWeightSupersessionAuthorityIntegrityError(
+            "owner port returned non-canonical final-weight supersession structure"
+        )
+
     record_values = dict(record.fields)
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
