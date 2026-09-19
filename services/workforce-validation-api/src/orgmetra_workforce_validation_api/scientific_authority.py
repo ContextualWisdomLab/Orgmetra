@@ -545,28 +545,37 @@ def resolve_calibration_auxiliary_authority(
             "owner port returned non-canonical calibration auxiliary authority evidence"
         )
 
-    record = CalibrationAuxiliaryAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        authority_reference=persisted.authority_reference,
-        auxiliary_projection_reference=persisted.auxiliary_projection_reference,
-        auxiliary_projection_version=persisted.auxiliary_projection_version,
-        auxiliary_projection_digest=persisted.auxiliary_projection_digest,
-        scientific_purpose_reference=persisted.scientific_purpose_reference,
-        scientific_purpose_digest=persisted.scientific_purpose_digest,
-        owner_contract_reference=persisted.owner_contract_reference,
-        owner_contract_version=persisted.owner_contract_version,
-        owner_contract_digest=persisted.owner_contract_digest,
-        owner_contract_released_at=persisted.owner_contract_released_at,
-        authorization_receipt_reference=persisted.authorization_receipt_reference,
-        authorization_receipt_digest=persisted.authorization_receipt_digest,
-        authorization_receipt_released_at=persisted.authorization_receipt_released_at,
-        scientific_use_receipt_reference=persisted.scientific_use_receipt_reference,
-        scientific_use_receipt_digest=persisted.scientific_use_receipt_digest,
-        scientific_use_at=persisted.scientific_use_at,
-        authorized_from=persisted.authorized_from,
-        authorized_to=persisted.authorized_to,
-    )
+    try:
+        record = CalibrationAuxiliaryAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            authority_reference=persisted.authority_reference,
+            auxiliary_projection_reference=persisted.auxiliary_projection_reference,
+            auxiliary_projection_version=persisted.auxiliary_projection_version,
+            auxiliary_projection_digest=persisted.auxiliary_projection_digest,
+            scientific_purpose_reference=persisted.scientific_purpose_reference,
+            scientific_purpose_digest=persisted.scientific_purpose_digest,
+            owner_contract_reference=persisted.owner_contract_reference,
+            owner_contract_version=persisted.owner_contract_version,
+            owner_contract_digest=persisted.owner_contract_digest,
+            owner_contract_released_at=persisted.owner_contract_released_at,
+            authorization_receipt_reference=persisted.authorization_receipt_reference,
+            authorization_receipt_digest=persisted.authorization_receipt_digest,
+            authorization_receipt_released_at=persisted.authorization_receipt_released_at,
+            scientific_use_receipt_reference=persisted.scientific_use_receipt_reference,
+            scientific_use_receipt_digest=persisted.scientific_use_receipt_digest,
+            scientific_use_at=persisted.scientific_use_at,
+            authorized_from=persisted.authorized_from,
+            authorized_to=persisted.authorized_to,
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise CalibrationAuxiliaryAuthorityIntegrityError(
+            "owner port returned malformed calibration auxiliary authority evidence"
+        ) from exc
+    if record != persisted:
+        raise CalibrationAuxiliaryAuthorityIntegrityError(
+            "owner port returned non-canonical calibration auxiliary authority evidence"
+        )
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
         != tenant_identity
