@@ -9,6 +9,7 @@ import pytest
 
 from orgmetra_keyverse_adapter import AuthorizationDeniedError, PurposeBoundAccessPolicy
 from orgmetra_workforce_validation_api import ValidationPrincipal
+import orgmetra_workforce_validation_api.trimming_bounding_authority as authority_module
 from orgmetra_workforce_validation_api.trimming_bounding_authority import (
     TrimmingBoundingAuthorityIntegrityError,
     TrimmingBoundingAuthorityNotFound,
@@ -337,6 +338,21 @@ def test_view_rejects_caller_authored_issuance_marker() -> None:
     forged = object.__new__(TrimmingBoundingAuthorityView)
     object.__setattr__(forged, "_tenant_identity", TENANT)
     object.__setattr__(forged, "_study_identity", STUDY)
+    object.__setattr__(forged, "_fields", ())
+    object.__setattr__(forged, "_issuance_marker", object())
+
+    with pytest.raises(TrimmingBoundingAuthorityIntegrityError):
+        _ = forged.fields
+
+
+def test_importable_marker_cannot_mint_trimming_bounding_view() -> None:
+    """Keep the trimming/bounding view seal outside importable module state."""
+    marker_name = "_TRIMMING_BOUNDING_VIEW_ISSUANCE_MARKER"
+    assert not hasattr(authority_module, marker_name)
+
+    forged = object.__new__(TrimmingBoundingAuthorityView)
+    object.__setattr__(forged, "_tenant_identity", TENANT.int)
+    object.__setattr__(forged, "_study_identity", STUDY.int)
     object.__setattr__(forged, "_fields", ())
     object.__setattr__(forged, "_issuance_marker", object())
 
