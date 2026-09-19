@@ -13,30 +13,12 @@ from orgmetra_workforce_validation_api.final_weight_component_evidence_resolutio
 )
 from test_final_weight_component_evidence_resolution import (
     FINAL_REFERENCE,
+    READ_FIELDS,
     TENANT,
     USED_AT,
     _ReadPort,
     _binding,
     _final_weight,
-)
-
-READ_FIELDS = frozenset(
-    {
-        "tenant_record_id",
-        "validity_study_id",
-        "receipt_reference",
-        "receipt_digest",
-        "evidence_version",
-        "method_code",
-        "method_reference",
-        "method_version",
-        "input_weight_artifact_digest",
-        "output_weight_artifact_digest",
-        "configuration_digest",
-        "evidence_kind",
-        "released_at",
-        "superseded_at",
-    }
 )
 
 
@@ -79,6 +61,8 @@ def test_denied_purpose_stops_before_any_component_owner_read() -> None:
     assert exc_info.value.decision.resource_reference == (
         f"final_weight_component_evidence_resolution:{receipt_tail}"
     )
+    assert port.final_owner_calls == []
+    assert port.binding_owner_calls == []
     assert port.base_calls == []
     assert port.adjustment_calls == []
 
@@ -100,6 +84,8 @@ def test_cross_tenant_principal_stops_before_any_component_owner_read() -> None:
             read_port=port,
         )
 
+    assert port.final_owner_calls == []
+    assert port.binding_owner_calls == []
     assert port.base_calls == []
     assert port.adjustment_calls == []
 
@@ -122,6 +108,8 @@ def test_noncanonical_principal_fails_before_component_owner_read(
             read_port=port,
         )
 
+    assert port.final_owner_calls == []
+    assert port.binding_owner_calls == []
     assert port.base_calls == []
     assert port.adjustment_calls == []
 
@@ -144,5 +132,7 @@ def test_noncanonical_policy_fails_before_component_owner_read(
             read_port=port,
         )
 
+    assert port.final_owner_calls == []
+    assert port.binding_owner_calls == []
     assert port.base_calls == []
     assert port.adjustment_calls == []
