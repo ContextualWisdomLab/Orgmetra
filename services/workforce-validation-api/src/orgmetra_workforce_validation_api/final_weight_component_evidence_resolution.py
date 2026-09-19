@@ -642,13 +642,15 @@ def corroborate_final_weight_component_evidence(
         granted_scope_codes=principal.granted_scope_codes,
     )
     detached_policy = _detach_policy(policy)
+    final_receipt_reference = str(final_values["analysis_weight_receipt_reference"])
+    final_receipt_tail = final_receipt_reference.partition(":")[2]
     require_purpose_bound_access(
         request=PurposeBoundAccessRequest(
             tenant_record_id=tenant_id,
             actor_tenant_record_id=detached_principal.tenant_record_id,
             resource_tenant_record_id=tenant_id,
             actor_reference=detached_principal.actor_reference,
-            resource_reference=f"{_RESOURCE_KIND}:{study_id}",
+            resource_reference=f"{_RESOURCE_KIND}:{final_receipt_tail}",
             purpose_code=purpose,
             operation_code=_OPERATION,
             resource_kind=_RESOURCE_KIND,
