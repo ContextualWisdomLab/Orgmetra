@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 
+import orgmetra_workforce_validation_api.result_authority as authority_module
 from orgmetra_workforce_validation_api.result_authority import (
     ValidationResultAuthorityIntegrityError,
     ValidationResultAuthorityView,
@@ -12,6 +13,21 @@ from orgmetra_workforce_validation_api.result_authority import (
 
 TENANT = UUID("10000000-0000-7000-8000-000000000001")
 STUDY = UUID("00000000-0000-7000-8000-0000000000f2")
+
+
+def test_importable_marker_cannot_mint_validation_result_view() -> None:
+    """Keep the validation-result view seal outside importable module state."""
+    marker_name = "_VALIDATION_RESULT_VIEW_ISSUANCE_MARKER"
+    assert not hasattr(authority_module, marker_name)
+
+    forged_view = object.__new__(ValidationResultAuthorityView)
+    object.__setattr__(forged_view, "_tenant_identity", TENANT.int)
+    object.__setattr__(forged_view, "_study_identity", STUDY.int)
+    object.__setattr__(forged_view, "_fields", ())
+    object.__setattr__(forged_view, "_issuance_marker", object())
+
+    with pytest.raises(ValidationResultAuthorityIntegrityError):
+        _ = forged_view.fields
 
 
 def test_low_level_tuple_construction_cannot_issue_validation_result_view() -> None:
