@@ -37,6 +37,7 @@ _READ_FIELDS = frozenset(
         "recorded_to",
     }
 )
+_VALIDITY_STUDY_VIEW_ISSUANCE_MARKER = object()
 
 
 class ValidityStudyNotFound(LookupError):
@@ -299,11 +300,10 @@ class ValidityStudyView(tuple):
     """Structurally immutable field-minimized view returned after authorization.
 
     Tuple-backed storage keeps target UUIDs and UUID-valued projected evidence as
-    immutable integers, so downstream gateway, audit, or workspace code cannot
-    rewrite authorized identity through retained UUID objects. The public
-    constructor is deliberately non-issuing: callers obtain this data-only
-    projection from ``read_validity_study`` and must re-authorize consequential
-    actions rather than treating the Python runtime type as a durable credential.
+    immutable integers. An internal issuance marker additionally prevents a plain
+    base-class tuple construction from exposing caller-authored data through the
+    authorized-view properties. The view remains data, not a reusable credential;
+    consequential actions must re-authorize and re-resolve owner truth.
     """
 
     __slots__ = ()
@@ -318,20 +318,33 @@ class ValidityStudyView(tuple):
         """Reject public construction so only the authorized read path issues views."""
         raise TypeError("ValidityStudyView is issued only by read_validity_study.")
 
+    def _require_issued(self) -> None:
+        """Reject a tuple-shaped value that was not sealed by the authorized read path."""
+        if (
+            tuple.__len__(self) != 4
+            or tuple.__getitem__(self, 0) is not _VALIDITY_STUDY_VIEW_ISSUANCE_MARKER
+        ):
+            raise ValidityStudyIntegrityError(
+                "validity-study view was not issued by read_validity_study"
+            )
+
     @property
     def tenant_record_id(self) -> UUID:
         """Return a fresh tenant identity authorized for this view."""
-        return _restore_operational_uuid("tenant_record_id", self[0])
+        self._require_issued()
+        return _restore_operational_uuid("tenant_record_id", tuple.__getitem__(self, 1))
 
     @property
     def validity_study_id(self) -> UUID:
         """Return a fresh validity-study identity authorized for this view."""
-        return _restore_operational_uuid("validity_study_id", self[1])
+        self._require_issued()
+        return _restore_operational_uuid("validity_study_id", tuple.__getitem__(self, 2))
 
     @property
     def fields(self) -> tuple[tuple[str, object], ...]:
         """Return ordered field-minimized evidence with fresh UUID-valued projections."""
-        return _restore_view_fields(self[2])
+        self._require_issued()
+        return _restore_view_fields(tuple.__getitem__(self, 3))
 
 
 @runtime_checkable
@@ -453,6 +466,7 @@ def read_validity_study(
     return tuple.__new__(
         ValidityStudyView,
         (
+            _VALIDITY_STUDY_VIEW_ISSUANCE_MARKER,
             tenant_identity,
             study_identity,
             _store_view_fields(projected_fields),
