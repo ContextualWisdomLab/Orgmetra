@@ -75,3 +75,15 @@ def test_adjustment_component_hidden_scope_structure_fails_closed() -> None:
     forged = tuple.__new__(AdjustmentComponentEvidence, tuple(_adjustment()) + ("hidden-scope",))
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="non-canonical"):
         _canonical_adjustment_evidence(forged)
+
+
+def test_base_component_missing_tenant_scope_coordinate_fails_closed() -> None:
+    forged = tuple.__new__(BaseWeightComponentEvidence, tuple(_base())[1:])
+    with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="malformed"):
+        _canonical_base_evidence(forged)
+
+
+def test_adjustment_component_missing_tenant_scope_coordinate_fails_closed() -> None:
+    forged = tuple.__new__(AdjustmentComponentEvidence, tuple(_adjustment())[1:])
+    with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="malformed"):
+        _canonical_adjustment_evidence(forged)
