@@ -1,9 +1,10 @@
-"""Corroborate exact final-weight component receipts against final-weight semantics.
+"""Authorize and corroborate exact final-weight component receipt evidence.
 
-This cross-owner consistency service is used after purpose-authorized final-weight
-and component-binding reads. It turns exact receipt locators into a deterministic
-resolution contract and verifies both owner scope and scientific transform
-semantics without copying row-level weights or foreign source values.
+This cross-owner consistency service performs its own purpose-bound authorization
+before any component owner read. It turns exact receipt locators into a
+deterministic resolution contract and verifies owner scope, scientific transform
+semantics, construction chronology, and governed-use currentness without copying
+row-level weights or foreign source values.
 """
 
 from __future__ import annotations
@@ -14,6 +15,12 @@ from types import FunctionType
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
+from orgmetra_keyverse_adapter import (
+    PurposeBoundAccessPolicy,
+    PurposeBoundAccessRequest,
+    require_purpose_bound_access,
+)
+
 from .final_weight_authority import (
     FinalAnalysisWeightAuthorityRecord,
     FinalWeightAdjustmentCoordinate,
@@ -23,6 +30,8 @@ from .final_weight_component_binding_authority import (
     _EVIDENCE_REFERENCE_NAMESPACE_BY_KIND,
 )
 from .registry import (
+    ValidationPrincipal,
+    _detach_policy,
     _require_aware_datetime,
     _require_code,
     _restore_operational_uuid,
@@ -32,6 +41,25 @@ from .scientific_authority import (
     _require_digest,
     _require_positive_integer,
     _require_reference,
+)
+
+_RESOURCE_KIND = "final_weight_component_evidence_resolution"
+_OPERATION = "read"
+_READ_FIELDS = frozenset(
+    {
+        "receipt_reference",
+        "receipt_digest",
+        "evidence_version",
+        "method_code",
+        "method_reference",
+        "method_version",
+        "input_weight_artifact_digest",
+        "output_weight_artifact_digest",
+        "configuration_digest",
+        "evidence_kind",
+        "released_at",
+        "superseded_at",
+    }
 )
 
 
@@ -536,12 +564,19 @@ def _require_component_current_at_use(
 
 def corroborate_final_weight_component_evidence(
     *,
+    principal: ValidationPrincipal,
     final_weight: FinalAnalysisWeightAuthorityRecord,
     binding: FinalWeightComponentBindingAuthorityRecord,
     used_at: datetime,
+    purpose_code: str,
+    policy: PurposeBoundAccessPolicy,
     read_port: FinalWeightComponentEvidenceReadPort,
 ) -> FinalWeightComponentEvidenceResolution:
-    """Resolve exact component receipts and prove scope and semantics match the final weight."""
+    """Authorize, resolve exact component receipts, and corroborate final-weight semantics."""
+    if type(principal) is not ValidationPrincipal:
+        raise TypeError("principal must be an exact ValidationPrincipal.")
+    if type(policy) is not PurposeBoundAccessPolicy:
+        raise TypeError("policy must be an exact PurposeBoundAccessPolicy.")
     base_capability = getattr_static(type(read_port), "read_base_weight_component_evidence", None)
     adjustment_capability = getattr_static(
         type(read_port), "read_adjustment_component_evidence", None
@@ -557,6 +592,7 @@ def corroborate_final_weight_component_evidence(
     final_record = _canonical_final_weight(final_weight)
     binding_record = _canonical_binding(binding)
     use_instant = _require_aware_datetime("used_at", used_at)
+    purpose = _require_code("purpose_code", purpose_code)
     final_values = dict(final_record.fields)
     binding_values = dict(binding_record.fields)
 
@@ -593,11 +629,35 @@ def corroborate_final_weight_component_evidence(
         )
 
     tenant_id = _restore_operational_uuid(
-        "tenant_record_id", _store_operational_uuid("tenant_record_id", final_record.tenant_record_id)
+        "tenant_record_id",
+        _store_operational_uuid("tenant_record_id", final_record.tenant_record_id),
     )
     study_id = _restore_operational_uuid(
-        "validity_study_id", _store_operational_uuid("validity_study_id", final_record.validity_study_id)
+        "validity_study_id",
+        _store_operational_uuid("validity_study_id", final_record.validity_study_id),
     )
+    detached_principal = ValidationPrincipal(
+        tenant_record_id=principal.tenant_record_id,
+        actor_reference=principal.actor_reference,
+        granted_scope_codes=principal.granted_scope_codes,
+    )
+    detached_policy = _detach_policy(policy)
+    require_purpose_bound_access(
+        request=PurposeBoundAccessRequest(
+            tenant_record_id=tenant_id,
+            actor_tenant_record_id=detached_principal.tenant_record_id,
+            resource_tenant_record_id=tenant_id,
+            actor_reference=detached_principal.actor_reference,
+            resource_reference=f"{_RESOURCE_KIND}:{study_id}",
+            purpose_code=purpose,
+            operation_code=_OPERATION,
+            resource_kind=_RESOURCE_KIND,
+            requested_fields=_READ_FIELDS,
+            granted_scope_codes=detached_principal.granted_scope_codes,
+        ),
+        policy=detached_policy,
+    )
+
     base_value = base_capability(
         read_port,
         tenant_record_id=tenant_id,
