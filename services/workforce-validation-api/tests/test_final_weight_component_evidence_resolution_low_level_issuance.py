@@ -12,6 +12,7 @@ from orgmetra_workforce_validation_api.final_weight_component_evidence_resolutio
     FinalWeightComponentEvidenceIntegrityError,
     FinalWeightComponentEvidenceResolution,
 )
+from test_final_weight_component_evidence_resolution import _ReadPort, _corroborate
 
 
 def _base_evidence() -> BaseWeightComponentEvidence:
@@ -47,3 +48,13 @@ def test_generic_object_allocation_cannot_expose_unsealed_proof() -> None:
         _ = forged.base_weight
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="not issued"):
         _ = forged.adjustments
+
+
+def test_canonical_issued_resolution_rejects_public_mutation() -> None:
+    """Keep corroborated result state immutable after the canonical issuer seals it."""
+    resolution = _corroborate(read_port=_ReadPort())
+
+    with pytest.raises(AttributeError, match="immutable"):
+        resolution.extra = _base_evidence()  # type: ignore[attr-defined]
+    with pytest.raises(AttributeError, match="immutable"):
+        del resolution.base_weight
