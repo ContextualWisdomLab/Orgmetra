@@ -786,14 +786,23 @@ def resolve_final_analysis_weight_authority(
             "owner port returned non-canonical final analysis-weight authority evidence"
         )
 
-    record = FinalAnalysisWeightAuthorityRecord(
-        tenant_record_id=persisted.tenant_record_id,
-        validity_study_id=persisted.validity_study_id,
-        owner_contract_released_at=persisted.owner_contract_released_at,
-        released_at=persisted.released_at,
-        superseded_at=persisted.superseded_at,
-        **dict(persisted.fields),
-    )
+    try:
+        record = FinalAnalysisWeightAuthorityRecord(
+            tenant_record_id=persisted.tenant_record_id,
+            validity_study_id=persisted.validity_study_id,
+            owner_contract_released_at=persisted.owner_contract_released_at,
+            released_at=persisted.released_at,
+            superseded_at=persisted.superseded_at,
+            **dict(persisted.fields),
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise FinalAnalysisWeightAuthorityIntegrityError(
+            "owner port returned malformed final analysis-weight authority evidence"
+        ) from exc
+    if record != persisted:
+        raise FinalAnalysisWeightAuthorityIntegrityError(
+            "owner port returned non-canonical final analysis-weight authority evidence"
+        )
     if (
         _store_operational_uuid("record tenant_record_id", record.tenant_record_id)
         != _store_operational_uuid("requested tenant_record_id", requested.tenant_record_id)
