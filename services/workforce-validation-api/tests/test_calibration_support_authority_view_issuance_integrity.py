@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 
+import orgmetra_workforce_validation_api.calibration_support_authority as authority_module
 from orgmetra_workforce_validation_api.calibration_support_authority import (
     CalibrationSupportAuthorityIntegrityError,
     CalibrationSupportAuthorityView,
@@ -12,6 +13,21 @@ from orgmetra_workforce_validation_api.calibration_support_authority import (
 
 TENANT = UUID("10000000-0000-7000-8000-000000000001")
 STUDY = UUID("00000000-0000-7000-8000-0000000000f2")
+
+
+def test_importable_marker_cannot_mint_calibration_support_view() -> None:
+    """Keep the calibration-support view seal outside importable module state."""
+    marker_name = "_CALIBRATION_SUPPORT_VIEW_ISSUANCE_MARKER"
+    assert not hasattr(authority_module, marker_name)
+
+    forged_view = object.__new__(CalibrationSupportAuthorityView)
+    object.__setattr__(forged_view, "_tenant_identity", TENANT.int)
+    object.__setattr__(forged_view, "_study_identity", STUDY.int)
+    object.__setattr__(forged_view, "_fields", ())
+    object.__setattr__(forged_view, "_issuance_marker", object())
+
+    with pytest.raises(CalibrationSupportAuthorityIntegrityError):
+        _ = forged_view.fields
 
 
 def test_low_level_tuple_construction_cannot_issue_support_view() -> None:
