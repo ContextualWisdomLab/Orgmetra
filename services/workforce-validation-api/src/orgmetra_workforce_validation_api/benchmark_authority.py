@@ -47,7 +47,6 @@ _READ_FIELDS = frozenset(
         "owner_contract_released_at",
     }
 )
-_CALIBRATION_BENCHMARK_VIEW_ISSUANCE_MARKER = object()
 
 
 class CalibrationBenchmarkAuthorityNotFound(LookupError):
@@ -342,18 +341,7 @@ class CalibrationBenchmarkAuthorityView:
 
     def _require_issued(self) -> None:
         """Reject exact-runtime allocations not sealed by the resolver."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise CalibrationBenchmarkAuthorityIntegrityError(
-                "calibration benchmark view was not issued by "
-                "resolve_calibration_benchmark_authority"
-            ) from exc
-        if marker is not _CALIBRATION_BENCHMARK_VIEW_ISSUANCE_MARKER:
-            raise CalibrationBenchmarkAuthorityIntegrityError(
-                "calibration benchmark view was not issued by "
-                "resolve_calibration_benchmark_authority"
-            )
+        _require_calibration_benchmark_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -404,7 +392,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 )
 
 
-def resolve_calibration_benchmark_authority(
+def _resolve_calibration_benchmark_authority_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -420,7 +408,7 @@ def resolve_calibration_benchmark_authority(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: CalibrationBenchmarkAuthorityReadPort,
-) -> CalibrationBenchmarkAuthorityView:
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
     """Authorize then corroborate the exact released benchmark tuple.
 
     The owner must independently resolve immutable release coordinates, release
@@ -605,21 +593,71 @@ def resolve_calibration_benchmark_authority(
         ("benchmark_reference_at", record.benchmark_reference_at),
         ("owner_contract_released_at", record.owner_contract_released_at),
     )
-    view = object.__new__(CalibrationBenchmarkAuthorityView)
-    object.__setattr__(
-        view,
-        "_tenant_identity",
+    return (
         _store_operational_uuid("tenant_record_id", tenant_id),
-    )
-    object.__setattr__(
-        view,
-        "_study_identity",
         _store_operational_uuid("validity_study_id", study_id),
+        fields,
     )
-    object.__setattr__(view, "_fields", fields)
-    object.__setattr__(
-        view,
-        "_issuance_marker",
-        _CALIBRATION_BENCHMARK_VIEW_ISSUANCE_MARKER,
-    )
-    return view
+
+
+def _build_calibration_benchmark_view_runtime():
+    """Create closure-private sealing state and the authorized public resolver."""
+    issuance_marker = object()
+
+    def require_issued(view: CalibrationBenchmarkAuthorityView) -> None:
+        """Verify one benchmark view against the closure-private capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise CalibrationBenchmarkAuthorityIntegrityError(
+                "calibration benchmark view was not issued by "
+                "resolve_calibration_benchmark_authority"
+            ) from exc
+        if marker is not issuance_marker:
+            raise CalibrationBenchmarkAuthorityIntegrityError(
+                "calibration benchmark view was not issued by "
+                "resolve_calibration_benchmark_authority"
+            )
+
+    def resolve(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        benchmark_receipt_reference: str,
+        benchmark_receipt_version: int,
+        benchmark_receipt_digest: str,
+        benchmark_owner_contract_reference: str,
+        benchmark_owner_contract_version: int,
+        benchmark_owner_contract_digest: str,
+        benchmark_reference_at: datetime,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: CalibrationBenchmarkAuthorityReadPort,
+    ) -> CalibrationBenchmarkAuthorityView:
+        """Authorize and corroborate one exact released calibration benchmark."""
+        tenant_identity, study_identity, fields = (
+            _resolve_calibration_benchmark_authority_state(
+                **{
+                    name: value
+                    for name, value in locals().items()
+                    if name != "issuance_marker"
+                }
+            )
+        )
+        view = object.__new__(CalibrationBenchmarkAuthorityView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, resolve
+
+
+(
+    _require_calibration_benchmark_view_issued,
+    resolve_calibration_benchmark_authority,
+) = _build_calibration_benchmark_view_runtime()
+del _build_calibration_benchmark_view_runtime
