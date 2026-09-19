@@ -241,8 +241,24 @@ class _ReadPort:
     ) -> None:
         self.base = _base_evidence() if base is None else base
         self.adjustment = _adjustment_evidence() if adjustment is None else adjustment
+        self.final_owner = _final_weight()
+        self.binding_owner = _binding()
+        self.final_owner_calls: list[dict[str, object]] = []
+        self.binding_owner_calls: list[dict[str, object]] = []
         self.base_calls: list[dict[str, object]] = []
         self.adjustment_calls: list[dict[str, object]] = []
+
+    def read_final_analysis_weight_authority(
+        self, **kwargs: object
+    ) -> FinalAnalysisWeightAuthorityRecord | None:
+        self.final_owner_calls.append(dict(kwargs))
+        return self.final_owner
+
+    def read_final_weight_component_binding_authority(
+        self, **kwargs: object
+    ) -> FinalWeightComponentBindingAuthorityRecord | None:
+        self.binding_owner_calls.append(dict(kwargs))
+        return self.binding_owner
 
     def read_base_weight_component_evidence(
         self, **kwargs: object
@@ -264,10 +280,15 @@ def _corroborate(
     binding: FinalWeightComponentBindingAuthorityRecord | None = None,
     used_at: datetime = USED_AT,
 ) -> FinalWeightComponentEvidenceResolution:
+    final_record = _final_weight() if final_weight is None else final_weight
+    binding_record = _binding() if binding is None else binding
+    if isinstance(read_port, _ReadPort):
+        read_port.final_owner = final_record
+        read_port.binding_owner = binding_record
     return corroborate_final_weight_component_evidence(
         principal=_principal(),
-        final_weight=_final_weight() if final_weight is None else final_weight,
-        binding=_binding() if binding is None else binding,
+        final_weight=final_record,
+        binding=binding_record,
         used_at=used_at,
         purpose_code="selection_validity_analysis",
         policy=_policy(),
@@ -284,6 +305,8 @@ def test_exact_receipt_identity_resolves_and_cross_checks_component_semantics() 
     assert resolution.base_weight.validity_study_id == STUDY
     assert resolution.base_weight.receipt_reference == BASE_RECEIPT_REFERENCE
     assert resolution.adjustments == (_adjustment_evidence(),)
+    assert len(port.final_owner_calls) == 1
+    assert len(port.binding_owner_calls) == 1
     assert port.base_calls == [
         {
             "tenant_record_id": TENANT,
