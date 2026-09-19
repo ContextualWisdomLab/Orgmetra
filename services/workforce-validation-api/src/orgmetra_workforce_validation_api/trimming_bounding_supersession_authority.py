@@ -36,7 +36,6 @@ from .scientific_authority import (
 
 _RESOURCE_KIND = "trimming_bounding_supersession_authority"
 _OPERATION = "read"
-_TRIMMING_BOUNDING_SUPERSESSION_VIEW_ISSUANCE_MARKER = object()
 _READ_FIELDS = frozenset(
     {
         "adjustment_receipt_reference",
@@ -259,18 +258,7 @@ class TrimmingBoundingSupersessionAuthorityView:
 
     def _require_issued(self) -> None:
         """Reject exact-runtime allocations not sealed by the resolver."""
-        try:
-            marker = object.__getattribute__(self, "_issuance_marker")
-        except AttributeError as exc:
-            raise TrimmingBoundingSupersessionAuthorityIntegrityError(
-                "trimming/bounding supersession view was not issued by "
-                "resolve_trimming_bounding_supersession_authority"
-            ) from exc
-        if marker is not _TRIMMING_BOUNDING_SUPERSESSION_VIEW_ISSUANCE_MARKER:
-            raise TrimmingBoundingSupersessionAuthorityIntegrityError(
-                "trimming/bounding supersession view was not issued by "
-                "resolve_trimming_bounding_supersession_authority"
-            )
+        _require_trimming_bounding_supersession_view_issued(self)
 
     @property
     def tenant_record_id(self) -> UUID:
@@ -321,7 +309,7 @@ _PROTOCOL_READ_CAPABILITY = getattr_static(
 )
 
 
-def resolve_trimming_bounding_supersession_authority(
+def _resolve_trimming_bounding_supersession_authority_state(
     *,
     principal: ValidationPrincipal,
     tenant_record_id: UUID,
@@ -336,8 +324,8 @@ def resolve_trimming_bounding_supersession_authority(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: TrimmingBoundingSupersessionAuthorityReadPort,
-) -> TrimmingBoundingSupersessionAuthorityView:
-    """Authorize then resolve the receipt's half-open append-only authority interval."""
+) -> tuple[int, int, tuple[tuple[str, object], ...]]:
+    """Authorize and resolve trimming supersession into inert projection state."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
     if type(policy) is not PurposeBoundAccessPolicy:
@@ -496,21 +484,78 @@ def resolve_trimming_bounding_supersession_authority(
             "released_at",
         )
     )
-    view = object.__new__(TrimmingBoundingSupersessionAuthorityView)
-    object.__setattr__(
-        view,
-        "_tenant_identity",
-        _store_operational_uuid("tenant_record_id", tenant_id),
+    return (
+        _store_operational_uuid("tenant_record_id", record.tenant_record_id),
+        _store_operational_uuid("validity_study_id", record.validity_study_id),
+        fields,
     )
-    object.__setattr__(
-        view,
-        "_study_identity",
-        _store_operational_uuid("validity_study_id", study_id),
-    )
-    object.__setattr__(view, "_fields", fields)
-    object.__setattr__(
-        view,
-        "_issuance_marker",
-        _TRIMMING_BOUNDING_SUPERSESSION_VIEW_ISSUANCE_MARKER,
-    )
-    return view
+
+
+def _build_trimming_bounding_supersession_view_runtime():
+    """Create closure-private sealing state and the authorized public resolver."""
+    issuance_marker = object()
+
+    def require_issued(view: TrimmingBoundingSupersessionAuthorityView) -> None:
+        """Verify one supersession view against the closure-private capability."""
+        try:
+            marker = object.__getattribute__(view, "_issuance_marker")
+        except AttributeError as exc:
+            raise TrimmingBoundingSupersessionAuthorityIntegrityError(
+                "trimming/bounding supersession view was not issued by "
+                "resolve_trimming_bounding_supersession_authority"
+            ) from exc
+        if marker is not issuance_marker:
+            raise TrimmingBoundingSupersessionAuthorityIntegrityError(
+                "trimming/bounding supersession view was not issued by "
+                "resolve_trimming_bounding_supersession_authority"
+            )
+
+    def resolve(
+        *,
+        principal: ValidationPrincipal,
+        tenant_record_id: UUID,
+        validity_study_id: UUID,
+        adjustment_receipt_reference: str,
+        adjustment_receipt_digest: str,
+        evidence_version: int,
+        owner_contract_reference: str,
+        owner_contract_version: int,
+        owner_contract_digest: str,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: TrimmingBoundingSupersessionAuthorityReadPort,
+    ) -> TrimmingBoundingSupersessionAuthorityView:
+        """Authorize then resolve the trimming receipt authority interval."""
+        tenant_identity, study_identity, fields = (
+            _resolve_trimming_bounding_supersession_authority_state(
+                principal=principal,
+                tenant_record_id=tenant_record_id,
+                validity_study_id=validity_study_id,
+                adjustment_receipt_reference=adjustment_receipt_reference,
+                adjustment_receipt_digest=adjustment_receipt_digest,
+                evidence_version=evidence_version,
+                owner_contract_reference=owner_contract_reference,
+                owner_contract_version=owner_contract_version,
+                owner_contract_digest=owner_contract_digest,
+                used_at=used_at,
+                purpose_code=purpose_code,
+                policy=policy,
+                read_port=read_port,
+            )
+        )
+        view = object.__new__(TrimmingBoundingSupersessionAuthorityView)
+        object.__setattr__(view, "_tenant_identity", tenant_identity)
+        object.__setattr__(view, "_study_identity", study_identity)
+        object.__setattr__(view, "_fields", fields)
+        object.__setattr__(view, "_issuance_marker", issuance_marker)
+        return view
+
+    return require_issued, resolve
+
+
+(
+    _require_trimming_bounding_supersession_view_issued,
+    resolve_trimming_bounding_supersession_authority,
+) = _build_trimming_bounding_supersession_view_runtime()
+del _build_trimming_bounding_supersession_view_runtime
