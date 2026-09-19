@@ -522,6 +522,16 @@ def _require_component_valid_at_construction(
         )
 
 
+def _require_component_current_at_use(
+    *, superseded_at: datetime | None, used_at: datetime
+) -> None:
+    """Require component authority to remain current at the governed scientific-use instant."""
+    if superseded_at is not None and used_at >= superseded_at:
+        raise FinalWeightComponentEvidenceIntegrityError(
+            "component evidence is not current at the governed use instant"
+        )
+
+
 def corroborate_final_weight_component_evidence(
     *,
     final_weight: FinalAnalysisWeightAuthorityRecord,
@@ -623,6 +633,10 @@ def corroborate_final_weight_component_evidence(
         superseded_at=base.superseded_at,
         constructed_at=constructed_at,
     )
+    _require_component_current_at_use(
+        superseded_at=base.superseded_at,
+        used_at=use_instant,
+    )
 
     adjustments = final_values["adjustments"]
     if type(adjustments) is not tuple:
@@ -702,6 +716,10 @@ def corroborate_final_weight_component_evidence(
             released_at=component.released_at,
             superseded_at=component.superseded_at,
             constructed_at=constructed_at,
+        )
+        _require_component_current_at_use(
+            superseded_at=component.superseded_at,
+            used_at=use_instant,
         )
         resolved_adjustments.append(component)
 
