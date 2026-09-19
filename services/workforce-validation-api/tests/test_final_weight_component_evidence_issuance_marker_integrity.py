@@ -58,25 +58,6 @@ def test_wrong_private_issuance_marker_cannot_expose_proof_properties() -> None:
         _ = forged.adjustments
 
 
-def test_private_issuer_rejects_mutable_adjustment_collection() -> None:
-    """Keep the internal proof issuer fail-closed if a future caller passes mutable state."""
-    with pytest.raises(
-        FinalWeightComponentEvidenceIntegrityError,
-        match="immutable tuple",
-    ):
-        resolution_module._issue_component_evidence_resolution(
-            base_weight=_base_evidence(),
-            adjustments=[],  # type: ignore[arg-type]
-        )
-
-
-def test_private_issuer_rejects_noncanonical_adjustment_member() -> None:
-    """Reject an immutable container whose member is not canonical adjustment evidence."""
-    with pytest.raises(
-        FinalWeightComponentEvidenceIntegrityError,
-        match="non-canonical specialized evidence",
-    ):
-        resolution_module._issue_component_evidence_resolution(
-            base_weight=_base_evidence(),
-            adjustments=(object(),),  # type: ignore[arg-type]
-        )
+def test_resolution_module_exposes_no_generic_private_issuer() -> None:
+    """Keep generic proof-result minting outside ordinary module state."""
+    assert not hasattr(resolution_module, "_issue_component_evidence_resolution")

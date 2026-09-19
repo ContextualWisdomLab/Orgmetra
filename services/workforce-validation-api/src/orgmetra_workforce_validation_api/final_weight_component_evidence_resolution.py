@@ -82,9 +82,6 @@ _ADJUSTMENT_READ_FIELDS = frozenset(
         "superseded_at",
     }
 )
-_RESOLUTION_ISSUANCE_MARKER = object()
-
-
 class FinalWeightComponentEvidenceNotFound(LookupError):
     """Indicate that exact authoritative evidence cannot be deterministically resolved."""
 
@@ -368,19 +365,7 @@ class FinalWeightComponentEvidenceResolution:
 
     def _require_issued(self) -> None:
         """Fail closed when generic allocation produced an unsealed exact runtime object."""
-        try:
-            marker = object.__getattribute__(
-                self,
-                "_FinalWeightComponentEvidenceResolution__issuance_marker",
-            )
-        except AttributeError as exc:
-            raise FinalWeightComponentEvidenceIntegrityError(
-                "component evidence resolution was not issued by canonical corroboration"
-            ) from exc
-        if marker is not _RESOLUTION_ISSUANCE_MARKER:
-            raise FinalWeightComponentEvidenceIntegrityError(
-                "component evidence resolution was not issued by canonical corroboration"
-            )
+        _require_component_evidence_resolution_issued(self)
 
     @property
     def base_weight(self) -> BaseWeightComponentEvidence:
@@ -532,39 +517,6 @@ def _canonical_base_evidence(value: object) -> BaseWeightComponentEvidence:
     return canonical
 
 
-def _issue_component_evidence_resolution(
-    *,
-    base_weight: BaseWeightComponentEvidence,
-    adjustments: tuple[AdjustmentComponentEvidence, ...],
-) -> FinalWeightComponentEvidenceResolution:
-    """Issue a sealed proof-bearing aggregate only from already corroborated canonical evidence."""
-    canonical_base = _canonical_base_evidence(base_weight)
-    if type(adjustments) is not tuple:
-        raise FinalWeightComponentEvidenceIntegrityError(
-            "corroborated adjustments must be an immutable tuple"
-        )
-    canonical_adjustments = tuple(
-        _canonical_adjustment_evidence(adjustment) for adjustment in adjustments
-    )
-    resolution = object.__new__(FinalWeightComponentEvidenceResolution)
-    object.__setattr__(
-        resolution,
-        "_FinalWeightComponentEvidenceResolution__base_weight",
-        canonical_base,
-    )
-    object.__setattr__(
-        resolution,
-        "_FinalWeightComponentEvidenceResolution__adjustments",
-        canonical_adjustments,
-    )
-    object.__setattr__(
-        resolution,
-        "_FinalWeightComponentEvidenceResolution__issuance_marker",
-        _RESOLUTION_ISSUANCE_MARKER,
-    )
-    return resolution
-
-
 def _canonical_final_weight(value: object) -> FinalAnalysisWeightAuthorityRecord:
     """Reconstruct final-weight authority before any cross-owner comparison."""
     if type(value) is not FinalAnalysisWeightAuthorityRecord:
@@ -662,7 +614,7 @@ def _require_component_current_at_use(
         )
 
 
-def corroborate_final_weight_component_evidence(
+def _corroborate_final_weight_component_evidence_state(
     *,
     principal: ValidationPrincipal,
     final_weight: FinalAnalysisWeightAuthorityRecord,
@@ -671,8 +623,8 @@ def corroborate_final_weight_component_evidence(
     purpose_code: str,
     policy: PurposeBoundAccessPolicy,
     read_port: FinalWeightComponentEvidenceReadPort,
-) -> FinalWeightComponentEvidenceResolution:
-    """Authorize, owner-resolve final/binding authority, and corroborate component evidence."""
+) -> tuple[BaseWeightComponentEvidence, tuple[AdjustmentComponentEvidence, ...]]:
+    """Authorize and corroborate canonical component evidence into inert state."""
     if type(principal) is not ValidationPrincipal:
         raise TypeError("principal must be an exact ValidationPrincipal.")
     if type(policy) is not PurposeBoundAccessPolicy:
@@ -945,7 +897,72 @@ def corroborate_final_weight_component_evidence(
         )
         resolved_adjustments.append(component)
 
-    return _issue_component_evidence_resolution(
-        base_weight=base,
-        adjustments=tuple(resolved_adjustments),
-    )
+    return base, tuple(resolved_adjustments)
+
+
+def _build_component_evidence_resolution_runtime():
+    """Create closure-private sealing state and the authorized public corroborator."""
+    issuance_marker = object()
+
+    def require_issued(resolution: FinalWeightComponentEvidenceResolution) -> None:
+        """Verify one proof result against the closure-private issuance capability."""
+        try:
+            marker = object.__getattribute__(
+                resolution,
+                "_FinalWeightComponentEvidenceResolution__issuance_marker",
+            )
+        except AttributeError as exc:
+            raise FinalWeightComponentEvidenceIntegrityError(
+                "component evidence resolution was not issued by canonical corroboration"
+            ) from exc
+        if marker is not issuance_marker:
+            raise FinalWeightComponentEvidenceIntegrityError(
+                "component evidence resolution was not issued by canonical corroboration"
+            )
+
+    def corroborate(
+        *,
+        principal: ValidationPrincipal,
+        final_weight: FinalAnalysisWeightAuthorityRecord,
+        binding: FinalWeightComponentBindingAuthorityRecord,
+        used_at: datetime,
+        purpose_code: str,
+        policy: PurposeBoundAccessPolicy,
+        read_port: FinalWeightComponentEvidenceReadPort,
+    ) -> FinalWeightComponentEvidenceResolution:
+        """Authorize, owner-resolve authority, and issue sealed component evidence."""
+        base_weight, adjustments = _corroborate_final_weight_component_evidence_state(
+            principal=principal,
+            final_weight=final_weight,
+            binding=binding,
+            used_at=used_at,
+            purpose_code=purpose_code,
+            policy=policy,
+            read_port=read_port,
+        )
+        resolution = object.__new__(FinalWeightComponentEvidenceResolution)
+        object.__setattr__(
+            resolution,
+            "_FinalWeightComponentEvidenceResolution__base_weight",
+            base_weight,
+        )
+        object.__setattr__(
+            resolution,
+            "_FinalWeightComponentEvidenceResolution__adjustments",
+            adjustments,
+        )
+        object.__setattr__(
+            resolution,
+            "_FinalWeightComponentEvidenceResolution__issuance_marker",
+            issuance_marker,
+        )
+        return resolution
+
+    return require_issued, corroborate
+
+
+(
+    _require_component_evidence_resolution_issued,
+    corroborate_final_weight_component_evidence,
+) = _build_component_evidence_resolution_runtime()
+del _build_component_evidence_resolution_runtime
