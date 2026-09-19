@@ -57,6 +57,15 @@ from orgmetra_workforce_validation_api.final_weight_authority import (
     FinalWeightAdjustmentCoordinate,
     resolve_final_analysis_weight_authority,
 )
+from orgmetra_workforce_validation_api.final_weight_component_binding_authority import (
+    FinalWeightAdjustmentEvidenceBinding,
+    FinalWeightComponentBindingAuthorityIntegrityError,
+    FinalWeightComponentBindingAuthorityNotFound,
+    FinalWeightComponentBindingAuthorityReadPort,
+    FinalWeightComponentBindingAuthorityRecord,
+    FinalWeightComponentBindingAuthorityView,
+    resolve_final_weight_component_binding_authority,
+)
 from orgmetra_workforce_validation_api.final_weight_supersession_authority import (
     FinalWeightSupersessionAuthorityIntegrityError,
     FinalWeightSupersessionAuthorityNotFound,
@@ -229,6 +238,12 @@ __all__ = [
     "FinalAnalysisWeightAuthorityRecord",
     "FinalAnalysisWeightAuthorityView",
     "FinalWeightAdjustmentCoordinate",
+    "FinalWeightAdjustmentEvidenceBinding",
+    "FinalWeightComponentBindingAuthorityIntegrityError",
+    "FinalWeightComponentBindingAuthorityNotFound",
+    "FinalWeightComponentBindingAuthorityReadPort",
+    "FinalWeightComponentBindingAuthorityRecord",
+    "FinalWeightComponentBindingAuthorityView",
     "FinalWeightSupersessionAuthorityIntegrityError",
     "FinalWeightSupersessionAuthorityNotFound",
     "FinalWeightSupersessionAuthorityReadPort",
@@ -314,6 +329,7 @@ __all__ = [
     "resolve_calibration_benchmark_authority",
     "resolve_calibration_support_authority",
     "resolve_final_analysis_weight_authority",
+    "resolve_final_weight_component_binding_authority",
     "resolve_final_weight_supersession_authority",
     "resolve_nonresponse_adjustment_authority",
     "resolve_nonresponse_adjustment_supersession_authority",
