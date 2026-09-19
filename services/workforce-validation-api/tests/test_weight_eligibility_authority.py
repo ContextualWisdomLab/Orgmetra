@@ -301,3 +301,46 @@ def test_record_and_view_are_structurally_immutable_and_uuid_views_are_detached(
             validity_study_id=STUDY,
             fields=(),
         )
+
+
+def test_view_rejects_tuple_base_constructor_forgery() -> None:
+    """Reject caller-authored instances created through the tuple base class."""
+    with pytest.raises(TypeError):
+        tuple.__new__(
+            WeightEligibilityAuthorityView,
+            (TENANT, STUDY, (("weight_scope_code", "longitudinal"),)),
+        )
+
+
+def test_raw_view_allocation_cannot_expose_projection_state() -> None:
+    """Keep an unissued raw allocation unusable through every public property."""
+    forged = object.__new__(WeightEligibilityAuthorityView)
+
+    with pytest.raises(WeightEligibilityAuthorityIntegrityError):
+        _ = forged.tenant_record_id
+    with pytest.raises(WeightEligibilityAuthorityIntegrityError):
+        _ = forged.validity_study_id
+    with pytest.raises(WeightEligibilityAuthorityIntegrityError):
+        _ = forged.fields
+
+
+def test_view_rejects_caller_authored_issuance_marker() -> None:
+    """Reject a raw allocation even when a caller invents a marker value."""
+    forged = object.__new__(WeightEligibilityAuthorityView)
+    object.__setattr__(forged, "_tenant_identity", TENANT)
+    object.__setattr__(forged, "_study_identity", STUDY)
+    object.__setattr__(forged, "_fields", ())
+    object.__setattr__(forged, "_issuance_marker", object())
+
+    with pytest.raises(WeightEligibilityAuthorityIntegrityError):
+        _ = forged.fields
+
+
+def test_issued_view_rejects_mutation_and_deletion() -> None:
+    """Keep a resolver-issued view immutable after all owner checks complete."""
+    view = _resolve(read_port=_ReadPort(_record()))
+
+    with pytest.raises(AttributeError):
+        view._fields = ()
+    with pytest.raises(AttributeError):
+        del view._fields
