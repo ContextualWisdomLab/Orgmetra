@@ -191,7 +191,7 @@ def test_resolver_returns_exact_component_locator_and_uses_final_receipt_key_onl
     ]
 
 
-def test_binding_sequence_may_skip_generic_adjustments_but_must_increase() -> None:
+def test_binding_sequences_must_be_contiguous_after_governed_adjustment_admission() -> None:
     bindings = (
         _binding(),
         _binding(
@@ -203,10 +203,10 @@ def test_binding_sequence_may_skip_generic_adjustments_but_must_increase() -> No
             evidence_receipt_digest="b" * 64,
         ),
     )
-    record = _record(adjustment_bindings=bindings)
-    assert dict(record.fields)["adjustment_bindings"] == bindings
+    with pytest.raises(ValueError, match="contiguous"):
+        _record(adjustment_bindings=bindings)
 
-    with pytest.raises(ValueError, match="strictly increasing"):
+    with pytest.raises(ValueError, match="contiguous"):
         _record(adjustment_bindings=(bindings[1], bindings[0]))
 
 
