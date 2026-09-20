@@ -10,6 +10,7 @@ from importlib.metadata import version as installed_version
 import io
 import os
 from pathlib import Path, PurePosixPath
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -541,8 +542,24 @@ def test_built_distribution_closure_installs_without_checkout_imports(tmp_path: 
 
     wheelhouse = tmp_path / "wheelhouse"
     wheelhouse.mkdir()
+    build_sources = tmp_path / "build-sources"
+    build_sources.mkdir()
     environment = _subprocess_environment()
     for source_root in (_KEYVERSE_ROOT, _SERVICE_ROOT):
+        build_root = build_sources / source_root.name
+        shutil.copytree(
+            source_root,
+            build_root,
+            ignore=shutil.ignore_patterns(
+                "__pycache__",
+                ".pytest_cache",
+                ".coverage",
+                "build",
+                "dist",
+                "*.egg-info",
+                "*.pyc",
+            ),
+        )
         subprocess.run(
             [
                 sys.executable,
@@ -555,9 +572,9 @@ def test_built_distribution_closure_installs_without_checkout_imports(tmp_path: 
                 "--no-build-isolation",
                 "--wheel-dir",
                 str(wheelhouse),
-                str(source_root),
+                str(build_root),
             ],
-            cwd=_REPOSITORY_ROOT,
+            cwd=tmp_path,
             env=environment,
             check=True,
         )
