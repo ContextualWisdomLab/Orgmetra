@@ -255,7 +255,7 @@ class ValidityStudyRecord(tuple):
 
     @property
     def study_status_code(self) -> str:
-        """Return the governed study lifecycle status code."""
+        """Return the stored study status code without inferring lifecycle governance."""
         return self[3]
 
     @property
