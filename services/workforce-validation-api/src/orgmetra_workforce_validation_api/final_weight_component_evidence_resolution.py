@@ -823,14 +823,10 @@ def _corroborate_final_weight_component_evidence_state(
             "component adjustment bindings are not canonical immutable coordinates"
         )
     binding_by_sequence = {item.sequence_number: item for item in adjustment_bindings}
-    specialized_sequences = {
-        item.sequence_number
-        for item in adjustments
-        if item.evidence_kind in _EVIDENCE_REFERENCE_NAMESPACE_BY_KIND
-    }
-    if set(binding_by_sequence) != specialized_sequences:
+    adjustment_sequences = {item.sequence_number for item in adjustments}
+    if set(binding_by_sequence) != adjustment_sequences:
         raise FinalWeightComponentEvidenceIntegrityError(
-            "component binding must cover every and only specialized final-weight adjustment"
+            "component binding must cover every governed specialized final-weight adjustment"
         )
 
     resolved_adjustments: list[AdjustmentComponentEvidence] = []
@@ -839,8 +835,6 @@ def _corroborate_final_weight_component_evidence_state(
             raise FinalWeightComponentEvidenceIntegrityError(
                 "final-weight adjustment coordinates must remain canonical"
             )
-        if adjustment.sequence_number not in specialized_sequences:
-            continue
         locator = binding_by_sequence[adjustment.sequence_number]
         if (
             locator.evidence_kind != adjustment.evidence_kind

@@ -10,7 +10,6 @@ import pytest
 import orgmetra_workforce_validation_api.final_weight_component_evidence_resolution as resolution_module
 from orgmetra_workforce_validation_api.final_weight_authority import (
     FinalAnalysisWeightAuthorityRecord,
-    FinalWeightAdjustmentCoordinate,
 )
 from orgmetra_workforce_validation_api.final_weight_component_binding_authority import (
     FinalWeightAdjustmentEvidenceBinding,
@@ -307,30 +306,3 @@ def test_post_canonicalization_adjustment_coordinate_type_remains_exact(
 
     with pytest.raises(FinalWeightComponentEvidenceIntegrityError, match="coordinates"):
         _corroborate(read_port=_ReadPort(), final_weight=final_weight)
-
-
-def test_non_specialized_adjustment_needs_no_cross_owner_locator() -> None:
-    """Resolve base evidence while leaving a non-specialized transform owner-local."""
-    local_adjustment = FinalWeightAdjustmentCoordinate(
-        sequence_number=1,
-        adjustment_code="replicate_weight_projection",
-        method_reference="weight_method:dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-        method_version=1,
-        input_weight_artifact_digest=BASE_ARTIFACT_DIGEST,
-        output_weight_artifact_digest="c" * 64,
-        configuration_digest="d" * 64,
-        evidence_receipt_digest="e" * 64,
-        evidence_kind="replicate_weight_receipt",
-    )
-    final_weight = _final_weight(
-        adjustments=(local_adjustment,),
-        final_weight_artifact_digest="c" * 64,
-    )
-    binding = _binding(adjustment_bindings=())
-    resolution = _corroborate(
-        read_port=_ReadPort(),
-        final_weight=final_weight,
-        binding=binding,
-    )
-
-    assert resolution.adjustments == ()
