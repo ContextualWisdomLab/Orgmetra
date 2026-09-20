@@ -32,6 +32,10 @@ The SIOP AI-assessment recommendations explicitly emphasize job-related score me
 
 Berry, C. M., Lievens, F., Zhang, C., & Sackett, P. R. (2024). Insights from an updated personnel selection meta-analytic matrix: Revisiting general mental ability tests' role in the validity–diversity trade-off. *Journal of Applied Psychology, 109*(10), 1611–1634. https://doi.org/10.1037/apl0001203
 
+*Correction to “Insights from an updated personnel selection meta-analytic matrix: Revisiting general mental ability tests' role in the validity-diversity trade-off” by Berry et al. (2024).* (2025). *Journal of Applied Psychology, 110*(9), 1239. https://doi.org/10.1037/apl0001308
+
+The 2025 erratum corrects adverse-impact ratios for the dotted lines in Figure 1 of Berry et al. (2024). It states that the error does not change the article's conclusions. Any future Orgmetra use of numerical adverse-impact ratios from that figure must therefore use the corrected figure/erratum rather than the original Figure 1 values.
+
 Merritt, S. M., & Ryan, A. M. (2024). Gendered competencies and gender composition: A human versus algorithm evaluator comparison. *International Journal of Selection and Assessment, 32*(2), 225–248. https://doi.org/10.1111/ijsa.12459
 
 Sackett, P. R., Zhang, C., Berry, C. M., & Lievens, F. (2022). Revisiting meta-analytic estimates of validity in personnel selection: Addressing systematic overcorrection for restriction of range. *Journal of Applied Psychology, 107*(11), 2040–2068. https://doi.org/10.1037/apl0000994
