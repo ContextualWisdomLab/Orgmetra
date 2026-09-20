@@ -23,9 +23,9 @@
     },
     {
       "path": "ARCHITECTURE.md",
-      "sha256": "52d68786f7359c1a50d804996021e4c70e90accd2fff6f1a27c91de1dd8df850",
-      "bytes": 7864,
-      "lines": 107
+      "sha256": "930573f73d815a0f9a67fb98de75a0a9ba8112c3f26c31f67764e30a36e1d31d",
+      "bytes": 9172,
+      "lines": 109
     },
     {
       "path": "CHANGELOG.md",
@@ -155,9 +155,9 @@
     },
     {
       "path": "docs/OPERABILITY.md",
-      "sha256": "82b2d3e70cec371ef35e9e0f982ac40fef84351976bc04b863b81d27023d5a62",
-      "bytes": 11189,
-      "lines": 71
+      "sha256": "821843e3ae6e5ff173e2ed45ab202341c50577568e67e3601b0cf9a6bc63c80c",
+      "bytes": 12816,
+      "lines": 77
     },
     {
       "path": "docs/PRD.md",
