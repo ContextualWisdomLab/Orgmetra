@@ -1,118 +1,172 @@
-# Assessment assignment and result-handoff boundary traceability
+# Assessment assignment coordination and external result-handoff traceability
 
-Status: Proposed design evidence for ADR 0429 / Issue #429. Nothing in this document is shipped assessment-delivery capability until the corresponding executable owner contract reaches protected truth.
+Status: Active-PR design evidence for Proposed ADR 0429. This file is not protected product capability and does not make a mutable Psychometrics Commons source revision a production dependency.
 
-Protected baseline reviewed: `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f`.
+Protected Orgmetra baseline reviewed: `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f`.
 
-## Current protected authority
+## Authority repair recorded on this branch
 
-| Protected authority | Existing truth | Assessment-delivery consequence |
-|---|---|---|
-| `docs/PRD.md` | Orgmetra spans the employment lifecycle; selection evidence and later validity evidence must remain reconstructable | Assessment evidence must retain exact business purpose and downstream decision/study provenance rather than becoming an opaque provider callback |
-| `docs/TRD.md` | Assessment results remain external immutable snapshot references unless a later ADR transfers instrument lifecycle ownership | ADR 0429 does not transfer instrument, item-bank, response, scoring-model or psychometric-result ownership |
-| `ARCHITECTURE.md` | `talent_acquisition`, `performance_management`, `workforce_validation`, `integration_hub` and other contexts have explicit separate schema/API authority; no assessment context exists | A new context is only Proposed; no existing service may silently claim assessment lifecycle state in the meantime |
-| `scripts/foundation-contract-core.mjs` | `assessment_assignment` is already part of the canonical logical database-object vocabulary | The product concept exists, but its aggregate/schema/API ownership must not be inferred from the inventory token |
-| `talent_acquisition` boundary | Owns requisitions, candidates, interviews, decision evidence and selection decisions | It may request assessment delivery through an ACL but does not own cross-lifecycle administration state or scientific scoring truth |
-| `workforce_validation` boundary | Owns validity studies, exact evidence/outcome linkage, subgroup diagnostics, drift, utility and scientific adapters | It consumes exact released assessment/scoring/admin/result coordinates and remains authoritative for validity/fairness/scientific interpretation |
-| `integration_hub` boundary | Owns adapters, inbox/outbox and transport/migration state | Provider transport may be implemented through adapters, but business assessment assignment/admin/result lifecycle is not connector state |
-| Keyverse boundary | Identity/authentication backend | Assessment Delivery receives purpose-authorized opaque subject/actor evidence; it does not become an identity store |
+The predecessor ADR/traceability design proposed a local `assessment_delivery` context containing an `AssessmentAdministration` entity and local result-supersession lifecycle. Fresh protected-authority review found that this contradicted Orgmetra `CLAUDE.md`, README and Accepted ADR 0001, all of which keep assessment operations / lifecycle and immutable assessment result snapshots with Psychometrics Commons.
 
-## Proposed Context Map
+Psychometrics Commons protected README independently assigns itself participant/session lifecycle, response events, scoring dispatch, immutable result snapshots, product persistence and resource authorization. Its GitHub release inventory was empty at this review, so protected-main source is design evidence only and production integration must fail closed until an immutable released owner contract exists.
 
-```mermaid
-flowchart LR
-    TA[talent_acquisition] -->|released request ACL| AD[assessment_delivery - Proposed]
-    TM[future protected talent_management] -.->|released request ACL if adopted| AD
-    JA[job_architecture] -->|released Job/FJA/KSAO evidence refs| AD
-    AD -->|versioned provider adapter| EXT[external assessment/scoring owner]
-    EXT -->|immutable result locator + version + integrity| AD
-    AD -->|non-authorizing result evidence| TA
-    AD -->|exact predictor coordinates| WV[workforce_validation]
-    KV[Keyverse] -. identity/authz backend .-> AD
-    AD -->|audit/outbox| AP[audit_provenance]
+The current repair therefore narrows the Proposed owner to **`assessment_coordination`**: Orgmetra owns HR-side assessment assignment intent, purpose, correlation and append-only binding to released external execution/result references. It does not own the assessment administration/session, response, scoring or result-snapshot lifecycle.
+
+## Ubiquitous language
+
+| Term | Kind | Owner | Meaning |
+|---|---|---|---|
+| `AssessmentAssignment` | Aggregate Root | Orgmetra `assessment_coordination` | HR business intent/purpose to request or consume an external assessment |
+| `AssessmentExecutionReference` | Value Object | Orgmetra projection of released Psychometrics Commons evidence | Opaque released-contract reference to one specialist-owned session/execution |
+| `AssessmentResultSnapshotReference` | Value Object | Orgmetra projection of released Psychometrics Commons evidence | Immutable released-contract reference to one specialist-owned result snapshot |
+| `AssessmentResultBinding` | Entity | Orgmetra `assessment_coordination` | Append-only admission of one exact external result snapshot under one assignment/purpose |
+| `AssessmentAssignmentPolicy` | Domain policy/value contract | Orgmetra | Versioned HR-side purpose/request/window/evidence-consumption policy; not an instrument/scoring/session policy |
+| assessment session / administration | External aggregate/lifecycle | Psychometrics Commons | Actual assessment execution/session lifecycle; not copied into Orgmetra |
+| response evidence | External evidence | Psychometrics Commons | Raw/structured assessment response evidence; not Orgmetra coordination truth |
+| scoring dispatch / result snapshot / result supersession | External lifecycle/evidence | Psychometrics Commons + numerical owner where applicable | Specialist scoring and immutable result authority |
+| Job/FJA/KSAO truth | Domain truth | `job_architecture` | Job and work-analysis evidence referenced by purpose/version |
+| selection decision | Domain truth | `talent_acquisition` / governed decision boundary | Human-accountable employment decision; assessment completion is non-authorizing |
+| validity/fairness interpretation | Scientific truth | `workforce_validation` | Study design, estimand, validity/fairness and interpretation |
+
+## Context Map
+
+```text
+ job_architecture -------- released refs --------> assessment_coordination
+ talent_acquisition ------ request/consume ------> assessment_coordination
+ future talent_management - request/consume -----> assessment_coordination
+ performance_management -- request/consume ------> assessment_coordination
+
+ assessment_coordination -- released ACL -------> Psychometrics Commons
+       |                                              |
+       | HR purpose / assignment                      | session/response/scoring/
+       | + external evidence binding                  | immutable result snapshots
+       v                                              v
+ workforce_validation <------ exact released coordinates / lineage
+
+ integration_hub may carry adapter/inbox/outbox transport only.
+ Keyverse remains identity/authn/authz backend.
+ fast-mlsirm remains numerical psychometric-kernel owner where its released contract is consumed by the product owner.
 ```
 
-Dashed/future edges are not current product authority. Physical database co-location never permits cross-context application SQL.
-
-## Proposed Ubiquitous Language
-
-| Term | Proposed meaning | Explicit non-meaning |
-|---|---|---|
-| `AssessmentAssignment` | accountable business request for one purpose/subject/process and exact released assessment procedure contract | provider session, score, selection decision |
-| `AssessmentAdministration` | one actual administration occurrence under an assignment | transport retry, assessment instrument definition |
-| `provider_session_reference` | external transport/provider coordinate associated with an administration | canonical administration identity by itself |
-| `AssessmentResultReference` | immutable external owner locator bound to one administration and exact procedure/scoring contract versions | copied provider payload, locally authoritative score |
-| `AssessmentResultSupersession` | append-only predecessor/successor lineage for correction/rescore | in-place result mutation |
-| `AssessmentDeliveryPolicy` | operational expiry/idempotency/permitted-purpose/evidence requirements | scoring model, cut score, validity or fairness policy |
-| `not_verifiable` | required owner/version/provenance cannot be reconstructed sufficiently for authorized use | zero score, failure-to-pass, neutral scientific result |
-
-## Proposed aggregate and transaction boundary
-
-`AssessmentAssignment` is the aggregate root. One command transaction may validate local current state, append one idempotent assignment/admin/result-reference transition, write correlated audit/outbox evidence and commit. External provider/scoring calls happen after commit and never while an Orgmetra transaction or explicit database lock waits for remote/LLM/scoring work.
-
-A provider callback enters through an idempotent inbox/adapter boundary, resolves one exact tenant/assignment/administration coordinate, validates released contract identity and purpose, and then performs one short domain transition. The callback cannot call a downstream selection/promotion/fairness finalizer in the same authority boundary.
+No arrow authorizes direct application-table SQL, source copying or mutable branch consumption.
 
 ## Ownership matrix
 
-| Fact / behavior | Proposed owner | Consumer(s) | Forbidden shortcut |
+| Concern | Orgmetra `assessment_coordination` | Psychometrics Commons / specialist owner | Downstream owner |
+|---|---:|---:|---:|
+| HR assessment assignment identity | owns | references/correlation only if contract supports it | consumes released Orgmetra truth |
+| HR purpose/reason/process scope | owns | consumes only what released request contract requires | re-authorizes for downstream use |
+| assignment request/cancel/expiry coordination | owns | external service receives request/correlation | downstream does not infer session state |
+| assessment session/administration lifecycle | **does not own** | owns | reference only |
+| item/instrument publication | does not own | owns | reference only |
+| raw responses / response events | does not own | owns | no copy by default |
+| scoring dispatch | does not own | owns | reference only |
+| psychometric numerical kernel | does not own | `fast-mlsirm` / specialist numerical owner | reference/evidence only |
+| immutable result snapshot | does not construct/mutate | owns | consumes released reference |
+| result correction/supersession | does not create | owns | local append-only binding follows verifiable owner chain |
+| assignment-to-result binding | owns append-only local evidence binding | publishes authoritative result reference | consumes exact binding |
+| selection/promotion/etc. decision | does not authorize | does not authorize | governed HR decision owner |
+| validity/fairness/scientific inference | does not authorize | result owner does not imply validity | `workforce_validation` |
+| connector delivery/retry transport | optional adapter consumer | published service endpoint/event owner | `integration_hub` may implement transport mechanics |
+
+## Requirement traceability
+
+| ID | Requirement / RED condition | Authority | Future executable evidence |
 |---|---|---|---|
-| assessment business request/purpose | `assessment_delivery` | Talent/HR workflows, audit | generic connector metadata as sole authority |
-| administration occurrence identity/status | `assessment_delivery` | requester, audit, validation | provider session ID as sole semantic identity |
-| instrument/item/content lifecycle | external assessment owner | Assessment Delivery reference only | source copy into Orgmetra |
-| response data | external/privacy owner by contract | purpose-bound only if explicitly released | unrestricted HRIS replication |
-| scoring algorithm/model | external scoring owner | reference by exact released version | local floating model alias |
-| result evidence | external result owner; Orgmetra stores immutable reference | selection/Talent/validation through ACL | digest-only or mutable URL as authority |
-| Job/FJA/KSAO job-related evidence | `job_architecture` | Assessment Delivery / selection / validation | copied job semantics |
-| employment decision | governed selection or later protected Talent owner | audit, validation | assessment callback finalizes decision |
-| validity/fairness/adverse impact | `workforce_validation` | decision governance/reporting | provider completion or raw score treated as scientific GREEN |
-| adapter retry/webhook transport | `integration_hub` / released adapter implementation | Assessment Delivery | connector owns business lifecycle |
-| identity/authentication | Keyverse | all authorized consumers | Assessment Delivery identity shadow table |
+| ASSMT-001 | Orgmetra owns HR-side `assessment_assignment` intent/purpose/correlation but not assessment operations | Protected CLAUDE/README, ADR 0001, ADR 0429 | architecture/domain ownership tests and schema/API inventory |
+| ASSMT-002 | Production consumption requires an immutable **released** Psychometrics Commons contract | CWL integration rule; ADR 0002; ADR 0429 | release/version/package-digest/SBOM/provenance fixture and consumer conformance |
+| ASSMT-003 | A mutable branch/PR/main or digest-only source snapshot cannot be production authority | ADR 0002 / automation contract | negative ACL/config contract |
+| ASSMT-004 | Orgmetra must not own a local `AssessmentAdministration`/session aggregate, response ledger, scoring lifecycle or result-snapshot lifecycle | Protected specialist boundary | architecture fitness / schema-event negative tests |
+| ASSMT-005 | One `AssessmentAssignment` binds exact tenant, purpose/policy, accountable process/actor and required owner contract before dispatch | ADR 0429 | aggregate RED/GREEN |
+| ASSMT-006 | Identical semantic assignment/request replay is idempotent; genuinely distinct external executions remain distinct | ADR 0429 | unit + PostgreSQL concurrency/idempotency tests |
+| ASSMT-007 | External execution/result refs must bind exact released contract/schema and owner locator; digest-only or floating aliases fail closed | ADR 0429 | consumer contract tests |
+| ASSMT-008 | Callback/HTTP success/external `completed` cannot approve, reject or advance employment decisions | ADR 0001 / ADR 0429 | adversarial application/API tests |
+| ASSMT-009 | `unavailable`, `interrupted`, `invalidated`, `not_verifiable` and equivalent owner states cannot coerce to score/pass/fail/normal completion | ADR 0429 / Operability boundary | state-machine/API tests |
+| ASSMT-010 | Result correction/supersession creates a new local binding only when an owner-issued chain is verifiable; old binding remains reconstructable | ADR 0429 | append-only persistence + as-recorded tests |
+| ASSMT-011 | Raw responses, item text, provider payload, credentials and unnecessary accommodation detail are excluded from coordination truth by default | AGENTS/SECURITY privacy rules / ADR 0429 | schema/event/privacy negative tests |
+| ASSMT-012 | Remote Psychometrics Commons/provider work never waits inside Orgmetra DB transaction/explicit lock | DDD/minimal-transaction rule / ADR 0429 | integration fault/timeout + lock-duration tests |
+| ASSMT-013 | Selection/Talent re-resolves exact assignment + released result binding before consequential use | ADR 0001 / ADR 0429 | decision-boundary integration tests |
+| ASSMT-014 | Workforce Validation can recover exact assignment plus exact released procedure/instrument/scoring/calibration/norm/result coordinates or reports `not_verifiable` | Workforce Validation scientific contract | #425 consumer/reproducibility tests |
+| ASSMT-015 | No cross-service SQL or source copy | ADR 0002 | dependency/static architecture tests |
+| ASSMT-016 | Synthetic fixtures are mechanism evidence only; buyer/scientific acceptance uses real/right-cleared released owner evidence | test/scientific policy | acceptance evidence bundle |
 
-## Contract requirements before implementation may be accepted
+## Aggregate and transaction boundary
 
-A released Assessment Delivery contract must preserve at minimum:
+The proposed Orgmetra aggregate root is only `AssessmentAssignment`.
 
-- `tenant_record_id` or equivalent tenant-scoped opaque identity;
-- accountable actor and purpose;
-- opaque subject reference plus process/Job context required for the purpose;
-- stable semantic assignment identity and stable administration occurrence identity;
-- external procedure owner and exact released procedure version;
-- external scoring owner/version when scoring applies;
-- requested/effective/expiry window and operational policy version;
-- provider session reference only as transport provenance;
-- immutable external result owner locator, result/contract version and integrity evidence;
-- explicit lifecycle outcomes including cancellation, expiry, unavailable, interrupted, invalidated and not-verifiable;
-- append-only correction/rescore/supersession lineage;
-- accommodation/accessibility provenance sufficient to verify correct administration without duplicating unrestricted sensitive detail;
-- idempotency, causation/correlation and immutable audit/outbox evidence.
+A local transaction may:
 
-## RED → GREEN verification map
+1. create/update the HR coordination state;
+2. append one audited outbound intent/outbox record; or
+3. verify and append one external execution/result binding.
 
-| RED finding | Minimum GREEN evidence |
-|---|---|
-| floating/mutable procedure or scoring reference accepted | contract/domain tests reject unversioned, mutable or alias-only authority |
-| digest without released owner locator accepted | domain tests require owner/context/version/locator + integrity evidence |
-| retry creates duplicate administration | PostgreSQL/service contract proves one semantic occurrence across replay while allowing an intentional second administration |
-| wrong tenant/subject/purpose/occurrence result accepted | authorization/domain tests fail closed before mutation |
-| provider contract drifts between assignment and result | exact historical version binding is persisted and mismatch requires explicit supersession/repair |
-| unavailable/interrupted/invalidated/not-verifiable becomes numeric/normal completion | typed-state tests prove non-authorizing semantics end to end |
-| rescore overwrites prior result | append-only predecessor/successor tests preserve both historical evidence identities |
-| callback advances/rejects/finalizes worker/candidate | architecture/service tests prove no direct high-impact decision command from provider callback boundary |
-| external provider call runs inside DB transaction | integration test/telemetry proves commit precedes remote wait and connection/lock cleanup is bounded |
-| cross-context SQL or source copy appears | architecture/static contract rejects foreign application-table/source ownership |
-| Workforce Validation cannot reconstruct predictor identity | E2E resolves exact assessment/scoring/admin/result coordinates consumed by a study version |
-| AI assessment lacks development/scoring/use provenance | result remains `not_verifiable`/non-authorizing until released owner evidence is resolvable |
+It must not execute an assessment, wait for a remote service, score a response or construct a result snapshot while the transaction/lock is open.
 
-Synthetic fixtures are suitable for unit/contract failure tests only. Buyer/scientific acceptance requires real or right-cleared assessment-provider evidence whose use permits the asserted verification. No synthetic-only acceptance may be reported as production validity/fairness evidence.
+`AssessmentExecutionReference` and `AssessmentResultSnapshotReference` are inert released-contract value objects. `AssessmentResultBinding` is append-only Orgmetra evidence that points to an immutable specialist artifact. The specialist owns the actual session/result aggregate and its supersession history.
 
-## Standards and scientific traceability
+## RED → GREEN plan
 
-The APA 7 reference set and current standards-status notes are in `docs/doctoring/assessment-assignment-result-handoff-references.md`.
+### DDD/ownership RED
 
-The key standards interpretation is deliberately bounded: ISO 10667-1:2020 supports a client-side lifecycle spanning multiple work-related assessment purposes; ISO 10667-2:2020 defines service-provider concerns; both Edition 3 replacements are still work items. SIOP/AERA-APA-NCME material supports provenance, job-relatedness, reliability/validity/fairness and auditability. None of these sources turns a provider callback into Orgmetra decision authority.
+Reject any proposed implementation that:
 
-## Documentation/release convergence required for completion
+- adds an Orgmetra `assessment_administration` / `assessment_session` business table or aggregate that mirrors specialist session state;
+- stores raw response/item/scoring payloads as `assessment_coordination` truth;
+- makes Orgmetra the constructor/mutator of immutable result snapshots or specialist supersession events;
+- treats `integration_hub` transport state as HR assessment-assignment truth; or
+- treats a recruiting-only context as the universal cross-lifecycle owner.
 
-If implementation proceeds, completion requires code-current updates to the canonical Context Map/Architecture, TRD, data model/ERD/UML, API/event contracts, SECURITY, THREAT_MODEL, TEST_STRATEGY, OPERABILITY/recovery and release evidence through their live single-writer owners. `docs/product-technical-gap-baseline.md` remains owned by PR #100 and must not be edited from this ADR lane.
+GREEN requires one clear HR coordination aggregate and released external references only.
 
-ADR 0429 remains Proposed until those executable contracts reach protected truth. A docs-only merge of this proposal is not sufficient to close Issue #429.
+### Dependency RED
+
+With Psychometrics Commons release inventory empty, consumer admission must remain unavailable. A branch SHA, PR SHA, protected-main SHA or hand-copied schema must fail production dependency admission.
+
+GREEN requires an immutable owner release with exact contract/schema identity, artifact/package digest, SBOM/provenance/reproducibility/compatibility evidence and consumer conformance fixtures.
+
+### Replay/concurrency RED
+
+- same assignment/request replay creates a duplicate local assignment or duplicate semantic outbound intent;
+- two distinct owner execution refs collapse because person/instrument/result values happen to match;
+- conflicting replay overwrites the previous binding; or
+- a remote call is performed while a local transaction/explicit lock is held.
+
+GREEN requires idempotent local identity, explicit external occurrence identity, append-only conflict evidence and short local transactions.
+
+### Authority RED
+
+- callback success or external `completed` advances/rejects/finalizes a candidate/worker action;
+- result presence becomes validity/fairness GREEN;
+- missing owner version/locator/digest requirements are accepted;
+- non-success becomes zero/pass/fail; or
+- a local rescore overwrites specialist truth.
+
+GREEN preserves non-authorizing evidence semantics and forces downstream independent authorization/scientific interpretation.
+
+### Privacy/security RED
+
+- raw response/item content, credentials, provider payload or unnecessary accommodation detail enters shared coordination evidence;
+- foreign tenant/process evidence can bind to an assignment;
+- an unauthorized actor can learn existence through a reference lookup; or
+- a consumer queries Psychometrics Commons application tables.
+
+GREEN requires purpose-bound authorization, minimal released references, tenant isolation, no existence oracle and ACL/API/event-only composition.
+
+### Workforce Validation RED
+
+A study that uses an assessment predictor but cannot identify the exact Orgmetra assignment and exact released Psychometrics Commons result/scoring coordinate must be `not_verifiable`. Equal human-readable labels or equal numeric scores do not prove coordinate identity.
+
+GREEN requires exact released/versioned predictor evidence and reproducible linkage into #425's study-design authority.
+
+## Documentation / owner reconciliation
+
+This branch may propose the boundary only. It does not edit protected `CLAUDE.md`, README, Architecture/TRD/Data Model/ERD/UML/API or `docs/product-technical-gap-baseline.md`.
+
+After executable owner proof and an immutable Psychometrics Commons release exist:
+
+- protected product/technical docs are reconciled through their canonical writer;
+- #100 alone updates the durable product-technical gap baseline;
+- downstream Workforce Validation consumes only protected/released truth; and
+- release evidence must remain exact-head/current, not transferred from this docs proposal.
+
+A docs-only merge is not #429 completion.
