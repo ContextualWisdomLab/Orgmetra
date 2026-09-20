@@ -199,8 +199,7 @@ class FinalWeightComponentBindingAuthorityRecord(tuple):
         if type(adjustment_bindings) is not tuple:
             raise ValueError("adjustment_bindings must be an immutable tuple.")
         detached_bindings: list[FinalWeightAdjustmentEvidenceBinding] = []
-        previous_sequence = 0
-        for binding in adjustment_bindings:
+        for expected_sequence, binding in enumerate(adjustment_bindings, start=1):
             if type(binding) is not FinalWeightAdjustmentEvidenceBinding:
                 raise ValueError(
                     "adjustment_bindings must contain exact FinalWeightAdjustmentEvidenceBinding values."
@@ -214,10 +213,11 @@ class FinalWeightComponentBindingAuthorityRecord(tuple):
             )
             if detached != binding:
                 raise ValueError("adjustment_bindings must contain canonical receipt locators.")
-            if detached.sequence_number <= previous_sequence:
-                raise ValueError("adjustment binding sequence numbers must be strictly increasing.")
+            if detached.sequence_number != expected_sequence:
+                raise ValueError(
+                    "adjustment binding sequence numbers must be contiguous starting at 1."
+                )
             detached_bindings.append(detached)
-            previous_sequence = detached.sequence_number
         owner_reference = _require_reference(
             "owner_contract_reference", owner_contract_reference, "released_owner_contract"
         )
