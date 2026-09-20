@@ -43,10 +43,15 @@
 
 ### Other dependencies
 
-- Psychometrics Commons unavailable: assessment-result fetches show an unavailable state, not invented scores.
-- TEPP unavailable: temporal analyses remain unavailable; authoritative HRIS facts remain readable under normal authorization.
+Contract admission and runtime health are separate operational states. A dependency whose required owner release/projection does not exist is **not** an admitted runtime dependency and must fail closed before network execution; an admitted dependency can separately become runtime-unavailable after compatibility/conformance has been established.
+
+- Psychometrics Commons: current production admission is `release_missing` pending owner #452. Assessment-result execution/fetch remains unavailable rather than reconstructed from a commit, branch, copied schema, callback payload, or invented score. After a released handoff is admitted, a later runtime outage still presents an explicit unavailable state and never authorizes employment/scientific conclusions.
+- TEPP: current production admission is `release_missing` pending owner #638. Temporal analysis remains unavailable while authoritative HRIS facts stay readable under normal authorization. A later admitted runtime outage remains distinct from release/compatibility admission failure.
+- fast-mlsirm: immutable releases exist, but the required downstream scientific-result provenance projection is `contract_projection_missing` pending owner #2086. A generic package release, raw commit, floating `latest`, or digest-only reference does not satisfy admission.
 - Contextual Orchestrator unavailable: AI drafting is disabled; manual workflows continue.
 - Semantic Data Portal unavailable: ontology enrichment is disabled; approved job profiles continue.
+
+Admission failures and runtime outages use different operator-safe evidence. Admission evidence records owner/context/contract/version, immutable artifact/package digest, owner locator, compatibility/conformance outcome and failure class. Runtime outage evidence is emitted only for a previously admitted contract and records the exact admitted version plus the observed transport/provider failure. Neither class is silently converted into local scientific or HR truth.
 
 ## Backups
 
@@ -64,7 +69,8 @@
 - outbox lease/retry/dead-letter or delivery-state corruption
 - missing or tampered outbox escalation evidence
 - lost final-attempt dispatcher identity requiring audited operator recovery
-- integration outage
+- specialist contract admission failure or incompatibility
+- admitted integration runtime outage
 - bitemporal corruption
 - LLM draft hallucination detected
 - validation study discrepancy
