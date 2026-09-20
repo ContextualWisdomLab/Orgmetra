@@ -80,7 +80,13 @@ def weight_receipt(**overrides: object) -> FinalAnalysisWeightReceipt:
 
 def compatibility(**overrides: object) -> WeightVarianceCompatibilityReceipt:
     """Build owner-correlatable compatibility evidence for one weighted analysis."""
-    point_weight = overrides.pop("analysis_weight_receipt", weight_receipt())
+    canonical_point_weight = weight_receipt()
+    point_weight = overrides.pop("analysis_weight_receipt", canonical_point_weight)
+    variance_point_weight = (
+        point_weight
+        if type(point_weight) is FinalAnalysisWeightReceipt
+        else canonical_point_weight
+    )
     values: dict[str, object] = {
         "tenant_record_id": TENANT,
         "receipt_reference": COMPATIBILITY_RECEIPT,
@@ -88,15 +94,17 @@ def compatibility(**overrides: object) -> WeightVarianceCompatibilityReceipt:
         "variance_design_receipt_reference": VARIANCE_RECEIPT,
         "variance_design_receipt_version": 1,
         "variance_design_receipt_digest": DIGEST_3,
-        "variance_analysis_weight_receipt_digest": point_weight.sha256_digest(),
+        "variance_analysis_weight_receipt_digest": variance_point_weight.sha256_digest(),
         "variance_analytic_case_occurrence_set_digest": (
-            point_weight.analytic_case_occurrence_set_digest
+            variance_point_weight.analytic_case_occurrence_set_digest
         ),
         "variance_weight_eligibility_receipt_digest": (
-            point_weight.weight_eligibility.sha256_digest()
+            variance_point_weight.weight_eligibility.sha256_digest()
         ),
-        "variance_weight_correction_sequence": point_weight.correction_sequence,
-        "variance_final_weight_artifact_digest": point_weight.final_weight_artifact_digest,
+        "variance_weight_correction_sequence": variance_point_weight.correction_sequence,
+        "variance_final_weight_artifact_digest": (
+            variance_point_weight.final_weight_artifact_digest
+        ),
         "constructed_at": datetime(2026, 9, 17, 0, 31, tzinfo=timezone.utc),
     }
     values.update(overrides)
