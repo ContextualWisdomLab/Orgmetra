@@ -1,20 +1,21 @@
 # ADR 0014: Persist governed job-analysis snapshots
 
-- Status: Accepted on active implementation branch
+- Status: Accepted
+- Maturity: Integrated on protected `develop` via merged PR #38
 - Date: 2026-08-20
 - Owners: Orgmetra Job Analysis / Workforce Validation
 
 ## Context
 
-ADR 0007 defines the canonical in-process `JobAnalysisSnapshot` evidence contract. Protected `develop` now also contains the governed People mutation/idempotency slice through migration 0012, so the next persistence migration is 0013. The previous draft persistence lane used historical migration/ADR numbers and overlapped a second proposed job-analysis store; that competing store has been closed rather than shipping two Task/KSAO authorities.
+ADR 0007 defines the canonical in-process `JobAnalysisSnapshot` evidence contract. Protected `develop` contains the governed People mutation/idempotency slice through migration 0012 and governed Job Analysis snapshot persistence through migration 0013. The previous draft persistence lane used historical migration/ADR numbers and overlapped a second proposed job-analysis store; that competing store has been closed rather than shipping two Task/KSAO authorities.
 
 A snapshot that exists only in memory cannot be reread, audited, or bound to the Job, Position, or criterion identities already present in Orgmetra. Job analysis is a systematic examination of work tasks and the competencies required to perform them, with explicit task-to-competency linkage and evidence provenance. When later selection procedures depend on work behaviors or job knowledge, the analysis must remain reviewable evidence rather than an opaque model assertion.
 
-This slice therefore persists one immutable snapshot without making a hiring, promotion, termination, compensation, or other high-impact employment decision. LLM-origin material remains untrusted draft evidence under ADR 0007 and cannot become validated occupational evidence without accountable human review.
+The integrated slice persists one immutable snapshot without making a hiring, promotion, termination, compensation, or other high-impact employment decision. LLM-origin material remains untrusted draft evidence under ADR 0007 and cannot become validated occupational evidence without accountable human review.
 
 ## Decision
 
-Orgmetra will persist the canonical `JobAnalysisSnapshot` in migration `0013_job_analysis_snapshot.sql` as tenant-scoped 3NF relations:
+Orgmetra persists the canonical `JobAnalysisSnapshot` in migration `0013_job_analysis_snapshot.sql` as tenant-scoped 3NF relations:
 
 - `job_analysis_snapshot` stores the version header, optional Position and criterion scope, accountable review metadata, content digest, and the 1:1 Functional Job Analysis compatibility profile;
 - `job_analysis_task_item` stores observable duties and their versioned evidence source;
@@ -42,7 +43,7 @@ The stronger provenance and sealing ideas from the superseded parallel case mode
 
 ## Verification
 
-Tests must prove that the persisted snapshot document equals the posted payload, `Idempotency-Key` is bound at the write port and stored on `job_analysis_write_command`, missing parents fail closed for the expected foreign-key or same-Job scope reason, snapshot UPDATE and DELETE operations are rejected by the append-only guard, cross-tenant snapshot reads return no rows under a `NOSUPERUSER NOBYPASSRLS` role, and `record_audit_outbox_event(...)` is persisted in the same governed write path. The service boundary requires exact 100% owned production statement and branch coverage where the pinned toolchain exposes those metrics, plus a PostgreSQL integration test that applies protected migrations 0001 through 0012 before migration 0013.
+Tests prove that the persisted snapshot document equals the posted payload, `Idempotency-Key` is bound at the write port and stored on `job_analysis_write_command`, missing parents fail closed for the expected foreign-key or same-Job scope reason, snapshot UPDATE and DELETE operations are rejected by the append-only guard, cross-tenant snapshot reads return no rows under a `NOSUPERUSER NOBYPASSRLS` role, and `record_audit_outbox_event(...)` is persisted in the same governed write path. The service boundary requires exact 100% owned production statement and branch coverage where the pinned toolchain exposes those metrics, plus a PostgreSQL integration test that applies protected migrations 0001 through 0012 before migration 0013.
 
 ## References
 

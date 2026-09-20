@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted on active PR only. This document is not protected-`develop` product truth until its owning PR integrates.
+Status: Accepted
+
+This ADR describes the intent-only adapter integrated on protected `develop`. Provider-executed create remains outside the Orgmetra-owned boundary until Naruon's owner contract supports and proves that path.
 
 ## Context
 

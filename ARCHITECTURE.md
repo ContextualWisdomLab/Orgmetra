@@ -2,7 +2,7 @@
 
 ## Architecture thesis
 
-Orgmetra is a monorepo-hosted, modular, MSA-ready HRIS/HCM platform. It owns employment truth and integrates CWL specialist systems through explicit, versioned contracts.
+Orgmetra is a monorepo-hosted, modular, MSA-ready HRIS/HCM platform. It owns employment truth and integrates CWL specialist systems only through explicit, released/versioned owner contracts and Orgmetra ACLs. Repository SHAs may preserve provenance but are not production consumer authority by themselves.
 
 ```mermaid
 flowchart LR
@@ -50,8 +50,8 @@ flowchart LR
 
     integration -. versioned adapter .-> keyverse[Keyverse]
     integration -. versioned adapter .-> naruon[Naruon]
-    validation -. snapshot contract .-> psych[Psychometrics Commons]
-    validation -. temporal analysis contract .-> tepp[TEPP]
+    validation -. released snapshot contract; admission gated .-> psych[Psychometrics Commons]
+    validation -. released temporal contract; admission gated .-> tepp[TEPP]
     jobs -. ontology contract .-> semantic[Semantic Data Portal]
     jobs -. draft-only workflow .-> orchestrator[Contextual Orchestrator]
     documents -. artifact adapter .-> doc_services[Clearfolio and NewsDOM]
@@ -60,13 +60,15 @@ flowchart LR
 
 The diagram shows one physical PostgreSQL cluster for the initial modular deployment, not a shared application schema. Each bounded context owns a separate schema, database role, migration history, and generated data-access layer.
 
+External edges express bounded-context ownership and intended contract shape, not a claim that every contract is currently production-admissible. Current specialist admission is fail-closed: Psychometrics Commons and TEPP are `release_missing`; fast-mlsirm is `contract_projection_missing`. Their owner paths are Psychometrics Commons #452, TEPP #638, and fast-mlsirm #2086. Until a supported immutable owner release/projection exists and Orgmetra consumer conformance passes, the corresponding production capability is unavailable rather than reconstructed from a branch, copied schema, raw commit pin, floating `latest`, or digest-only reference.
+
 ## Runtime layers
 
 1. **Role workspaces**: employee, manager, recruiter, HR, analyst, and admin.
 2. **Orgmetra Gateway**: API aggregation, tenant context, purpose-bound authorization, idempotency, and event-envelope handling.
 3. **Domain services**: `people_core`, `organization_core`, `job_architecture`, `talent_acquisition`, `performance_management`, `workforce_validation`, `document_records`, `integration_hub`, and `audit_provenance`.
 4. **Stores**: service-owned PostgreSQL schemas, evidence object store, audit/provenance store, and search/vector store.
-5. **External CWL services**: Keyverse, Naruon, Psychometrics Commons, TEPP, Semantic Data Portal, Contextual Orchestrator, Clearfolio, NewsDOM, MHTML ETL Gateway, and mightyETL.
+5. **External CWL services**: Keyverse, Naruon, Psychometrics Commons, TEPP, Semantic Data Portal, Contextual Orchestrator, Clearfolio, NewsDOM, MHTML ETL Gateway, and mightyETL. A named external system is not automatically an admitted runtime dependency; admission requires its released owner contract plus Orgmetra compatibility/conformance evidence.
 
 ## Database ownership and access
 
@@ -96,7 +98,7 @@ Both stores require encryption in transit and at rest, deny-by-default tenant an
 
 ## Data ownership
 
-Orgmetra is authoritative for employment facts. It stores foreign references to external artifacts but not external service internals. External products can provide evidence and computation but do not own employment truth.
+Orgmetra is authoritative for employment facts. It stores foreign references to external artifacts but not external service internals. External products can provide evidence and computation but do not own employment truth. Production use of specialist evidence additionally requires a supported owner contract identity/version, immutable artifact/package digest, owner locator, and executable Orgmetra consumer conformance; provenance-only source SHAs and generic releases without the consumed projection remain non-authorizing.
 
 ## Service extraction strategy
 

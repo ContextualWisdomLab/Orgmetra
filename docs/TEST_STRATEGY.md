@@ -72,43 +72,49 @@ Required negative and provenance tests include:
 
 ## External psychometric contracts
 
-Orgmetra does not combine fast-mlsirm and TEPP into one dependency.
+Orgmetra does not combine fast-mlsirm and TEPP into one dependency. Production integration is admitted only from an immutable supported owner release. A raw repository revision may remain in provenance evidence but cannot satisfy the consumer contract by itself.
 
 ### fast-mlsirm
 
 - Canonical repository: `ContextualWisdomLab/fast-mlsirm`.
-- Reviewed immutable revision for this baseline: `fb67ced09d8ee00542c05d56374537a9a7239751`.
-- Orgmetra contract identifier: `orgmetra.fast_mlsirm.v1`.
-- Owner: `workforce_validation`; the normal online path consumes a Psychometrics Commons immutable result snapshot rather than calling the kernel from a role workspace.
-- Backend: Rust production arithmetic with bounded CPU multithreading and GPU parity for material kernels. NumPy is a reference/parity path only.
-- Request/result contract: versioned model identifier, response-snapshot reference, seed manifest, backend, precision, estimates, uncertainty, diagnostics, convergence, and provenance digest.
-- Failure semantics: bounded timeout, typed unavailable/invalid/nonconverged result, no partial score publication, and no invented fallback estimate.
+- Historical reviewed source revision: `fb67ced09d8ee00542c05d56374537a9a7239751`; this is provenance only, not the production dependency identity.
+- Current authority classification: `contract_projection_missing`. Immutable fast-mlsirm releases exist, but the previously documented `orgmetra.fast_mlsirm.v1` identifier is not an owner-published contract.
+- Required production boundary: a domain-neutral released scientific-result/provenance contract consumed through an Orgmetra Anti-Corruption Layer. The owner contract, not fast-mlsirm, must remain free of Orgmetra-specific HR/tenant/decision fields.
+- Owner: `workforce_validation`; the normal online path consumes a Psychometrics Commons immutable result snapshot rather than calling a kernel from a role workspace.
+- Backend: Rust production arithmetic with bounded CPU multithreading and GPU parity for material kernels. Python/NumPy reference calculations cannot become production fallbacks.
+- Required conformance coordinates: released package/contract version, supported public result/schema identity, exact owner locator and artifact/package digest, model/estimator/scoring configuration fingerprint, immutable input/evidence reference, backend/precision, uncertainty/diagnostics, convergence/failure semantics, reproducibility manifest or seed identity where applicable, and CPU/GPU parity evidence where promoted.
+- Failure semantics: unknown/incompatible schema, nonconvergence, invalid input, unavailable capability, missing owner locator, and unsupported release all fail closed; no partial score publication or invented fallback estimate.
 
 ### TEPP
 
 - Canonical repository: `ContextualWisdomLab/TEPP`.
-- Reviewed immutable revision for this baseline: `40adac9a26a8af85147ffa2795fb548ea243e0e5`.
-- Orgmetra contract identifier: `orgmetra.tepp.v1`.
+- Historical reviewed source revision: `40adac9a26a8af85147ffa2795fb548ea243e0e5`; this is provenance only, not the production dependency identity.
+- Current authority classification: `release_missing`; no immutable supported TEPP release is presently available to Orgmetra.
+- Required production boundary: a released temporal-analysis owner contract with exact contract/version, artifact/package digest and owner locator.
 - Owner: `workforce_validation`.
 - Backend: Rust temporal/event/multilevel analysis services and immutable analytical artifacts.
-- Request/result contract: tenant-scoped evidence references, event/effective/available times, knowledge cutoff, multiple-membership weights, model manifest, uncertainty, leakage audit, and provenance digest.
-- Failure semantics: bounded timeout, typed invalid-temporal-order/insufficient-evidence/nonconverged/unavailable result, and no promotion of an analytical artifact to HRIS truth.
+- Required conformance coordinates: evidence references, event/effective/available times, knowledge cutoff, multiple-membership weights, model manifest, uncertainty, leakage audit, provenance digest and owner result locator.
+- Failure semantics: invalid temporal order, insufficient evidence, nonconvergence, unavailable capability, missing/incompatible release and provenance mismatch fail closed; an analytical artifact is never promoted to HRIS truth.
 
 ### Psychometrics Commons snapshot linkage
 
 - Canonical repository: `ContextualWisdomLab/psychometrics-commons`.
-- Reviewed immutable revision for this baseline: `cc5850a0d1eacbbf16d03075534fce460a8286e6`.
-- Orgmetra stores the immutable `snapshot_ref`, instrument/model version, scoring-contract version, event count, payload digest, result artifact reference, and provenance reference.
-- A snapshot may be consumed only when tenant, session, instrument version, event prefix, digest, and result identity all match.
+- Historical reviewed source revision: `cc5850a0d1eacbbf16d03075534fce460a8286e6`; this is provenance only, not the production dependency identity.
+- Current authority classification: `release_missing`; no immutable supported Psychometrics Commons release is presently available to Orgmetra.
+- Required production boundary: a released assessment execution/result-snapshot contract. Orgmetra stores purpose-minimized released owner references rather than copying foreign product persistence.
+- A snapshot may be consumed only when the released owner contract/version, tenant, session, instrument/scoring coordinate, event prefix where applicable, digest, result identity and owner locator all agree.
 
-Before production integration, each contract requires:
+Before production integration, each specialist contract requires:
 
-- schema compatibility tests against the immutable revision;
-- fake-server timeout, malformed result, unavailable, and tenant-mismatch tests;
+- an immutable supported owner release and exact contract/schema version;
+- artifact or package digest plus owner locator; a digest alone or bare repository SHA is insufficient;
+- installed-package/API/schema compatibility tests rather than checkout/PYTHONPATH-only acceptance;
+- fake-server or equivalent timeout, malformed result, unavailable, tenant/purpose mismatch and unknown-version tests at the owning adapter boundary;
 - exact replay and provenance-link tests;
-- fast-mlsirm Rust/NumPy and CPU/GPU parity evidence where supported;
-- TEPP CPU/GPU parity for material kernels and leakage-safe temporal replay;
-- upgrade tests proving a new revision cannot silently change a pinned result schema.
+- fast-mlsirm Rust/reference and CPU/GPU parity evidence where the released result claims those paths;
+- TEPP CPU/GPU parity for material kernels and leakage-safe temporal replay where applicable;
+- negative tests proving `release_missing` and `contract_projection_missing` cannot fall back to a mutable branch, copied schema, floating `latest`, or unversioned result; and
+- upgrade tests proving a new owner release cannot silently change the consumed result schema or scientific meaning.
 
 ## Psychometric and mathematical evidence
 

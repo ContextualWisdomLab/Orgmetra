@@ -84,17 +84,21 @@ These identifiers are canonical across deployment names, ACLs, metrics, generate
 |---|---|---|
 | `keyverse_adapter` | Keyverse OIDC/SCIM contract | `integration_hub` |
 | `naruon_adapter` | Naruon communication-intent contract | `integration_hub` |
-| `psychometrics_commons_adapter` | immutable response/result snapshot contract pinned to `cc5850a0d1eacbbf16d03075534fce460a8286e6` | `workforce_validation` |
-| `fast_mlsirm_adapter` | `orgmetra.fast_mlsirm.v1`, repository `ContextualWisdomLab/fast-mlsirm` pinned to `fb67ced09d8ee00542c05d56374537a9a7239751`; online role workspaces consume it through Psychometrics Commons, while direct calls are limited to an approved offline validation worker | `workforce_validation` |
-| `tepp_adapter` | `orgmetra.tepp.v1`, repository `ContextualWisdomLab/TEPP` pinned to `40adac9a26a8af85147ffa2795fb548ea243e0e5` | `workforce_validation` |
+| `psychometrics_commons_adapter` | released assessment execution/result-snapshot owner contract; production consumption is fail-closed while the owner has no immutable supported release. Historical reviewed source `cc5850a0d1eacbbf16d03075534fce460a8286e6` is provenance only, not consumer authority | `workforce_validation` |
+| `fast_mlsirm_adapter` | domain-neutral released scientific-result/provenance contract consumed through an Orgmetra ACL. Immutable fast-mlsirm releases exist, but the previously named `orgmetra.fast_mlsirm.v1` contract is not owner-published; production consumption remains fail-closed until a supported owner projection is released. Direct role-workspace calls are prohibited | `workforce_validation` |
+| `tepp_adapter` | released temporal-analysis owner contract; production consumption is fail-closed while the owner has no immutable supported release. Historical reviewed source `40adac9a26a8af85147ffa2795fb548ea243e0e5` is provenance only, not consumer authority | `workforce_validation` |
 | `semantic_data_portal_adapter` | versioned ontology and data-catalog contract | `job_architecture` |
-| `contextual_orchestrator_adapter` | schema-bound draft and verification operations; no authoritative writes | `job_architecture` and `integration_hub` |
+| `contextual_orchestrator_adapter` | released `contextual-orchestrator` schema-bound draft and verification operations; no authoritative writes or provider-routing authority in Orgmetra | `job_architecture` and `integration_hub` |
 | `clearfolio_adapter` | document preview artifact contract | `document_records` |
 | `newsdom_adapter` | canonical document-block and source-span contract | `document_records` |
 | `mhtml_etl_adapter` | governed schema-proposal and row-lineage contract | `integration_hub` |
 | `mightyetl_adapter` | bounded migration/CDC contract | `integration_hub` |
 
+A repository commit SHA may be retained inside provenance or compatibility evidence, but it is never sufficient by itself as a production integration contract. A production specialist adapter requires a supported owner contract identity and version, immutable artifact or package digest, owner locator, and executable consumer-conformance evidence. A missing owner release is `release_missing`; an immutable release that does not expose the required supported projection is `contract_projection_missing`. Both states fail closed rather than falling back to a mutable branch, copied source/schema, digest-only pointer, or floating `latest`.
+
 Adapters use bounded timeouts, typed error semantics, tenant validation, idempotency, and provenance. They fail closed, never log credentials, and never promote external data to authoritative HRIS truth without Orgmetra command validation.
+
+Model-backed GitHub Actions consume only a released Contextual Orchestrator API/client/schema through `orchestrator/free` and the approved gateway token. Orgmetra does not hard-code a provider, model, provider group, or paid fallback and does not require provider API keys. Provider-key discovery, routing, capability availability, default model timeout, user cancellation, provider-end, and administrator-timeout semantics are owned by Contextual Orchestrator. If a required capability is unavailable at that boundary, the Orgmetra consumer fails closed and the owner contract is repaired rather than bypassed locally.
 
 ## 7. Testing requirements
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Active-PR only. This evidence does not describe protected-`develop` product truth until the owning PR integrates.
+Protected `develop` capability. This page describes the Orgmetra-owned intent adapter shipped on protected `develop`; provider-side calendar execution remains outside Orgmetra's ownership boundary.
 
 | Requirement | Decision / contract | Production implementation | Executable evidence |
 |---|---|---|---|
