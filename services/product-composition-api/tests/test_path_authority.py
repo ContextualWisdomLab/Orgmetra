@@ -13,9 +13,9 @@ A = "a" * 64
 B = "b" * 64
 
 
-def owner_release() -> OwnerApiRelease:
+def owner_release(service_id: str = "people_api") -> OwnerApiRelease:
     return OwnerApiRelease(
-        service_id="people_api",
+        service_id=service_id,
         release_version="v1.2.3",
         openapi_sha256=A,
         artifact_sha256=B,
@@ -23,13 +23,19 @@ def owner_release() -> OwnerApiRelease:
     )
 
 
-def route(route_id: str, path_template: str, method: str) -> CompositionRoute:
+def route(
+    route_id: str,
+    path_template: str,
+    method: str,
+    *,
+    service_id: str = "people_api",
+) -> CompositionRoute:
     return CompositionRoute(
         route_id=route_id,
         path_template=path_template,
         methods=(method,),
-        owner_release=owner_release(),
-        logical_upstream="service://people-api",
+        owner_release=owner_release(service_id),
+        logical_upstream=f"service://{service_id.replace('_', '-')}",
         required=True,
     )
 
@@ -89,3 +95,37 @@ def test_route_set_allows_same_template_identity_across_distinct_methods() -> No
     )
 
     assert len(configuration_sha256(routes)) == 64
+
+
+def test_route_set_allows_same_owner_concrete_precedence_for_same_method() -> None:
+    routes = (
+        route("people_current", "/v1/people/current", "GET"),
+        route("people_read", "/v1/people/{person_record_id}", "GET"),
+    )
+
+    assert len(configuration_sha256(routes)) == 64
+
+
+def test_route_set_rejects_cross_owner_concrete_template_overlap() -> None:
+    routes = (
+        route("people_current", "/v1/people/current", "GET"),
+        route(
+            "job_people_lookup",
+            "/v1/people/{person_record_id}",
+            "GET",
+            service_id="job_analysis_api",
+        ),
+    )
+
+    with pytest.raises(CompositionContractError, match="method/path authority"):
+        configuration_sha256(routes)
+
+
+def test_route_set_rejects_same_owner_ambiguous_templated_overlap() -> None:
+    routes = (
+        route("people_current", "/v1/{collection}/current", "GET"),
+        route("people_read", "/v1/people/{person_record_id}", "GET"),
+    )
+
+    with pytest.raises(CompositionContractError, match="method/path authority"):
+        configuration_sha256(routes)
