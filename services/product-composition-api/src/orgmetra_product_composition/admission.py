@@ -15,10 +15,10 @@ from typing import Mapping
 from weakref import WeakValueDictionary, finalize
 
 _CONTRACT_SCHEMA = "orgmetra_gateway_composition.v1"
-_IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
+_IDENTIFIER = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _RELEASE_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
-_UPSTREAM = re.compile(r"^service://[a-z][a-z0-9-]{1,63}$")
+_UPSTREAM = re.compile(r"^service://[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 _PATH_PARAMETER = re.compile(r"^\{[a-z][a-z0-9_]{0,63}\}$")
 _ROUTE_PATH = re.compile(
     r"^/v[0-9]+(?:/(?:[A-Za-z0-9._:-]+|\{[a-z][a-z0-9_]{0,63}\}))+?$"
