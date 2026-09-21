@@ -42,7 +42,7 @@ Orgmetra #295/#297 own durable subject-to-Person binding/consumer ACL. Orgmetra 
 
 ### Executable product-composition canary
 
-Draft PR #434 is stacked on #340 so it does not become a competing Foundation-workflow writer. Current exact head is `bdedbda008746ecfac39895b16537c2c99a63165`; fresh compare against #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f` is 41 ahead / 0 behind with merge base exactly that parent and eight changed files confined to `services/product-composition-api/**`.
+Draft PR #434 is stacked on #340 so it does not become a competing Foundation-workflow writer. Current exact head is `8bdb2bb295ccf69d789c9c19771a42066e05b109`; fresh compare against #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f` is 44 ahead / 0 behind with merge base exactly that parent and nine changed files confined to `services/product-composition-api/**`.
 
 Current canary semantics are deliberately narrower than the final Gateway/product boundary:
 
@@ -50,21 +50,23 @@ Current canary semantics are deliberately narrower than the final Gateway/produc
 - `CompositionRoute` contains route identity, canonical path/methods, exact owner release, an owner-bound logical service reference, and required/optional criticality only;
 - `configuration_sha256` is derived from the canonical semantic route projection and is stable across route ordering;
 - path templates that can select the same concrete request are rejected across different owners when their effective method authorities overlap; GET and HEAD are one collision authority while the actually declared method set remains canonical route material;
+- complete `.` and `..` URI path segments are rejected before route admission so URI normalization cannot make a manifest route and a downstream selected path disagree;
 - the composition contract has **no local retry class, idempotency mode, or concurrency mode**;
 - `AdmissionReceipt` is canonical process-local structural evidence whose exact issued fields remain bound to the issued object; post-issuance field drift fails closed;
 - admitted/unavailable receipt route IDs are emitted in deterministic `route_id` order, matching the contract's treatment of route tuple order as non-semantic;
 - admission revalidates current nested owner/route/generation/config evidence before use rather than trusting constructor-time success, retained aliases, cached booleans, or reconstructed receipt-shaped data; and
 - a canonically constructed `CompositionGeneration` is additionally bound to its original process-local `(schema_version, generation_id, config_sha256)` construction snapshot. Changing `generation_id`, or coherently changing route semantics and then recomputing/writing `config_sha256`, cannot silently turn the same constructed generation into a different semantic generation.
 
-The canary's RED history matters to this ADR. The first test-only state had no production package. Later REDs established that an arbitrary 64-hex config label could pass without binding route semantics; permissive release locators, overlapping route authority, duplicated retry-policy ownership, and overclaimed buyer readiness were possible; an issued receipt could be changed after issuance; a route could point to a different logical upstream than its released owner; nested route/release evidence could drift after construction; a self-consistent rewritten generation could pass use-time validation if the caller rewrote both the semantic graph and matching digest or rewrote `generation_id`; receipt route ordering could drift with a semantically irrelevant tuple reorder; and finally GET and HEAD for the same selected-resource path could be split across different route owners.
+The canary's RED history matters to this ADR. The first test-only state had no production package. Later REDs established that an arbitrary 64-hex config label could pass without binding route semantics; permissive release locators, overlapping route authority, duplicated retry-policy ownership, and overclaimed buyer readiness were possible; an issued receipt could be changed after issuance; a route could point to a different logical upstream than its released owner; nested route/release evidence could drift after construction; a self-consistent rewritten generation could pass use-time validation if the caller rewrote both the semantic graph and matching digest or rewrote `generation_id`; receipt route ordering could drift with a semantically irrelevant tuple reorder; GET and HEAD for the same selected-resource path could be split across different route owners; and complete URI `.` dot-segments could be admitted even though URI normalization removes them.
 
 The latest executable ordinary-forward sequences are:
 
 - `f7175e36d32034581cf05758b64256c06e7a3ea5` -> `105fa9a584c5aa9865c86082664411f922a84492` -> `d3e24da90bbd4b2c5e44f7acfaeb15225eff08a0` for generation-construction identity;
-- `5bbd018750a49a2bfa4c28d62c1b091f493c77b2` -> `79279c211fd5912a30060991cb5054fac19daba1` -> `db251db2168bdea2e5af321e75952826a1f5a21b` for canonical receipt route ordering; and
-- `34a598ad2c60cd00b8c51b3be5a8abfd3b5b377f` -> `8a1e8854bb8e7c7a712e83dc9ef1e593095ebdfe` -> `bdedbda008746ecfac39895b16537c2c99a63165` for GET/HEAD selected-resource ownership.
+- `5bbd018750a49a2bfa4c28d62c1b091f493c77b2` -> `79279c211fd5912a30060991cb5054fac19daba1` -> `db251db2168bdea2e5af321e75952826a1f5a21b` for canonical receipt route ordering;
+- `34a598ad2c60cd00b8c51b3be5a8abfd3b5b377f` -> `8a1e8854bb8e7c7a712e83dc9ef1e593095ebdfe` -> `bdedbda008746ecfac39895b16537c2c99a63165` for GET/HEAD selected-resource ownership; and
+- `4c8d195de1876d163dd115d82aaa9cc7f628d48f` -> `e8931bc9861cb2e01c68887660f1286bed3329b0` -> `8bdb2bb295ccf69d789c9c19771a42066e05b109` for URI dot-segment route identity.
 
-Earlier focused local figures on predecessor `cb32ba828...`—16 tests, 201/201 statements and 84/84 branches—are **predecessor evidence only** after the material receipt/nested-generation/generation-construction/route-authority writes. Current exact `bdedbda...` has no PR-triggered hosted workflow evidence because it remains stacked on #340. No current-head 100% statement/branch/docstring/edge, Security, SAST or CodeQL GREEN is claimed.
+Earlier focused local figures on predecessor `cb32ba828...`—16 tests, 201/201 statements and 84/84 branches—are **predecessor evidence only** after the material receipt/nested-generation/generation-construction/route-authority writes. Current exact `8bdb2bb...` has no PR-triggered hosted workflow evidence because it remains stacked on #340. No current-head 100% statement/branch/docstring/edge, Security, SAST or CodeQL GREEN is claimed.
 
 ## Corrected Context Map
 
@@ -106,7 +108,7 @@ The protected product label “Orgmetra Gateway” is the buyer-facing boundary.
 | Concern | Owner | Composition role | Forbidden behavior |
 |---|---|---|---|
 | Generic network/proxy transport, connection/TLS mechanics, bounded edge resources, drain | released shared edge owner | consume only supported released capabilities | copy mutable edge source; reinterpret a single-upstream contract as multi-service routing |
-| Product route/admission generation | Orgmetra #432 implementation | select compatible released owner operations and bind a reproducible composition generation | put product route semantics into an unsupported edge config; reuse pg-erd migration routing as generic authority; rewrite one constructed generation into another meaning; split GET/HEAD selected-resource authority across owners |
+| Product route/admission generation | Orgmetra #432 implementation | select compatible released owner operations and bind a reproducible composition generation | put product route semantics into an unsupported edge config; reuse pg-erd migration routing as generic authority; rewrite one constructed generation into another meaning; split GET/HEAD selected-resource authority across owners; admit URI dot-segment aliases as distinct routes |
 | Identity provider / token issuance / canonical OIDC profile | Keyverse | consume released RP verifier/profile | issue credentials; broaden Keyverse with ad hoc HR claims |
 | Durable subject trust | Keyverse #155, packaged by #158 | preserve exact released semantics | assume every syntactically valid `sub` is durably bindable |
 | Durable subject-to-Person binding / consumer ACL | Orgmetra #295/#297 | reconstruct/revalidate owner evidence | mint Person truth in gateway/composition |
@@ -132,16 +134,16 @@ A future executable `orgmetra_gateway_composition.v1` or equivalent must identif
 - shared edge release/artifact digest when deployed;
 - Keyverse release/profile plus subject-trust contract identity;
 - Orgmetra identity-ACL version/digest;
-- stable `route_id`, path/method set, owner service identity;
+- stable `route_id`, canonical path/method set, owner service identity;
 - released owner API/OpenAPI version and digest;
 - immutable owner artifact/release coordinate sufficient to reconstruct the admitted operation;
 - logical upstream service reference bound to that owner service;
 - required coarse capability and authoritative tenant/actor/purpose locations; and
 - required-versus-optional readiness criticality.
 
-The config digest is computed from the canonical semantic projection; it is not an arbitrary caller label. A generation identifier cannot be reassigned to a different digest/semantic graph after canonical construction. Owner idempotency, replay, concurrency, error, and retry semantics are **referenced through exact released owner evidence rather than copied into local manifest classifications**. Route method declarations remain exact contract material; only collision ownership treats GET and HEAD as one effective selected-resource authority.
+The config digest is computed from the canonical semantic projection; it is not an arbitrary caller label. A generation identifier cannot be reassigned to a different digest/semantic graph after canonical construction. Owner idempotency, replay, concurrency, error, and retry semantics are **referenced through exact released owner evidence rather than copied into local manifest classifications**. Route method declarations remain exact contract material; only collision ownership treats GET and HEAD as one effective selected-resource authority. Complete `.` and `..` path segments are rejected rather than normalized into another manifest route identity.
 
-A mutable branch, PR SHA, copied schema, floating image/tag, reachable endpoint, constructor-time success, self-consistent rewritten object graph, or reconstructed receipt-shaped value alone is not route authority.
+A mutable branch, PR SHA, copied schema, floating image/tag, reachable endpoint, constructor-time success, self-consistent rewritten object graph, dot-segment alias, or reconstructed receipt-shaped value alone is not route authority.
 
 ## RED -> GREEN evidence map
 
@@ -161,6 +163,7 @@ A mutable branch, PR SHA, copied schema, floating image/tag, reachable endpoint,
 | config digest is an unbound caller value | deterministic digest recomputed from canonical semantic route projection; mismatch rejected | #434 + final composition owner |
 | generation identity or route semantics are rewritten after construction and the caller supplies a matching new digest | exact constructed schema/generation/config identity remains bound; activation/admission rejects any post-construction identity/digest drift and revalidates the nested semantic graph | #432/#434 + activation owner |
 | overlapping path templates claim different owners under the same effective method authority, including a GET/HEAD split | parameter/static overlap and GET/HEAD selected-resource collision rejected before activation; declared method sets remain unchanged | #434 + HTTP composition E2E |
+| a route template contains complete `.` or `..` URI path segments | reject before manifest hashing/admission so normalization cannot select another route identity | #434 + HTTP composition E2E |
 | logical upstream names a different service from the admitted owner release | owner-bound upstream invariant rejects the route before admission | #434 + HTTP composition E2E |
 | issued admission receipt fields are changed after issuance | canonical process-local field binding rejects mutated receipt evidence | #434; durable activation must independently re-evaluate |
 | semantically equivalent route tuples produce different receipt ordering | deterministic `route_id` ordering for admitted/unavailable receipt fields | #434 + activation evidence |
@@ -221,7 +224,7 @@ GREEN requires:
 ## Single-writer handoff
 
 - #432 remains the executable product-composition gap owner. Draft #434 is its first bounded implementation slice, not a new owner issue.
-- #433 owns this Proposed ADR/traceability/doctoring decision only. This traceability source now incorporates receipt-field, owner/upstream, use-time nested-revalidation, generation-construction identity, canonical receipt ordering, and GET/HEAD selected-resource authority findings; ADR 0432 and doctoring must remain aligned before Accepted consideration.
+- #433 owns this Proposed ADR/traceability/doctoring decision only. This traceability source now incorporates receipt-field, owner/upstream, use-time nested-revalidation, generation-construction identity, canonical receipt ordering, GET/HEAD selected-resource authority, and URI dot-segment route identity findings; ADR 0432 and doctoring must remain aligned before Accepted consideration.
 - #340 remains the Foundation-workflow prerequisite/owner; #434 is stacked on it precisely to avoid a parallel Foundation workflow writer.
 - #51 remains canonical writer for protected `ARCHITECTURE.md`, TRD, API, SECURITY, THREAT_MODEL, TEST_STRATEGY, OPERABILITY, repository TRACEABILITY, and deterministic manifest reconciliation.
 - #100 remains sole writer for `docs/product-technical-gap-baseline.md`; `API-01` stays Planned while #434 is unprotected and non-deployable.
