@@ -314,3 +314,18 @@ def test_admission_receipt_cannot_be_minted_outside_canonical_admission() -> Non
     object.__setattr__(forged, "unavailable_optional_route_ids", ())
     with pytest.raises(CompositionContractError, match="not canonically issued"):
         _ = forged.required_routes_admitted
+
+
+def test_admission_receipt_rejects_post_issuance_field_mutation() -> None:
+    expected = route()
+    mutations = (
+        ("generation_id", "generation_999"),
+        ("config_sha256", C),
+        ("admitted_route_ids", ("forged_route",)),
+        ("unavailable_optional_route_ids", ("forged_optional",)),
+    )
+    for field, value in mutations:
+        receipt = admit_generation(generation(expected), {"people_api": expected.owner_release})
+        object.__setattr__(receipt, field, value)
+        with pytest.raises(CompositionContractError, match="not canonically issued"):
+            _ = receipt.required_routes_admitted
