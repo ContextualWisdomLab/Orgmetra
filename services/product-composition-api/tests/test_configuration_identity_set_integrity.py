@@ -39,12 +39,13 @@ def route(
     *,
     service_id: str = "people_api",
     owner: OwnerApiRelease | None = None,
+    methods: tuple[str, ...] = ("GET",),
 ) -> CompositionRoute:
     selected_owner = owner or owner_release(service_id)
     return CompositionRoute(
         route_id=route_id,
         path_template=path,
-        methods=("GET",),
+        methods=methods,
         owner_release=selected_owner,
         logical_upstream=f"service://{service_id.replace('_', '-')}",
         required=True,
@@ -89,3 +90,18 @@ def test_configuration_identity_rejects_same_hierarchy_alias_before_hashing() ->
 
     with pytest.raises(CompositionContractError, match="same hierarchy"):
         configuration_sha256(routes)
+
+
+def test_configuration_identity_treats_method_order_as_set_order() -> None:
+    get_head = route(
+        "people_lookup",
+        "/v1/people/{person_record_id}",
+        methods=("GET", "HEAD"),
+    )
+    head_get = route(
+        "people_lookup",
+        "/v1/people/{person_record_id}",
+        methods=("HEAD", "GET"),
+    )
+
+    assert configuration_sha256((get_head,)) == configuration_sha256((head_get,))
