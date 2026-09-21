@@ -49,6 +49,19 @@ def summary_route(owner: OwnerApiRelease) -> CompositionRoute:
     )
 
 
+def test_route_construction_revalidates_preexisting_owner_release_evidence() -> None:
+    owner = release()
+    object.__setattr__(owner, "release_version", "latest")
+    object.__setattr__(
+        owner,
+        "release_locator",
+        "https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/latest",
+    )
+
+    with pytest.raises(CompositionContractError, match="immutable release"):
+        route(owner)
+
+
 def test_configuration_digest_rejects_low_level_mutated_owner_before_materialization() -> None:
     owner = release()
     selected_route = route(owner)
