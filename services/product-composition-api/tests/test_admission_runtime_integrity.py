@@ -96,6 +96,38 @@ def test_admission_rejects_self_consistent_post_construction_generation_retarget
         admit_generation(candidate, {"people_api": owner})
 
 
+def test_admission_receipt_route_ids_remain_canonical_after_nonsemantic_route_reorder() -> None:
+    owner = release()
+    alpha = CompositionRoute(
+        route_id="alpha_route",
+        path_template="/v1/alpha/{record_id}",
+        methods=("GET",),
+        owner_release=owner,
+        logical_upstream="service://people-api",
+        required=True,
+    )
+    zeta = CompositionRoute(
+        route_id="zeta_route",
+        path_template="/v1/zeta/{record_id}",
+        methods=("GET",),
+        owner_release=owner,
+        logical_upstream="service://people-api",
+        required=True,
+    )
+    routes = (alpha, zeta)
+    candidate = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id="generation_001",
+        config_sha256=configuration_sha256(routes),
+        routes=routes,
+    )
+
+    object.__setattr__(candidate, "routes", (zeta, alpha))
+
+    receipt = admit_generation(candidate, {"people_api": owner})
+    assert receipt.admitted_route_ids == ("alpha_route", "zeta_route")
+
+
 def test_admission_rejects_low_level_generation_route_shape_mutation() -> None:
     owner = release()
     candidate = generation(route(owner))
