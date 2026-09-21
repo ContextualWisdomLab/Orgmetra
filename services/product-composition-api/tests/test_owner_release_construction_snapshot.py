@@ -55,7 +55,26 @@ def test_route_rejects_valid_to_valid_owner_release_retarget(
         route(owner)
 
 
-def test_new_owner_release_may_use_a_different_valid_artifact_digest() -> None:
-    successor = replace(release(), artifact_sha256=C)
+def test_route_rejects_paired_release_version_locator_retarget() -> None:
+    owner = release()
+    object.__setattr__(owner, "release_version", "v1.2.4")
+    object.__setattr__(
+        owner,
+        "release_locator",
+        "https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.4",
+    )
 
-    assert route(successor).owner_release.artifact_sha256 == C
+    with pytest.raises(CompositionContractError, match="construction snapshot"):
+        route(owner)
+
+
+def test_new_owner_release_may_use_different_valid_coordinates() -> None:
+    digest_successor = replace(release(), artifact_sha256=C)
+    version_successor = replace(
+        release(),
+        release_version="v1.2.4",
+        release_locator="https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.4",
+    )
+
+    assert route(digest_successor).owner_release.artifact_sha256 == C
+    assert route(version_successor).owner_release.release_version == "v1.2.4"
