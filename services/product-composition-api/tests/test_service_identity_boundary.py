@@ -1,0 +1,81 @@
+from __future__ import annotations
+
+import pytest
+
+from orgmetra_product_composition import (
+    CompositionContractError,
+    CompositionRoute,
+    OwnerApiRelease,
+)
+
+A = "a" * 64
+B = "b" * 64
+
+
+def test_maximum_service_identifier_remains_routable_through_logical_upstream() -> None:
+    service_id = "s" * 64
+    owner = OwnerApiRelease(
+        service_id=service_id,
+        release_version="v1.2.3",
+        openapi_sha256=A,
+        artifact_sha256=B,
+        release_locator="https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.3",
+    )
+
+    selected_route = CompositionRoute(
+        route_id="maximum_service_identity",
+        path_template="/v1/people/{person_record_id}",
+        methods=("GET",),
+        owner_release=owner,
+        logical_upstream="service://" + service_id,
+        required=True,
+    )
+
+    assert selected_route.owner_release.service_id == service_id
+    assert selected_route.logical_upstream == "service://" + service_id
+
+
+def test_single_character_snake_case_identity_remains_routable() -> None:
+    owner = OwnerApiRelease(
+        service_id="s",
+        release_version="v1.2.3",
+        openapi_sha256=A,
+        artifact_sha256=B,
+        release_locator="https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.3",
+    )
+
+    selected_route = CompositionRoute(
+        route_id="r",
+        path_template="/v1/people/{person_record_id}",
+        methods=("GET",),
+        owner_release=owner,
+        logical_upstream="service://s",
+        required=True,
+    )
+
+    assert selected_route.owner_release.service_id == "s"
+    assert selected_route.route_id == "r"
+    assert selected_route.logical_upstream == "service://s"
+
+
+@pytest.mark.parametrize("service_id", ("people_", "people__api"))
+def test_service_identifier_rejects_empty_snake_case_segments(service_id: str) -> None:
+    with pytest.raises(CompositionContractError, match="lower snake_case"):
+        OwnerApiRelease(
+            service_id=service_id,
+            release_version="v1.2.3",
+            openapi_sha256=A,
+            artifact_sha256=B,
+            release_locator="https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.3",
+        )
+
+
+def test_service_identifier_beyond_contract_bound_remains_rejected() -> None:
+    with pytest.raises(CompositionContractError, match="service_id"):
+        OwnerApiRelease(
+            service_id="s" * 65,
+            release_version="v1.2.3",
+            openapi_sha256=A,
+            artifact_sha256=B,
+            release_locator="https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.3",
+        )
