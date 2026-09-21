@@ -20,7 +20,7 @@ CWL also has a reusable edge-runtime owner, `ContextualWisdomLab/pingora-gateway
 
 Keyverse protected `main@7d9151cd2da260e118020c938c7358e2ee75d541` likewise has no published immutable consumer release. Keyverse #155/#158, Orgmetra #295/#297, Orgmetra #65, and domain API owners therefore remain prerequisite owners rather than copied source inside composition.
 
-Draft #434 is the first executable canary under #432. Current exact authority is `9852fe6bf1b4cddf1b4710d2908cb42019a0ac86`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with 88 ordinary-forward commits / 14 files confined to `services/product-composition-api/**`. It proves only a route-admission and structural generation-integrity slice. It does not claim Keyverse authentication, HR authorization, HTTP proxying, durable activation, Kubernetes deployment, buyer-path latency, protected integration, or release completion.
+Draft #434 is the first executable canary under #432. Current exact authority is `9ced14ae97f8c07285cdc3975f57a81c717313a2`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with 110 ordinary-forward commits / 17 files confined to `services/product-composition-api/**`. It proves only a route-admission and structural generation-integrity slice. It does not claim Keyverse authentication, HR authorization, HTTP proxying, durable activation, Kubernetes deployment, buyer-path latency, protected integration, or release completion.
 
 ## Decision drivers
 
@@ -110,6 +110,8 @@ Complete `.` and `..` URI path segments are rejected before collision analysis o
 
 Before admission or activation, nested generation, route, owner-release, logical-upstream, one-release-per-service, one-owner-per-Path-Item, supported-profile, path identity/matching, operation authority, and canonical configuration-digest invariants are revalidated. Constructor-time success is not durable trust.
 
+Canonically constructed `OwnerApiRelease`, `CompositionRoute`, and `CompositionGeneration` values retain process-local construction identity for the semantic coordinates they were created to represent. A valid-looking low-level retarget of an already-constructed owner release or route is rejected even when every replacement field would be valid on a newly constructed value. New legitimate release or route semantics require a new value object. These snapshots are process-local integrity evidence only; they do not prove release existence, deployment identity, or historical non-reassignment across GC/process restart.
+
 A process-local `AdmissionReceipt` proves only that the canonical evaluator admitted one exact structural state in that process. Directly constructed, reconstructed, serialized/deserialized, post-issuance-mutated, or stale receipt-shaped data does not authorize activation, routing, HR access, or readiness. Durable activation/recovery independently re-evaluates immutable generation and owner evidence.
 
 Actual release existence and owner operation compatibility are not proven by a release-shaped caller value. Production admission requires immutable owner release evidence and operation-level conformance to the referenced OpenAPI/behavior contract.
@@ -157,6 +159,7 @@ For paths designated applicable to the commercial target, p95 must be <= 20 ms. 
 - no owner release whose service identity disagrees with the logical upstream;
 - no two exact releases for one owner `service_id` in one generation;
 - no one exact OpenAPI Path Item split across owner releases without a future explicit released merge/conformance contract;
+- no post-construction owner-release or route retarget accepted as fresh evidence merely because the replacement coordinates are individually valid;
 - no post-construction generation identity/configuration rewrite accepted as the same generation;
 - no reconstructed or mutated admission receipt treated as durable proof;
 - no same-hierarchy path aliases with different template names;
@@ -170,17 +173,19 @@ For paths designated applicable to the commercial target, p95 must be <= 20 ms. 
 
 ## RED -> GREEN acceptance
 
-Implementation preserves executable RED cases for unsupported or ambiguous route material, cross-owner exact Path Item splits, release/upstream disagreement, split owner-release identities, configuration/generation rewrite, forged/stale receipt evidence, path identity/matching/operation collisions, identity/ACL bypass, cross-service SQL, owner semantic distortion, recovery leaks, and benchmarks that bypass deployed layers.
+Implementation preserves executable RED cases for unsupported or ambiguous route material, cross-owner exact Path Item splits, release/upstream disagreement, split owner-release identities, valid-to-valid post-construction owner/route retargeting, configuration/generation rewrite, forged/stale receipt evidence, path identity/matching/operation collisions, identity/ACL bypass, cross-service SQL, owner semantic distortion, recovery leaks, and benchmarks that bypass deployed layers.
 
-The newest Path Item RED is explicit: one exact path cannot be divided across different owner releases merely because the operations use disjoint methods. Exact #434 sequence `ede0b6d602d2160af6c3ae37253f9728ac4b1e08 -> 8b7b059d60bf732e1acc33dc63db2ad8d5cbb52a -> 9852fe6bf1b4cddf1b4710d2908cb42019a0ac86` binds the regression, causal production fix, and documentation without claiming that OpenAPI itself assigns Orgmetra ownership.
+The Path Item RED remains explicit: one exact path cannot be divided across different owner releases merely because the operations use disjoint methods. Exact #434 sequence `ede0b6d602d2160af6c3ae37253f9728ac4b1e08 -> 8b7b059d60bf732e1acc33dc63db2ad8d5cbb52a -> 9852fe6bf1b4cddf1b4710d2908cb42019a0ac86` binds the regression, causal production fix, and documentation without claiming that OpenAPI itself assigns Orgmetra ownership.
+
+The process-local construction-integrity repair is now source-current. Owner-release sequence `0637353074d19327940b72821d497ffba131c284 -> 747c2a7a105e3abf23f8ddfbcb5b662f17e61924 -> 6744a55e95073b2c3f8572c62b84e555f580146a` rejects valid-to-valid low-level owner-release retargeting while preserving newly constructed successor releases. Route sequence `5935135daf9eb2a89bcfd32e32105d9bd9563f96 -> 946d0a25faf5759233fb0aabeaf61f2fac653740 -> 9ced14ae97f8c07285cdc3975f57a81c717313a2` applies the same boundary to route ID, path, method set, required status, and paired owner/upstream semantics. Both remain process-local integrity controls, not durable release or activation provenance.
 
 The previous standards-profile RED remains explicit: documentation must not present the canary as general OpenAPI 3.2 support while executable admission rejects OAS-valid route forms by product policy. Exact #434 sequence `7a30ccd000c5e7b5a69e6f872277e7cf8fab2437 -> a1b903cabc900b33ac4da36f3781bddc50cf57ee` binds that distinction without widening production admission.
 
-Positive controls remain explicit: distinct methods may share the same exact admitted template string **within one exact owner release**, and one exact owner release may use concrete-before-template precedence when both routes declare the same method set.
+Positive controls remain explicit: distinct methods may share the same exact admitted template string **within one exact owner release**, one exact owner release may use concrete-before-template precedence when both routes declare the same method set, and genuinely different owner/route semantics remain legal when represented by newly constructed values.
 
 GREEN requires deployable boundaries, immutable identities for every admitted layer and generation, released owner operation conformance, real/right-cleared evidence where acceptance depends on data, exact current-head tests, supported Podman/Colima and Kubernetes evidence, fault/recovery rehearsal, security evidence, and the applicable full-path latency target.
 
-Exact #434 `9852fe6b...` currently has no PR-triggered hosted workflow evidence. Earlier local coverage figures at predecessor `cb32ba828...` do not transfer. #434 remains Draft and stacked on #340; source history alone is not merge or release authority.
+Exact #434 `9ced14ae...` currently has no PR-triggered hosted workflow evidence. Earlier local coverage figures at predecessor `cb32ba828...` do not transfer. #434 remains Draft and stacked on #340; source history alone is not merge or release authority.
 
 ## Implementation and release order
 
