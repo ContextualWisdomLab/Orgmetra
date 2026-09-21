@@ -88,13 +88,28 @@ def test_route_set_rejects_same_hierarchy_with_different_template_names_across_m
         configuration_sha256(routes)
 
 
-def test_route_set_allows_same_template_identity_across_distinct_methods() -> None:
+def test_route_set_allows_same_owner_template_identity_across_distinct_methods() -> None:
     routes = (
         route("people_read", "/v1/people/{person_record_id}", "GET"),
         route("people_update", "/v1/people/{person_record_id}", "PUT"),
     )
 
     assert len(configuration_sha256(routes)) == 64
+
+
+def test_route_set_rejects_cross_owner_exact_path_split_across_distinct_methods() -> None:
+    routes = (
+        route("people_read", "/v1/people/{person_record_id}", "GET"),
+        route(
+            "job_people_update",
+            "/v1/people/{person_record_id}",
+            "PUT",
+            service_id="job_analysis_api",
+        ),
+    )
+
+    with pytest.raises(CompositionContractError, match="path item authority"):
+        configuration_sha256(routes)
 
 
 def test_route_set_allows_same_owner_concrete_precedence_for_same_method() -> None:
