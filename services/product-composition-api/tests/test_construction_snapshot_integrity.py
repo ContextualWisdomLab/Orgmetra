@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import gc
+
 import pytest
 
 from orgmetra_product_composition import (
@@ -28,6 +30,17 @@ def route(owner: OwnerApiRelease) -> CompositionRoute:
     return CompositionRoute(
         route_id="people_history",
         path_template="/v1/tenants/{tenant_record_id}/people/{person_record_id}",
+        methods=("GET",),
+        owner_release=owner,
+        logical_upstream="service://people-api",
+        required=True,
+    )
+
+
+def summary_route(owner: OwnerApiRelease) -> CompositionRoute:
+    return CompositionRoute(
+        route_id="people_summary",
+        path_template="/v1/tenants/{tenant_record_id}/people",
         methods=("GET",),
         owner_release=owner,
         logical_upstream="service://people-api",
@@ -96,14 +109,7 @@ def test_generation_id_allows_concurrent_views_of_the_same_semantic_generation()
 def test_generation_id_rejects_concurrent_semantic_reuse() -> None:
     owner = release()
     first_route = route(owner)
-    second_route = CompositionRoute(
-        route_id="people_summary",
-        path_template="/v1/tenants/{tenant_record_id}/people",
-        methods=("GET",),
-        owner_release=owner,
-        logical_upstream="service://people-api",
-        required=True,
-    )
+    second_route = summary_route(owner)
     first_routes = (first_route,)
     second_routes = (second_route,)
     first_digest = configuration_sha256(first_routes)
@@ -126,3 +132,31 @@ def test_generation_id_rejects_concurrent_semantic_reuse() -> None:
         )
 
     assert first.config_sha256 == first_digest
+
+
+def test_generation_id_live_lineage_is_not_durable_after_last_view_is_released() -> None:
+    owner = release()
+    first_routes = (route(owner),)
+    second_routes = (summary_route(owner),)
+    first_digest = configuration_sha256(first_routes)
+    second_digest = configuration_sha256(second_routes)
+    generation_id = "generation_lineage_ephemeral"
+
+    first = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id=generation_id,
+        config_sha256=first_digest,
+        routes=first_routes,
+    )
+    assert first.config_sha256 == first_digest
+
+    del first
+    gc.collect()
+
+    successor = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id=generation_id,
+        config_sha256=second_digest,
+        routes=second_routes,
+    )
+    assert successor.config_sha256 == second_digest
