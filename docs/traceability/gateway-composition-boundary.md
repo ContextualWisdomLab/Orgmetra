@@ -26,7 +26,7 @@ Two independent gates remain: the shared edge is unreleased, and even a future r
 
 ### Executable product-composition canary
 
-Draft #434 exact authority is `9852fe6bf1b4cddf1b4710d2908cb42019a0ac86`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with 88 ordinary-forward commits / 14 changed files, all confined to `services/product-composition-api/**`.
+Draft #434 exact authority is `9ced14ae97f8c07285cdc3975f57a81c717313a2`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with 110 ordinary-forward commits / 17 changed files, all confined to `services/product-composition-api/**`.
 
 The canary proves only structural admission invariants:
 
@@ -41,6 +41,8 @@ The canary proves only structural admission invariants:
 - same-owner concrete-before-template precedence only for the same exact owner release and declared method set;
 - cross-owner concrete/template overlap and ambiguous two-templated overlap fail closed;
 - effective-method authority separate from path matching, with GET/HEAD treated as one selected-resource collision authority while declared methods remain exact contract material;
+- canonical 1..64-character lower-snake-case owner/route/generation identities and canonical path-template expressions;
+- process-local construction identity for `OwnerApiRelease`, `CompositionRoute`, and `CompositionGeneration`, rejecting valid-to-valid low-level retargeting of already-constructed evidence;
 - no composition-local retry/idempotency/concurrency taxonomy;
 - canonical process-local `AdmissionReceipt` field binding/source-generation leasing and deterministic receipt ordering;
 - use-time revalidation of owner/route/generation/config evidence; and
@@ -50,19 +52,18 @@ Production activation/rollback still needs immutable durable generation/configur
 
 ## Latest executable finding and repair
 
-Fresh OpenAPI review found that the previous canary could admit one exact path under two distinct owner releases when their HTTP methods were disjoint. For example, `people_api` could own `GET /v1/people/{person_record_id}` while `job_analysis_api` owned `PUT` on the same exact path. Operation-method disjointness made the old exact-path branch continue before checking owner identity.
-
-That state is not supportable by the current contract. An OpenAPI Path Item contains path-level `$ref`, `summary`, `description`, `servers`, and `parameters` in addition to operations. Path-level servers service all operations and Path Item parameters apply to all operations. The present composition contract does not define or test a cross-owner Path Item merge algorithm, so it cannot prove which released owner supplies those shared semantics. OpenAPI itself does not assign repository or bounded-context ownership; one-owner-per-Path-Item is the narrower Orgmetra fail-closed decision until an explicit released merge/conformance contract exists.
+The newest integrity finding is not another routing-policy change. After `OwnerApiRelease` construction identity was protected, `CompositionRoute` still lacked an original semantic construction identity. A caller using low-level mutation could retarget an already-created route to another individually valid route ID, path, method tuple, required flag, or a mutually consistent owner/upstream pair before configuration hashing. Constructor shape checks alone could not distinguish that retarget from a genuinely new route value.
 
 Ordinary-forward repair:
 
-- `ede0b6d602d2160af6c3ae37253f9728ac4b1e08` — adds the regression that cross-owner GET/PUT on one exact path must fail while same-owner disjoint methods remain a positive control;
-- `8b7b059d60bf732e1acc33dc63db2ad8d5cbb52a` — checks exact `OwnerApiRelease` equality before allowing disjoint methods on one exact path;
-- `9852fe6bf1b4cddf1b4710d2908cb42019a0ac86` — documents Path Item shared-field semantics, the fail-closed ownership decision, and the evidence threshold for future broadening.
+- `0637353074d19327940b72821d497ffba131c284` -> `747c2a7a105e3abf23f8ddfbcb5b662f17e61924` -> `6744a55e95073b2c3f8572c62b84e555f580146a` first established process-local construction identity over all five `OwnerApiRelease` coordinates while keeping separately constructed successor releases legal;
+- `5935135daf9eb2a89bcfd32e32105d9bd9563f96` adds regression-first valid-to-valid `CompositionRoute` retarget cases;
+- `946d0a25faf5759233fb0aabeaf61f2fac653740` records a weak-referenceable, lock-protected closure-private route construction snapshot over `route_id`, path template, methods, exact owner release, logical upstream, and required status;
+- `9ced14ae97f8c07285cdc3975f57a81c717313a2` documents owner-release, route, and generation snapshots as process-local integrity evidence rather than durable activation provenance.
 
-The preceding bounded-profile sequence remains `7a30ccd000c5e7b5a69e6f872277e7cf8fab2437` -> `a1b903cabc900b33ac4da36f3781bddc50cf57ee`. The deterministic path-selection sequence remains `fd7e7c69105fa2850dc30dd43014592f1a753eaa` -> `393cb561a1226529553baa6129378281cfba6f27` -> `a98dd5f7ffd175e2a7b3b5ca61255420f2959f8b`. Path-key identity remains `2b4f2211a2e332058bec31af11474d3937899855` -> `2c7bfcf75ec2d353d52ed86cbcd74dba5ddae3ea` -> `bf90bbfbc2eef88d57fd30286b41a86f483a3fa1`. Later test-only commits aligned stale assertions with the three-layer path model without weakening production admission.
+The earlier Path Item ownership sequence remains `ede0b6d602d2160af6c3ae37253f9728ac4b1e08` -> `8b7b059d60bf732e1acc33dc63db2ad8d5cbb52a` -> `9852fe6bf1b4cddf1b4710d2908cb42019a0ac86`. The bounded-profile sequence remains `7a30ccd000c5e7b5a69e6f872277e7cf8fab2437` -> `a1b903cabc900b33ac4da36f3781bddc50cf57ee`. The deterministic path-selection sequence remains `fd7e7c69105fa2850dc30dd43014592f1a753eaa` -> `393cb561a1226529553baa6129378281cfba6f27` -> `a98dd5f7ffd175e2a7b3b5ca61255420f2959f8b`. Path-key identity remains `2b4f2211a2e332058bec31af11474d3937899855` -> `2c7bfcf75ec2d353d52ed86cbcd74dba5ddae3ea` -> `bf90bbfbc2eef88d57fd30286b41a86f483a3fa1`. Later test-only commits aligned stale assertions with the three-layer path model without weakening production admission.
 
-Earlier focused local figures at predecessor `cb32ba828...` are predecessor evidence only; material source/test writes followed. Exact `9852fe6b...` currently has no PR-triggered hosted workflow evidence.
+Earlier focused local figures at predecessor `cb32ba828...` are predecessor evidence only; material source/test writes followed. Exact `9ced14ae...` currently has no PR-triggered hosted workflow evidence.
 
 ## Corrected context map
 
@@ -104,7 +105,7 @@ The protected product label “Orgmetra Gateway” remains the buyer-facing boun
 | Concern | Owner | Composition role | Forbidden behavior |
 |---|---|---|---|
 | Generic network/proxy/TLS/drain | released shared-edge owner | consume supported released capability | copy mutable edge source or reinterpret single-upstream config as product routing |
-| Product route/admission generation | Orgmetra #432 | bind reproducible admitted owner operations | rewrite generation meaning; overclaim full OpenAPI support; split one exact Path Item across owner releases; same-hierarchy aliases; cross-owner/ambiguous path overlap; split GET/HEAD authority; dot-segment aliases; repeated expressions; split owner release identities |
+| Product route/admission generation | Orgmetra #432 | bind reproducible admitted owner operations | rewrite constructed owner/route/generation meaning; overclaim full OpenAPI support; split one exact Path Item across owner releases; same-hierarchy aliases; cross-owner/ambiguous path overlap; split GET/HEAD authority; dot-segment aliases; repeated expressions; split owner release identities |
 | Identity issuer/profile | Keyverse | consume released RP verifier/profile | issue credentials or broaden Keyverse with HR claims |
 | Durable subject trust | Keyverse #155 packaged by #158 | preserve released semantics | assume every syntactically valid `sub` is durably bindable |
 | Durable subject-to-Person binding / ACL | Orgmetra #295/#297 | consume/revalidate evidence | mint Person truth in composition |
@@ -136,7 +137,7 @@ Path concerns remain separate:
 - **Operation authority:** after Path Item ownership and path matching are valid, effective-method collision is evaluated separately; GET/HEAD share one selected-resource collision authority.
 - **Canonical URI/template syntax:** dot segments are rejected rather than normalized and a path cannot repeat one template expression.
 
-A mutable branch, PR SHA, copied schema, floating tag, reachable endpoint, constructor success, self-consistent rewritten graph, split owner release identity, cross-owner exact Path Item, ambiguous path, unsupported method/path form, or receipt-shaped value alone is not route authority.
+A mutable branch, PR SHA, copied schema, floating tag, reachable endpoint, constructor success, self-consistent rewritten graph, split owner release identity, cross-owner exact Path Item, ambiguous path, unsupported method/path form, or receipt-shaped value alone is not route authority. Process-local construction snapshots prove only that a live value has not been reinterpreted since construction; they do not replace immutable release/deployment provenance.
 
 ## RED -> GREEN evidence map
 
@@ -150,6 +151,7 @@ A mutable branch, PR SHA, copied schema, floating tag, reachable endpoint, const
 | scope/role bypasses purpose/resource auth | #65/domain-owner denial survives E2E | #65 + domain owner + composition |
 | route lacks released owner API/operation | missing/floating/incompatible owner contract or absent operation rejected | #432/#434 + owner conformance |
 | one service has multiple release identities | reject before admission and on use-time revalidation | #432/#434 |
+| constructed owner release or route is retargeted to another valid meaning | reject against process-local construction snapshot; require new value for new semantics | #432/#434 |
 | one exact Path Item is split across owner releases | reject before configuration identity; broaden only with explicit released path-item merge/conformance evidence | #432/#433/#434 + owner conformance |
 | config digest is caller label | recompute deterministic digest from canonical route material | #434 |
 | generation meaning rewritten | construction identity and use-time graph revalidation reject drift | #432/#434 + activation |
@@ -194,7 +196,7 @@ GREEN requires production-equivalent Podman/Colima boundaries, supported Kuberne
 ## Single-writer handoff
 
 - #432 remains the executable product-composition gap owner; #434 is its bounded first slice.
-- #433 owns this Proposed ADR/traceability/doctoring lane. This source is current through the one-owner-per-Path-Item finding as well as prior bounded-profile, path identity/matching, receipt, owner/upstream, release-coherence, use-time revalidation, generation identity, receipt ordering, GET/HEAD, URI dot-segment, and repeated-expression findings.
+- #433 owns this Proposed ADR/traceability/doctoring lane. This source is current through process-local owner-release and route construction integrity as well as prior bounded-profile, Path Item ownership, path identity/matching, receipt, owner/upstream, release-coherence, use-time revalidation, generation identity, receipt ordering, GET/HEAD, URI dot-segment, and repeated-expression findings.
 - #340 remains the Foundation prerequisite/owner; #434 remains stacked on it to avoid a parallel Foundation writer.
 - #51 remains canonical writer for protected ARCHITECTURE/TRD/API/SECURITY/THREAT_MODEL/TEST_STRATEGY/OPERABILITY/TRACEABILITY and manifest reconciliation after architecture admission.
 - #100 remains sole writer for `docs/product-technical-gap-baseline.md`; `API-01` stays Planned while #434 is unprotected and non-deployable.
