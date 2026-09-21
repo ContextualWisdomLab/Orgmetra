@@ -77,7 +77,7 @@ def test_configuration_identity_rejects_split_owner_release_before_hashing() -> 
         configuration_sha256(routes)
 
 
-def test_configuration_identity_rejects_overlapping_authority_before_hashing() -> None:
+def test_configuration_identity_rejects_same_hierarchy_alias_before_hashing() -> None:
     routes = (
         route("person_by_id", "/v1/people/{person_record_id}"),
         route(
@@ -87,5 +87,5 @@ def test_configuration_identity_rejects_overlapping_authority_before_hashing() -
         ),
     )
 
-    with pytest.raises(CompositionContractError, match="method/path authority"):
+    with pytest.raises(CompositionContractError, match="same hierarchy"):
         configuration_sha256(routes)
