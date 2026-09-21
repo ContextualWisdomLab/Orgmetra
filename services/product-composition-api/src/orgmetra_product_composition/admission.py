@@ -17,9 +17,16 @@ _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 _RELEASE_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _UPSTREAM = re.compile(r"^service://[a-z][a-z0-9-]{1,62}$")
-_ROUTE_PATH = re.compile(r"^/v[0-9]+(?:/[A-Za-z0-9._{}:-]+)+$")
+_PATH_PARAMETER = re.compile(r"^\{[a-z][a-z0-9_]{0,63}\}$")
+_ROUTE_PATH = re.compile(
+    r"^/v[0-9]+(?:/(?:[A-Za-z0-9._:-]+|\{[a-z][a-z0-9_]{0,63}\}))+?$"
+)
+_RELEASE_LOCATOR = re.compile(
+    r"^https://github\.com/ContextualWisdomLab/"
+    r"[A-Za-z0-9_.-]+/releases/tag/"
+    r"(?P<tag>[A-Za-z0-9][A-Za-z0-9._+-]{0,63})$"
+)
 _ALLOWED_METHODS = frozenset({"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"})
-_ALLOWED_RETRY_CLASSES = frozenset({"never", "safe", "owner_idempotent"})
 _FLOATING_RELEASES = frozenset({"develop", "head", "latest", "main", "master"})
 
 
@@ -58,6 +65,20 @@ def _release_version(value: object) -> str:
     return text
 
 
+def _route_paths_overlap(left: str, right: str) -> bool:
+    left_parts = left.strip("/").split("/")
+    right_parts = right.strip("/").split("/")
+    if len(left_parts) != len(right_parts):
+        return False
+    for left_part, right_part in zip(left_parts, right_parts, strict=True):
+        if left_part == right_part:
+            continue
+        if _PATH_PARAMETER.fullmatch(left_part) or _PATH_PARAMETER.fullmatch(right_part):
+            continue
+        return False
+    return True
+
+
 @dataclass(frozen=True, slots=True)
 class OwnerApiRelease:
     """Exact released owner API identity required for route admission."""
@@ -74,9 +95,10 @@ class OwnerApiRelease:
         object.__setattr__(self, "openapi_sha256", _sha256("openapi_sha256", self.openapi_sha256))
         object.__setattr__(self, "artifact_sha256", _sha256("artifact_sha256", self.artifact_sha256))
         locator = _exact_text("release_locator", self.release_locator, maximum=512)
-        if not locator.startswith("https://github.com/ContextualWisdomLab/") or "/releases/tag/" not in locator:
-            raise CompositionContractError("release_locator must name a canonical CWL GitHub Release")
-        if not locator.endswith(f"/{self.release_version}"):
+        match = _RELEASE_LOCATOR.fullmatch(locator)
+        if match is None:
+            raise CompositionContractError("release_locator must name one canonical CWL GitHub Release")
+        if match.group("tag") != self.release_version:
             raise CompositionContractError("release_locator must bind the exact release_version")
         object.__setattr__(self, "release_locator", locator)
 
@@ -91,7 +113,6 @@ class CompositionRoute:
     owner_release: OwnerApiRelease
     logical_upstream: str
     required: bool
-    retry_class: str
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "route_id", _identifier("route_id", self.route_id))
@@ -119,10 +140,6 @@ class CompositionRoute:
         object.__setattr__(self, "logical_upstream", upstream)
         if type(self.required) is not bool:
             raise CompositionContractError("required must be an exact bool")
-        retry_class = _exact_text("retry_class", self.retry_class, maximum=32)
-        if retry_class not in _ALLOWED_RETRY_CLASSES:
-            raise CompositionContractError("retry_class is not governed")
-        object.__setattr__(self, "retry_class", retry_class)
 
 
 def configuration_sha256(routes: tuple["CompositionRoute", ...]) -> str:
@@ -148,7 +165,6 @@ def configuration_sha256(routes: tuple["CompositionRoute", ...]) -> str:
                 },
                 "logical_upstream": route.logical_upstream,
                 "required": route.required,
-                "retry_class": route.retry_class,
             }
         )
     document = {
@@ -181,7 +197,7 @@ class CompositionGeneration:
         if type(self.routes) is not tuple or not self.routes:
             raise CompositionContractError("routes must be a non-empty exact tuple")
         route_ids: set[str] = set()
-        route_keys: set[tuple[str, str]] = set()
+        authorities: list[tuple[str, str]] = []
         for route in self.routes:
             if type(route) is not CompositionRoute:
                 raise CompositionContractError("routes must contain exact CompositionRoute values")
@@ -189,10 +205,12 @@ class CompositionGeneration:
                 raise CompositionContractError("route_id values must be unique")
             route_ids.add(route.route_id)
             for method in route.methods:
-                key = (method, route.path_template)
-                if key in route_keys:
-                    raise CompositionContractError("method/path authority must have one owner")
-                route_keys.add(key)
+                for existing_method, existing_path in authorities:
+                    if method == existing_method and _route_paths_overlap(
+                        route.path_template, existing_path
+                    ):
+                        raise CompositionContractError("method/path authority must have one owner")
+                authorities.append((method, route.path_template))
         expected_config_sha256 = configuration_sha256(self.routes)
         if self.config_sha256 != expected_config_sha256:
             raise CompositionContractError(
@@ -202,7 +220,7 @@ class CompositionGeneration:
 
 @dataclass(frozen=True, slots=True)
 class AdmissionReceipt:
-    """Structural route-admission result; it is not HR authorization evidence."""
+    """Structural route-admission result; never authorization or product-ready evidence."""
 
     generation_id: str
     config_sha256: str
@@ -210,8 +228,8 @@ class AdmissionReceipt:
     unavailable_optional_route_ids: tuple[str, ...]
 
     @property
-    def buyer_ready(self) -> bool:
-        """A returned receipt means every required route passed exact release admission."""
+    def required_routes_admitted(self) -> bool:
+        """A returned receipt means every configured required route matched exactly."""
         return True
 
 
@@ -221,8 +239,8 @@ def admit_generation(
 ) -> AdmissionReceipt:
     """Admit routes only when observed owner releases exactly match configured evidence.
 
-    Optional routes may remain unavailable without making the required product surface
-    unready. A required missing or mismatched owner release fails closed.
+    Optional routes may remain unavailable without invalidating required-route admission.
+    A required missing or mismatched owner release fails closed.
     """
 
     if type(generation) is not CompositionGeneration:
