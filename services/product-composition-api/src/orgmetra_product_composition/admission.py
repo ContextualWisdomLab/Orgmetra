@@ -19,7 +19,9 @@ _IDENTIFIER = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 _RELEASE_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _UPSTREAM = re.compile(r"^service://[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
-_PATH_PARAMETER = re.compile(r"^\{[a-z][a-z0-9_]{0,63}\}$")
+_PATH_PARAMETER = re.compile(
+    r"^\{(?=[a-z0-9_]{1,64}\}$)[a-z][a-z0-9]*(?:_[a-z0-9]+)*\}$"
+)
 _ROUTE_PATH = re.compile(
     r"^/v[0-9]+(?:/(?:[A-Za-z0-9._:-]+|\{[a-z][a-z0-9_]{0,63}\}))+?$"
 )
@@ -169,9 +171,9 @@ class CompositionRoute:
             segment in {".", ".."} for segment in path_segments
         ):
             raise CompositionContractError("path_template must be a canonical versioned API path")
-        template_expressions = [
-            segment for segment in path_segments if _PATH_PARAMETER.fullmatch(segment)
-        ]
+        template_expressions = [segment for segment in path_segments if segment.startswith("{")]
+        if any(_PATH_PARAMETER.fullmatch(segment) is None for segment in template_expressions):
+            raise CompositionContractError("path template expressions must be lower snake_case")
         if len(template_expressions) != len(set(template_expressions)):
             raise CompositionContractError("path_template must not repeat a template expression")
         object.__setattr__(self, "path_template", path)
