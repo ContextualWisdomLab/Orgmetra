@@ -1,0 +1,105 @@
+# Gateway composition boundary references
+
+Verification date: 2026-09-21
+
+Scope: primary standards and authoritative specifications used by ADR 0432. This file records what each source supports and what it does **not** prove for Orgmetra. It is not evidence that a gateway implementation, owner API, shared edge runtime, or commercial latency target has passed.
+
+## Source-to-decision traceability
+
+### OAuth and OpenID Connect
+
+**OpenID Foundation. (2023). _OpenID Connect Core 1.0 incorporating errata set 2_. https://openid.net/specs/openid-connect-core-1_0.html**
+
+The OpenID Foundation approved the second errata set in December 2023. OpenID Connect remains the published authentication/claims contract referenced by protected Orgmetra architecture. In 2025 the errata-set-2 Core specification was also published as ITU-T X.1285; that recognition does not change Keyverse/Orgmetra ownership.
+
+Use in ADR 0432:
+
+- Keyverse remains the identity provider;
+- the gateway may validate the product-facing OIDC bearer token but does not become credential or identity authority; and
+- downstream domain authorization remains separate from authentication and coarse scope checks.
+
+Not established by this source:
+
+- that Orgmetra's current Keyverse integration is conformant;
+- that forwarding any particular token/context representation between gateway and owner services is safe; or
+- that a shared gateway release exists.
+
+**Lodderstedt, T., Bradley, J., Labunets, A., & Fett, D. (2025). _Best current practice for OAuth 2.0 security_ (BCP 240, RFC 9700). RFC Editor. https://www.rfc-editor.org/rfc/rfc9700.html**
+
+RFC 9700 is the IETF Best Current Practice for OAuth 2.0 security as of this verification date. It updates security guidance associated with RFCs 6749, 6750, and 6819 and rejects several insecure historical patterns.
+
+Use in ADR 0432:
+
+- bearer-token handling at the product edge is a security boundary, not generic header forwarding;
+- redirect/browser behavior, if introduced, must follow explicit secure flow rules instead of proxy defaults; and
+- authentication material must fail closed rather than fall back to weaker legacy handling.
+
+Not established by this source:
+
+- Orgmetra-specific tenant, actor, business-purpose, employment-policy, or resource authorization semantics.
+
+### HTTP semantics, retries, and errors
+
+**Fielding, R., Nottingham, M., & Reschke, J. (2022). _HTTP semantics_ (RFC 9110). RFC Editor. https://www.rfc-editor.org/rfc/rfc9110.html**
+
+RFC 9110 Section 9.2.2 defines HTTP method idempotency and explains why idempotent requests can be automatically retried after some communication failures.
+
+Use in ADR 0432:
+
+- transport retry policy distinguishes protocol-level idempotent methods from application commands;
+- POST/mutation replay is not made safe merely by the gateway; replay requires the released owner contract's exact `Idempotency-Key` semantics; and
+- an ambiguous failure after a potentially committed non-replay-safe mutation does not justify a fresh mutation attempt.
+
+Not established by this source:
+
+- Orgmetra's semantic command digest, first-commit replay, or employment-fact idempotency contract. Those remain owner-domain evidence.
+
+**Nottingham, M., Wilde, E., & Dalal, S. (2023). _Problem details for HTTP APIs_ (RFC 9457). RFC Editor. https://www.rfc-editor.org/rfc/rfc9457.html**
+
+RFC 9457 is the current IETF Standards Track Problem Details specification and obsoletes RFC 7807. Its security considerations warn against leaking sensitive implementation details in errors.
+
+Use in ADR 0432:
+
+- if an owner publishes RFC 9457 Problem Details, the gateway preserves the owner's status and problem identity rather than converting it to generic success;
+- client-visible problem payloads must not expose stack dumps, credentials, internal topology, or restricted data; and
+- error-format normalization is a versioned owner/product decision, not an implicit proxy behavior.
+
+Not established by this source:
+
+- that protected Orgmetra APIs already publish RFC 9457. Protected `docs/API_CONTRACT.md` currently shows a versioned Orgmetra error shape; canonical standardization, if chosen, belongs to the existing documentation/API owner path.
+
+### API contract description
+
+**OpenAPI Initiative. (2025). _OpenAPI Specification v3.2.0_. https://spec.openapis.org/oas/v3.2.0.html**
+
+Protected Orgmetra documentation already uses OpenAPI 3.2.0 as its HTTP contract language.
+
+Use in ADR 0432:
+
+- route admission is tied to a released owner API contract/version and exact OpenAPI digest;
+- the gateway composition inventory does not turn separately owned OpenAPI contracts into one monolithic domain schema; and
+- missing or incompatible owner contracts keep a route unadmitted.
+
+Not established by this source:
+
+- semantic compatibility of two Orgmetra service releases. Compatibility requires executable consumer/provider conformance evidence.
+
+## Repository evidence used with the standards
+
+The standards above are combined with live repository evidence, not substituted for it.
+
+On 2026-09-21:
+
+- Orgmetra protected authority was `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f`;
+- protected `ARCHITECTURE.md` documented an Orgmetra Gateway;
+- protected `docs/API_CONTRACT.md` documented pre-handler Keyverse OIDC validation at that gateway;
+- the executable repository still lacked one supported deployable product composition boundary;
+- `ContextualWisdomLab/pingora-gateway` protected authority was `main@f8b4c99b8e5d3de79af1ff0c00c0c8fd63b52991`;
+- its published GitHub Release inventory was empty; and
+- root PR #1 exact `38db1949354f5721dc0ecfeea395bcf958a64ace` remained Draft and recorded a PR-introduced `derivative 2.2.0` / RUSTSEC-2024-0388 supplier-admission RED plus incomplete current-head central CodeQL evidence.
+
+Those repository facts are why ADR 0432 can select a **target** shared-owner architecture while still requiring production admission to fail closed today.
+
+## Evidence discipline
+
+A standards citation is not GREEN implementation evidence. Commercial acceptance still requires exact protected/released identities, current-head conformance and security tests, fault injection, deployment/recovery evidence, and realistic k6/E2E measurements against real deployable service boundaries. Synthetic fixtures may establish mechanism behavior but cannot by themselves establish buyer-path availability, latency, privacy, or scientific correctness.
