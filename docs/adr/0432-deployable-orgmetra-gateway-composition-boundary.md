@@ -89,21 +89,25 @@ The manifest does not mint local retry, idempotency, concurrency, or error-prese
 
 Admission is deny-by-default. Reachability is not admission. Invalid route material fails before configuration identity is minted.
 
-#### OpenAPI path identity
+#### OpenAPI path identity and deterministic matching
 
 OpenAPI Specification 3.2.1 Section 4.8.1 defines templated paths with the same hierarchy but different template names as identical and says they MUST NOT coexist. Consequently:
 
 - `/v1/people/{person_record_id}` and `/v1/people/{worker_record_id}` are the same OpenAPI path identity even if their HTTP methods are disjoint;
 - one path hierarchy maps to one exact template string in one composition generation; and
-- distinct HTTP methods may coexist only under the same exact path template, subject to the separate operation-authority rules below.
+- distinct HTTP methods may coexist only under that same exact path template, subject to the separate operation-authority rules below.
 
-This path-key identity check runs before effective-method collision analysis and before configuration hashing. Placeholder renaming is not a way to create another path owner.
+Path-key identity runs before effective-method collision and before configuration hashing. Placeholder renaming is not a way to create another path owner.
+
+The same OpenAPI section specifies that concrete non-templated paths are matched before templated counterparts; Section 4.8.2.1 illustrates `/pets/mine` taking precedence over `/pets/{petId}`. Orgmetra therefore does **not** reject every concrete/template overlap. The canary admits that deterministic precedence only when both routes bind the same exact `OwnerApiRelease` and declare the same exact method set. For example, one owner may publish both `GET /v1/people/current` and `GET /v1/people/{person_record_id}`. Cross-owner concrete/template overlap remains invalid, and two overlapping templated paths remain fail-closed because OpenAPI does not define a deterministic winner for ambiguous templated matching.
+
+Requiring the same declared method set is deliberate. If a method existed only on the templated Path Item while a matching concrete Path Item was selected first, the composition layer could otherwise claim an operation that the selected concrete path does not declare. A future broader precedence model requires explicit released-owner conformance evidence rather than framework-specific fallback assumptions.
 
 OpenAPI path-template-expression validity is separate again: one path cannot repeat the same template expression, so `/v1/tenants/{record_id}/people/{record_id}` fails before hashing/admission.
 
 #### HTTP operation authority
 
-After path identity is valid, operation ownership is checked independently. Path templates that can select the same concrete request must not split one effective method authority across different owners. For collision ownership, `GET` and `HEAD` form one selected-resource authority because RFC 9110 Section 9.3.2 defines HEAD as GET semantics without response content. Canonical route material still preserves the methods actually declared; this rule does not synthesize an undeclared HEAD operation.
+After path identity and deterministic path matching are valid, operation ownership is checked independently. Path templates that can select the same concrete request must not split one effective method authority across different owners. For collision ownership, `GET` and `HEAD` form one selected-resource authority because RFC 9110 Section 9.3.2 defines HEAD as GET semantics without response content. Canonical route material still preserves the methods actually declared; this rule does not synthesize an undeclared HEAD operation.
 
 #### URI identity
 
@@ -111,7 +115,7 @@ Complete `.` and `..` URI path segments are rejected before collision analysis o
 
 ### Structural evidence
 
-Before admission or activation, nested generation, route, owner-release, logical-upstream, one-release-per-service, path identity, operation authority, and canonical configuration-digest invariants are revalidated. Constructor-time success is not durable trust.
+Before admission or activation, nested generation, route, owner-release, logical-upstream, one-release-per-service, path identity/matching, operation authority, and canonical configuration-digest invariants are revalidated. Constructor-time success is not durable trust.
 
 A process-local `AdmissionReceipt` proves only that the canonical evaluator admitted one exact structural state in that process. Its issued fields remain bound to the issued object. Directly constructed, reconstructed, serialized/deserialized, post-issuance-mutated, or stale receipt-shaped data does not authorize activation, routing, HR access, or readiness. Durable activation/recovery independently re-evaluates immutable generation and owner evidence.
 
@@ -160,6 +164,8 @@ For paths designated applicable to the commercial target, p95 must be <= 20 ms. 
 - no post-construction generation identity/configuration rewrite accepted as the same generation;
 - no reconstructed or mutated admission receipt treated as durable proof;
 - no same-hierarchy OpenAPI path aliases with different template names, regardless of HTTP method;
+- no cross-owner concrete/template overlap hidden behind OpenAPI precedence;
+- no ambiguous same-owner templated overlap accepted by framework-specific ordering;
 - no split GET/HEAD selected-resource authority across owners;
 - no complete `.` or `..` URI path segment as distinct route authority;
 - no repeated OpenAPI template expression in one route path;
@@ -180,6 +186,8 @@ Implementation preserves executable RED cases for at least:
 - logical upstream disagrees with released owner evidence;
 - issued receipt fields drift after issuance or stale nested evidence is trusted;
 - `GET /v1/people/{person_record_id}` and `PUT /v1/people/{worker_record_id}` coexist even though their templated path hierarchy is identical;
+- a valid same-owner concrete-before-template pair such as `GET /v1/people/current` and `GET /v1/people/{person_record_id}` is incorrectly rejected even though OpenAPI path selection is deterministic;
+- the same concrete/template overlap is allowed across different owners, or ambiguous overlapping templated paths are accepted through framework-specific precedence;
 - overlapping routes split one effective method authority, including GET/HEAD selected-resource ownership;
 - complete URI dot segments become route authority;
 - a path repeats one OpenAPI template expression;
@@ -192,11 +200,11 @@ Implementation preserves executable RED cases for at least:
 - composition reaches another context's database; or
 - benchmark evidence bypasses a deployed layer or the owner database.
 
-A positive path-identity control also remains explicit: distinct methods such as GET and PUT may share the same exact OpenAPI template string when their operation ownership is otherwise valid. Path-key identity and method-authority collision are different invariants.
+Positive route controls remain explicit: distinct methods may share the same exact OpenAPI template string, and one exact owner release may use concrete-before-template precedence when both routes declare the same method set. Path-key identity, path matching, and method-authority collision are separate invariants.
 
 GREEN requires deployable boundaries, immutable identities for every admitted layer and generation, real/right-cleared evidence where acceptance depends on data, exact current-head tests, supported Podman/Colima and Kubernetes evidence, fault/recovery rehearsal, security evidence, and the applicable full-path latency target.
 
-Draft #434 currently supplies only the focused admission canary. Current executable authority is `bf90bbfbc2eef88d57fd30286b41a86f483a3fa1`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, 74 ahead / 0 behind with 13 changed files confined to `services/product-composition-api/**`. Its latest ordinary-forward path-identity sequence is `2b4f2211a2e332058bec31af11474d3937899855` -> `2c7bfcf75ec2d353d52ed86cbcd74dba5ddae3ea` -> `bf90bbfbc2eef88d57fd30286b41a86f483a3fa1`. Earlier local coverage figures at predecessor `cb32ba828...` do not transfer to this exact head; no current-head hosted GREEN is claimed merely from source history.
+Draft #434 currently supplies only the focused admission canary. Current executable authority is `a98dd5f7ffd175e2a7b3b5ca61255420f2959f8b`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, 77 commits with 13 changed files confined to `services/product-composition-api/**`. Its latest ordinary-forward deterministic-precedence sequence is `fd7e7c69105fa2850dc30dd43014592f1a753eaa` -> `393cb561a1226529553baa6129378281cfba6f27` -> `a98dd5f7ffd175e2a7b3b5ca61255420f2959f8b`. Earlier local coverage figures at predecessor `cb32ba828...` do not transfer to this exact head; no current-head hosted GREEN is claimed merely from source history.
 
 ## Implementation and release order
 
