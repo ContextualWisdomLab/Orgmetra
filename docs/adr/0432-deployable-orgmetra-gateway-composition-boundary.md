@@ -24,7 +24,9 @@ CWL also has a reusable edge-runtime owner, `ContextualWisdomLab/pingora-gateway
 
 Therefore “released shared edge owner + thin Orgmetra config” is not, by itself, an executable Orgmetra product architecture. Even a future immutable release of the current generic v1 edge contract would not supply the multi-owner route/auth/composition semantics required by protected Orgmetra architecture. Reusing the pg-erd migration-specific router or copying its mutable source would violate both owner scope and the released-contract rule.
 
-The first executable canary under #432 is Draft PR #434. Its current contract intentionally proves only immutable route admission: exact released-owner coordinates, canonical composition hashing, route-authority collision rejection, and required/optional admission. It deliberately does not implement Keyverse authentication, HR authorization, retry policy, HTTP proxying, deployment, or buyer readiness. That narrowness is an ownership constraint, not missing permission for the composition layer to invent those semantics.
+The first executable canary under #432 is Draft PR #434. Its current contract intentionally proves only route admission and structural generation integrity. It deliberately does not implement Keyverse authentication, HR authorization, retry policy, HTTP proxying, deployment, or buyer readiness. That narrowness is an ownership constraint, not missing permission for the composition layer to invent those semantics.
+
+Fresh executable review of #434 also establishes that a frozen Python object is not durable identity evidence. Constructor-time success, a cached admission boolean, a reconstructed receipt-shaped value, or a self-consistent object graph rewritten after construction cannot be treated as continuing authority. The current canary therefore binds canonically issued receipt fields and the constructed generation's `(schema_version, generation_id, config_sha256)` within process-local closure state, then revalidates the current nested owner/route/config graph immediately before admission. These mechanisms are structural process-local integrity only; they are not same-process arbitrary-code isolation, durable authorization, signing, activation authority, or release evidence.
 
 ## Decision drivers
 
@@ -37,8 +39,8 @@ The supported product boundary must:
 - preserve owner idempotency, concurrency, error, retry/replay, and scientific-state semantics rather than translate them into weaker composition-local concepts;
 - prevent cross-service SQL, copied sibling source/schema, and mutable owner dependencies;
 - provide one supportable local and Kubernetes deployment/recovery path;
-- fail closed when identity, route, owner API, transport runtime, configuration, or deployment identity is not verifiable;
-- expose exact provenance for the product-composition artifact, optional shared edge runtime, admitted owner APIs, and active route generation; and
+- fail closed when identity, route, owner API, transport runtime, configuration, generation identity, or deployment identity is not verifiable;
+- expose exact provenance for the product-composition artifact, optional shared edge runtime, admitted owner APIs, active route generation, and activation/rollback identity; and
 - meet applicable buyer-path performance targets while measuring edge, composition, and owner costs separately.
 
 ## Alternatives
@@ -71,31 +73,35 @@ Rejected under current protected Architecture/API truth. It would distribute Key
 
 ## Decision
 
-Orgmetra will target **two explicit runtime responsibilities**:
+Orgmetra will target two explicit runtime responsibilities:
 
 1. **Shared edge transport runtime (external owner, optional but preferred when release-qualified):** connection handling, generic proxy transport, upstream TLS mechanics, bounded transport resources, drain/shutdown, and low-cardinality edge telemetry within its released contract.
-2. **Orgmetra product-composition application (Orgmetra owner):** product-facing authentication integration, principal projection, admitted route selection, owner API compatibility, tenant/actor/purpose propagation, product readiness, and end-to-end preservation of owner semantics.
+2. **Orgmetra product-composition application (Orgmetra owner):** product-facing authentication integration, principal projection, admitted route selection, owner API compatibility, tenant/actor/purpose propagation, product readiness, activation/re-admission, and end-to-end preservation of owner semantics.
 
 The protected name “Orgmetra Gateway” may continue to describe the buyer-visible deployment boundary, but canonical architecture reconciliation must make these internal ownership layers explicit so “Gateway” is not mistaken for one shared reverse-proxy configuration.
 
-The product-composition application is not an HR bounded context and owns no domain persistence. Its durable state, if any, is limited to immutable/configuration/admission/audit coordinates needed to prove which product composition generation was active; HR facts and owner command receipts remain downstream.
+The product-composition application is not an HR bounded context and owns no domain persistence. Its durable state, if any, is limited to immutable configuration/admission/activation/audit coordinates needed to prove which exact product-composition generation was active; HR facts and owner command receipts remain downstream.
 
 ## Product-composition contract
 
 The implementation owner introduces a versioned product contract equivalent to `orgmetra_gateway_composition.v1`. Serialization and package/service naming are implementation details, but the following semantics are mandatory.
 
-### Deployment identity
+### Deployment and generation identity
+
+The contract binds:
 
 - Orgmetra product release/version and source identity;
 - product-composition application release/artifact digest;
 - composition schema version and immutable composition digest derived from the canonical semantic route projection;
-- active generation/activation identity;
+- immutable generation identity and activation identity;
 - shared edge owner/release/artifact digest when that runtime is present;
 - Keyverse released consumer-contract identity;
 - each admitted owner service release/API/OpenAPI digest; and
 - environment/deployment identity containing no credential or person/tenant PII.
 
 A Git commit may be retained as provenance but does not replace an immutable consumer/deployment release. A caller-provided digest that is not reproducibly derived from the admitted semantic projection is not configuration authority.
+
+One canonically constructed generation cannot be rewritten into another semantic generation. `generation_id`, schema identity, and canonical configuration digest remain bound to the same generation lineage. A caller who changes route material and also recomputes a matching digest has created different semantic material, not permission to reuse the old generation identity. The current Python canary enforces this only as process-local structural integrity; production activation must bind the same invariant to durable immutable release/configuration evidence.
 
 ### Route admission
 
@@ -106,14 +112,18 @@ Each admitted route carries at least:
 - owning service/bounded-context identity;
 - released owner API contract version and OpenAPI digest;
 - immutable owner artifact/release coordinate sufficient to reconstruct the exact admitted operation contract;
-- logical upstream service reference;
+- logical upstream service reference that identifies the same service as the exact released owner evidence;
 - required coarse product capability;
 - authoritative tenant/actor/purpose input locations; and
 - required-versus-optional readiness criticality.
 
-The composition manifest **does not** mint local idempotency, concurrency, error-preservation, or retry classifications. Those semantics remain owner contract truth. When an owner exposes a released behavioral contract or receipt needed to prove those semantics, the composition generation records that exact immutable owner coordinate rather than translating it into a second taxonomy.
+The composition manifest does **not** mint local idempotency, concurrency, error-preservation, or retry classifications. Those semantics remain owner contract truth. When an owner exposes a released behavioral contract or receipt needed to prove those semantics, the composition generation records that exact immutable owner coordinate rather than translating it into a second taxonomy.
 
 Admission is deny-by-default. Reachability is not admission. A route is unavailable when the released owner API is absent, incompatible, unverifiable, or does not match its recorded digest. Same-method path templates that can select the same concrete request must not coexist with different owners; parameter renaming does not make overlapping route authority distinct.
+
+Before admission or activation, the current nested generation, route, owner-release, logical-upstream, and canonical configuration-digest invariants are revalidated. Constructor-time validation is not durable trust.
+
+A process-local `AdmissionReceipt` proves only that the canonical evaluator admitted one exact structural state in that process. Its exact issued fields remain bound to the issued object. Directly constructed, low-level reconstructed, post-issuance-mutated, serialized/deserialized, or stale receipt-shaped data does not authorize activation, routing, HR access, or readiness. Durable activation/recovery re-evaluates immutable generation and owner evidence independently.
 
 The composition application does not merge owner schemas into a monolithic domain model. Aggregated discovery is only an inventory of admitted operations.
 
@@ -156,13 +166,14 @@ Signals are separate:
 - edge-runtime liveness/transport readiness;
 - product-composition process liveness;
 - composition-config validity;
+- generation identity/activation validity;
 - Keyverse/identity-contract admission;
 - per-owner route/contract admission; and
 - buyer product readiness.
 
 A route-admission receipt is not buyer-readiness evidence. Buyer readiness additionally depends on the released identity/ACL path, owner authorization path, runtime/deployment health, required route set, and applicable product dependencies. A missing required route makes product readiness fail. Optional routes remain explicitly unavailable rather than disappearing silently.
 
-Configuration activation is generation-atomic; a partially validated generation never becomes current. Rollback activates a previously admitted immutable generation and revalidates compatibility with the deployment actually selected.
+Configuration activation is generation-atomic; a partially validated or post-construction-retargeted generation never becomes current. Rollback activates a previously admitted immutable generation only after revalidating its durable generation/configuration identity and compatibility with the owner/deployment evidence actually selected. A stale process-local receipt is not rollback authority.
 
 The composition application must release request tasks, buffers, client/upstream connections, and temporary state on success, rejection, cancellation, timeout, partial response, and owner-unavailable paths. If a shared edge runtime is used, edge and composition drain semantics are tested together rather than each layer claiming shutdown in isolation.
 
@@ -183,6 +194,9 @@ Do not claim the SLO from an in-memory router, mocked owner, reduced sample, dis
 - no reuse of pg-erd migration routing as a general product router without an independently released owner contract that explicitly supports that role;
 - no bearer credential, restricted HR payload, tenant/person identifier, or high-cardinality sensitive value as an unbounded metric label;
 - no caller-controlled header overrides contradictory authenticated identity/purpose coordinates;
+- no owner release whose service identity disagrees with the logical upstream;
+- no post-construction generation identity/configuration rewrite accepted as the same generation;
+- no reconstructed or post-issuance-mutated route-admission receipt treated as durable proof;
 - browser CORS/CSRF/cookie/session behavior is explicit when used;
 - route inventory/readiness exposes safe contract coordinates without leaking secrets; and
 - all composition/config/deployment changes are attributable and auditable.
@@ -196,6 +210,11 @@ Implementation must preserve executable RED cases for at least:
 - a pg-erd-specific migration route contract is mistakenly admitted as generic Orgmetra route authority;
 - a route exists without a compatible released owner OpenAPI contract;
 - a composition digest is accepted even though it is not derived from the canonical route materialization;
+- one constructed generation has its `generation_id` rewritten after construction;
+- one constructed generation has route semantics changed and a new matching digest written so the same object appears self-consistent;
+- a logical upstream names a different service from the exact released owner evidence;
+- an issued admission receipt's generation/config/admitted-route fields change after issuance;
+- stale nested owner/route/config evidence is trusted because construction previously succeeded;
 - two same-method route templates can select the same concrete request but claim different owners;
 - composition-local retry/idempotency/concurrency classification diverges from or substitutes for owner contract truth;
 - a route-admission receipt is represented as buyer/product readiness;
@@ -205,24 +224,24 @@ Implementation must preserve executable RED cases for at least:
 - gateway/composition idempotency or concurrency coordinates diverge from the owner;
 - an ambiguous mutation transport failure causes a second fact;
 - owner denial/conflict/unavailable/timeout/scientific non-success is converted into success;
-- stale or partially validated config activates;
+- stale, partially validated, or semantically retargeted config activates;
 - cancellation/error leaks connections/tasks/buffers;
 - composition code can query another context's PostgreSQL schema; and
 - benchmark evidence bypasses one deployed layer or the owner database while claiming buyer-path latency.
 
-GREEN requires real deployable boundaries, immutable identity for every admitted layer, right-cleared realistic data where buyer acceptance depends on data, exact current-head tests, Podman/Colima and supported Kubernetes evidence, fault/recovery rehearsal, security evidence, and the applicable p95 target.
+GREEN requires real deployable boundaries, immutable identity for every admitted layer and generation, right-cleared realistic data where buyer acceptance depends on data, exact current-head tests, Podman/Colima and supported Kubernetes evidence, fault/recovery rehearsal, security evidence, and the applicable p95 target.
 
-Draft #434 currently supplies only a focused executable canary for the route-admission subset. Its RED history verifies missing implementation, unbound config digest, noncanonical release locator, route-authority overlap, duplicated retry-policy authority, and overclaimed readiness. Local 100% unit/branch coverage on that Draft does not satisfy hosted current-head, deployment, identity, owner-contract, recovery, performance, protected-integration, or release acceptance.
+Draft #434 currently supplies only a focused executable canary for the route-admission subset. Its ordinary-forward RED history now includes missing implementation, unbound config digest, noncanonical release locator, route-authority overlap, duplicated retry-policy authority, overclaimed readiness, issued-receipt mutation, owner/upstream disagreement, stale nested evidence, and self-consistent post-construction generation retargeting. Earlier predecessor local 100% figures do not transfer across the later material source/test writes. Current exact #434 `d3e24da90bbd4b2c5e44f7acfaeb15225eff08a0` has no PR-triggered hosted workflow run while stacked on #340; no current-head coverage/Security/SAST/CodeQL GREEN is claimed.
 
 ## Implementation and release order
 
 The causal order is:
 
 1. keep #432 as the single executable owner of this product gap;
-2. keep #433 Proposed until this ownership decision passes normal review/protected integration;
+2. keep #433 Proposed until this ownership decision and the executable integrity findings pass normal review/protected integration;
 3. shared edge owner resolves supplier/security/current-head gate REDs and eventually publishes a release-qualified runtime before Orgmetra consumes it;
 4. Keyverse #155/#158 and Orgmetra #295/#297/#65 reach the required protected/released consumer boundaries;
-5. advance #434 ordinary-forward from then-current protected truth, preserving its route-admission RED/GREEN evidence without treating the current stacked Draft as shipped authority;
+5. advance #434 ordinary-forward from then-current protected truth, preserving its route-admission and generation-integrity RED/GREEN source evidence without treating the current stacked Draft as shipped authority;
 6. implement the deployable HTTP composition host without copying shared-edge or owner-service source;
 7. consume only released shared-edge capability actually supported by its owner contract; if the released edge contract remains single-upstream/transport-only, place the Orgmetra composition application behind it rather than pretending edge config is the product router;
 8. admit only compatible released owner OpenAPI/behavior contracts and preserve owner semantics end to end;
@@ -234,7 +253,7 @@ The causal order is:
 
 This decision keeps generic transport runtime reusable without assigning product semantics to a reverse proxy that does not own them. It also means the phrase “thin Orgmetra composition” refers to a small **deployable application contract**, not merely a configuration document. Orgmetra carries the operational cost of one explicit product-composition service, but its boundary is inspectable, independently testable, and replaceable without moving HR truth.
 
-The buyer-visible Gateway cannot be claimed shipped until the product-composition application, identity consumer path, required owner APIs, optional shared edge runtime, deployment provenance, recovery, and full-path performance evidence all converge on protected/released truth.
+The buyer-visible Gateway cannot be claimed shipped until the product-composition application, identity consumer path, required owner APIs, optional shared edge runtime, immutable generation/deployment provenance, recovery, and full-path performance evidence all converge on protected/released truth.
 
 ## References
 
