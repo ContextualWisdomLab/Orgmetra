@@ -207,7 +207,7 @@ def test_live_admission_receipt_revalidates_its_source_generation() -> None:
         "/v1/tenants/{tenant_record_id}/people/{person_record_id}/retargeted",
     )
 
-    with pytest.raises(CompositionContractError, match="config_sha256"):
+    with pytest.raises(CompositionContractError, match="construction snapshot"):
         _ = receipt.required_routes_admitted
 
 
