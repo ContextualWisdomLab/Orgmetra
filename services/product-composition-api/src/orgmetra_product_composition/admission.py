@@ -126,7 +126,45 @@ def _same_owner_concrete_precedence_is_deterministic(
     )
 
 
-@dataclass(frozen=True, slots=True)
+def _build_owner_release_construction_runtime():
+    """Build process-local construction snapshots for owner-release identity integrity."""
+    constructed_releases: WeakValueDictionary[int, object] = WeakValueDictionary()
+    constructed_fields: dict[int, tuple[str, str, str, str, str]] = {}
+    state_lock = RLock()
+
+    def discard_owner_release_construction(release_object_id: int) -> None:
+        with state_lock:
+            constructed_fields.pop(release_object_id, None)
+
+    def record_or_require_owner_release_construction(release: OwnerApiRelease) -> None:
+        release_object_id = id(release)
+        current_fields = (
+            release.service_id,
+            release.release_version,
+            release.openapi_sha256,
+            release.artifact_sha256,
+            release.release_locator,
+        )
+        with state_lock:
+            canonical_release = constructed_releases.get(release_object_id)
+            canonical_fields = constructed_fields.get(release_object_id)
+            if canonical_release is None and canonical_fields is None:
+                constructed_releases[release_object_id] = release
+                constructed_fields[release_object_id] = current_fields
+                finalize(release, discard_owner_release_construction, release_object_id)
+                return
+            if canonical_release is not release or canonical_fields != current_fields:
+                raise CompositionContractError(
+                    "OwnerApiRelease no longer matches its construction snapshot"
+                )
+
+    return record_or_require_owner_release_construction
+
+
+_record_or_require_owner_release_construction = _build_owner_release_construction_runtime()
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class OwnerApiRelease:
     """Exact released owner API identity required for route admission."""
 
@@ -150,6 +188,7 @@ class OwnerApiRelease:
         if match.group("tag") != self.release_version:
             raise CompositionContractError("release_locator must bind the exact release_version")
         object.__setattr__(self, "release_locator", locator)
+        _record_or_require_owner_release_construction(self)
 
 
 @dataclass(frozen=True, slots=True)
