@@ -73,9 +73,23 @@ def test_admission_revalidates_generation_after_low_level_route_mutation() -> No
 def test_admission_rejects_low_level_generation_route_shape_mutation() -> None:
     owner = release()
     candidate = generation(route(owner))
-    object.__setattr__(candidate, "routes", (object(),))
+    object.__setattr__(candidate, "routes", [candidate.routes[0]])
+    with pytest.raises(CompositionContractError, match="non-empty exact tuple"):
+        admit_generation(candidate, {"people_api": owner})
 
+    candidate = generation(route(owner))
+    object.__setattr__(candidate, "routes", (object(),))
     with pytest.raises(CompositionContractError, match="exact CompositionRoute"):
+        admit_generation(candidate, {"people_api": owner})
+
+
+def test_admission_rejects_low_level_route_owner_shape_mutation() -> None:
+    owner = release()
+    selected_route = route(owner)
+    candidate = generation(selected_route)
+    object.__setattr__(selected_route, "owner_release", object())
+
+    with pytest.raises(CompositionContractError, match="exact OwnerApiRelease"):
         admit_generation(candidate, {"people_api": owner})
 
 
