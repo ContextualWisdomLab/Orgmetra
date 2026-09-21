@@ -417,24 +417,18 @@ def _build_admission_runtime():
         issued_generation_leases.pop(receipt_id, None)
 
     def require_canonical_admission_receipt(receipt: AdmissionReceipt) -> None:
-        """Reject unissued or post-issuance-mutated receipt evidence."""
+        """Reject unissued, mutated, or source-invalid receipt evidence."""
         receipt_id = id(receipt)
         canonical_fields = issued_fields.get(receipt_id)
-        leased_generation = issued_generation_leases.get(receipt_id)
         current_fields = (
             receipt.generation_id,
             receipt.config_sha256,
             receipt.admitted_route_ids,
             receipt.unavailable_optional_route_ids,
         )
-        if (
-            issued_receipts.get(receipt_id) is not receipt
-            or canonical_fields != current_fields
-            or leased_generation is None
-            or leased_generation.generation_id != receipt.generation_id
-            or leased_generation.config_sha256 != receipt.config_sha256
-        ):
+        if issued_receipts.get(receipt_id) is not receipt or canonical_fields != current_fields:
             raise CompositionContractError("AdmissionReceipt was not canonically issued")
+        _revalidate_generation_snapshot(issued_generation_leases[receipt_id])
 
     def admit_generation(
         generation: CompositionGeneration,
