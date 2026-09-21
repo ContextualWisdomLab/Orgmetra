@@ -329,7 +329,7 @@ def _evaluate_generation(
 
     admitted: list[str] = []
     optional_unavailable: list[str] = []
-    for route in generation.routes:
+    for route in sorted(generation.routes, key=lambda item: item.route_id):
         current = observed.get(route.owner_release.service_id)
         if current != route.owner_release:
             if route.required:
