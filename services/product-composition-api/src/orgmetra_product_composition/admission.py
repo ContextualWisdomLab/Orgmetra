@@ -80,6 +80,13 @@ def _route_paths_overlap(left: str, right: str) -> bool:
     return True
 
 
+def _method_authority_key(method: str) -> str:
+    """Collapse GET/HEAD to one selected-resource routing authority."""
+    if method in {"GET", "HEAD"}:
+        return "GET_OR_HEAD"
+    return method
+
+
 @dataclass(frozen=True, slots=True)
 class OwnerApiRelease:
     """Exact released owner API identity required for route admission."""
@@ -255,7 +262,8 @@ class CompositionGeneration:
             if route.route_id in route_ids:
                 raise CompositionContractError("route_id values must be unique")
             route_ids.add(route.route_id)
-            for method in route.methods:
+            authority_methods = sorted({_method_authority_key(method) for method in route.methods})
+            for method in authority_methods:
                 for existing_method, existing_path in authorities:
                     if method == existing_method and _route_paths_overlap(
                         route.path_template, existing_path
