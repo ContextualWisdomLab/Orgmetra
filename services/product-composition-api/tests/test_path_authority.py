@@ -6,6 +6,7 @@ from orgmetra_product_composition import (
     CompositionContractError,
     CompositionRoute,
     OwnerApiRelease,
+    configuration_sha256,
 )
 
 A = "a" * 64
@@ -19,6 +20,17 @@ def owner_release() -> OwnerApiRelease:
         openapi_sha256=A,
         artifact_sha256=B,
         release_locator="https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.3",
+    )
+
+
+def route(route_id: str, path_template: str, method: str) -> CompositionRoute:
+    return CompositionRoute(
+        route_id=route_id,
+        path_template=path_template,
+        methods=(method,),
+        owner_release=owner_release(),
+        logical_upstream="service://people-api",
+        required=True,
     )
 
 
@@ -58,3 +70,22 @@ def test_route_rejects_repeated_path_template_expression(path_template: str) -> 
             logical_upstream="service://people-api",
             required=True,
         )
+
+
+def test_route_set_rejects_same_hierarchy_with_different_template_names_across_methods() -> None:
+    routes = (
+        route("people_read", "/v1/people/{person_record_id}", "GET"),
+        route("people_update", "/v1/people/{worker_record_id}", "PUT"),
+    )
+
+    with pytest.raises(CompositionContractError, match="same hierarchy"):
+        configuration_sha256(routes)
+
+
+def test_route_set_allows_same_template_identity_across_distinct_methods() -> None:
+    routes = (
+        route("people_read", "/v1/people/{person_record_id}", "GET"),
+        route("people_update", "/v1/people/{person_record_id}", "PUT"),
+    )
+
+    assert len(configuration_sha256(routes)) == 64
