@@ -64,17 +64,19 @@ class OwnerApiRelease:
     release_version: str
     openapi_sha256: str
     artifact_sha256: str
-    owner_locator: str
+    release_locator: str
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "service_id", _identifier("service_id", self.service_id))
         object.__setattr__(self, "release_version", _release_version(self.release_version))
         object.__setattr__(self, "openapi_sha256", _sha256("openapi_sha256", self.openapi_sha256))
         object.__setattr__(self, "artifact_sha256", _sha256("artifact_sha256", self.artifact_sha256))
-        locator = _exact_text("owner_locator", self.owner_locator, maximum=512)
-        if not locator.startswith("https://github.com/ContextualWisdomLab/"):
-            raise CompositionContractError("owner_locator must name the canonical CWL owner")
-        object.__setattr__(self, "owner_locator", locator)
+        locator = _exact_text("release_locator", self.release_locator, maximum=512)
+        if not locator.startswith("https://github.com/ContextualWisdomLab/") or "/releases/tag/" not in locator:
+            raise CompositionContractError("release_locator must name a canonical CWL GitHub Release")
+        if not locator.endswith(f"/{self.release_version}"):
+            raise CompositionContractError("release_locator must bind the exact release_version")
+        object.__setattr__(self, "release_locator", locator)
 
 
 @dataclass(frozen=True, slots=True)
