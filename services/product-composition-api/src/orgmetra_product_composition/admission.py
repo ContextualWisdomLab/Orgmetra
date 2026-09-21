@@ -166,13 +166,47 @@ def _revalidate_route_contract(route: CompositionRoute) -> None:
     CompositionRoute.__post_init__(route)
 
 
-def configuration_sha256(routes: tuple["CompositionRoute", ...]) -> str:
-    """Hash the canonical semantic route projection, independent of route order."""
+def _validate_route_set(
+    routes: tuple[CompositionRoute, ...],
+) -> tuple[CompositionRoute, ...]:
+    """Validate cross-route invariants before a route set receives configuration identity."""
     if type(routes) is not tuple or not routes:
         raise CompositionContractError("routes must be a non-empty exact tuple")
-    materialized: list[dict[str, object]] = []
+
+    route_ids: set[str] = set()
+    authorities: list[tuple[str, str]] = []
+    owner_releases: dict[str, OwnerApiRelease] = {}
     for route in routes:
         _revalidate_route_contract(route)
+        if route.route_id in route_ids:
+            raise CompositionContractError("route_id values must be unique")
+        route_ids.add(route.route_id)
+
+        existing_owner_release = owner_releases.get(route.owner_release.service_id)
+        if existing_owner_release is None:
+            owner_releases[route.owner_release.service_id] = route.owner_release
+        elif existing_owner_release != route.owner_release:
+            raise CompositionContractError(
+                "one owner service must use one exact release per generation"
+            )
+
+        authority_methods = sorted({_method_authority_key(method) for method in route.methods})
+        for method in authority_methods:
+            for existing_method, existing_path in authorities:
+                if method == existing_method and _route_paths_overlap(
+                    route.path_template, existing_path
+                ):
+                    raise CompositionContractError("method/path authority must have one owner")
+            authorities.append((method, route.path_template))
+
+    return routes
+
+
+def configuration_sha256(routes: tuple["CompositionRoute", ...]) -> str:
+    """Hash one valid canonical semantic route projection, independent of route order."""
+    validated_routes = _validate_route_set(routes)
+    materialized: list[dict[str, object]] = []
+    for route in validated_routes:
         owner = route.owner_release
         materialized.append(
             {
@@ -264,31 +298,6 @@ class CompositionGeneration:
             raise CompositionContractError(f"schema_version must be {_CONTRACT_SCHEMA}")
         object.__setattr__(self, "generation_id", _identifier("generation_id", self.generation_id))
         object.__setattr__(self, "config_sha256", _sha256("config_sha256", self.config_sha256))
-        if type(self.routes) is not tuple or not self.routes:
-            raise CompositionContractError("routes must be a non-empty exact tuple")
-        route_ids: set[str] = set()
-        authorities: list[tuple[str, str]] = []
-        owner_releases: dict[str, OwnerApiRelease] = {}
-        for route in self.routes:
-            _revalidate_route_contract(route)
-            if route.route_id in route_ids:
-                raise CompositionContractError("route_id values must be unique")
-            route_ids.add(route.route_id)
-            existing_owner_release = owner_releases.get(route.owner_release.service_id)
-            if existing_owner_release is None:
-                owner_releases[route.owner_release.service_id] = route.owner_release
-            elif existing_owner_release != route.owner_release:
-                raise CompositionContractError(
-                    "one owner service must use one exact release per generation"
-                )
-            authority_methods = sorted({_method_authority_key(method) for method in route.methods})
-            for method in authority_methods:
-                for existing_method, existing_path in authorities:
-                    if method == existing_method and _route_paths_overlap(
-                        route.path_template, existing_path
-                    ):
-                        raise CompositionContractError("method/path authority must have one owner")
-                authorities.append((method, route.path_template))
         expected_config_sha256 = configuration_sha256(self.routes)
         if self.config_sha256 != expected_config_sha256:
             raise CompositionContractError(
