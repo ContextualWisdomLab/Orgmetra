@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools==82.0.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orgmetra-product-composition"
+version = "0.1.0"
+description = "Fail-closed product-composition admission for released Orgmetra owner APIs."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "ContextualWisdomLab" }]
+dependencies = []
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+orgmetra_product_composition = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+  "--cov=orgmetra_product_composition",
+  "--cov-branch",
+  "--cov-report=term-missing",
+  "--cov-fail-under=100",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["orgmetra_product_composition"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
