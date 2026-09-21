@@ -48,17 +48,18 @@ Not established by this source:
 
 **Fielding, R., Nottingham, M., & Reschke, J. (2022). _HTTP semantics_ (RFC 9110). RFC Editor. https://www.rfc-editor.org/rfc/rfc9110.html**
 
-RFC 9110 Section 9.2.2 defines HTTP method idempotency and why some idempotent requests can be retried after communication failure.
+RFC 9110 Section 9.2.2 defines HTTP method idempotency and the protocol conditions under which some requests may be retried after communication failure. That protocol property is not an application-specific replay authorization contract.
 
 Use in ADR 0432:
 
-- transport retry policy distinguishes protocol-level idempotent methods from application commands;
-- POST/mutation replay is not made safe by either shared edge transport or product composition; replay requires the released owner service's exact `Idempotency-Key` contract; and
+- HTTP method semantics constrain transport behavior, but the composition layer does not maintain a second `retry_class` taxonomy;
+- positive automatic replay of an Orgmetra operation requires the exact released owner operation contract to make that attempted replay safe under the observed request state;
+- POST/mutation replay is not made safe by either shared edge transport or product composition; where replay is supported, the released owner service's exact `Idempotency-Key`/replay contract remains authoritative; and
 - an ambiguous failure after a potentially committed non-replay-safe mutation does not justify a fresh mutation attempt.
 
 Not established by this source:
 
-- Orgmetra semantic command digests, first-commit replay, optimistic-concurrency or employment-fact idempotency semantics. Those remain owner-domain evidence.
+- Orgmetra semantic command digests, first-commit replay, optimistic-concurrency, retry admission, or employment-fact idempotency semantics. Those remain owner-domain evidence.
 
 **Nottingham, M., Wilde, E., & Dalal, S. (2023). _Problem details for HTTP APIs_ (RFC 9457). RFC Editor. https://www.rfc-editor.org/rfc/rfc9457.html**
 
@@ -83,12 +84,13 @@ Protected Orgmetra documentation already uses OpenAPI 3.2.0 as its HTTP contract
 Use in ADR 0432:
 
 - route admission is tied to a released owner API version and exact OpenAPI digest;
-- the product-composition inventory remains an admitted-operation catalogue, not a monolithic copied domain schema; and
+- the product-composition inventory remains an admitted-operation catalogue, not a monolithic copied domain schema;
+- route-path authority must be deterministic so two same-method templates cannot silently compete for the same concrete request; and
 - a missing or incompatible owner contract leaves a route unavailable.
 
 Not established by this source:
 
-- semantic compatibility of two Orgmetra service releases. That requires executable consumer/provider conformance evidence.
+- semantic compatibility of two Orgmetra service releases, retry/replay safety, buyer readiness, or deployment fitness. Those require executable owner/consumer conformance evidence.
 
 ## Repository-owner capability evidence
 
@@ -102,9 +104,23 @@ On 2026-09-21:
 - protected `ARCHITECTURE.md` documented a buyer-facing Orgmetra Gateway and assigned API aggregation, tenant context, purpose-bound authorization, idempotency and event-envelope handling to the runtime layer;
 - protected `docs/API_CONTRACT.md` documented pre-handler Keyverse OIDC validation at that boundary;
 - protected People and Job Analysis HTTP code exposed injected `TokenAuthenticator` / `AuthenticatedPrincipal` ports rather than a released Keyverse verifier/ACL implementation; and
-- the executable repository still had no supported deployable application that composes independently versioned owner APIs into that buyer-facing boundary.
+- the protected executable repository still had no supported deployable application that composes independently versioned owner APIs into that buyer-facing boundary.
 
 Those protected responsibilities are therefore design obligations, not proof that one executable gateway currently exists.
+
+### Draft executable canary #434
+
+Draft PR #434 is the first bounded implementation slice under #432. It is intentionally stacked on the active Foundation owner #340 and therefore is not protected truth or hosted current-head gate evidence.
+
+Its current design evidence corrects several mistakes found by test-first/self-review rather than promoting them into architecture:
+
+- the composition digest is derived from a deterministic canonical semantic route projection instead of accepting any caller-supplied 64-hex label;
+- a release locator must identify one exact `ContextualWisdomLab/<repository>/releases/tag/<version>` coordinate bound to the recorded release version;
+- same-method path templates that can select the same concrete request are rejected even when the overlap arises from parameter renaming or static-versus-parameter segments;
+- the route model contains no composition-local retry class, idempotency mode, or concurrency mode; and
+- the admission receipt states only that configured required routes matched the supplied exact released-owner evidence. It is not buyer-readiness or authorization evidence.
+
+Its focused local 100% statement/branch coverage is mechanism evidence only. Synthetic owner-release fixtures do not prove an actual owner release, Keyverse conformance, Orgmetra identity ACL, deployment/recovery, commercial latency, protected integration, or immutable Orgmetra release.
 
 ### pingora-gateway owner contract
 
@@ -147,10 +163,10 @@ This is not a claim that two network hops are inherently superior. It is an owne
 - generic transport/runtime mechanics already have a reusable owner;
 - the reusable owner's current generic contract intentionally does not own Orgmetra product route/auth/business semantics;
 - protected Orgmetra architecture nonetheless requires a coherent product composition boundary; and
-- HR/identity/authorization truth already has narrower owners that the composition layer must preserve.
+- HR/identity/authorization/idempotency/concurrency/retry truth already has narrower owners that the composition layer must preserve.
 
 A future implementation may deploy the composition application behind a release-qualified shared edge or behind another approved ingress. The product contract remains the same. If measurement shows an unacceptable extra hop, optimization occurs against the measured deployed path rather than by collapsing ownership and silently moving product semantics into a reverse proxy.
 
 ## Evidence discipline
 
-A standards citation, repository file, open PR, or architecture diagram is not GREEN implementation evidence. Commercial acceptance still requires exact protected/released identities, current-head conformance/security tests, cryptographic identity verification, explicit ACL projection tests, fault injection, deployment/recovery evidence and realistic k6/E2E measurements across every actually deployed layer and the owner PostgreSQL path. Synthetic fixtures may prove mechanism behavior but cannot alone establish buyer-path availability, latency, privacy, identity conformance, or scientific correctness.
+A standards citation, repository file, open PR, architecture diagram, synthetic fixture, or local unit suite is not GREEN implementation evidence. Commercial acceptance still requires exact protected/released identities, current-head conformance/security tests, cryptographic identity verification, explicit ACL projection tests, fault injection, deployment/recovery evidence and realistic k6/E2E measurements across every actually deployed layer and the owner PostgreSQL path.
