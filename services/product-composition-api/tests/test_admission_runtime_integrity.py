@@ -66,7 +66,7 @@ def test_admission_revalidates_generation_after_low_level_route_mutation() -> No
 
     object.__setattr__(selected_route, "path_template", "/v1/jobs/{job_id}")
 
-    with pytest.raises(CompositionContractError, match="config_sha256"):
+    with pytest.raises(CompositionContractError, match="construction snapshot"):
         admit_generation(candidate, {"people_api": owner})
 
 
@@ -82,15 +82,23 @@ def test_admission_rejects_post_construction_generation_identity_rewrite() -> No
 
 def test_admission_rejects_self_consistent_post_construction_generation_retarget() -> None:
     owner = release()
-    selected_route = route(owner)
-    candidate = generation(selected_route)
-
-    object.__setattr__(
-        selected_route,
-        "path_template",
-        "/v1/tenants/{tenant_record_id}/people/{person_record_id}/employment-history",
+    candidate = generation(route(owner))
+    successor_route = CompositionRoute(
+        route_id="people_history_v2",
+        path_template=(
+            "/v1/tenants/{tenant_record_id}/people/"
+            "{person_record_id}/employment-history"
+        ),
+        methods=("GET",),
+        owner_release=owner,
+        logical_upstream="service://people-api",
+        required=True,
     )
-    object.__setattr__(candidate, "config_sha256", configuration_sha256(candidate.routes))
+    successor_routes = (successor_route,)
+    successor_digest = configuration_sha256(successor_routes)
+
+    object.__setattr__(candidate, "routes", successor_routes)
+    object.__setattr__(candidate, "config_sha256", successor_digest)
 
     with pytest.raises(CompositionContractError, match="construction snapshot"):
         admit_generation(candidate, {"people_api": owner})
