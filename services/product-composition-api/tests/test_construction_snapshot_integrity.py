@@ -177,6 +177,27 @@ def test_live_admission_receipt_keeps_generation_lineage_bound() -> None:
     assert successor.config_sha256 == second_digest
 
 
+def test_live_admission_receipt_revalidates_its_source_generation() -> None:
+    owner = release()
+    selected_route = route(owner)
+    candidate = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id="generation_receipt_source",
+        config_sha256=configuration_sha256((selected_route,)),
+        routes=(selected_route,),
+    )
+    receipt = admit_generation(candidate, {"people_api": owner})
+
+    object.__setattr__(
+        selected_route,
+        "path_template",
+        "/v1/tenants/{tenant_record_id}/people/{person_record_id}/retargeted",
+    )
+
+    with pytest.raises(CompositionContractError, match="config_sha256"):
+        _ = receipt.required_routes_admitted
+
+
 def test_generation_id_live_lineage_is_not_durable_after_last_view_is_released() -> None:
     owner = release()
     first_routes = (route(owner),)
