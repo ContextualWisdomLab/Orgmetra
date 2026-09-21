@@ -249,13 +249,11 @@ def _build_generation_construction_runtime():
     def discard_generation_construction(generation_object_id: int, generation_id: str) -> None:
         with state_lock:
             constructed_fields.pop(generation_object_id, None)
-            live_objects = live_generation_objects.get(generation_id)
-            if live_objects is None:
-                return
-            live_objects.discard(generation_object_id)
+            live_objects = live_generation_objects[generation_id]
+            live_objects.remove(generation_object_id)
             if not live_objects:
-                live_generation_objects.pop(generation_id, None)
-                generation_config_by_id.pop(generation_id, None)
+                del live_generation_objects[generation_id]
+                del generation_config_by_id[generation_id]
 
     def record_generation_construction(generation: CompositionGeneration) -> None:
         generation_object_id = id(generation)
@@ -304,10 +302,6 @@ def _build_generation_construction_runtime():
             if (
                 constructed_generations.get(generation_object_id) is not generation
                 or constructed_fields.get(generation_object_id) != current_fields
-                or generation_config_by_id.get(generation.generation_id)
-                != generation.config_sha256
-                or generation_object_id
-                not in live_generation_objects.get(generation.generation_id, set())
             ):
                 raise CompositionContractError(
                     "CompositionGeneration no longer matches its construction snapshot"
