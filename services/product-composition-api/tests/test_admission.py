@@ -1,0 +1,187 @@
+from __future__ import annotations
+
+from dataclasses import replace
+
+import pytest
+
+from orgmetra_product_composition import (
+    CompositionContractError,
+    CompositionGeneration,
+    CompositionRoute,
+    OwnerApiRelease,
+    admit_generation,
+)
+
+A = "a" * 64
+B = "b" * 64
+C = "c" * 64
+D = "d" * 64
+
+
+def release(service_id: str = "people_api") -> OwnerApiRelease:
+    return OwnerApiRelease(
+        service_id=service_id,
+        release_version="v1.2.3",
+        openapi_sha256=A,
+        artifact_sha256=B,
+        owner_locator=f"https://github.com/ContextualWisdomLab/{service_id}",
+    )
+
+
+def route(
+    *,
+    route_id: str = "people_history",
+    service_id: str = "people_api",
+    path: str = "/v1/tenants/{tenant_record_id}/people/{person_record_id}",
+    methods: tuple[str, ...] = ("GET",),
+    required: bool = True,
+) -> CompositionRoute:
+    return CompositionRoute(
+        route_id=route_id,
+        path_template=path,
+        methods=methods,
+        owner_release=release(service_id),
+        logical_upstream=f"service://{service_id.replace('_', '-')}",
+        required=required,
+        retry_class="safe" if methods == ("GET",) else "owner_idempotent",
+    )
+
+
+def generation(*routes: CompositionRoute) -> CompositionGeneration:
+    return CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id="generation_001",
+        config_sha256=C,
+        routes=routes or (route(),),
+    )
+
+
+def test_admits_exact_required_release_and_reports_optional_unavailable() -> None:
+    required_route = route()
+    optional_route = route(
+        route_id="validation_read",
+        service_id="workforce_validation_api",
+        path="/v1/validation/studies/{study_id}",
+        required=False,
+    )
+    receipt = admit_generation(
+        generation(required_route, optional_route),
+        {"people_api": required_route.owner_release},
+    )
+
+    assert receipt.buyer_ready is True
+    assert receipt.generation_id == "generation_001"
+    assert receipt.config_sha256 == C
+    assert receipt.admitted_route_ids == ("people_history",)
+    assert receipt.unavailable_optional_route_ids == ("validation_read",)
+
+
+def test_required_release_must_match_every_coordinate() -> None:
+    expected = route()
+    mismatched = replace(expected.owner_release, artifact_sha256=D)
+    with pytest.raises(CompositionContractError, match="lacks its exact released owner API"):
+        admit_generation(generation(expected), {"people_api": mismatched})
+    with pytest.raises(CompositionContractError, match="lacks its exact released owner API"):
+        admit_generation(generation(expected), {})
+
+
+def test_owner_release_rejects_mutable_or_ambiguous_coordinates() -> None:
+    base = dict(
+        service_id="people_api",
+        release_version="v1.2.3",
+        openapi_sha256=A,
+        artifact_sha256=B,
+        owner_locator="https://github.com/ContextualWisdomLab/people-api",
+    )
+    for version in ("latest", "main", "refs/heads/main", "pr-17", "bad version"):
+        with pytest.raises(CompositionContractError):
+            OwnerApiRelease(**(base | {"release_version": version}))
+    for field, value in (
+        ("service_id", "People-API"),
+        ("openapi_sha256", "A" * 64),
+        ("artifact_sha256", "x" * 64),
+        ("owner_locator", "https://example.com/people-api"),
+    ):
+        with pytest.raises(CompositionContractError):
+            OwnerApiRelease(**(base | {field: value}))
+
+
+def test_route_rejects_ambiguous_routing_and_non_owner_evidence() -> None:
+    valid = route()
+    invalid_cases = (
+        {"route_id": "Bad-Route"},
+        {"path_template": "v1/people"},
+        {"path_template": "/v1/../people"},
+        {"methods": []},
+        {"methods": ("GET", "GET")},
+        {"methods": ("POST", "GET")},
+        {"methods": ("TRACE",)},
+        {"logical_upstream": "https://people-api"},
+        {"required": 1},
+        {"retry_class": "automatic"},
+        {"owner_release": object()},
+    )
+    for changes in invalid_cases:
+        with pytest.raises(CompositionContractError):
+            CompositionRoute(
+                route_id=changes.get("route_id", valid.route_id),
+                path_template=changes.get("path_template", valid.path_template),
+                methods=changes.get("methods", valid.methods),
+                owner_release=changes.get("owner_release", valid.owner_release),
+                logical_upstream=changes.get("logical_upstream", valid.logical_upstream),
+                required=changes.get("required", valid.required),
+                retry_class=changes.get("retry_class", valid.retry_class),
+            )
+
+
+def test_generation_rejects_bad_schema_shape_and_duplicate_authority() -> None:
+    first = route()
+    second = route(route_id="people_history_alias")
+    for kwargs in (
+        {"schema_version": "v1"},
+        {"generation_id": "bad-id"},
+        {"config_sha256": "0"},
+        {"routes": []},
+        {"routes": (object(),)},
+        {"routes": (first, first)},
+        {"routes": (first, second)},
+    ):
+        values = dict(
+            schema_version="orgmetra_gateway_composition.v1",
+            generation_id="generation_001",
+            config_sha256=C,
+            routes=(first,),
+        )
+        values.update(kwargs)
+        with pytest.raises(CompositionContractError):
+            CompositionGeneration(**values)
+
+
+def test_observed_snapshot_is_exact_and_keyed_by_release_identity() -> None:
+    expected = route()
+    gen = generation(expected)
+    with pytest.raises(CompositionContractError, match="exact CompositionGeneration"):
+        admit_generation(object(), {})
+    with pytest.raises(CompositionContractError, match="exact dict snapshot"):
+        admit_generation(gen, [])  # type: ignore[arg-type]
+
+
+def test_observed_snapshot_rejects_bad_keys_values_and_mismatched_key() -> None:
+    gen = generation()
+    with pytest.raises(CompositionContractError):
+        admit_generation(gen, {"Bad-Key": release()})
+    with pytest.raises(CompositionContractError):
+        admit_generation(gen, {"people_api": object()})  # type: ignore[dict-item]
+    with pytest.raises(CompositionContractError):
+        admit_generation(gen, {"job_analysis_api": release("people_api")})
+
+
+def test_exact_builtin_scalar_guards_reject_subclasses_and_empty_text() -> None:
+    class Text(str):
+        pass
+
+    base = release()
+    with pytest.raises(CompositionContractError):
+        replace(base, service_id=Text("people_api"))
+    with pytest.raises(CompositionContractError):
+        replace(base, owner_locator="")
