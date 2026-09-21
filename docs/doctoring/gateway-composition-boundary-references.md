@@ -90,7 +90,7 @@ Use in ADR 0432:
 
 Not established by this source:
 
-- semantic compatibility of two Orgmetra service releases, retry/replay safety, buyer readiness, or deployment fitness. Those require executable owner/consumer conformance evidence.
+- semantic compatibility of two Orgmetra service releases, retry/replay safety, buyer readiness, deployment fitness, or immutable generation identity. Those require executable owner/consumer conformance evidence.
 
 ## Repository-owner capability evidence
 
@@ -112,15 +112,30 @@ Those protected responsibilities are therefore design obligations, not proof tha
 
 Draft PR #434 is the first bounded implementation slice under #432. It is intentionally stacked on the active Foundation owner #340 and therefore is not protected truth or hosted current-head gate evidence.
 
-Its current design evidence corrects several mistakes found by test-first/self-review rather than promoting them into architecture:
+Current exact canary authority is `d3e24da90bbd4b2c5e44f7acfaeb15225eff08a0`, 35 commits ahead / 0 behind #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with seven changed files confined to `services/product-composition-api/**`.
+
+Its current executable evidence corrects several mistakes found through test-first/self-review without promoting the Draft into architecture or shipped truth:
 
 - the composition digest is derived from a deterministic canonical semantic route projection instead of accepting any caller-supplied 64-hex label;
 - a release locator must identify one exact `ContextualWisdomLab/<repository>/releases/tag/<version>` coordinate bound to the recorded release version;
 - same-method path templates that can select the same concrete request are rejected even when the overlap arises from parameter renaming or static-versus-parameter segments;
-- the route model contains no composition-local retry class, idempotency mode, or concurrency mode; and
-- the admission receipt states only that configured required routes matched the supplied exact released-owner evidence. It is not buyer-readiness or authorization evidence.
+- each logical `service://` upstream is bound to the exact released owner service identity;
+- the route model contains no composition-local retry class, idempotency mode, or concurrency mode;
+- `AdmissionReceipt` can be issued only by the canonical evaluator and its exact issued generation/config/admitted-route fields remain bound to that receipt within process-local closure state;
+- admission revalidates the current nested owner/route/generation/config evidence immediately before use; and
+- a canonically constructed `CompositionGeneration` is bound to its original process-local `(schema_version, generation_id, config_sha256)` construction snapshot, so changing `generation_id` or coherently rewriting both route semantics and a matching digest cannot silently redefine the same generation.
 
-Its focused local 100% statement/branch coverage is mechanism evidence only. Synthetic owner-release fixtures do not prove an actual owner release, Keyverse conformance, Orgmetra identity ACL, deployment/recovery, commercial latency, protected integration, or immutable Orgmetra release.
+The last point is not derived from OpenAPI, OAuth, or HTTP standards. It is an Orgmetra evidence-integrity requirement induced by the product's own generation/activation/rollback semantics. A generation identifier is useful only if it continues to name the same configuration lineage. Re-running constructor invariants on a mutable-in-practice Python object graph was insufficient because a caller could make a rewritten graph internally self-consistent. The current process-local construction snapshot closes that executable canary path while deliberately **not** claiming durable tamper resistance or same-process arbitrary-code isolation.
+
+The latest test-first/source sequence is:
+
+- `f7175e36d32034581cf05758b64256c06e7a3ea5` — regressions for generation-id rewrite and coherent route+digest retargeting;
+- `105fa9a584c5aa9865c86082664411f922a84492` — process-local construction binding plus admission-time construction-snapshot requirement; and
+- `d3e24da90bbd4b2c5e44f7acfaeb15225eff08a0` — package documentation currentization.
+
+Earlier focused local figures on predecessor `cb32ba828...`—16 tests, 201/201 statements and 84/84 branches—are predecessor mechanism evidence only. Material source and test bytes changed afterward. Current exact `d3e24da...` has no PR-triggered hosted workflow run while stacked on #340, so no current-head 100% statement/branch/docstring/edge, Security, SAST or CodeQL GREEN is claimed.
+
+Synthetic owner-release fixtures and process-local identity registries do not prove an actual owner release, Keyverse conformance, Orgmetra identity ACL, deployment/recovery, commercial latency, durable activation authority, protected integration, or immutable Orgmetra release.
 
 ### pingora-gateway owner contract
 
@@ -169,4 +184,4 @@ A future implementation may deploy the composition application behind a release-
 
 ## Evidence discipline
 
-A standards citation, repository file, open PR, architecture diagram, synthetic fixture, or local unit suite is not GREEN implementation evidence. Commercial acceptance still requires exact protected/released identities, current-head conformance/security tests, cryptographic identity verification, explicit ACL projection tests, fault injection, deployment/recovery evidence and realistic k6/E2E measurements across every actually deployed layer and the owner PostgreSQL path.
+A standards citation, repository file, open PR, architecture diagram, synthetic fixture, frozen dataclass, process-local identity registry, or local unit suite is not GREEN implementation evidence. Commercial acceptance still requires exact protected/released identities, current-head conformance/security tests, cryptographic identity verification, explicit ACL projection tests, immutable generation/activation/deployment evidence, fault injection, recovery/rollback evidence and realistic k6/E2E measurements across every actually deployed layer and the owner PostgreSQL path.
