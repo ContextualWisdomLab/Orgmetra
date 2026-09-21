@@ -4,6 +4,12 @@ This package is the first executable slice of the product-composition boundary t
 
 A generation is bound to a deterministic digest of canonical semantic route material. Configuration identity is minted only after per-route and cross-route invariants pass. Owner release evidence must identify the canonical `ContextualWisdomLab/Orgmetra/releases/tag/<version>` coordinate, each `service_id` has one exact release/OpenAPI/artifact identity per generation, and each logical `service://` upstream must name that same owner service. Mutable branches, floating labels, copied schemas, reachability-only checks, and digest-only pointers are not route authority.
 
+## Supported OpenAPI route profile
+
+Protected `docs/API_CONTRACT.md` remains the product contract and declares OpenAPI 3.2.0. OpenAPI Specification 3.2.1 is used here only as the current patch-level interpretation of the same 3.2 feature set; this canary is not a general OpenAPI parser and does not claim support for every path or operation form that OpenAPI 3.2 permits.
+
+The admitted product-route dialect is intentionally narrower while no released owner contract requires a broader surface. A route path starts with `/v<digits>`, uses restricted ASCII literal segments, and uses a whole path segment for each lower-snake-case template expression. The admitted method set is exactly `DELETE`, `GET`, `HEAD`, `OPTIONS`, `PATCH`, `POST`, and `PUT`. OpenAPI-valid forms outside that profile—including a template expression mixed with literals in one segment, percent-encoded or other unsupported `pchar` literals, and `TRACE`, `QUERY`, and `additionalOperations` methods—fail closed before configuration identity. Expanding the dialect requires released owner evidence plus explicit conformance tests; it is not inferred merely because a framework can route the form.
+
 Route identity follows three separate layers:
 
 1. **OpenAPI path-key identity.** OpenAPI Specification 3.2.1 §4.8.1 says templated paths with the same hierarchy but different template names are identical and MUST NOT coexist. `/v1/people/{person_record_id}` and `/v1/people/{worker_record_id}` therefore cannot both acquire configuration identity, even when their HTTP methods differ. Distinct methods may share the same exact template string.
