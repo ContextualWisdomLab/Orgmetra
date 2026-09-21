@@ -138,6 +138,9 @@ class CompositionRoute:
         upstream = _exact_text("logical_upstream", self.logical_upstream, maximum=80)
         if _UPSTREAM.fullmatch(upstream) is None:
             raise CompositionContractError("logical_upstream must be a service:// reference")
+        expected_upstream = f"service://{self.owner_release.service_id.replace('_', '-')}"
+        if upstream != expected_upstream:
+            raise CompositionContractError("logical_upstream must target the exact owner service")
         object.__setattr__(self, "logical_upstream", upstream)
         if type(self.required) is not bool:
             raise CompositionContractError("required must be an exact bool")
@@ -238,13 +241,30 @@ class AdmissionReceipt:
         return True
 
 
+def _revalidate_generation_snapshot(generation: CompositionGeneration) -> None:
+    """Re-run every nested constructor invariant before consuming a generation."""
+    if type(generation) is not CompositionGeneration:
+        raise CompositionContractError("generation must be exact CompositionGeneration evidence")
+    if type(generation.routes) is not tuple or not generation.routes:
+        raise CompositionContractError("generation routes must be a non-empty exact tuple")
+    for route in generation.routes:
+        if type(route) is not CompositionRoute:
+            raise CompositionContractError(
+                "generation routes must contain exact CompositionRoute evidence"
+            )
+        if type(route.owner_release) is not OwnerApiRelease:
+            raise CompositionContractError("owner_release must be exact OwnerApiRelease evidence")
+        OwnerApiRelease.__post_init__(route.owner_release)
+        CompositionRoute.__post_init__(route)
+    CompositionGeneration.__post_init__(generation)
+
+
 def _evaluate_generation(
     generation: CompositionGeneration,
     observed_owner_releases: Mapping[str, OwnerApiRelease],
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """Return canonical route IDs after exact released-owner admission checks."""
-    if type(generation) is not CompositionGeneration:
-        raise CompositionContractError("generation must be exact CompositionGeneration evidence")
+    _revalidate_generation_snapshot(generation)
     if type(observed_owner_releases) is not dict:
         raise CompositionContractError("observed_owner_releases must be an exact dict snapshot")
 
@@ -253,6 +273,7 @@ def _evaluate_generation(
         canonical_service_id = _identifier("observed service_id", service_id)
         if type(release) is not OwnerApiRelease:
             raise CompositionContractError("observed owner evidence must be exact OwnerApiRelease")
+        OwnerApiRelease.__post_init__(release)
         if canonical_service_id != release.service_id:
             raise CompositionContractError("observed owner key must match release service_id")
         observed[canonical_service_id] = release
