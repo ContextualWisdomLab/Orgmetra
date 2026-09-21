@@ -44,7 +44,7 @@ def generation(*routes: CompositionRoute) -> CompositionGeneration:
     )
 
 
-def test_generation_rejects_get_head_authority_split_across_owners() -> None:
+def test_generation_rejects_get_head_authority_split_within_one_path_item() -> None:
     get_route = route(
         route_id="people_get",
         service_id="people_api",
@@ -52,7 +52,7 @@ def test_generation_rejects_get_head_authority_split_across_owners() -> None:
     )
     head_route = route(
         route_id="people_head",
-        service_id="job_analysis_api",
+        service_id="people_api",
         methods=("HEAD",),
     )
 
