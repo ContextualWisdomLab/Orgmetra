@@ -24,7 +24,7 @@ def release(service_id: str = "people_api") -> OwnerApiRelease:
         release_version="v1.2.3",
         openapi_sha256=A,
         artifact_sha256=B,
-        owner_locator=f"https://github.com/ContextualWisdomLab/{service_id}",
+        release_locator="https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.3",
     )
 
 
@@ -91,7 +91,7 @@ def test_owner_release_rejects_mutable_or_ambiguous_coordinates() -> None:
         release_version="v1.2.3",
         openapi_sha256=A,
         artifact_sha256=B,
-        owner_locator="https://github.com/ContextualWisdomLab/people-api",
+        release_locator="https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.3",
     )
     for version in ("latest", "main", "refs/heads/main", "pr-17", "bad version"):
         with pytest.raises(CompositionContractError):
@@ -100,10 +100,19 @@ def test_owner_release_rejects_mutable_or_ambiguous_coordinates() -> None:
         ("service_id", "People-API"),
         ("openapi_sha256", "A" * 64),
         ("artifact_sha256", "x" * 64),
-        ("owner_locator", "https://example.com/people-api"),
+        ("release_locator", "https://example.com/people-api/releases/tag/v1.2.3"),
     ):
         with pytest.raises(CompositionContractError):
             OwnerApiRelease(**(base | {field: value}))
+    with pytest.raises(CompositionContractError):
+        OwnerApiRelease(
+            **(
+                base
+                | {
+                    "release_locator": "https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.4"
+                }
+            )
+        )
 
 
 def test_route_rejects_ambiguous_routing_and_non_owner_evidence() -> None:
@@ -184,4 +193,4 @@ def test_exact_builtin_scalar_guards_reject_subclasses_and_empty_text() -> None:
     with pytest.raises(CompositionContractError):
         replace(base, service_id=Text("people_api"))
     with pytest.raises(CompositionContractError):
-        replace(base, owner_locator="")
+        replace(base, release_locator="")
