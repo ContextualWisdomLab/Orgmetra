@@ -7,6 +7,8 @@ authentication, HR-domain authorization, database access, or retry execution.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 import re
 from typing import Mapping
 
@@ -123,6 +125,45 @@ class CompositionRoute:
         object.__setattr__(self, "retry_class", retry_class)
 
 
+def configuration_sha256(routes: tuple["CompositionRoute", ...]) -> str:
+    """Hash the canonical semantic route projection, independent of route order."""
+    if type(routes) is not tuple or not routes:
+        raise CompositionContractError("routes must be a non-empty exact tuple")
+    materialized: list[dict[str, object]] = []
+    for route in routes:
+        if type(route) is not CompositionRoute:
+            raise CompositionContractError("routes must contain exact CompositionRoute values")
+        owner = route.owner_release
+        materialized.append(
+            {
+                "route_id": route.route_id,
+                "path_template": route.path_template,
+                "methods": list(route.methods),
+                "owner_release": {
+                    "service_id": owner.service_id,
+                    "release_version": owner.release_version,
+                    "openapi_sha256": owner.openapi_sha256,
+                    "artifact_sha256": owner.artifact_sha256,
+                    "release_locator": owner.release_locator,
+                },
+                "logical_upstream": route.logical_upstream,
+                "required": route.required,
+                "retry_class": route.retry_class,
+            }
+        )
+    document = {
+        "schema_version": _CONTRACT_SCHEMA,
+        "routes": sorted(materialized, key=lambda item: str(item["route_id"])),
+    }
+    encoded = json.dumps(
+        document,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class CompositionGeneration:
     """Immutable candidate generation for route admission and rollback identity."""
@@ -152,6 +193,11 @@ class CompositionGeneration:
                 if key in route_keys:
                     raise CompositionContractError("method/path authority must have one owner")
                 route_keys.add(key)
+        expected_config_sha256 = configuration_sha256(self.routes)
+        if self.config_sha256 != expected_config_sha256:
+            raise CompositionContractError(
+                "config_sha256 must match the canonical route materialization"
+            )
 
 
 @dataclass(frozen=True, slots=True)
