@@ -92,16 +92,10 @@ def test_configuration_identity_rejects_same_hierarchy_alias_before_hashing() ->
         configuration_sha256(routes)
 
 
-def test_configuration_identity_treats_method_order_as_set_order() -> None:
-    get_head = route(
-        "people_lookup",
-        "/v1/people/{person_record_id}",
-        methods=("GET", "HEAD"),
-    )
-    head_get = route(
-        "people_lookup",
-        "/v1/people/{person_record_id}",
-        methods=("HEAD", "GET"),
-    )
-
-    assert configuration_sha256((get_head,)) == configuration_sha256((head_get,))
+def test_route_rejects_noncanonical_http_method_order_before_hashing() -> None:
+    with pytest.raises(CompositionContractError, match="deterministic lexical order"):
+        route(
+            "people_lookup",
+            "/v1/people/{person_record_id}",
+            methods=("HEAD", "GET"),
+        )
