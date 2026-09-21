@@ -250,15 +250,12 @@ def test_generation_rejects_overlapping_route_templates() -> None:
         service_id="job_analysis_api",
         path="/v1/people/current",
     )
-    for second in (renamed_parameter, static_overlap):
-        routes = (parameterized, second)
-        with pytest.raises(CompositionContractError, match="method/path authority"):
-            CompositionGeneration(
-                schema_version="orgmetra_gateway_composition.v1",
-                generation_id="generation_001",
-                config_sha256=configuration_sha256(routes),
-                routes=routes,
-            )
+
+    with pytest.raises(CompositionContractError, match="same hierarchy"):
+        configuration_sha256((parameterized, renamed_parameter))
+
+    with pytest.raises(CompositionContractError, match="path selection"):
+        configuration_sha256((parameterized, static_overlap))
 
 
 def test_generation_allows_distinct_authority_or_distinct_http_method() -> None:
