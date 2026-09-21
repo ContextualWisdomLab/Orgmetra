@@ -62,6 +62,20 @@ Not established by this source:
 
 - Orgmetra semantic command digests, first-commit replay, optimistic-concurrency, retry admission, employment-fact idempotency semantics, or which bounded context owns a route. Those remain Orgmetra owner-domain and product-composition evidence.
 
+**Berners-Lee, T., Fielding, R., & Masinter, L. (2005). _Uniform Resource Identifier (URI): Generic Syntax_ (RFC 3986). RFC Editor. https://www.rfc-editor.org/rfc/rfc3986.html**
+
+RFC 3986 Sections 5.2.4 and 6.2.2.3 define complete `.` and `..` path segments as dot-segments and describe their removal during reference resolution/path normalization. Section 6.2.2.3 notes that normalizers should remove these segments even when an implementation receives an already formed URI.
+
+Use in ADR 0432:
+
+- complete `.` and `..` path segments cannot be distinct Orgmetra route-manifest identities because a conforming normalization step can remove them before request selection;
+- product composition rejects dot-segment route templates before hashing/admission instead of silently normalizing one declared owner route into another path; and
+- ordinary dots inside non-dot path segments are not reinterpreted as hierarchy solely by this rule.
+
+Not established by this source:
+
+- which Orgmetra bounded context owns a normalized path, whether two released owner OpenAPI contracts are compatible, or how a particular proxy/framework normalizes every request target. Those remain product/owner conformance evidence.
+
 **Nottingham, M., Wilde, E., & Dalal, S. (2023). _Problem details for HTTP APIs_ (RFC 9457). RFC Editor. https://www.rfc-editor.org/rfc/rfc9457.html**
 
 RFC 9457 is the current IETF Standards Track Problem Details specification and obsoletes RFC 7807. Its security considerations warn against leaking sensitive implementation details.
@@ -86,7 +100,8 @@ Use in ADR 0432:
 
 - route admission is tied to a released owner API version and exact OpenAPI digest;
 - the product-composition inventory remains an admitted-operation catalogue, not a monolithic copied domain schema;
-- route-path authority must be deterministic so overlapping templates cannot silently compete for one concrete request under the same effective method authority; the Orgmetra GET/HEAD equivalence used for collision ownership comes from RFC 9110 rather than OpenAPI itself; and
+- route-path authority must be deterministic so overlapping templates cannot silently compete for one concrete request under the same effective method authority; the Orgmetra GET/HEAD equivalence used for collision ownership comes from RFC 9110 rather than OpenAPI itself;
+- URI dot-segment rejection follows RFC 3986 normalization semantics rather than being inferred from OpenAPI; and
 - a missing or incompatible owner contract leaves a route unavailable.
 
 Not established by this source:
@@ -113,13 +128,14 @@ Those protected responsibilities are therefore design obligations, not proof tha
 
 Draft PR #434 is the first bounded implementation slice under #432. It is intentionally stacked on the active Foundation owner #340 and therefore is not protected truth or hosted current-head gate evidence.
 
-Current exact canary authority is `bdedbda008746ecfac39895b16537c2c99a63165`, 41 commits ahead / 0 behind #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with eight changed files confined to `services/product-composition-api/**`.
+Current exact canary authority is `8bdb2bb295ccf69d789c9c19771a42066e05b109`, 44 commits ahead / 0 behind #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with nine changed files confined to `services/product-composition-api/**`.
 
 Its current executable evidence corrects several mistakes found through test-first/self-review without promoting the Draft into architecture or shipped truth:
 
 - the composition digest is derived from a deterministic canonical semantic route projection instead of accepting any caller-supplied 64-hex label;
 - a release locator must identify one exact `ContextualWisdomLab/<repository>/releases/tag/<version>` coordinate bound to the recorded release version;
 - overlapping path templates are rejected across different owners when their effective method authorities overlap; GET and HEAD form one selected-resource collision authority while the actually declared method set remains canonical route material;
+- complete `.` and `..` URI path segments are rejected before they become route identity;
 - each logical `service://` upstream is bound to the exact released owner service identity;
 - the route model contains no composition-local retry class, idempotency mode, or concurrency mode;
 - `AdmissionReceipt` can be issued only by the canonical evaluator and its exact issued generation/config/admitted-route fields remain bound to that receipt within process-local closure state;
@@ -131,13 +147,16 @@ The generation-construction rule is not derived from OpenAPI, OAuth, or HTTP sta
 
 The GET/HEAD collision rule is narrower in a different way: RFC 9110 supplies the selected-resource method semantics, while Orgmetra's decision that one bounded-context owner must retain that effective authority is a product-architecture invariant. The standard does not dictate Orgmetra service ownership.
 
+The dot-segment rule similarly separates standard from product decision: RFC 3986 establishes normalization semantics; Orgmetra chooses fail-closed rejection so an admitted manifest path cannot be silently rewritten by another layer into a different selected route.
+
 The latest ordinary-forward executable sequences include:
 
 - `f7175e36d32034581cf05758b64256c06e7a3ea5` -> `105fa9a584c5aa9865c86082664411f922a84492` -> `d3e24da90bbd4b2c5e44f7acfaeb15225eff08a0` for generation construction identity;
-- `5bbd018750a49a2bfa4c28d62c1b091f493c77b2` -> `79279c211fd5912a30060991cb5054fac19daba1` -> `db251db2168bdea2e5af321e75952826a1f5a21b` for canonical receipt route ordering; and
-- `34a598ad2c60cd00b8c51b3be5a8abfd3b5b377f` -> `8a1e8854bb8e7c7a712e83dc9ef1e593095ebdfe` -> `bdedbda008746ecfac39895b16537c2c99a63165` for GET/HEAD selected-resource ownership.
+- `5bbd018750a49a2bfa4c28d62c1b091f493c77b2` -> `79279c211fd5912a30060991cb5054fac19daba1` -> `db251db2168bdea2e5af321e75952826a1f5a21b` for canonical receipt route ordering;
+- `34a598ad2c60cd00b8c51b3be5a8abfd3b5b377f` -> `8a1e8854bb8e7c7a712e83dc9ef1e593095ebdfe` -> `bdedbda008746ecfac39895b16537c2c99a63165` for GET/HEAD selected-resource ownership; and
+- `4c8d195de1876d163dd115d82aaa9cc7f628d48f` -> `e8931bc9861cb2e01c68887660f1286bed3329b0` -> `8bdb2bb295ccf69d789c9c19771a42066e05b109` for URI dot-segment route identity.
 
-Earlier focused local figures on predecessor `cb32ba828...`—16 tests, 201/201 statements and 84/84 branches—are predecessor mechanism evidence only. Material source and test bytes changed afterward. Current exact `bdedbda...` has no PR-triggered hosted workflow run while stacked on #340, so no current-head 100% statement/branch/docstring/edge, Security, SAST or CodeQL GREEN is claimed.
+Earlier focused local figures on predecessor `cb32ba828...`—16 tests, 201/201 statements and 84/84 branches—are predecessor mechanism evidence only. Material source and test bytes changed afterward. Current exact `8bdb2bb...` has no PR-triggered hosted workflow run while stacked on #340, so no current-head 100% statement/branch/docstring/edge, Security, SAST or CodeQL GREEN is claimed.
 
 Synthetic owner-release fixtures and process-local identity registries do not prove an actual owner release, Keyverse conformance, Orgmetra identity ACL, deployment/recovery, commercial latency, durable activation authority, protected integration, or immutable Orgmetra release.
 
