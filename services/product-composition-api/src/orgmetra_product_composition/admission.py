@@ -191,7 +191,49 @@ class OwnerApiRelease:
         _record_or_require_owner_release_construction(self)
 
 
-@dataclass(frozen=True, slots=True)
+def _build_route_construction_runtime():
+    """Build process-local construction snapshots for route semantic integrity."""
+    constructed_routes: WeakValueDictionary[int, object] = WeakValueDictionary()
+    constructed_fields: dict[
+        int,
+        tuple[str, str, tuple[str, ...], OwnerApiRelease, str, bool],
+    ] = {}
+    state_lock = RLock()
+
+    def discard_route_construction(route_object_id: int) -> None:
+        with state_lock:
+            constructed_fields.pop(route_object_id, None)
+
+    def record_or_require_route_construction(route: CompositionRoute) -> None:
+        route_object_id = id(route)
+        current_fields = (
+            route.route_id,
+            route.path_template,
+            route.methods,
+            route.owner_release,
+            route.logical_upstream,
+            route.required,
+        )
+        with state_lock:
+            canonical_route = constructed_routes.get(route_object_id)
+            canonical_fields = constructed_fields.get(route_object_id)
+            if canonical_route is None and canonical_fields is None:
+                constructed_routes[route_object_id] = route
+                constructed_fields[route_object_id] = current_fields
+                finalize(route, discard_route_construction, route_object_id)
+                return
+            if canonical_route is not route or canonical_fields != current_fields:
+                raise CompositionContractError(
+                    "CompositionRoute no longer matches its construction snapshot"
+                )
+
+    return record_or_require_route_construction
+
+
+_record_or_require_route_construction = _build_route_construction_runtime()
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class CompositionRoute:
     """One product route mapped to one exact released owner API."""
 
@@ -240,6 +282,7 @@ class CompositionRoute:
         object.__setattr__(self, "logical_upstream", upstream)
         if type(self.required) is not bool:
             raise CompositionContractError("required must be an exact bool")
+        _record_or_require_route_construction(self)
 
 
 def _revalidate_route_contract(route: CompositionRoute) -> None:
