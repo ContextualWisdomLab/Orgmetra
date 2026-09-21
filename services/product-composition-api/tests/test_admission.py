@@ -222,3 +222,50 @@ def test_generation_rejects_config_digest_not_derived_from_route_materialization
             config_sha256=C,
             routes=(route(),),
         )
+
+
+def test_release_locator_requires_one_canonical_release_tag_path() -> None:
+    base = release()
+    for locator in (
+        "https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/alias/v1.2.3",
+        "https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.3?copy=v1.2.3",
+    ):
+        with pytest.raises(CompositionContractError):
+            replace(base, release_locator=locator)
+
+
+def test_generation_rejects_overlapping_route_templates() -> None:
+    parameterized = route(
+        route_id="person_by_id",
+        path="/v1/people/{person_record_id}",
+    )
+    renamed_parameter = route(
+        route_id="person_by_subject",
+        service_id="job_analysis_api",
+        path="/v1/people/{subject_id}",
+    )
+    static_overlap = route(
+        route_id="person_current",
+        service_id="job_analysis_api",
+        path="/v1/people/current",
+    )
+    for second in (renamed_parameter, static_overlap):
+        routes = (parameterized, second)
+        with pytest.raises(CompositionContractError, match="method/path authority"):
+            CompositionGeneration(
+                schema_version="orgmetra_gateway_composition.v1",
+                generation_id="generation_001",
+                config_sha256=configuration_sha256(routes),
+                routes=routes,
+            )
+
+
+def test_composition_does_not_own_retry_policy() -> None:
+    assert not hasattr(route(), "retry_class")
+
+
+def test_route_admission_receipt_does_not_claim_buyer_readiness() -> None:
+    expected = route()
+    receipt = admit_generation(generation(expected), {"people_api": expected.owner_release})
+    assert not hasattr(receipt, "buyer_ready")
+    assert receipt.required_routes_admitted is True
