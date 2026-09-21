@@ -258,12 +258,20 @@ class CompositionGeneration:
             raise CompositionContractError("routes must be a non-empty exact tuple")
         route_ids: set[str] = set()
         authorities: list[tuple[str, str]] = []
+        owner_releases: dict[str, OwnerApiRelease] = {}
         for route in self.routes:
             if type(route) is not CompositionRoute:
                 raise CompositionContractError("routes must contain exact CompositionRoute values")
             if route.route_id in route_ids:
                 raise CompositionContractError("route_id values must be unique")
             route_ids.add(route.route_id)
+            existing_owner_release = owner_releases.get(route.owner_release.service_id)
+            if existing_owner_release is None:
+                owner_releases[route.owner_release.service_id] = route.owner_release
+            elif existing_owner_release != route.owner_release:
+                raise CompositionContractError(
+                    "one owner service must use one exact release per generation"
+                )
             authority_methods = sorted({_method_authority_key(method) for method in route.methods})
             for method in authority_methods:
                 for existing_method, existing_path in authorities:
