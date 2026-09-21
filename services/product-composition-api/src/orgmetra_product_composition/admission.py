@@ -11,7 +11,7 @@ import hashlib
 import json
 import re
 from typing import Mapping
-from weakref import WeakValueDictionary
+from weakref import WeakValueDictionary, finalize
 
 _CONTRACT_SCHEMA = "orgmetra_gateway_composition.v1"
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
@@ -276,10 +276,22 @@ def _evaluate_generation(
 def _build_admission_runtime():
     """Build closure-private receipt issuance state plus the canonical evaluator."""
     issued_receipts: WeakValueDictionary[int, AdmissionReceipt] = WeakValueDictionary()
+    issued_fields: dict[
+        int,
+        tuple[str, str, tuple[str, ...], tuple[str, ...]],
+    ] = {}
 
     def require_canonical_admission_receipt(receipt: AdmissionReceipt) -> None:
-        """Reject a receipt that this process did not issue after exact admission."""
-        if issued_receipts.get(id(receipt)) is not receipt:
+        """Reject unissued or post-issuance-mutated receipt evidence."""
+        receipt_id = id(receipt)
+        canonical_fields = issued_fields.get(receipt_id)
+        current_fields = (
+            receipt.generation_id,
+            receipt.config_sha256,
+            receipt.admitted_route_ids,
+            receipt.unavailable_optional_route_ids,
+        )
+        if issued_receipts.get(receipt_id) is not receipt or canonical_fields != current_fields:
             raise CompositionContractError("AdmissionReceipt was not canonically issued")
 
     def admit_generation(
@@ -299,7 +311,15 @@ def _build_admission_runtime():
         object.__setattr__(receipt, "config_sha256", generation.config_sha256)
         object.__setattr__(receipt, "admitted_route_ids", admitted)
         object.__setattr__(receipt, "unavailable_optional_route_ids", optional_unavailable)
-        issued_receipts[id(receipt)] = receipt
+        receipt_id = id(receipt)
+        issued_receipts[receipt_id] = receipt
+        issued_fields[receipt_id] = (
+            generation.generation_id,
+            generation.config_sha256,
+            admitted,
+            optional_unavailable,
+        )
+        finalize(receipt, issued_fields.pop, receipt_id, None)
         return receipt
 
     return require_canonical_admission_receipt, admit_generation
