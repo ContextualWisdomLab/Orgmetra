@@ -10,6 +10,7 @@ from orgmetra_product_composition import (
     CompositionRoute,
     OwnerApiRelease,
     admit_generation,
+    configuration_sha256,
 )
 
 A = "a" * 64
@@ -48,11 +49,12 @@ def route(
 
 
 def generation(*routes: CompositionRoute) -> CompositionGeneration:
+    selected_routes = routes or (route(),)
     return CompositionGeneration(
         schema_version="orgmetra_gateway_composition.v1",
         generation_id="generation_001",
-        config_sha256=C,
-        routes=routes or (route(),),
+        config_sha256=configuration_sha256(selected_routes),
+        routes=selected_routes,
     )
 
 
@@ -71,7 +73,7 @@ def test_admits_exact_required_release_and_reports_optional_unavailable() -> Non
 
     assert receipt.buyer_ready is True
     assert receipt.generation_id == "generation_001"
-    assert receipt.config_sha256 == C
+    assert receipt.config_sha256 == configuration_sha256((required_route, optional_route))
     assert receipt.admitted_route_ids == ("people_history",)
     assert receipt.unavailable_optional_route_ids == ("validation_read",)
 
@@ -158,7 +160,7 @@ def test_generation_rejects_bad_schema_shape_and_duplicate_authority() -> None:
         values = dict(
             schema_version="orgmetra_gateway_composition.v1",
             generation_id="generation_001",
-            config_sha256=C,
+            config_sha256=configuration_sha256((first,)),
             routes=(first,),
         )
         values.update(kwargs)
@@ -194,6 +196,22 @@ def test_exact_builtin_scalar_guards_reject_subclasses_and_empty_text() -> None:
         replace(base, service_id=Text("people_api"))
     with pytest.raises(CompositionContractError):
         replace(base, release_locator="")
+
+
+def test_configuration_digest_is_order_stable_and_binds_route_semantics() -> None:
+    first = route()
+    second = route(
+        route_id="validation_read",
+        service_id="workforce_validation_api",
+        path="/v1/validation/studies/{study_id}",
+        required=False,
+    )
+    assert configuration_sha256((first, second)) == configuration_sha256((second, first))
+    changed = replace(second, retry_class="never")
+    assert configuration_sha256((first, second)) != configuration_sha256((first, changed))
+    for invalid_routes in ((), [first], (object(),)):
+        with pytest.raises(CompositionContractError):
+            configuration_sha256(invalid_routes)  # type: ignore[arg-type]
 
 
 def test_generation_rejects_config_digest_not_derived_from_route_materialization() -> None:
