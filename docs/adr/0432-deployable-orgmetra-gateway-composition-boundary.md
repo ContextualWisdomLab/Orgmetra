@@ -32,6 +32,8 @@ Fresh HTTP-method review adds one routing-ownership constraint. RFC 9110 Section
 
 Fresh URI-path review adds a second canonical-routing constraint. RFC 3986 Sections 5.2.4 and 6.2.2.3 define complete `.` and `..` path segments as dot-segments that are removed during URI reference resolution/normalization. A route manifest must therefore reject those complete segments before admission rather than allow one layer to authorize `/v1/./people` while another normalizes it to `/v1/people`. This rule concerns route identity at the composition boundary; it does not reinterpret ordinary dots inside non-dot path segments.
 
+Fresh owner-snapshot review adds a third coherence constraint. The current executable evaluator observes owner releases in a snapshot keyed by `service_id`. A generation that assigns two different `OwnerApiRelease` identities to two routes of the same `service_id` cannot be satisfied by one coherent observed snapshot: at least one route must mismatch by construction. A composition generation therefore binds each owner service to one exact release identity across all of its routes. Supporting simultaneous versions of one service would require an explicit versioned upstream identity and a different released contract, not an accidental ambiguity inside the current `service_id` key.
+
 ## Decision drivers
 
 The supported product boundary must:
@@ -121,13 +123,15 @@ Each admitted route carries at least:
 - authoritative tenant/actor/purpose input locations; and
 - required-versus-optional readiness criticality.
 
+Within one composition generation, all routes for the same owner `service_id` must reference the same exact `OwnerApiRelease` coordinates. The observed owner snapshot is keyed by `service_id`, so admitting multiple release identities for one service would make the generation intrinsically unsatisfiable under the current contract. Multi-version routing for one service is out of scope unless a later contract introduces an explicit version-qualified upstream identity.
+
 The composition manifest does **not** mint local idempotency, concurrency, error-preservation, or retry classifications. Those semantics remain owner contract truth. When an owner exposes a released behavioral contract or receipt needed to prove those semantics, the composition generation records that exact immutable owner coordinate rather than translating it into a second taxonomy.
 
 Admission is deny-by-default. Reachability is not admission. A route is unavailable when the released owner API is absent, incompatible, unverifiable, or does not match its recorded digest. Path templates that can select the same concrete request must not coexist with different owners when their effective method authorities overlap; parameter renaming does not make overlapping route authority distinct. For this collision check, `GET` and `HEAD` form one selected-resource authority because RFC 9110 Section 9.3.2 defines HEAD as identical to GET except for response content. Canonical route material still preserves the method set actually declared, so this rule does not synthesize an undeclared HEAD operation.
 
 Route templates must also be canonical before they enter collision analysis or configuration hashing. Complete `.` and `..` path segments are not route identity because RFC 3986 removes them during URI normalization/resolution. They fail closed rather than being normalized inside the manifest, so the admitted path is exactly the path the owner contract declares and no downstream proxy/framework can silently select a different normalized route.
 
-Before admission or activation, the current nested generation, route, owner-release, logical-upstream, and canonical configuration-digest invariants are revalidated. Constructor-time validation is not durable trust.
+Before admission or activation, the current nested generation, route, owner-release, logical-upstream, owner-release coherence, and canonical configuration-digest invariants are revalidated. Constructor-time validation is not durable trust.
 
 A process-local `AdmissionReceipt` proves only that the canonical evaluator admitted one exact structural state in that process. Its exact issued fields remain bound to the issued object. Directly constructed, low-level reconstructed, post-issuance-mutated, serialized/deserialized, or stale receipt-shaped data does not authorize activation, routing, HR access, or readiness. Durable activation/recovery re-evaluates immutable generation and owner evidence independently.
 
@@ -201,6 +205,7 @@ Do not claim the SLO from an in-memory router, mocked owner, reduced sample, dis
 - no bearer credential, restricted HR payload, tenant/person identifier, or high-cardinality sensitive value as an unbounded metric label;
 - no caller-controlled header overrides contradictory authenticated identity/purpose coordinates;
 - no owner release whose service identity disagrees with the logical upstream;
+- no composition generation containing two different exact release identities for one owner `service_id`;
 - no post-construction generation identity/configuration rewrite accepted as the same generation;
 - no reconstructed or post-issuance-mutated route-admission receipt treated as durable proof;
 - no overlapping route owners that split one selected-resource authority between GET and HEAD;
@@ -220,6 +225,7 @@ Implementation must preserve executable RED cases for at least:
 - a composition digest is accepted even though it is not derived from the canonical route materialization;
 - one constructed generation has its `generation_id` rewritten after construction;
 - one constructed generation has route semantics changed and a new matching digest written so the same object appears self-consistent;
+- one generation assigns two different exact release/OpenAPI/artifact identities to routes of the same owner `service_id`, making the `service_id`-keyed observed snapshot impossible to satisfy coherently;
 - a logical upstream names a different service from the exact released owner evidence;
 - an issued admission receipt's generation/config/admitted-route fields change after issuance;
 - stale nested owner/route/config evidence is trusted because construction previously succeeded;
@@ -240,7 +246,7 @@ Implementation must preserve executable RED cases for at least:
 
 GREEN requires real deployable boundaries, immutable identity for every admitted layer and generation, right-cleared realistic data where buyer acceptance depends on data, exact current-head tests, Podman/Colima and supported Kubernetes evidence, fault/recovery rehearsal, security evidence, and the applicable p95 target.
 
-Draft #434 currently supplies only a focused executable canary for the route-admission subset. Its ordinary-forward RED history now includes missing implementation, unbound config digest, noncanonical release locator, route-authority overlap, duplicated retry-policy authority, overclaimed readiness, issued-receipt mutation, owner/upstream disagreement, stale nested evidence, self-consistent post-construction generation retargeting, non-deterministic receipt ordering for semantically equivalent route tuples, GET/HEAD split authority, and URI dot-segment route aliases. Earlier predecessor local 100% figures do not transfer across the later material source/test writes. Current exact #434 `8bdb2bb295ccf69d789c9c19771a42066e05b109` has no PR-triggered hosted workflow run while stacked on #340; no current-head coverage/Security/SAST/CodeQL GREEN is claimed.
+Draft #434 currently supplies only a focused executable canary for the route-admission subset. Its ordinary-forward RED history now includes missing implementation, unbound config digest, noncanonical release locator, route-authority overlap, duplicated retry-policy authority, overclaimed readiness, issued-receipt mutation, owner/upstream disagreement, stale nested evidence, self-consistent post-construction generation retargeting, non-deterministic receipt ordering for semantically equivalent route tuples, GET/HEAD split authority, URI dot-segment route aliases, and split release identities for one owner service. Earlier predecessor local 100% figures do not transfer across the later material source/test writes. Current exact #434 `51a1ad47025e5522aea65af01c97d1f4cef078c5` has no PR-triggered hosted workflow run while stacked on #340; no current-head coverage/Security/SAST/CodeQL GREEN is claimed.
 
 ## Implementation and release order
 
