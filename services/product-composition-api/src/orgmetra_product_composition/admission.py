@@ -155,14 +155,23 @@ class CompositionRoute:
             raise CompositionContractError("required must be an exact bool")
 
 
+def _revalidate_route_contract(route: CompositionRoute) -> None:
+    """Reject stale nested evidence before it can become configuration identity."""
+    if type(route) is not CompositionRoute:
+        raise CompositionContractError("routes must contain exact CompositionRoute values")
+    if type(route.owner_release) is not OwnerApiRelease:
+        raise CompositionContractError("owner_release must be exact OwnerApiRelease evidence")
+    OwnerApiRelease.__post_init__(route.owner_release)
+    CompositionRoute.__post_init__(route)
+
+
 def configuration_sha256(routes: tuple["CompositionRoute", ...]) -> str:
     """Hash the canonical semantic route projection, independent of route order."""
     if type(routes) is not tuple or not routes:
         raise CompositionContractError("routes must be a non-empty exact tuple")
     materialized: list[dict[str, object]] = []
     for route in routes:
-        if type(route) is not CompositionRoute:
-            raise CompositionContractError("routes must contain exact CompositionRoute values")
+        _revalidate_route_contract(route)
         owner = route.owner_release
         materialized.append(
             {
@@ -260,8 +269,7 @@ class CompositionGeneration:
         authorities: list[tuple[str, str]] = []
         owner_releases: dict[str, OwnerApiRelease] = {}
         for route in self.routes:
-            if type(route) is not CompositionRoute:
-                raise CompositionContractError("routes must contain exact CompositionRoute values")
+            _revalidate_route_contract(route)
             if route.route_id in route_ids:
                 raise CompositionContractError("route_id values must be unique")
             route_ids.add(route.route_id)
@@ -315,14 +323,7 @@ def _revalidate_generation_snapshot(generation: CompositionGeneration) -> None:
     if type(generation.routes) is not tuple or not generation.routes:
         raise CompositionContractError("generation routes must be a non-empty exact tuple")
     for route in generation.routes:
-        if type(route) is not CompositionRoute:
-            raise CompositionContractError(
-                "generation routes must contain exact CompositionRoute evidence"
-            )
-        if type(route.owner_release) is not OwnerApiRelease:
-            raise CompositionContractError("owner_release must be exact OwnerApiRelease evidence")
-        OwnerApiRelease.__post_init__(route.owner_release)
-        CompositionRoute.__post_init__(route)
+        _revalidate_route_contract(route)
     CompositionGeneration.__post_init__(generation)
 
 
