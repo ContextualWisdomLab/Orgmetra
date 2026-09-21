@@ -28,7 +28,7 @@ RFC 9110 does not determine which Orgmetra bounded context owns a route or make 
 
 **Berners-Lee, T., Fielding, R., & Masinter, L. (2005). _Uniform Resource Identifier (URI): Generic Syntax_ (RFC 3986). RFC Editor. https://www.rfc-editor.org/rfc/rfc3986.html**
 
-RFC 3986 Sections 5.2.4 and 6.2.2.3 define complete `.` and `..` path segments as dot-segments removed during reference resolution/path normalization. Orgmetra therefore rejects those complete segments before route hashing/admission rather than letting one manifest identity normalize into another selected path. Ordinary dots inside other segments are not reinterpreted by this rule.
+RFC 3986 Sections 5.2.4 and 6.2.2.3 define complete `.` and `..` path segments as dot-segments removed during reference resolution/path normalization. Orgmetra rejects those complete segments before route hashing/admission rather than letting one manifest identity normalize into another selected path. Ordinary dots inside other segments are not reinterpreted by this rule.
 
 **Nottingham, M., Wilde, E., & Dalal, S. (2023). _Problem details for HTTP APIs_ (RFC 9457). RFC Editor. https://www.rfc-editor.org/rfc/rfc9457.html**
 
@@ -38,16 +38,19 @@ Where an owner publishes RFC 9457 Problem Details, product composition preserves
 
 **OpenAPI Initiative. (2026). _OpenAPI Specification v3.2.1_. https://spec.openapis.org/oas/v3.2.1.html**
 
-OpenAPI Specification 3.2.1 is the current 3.2 patch release on this verification date. Protected Orgmetra documentation still records OpenAPI 3.2.0 as its HTTP contract language. Citing 3.2.1 here does not silently upgrade protected owner contracts; the path rules below are compatible with the existing 3.2 line and are used as fail-closed composition conformance constraints.
+OpenAPI Specification 3.2.1 is the current 3.2 patch release on this verification date. Protected Orgmetra documentation still records OpenAPI 3.2.0 as its HTTP contract language. Citing 3.2.1 here does not silently upgrade protected owner contracts; the path rules below are compatible with the existing 3.2 line and are applied as fail-closed composition conformance constraints.
 
-Two OpenAPI rules must remain distinct:
+Three OpenAPI facts matter separately:
 
-1. **Paths Object identity — Section 4.8.1.** Templated paths with the same hierarchy but different templated names MUST NOT exist because they are identical. Consequently `/v1/people/{person_record_id}` and `/v1/people/{worker_record_id}` are one OpenAPI path identity regardless of the operations attached to them. Orgmetra enforces one exact template string per hierarchy before configuration hashing. Distinct methods may coexist only under that same exact path template, subject to operation-authority rules.
-2. **Path templating validity — Section 4.8.2.** Template expressions must be valid path-template coordinates and each path-parameter name maps to one template occurrence. Orgmetra rejects repeated expressions such as `/v1/tenants/{record_id}/people/{record_id}` before configuration hashing/admission rather than depending on framework-specific parameter-map behavior.
+1. **Paths Object identity — Section 4.8.1.** Templated paths with the same hierarchy but different templated names MUST NOT exist because they are identical. `/v1/people/{person_record_id}` and `/v1/people/{worker_record_id}` are therefore one path identity regardless of attached HTTP operations. Orgmetra enforces one exact template string per hierarchy before configuration hashing.
+2. **Concrete-before-template matching — Section 4.8.1, with the Section 4.8.2.1 example.** Concrete non-templated paths are matched before templated counterparts; the specification illustrates `/pets/mine` taking precedence over `/pets/{petId}`. A composition layer must not reject this valid owner API shape merely because both paths can match the same concrete request.
+3. **Path-template validity — Section 4.8.2.** Each template expression MUST NOT appear more than once in a single path template. Orgmetra rejects repeated expressions such as `/v1/tenants/{record_id}/people/{record_id}` before hashing/admission rather than depending on framework parameter maps.
 
-These normative OpenAPI path rules are separate from Orgmetra's HTTP operation-ownership policy. The GET/HEAD equivalence used for collision ownership is derived from RFC 9110, not OpenAPI. URI dot-segment rejection derives from RFC 3986. Orgmetra's added decision in all cases is to fail before invalid or ambiguous route material receives configuration identity.
+Orgmetra adds a deliberately narrower product rule to concrete-before-template matching: deterministic overlap is admitted only when the concrete and templated routes bind the same exact owner release and declare the same exact method set. Cross-owner overlap remains fail-closed, and ambiguous overlap between two templated paths remains fail-closed. The same-method-set condition prevents composition from inventing a fallback to a templated operation when OpenAPI first selects a concrete Path Item that does not declare that method. Broadening this behavior requires released-owner conformance evidence, not framework-specific routing assumptions.
 
-OpenAPI does not establish semantic compatibility of two Orgmetra service releases, retry safety, buyer readiness, deployment fitness, durable generation identity, or route ownership. Those require executable owner/consumer evidence.
+These OpenAPI rules remain separate from HTTP operation ownership. GET/HEAD collision equivalence is derived from RFC 9110, not OpenAPI. URI dot-segment rejection derives from RFC 3986. Orgmetra's additional evidence rule is that invalid or ambiguous route material must fail before configuration identity is minted.
+
+OpenAPI does not establish semantic compatibility of two Orgmetra releases, retry safety, buyer readiness, durable generation identity, or HR bounded-context ownership. Those require executable owner/consumer evidence.
 
 ## Repository-owner capability evidence
 
@@ -59,42 +62,19 @@ On 2026-09-21 protected authority is `develop@eb9757f8649aaad026a9865508d9aad50c
 
 ### Draft executable canary #434
 
-Draft #434 exact authority is `bf90bbfbc2eef88d57fd30286b41a86f483a3fa1`, 74 commits / 13 changed files, all confined to `services/product-composition-api/**`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`.
+Draft #434 exact authority is `a98dd5f7ffd175e2a7b3b5ca61255420f2959f8b`, 77 commits / 13 changed files, all confined to `services/product-composition-api/**`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`.
 
-Current executable evidence includes:
+Current executable evidence includes deterministic config hashing, canonical Orgmetra release attribution, pre-hash route-set validation, one release per owner service, owner-bound upstream identity, URI dot-segment and repeated-expression rejection, one exact template identity per OpenAPI path hierarchy, deterministic same-owner concrete-before-template precedence, cross-owner/ambiguous-template rejection, separate GET/HEAD effective-authority checks, process-local receipt/source-generation integrity, deterministic receipt ordering, use-time graph revalidation, and process-local generation lineage protection.
 
-- deterministic config digest from canonical semantic route material;
-- canonical Orgmetra release-locator attribution;
-- pre-hash per-route and generation-wide validation;
-- one exact owner release per `service_id`;
-- owner-bound logical upstream identity;
-- URI dot-segment rejection;
-- repeated single-path template-expression rejection;
-- one exact OpenAPI template identity per parameter-name-independent hierarchy, independent of HTTP method;
-- distinct methods allowed on the same exact template string;
-- separate effective-method collision checks with GET/HEAD as one selected-resource authority;
-- no local retry/idempotency/concurrency taxonomy;
-- canonical process-local `AdmissionReceipt` field binding and source-generation leasing;
-- deterministic receipt route ordering;
-- use-time nested graph/config revalidation; and
-- process-local generation construction identity/live lineage protection.
+The latest deterministic-precedence sequence is:
 
-The latest OpenAPI path-identity sequence is:
+- `fd7e7c69105fa2850dc30dd43014592f1a753eaa` — regression-first positive same-owner concrete/template case plus negative cross-owner and ambiguous-template controls;
+- `393cb561a1226529553baa6129378281cfba6f27` — admits only same exact owner release + same declared method set when exactly one overlapping path is concrete; and
+- `a98dd5f7ffd175e2a7b3b5ca61255420f2959f8b` — executable documentation currentization.
 
-- `2b4f2211a2e332058bec31af11474d3937899855` — RED for same hierarchy/different template names under disjoint methods, plus positive control for different methods on the same exact template;
-- `2c7bfcf75ec2d353d52ed86cbcd74dba5ddae3ea` — one exact template identity per parameter-name-independent hierarchy before hashing; and
-- `bf90bbfbc2eef88d57fd30286b41a86f483a3fa1` — executable documentation currentization.
+The immediately preceding path-key identity sequence remains `2b4f2211a2e332058bec31af11474d3937899855` -> `2c7bfcf75ec2d353d52ed86cbcd74dba5ddae3ea` -> `bf90bbfbc2eef88d57fd30286b41a86f483a3fa1`. Earlier retained sequences cover generation construction identity, deterministic receipt ordering, GET/HEAD ownership, URI dot segments, one-release-per-service, foreign-release attribution, pre-hash route-set validity, live generation lineage, and repeated template expressions.
 
-Earlier retained ordinary-forward sequences include:
-
-- `f7175e36... -> 105fa9a5... -> d3e24da9...` for generation-construction identity;
-- `5bbd0187... -> 79279c21... -> db251db2...` for deterministic receipt ordering;
-- `34a598ad... -> 8a1e8854... -> bdedbda0...` for GET/HEAD selected-resource ownership;
-- `4c8d195d... -> e8931bc9... -> 8bdb2bb2...` for URI dot-segment identity;
-- `b9777f69... -> ab35e5c3... -> 356fe9e9... -> 51a1ad47...` for one-release-per-owner-service coherence; and
-- `acc7a471... -> bd43f474... -> 9ad27d83...` for repeated OpenAPI template-expression rejection.
-
-The generation-construction and live-lineage rules are Orgmetra evidence-integrity requirements, not OpenAPI/OAuth/HTTP rules. GET/HEAD combines RFC 9110 selected-resource semantics with an Orgmetra ownership decision. Dot-segment rejection combines RFC 3986 normalization semantics with a fail-closed product decision. Same-hierarchy/different-template-name prohibition and path-template conformance come from OpenAPI; Orgmetra additionally requires those failures to occur before configuration identity is minted.
+The generation-construction/live-lineage rules are Orgmetra evidence-integrity requirements, not OpenAPI/OAuth/HTTP rules. GET/HEAD combines RFC 9110 semantics with an Orgmetra ownership decision. Dot-segment rejection combines RFC 3986 normalization with a fail-closed decision. Same-hierarchy identity, concrete-before-template precedence, and repeated-expression validity come from OpenAPI; Orgmetra adds narrower ownership/evidence constraints around when those semantics may be admitted.
 
 Earlier focused local coverage figures at predecessor `cb32ba828...` are predecessor mechanism evidence only. Material source/test writes followed. No predecessor workflow result substitutes for current exact-head coverage, Security, SAST, CodeQL, independent review, deployment, or release evidence.
 
