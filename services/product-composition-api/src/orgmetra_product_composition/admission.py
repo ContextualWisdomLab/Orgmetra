@@ -184,7 +184,54 @@ def configuration_sha256(routes: tuple["CompositionRoute", ...]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-@dataclass(frozen=True, slots=True)
+def _build_generation_construction_runtime():
+    """Build process-local construction snapshots for generation identity integrity."""
+    constructed_generations: WeakValueDictionary[int, CompositionGeneration] = WeakValueDictionary()
+    constructed_fields: dict[int, tuple[str, str, str]] = {}
+
+    def record_generation_construction(generation: CompositionGeneration) -> None:
+        generation_object_id = id(generation)
+        current_fields = (
+            generation.schema_version,
+            generation.generation_id,
+            generation.config_sha256,
+        )
+        canonical_generation = constructed_generations.get(generation_object_id)
+        canonical_fields = constructed_fields.get(generation_object_id)
+        if canonical_generation is not None or canonical_fields is not None:
+            if canonical_generation is not generation or canonical_fields != current_fields:
+                raise CompositionContractError(
+                    "CompositionGeneration no longer matches its construction snapshot"
+                )
+            return
+        constructed_generations[generation_object_id] = generation
+        constructed_fields[generation_object_id] = current_fields
+        finalize(generation, constructed_fields.pop, generation_object_id, None)
+
+    def require_generation_construction_snapshot(generation: CompositionGeneration) -> None:
+        generation_object_id = id(generation)
+        current_fields = (
+            generation.schema_version,
+            generation.generation_id,
+            generation.config_sha256,
+        )
+        if (
+            constructed_generations.get(generation_object_id) is not generation
+            or constructed_fields.get(generation_object_id) != current_fields
+        ):
+            raise CompositionContractError(
+                "CompositionGeneration no longer matches its construction snapshot"
+            )
+
+    return record_generation_construction, require_generation_construction_snapshot
+
+
+_record_generation_construction, _require_generation_construction_snapshot = (
+    _build_generation_construction_runtime()
+)
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class CompositionGeneration:
     """Immutable candidate generation for route admission and rollback identity."""
 
@@ -220,6 +267,7 @@ class CompositionGeneration:
             raise CompositionContractError(
                 "config_sha256 must match the canonical route materialization"
             )
+        _record_generation_construction(self)
 
 
 @dataclass(frozen=True, slots=True, init=False, weakref_slot=True)
@@ -245,6 +293,7 @@ def _revalidate_generation_snapshot(generation: CompositionGeneration) -> None:
     """Re-run every nested constructor invariant before consuming a generation."""
     if type(generation) is not CompositionGeneration:
         raise CompositionContractError("generation must be exact CompositionGeneration evidence")
+    _require_generation_construction_snapshot(generation)
     if type(generation.routes) is not tuple or not generation.routes:
         raise CompositionContractError("generation routes must be a non-empty exact tuple")
     for route in generation.routes:
