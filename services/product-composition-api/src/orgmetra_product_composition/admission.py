@@ -246,16 +246,21 @@ def _validate_route_set(
 
         route_authorities = _effective_method_authorities(route)
         for existing_route in admitted_authorities:
-            if route_authorities.isdisjoint(_effective_method_authorities(existing_route)):
-                continue
             if not _route_paths_overlap(route.path_template, existing_route.path_template):
                 continue
-            if (
-                route.path_template != existing_route.path_template
-                and _same_owner_concrete_precedence_is_deterministic(route, existing_route)
-            ):
+
+            existing_authorities = _effective_method_authorities(existing_route)
+            if route.path_template == existing_route.path_template:
+                if route_authorities.isdisjoint(existing_authorities):
+                    continue
+                raise CompositionContractError("method/path authority must have one owner")
+
+            if _same_owner_concrete_precedence_is_deterministic(route, existing_route):
                 continue
-            raise CompositionContractError("method/path authority must have one owner")
+
+            raise CompositionContractError(
+                "path selection must be deterministic and owner-coherent"
+            )
         admitted_authorities.append(route)
 
     return routes
