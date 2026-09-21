@@ -242,6 +242,7 @@ def _evaluate_generation(
     generation: CompositionGeneration,
     observed_owner_releases: Mapping[str, OwnerApiRelease],
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Return canonical route IDs after exact released-owner admission checks."""
     if type(generation) is not CompositionGeneration:
         raise CompositionContractError("generation must be exact CompositionGeneration evidence")
     if type(observed_owner_releases) is not dict:
@@ -273,9 +274,11 @@ def _evaluate_generation(
 
 
 def _build_admission_runtime():
+    """Build closure-private receipt issuance state plus the canonical evaluator."""
     issued_receipts: WeakValueDictionary[int, AdmissionReceipt] = WeakValueDictionary()
 
     def require_canonical_admission_receipt(receipt: AdmissionReceipt) -> None:
+        """Reject a receipt that this process did not issue after exact admission."""
         if issued_receipts.get(id(receipt)) is not receipt:
             raise CompositionContractError("AdmissionReceipt was not canonically issued")
 
