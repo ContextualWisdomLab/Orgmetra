@@ -26,17 +26,18 @@ Two independent gates remain: the shared edge is unreleased, and even a future r
 
 ### Executable product-composition canary
 
-Draft #434 exact authority is `a1b903cabc900b33ac4da36f3781bddc50cf57ee`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with 85 ordinary-forward commits / 14 changed files, all confined to `services/product-composition-api/**`.
+Draft #434 exact authority is `9852fe6bf1b4cddf1b4710d2908cb42019a0ac86`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with 88 ordinary-forward commits / 14 changed files, all confined to `services/product-composition-api/**`.
 
 The canary proves only structural admission invariants:
 
 - exact owner release/OpenAPI/artifact/repository attribution and owner-bound logical upstream;
 - one exact `OwnerApiRelease` per `service_id` per generation;
+- one exact `OwnerApiRelease` per exact OpenAPI Path Item in the current product profile;
 - deterministic configuration digest over canonical route material;
 - invalid per-route and cross-route material rejected before configuration identity;
 - URI dot-segment and repeated path-template-expression rejection;
 - one exact OpenAPI template identity per parameter-name-independent path hierarchy;
-- distinct methods may share the same exact template string when operation ownership is otherwise valid;
+- distinct methods may share the same exact template string only inside the same exact owner release;
 - same-owner concrete-before-template precedence only for the same exact owner release and declared method set;
 - cross-owner concrete/template overlap and ambiguous two-templated overlap fail closed;
 - effective-method authority separate from path matching, with GET/HEAD treated as one selected-resource collision authority while declared methods remain exact contract material;
@@ -49,20 +50,19 @@ Production activation/rollback still needs immutable durable generation/configur
 
 ## Latest executable finding and repair
 
-Fresh standards review found a **support-profile overclaim risk**, not a reason to widen routing. OpenAPI Specification 3.2.0 is protected Orgmetra product truth. OpenAPI Specification 3.2.1 is the current patch-level publication; OAS versioning defines the `major.minor` pair as the feature set and patch releases as corrections/clarifications. Current 3.2.1 interpretation can therefore be cited without silently changing the protected 3.2.0 contract.
+Fresh OpenAPI review found that the previous canary could admit one exact path under two distinct owner releases when their HTTP methods were disjoint. For example, `people_api` could own `GET /v1/people/{person_record_id}` while `job_analysis_api` owned `PUT` on the same exact path. Operation-method disjointness made the old exact-path branch continue before checking owner identity.
 
-The distinction matters because full OpenAPI 3.2 permits a broader path and operation vocabulary than #434 currently admits. Section 4.8.2 permits path segments built from RFC 3986 `pchar` literals and template expressions; Section 4.9.1 includes `TRACE`, `QUERY`, and `additionalOperations`. #434 intentionally uses a narrower product route dialect: restricted ASCII literal segments, whole-segment lower-snake-case template expressions, and exactly `DELETE`, `GET`, `HEAD`, `OPTIONS`, `PATCH`, `POST`, `PUT`.
+That state is not supportable by the current contract. An OpenAPI Path Item contains path-level `$ref`, `summary`, `description`, `servers`, and `parameters` in addition to operations. Path-level servers service all operations and Path Item parameters apply to all operations. The present composition contract does not define or test a cross-owner Path Item merge algorithm, so it cannot prove which released owner supplies those shared semantics. OpenAPI itself does not assign repository or bounded-context ownership; one-owner-per-Path-Item is the narrower Orgmetra fail-closed decision until an explicit released merge/conformance contract exists.
 
 Ordinary-forward repair:
 
-- `7a30ccd000c5e7b5a69e6f872277e7cf8fab2437` — adds executable controls for OpenAPI-valid forms outside the bounded route profile and a documentation-contract RED because the predecessor README did not state that the canary is only a strict product subset;
-- `a1b903cabc900b33ac4da36f3781bddc50cf57ee` — states the protected 3.2.0 product contract, 3.2.1 patch-level reference boundary, exact supported route/method dialect, fail-closed unsupported forms, and released-owner/conformance threshold for future expansion.
+- `ede0b6d602d2160af6c3ae37253f9728ac4b1e08` — adds the regression that cross-owner GET/PUT on one exact path must fail while same-owner disjoint methods remain a positive control;
+- `8b7b059d60bf732e1acc33dc63db2ad8d5cbb52a` — checks exact `OwnerApiRelease` equality before allowing disjoint methods on one exact path;
+- `9852fe6bf1b4cddf1b4710d2908cb42019a0ac86` — documents Path Item shared-field semantics, the fail-closed ownership decision, and the evidence threshold for future broadening.
 
-This repair deliberately does not enable `TRACE`, `QUERY`, arbitrary `additionalOperations`, mixed literal/template path segments, or the complete RFC 3986 `pchar` set without a real released-owner requirement. Framework acceptance alone is not an ownership or commercial-support decision.
+The preceding bounded-profile sequence remains `7a30ccd000c5e7b5a69e6f872277e7cf8fab2437` -> `a1b903cabc900b33ac4da36f3781bddc50cf57ee`. The deterministic path-selection sequence remains `fd7e7c69105fa2850dc30dd43014592f1a753eaa` -> `393cb561a1226529553baa6129378281cfba6f27` -> `a98dd5f7ffd175e2a7b3b5ca61255420f2959f8b`. Path-key identity remains `2b4f2211a2e332058bec31af11474d3937899855` -> `2c7bfcf75ec2d353d52ed86cbcd74dba5ddae3ea` -> `bf90bbfbc2eef88d57fd30286b41a86f483a3fa1`. Later test-only commits aligned stale assertions with the three-layer path model without weakening production admission.
 
-The preceding deterministic path-selection sequence remains `fd7e7c69105fa2850dc30dd43014592f1a753eaa` -> `393cb561a1226529553baa6129378281cfba6f27` -> `a98dd5f7ffd175e2a7b3b5ca61255420f2959f8b`. Path-key identity remains `2b4f2211a2e332058bec31af11474d3937899855` -> `2c7bfcf75ec2d353d52ed86cbcd74dba5ddae3ea` -> `bf90bbfbc2eef88d57fd30286b41a86f483a3fa1`. Later test-only commits aligned stale assertions with the three-layer path model without weakening production admission.
-
-Earlier focused local figures at predecessor `cb32ba828...` are predecessor evidence only; material source/test writes followed. Exact `a1b903ca...` currently has no PR-triggered hosted workflow evidence.
+Earlier focused local figures at predecessor `cb32ba828...` are predecessor evidence only; material source/test writes followed. Exact `9852fe6b...` currently has no PR-triggered hosted workflow evidence.
 
 ## Corrected context map
 
@@ -104,7 +104,7 @@ The protected product label “Orgmetra Gateway” remains the buyer-facing boun
 | Concern | Owner | Composition role | Forbidden behavior |
 |---|---|---|---|
 | Generic network/proxy/TLS/drain | released shared-edge owner | consume supported released capability | copy mutable edge source or reinterpret single-upstream config as product routing |
-| Product route/admission generation | Orgmetra #432 | bind reproducible admitted owner operations | rewrite generation meaning; overclaim full OpenAPI support; same-hierarchy aliases; cross-owner/ambiguous path overlap; split GET/HEAD authority; dot-segment aliases; repeated expressions; split owner release identities |
+| Product route/admission generation | Orgmetra #432 | bind reproducible admitted owner operations | rewrite generation meaning; overclaim full OpenAPI support; split one exact Path Item across owner releases; same-hierarchy aliases; cross-owner/ambiguous path overlap; split GET/HEAD authority; dot-segment aliases; repeated expressions; split owner release identities |
 | Identity issuer/profile | Keyverse | consume released RP verifier/profile | issue credentials or broaden Keyverse with HR claims |
 | Durable subject trust | Keyverse #155 packaged by #158 | preserve released semantics | assume every syntactically valid `sub` is durably bindable |
 | Durable subject-to-Person binding / ACL | Orgmetra #295/#297 | consume/revalidate evidence | mint Person truth in composition |
@@ -124,18 +124,19 @@ The protected product label “Orgmetra Gateway” remains the buyer-facing boun
 
 A future executable `orgmetra_gateway_composition.v1` or equivalent identifies product/composition release provenance, schema/config/generation/activation identity, optional shared-edge release, Keyverse release/profile, Orgmetra identity-ACL version, stable route identity, exact product path and method set, exact owner API/OpenAPI/artifact/release coordinates, owner-bound logical upstream, coarse capability, authoritative tenant/actor/purpose locations, and required/optional criticality.
 
-Configuration digest is computed from canonical semantic projection. A generation identifier cannot be reassigned to a different semantic graph. One owner service maps to one exact owner release per generation. Owner idempotency/replay/concurrency/error/retry semantics are referenced through released owner evidence rather than copied.
+Configuration digest is computed from canonical semantic projection. A generation identifier cannot be reassigned to a different semantic graph. One owner service maps to one exact owner release per generation. One exact OpenAPI Path Item maps to one exact owner release in the current bounded profile. Owner idempotency/replay/concurrency/error/retry semantics are referenced through released owner evidence rather than copied.
 
 Path concerns remain separate:
 
 - **Supported profile:** protected product truth is OpenAPI 3.2.0, while the canary intentionally supports a fail-closed subset of OAS path/method forms.
 - **Path-key identity:** same-hierarchy templates with different placeholder names are one OpenAPI identity and cannot coexist.
+- **Path Item ownership:** distinct methods may reuse one exact path only under the same exact `OwnerApiRelease`; cross-owner Path Item composition requires a future released contract that reconciles path-level shared semantics.
 - **Deterministic path matching:** a concrete path may coexist with its templated counterpart only inside the same exact owner release and same declared method set.
 - **Ambiguity rejection:** overlapping templated paths with no defined winner remain fail-closed.
-- **Operation authority:** after path matching is valid, effective-method collision is evaluated separately; GET/HEAD share one selected-resource collision authority.
+- **Operation authority:** after Path Item ownership and path matching are valid, effective-method collision is evaluated separately; GET/HEAD share one selected-resource collision authority.
 - **Canonical URI/template syntax:** dot segments are rejected rather than normalized and a path cannot repeat one template expression.
 
-A mutable branch, PR SHA, copied schema, floating tag, reachable endpoint, constructor success, self-consistent rewritten graph, split owner release identity, ambiguous path, unsupported method/path form, or receipt-shaped value alone is not route authority.
+A mutable branch, PR SHA, copied schema, floating tag, reachable endpoint, constructor success, self-consistent rewritten graph, split owner release identity, cross-owner exact Path Item, ambiguous path, unsupported method/path form, or receipt-shaped value alone is not route authority.
 
 ## RED -> GREEN evidence map
 
@@ -149,10 +150,11 @@ A mutable branch, PR SHA, copied schema, floating tag, reachable endpoint, const
 | scope/role bypasses purpose/resource auth | #65/domain-owner denial survives E2E | #65 + domain owner + composition |
 | route lacks released owner API/operation | missing/floating/incompatible owner contract or absent operation rejected | #432/#434 + owner conformance |
 | one service has multiple release identities | reject before admission and on use-time revalidation | #432/#434 |
+| one exact Path Item is split across owner releases | reject before configuration identity; broaden only with explicit released path-item merge/conformance evidence | #432/#433/#434 + owner conformance |
 | config digest is caller label | recompute deterministic digest from canonical route material | #434 |
 | generation meaning rewritten | construction identity and use-time graph revalidation reject drift | #432/#434 + activation |
 | canary is presented as full OpenAPI 3.2 support | document/test bounded route profile; broaden only from released-owner evidence | #433/#434 |
-| same hierarchy uses different placeholder names under any methods | reject before hashing; distinct methods may reuse one exact template | #434 + HTTP E2E |
+| same hierarchy uses different placeholder names under any methods | reject before hashing; distinct methods may reuse one exact template only inside one owner release | #434 + HTTP E2E |
 | same-owner concrete/template precedence is rejected | allow only same exact owner release + same method set; prove concrete route wins | #434 + HTTP E2E |
 | concrete/template overlap crosses owner boundary | reject before hashing/admission | #434 + HTTP E2E |
 | overlapping templated paths have no deterministic winner | reject unless a future explicit released contract defines semantics | #434 + HTTP E2E |
@@ -192,7 +194,7 @@ GREEN requires production-equivalent Podman/Colima boundaries, supported Kuberne
 ## Single-writer handoff
 
 - #432 remains the executable product-composition gap owner; #434 is its bounded first slice.
-- #433 owns this Proposed ADR/traceability/doctoring lane. This source is current through the bounded OpenAPI profile finding as well as prior path identity/matching, receipt, owner/upstream, release-coherence, use-time revalidation, generation identity, receipt ordering, GET/HEAD, URI dot-segment, and repeated-expression findings.
+- #433 owns this Proposed ADR/traceability/doctoring lane. This source is current through the one-owner-per-Path-Item finding as well as prior bounded-profile, path identity/matching, receipt, owner/upstream, release-coherence, use-time revalidation, generation identity, receipt ordering, GET/HEAD, URI dot-segment, and repeated-expression findings.
 - #340 remains the Foundation prerequisite/owner; #434 remains stacked on it to avoid a parallel Foundation writer.
 - #51 remains canonical writer for protected ARCHITECTURE/TRD/API/SECURITY/THREAT_MODEL/TEST_STRATEGY/OPERABILITY/TRACEABILITY and manifest reconciliation after architecture admission.
 - #100 remains sole writer for `docs/product-technical-gap-baseline.md`; `API-01` stays Planned while #434 is unprotected and non-deployable.
