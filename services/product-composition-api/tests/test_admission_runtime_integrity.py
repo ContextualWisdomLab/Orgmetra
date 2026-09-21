@@ -70,6 +70,32 @@ def test_admission_revalidates_generation_after_low_level_route_mutation() -> No
         admit_generation(candidate, {"people_api": owner})
 
 
+def test_admission_rejects_post_construction_generation_identity_rewrite() -> None:
+    owner = release()
+    candidate = generation(route(owner))
+
+    object.__setattr__(candidate, "generation_id", "generation_002")
+
+    with pytest.raises(CompositionContractError, match="construction snapshot"):
+        admit_generation(candidate, {"people_api": owner})
+
+
+def test_admission_rejects_self_consistent_post_construction_generation_retarget() -> None:
+    owner = release()
+    selected_route = route(owner)
+    candidate = generation(selected_route)
+
+    object.__setattr__(
+        selected_route,
+        "path_template",
+        "/v1/tenants/{tenant_record_id}/people/{person_record_id}/employment-history",
+    )
+    object.__setattr__(candidate, "config_sha256", configuration_sha256(candidate.routes))
+
+    with pytest.raises(CompositionContractError, match="construction snapshot"):
+        admit_generation(candidate, {"people_api": owner})
+
+
 def test_admission_rejects_low_level_generation_route_shape_mutation() -> None:
     owner = release()
     candidate = generation(route(owner))
