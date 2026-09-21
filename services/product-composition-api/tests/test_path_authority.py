@@ -117,7 +117,7 @@ def test_route_set_rejects_cross_owner_concrete_template_overlap() -> None:
         ),
     )
 
-    with pytest.raises(CompositionContractError, match="method/path authority"):
+    with pytest.raises(CompositionContractError, match="path selection"):
         configuration_sha256(routes)
 
 
