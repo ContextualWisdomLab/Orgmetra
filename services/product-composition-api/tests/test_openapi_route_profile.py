@@ -52,6 +52,20 @@ def test_product_route_profile_rejects_openapi_paths_outside_its_bounded_subset(
         route(path_template=path_template, method="GET")
 
 
+@pytest.mark.parametrize(
+    "path_template",
+    (
+        "/v1/people/{person__record_id}",
+        "/v1/people/{person_record_id_}",
+    ),
+)
+def test_product_route_profile_rejects_noncanonical_snake_case_template_names(
+    path_template: str,
+) -> None:
+    with pytest.raises(CompositionContractError, match="lower snake_case"):
+        route(path_template=path_template, method="GET")
+
+
 @pytest.mark.parametrize("method", ("QUERY", "TRACE"))
 def test_product_route_profile_rejects_openapi_methods_not_admitted_by_orgmetra(
     method: str,
