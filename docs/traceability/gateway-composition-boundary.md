@@ -10,11 +10,15 @@ Related Proposed ADR: `docs/adr/0432-deployable-orgmetra-gateway-composition-bou
 
 Protected `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` documents an Orgmetra Gateway in `ARCHITECTURE.md` and gives it pre-handler Keyverse validation responsibility in `docs/API_CONTRACT.md`. The executable repository does not yet expose one supported deployable composition artifact across independently versioned Orgmetra domain services. This document records design/acceptance traceability only; it does not convert the RED into shipped capability.
 
-Fresh shared-owner evidence on 2026-09-21:
+Fresh shared-owner and identity-owner evidence on 2026-09-21:
 
 - `ContextualWisdomLab/pingora-gateway` protected `main@f8b4c99b8e5d3de79af1ff0c00c0c8fd63b52991` has no published immutable GitHub Release.
 - root PR #1 exact `38db1949354f5721dc0ecfeea395bcf958a64ace` remains Draft and records an unresolved PR-introduced OSV finding (`derivative 2.2.0` / RUSTSEC-2024-0388) plus incomplete exact-head central CodeQL evidence.
-- therefore no mutable branch, PR commit, copied source/config, or floating image is an admissible Orgmetra production gateway dependency.
+- `ContextualWisdomLab/keyverse` protected `main@7d9151cd2da260e118020c938c7358e2ee75d541` also has no published immutable GitHub Release.
+- protected Keyverse deliberately keeps the OIDC relying-party mapper profile closed: one self-pinned audience plus only canonical `role`, `org`, and `workspace` hardcoded claims when mappers are present. Orgmetra must not widen that profile ad hoc with HR-specific tenant/actor claims.
+- protected Orgmetra People and Job Analysis HTTP edges currently expose an injected `TokenAuthenticator`/`AuthenticatedPrincipal` port rather than a released Keyverse verifier/ACL. The principal requires an Orgmetra tenant UUID, opaque actor reference, and explicit Orgmetra operation scopes, so Keyverse identity coordinates require an explicit Orgmetra-owned mapping rather than an implicit claim cast.
+- Keyverse issue #158 owns the missing immutable OIDC relying-party consumer release; an Orgmetra implementation successor must own the downstream ACL/conformance after that release exists.
+- therefore no mutable gateway or identity-provider branch, PR commit, copied source/config, floating image, decoded-only claim set, or guessed identity mapping is an admissible Orgmetra production dependency.
 
 ## Context Map
 
@@ -22,7 +26,8 @@ Fresh shared-owner evidence on 2026-09-21:
 flowchart LR
     client[Orgmetra workspaces / API clients]
     gateway[Shared released edge runtime\n+ Orgmetra composition contract]
-    keyverse[Keyverse]
+    keyverse[Keyverse released OIDC contract]
+    identity_acl[Orgmetra identity ACL]
     people[people_core]
     org[organization_core]
     jobs[job_architecture]
@@ -32,23 +37,26 @@ flowchart LR
     validation[workforce_validation]
 
     client --> gateway
-    gateway -. authenticate against released identity contract .-> keyverse
-    gateway --> people
-    gateway --> org
-    gateway --> jobs
-    gateway --> talent
-    gateway --> perf
-    gateway --> assess
-    gateway --> validation
+    gateway -. verify released identity contract .-> keyverse
+    gateway --> identity_acl
+    identity_acl --> people
+    identity_acl --> org
+    identity_acl --> jobs
+    identity_acl --> talent
+    identity_acl --> perf
+    identity_acl --> assess
+    identity_acl --> validation
 ```
 
-The gateway is an application/edge adapter, not a bounded context for HR truth. Each owner service retains its API/domain/persistence invariants and re-authorizes purpose/resource/domain access.
+The gateway is an application/edge adapter, not a bounded context for HR truth. Keyverse remains issuer/identity authority. Orgmetra owns the ACL that maps verified Keyverse identity coordinates into Orgmetra tenant/actor/operation-capability coordinates. Each domain owner retains its API/domain/persistence invariants and re-authorizes purpose/resource/domain access.
 
 ## Ownership matrix
 
-| Concern | Owner | Gateway role | Forbidden gateway behavior |
+| Concern | Owner | Gateway / ACL role | Forbidden behavior |
 |---|---|---|---|
-| Identity provider, credentials, token issuance | Keyverse | Validate product-facing released OIDC contract | Store credentials/passkeys; become identity authority |
+| Identity provider, credentials, token issuance, canonical OIDC profile | Keyverse | Validate released OIDC contract | Store credentials/passkeys; become a second identity issuer |
+| Keyverse `sub`/`org`/`workspace` to Orgmetra actor/tenant binding | Orgmetra identity ACL | Produce explicit authenticated Orgmetra principal coordinates after cryptographic verification | Add ad hoc Keyverse HR claims; implicit UUID cast; trust decoded-only claims |
+| Orgmetra operation capability mapping | Orgmetra identity ACL + registered Keyverse client contract | Map released scopes to explicit `orgmetra.*` capabilities | Treat `role` or `scope` as self-authorizing HR purpose |
 | Person/Employment/Assignment | People | Route and preserve authenticated context | Read/write People tables; decide HR invariants |
 | Organization/Position | Organization | Route and preserve context | Read/write Organization tables; synthesize capacity truth |
 | Job/FJA/KSAO | Job Architecture | Route and preserve context | Copy job schema or ontology truth |
@@ -70,6 +78,8 @@ The implementation artifact must preserve at least the following semantic coordi
 | `orgmetra_release` + source identity | Binds product behavior to released product evidence | Mutable/default-branch-only identity is non-production |
 | `composition_digest` | Identifies exact route/policy generation | Runtime-reported digest equals deployment evidence |
 | shared gateway owner/release/contract/artifact digest | Admits a reusable edge runtime | Missing/unreleased/floating identity fails closed |
+| Keyverse release/contract/profile identity | Binds authentication to released issuer semantics | Missing/unreleased/incompatible identity contract fails closed |
+| Orgmetra identity-ACL version/digest | Makes identity projection reviewable and replayable | No implicit claim-to-HR mapping outside the ACL |
 | `route_id` | Stable operational/audit coordinate | Unique within one generation |
 | path + method set | Declares exposed operation | Must match compatible released owner OpenAPI |
 | owner service + owner API release + OpenAPI digest | Keeps route tied to domain owner | Digest/version mismatch prevents admission |
@@ -88,10 +98,14 @@ The implementation artifact must preserve at least the following semantic coordi
 | Architecture advertises gateway but no deployable composition exists | one supported local + Kubernetes composition artifact bound to immutable identities | #432 implementation successor |
 | shared gateway has no release | immutable shared-owner version/tag/artifact + SBOM/provenance/reproducibility/rollback | `pingora-gateway` owner stack |
 | shared runtime exact security RED | owner root-cause fix and exact-head security evidence; no advisory suppression | `pingora-gateway` owner stack |
+| Keyverse has no immutable RP consumer release | released OIDC/profile contract + immutable artifact + conformance fixtures + SBOM/provenance/rollback | Keyverse #158 |
+| Keyverse canonical identity claims do not directly equal Orgmetra principal coordinates | explicit versioned Orgmetra ACL maps verified `sub` to opaque actor, `org`/`workspace` to tenant/workspace binding, and released scopes to allowed `orgmetra.*` capabilities | #432 implementation successor / identity ACL |
+| decoded or unverified Keyverse claims are trusted | cryptographic issuer/audience/signature/algorithm/time/JWKS verification before ACL evaluation | Keyverse #158 + Orgmetra conformance |
+| unknown/stale JWKS key races refresh | deterministic fail closed or bounded standards-conformant refresh; never unsigned/stale-unbounded acceptance | Keyverse #158 + gateway security test |
 | route exposed without released owner API | startup/admission test rejects missing/floating/incompatible owner contract | #432 implementation successor |
 | OpenAPI digest differs from admitted contract | route remains unavailable; readiness evidence names safe route/contract coordinate | #432 implementation successor |
-| token issuer/audience/signature/expiry/subject/tenant/actor invalid | request rejected before owner call | gateway security contract |
-| token/path/query/header tenant/actor/purpose contradict | deterministic fail-closed rejection; no source precedence guess | gateway + owner contract |
+| token issuer/audience/signature/expiry/subject/tenant/actor invalid | request rejected before owner call | gateway security contract + identity ACL |
+| token/path/query/header tenant/actor/purpose contradict | deterministic fail-closed rejection; no source precedence guess | gateway + identity ACL + owner contract |
 | gateway coarse scope passes but owner purpose/resource rule denies | owner denial preserved; no edge override | gateway E2E + domain owner test |
 | gateway mints/changes mutation idempotency coordinate | negative test proves exact client key reaches owner and gateway stores no replay fact | gateway E2E + owner API |
 | same key but owner semantic digest differs | owner conflict preserved | owner API + gateway pass-through |
@@ -105,6 +119,17 @@ The implementation artifact must preserve at least the following semantic coordi
 | rollback routes new contract to old owner silently | immutable prior generation activation + compatibility revalidation | recovery rehearsal |
 | gateway can reach peer PostgreSQL directly | network/config and code test prohibit cross-service SQL | security/integration test |
 | benchmark measures router stub | k6/E2E reaches gateway -> owner HTTP -> PostgreSQL with exact deployment evidence | performance acceptance |
+
+## Identity projection invariants
+
+The Keyverse/Orgmetra boundary is an ACL, not a Shared Kernel and not a reason to broaden the Keyverse claim surface.
+
+- verified Keyverse `sub` becomes a namespaced opaque Orgmetra actor reference; it is not a Person record identifier;
+- Keyverse `org` and `workspace` evidence is resolved through an explicit Orgmetra mapping/version into the applicable Orgmetra tenant/workspace coordinate; a text claim is never cast directly to `tenant_record_id`;
+- only explicitly admitted Keyverse scope semantics can map to `orgmetra.*` operation capabilities;
+- Keyverse `role` can contribute identity/authorization evidence but cannot create an HR business purpose, employment decision, or domain permission by itself;
+- caller-controlled `X-Tenant-Reference`, `X-Actor-Reference`, path or query values must agree with the authenticated/ACL-derived coordinates when that route's contract requires them; disagreement fails closed; and
+- an unavailable/incompatible Keyverse release, verifier, JWKS set, or ACL mapping is authentication/admission failure, never anonymous fallback.
 
 ## Retry and failure interleavings
 
@@ -123,7 +148,8 @@ Additional interleavings:
 - required owner contract changes between config build and activation: digest mismatch blocks activation;
 - optional owner becomes unavailable after activation: route is explicitly unavailable while required-route readiness semantics remain deterministic;
 - request cancellation races owner response: cleanup happens once, and a late owner completion cannot be reported as client success after cancellation;
-- token/JWKS refresh races a request: a failed/unknown key does not downgrade to unsigned or stale-unbounded acceptance.
+- token/JWKS refresh races a request: a failed/unknown key does not downgrade to unsigned or stale-unbounded acceptance; and
+- a Keyverse identity-to-tenant ACL version changes while a request is in flight: one request is evaluated against one exact verified token + ACL version and cannot mix old/new projection coordinates.
 
 ## Performance evidence
 
@@ -134,12 +160,12 @@ The measured ordinary buyer path is:
 For paths designated applicable to the commercial latency target:
 
 - target: p95 <= 20 ms;
-- record sample size, concurrency, duration, deployment identity, dataset/right-to-use, PostgreSQL/schema/index/RLS state, auth/audit state, gateway release/artifact digest, composition digest, owner API release/OpenAPI digest, hardware/runtime, and observation timestamps;
+- record sample size, concurrency, duration, deployment identity, dataset/right-to-use, PostgreSQL/schema/index/RLS state, auth/audit state, Keyverse release/profile and Orgmetra ACL identity, gateway release/artifact digest, composition digest, owner API release/OpenAPI digest, hardware/runtime, and observation timestamps;
 - report gateway overhead separately from owner execution;
 - report connection-establishment/cold and steady-state windows when they differ materially;
 - do not discard slow requests, shrink the sample to make the target pass, disable auth/audit, or substitute an in-memory owner/router.
 
-A failed target triggers profile evidence across DNS/connect/TLS or service-connect, gateway queueing, auth validation, serialization, upstream pool acquisition, owner authorization/query/transaction, forwarding, and cleanup before any runtime/language replacement.
+A failed target triggers profile evidence across DNS/connect/TLS or service-connect, gateway queueing, auth/JWKS validation, identity ACL evaluation, serialization, upstream pool acquisition, owner authorization/query/transaction, forwarding, and cleanup before any runtime/language replacement.
 
 ## Deployment and recovery evidence
 
@@ -148,10 +174,11 @@ GREEN requires both supported development and production-oriented composition:
 - Podman/Colima local composition with production-equivalent service boundaries;
 - supported Kubernetes manifests/packaging with immutable image/artifact identities;
 - PostgreSQL with owner schemas/roles rather than cross-schema gateway credentials;
-- separate liveness, config-validity, route-admission, and product-readiness signals;
+- immutable released Keyverse identity/profile coordinates and a versioned Orgmetra identity ACL alongside the gateway composition generation;
+- separate liveness, config-validity, identity-contract admission, route-admission, and product-readiness signals;
 - bounded graceful shutdown and in-flight drain;
 - immutable generation activation/rollback;
-- rollback rehearsal proving the restored generation still admits exactly the compatible owner contracts it claims; and
+- rollback rehearsal proving the restored generation still admits exactly the compatible identity and owner contracts it claims; and
 - logs/metrics/traces that avoid raw credentials, restricted-HR payloads, stack traces in client responses, and unbounded tenant/person labels.
 
 ## Canonical single-writer handoff
@@ -161,6 +188,7 @@ This PR must not edit the existing canonical surfaces owned elsewhere:
 - #51: `ARCHITECTURE.md`, TRD, API_CONTRACT, SECURITY, THREAT_MODEL, TEST_STRATEGY, OPERABILITY, TRACEABILITY and deterministic manifest reconciliation;
 - #100: `docs/product-technical-gap-baseline.md`;
 - #427: Workforce Validation HTTP semantics;
+- Keyverse #158: immutable OIDC relying-party consumer release; and
 - domain-owner PRs: owner OpenAPI/domain contract truth.
 
-After ADR 0432 is protected, #51 may reconcile the selected target architecture into canonical docs. #100 may move `API-01` only when protected/released evidence justifies a state change. A Proposed/Draft ADR is not shipment.
+After ADR 0432 is protected, #51 may reconcile the selected target architecture into canonical docs. #100 may move `API-01` only when protected/released evidence justifies a state change. A Proposed/Draft ADR is not shipment. Keyverse #158 must reach a released owner contract before Orgmetra claims production Keyverse authentication conformance.
