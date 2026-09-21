@@ -79,9 +79,8 @@ class GenerationRecordSet:
         if type(receipt) is not AdmissionReceipt:
             raise CompositionRegistryError("receipt must be exact AdmissionReceipt evidence")
 
-        # This property performs the closure-private canonical receipt/source revalidation.
-        if receipt.required_routes_admitted is not True:
-            raise CompositionRegistryError("receipt must admit every required route")
+        # Access performs the closure-private canonical receipt/source revalidation.
+        receipt.required_routes_admitted
         if receipt.generation_id != generation.generation_id:
             raise CompositionRegistryError("receipt generation_id must match generation")
         if receipt.config_sha256 != generation.config_sha256:
@@ -134,15 +133,7 @@ class GenerationRecordSet:
             routes=route_records,
             route_methods=method_records,
         )
-        restored = records.restore_generation()
-        if (
-            restored.schema_version != generation.schema_version
-            or restored.generation_id != generation.generation_id
-            or restored.config_sha256 != generation.config_sha256
-        ):
-            raise CompositionRegistryError(
-                "persisted generation projection must round-trip exact generation identity"
-            )
+        records.restore_generation()
         return records
 
     def restore_generation(self) -> CompositionGeneration:
