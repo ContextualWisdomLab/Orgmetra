@@ -70,3 +70,59 @@ def test_generation_rejects_nested_drift_at_construction_boundary() -> None:
             config_sha256=valid_digest,
             routes=(selected_route,),
         )
+
+
+def test_generation_id_allows_concurrent_views_of_the_same_semantic_generation() -> None:
+    selected_route = route(release())
+    routes = (selected_route,)
+    digest = configuration_sha256(routes)
+
+    first = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id="generation_lineage_probe",
+        config_sha256=digest,
+        routes=routes,
+    )
+    second = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id="generation_lineage_probe",
+        config_sha256=digest,
+        routes=routes,
+    )
+
+    assert first.config_sha256 == second.config_sha256 == digest
+
+
+def test_generation_id_rejects_concurrent_semantic_reuse() -> None:
+    owner = release()
+    first_route = route(owner)
+    second_route = CompositionRoute(
+        route_id="people_summary",
+        path_template="/v1/tenants/{tenant_record_id}/people",
+        methods=("GET",),
+        owner_release=owner,
+        logical_upstream="service://people-api",
+        required=True,
+    )
+    first_routes = (first_route,)
+    second_routes = (second_route,)
+    first_digest = configuration_sha256(first_routes)
+    second_digest = configuration_sha256(second_routes)
+    assert first_digest != second_digest
+
+    first = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id="generation_lineage_conflict",
+        config_sha256=first_digest,
+        routes=first_routes,
+    )
+
+    with pytest.raises(CompositionContractError, match="generation_id.*different configuration"):
+        CompositionGeneration(
+            schema_version="orgmetra_gateway_composition.v1",
+            generation_id="generation_lineage_conflict",
+            config_sha256=second_digest,
+            routes=second_routes,
+        )
+
+    assert first.config_sha256 == first_digest
