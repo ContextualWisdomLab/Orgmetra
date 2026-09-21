@@ -2,7 +2,7 @@
 
 Verification date: 2026-09-21
 
-Scope: primary standards and authoritative specifications used by ADR 0432. This file records what each source supports and what it does **not** prove for Orgmetra. It is not evidence that a gateway implementation, owner API, shared edge runtime, or commercial latency target has passed.
+Scope: primary standards and authoritative specifications used by ADR 0432. This file records what each source supports and what it does **not** prove for Orgmetra. It is not evidence that a gateway implementation, owner API, shared edge runtime, identity adapter, or commercial latency target has passed.
 
 ## Source-to-decision traceability
 
@@ -15,14 +15,16 @@ The OpenID Foundation approved the second errata set in December 2023. OpenID Co
 Use in ADR 0432:
 
 - Keyverse remains the identity provider;
-- the gateway may validate the product-facing OIDC bearer token but does not become credential or identity authority; and
+- the gateway may validate the product-facing OIDC bearer token but does not become credential or identity authority;
+- verified issuer/subject/audience and claim coordinates still require an explicit Orgmetra ACL before they become Orgmetra tenant/actor/operation-capability coordinates; and
 - downstream domain authorization remains separate from authentication and coarse scope checks.
 
 Not established by this source:
 
 - that Orgmetra's current Keyverse integration is conformant;
+- that a Keyverse `org`, `workspace`, `role`, or `sub` value can be cast directly into an Orgmetra HRIS identifier;
 - that forwarding any particular token/context representation between gateway and owner services is safe; or
-- that a shared gateway release exists.
+- that a Keyverse or shared-gateway release exists.
 
 **Lodderstedt, T., Bradley, J., Labunets, A., & Fett, D. (2025). _Best current practice for OAuth 2.0 security_ (BCP 240, RFC 9700). RFC Editor. https://www.rfc-editor.org/rfc/rfc9700.html**
 
@@ -31,12 +33,13 @@ RFC 9700 is the IETF Best Current Practice for OAuth 2.0 security as of this ver
 Use in ADR 0432:
 
 - bearer-token handling at the product edge is a security boundary, not generic header forwarding;
-- redirect/browser behavior, if introduced, must follow explicit secure flow rules instead of proxy defaults; and
-- authentication material must fail closed rather than fall back to weaker legacy handling.
+- redirect/browser behavior, if introduced, must follow explicit secure flow rules instead of proxy defaults;
+- authentication material and key-rotation failures must fail closed rather than fall back to weaker legacy handling; and
+- an identity backend outage is not permission for anonymous or decoded-only fallback.
 
 Not established by this source:
 
-- Orgmetra-specific tenant, actor, business-purpose, employment-policy, or resource authorization semantics.
+- Orgmetra-specific tenant, actor, business-purpose, employment-policy, resource authorization, or Keyverse-to-Orgmetra ACL semantics.
 
 ### HTTP semantics, retries, and errors
 
@@ -93,13 +96,17 @@ On 2026-09-21:
 - Orgmetra protected authority was `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f`;
 - protected `ARCHITECTURE.md` documented an Orgmetra Gateway;
 - protected `docs/API_CONTRACT.md` documented pre-handler Keyverse OIDC validation at that gateway;
+- protected People/Job Analysis service code exposed an injected `TokenAuthenticator` and `AuthenticatedPrincipal` contract, where the principal carries an Orgmetra tenant UUID, opaque actor reference, and explicit `orgmetra.*` operation scopes; no released Keyverse verifier/ACL implementation was present in that protected runtime path;
 - the executable repository still lacked one supported deployable product composition boundary;
 - `ContextualWisdomLab/pingora-gateway` protected authority was `main@f8b4c99b8e5d3de79af1ff0c00c0c8fd63b52991`;
-- its published GitHub Release inventory was empty; and
-- root PR #1 exact `38db1949354f5721dc0ecfeea395bcf958a64ace` remained Draft and recorded a PR-introduced `derivative 2.2.0` / RUSTSEC-2024-0388 supplier-admission RED plus incomplete current-head central CodeQL evidence.
+- its published GitHub Release inventory was empty;
+- root PR #1 exact `38db1949354f5721dc0ecfeea395bcf958a64ace` remained Draft and recorded a PR-introduced `derivative 2.2.0` / RUSTSEC-2024-0388 supplier-admission RED plus incomplete current-head central CodeQL evidence;
+- `ContextualWisdomLab/keyverse` protected authority was `main@7d9151cd2da260e118020c938c7358e2ee75d541` and its published GitHub Release inventory was empty;
+- protected Keyverse constrained the OIDC relying-party mapper profile to one self-pinned audience plus optional canonical hardcoded `role`, `org`, and `workspace` claims rather than Orgmetra-specific HR claims; and
+- Keyverse #158 was opened as the owner path for an immutable domain-neutral OIDC relying-party consumer release, while Orgmetra retains responsibility for its explicit Keyverse-to-Orgmetra identity ACL and downstream HR authorization.
 
-Those repository facts are why ADR 0432 can select a **target** shared-owner architecture while still requiring production admission to fail closed today.
+Those repository facts are why ADR 0432 can select a **target** shared-owner architecture while still requiring both transport-runtime admission and identity-contract admission to fail closed today. They also prevent a shortcut in which Orgmetra broadens Keyverse claims merely to manufacture `tenant_record_id` or trusts mutable issuer configuration as production authority.
 
 ## Evidence discipline
 
-A standards citation is not GREEN implementation evidence. Commercial acceptance still requires exact protected/released identities, current-head conformance and security tests, fault injection, deployment/recovery evidence, and realistic k6/E2E measurements against real deployable service boundaries. Synthetic fixtures may establish mechanism behavior but cannot by themselves establish buyer-path availability, latency, privacy, or scientific correctness.
+A standards citation is not GREEN implementation evidence. Commercial acceptance still requires exact protected/released identities, current-head conformance and security tests, cryptographic identity verification, explicit ACL projection tests, fault injection, deployment/recovery evidence, and realistic k6/E2E measurements against real deployable service boundaries. Synthetic fixtures may establish mechanism behavior but cannot by themselves establish buyer-path availability, latency, privacy, identity conformance, or scientific correctness.
