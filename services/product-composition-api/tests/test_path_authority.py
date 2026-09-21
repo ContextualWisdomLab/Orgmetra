@@ -121,11 +121,46 @@ def test_route_set_rejects_cross_owner_concrete_template_overlap() -> None:
         configuration_sha256(routes)
 
 
+def test_route_set_rejects_cross_owner_concrete_template_overlap_with_disjoint_methods() -> None:
+    routes = (
+        route("people_current", "/v1/people/current", "GET"),
+        route(
+            "job_people_update",
+            "/v1/people/{person_record_id}",
+            "PUT",
+            service_id="job_analysis_api",
+        ),
+    )
+
+    with pytest.raises(CompositionContractError, match="path selection"):
+        configuration_sha256(routes)
+
+
+def test_route_set_rejects_same_owner_concrete_template_with_different_methods() -> None:
+    routes = (
+        route("people_current", "/v1/people/current", "GET"),
+        route("people_update", "/v1/people/{person_record_id}", "PUT"),
+    )
+
+    with pytest.raises(CompositionContractError, match="path selection"):
+        configuration_sha256(routes)
+
+
 def test_route_set_rejects_same_owner_ambiguous_templated_overlap() -> None:
     routes = (
         route("people_current", "/v1/{collection}/current", "GET"),
         route("people_read", "/v1/people/{person_record_id}", "GET"),
     )
 
-    with pytest.raises(CompositionContractError, match="method/path authority"):
+    with pytest.raises(CompositionContractError, match="path selection"):
+        configuration_sha256(routes)
+
+
+def test_route_set_rejects_ambiguous_templated_overlap_with_disjoint_methods() -> None:
+    routes = (
+        route("people_current", "/v1/{collection}/current", "GET"),
+        route("people_update", "/v1/people/{person_record_id}", "PUT"),
+    )
+
+    with pytest.raises(CompositionContractError, match="path selection"):
         configuration_sha256(routes)
