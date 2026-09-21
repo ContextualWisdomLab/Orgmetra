@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from orgmetra_product_composition import CompositionRoute, OwnerApiRelease
+import pytest
+
+from orgmetra_product_composition import (
+    CompositionContractError,
+    CompositionRoute,
+    OwnerApiRelease,
+)
 
 A = "a" * 64
 B = "b" * 64
@@ -27,3 +33,14 @@ def test_maximum_service_identifier_remains_routable_through_logical_upstream() 
 
     assert selected_route.owner_release.service_id == service_id
     assert selected_route.logical_upstream == "service://" + service_id
+
+
+def test_service_identifier_beyond_contract_bound_remains_rejected() -> None:
+    with pytest.raises(CompositionContractError, match="service_id"):
+        OwnerApiRelease(
+            service_id="s" * 65,
+            release_version="v1.2.3",
+            openapi_sha256=A,
+            artifact_sha256=B,
+            release_locator="https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.3",
+        )
