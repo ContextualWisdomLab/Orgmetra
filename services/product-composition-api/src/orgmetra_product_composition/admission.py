@@ -125,7 +125,9 @@ class CompositionRoute:
     def __post_init__(self) -> None:
         object.__setattr__(self, "route_id", _identifier("route_id", self.route_id))
         path = _exact_text("path_template", self.path_template)
-        if _ROUTE_PATH.fullmatch(path) is None or ".." in path:
+        if _ROUTE_PATH.fullmatch(path) is None or any(
+            segment in {".", ".."} for segment in path.split("/")
+        ):
             raise CompositionContractError("path_template must be a canonical versioned API path")
         object.__setattr__(self, "path_template", path)
         if type(self.methods) is not tuple or not self.methods:
