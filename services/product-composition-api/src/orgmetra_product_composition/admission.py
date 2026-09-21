@@ -410,18 +410,30 @@ def _build_admission_runtime():
         int,
         tuple[str, str, tuple[str, ...], tuple[str, ...]],
     ] = {}
+    issued_generation_leases: dict[int, CompositionGeneration] = {}
+
+    def discard_admission_receipt(receipt_id: int) -> None:
+        issued_fields.pop(receipt_id, None)
+        issued_generation_leases.pop(receipt_id, None)
 
     def require_canonical_admission_receipt(receipt: AdmissionReceipt) -> None:
         """Reject unissued or post-issuance-mutated receipt evidence."""
         receipt_id = id(receipt)
         canonical_fields = issued_fields.get(receipt_id)
+        leased_generation = issued_generation_leases.get(receipt_id)
         current_fields = (
             receipt.generation_id,
             receipt.config_sha256,
             receipt.admitted_route_ids,
             receipt.unavailable_optional_route_ids,
         )
-        if issued_receipts.get(receipt_id) is not receipt or canonical_fields != current_fields:
+        if (
+            issued_receipts.get(receipt_id) is not receipt
+            or canonical_fields != current_fields
+            or leased_generation is None
+            or leased_generation.generation_id != receipt.generation_id
+            or leased_generation.config_sha256 != receipt.config_sha256
+        ):
             raise CompositionContractError("AdmissionReceipt was not canonically issued")
 
     def admit_generation(
@@ -449,7 +461,8 @@ def _build_admission_runtime():
             admitted,
             optional_unavailable,
         )
-        finalize(receipt, issued_fields.pop, receipt_id, None)
+        issued_generation_leases[receipt_id] = generation
+        finalize(receipt, discard_admission_receipt, receipt_id)
         return receipt
 
     return require_canonical_admission_receipt, admit_generation
