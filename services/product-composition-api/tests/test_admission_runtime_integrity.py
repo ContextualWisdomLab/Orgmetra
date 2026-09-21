@@ -46,6 +46,19 @@ def generation(selected_route: CompositionRoute) -> CompositionGeneration:
     )
 
 
+def test_route_binds_logical_upstream_to_owner_service_identity() -> None:
+    owner = release()
+    with pytest.raises(CompositionContractError, match="owner service"):
+        CompositionRoute(
+            route_id="people_history",
+            path_template="/v1/tenants/{tenant_record_id}/people/{person_record_id}",
+            methods=("GET",),
+            owner_release=owner,
+            logical_upstream="service://job-analysis-api",
+            required=True,
+        )
+
+
 def test_admission_revalidates_generation_after_low_level_route_mutation() -> None:
     owner = release()
     selected_route = route(owner)
@@ -54,6 +67,15 @@ def test_admission_revalidates_generation_after_low_level_route_mutation() -> No
     object.__setattr__(selected_route, "path_template", "/v1/jobs/{job_id}")
 
     with pytest.raises(CompositionContractError, match="config_sha256"):
+        admit_generation(candidate, {"people_api": owner})
+
+
+def test_admission_rejects_low_level_generation_route_shape_mutation() -> None:
+    owner = release()
+    candidate = generation(route(owner))
+    object.__setattr__(candidate, "routes", (object(),))
+
+    with pytest.raises(CompositionContractError, match="exact CompositionRoute"):
         admit_generation(candidate, {"people_api": owner})
 
 
