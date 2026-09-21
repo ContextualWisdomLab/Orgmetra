@@ -11,6 +11,7 @@ import hashlib
 import json
 import re
 from typing import Mapping
+from weakref import WeakValueDictionary
 
 _CONTRACT_SCHEMA = "orgmetra_gateway_composition.v1"
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
@@ -218,31 +219,29 @@ class CompositionGeneration:
             )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False, weakref_slot=True)
 class AdmissionReceipt:
-    """Structural route-admission result; never authorization or product-ready evidence."""
+    """Canonically issued structural admission evidence, never product authorization."""
 
     generation_id: str
     config_sha256: str
     admitted_route_ids: tuple[str, ...]
     unavailable_optional_route_ids: tuple[str, ...]
 
+    def __new__(cls, *args: object, **kwargs: object) -> "AdmissionReceipt":
+        raise CompositionContractError("AdmissionReceipt is issued only by admit_generation")
+
     @property
     def required_routes_admitted(self) -> bool:
-        """A returned receipt means every configured required route matched exactly."""
+        """Prove this exact receipt came from canonical required-route admission."""
+        _require_canonical_admission_receipt(self)
         return True
 
 
-def admit_generation(
+def _evaluate_generation(
     generation: CompositionGeneration,
     observed_owner_releases: Mapping[str, OwnerApiRelease],
-) -> AdmissionReceipt:
-    """Admit routes only when observed owner releases exactly match configured evidence.
-
-    Optional routes may remain unavailable without invalidating required-route admission.
-    A required missing or mismatched owner release fails closed.
-    """
-
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
     if type(generation) is not CompositionGeneration:
         raise CompositionContractError("generation must be exact CompositionGeneration evidence")
     if type(observed_owner_releases) is not dict:
@@ -270,9 +269,37 @@ def admit_generation(
             continue
         admitted.append(route.route_id)
 
-    return AdmissionReceipt(
-        generation_id=generation.generation_id,
-        config_sha256=generation.config_sha256,
-        admitted_route_ids=tuple(admitted),
-        unavailable_optional_route_ids=tuple(optional_unavailable),
-    )
+    return tuple(admitted), tuple(optional_unavailable)
+
+
+def _build_admission_runtime():
+    issued_receipts: WeakValueDictionary[int, AdmissionReceipt] = WeakValueDictionary()
+
+    def require_canonical_admission_receipt(receipt: AdmissionReceipt) -> None:
+        if issued_receipts.get(id(receipt)) is not receipt:
+            raise CompositionContractError("AdmissionReceipt was not canonically issued")
+
+    def admit_generation(
+        generation: CompositionGeneration,
+        observed_owner_releases: Mapping[str, OwnerApiRelease],
+    ) -> AdmissionReceipt:
+        """Admit exact owner releases and issue one structural result for this process.
+
+        Optional routes may remain unavailable without invalidating required-route admission.
+        A required missing or mismatched owner release fails closed. The returned receipt is
+        structural evidence only and is neither HR authorization nor buyer-readiness evidence.
+        """
+
+        admitted, optional_unavailable = _evaluate_generation(generation, observed_owner_releases)
+        receipt = object.__new__(AdmissionReceipt)
+        object.__setattr__(receipt, "generation_id", generation.generation_id)
+        object.__setattr__(receipt, "config_sha256", generation.config_sha256)
+        object.__setattr__(receipt, "admitted_route_ids", admitted)
+        object.__setattr__(receipt, "unavailable_optional_route_ids", optional_unavailable)
+        issued_receipts[id(receipt)] = receipt
+        return receipt
+
+    return require_canonical_admission_receipt, admit_generation
+
+
+_require_canonical_admission_receipt, admit_generation = _build_admission_runtime()
