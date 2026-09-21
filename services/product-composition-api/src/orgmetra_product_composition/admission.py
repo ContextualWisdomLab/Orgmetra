@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import re
+from threading import RLock
 from typing import Mapping
 from weakref import WeakValueDictionary, finalize
 
@@ -241,6 +242,20 @@ def _build_generation_construction_runtime():
     """Build process-local construction snapshots for generation identity integrity."""
     constructed_generations: WeakValueDictionary[int, CompositionGeneration] = WeakValueDictionary()
     constructed_fields: dict[int, tuple[str, str, str]] = {}
+    generation_config_by_id: dict[str, str] = {}
+    live_generation_objects: dict[str, set[int]] = {}
+    state_lock = RLock()
+
+    def discard_generation_construction(generation_object_id: int, generation_id: str) -> None:
+        with state_lock:
+            constructed_fields.pop(generation_object_id, None)
+            live_objects = live_generation_objects.get(generation_id)
+            if live_objects is None:
+                return
+            live_objects.discard(generation_object_id)
+            if not live_objects:
+                live_generation_objects.pop(generation_id, None)
+                generation_config_by_id.pop(generation_id, None)
 
     def record_generation_construction(generation: CompositionGeneration) -> None:
         generation_object_id = id(generation)
@@ -249,17 +264,34 @@ def _build_generation_construction_runtime():
             generation.generation_id,
             generation.config_sha256,
         )
-        canonical_generation = constructed_generations.get(generation_object_id)
-        canonical_fields = constructed_fields.get(generation_object_id)
-        if canonical_generation is not None or canonical_fields is not None:
-            if canonical_generation is not generation or canonical_fields != current_fields:
+        with state_lock:
+            canonical_generation = constructed_generations.get(generation_object_id)
+            canonical_fields = constructed_fields.get(generation_object_id)
+            if canonical_generation is not None or canonical_fields is not None:
+                if canonical_generation is not generation or canonical_fields != current_fields:
+                    raise CompositionContractError(
+                        "CompositionGeneration no longer matches its construction snapshot"
+                    )
+                return
+
+            generation_config = generation_config_by_id.get(generation.generation_id)
+            if generation_config is not None and generation_config != generation.config_sha256:
                 raise CompositionContractError(
-                    "CompositionGeneration no longer matches its construction snapshot"
+                    "generation_id is already bound to a different configuration"
                 )
-            return
-        constructed_generations[generation_object_id] = generation
-        constructed_fields[generation_object_id] = current_fields
-        finalize(generation, constructed_fields.pop, generation_object_id, None)
+
+            constructed_generations[generation_object_id] = generation
+            constructed_fields[generation_object_id] = current_fields
+            generation_config_by_id[generation.generation_id] = generation.config_sha256
+            live_generation_objects.setdefault(generation.generation_id, set()).add(
+                generation_object_id
+            )
+            finalize(
+                generation,
+                discard_generation_construction,
+                generation_object_id,
+                generation.generation_id,
+            )
 
     def require_generation_construction_snapshot(generation: CompositionGeneration) -> None:
         generation_object_id = id(generation)
@@ -268,13 +300,18 @@ def _build_generation_construction_runtime():
             generation.generation_id,
             generation.config_sha256,
         )
-        if (
-            constructed_generations.get(generation_object_id) is not generation
-            or constructed_fields.get(generation_object_id) != current_fields
-        ):
-            raise CompositionContractError(
-                "CompositionGeneration no longer matches its construction snapshot"
-            )
+        with state_lock:
+            if (
+                constructed_generations.get(generation_object_id) is not generation
+                or constructed_fields.get(generation_object_id) != current_fields
+                or generation_config_by_id.get(generation.generation_id)
+                != generation.config_sha256
+                or generation_object_id
+                not in live_generation_objects.get(generation.generation_id, set())
+            ):
+                raise CompositionContractError(
+                    "CompositionGeneration no longer matches its construction snapshot"
+                )
 
     return record_generation_construction, require_generation_construction_snapshot
 
