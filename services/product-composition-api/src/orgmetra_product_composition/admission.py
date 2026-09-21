@@ -88,11 +88,40 @@ def _path_template_shape(path: str) -> tuple[str, ...]:
     )
 
 
+def _is_concrete_path(path: str) -> bool:
+    """Return whether OpenAPI selects this path before templated counterparts."""
+    return all(
+        _PATH_PARAMETER.fullmatch(segment) is None
+        for segment in path.strip("/").split("/")
+    )
+
+
 def _method_authority_key(method: str) -> str:
     """Collapse GET/HEAD to one selected-resource routing authority."""
     if method in {"GET", "HEAD"}:
         return "GET_OR_HEAD"
     return method
+
+
+def _effective_method_authorities(route: "CompositionRoute") -> frozenset[str]:
+    """Return collision authorities without changing the declared method contract."""
+    return frozenset(_method_authority_key(method) for method in route.methods)
+
+
+def _same_owner_concrete_precedence_is_deterministic(
+    left: "CompositionRoute",
+    right: "CompositionRoute",
+) -> bool:
+    """Allow only the OpenAPI concrete-before-template case within one exact owner.
+
+    Matching declared method sets are required so path selection cannot cause an operation
+    present only on the template route to bypass the concrete Path Item selected by OpenAPI.
+    """
+    return (
+        left.owner_release == right.owner_release
+        and left.methods == right.methods
+        and _is_concrete_path(left.path_template) != _is_concrete_path(right.path_template)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,7 +218,7 @@ def _validate_route_set(
         raise CompositionContractError("routes must be a non-empty exact tuple")
 
     route_ids: set[str] = set()
-    authorities: list[tuple[str, str]] = []
+    admitted_authorities: list[CompositionRoute] = []
     owner_releases: dict[str, OwnerApiRelease] = {}
     path_templates_by_shape: dict[tuple[str, ...], str] = {}
     for route in routes:
@@ -215,14 +244,19 @@ def _validate_route_set(
                 "one owner service must use one exact release per generation"
             )
 
-        authority_methods = sorted({_method_authority_key(method) for method in route.methods})
-        for method in authority_methods:
-            for existing_method, existing_path in authorities:
-                if method == existing_method and _route_paths_overlap(
-                    route.path_template, existing_path
-                ):
-                    raise CompositionContractError("method/path authority must have one owner")
-            authorities.append((method, route.path_template))
+        route_authorities = _effective_method_authorities(route)
+        for existing_route in admitted_authorities:
+            if route_authorities.isdisjoint(_effective_method_authorities(existing_route)):
+                continue
+            if not _route_paths_overlap(route.path_template, existing_route.path_template):
+                continue
+            if (
+                route.path_template != existing_route.path_template
+                and _same_owner_concrete_precedence_is_deterministic(route, existing_route)
+            ):
+                continue
+            raise CompositionContractError("method/path authority must have one owner")
+        admitted_authorities.append(route)
 
     return routes
 
