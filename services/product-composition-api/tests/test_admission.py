@@ -5,6 +5,7 @@ from dataclasses import replace
 import pytest
 
 from orgmetra_product_composition import (
+    AdmissionReceipt,
     CompositionContractError,
     CompositionGeneration,
     CompositionRoute,
@@ -295,3 +296,21 @@ def test_route_admission_receipt_does_not_claim_buyer_readiness() -> None:
     receipt = admit_generation(generation(expected), {"people_api": expected.owner_release})
     assert not hasattr(receipt, "buyer_ready")
     assert receipt.required_routes_admitted is True
+
+
+def test_admission_receipt_cannot_be_minted_outside_canonical_admission() -> None:
+    with pytest.raises(CompositionContractError, match="issued only by admit_generation"):
+        AdmissionReceipt(
+            generation_id="generation_001",
+            config_sha256=A,
+            admitted_route_ids=("people_history",),
+            unavailable_optional_route_ids=(),
+        )
+
+    forged = object.__new__(AdmissionReceipt)
+    object.__setattr__(forged, "generation_id", "generation_001")
+    object.__setattr__(forged, "config_sha256", A)
+    object.__setattr__(forged, "admitted_route_ids", ("people_history",))
+    object.__setattr__(forged, "unavailable_optional_route_ids", ())
+    with pytest.raises(CompositionContractError, match="not canonically issued"):
+        _ = forged.required_routes_admitted
