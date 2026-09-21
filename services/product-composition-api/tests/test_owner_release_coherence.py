@@ -53,7 +53,7 @@ def test_generation_rejects_two_release_identities_for_one_owner_service() -> No
     release_v2 = owner_release("v1.2.4", C, D)
     routes = (
         route("people_history", "/v1/people/{person_record_id}", release_v1),
-        route("people_search", "/v1/people/search", release_v2),
+        route("people_search", "/v1/people-search/{query_id}", release_v2),
     )
 
     with pytest.raises(CompositionContractError, match="one exact release"):
@@ -64,7 +64,7 @@ def test_generation_allows_one_exact_release_reused_across_owner_routes() -> Non
     release_v1 = owner_release("v1.2.3", A, B)
     routes = (
         route("people_history", "/v1/people/{person_record_id}", release_v1),
-        route("people_search", "/v1/people/search", release_v1),
+        route("people_search", "/v1/people-search/{query_id}", release_v1),
     )
 
     candidate = generation(*routes)
