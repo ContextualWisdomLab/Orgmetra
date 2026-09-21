@@ -20,7 +20,7 @@ CWL also has a reusable edge-runtime owner, `ContextualWisdomLab/pingora-gateway
 
 Keyverse protected `main@7d9151cd2da260e118020c938c7358e2ee75d541` likewise has no published immutable consumer release. Keyverse #155/#158, Orgmetra #295/#297, Orgmetra #65, and domain API owners therefore remain prerequisite owners rather than copied source inside composition.
 
-Draft #434 is the first executable canary under #432. Current exact authority is `a1b903cabc900b33ac4da36f3781bddc50cf57ee`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with 85 ordinary-forward commits / 14 files confined to `services/product-composition-api/**`. It proves only a route-admission and structural generation-integrity slice. It does not claim Keyverse authentication, HR authorization, HTTP proxying, durable activation, Kubernetes deployment, buyer-path latency, protected integration, or release completion.
+Draft #434 is the first executable canary under #432. Current exact authority is `9852fe6bf1b4cddf1b4710d2908cb42019a0ac86`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with 88 ordinary-forward commits / 14 files confined to `services/product-composition-api/**`. It proves only a route-admission and structural generation-integrity slice. It does not claim Keyverse authentication, HR authorization, HTTP proxying, durable activation, Kubernetes deployment, buyer-path latency, protected integration, or release completion.
 
 ## Decision drivers
 
@@ -83,22 +83,24 @@ The #434 canary intentionally implements a stricter product route profile than t
 
 This restriction is an Orgmetra product decision, not an OpenAPI requirement. Broadening it requires a released owner need plus explicit conformance tests. Framework acceptance alone is not evidence.
 
-### OpenAPI path identity and deterministic matching
+### OpenAPI path identity, Path Item ownership, and deterministic matching
 
-OpenAPI 3.2 Sections 4.8.1 and 4.8.2 define path identity and templating. The composition rules are:
+OpenAPI 3.2 Sections 4.8.1, 4.8.2, and 4.9.1 define path identity, templating, and Path Item structure. The composition rules are:
 
 - `/v1/people/{person_record_id}` and `/v1/people/{worker_record_id}` are one path hierarchy and cannot coexist as distinct path identities, even when methods are disjoint;
-- distinct HTTP methods may coexist only under the same exact template string, subject to operation-authority checks;
+- distinct HTTP methods may coexist under the same exact template string only when they bind the same exact `OwnerApiRelease` in the current Orgmetra profile;
 - a concrete path may coexist with its templated counterpart only when both routes bind the same exact `OwnerApiRelease` and declare the same exact method set;
 - cross-owner concrete/template overlap remains invalid;
 - overlapping templated paths without a defined winner remain fail-closed; and
 - one path cannot repeat the same template expression.
 
-The same-method-set restriction prevents composition from inventing fallback to a templated operation when OpenAPI has already selected a concrete Path Item that does not declare the method. Broader fallback semantics require explicit released-owner conformance evidence.
+One-owner-per-Path-Item is an Orgmetra fail-closed ownership rule, not an OpenAPI claim about repositories or bounded contexts. A Path Item contains shared `$ref`, summary/description, servers, parameters, and operations; path-level servers service all operations and Path Item parameters apply across the operations. The current canary has no released cross-owner merge/conformance contract for those shared fields, so disjoint methods do not make a cross-owner exact-path split safe. A future exception requires a versioned contract that defines and tests reconciliation of every shared Path Item semantic.
+
+The same-method-set restriction for concrete/template overlap prevents composition from inventing fallback to a templated operation when OpenAPI has already selected a concrete Path Item that does not declare the method. Broader fallback semantics require explicit released-owner conformance evidence.
 
 ### HTTP operation authority
 
-After path identity and deterministic path matching are valid, operation ownership is checked independently. Path templates that can select the same concrete request must not split one effective method authority across different owners. For collision ownership, `GET` and `HEAD` form one selected-resource authority because RFC 9110 Section 9.3.2 defines HEAD as GET semantics without response content. Canonical route material still preserves the methods actually declared; this rule does not synthesize an undeclared HEAD operation.
+After Path Item ownership, path identity, and deterministic path matching are valid, operation ownership is checked independently. Path templates that can select the same concrete request must not split one effective method authority across different owners. For collision ownership, `GET` and `HEAD` form one selected-resource authority because RFC 9110 Section 9.3.2 defines HEAD as GET semantics without response content. Canonical route material still preserves the methods actually declared; this rule does not synthesize an undeclared HEAD operation.
 
 ### URI identity
 
@@ -106,7 +108,7 @@ Complete `.` and `..` URI path segments are rejected before collision analysis o
 
 ### Structural evidence
 
-Before admission or activation, nested generation, route, owner-release, logical-upstream, one-release-per-service, supported-profile, path identity/matching, operation authority, and canonical configuration-digest invariants are revalidated. Constructor-time success is not durable trust.
+Before admission or activation, nested generation, route, owner-release, logical-upstream, one-release-per-service, one-owner-per-Path-Item, supported-profile, path identity/matching, operation authority, and canonical configuration-digest invariants are revalidated. Constructor-time success is not durable trust.
 
 A process-local `AdmissionReceipt` proves only that the canonical evaluator admitted one exact structural state in that process. Directly constructed, reconstructed, serialized/deserialized, post-issuance-mutated, or stale receipt-shaped data does not authorize activation, routing, HR access, or readiness. Durable activation/recovery independently re-evaluates immutable generation and owner evidence.
 
@@ -154,6 +156,7 @@ For paths designated applicable to the commercial target, p95 must be <= 20 ms. 
 - no caller-controlled identity/purpose coordinate overriding authenticated/projected evidence;
 - no owner release whose service identity disagrees with the logical upstream;
 - no two exact releases for one owner `service_id` in one generation;
+- no one exact OpenAPI Path Item split across owner releases without a future explicit released merge/conformance contract;
 - no post-construction generation identity/configuration rewrite accepted as the same generation;
 - no reconstructed or mutated admission receipt treated as durable proof;
 - no same-hierarchy path aliases with different template names;
@@ -167,15 +170,17 @@ For paths designated applicable to the commercial target, p95 must be <= 20 ms. 
 
 ## RED -> GREEN acceptance
 
-Implementation preserves executable RED cases for unsupported or ambiguous route material, release/upstream disagreement, split owner-release identities, configuration/generation rewrite, forged/stale receipt evidence, path identity/matching/operation collisions, identity/ACL bypass, cross-service SQL, owner semantic distortion, recovery leaks, and benchmarks that bypass deployed layers.
+Implementation preserves executable RED cases for unsupported or ambiguous route material, cross-owner exact Path Item splits, release/upstream disagreement, split owner-release identities, configuration/generation rewrite, forged/stale receipt evidence, path identity/matching/operation collisions, identity/ACL bypass, cross-service SQL, owner semantic distortion, recovery leaks, and benchmarks that bypass deployed layers.
 
-The newest standards-profile RED is explicit: documentation must not present the canary as general OpenAPI 3.2 support while executable admission rejects OAS-valid route forms by product policy. Exact #434 sequence `7a30ccd000c5e7b5a69e6f872277e7cf8fab2437 -> a1b903cabc900b33ac4da36f3781bddc50cf57ee` binds that distinction without widening production admission.
+The newest Path Item RED is explicit: one exact path cannot be divided across different owner releases merely because the operations use disjoint methods. Exact #434 sequence `ede0b6d602d2160af6c3ae37253f9728ac4b1e08 -> 8b7b059d60bf732e1acc33dc63db2ad8d5cbb52a -> 9852fe6bf1b4cddf1b4710d2908cb42019a0ac86` binds the regression, causal production fix, and documentation without claiming that OpenAPI itself assigns Orgmetra ownership.
 
-Positive controls remain explicit: distinct methods may share the same exact admitted template string, and one exact owner release may use concrete-before-template precedence when both routes declare the same method set.
+The previous standards-profile RED remains explicit: documentation must not present the canary as general OpenAPI 3.2 support while executable admission rejects OAS-valid route forms by product policy. Exact #434 sequence `7a30ccd000c5e7b5a69e6f872277e7cf8fab2437 -> a1b903cabc900b33ac4da36f3781bddc50cf57ee` binds that distinction without widening production admission.
+
+Positive controls remain explicit: distinct methods may share the same exact admitted template string **within one exact owner release**, and one exact owner release may use concrete-before-template precedence when both routes declare the same method set.
 
 GREEN requires deployable boundaries, immutable identities for every admitted layer and generation, released owner operation conformance, real/right-cleared evidence where acceptance depends on data, exact current-head tests, supported Podman/Colima and Kubernetes evidence, fault/recovery rehearsal, security evidence, and the applicable full-path latency target.
 
-Exact #434 `a1b903ca...` currently has no PR-triggered hosted workflow evidence. Earlier local coverage figures at predecessor `cb32ba828...` do not transfer. #434 remains Draft and stacked on #340; source history alone is not merge or release authority.
+Exact #434 `9852fe6b...` currently has no PR-triggered hosted workflow evidence. Earlier local coverage figures at predecessor `cb32ba828...` do not transfer. #434 remains Draft and stacked on #340; source history alone is not merge or release authority.
 
 ## Implementation and release order
 
@@ -192,7 +197,7 @@ Exact #434 `a1b903ca...` currently has no PR-triggered hosted workflow evidence.
 
 Generic transport remains reusable without acquiring product semantics. “Thin Orgmetra composition” means a small deployable application contract, not merely a configuration document. The buyer-visible Gateway cannot be claimed shipped until product composition, identity/ACL, required owner APIs, optional edge transport, immutable generation/deployment provenance, recovery, and full-path performance evidence converge on protected/released truth.
 
-The bounded OpenAPI profile reduces unsupported surface now but creates an explicit future compatibility task: if a released Orgmetra owner needs OAS-valid forms outside the current dialect, support must expand deliberately with conformance, security, and path-authority evidence rather than by permissive parser drift.
+The bounded OpenAPI profile reduces unsupported surface now but creates an explicit future compatibility task: if a released Orgmetra owner needs OAS-valid forms outside the current dialect or cross-owner composition under one Path Item, support must expand deliberately with conformance, security, shared-field reconciliation, and path-authority evidence rather than by permissive parser drift.
 
 ## References
 
