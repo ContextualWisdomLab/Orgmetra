@@ -194,3 +194,13 @@ def test_exact_builtin_scalar_guards_reject_subclasses_and_empty_text() -> None:
         replace(base, service_id=Text("people_api"))
     with pytest.raises(CompositionContractError):
         replace(base, release_locator="")
+
+
+def test_generation_rejects_config_digest_not_derived_from_route_materialization() -> None:
+    with pytest.raises(CompositionContractError, match="config_sha256"):
+        CompositionGeneration(
+            schema_version="orgmetra_gateway_composition.v1",
+            generation_id="generation_001",
+            config_sha256=C,
+            routes=(route(),),
+        )
