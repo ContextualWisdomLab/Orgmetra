@@ -9,6 +9,7 @@ from orgmetra_product_composition import (
     CompositionGeneration,
     CompositionRoute,
     OwnerApiRelease,
+    admit_generation,
     configuration_sha256,
 )
 
@@ -132,6 +133,48 @@ def test_generation_id_rejects_concurrent_semantic_reuse() -> None:
         )
 
     assert first.config_sha256 == first_digest
+
+
+def test_live_admission_receipt_keeps_generation_lineage_bound() -> None:
+    owner = release()
+    first_routes = (route(owner),)
+    second_routes = (summary_route(owner),)
+    first_digest = configuration_sha256(first_routes)
+    second_digest = configuration_sha256(second_routes)
+    generation_id = "generation_receipt_lineage"
+
+    candidate = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id=generation_id,
+        config_sha256=first_digest,
+        routes=first_routes,
+    )
+    receipt = admit_generation(candidate, {"people_api": owner})
+    assert receipt.required_routes_admitted is True
+
+    del candidate
+    gc.collect()
+
+    with pytest.raises(CompositionContractError, match="generation_id.*different configuration"):
+        CompositionGeneration(
+            schema_version="orgmetra_gateway_composition.v1",
+            generation_id=generation_id,
+            config_sha256=second_digest,
+            routes=second_routes,
+        )
+
+    assert receipt.required_routes_admitted is True
+
+    del receipt
+    gc.collect()
+
+    successor = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id=generation_id,
+        config_sha256=second_digest,
+        routes=second_routes,
+    )
+    assert successor.config_sha256 == second_digest
 
 
 def test_generation_id_live_lineage_is_not_durable_after_last_view_is_released() -> None:
