@@ -32,7 +32,9 @@ Fresh HTTP-method review adds one routing-ownership constraint. RFC 9110 Section
 
 Fresh URI-path review adds a second canonical-routing constraint. RFC 3986 Sections 5.2.4 and 6.2.2.3 define complete `.` and `..` path segments as dot-segments that are removed during URI reference resolution/normalization. A route manifest must therefore reject those complete segments before admission rather than allow one layer to authorize `/v1/./people` while another normalizes it to `/v1/people`. This rule concerns route identity at the composition boundary; it does not reinterpret ordinary dots inside non-dot path segments.
 
-Fresh owner-snapshot review adds a third coherence constraint. The current executable evaluator observes owner releases in a snapshot keyed by `service_id`. A generation that assigns two different `OwnerApiRelease` identities to two routes of the same `service_id` cannot be satisfied by one coherent observed snapshot: at least one route must mismatch by construction. A composition generation therefore binds each owner service to one exact release identity across all of its routes. Supporting simultaneous versions of one service would require an explicit versioned upstream identity and a different released contract, not an accidental ambiguity inside the current `service_id` key.
+Fresh OpenAPI path-template review adds another canonical-routing constraint. OpenAPI Specification 3.2.1 Section 4.8.2 requires each template expression to appear at most once in a single path template. A manifest such as `/v1/tenants/{record_id}/people/{record_id}` is therefore rejected before configuration hashing instead of relying on framework-specific parameter-map behavior that can collapse two semantic coordinates into one name.
+
+Fresh owner-snapshot review adds a coherence constraint. The current executable evaluator observes owner releases in a snapshot keyed by `service_id`. A generation that assigns two different `OwnerApiRelease` identities to two routes of the same `service_id` cannot be satisfied by one coherent observed snapshot: at least one route must mismatch by construction. A composition generation therefore binds each owner service to one exact release identity across all of its routes. Supporting simultaneous versions of one service would require an explicit versioned upstream identity and a different released contract, not an accidental ambiguity inside the current `service_id` key.
 
 ## Decision drivers
 
@@ -129,7 +131,7 @@ The composition manifest does **not** mint local idempotency, concurrency, error
 
 Admission is deny-by-default. Reachability is not admission. A route is unavailable when the released owner API is absent, incompatible, unverifiable, or does not match its recorded digest. Path templates that can select the same concrete request must not coexist with different owners when their effective method authorities overlap; parameter renaming does not make overlapping route authority distinct. For this collision check, `GET` and `HEAD` form one selected-resource authority because RFC 9110 Section 9.3.2 defines HEAD as identical to GET except for response content. Canonical route material still preserves the method set actually declared, so this rule does not synthesize an undeclared HEAD operation.
 
-Route templates must also be canonical before they enter collision analysis or configuration hashing. Complete `.` and `..` path segments are not route identity because RFC 3986 removes them during URI normalization/resolution. They fail closed rather than being normalized inside the manifest, so the admitted path is exactly the path the owner contract declares and no downstream proxy/framework can silently select a different normalized route.
+Route templates must also be canonical before they enter collision analysis or configuration hashing. Complete `.` and `..` path segments are not route identity because RFC 3986 removes them during URI normalization/resolution. They fail closed rather than being normalized inside the manifest, so the admitted path is exactly the path the owner contract declares and no downstream proxy/framework can silently select a different normalized route. In addition, each OpenAPI template expression may appear only once in one path template. Repeated placeholders are rejected before hashing/admission so tenant/resource coordinates cannot collapse into one framework parameter name.
 
 Before admission or activation, the current nested generation, route, owner-release, logical-upstream, owner-release coherence, and canonical configuration-digest invariants are revalidated. Constructor-time validation is not durable trust.
 
@@ -210,6 +212,7 @@ Do not claim the SLO from an in-memory router, mocked owner, reduced sample, dis
 - no reconstructed or post-issuance-mutated route-admission receipt treated as durable proof;
 - no overlapping route owners that split one selected-resource authority between GET and HEAD;
 - no complete `.` or `..` URI path segment admitted as distinct route authority;
+- no repeated OpenAPI template expression admitted in one route path;
 - browser CORS/CSRF/cookie/session behavior is explicit when used;
 - route inventory/readiness exposes safe contract coordinates without leaking secrets; and
 - all composition/config/deployment changes are attributable and auditable.
@@ -231,6 +234,7 @@ Implementation must preserve executable RED cases for at least:
 - stale nested owner/route/config evidence is trusted because construction previously succeeded;
 - two overlapping route templates with the same effective method authority—including GET on one owner and HEAD on another—can select the same concrete request;
 - a route template containing a complete `.` or `..` path segment is admitted as distinct authority even though URI normalization can remove that segment;
+- one route path repeats the same OpenAPI template expression and depends on framework-specific parameter binding instead of canonical manifest identity;
 - composition-local retry/idempotency/concurrency classification diverges from or substitutes for owner contract truth;
 - a route-admission receipt is represented as buyer/product readiness;
 - decoded/unverified Keyverse claims reach product principal projection;
@@ -246,7 +250,7 @@ Implementation must preserve executable RED cases for at least:
 
 GREEN requires real deployable boundaries, immutable identity for every admitted layer and generation, right-cleared realistic data where buyer acceptance depends on data, exact current-head tests, Podman/Colima and supported Kubernetes evidence, fault/recovery rehearsal, security evidence, and the applicable p95 target.
 
-Draft #434 currently supplies only a focused executable canary for the route-admission subset. Its ordinary-forward RED history now includes missing implementation, unbound config digest, noncanonical release locator, route-authority overlap, duplicated retry-policy authority, overclaimed readiness, issued-receipt mutation, owner/upstream disagreement, stale nested evidence, self-consistent post-construction generation retargeting, non-deterministic receipt ordering for semantically equivalent route tuples, GET/HEAD split authority, URI dot-segment route aliases, and split release identities for one owner service. Earlier predecessor local 100% figures do not transfer across the later material source/test writes. Current exact #434 `51a1ad47025e5522aea65af01c97d1f4cef078c5` has no PR-triggered hosted workflow run while stacked on #340; no current-head coverage/Security/SAST/CodeQL GREEN is claimed.
+Draft #434 currently supplies only a focused executable canary for the route-admission subset. Its ordinary-forward RED history now includes missing implementation, unbound config digest, noncanonical release locator, route-authority overlap, duplicated retry-policy authority, overclaimed readiness, issued-receipt mutation, owner/upstream disagreement, stale nested evidence, self-consistent post-construction generation retargeting, non-deterministic receipt ordering for semantically equivalent route tuples, GET/HEAD split authority, URI dot-segment route aliases, split release identities for one owner service, and repeated path-template expression ambiguity. Earlier predecessor local 100% figures do not transfer across the later material source/test writes. Current exact #434 `9ad27d839a4684706561479c58eaeb51a9c4a7d9` has no PR-triggered hosted workflow run while stacked on #340; no current-head coverage/Security/SAST/CodeQL GREEN is claimed.
 
 ## Implementation and release order
 
