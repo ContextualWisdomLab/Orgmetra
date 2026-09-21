@@ -258,7 +258,7 @@ def test_generation_rejects_overlapping_route_templates() -> None:
         configuration_sha256((parameterized, static_overlap))
 
 
-def test_generation_allows_distinct_authority_or_distinct_http_method() -> None:
+def test_generation_allows_distinct_path_authority_or_same_owner_distinct_http_method() -> None:
     person_get = route(
         route_id="person_get",
         path="/v1/people/{person_record_id}",
@@ -270,7 +270,6 @@ def test_generation_allows_distinct_authority_or_distinct_http_method() -> None:
     )
     person_post = route(
         route_id="person_post",
-        service_id="job_analysis_api",
         path="/v1/people/{person_record_id}",
         methods=("POST",),
     )
