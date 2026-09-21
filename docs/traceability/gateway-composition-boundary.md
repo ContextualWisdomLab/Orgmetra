@@ -8,7 +8,9 @@ Related Proposed ADR: `docs/adr/0432-deployable-orgmetra-gateway-composition-bou
 
 ## Protected-truth RED
 
-Protected `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` documents one buyer-visible Orgmetra Gateway and gives it API aggregation plus pre-handler Keyverse authentication responsibility. The executable repository still has no supported deployable product-composition application across independently versioned owner services. This document records design/acceptance traceability only; it does not convert that RED into shipped capability.
+Protected `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` documents one buyer-visible Orgmetra Gateway and gives it API aggregation plus pre-handler Keyverse authentication responsibility. The executable protected repository still has no supported deployable product-composition application across independently versioned owner services. This document records design/acceptance traceability only; it does not convert that RED into shipped capability.
+
+Draft #434 is the first executable canary under #432, but it is stacked on #340 and remains unprotected. It proves only a route-admission subset and carries no protected deployment/release credit.
 
 ## Fresh owner evidence
 
@@ -37,6 +39,21 @@ This produces two independent gates:
 `ContextualWisdomLab/keyverse` protected `main@7d9151cd2da260e118020c938c7358e2ee75d541` has no published immutable consumer release. Keyverse #155 owns durable-versus-session-only subject-trust semantics. #158 owns the broader immutable OIDC relying-party release envelope and must reuse or fully supersede #155 rather than define parallel subject truth.
 
 Orgmetra #295/#297 own durable subject-to-Person binding/consumer ACL. Orgmetra #65 and each domain owner retain purpose/resource authorization. Existing People and Job Analysis HTTP edges expose an injected authenticator/principal port rather than a released Keyverse verifier. Product composition may project a request principal over those contracts but cannot become a second identity, Person-binding, or authorization authority.
+
+### Executable product-composition canary
+
+Draft PR #434 is stacked on #340 so it does not become a competing Foundation-workflow writer. Current canary semantics are deliberately narrower than the final Gateway/product boundary:
+
+- `OwnerApiRelease` requires service identity, immutable release version, exact OpenAPI digest, exact artifact digest, and one canonical CWL GitHub Release locator;
+- `CompositionRoute` contains route identity, canonical path/methods, exact owner release, logical service reference, and required/optional criticality only;
+- `configuration_sha256` is derived from the canonical semantic route projection and is stable across route ordering;
+- same-method templates that can select the same concrete request are rejected even when only parameter names differ or one segment is static and the other parameterized;
+- the composition contract has **no local retry class, idempotency mode, or concurrency mode**; and
+- `AdmissionReceipt` proves only that configured required routes matched exact supplied released-owner evidence. It does not claim buyer readiness or authorization.
+
+The canary's RED history matters to this ADR: the first test-only state had no production package; a later RED proved an arbitrary 64-hex config label could pass without binding route semantics; a further RED proved permissive release locators, overlapping route authority, duplicated retry-policy ownership, and an overclaimed `buyer_ready` receipt. Those defects were repaired ordinary-forward rather than erased.
+
+Focused local current-source tests are 100% statement/branch coverage, but this is unit evidence only. #434 currently has no hosted exact-head workflow evidence because it is stacked on #340 rather than `develop`. Synthetic release fixtures also do not establish a real owner release, identity ACL, deployment, latency, or buyer-readiness claim.
 
 ## Corrected Context Map
 
@@ -78,7 +95,7 @@ The protected product label “Orgmetra Gateway” is the buyer-facing boundary.
 | Concern | Owner | Composition role | Forbidden behavior |
 |---|---|---|---|
 | Generic network/proxy transport, connection/TLS mechanics, bounded edge resources, drain | released shared edge owner | consume only supported released capabilities | copy mutable edge source; reinterpret a single-upstream contract as multi-service routing |
-| Product route/admission generation | Orgmetra #432 implementation | select compatible released owner operations | put product route semantics into an unsupported edge config; reuse pg-erd migration routing as generic authority |
+| Product route/admission generation | Orgmetra #432 implementation | select compatible released owner operations and bind a reproducible composition generation | put product route semantics into an unsupported edge config; reuse pg-erd migration routing as generic authority |
 | Identity provider / token issuance / canonical OIDC profile | Keyverse | consume released RP verifier/profile | issue credentials; broaden Keyverse with ad hoc HR claims |
 | Durable subject trust | Keyverse #155, packaged by #158 | preserve exact released semantics | assume every syntactically valid `sub` is durably bindable |
 | Durable subject-to-Person binding / consumer ACL | Orgmetra #295/#297 | reconstruct/revalidate owner evidence | mint Person truth in gateway/composition |
@@ -90,7 +107,9 @@ The protected product label “Orgmetra Gateway” is the buyer-facing boundary.
 | Talent/selection | owning Talent context | route and preserve owner semantics | make employment decisions |
 | Assessment assignment intent | assessment coordination | route and preserve owner semantics | own assessment execution/scoring/result truth |
 | Scientific validity/fairness | Workforce Validation | preserve scientific state/errors | coerce pending/not-verifiable/non-convergence to success |
-| Mutation idempotency/concurrency | owning domain service | forward exact coordinates | create a second replay/version truth |
+| Mutation idempotency/replay | owning domain service | forward exact owner-required coordinates and consume released owner replay semantics | create a second replay taxonomy/state or infer mutation safety locally |
+| Optimistic concurrency | owning domain service | forward exact owner coordinate | create a gateway/composition-local version truth |
+| Retry safety | released owner operation contract, constrained by HTTP semantics | deny by default unless the exact owner contract makes the attempted replay safe | store a composition-local `retry_class` or infer positive safety from HTTP method alone |
 
 ## Composition manifest semantics
 
@@ -98,15 +117,18 @@ A future executable `orgmetra_gateway_composition.v1` or equivalent must identif
 
 - Orgmetra product release and source provenance;
 - product-composition application release/artifact digest;
-- composition schema version, immutable config digest, and activation generation;
+- composition schema version, semantic config digest, and activation generation;
 - shared edge release/artifact digest when deployed;
 - Keyverse release/profile plus subject-trust contract identity;
 - Orgmetra identity-ACL version/digest;
 - stable `route_id`, path/method set, owner service identity;
 - released owner API/OpenAPI version and digest;
+- immutable owner artifact/release coordinate sufficient to reconstruct the admitted operation;
 - logical upstream service reference;
-- required coarse capability and authoritative tenant/actor/purpose locations;
-- idempotency, concurrency/error preservation, retry class, and readiness criticality.
+- required coarse capability and authoritative tenant/actor/purpose locations; and
+- required-versus-optional readiness criticality.
+
+The config digest is computed from the canonical semantic projection; it is not an arbitrary caller label. Owner idempotency, replay, concurrency, error, and retry semantics are **referenced through exact released owner evidence rather than copied into local manifest classifications**.
 
 A mutable branch, PR SHA, copied schema, floating image/tag, or reachable endpoint alone is not route authority.
 
@@ -123,8 +145,12 @@ A mutable branch, PR SHA, copied schema, floating image/tag, or reachable endpoi
 | decoded/unverified Keyverse claims are trusted | issuer/audience/signature/algorithm/time/JWKS verification before projection | Keyverse #158 + Orgmetra conformance |
 | raw subject becomes durable Person truth | released evidence revalidated under #295/#297; forged/stale/cross-tenant/non-durable fails closed | #295/#297 |
 | scope/role bypasses purpose/resource auth | #65/domain-owner authorization executes and denial survives end to end | #65 + owner + composition E2E |
-| route exists without released owner API | admission rejects missing/floating/incompatible owner contract | #432 implementation |
-| OpenAPI digest differs from admitted contract | route unavailable; safe readiness coordinate identifies mismatch | #432 implementation |
+| route exists without released owner API | admission rejects missing/floating/incompatible owner contract | #432/#434 implementation |
+| OpenAPI/artifact/release coordinate differs from admitted contract | route unavailable; safe admission coordinate identifies mismatch | #432/#434 implementation |
+| config digest is an unbound caller value | deterministic digest recomputed from canonical semantic route projection; mismatch rejected | #434 + final composition owner |
+| same-method path templates overlap but claim different owners | parameter-renaming/static-vs-parameter collision rejected before activation | #434 + HTTP composition E2E |
+| local retry/idempotency/concurrency taxonomy substitutes for owner truth | no local retry class/replay state; exact released owner semantics control permitted replay | #432/#434 + owner contract |
+| route admission is represented as buyer readiness | admission receipt remains structural only; buyer readiness requires identity/ACL/runtime/dependency evidence | #432 implementation + operability |
 | token/path/query/header identity coordinates contradict | deterministic fail closed; no precedence guess | composition + identity ACL |
 | composition changes `Idempotency-Key` or owns replay state | exact key reaches owner; no composition replay fact exists | composition E2E + owner API |
 | ambiguous post-commit failure causes duplicate mutation | no fresh mutation; only owner-declared same-key replay | fault-injection E2E |
@@ -149,11 +175,11 @@ A mutable branch, PR SHA, copied schema, floating image/tag, or reachable endpoi
 Acceptance must include:
 
 1. owner commits mutation but the response is lost;
-2. client retries with the same `Idempotency-Key`;
+2. client retries with the same `Idempotency-Key` only if the exact released owner operation contract authorizes that replay;
 3. owner returns the original committed identity under its replay contract;
-4. product composition preserves that result without inventing another mutation identity.
+4. product composition preserves that result without inventing another mutation identity or retry classification.
 
-A route without published replay safety receives no automatic mutation retry. Generation changes, owner-contract changes during activation, request cancellation racing a late owner response, JWKS refresh races, and identity-ACL version changes are all tested so one request never mixes incompatible generations.
+RFC 9110 method semantics are a protocol constraint, not sufficient evidence that an Orgmetra operation is safe to replay automatically. A route without an exact released owner replay guarantee receives no automatic mutation retry, and product composition has no local `retry_class` from which to infer one. Generation changes, owner-contract changes during activation, request cancellation racing a late owner response, JWKS refresh races, and identity-ACL version changes are all tested so one request never mixes incompatible generations.
 
 ## Performance evidence
 
@@ -179,10 +205,11 @@ GREEN requires:
 
 ## Single-writer handoff
 
-- #432 remains the executable product-composition gap owner. Do not create a second BFF/gateway implementation issue unless #432 explicitly delegates a bounded child.
+- #432 remains the executable product-composition gap owner. Draft #434 is its first bounded implementation slice, not a new owner issue.
 - #433 owns this Proposed ADR/traceability/doctoring decision only.
+- #340 remains the Foundation-workflow prerequisite/owner; #434 is stacked on it precisely to avoid a parallel Foundation workflow writer.
 - #51 remains canonical writer for protected `ARCHITECTURE.md`, TRD, API, SECURITY, THREAT_MODEL, TEST_STRATEGY, OPERABILITY, repository TRACEABILITY, and deterministic manifest reconciliation.
-- #100 remains sole writer for `docs/product-technical-gap-baseline.md`; its `API-01` wording must eventually describe a deployable Orgmetra product-composition application rather than imply that shared-edge config alone closes the gap.
+- #100 remains sole writer for `docs/product-technical-gap-baseline.md`; `API-01` stays Planned while #434 is unprotected and non-deployable.
 - Keyverse #155/#158, Orgmetra #295/#297/#65, domain API owners, and pingora-gateway keep their existing authority.
 
-No source in this Proposed lane grants protected integration, release, deployment, or performance credit.
+No source in this Proposed lane or Draft #434 grants protected integration, release, deployment, buyer-readiness, or performance credit.
