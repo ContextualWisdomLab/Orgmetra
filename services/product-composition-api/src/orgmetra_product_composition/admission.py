@@ -80,6 +80,14 @@ def _route_paths_overlap(left: str, right: str) -> bool:
     return True
 
 
+def _path_template_shape(path: str) -> tuple[str, ...]:
+    """Return OpenAPI path hierarchy independent of template-expression names."""
+    return tuple(
+        "{}" if _PATH_PARAMETER.fullmatch(segment) else segment
+        for segment in path.strip("/").split("/")
+    )
+
+
 def _method_authority_key(method: str) -> str:
     """Collapse GET/HEAD to one selected-resource routing authority."""
     if method in {"GET", "HEAD"}:
@@ -183,11 +191,21 @@ def _validate_route_set(
     route_ids: set[str] = set()
     authorities: list[tuple[str, str]] = []
     owner_releases: dict[str, OwnerApiRelease] = {}
+    path_templates_by_shape: dict[tuple[str, ...], str] = {}
     for route in routes:
         _revalidate_route_contract(route)
         if route.route_id in route_ids:
             raise CompositionContractError("route_id values must be unique")
         route_ids.add(route.route_id)
+
+        path_shape = _path_template_shape(route.path_template)
+        existing_path_template = path_templates_by_shape.get(path_shape)
+        if existing_path_template is None:
+            path_templates_by_shape[path_shape] = route.path_template
+        elif existing_path_template != route.path_template:
+            raise CompositionContractError(
+                "templated paths with the same hierarchy must use one template identity"
+            )
 
         existing_owner_release = owner_releases.get(route.owner_release.service_id)
         if existing_owner_release is None:
