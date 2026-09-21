@@ -189,6 +189,7 @@ class CompositionRoute:
             raise CompositionContractError("methods must use deterministic lexical order")
         if type(self.owner_release) is not OwnerApiRelease:
             raise CompositionContractError("owner_release must be exact OwnerApiRelease evidence")
+        OwnerApiRelease.__post_init__(self.owner_release)
         upstream = _exact_text("logical_upstream", self.logical_upstream, maximum=80)
         if _UPSTREAM.fullmatch(upstream) is None:
             raise CompositionContractError("logical_upstream must be a service:// reference")
