@@ -251,6 +251,10 @@ def _validate_route_set(
 
             existing_authorities = _effective_method_authorities(existing_route)
             if route.path_template == existing_route.path_template:
+                if route.owner_release != existing_route.owner_release:
+                    raise CompositionContractError(
+                        "path item authority must have one exact owner release"
+                    )
                 if route_authorities.isdisjoint(existing_authorities):
                     continue
                 raise CompositionContractError("method/path authority must have one owner")
