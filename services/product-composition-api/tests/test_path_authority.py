@@ -39,3 +39,22 @@ def test_route_rejects_complete_dot_segments(path_template: str) -> None:
             logical_upstream="service://people-api",
             required=True,
         )
+
+
+@pytest.mark.parametrize(
+    "path_template",
+    (
+        "/v1/tenants/{record_id}/people/{record_id}",
+        "/v1/{scope}/people/{scope}",
+    ),
+)
+def test_route_rejects_repeated_path_template_expression(path_template: str) -> None:
+    with pytest.raises(CompositionContractError, match="template expression"):
+        CompositionRoute(
+            route_id="people_read",
+            path_template=path_template,
+            methods=("GET",),
+            owner_release=owner_release(),
+            logical_upstream="service://people-api",
+            required=True,
+        )
