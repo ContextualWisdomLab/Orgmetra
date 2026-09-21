@@ -28,6 +28,8 @@ The first executable canary under #432 is Draft PR #434. Its current contract in
 
 Fresh executable review of #434 also establishes that a frozen Python object is not durable identity evidence. Constructor-time success, a cached admission boolean, a reconstructed receipt-shaped value, or a self-consistent object graph rewritten after construction cannot be treated as continuing authority. The current canary therefore binds canonically issued receipt fields and the constructed generation's `(schema_version, generation_id, config_sha256)` within process-local closure state, then revalidates the current nested owner/route/config graph immediately before admission. These mechanisms are structural process-local integrity only; they are not same-process arbitrary-code isolation, durable authorization, signing, activation authority, or release evidence.
 
+Fresh HTTP-method review adds one routing-ownership constraint. RFC 9110 Section 9.3.2 defines HEAD as identical to GET except that the response carries no content. For Orgmetra collision ownership, GET and HEAD therefore belong to one effective selected-resource authority: overlapping path templates cannot assign GET to one owner and HEAD to another. This is a product-composition ownership rule derived from HTTP semantics; it does not implicitly add HEAD to a route's declared method set.
+
 ## Decision drivers
 
 The supported product boundary must:
@@ -119,7 +121,7 @@ Each admitted route carries at least:
 
 The composition manifest does **not** mint local idempotency, concurrency, error-preservation, or retry classifications. Those semantics remain owner contract truth. When an owner exposes a released behavioral contract or receipt needed to prove those semantics, the composition generation records that exact immutable owner coordinate rather than translating it into a second taxonomy.
 
-Admission is deny-by-default. Reachability is not admission. A route is unavailable when the released owner API is absent, incompatible, unverifiable, or does not match its recorded digest. Same-method path templates that can select the same concrete request must not coexist with different owners; parameter renaming does not make overlapping route authority distinct.
+Admission is deny-by-default. Reachability is not admission. A route is unavailable when the released owner API is absent, incompatible, unverifiable, or does not match its recorded digest. Path templates that can select the same concrete request must not coexist with different owners when their effective method authorities overlap; parameter renaming does not make overlapping route authority distinct. For this collision check, `GET` and `HEAD` form one selected-resource authority because RFC 9110 Section 9.3.2 defines HEAD as identical to GET except for response content. Canonical route material still preserves the method set actually declared, so this rule does not synthesize an undeclared HEAD operation.
 
 Before admission or activation, the current nested generation, route, owner-release, logical-upstream, and canonical configuration-digest invariants are revalidated. Constructor-time validation is not durable trust.
 
@@ -197,6 +199,7 @@ Do not claim the SLO from an in-memory router, mocked owner, reduced sample, dis
 - no owner release whose service identity disagrees with the logical upstream;
 - no post-construction generation identity/configuration rewrite accepted as the same generation;
 - no reconstructed or post-issuance-mutated route-admission receipt treated as durable proof;
+- no overlapping route owners that split one selected-resource authority between GET and HEAD;
 - browser CORS/CSRF/cookie/session behavior is explicit when used;
 - route inventory/readiness exposes safe contract coordinates without leaking secrets; and
 - all composition/config/deployment changes are attributable and auditable.
@@ -215,7 +218,7 @@ Implementation must preserve executable RED cases for at least:
 - a logical upstream names a different service from the exact released owner evidence;
 - an issued admission receipt's generation/config/admitted-route fields change after issuance;
 - stale nested owner/route/config evidence is trusted because construction previously succeeded;
-- two same-method route templates can select the same concrete request but claim different owners;
+- two overlapping route templates with the same effective method authority—including GET on one owner and HEAD on another—can select the same concrete request;
 - composition-local retry/idempotency/concurrency classification diverges from or substitutes for owner contract truth;
 - a route-admission receipt is represented as buyer/product readiness;
 - decoded/unverified Keyverse claims reach product principal projection;
@@ -231,7 +234,7 @@ Implementation must preserve executable RED cases for at least:
 
 GREEN requires real deployable boundaries, immutable identity for every admitted layer and generation, right-cleared realistic data where buyer acceptance depends on data, exact current-head tests, Podman/Colima and supported Kubernetes evidence, fault/recovery rehearsal, security evidence, and the applicable p95 target.
 
-Draft #434 currently supplies only a focused executable canary for the route-admission subset. Its ordinary-forward RED history now includes missing implementation, unbound config digest, noncanonical release locator, route-authority overlap, duplicated retry-policy authority, overclaimed readiness, issued-receipt mutation, owner/upstream disagreement, stale nested evidence, and self-consistent post-construction generation retargeting. Earlier predecessor local 100% figures do not transfer across the later material source/test writes. Current exact #434 `d3e24da90bbd4b2c5e44f7acfaeb15225eff08a0` has no PR-triggered hosted workflow run while stacked on #340; no current-head coverage/Security/SAST/CodeQL GREEN is claimed.
+Draft #434 currently supplies only a focused executable canary for the route-admission subset. Its ordinary-forward RED history now includes missing implementation, unbound config digest, noncanonical release locator, route-authority overlap, duplicated retry-policy authority, overclaimed readiness, issued-receipt mutation, owner/upstream disagreement, stale nested evidence, self-consistent post-construction generation retargeting, non-deterministic receipt ordering for semantically equivalent route tuples, and GET/HEAD split authority. Earlier predecessor local 100% figures do not transfer across the later material source/test writes. Current exact #434 `bdedbda008746ecfac39895b16537c2c99a63165` has no PR-triggered hosted workflow run while stacked on #340; no current-head coverage/Security/SAST/CodeQL GREEN is claimed.
 
 ## Implementation and release order
 
