@@ -23,8 +23,7 @@ _ROUTE_PATH = re.compile(
     r"^/v[0-9]+(?:/(?:[A-Za-z0-9._:-]+|\{[a-z][a-z0-9_]{0,63}\}))+?$"
 )
 _RELEASE_LOCATOR = re.compile(
-    r"^https://github\.com/ContextualWisdomLab/"
-    r"[A-Za-z0-9_.-]+/releases/tag/"
+    r"^https://github\.com/ContextualWisdomLab/Orgmetra/releases/tag/"
     r"(?P<tag>[A-Za-z0-9][A-Za-z0-9._+-]{0,63})$"
 )
 _ALLOWED_METHODS = frozenset({"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"})
@@ -105,7 +104,9 @@ class OwnerApiRelease:
         locator = _exact_text("release_locator", self.release_locator, maximum=512)
         match = _RELEASE_LOCATOR.fullmatch(locator)
         if match is None:
-            raise CompositionContractError("release_locator must name one canonical CWL GitHub Release")
+            raise CompositionContractError(
+                "release_locator must name the canonical Orgmetra release repository"
+            )
         if match.group("tag") != self.release_version:
             raise CompositionContractError("release_locator must bind the exact release_version")
         object.__setattr__(self, "release_locator", locator)
