@@ -7,6 +7,7 @@ from .admission import (
     CompositionRoute,
     OwnerApiRelease,
     admit_generation,
+    configuration_sha256,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "CompositionRoute",
     "OwnerApiRelease",
     "admit_generation",
+    "configuration_sha256",
 ]
