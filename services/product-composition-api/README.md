@@ -2,7 +2,7 @@
 
 This package is the first executable slice of the product-composition boundary tracked by #432. It decides whether configured product routes refer to exact immutable Orgmetra owner API releases before they are eligible for a composition generation. Route admission by itself is not buyer/product readiness.
 
-A generation is bound to a deterministic digest of canonical semantic route material. Configuration identity is minted only after per-route and cross-route invariants pass. Owner release evidence must identify the canonical `ContextualWisdomLab/Orgmetra/releases/tag/<version>` coordinate, each `service_id` has one exact release/OpenAPI/artifact identity per generation, and each logical `service://` upstream must name that same owner service. Mutable branches, floating labels, copied schemas, reachability-only checks, and digest-only pointers are not route authority.
+A generation is bound to a deterministic digest of canonical semantic route material. Configuration identity is minted only after per-route and cross-route invariants pass. Owner release evidence must identify the canonical `ContextualWisdomLab/Orgmetra/releases/tag/<version>` coordinate, each `service_id` has one exact release/OpenAPI/artifact identity per generation, and each logical `service://` upstream must name that same owner service. The lower-snake-case owner service identifier and its hyphenated `service://` projection share the same 64-character identifier bound so a structurally valid owner identity does not become unroutable only at the upstream representation boundary. Mutable branches, floating labels, copied schemas, reachability-only checks, and digest-only pointers are not route authority.
 
 ## Supported OpenAPI route profile
 
