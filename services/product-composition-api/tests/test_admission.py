@@ -44,7 +44,6 @@ def route(
         owner_release=release(service_id),
         logical_upstream=f"service://{service_id.replace('_', '-')}",
         required=required,
-        retry_class="safe" if methods == ("GET",) else "owner_idempotent",
     )
 
 
@@ -71,7 +70,7 @@ def test_admits_exact_required_release_and_reports_optional_unavailable() -> Non
         {"people_api": required_route.owner_release},
     )
 
-    assert receipt.buyer_ready is True
+    assert receipt.required_routes_admitted is True
     assert receipt.generation_id == "generation_001"
     assert receipt.config_sha256 == configuration_sha256((required_route, optional_route))
     assert receipt.admitted_route_ids == ("people_history",)
@@ -123,13 +122,15 @@ def test_route_rejects_ambiguous_routing_and_non_owner_evidence() -> None:
         {"route_id": "Bad-Route"},
         {"path_template": "v1/people"},
         {"path_template": "/v1/../people"},
+        {"path_template": "/v1/people/{}"},
+        {"path_template": "/v1/people/{Person}"},
+        {"path_template": "/v1/people/{person"},
         {"methods": []},
         {"methods": ("GET", "GET")},
         {"methods": ("POST", "GET")},
         {"methods": ("TRACE",)},
         {"logical_upstream": "https://people-api"},
         {"required": 1},
-        {"retry_class": "automatic"},
         {"owner_release": object()},
     )
     for changes in invalid_cases:
@@ -141,7 +142,6 @@ def test_route_rejects_ambiguous_routing_and_non_owner_evidence() -> None:
                 owner_release=changes.get("owner_release", valid.owner_release),
                 logical_upstream=changes.get("logical_upstream", valid.logical_upstream),
                 required=changes.get("required", valid.required),
-                retry_class=changes.get("retry_class", valid.retry_class),
             )
 
 
@@ -207,7 +207,7 @@ def test_configuration_digest_is_order_stable_and_binds_route_semantics() -> Non
         required=False,
     )
     assert configuration_sha256((first, second)) == configuration_sha256((second, first))
-    changed = replace(second, retry_class="never")
+    changed = replace(second, required=True)
     assert configuration_sha256((first, second)) != configuration_sha256((first, changed))
     for invalid_routes in ((), [first], (object(),)):
         with pytest.raises(CompositionContractError):
@@ -258,6 +258,32 @@ def test_generation_rejects_overlapping_route_templates() -> None:
                 config_sha256=configuration_sha256(routes),
                 routes=routes,
             )
+
+
+def test_generation_allows_distinct_authority_or_distinct_http_method() -> None:
+    person_get = route(
+        route_id="person_get",
+        path="/v1/people/{person_record_id}",
+    )
+    job_get = route(
+        route_id="job_get",
+        service_id="job_analysis_api",
+        path="/v1/jobs/{job_id}",
+    )
+    person_post = route(
+        route_id="person_post",
+        service_id="job_analysis_api",
+        path="/v1/people/{person_record_id}",
+        methods=("POST",),
+    )
+    routes = (person_get, job_get, person_post)
+    generation = CompositionGeneration(
+        schema_version="orgmetra_gateway_composition.v1",
+        generation_id="generation_001",
+        config_sha256=configuration_sha256(routes),
+        routes=routes,
+    )
+    assert generation.routes == routes
 
 
 def test_composition_does_not_own_retry_policy() -> None:
