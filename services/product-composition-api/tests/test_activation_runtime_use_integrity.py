@@ -214,3 +214,120 @@ def test_transition_rechecks_and_pins_structural_registry_after_evidence(
             generation_id=generation.generation_id,
             expected_previous_sequence=state_sequence,
         )
+
+
+def test_generation_connection_factory_retarget_after_guard_never_executes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A nested generation DB factory swapped after the guard must not execute once."""
+
+    registry = _registry()
+    replacement_calls = 0
+
+    def replacement_factory() -> None:
+        nonlocal replacement_calls
+        replacement_calls += 1
+        raise AssertionError("unadmitted generation connection factory executed")
+
+    original_guard = AuthorizedPostgresActivationRegistry._require_runtime_capabilities
+    mutated = False
+
+    def mutate_nested_factory_after_guard(self: AuthorizedPostgresActivationRegistry) -> None:
+        nonlocal mutated
+        original_guard(self)
+        if not mutated:
+            object.__setattr__(
+                self._generation_registry,
+                "connection_factory",
+                replacement_factory,
+            )
+            mutated = True
+
+    monkeypatch.setattr(
+        AuthorizedPostgresActivationRegistry,
+        "_require_runtime_capabilities",
+        mutate_nested_factory_after_guard,
+    )
+
+    with pytest.raises(ActivationAuthorizationError, match="construction snapshot"):
+        registry._load_target("generation_one")
+
+    assert replacement_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("operation_name", "state_sequence"),
+    (("activate", 0), ("rollback", 1)),
+)
+def test_transition_connection_factory_retarget_after_guard_never_executes(
+    monkeypatch: pytest.MonkeyPatch,
+    operation_name: str,
+    state_sequence: int,
+) -> None:
+    """A nested structural DB factory swapped after the guard must not execute once."""
+
+    registry = _registry()
+    generation = _generation()
+    evidence = _evidence(
+        generation,
+        action=operation_name,
+        state_sequence=state_sequence,
+    )
+    replacement_calls = 0
+
+    def replacement_factory() -> None:
+        nonlocal replacement_calls
+        replacement_calls += 1
+        raise AssertionError("unadmitted structural connection factory executed")
+
+    def fake_load_target(
+        self: AuthorizedPostgresActivationRegistry,
+        _generation_id: str,
+    ) -> CompositionGeneration:
+        return generation
+
+    def fake_obtain_evidence(
+        self: AuthorizedPostgresActivationRegistry,
+        *_args: object,
+        **_kwargs: object,
+    ) -> ActivationAdmissionEvidence:
+        return evidence
+
+    original_guard = AuthorizedPostgresActivationRegistry._require_runtime_capabilities
+    mutated = False
+
+    def mutate_nested_factory_after_guard(self: AuthorizedPostgresActivationRegistry) -> None:
+        nonlocal mutated
+        original_guard(self)
+        if not mutated:
+            object.__setattr__(
+                self._structural_registry,
+                "connection_factory",
+                replacement_factory,
+            )
+            mutated = True
+
+    monkeypatch.setattr(AuthorizedPostgresActivationRegistry, "_load_target", fake_load_target)
+    monkeypatch.setattr(
+        AuthorizedPostgresActivationRegistry,
+        "_obtain_evidence",
+        fake_obtain_evidence,
+    )
+    monkeypatch.setattr(
+        AuthorizedPostgresActivationRegistry,
+        "_require_runtime_capabilities",
+        mutate_nested_factory_after_guard,
+    )
+
+    operation: Callable[..., object] = getattr(registry, operation_name)
+    with pytest.raises(ActivationAuthorizationError, match="construction snapshot"):
+        operation(
+            DeploymentIdentity(
+                deployment_id="orgmetra_gateway",
+                environment_id="production",
+            ),
+            generation_id=generation.generation_id,
+            expected_previous_sequence=state_sequence,
+        )
+
+    assert replacement_calls == 0
