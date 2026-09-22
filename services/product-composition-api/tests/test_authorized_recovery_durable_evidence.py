@@ -7,7 +7,6 @@ from orgmetra_product_composition import (
     ActivationAuthorizationError,
     ActivationEvent,
     ActivationRegistryError,
-    AuthorizedPostgresActivationRegistry,
     CompositionGeneration,
     CompositionRoute,
     DeploymentIdentity,
@@ -16,6 +15,9 @@ from orgmetra_product_composition import (
     RecoveredActivation,
     ReleasedAuthorityEvidence,
     configuration_sha256,
+)
+from orgmetra_product_composition.activation_authorization import (
+    AuthorizedPostgresActivationRegistry as AuthorizationRegistry,
 )
 
 
@@ -128,7 +130,7 @@ def test_authorized_recovery_rejects_structural_event_without_durable_evidence(m
         assert state_sequence == 1
         return _evidence(generation)
 
-    registry = AuthorizedPostgresActivationRegistry(
+    registry = AuthorizationRegistry(
         connection_factory=lambda: None,
         evidence_provider=evidence_provider,
         clock_unix_ms=lambda: 1_500,
@@ -197,7 +199,7 @@ def test_authorized_recovery_preserves_activation_evidence_and_persists_fresh_re
         assert state_sequence == 1
         return evidence
 
-    registry = AuthorizedPostgresActivationRegistry(
+    registry = AuthorizationRegistry(
         connection_factory=lambda: None,
         evidence_provider=evidence_provider,
         clock_unix_ms=lambda: 1_500,
