@@ -87,8 +87,21 @@ class GenerationRecordSet:
             raise CompositionRegistryError("receipt config_sha256 must match generation")
 
         route_ids = tuple(sorted(route.route_id for route in generation.routes))
-        if receipt.admitted_route_ids != route_ids:
-            raise CompositionRegistryError("receipt route set must match generation")
+        receipt_route_ids = tuple(
+            sorted(receipt.admitted_route_ids + receipt.unavailable_optional_route_ids)
+        )
+        if receipt_route_ids != route_ids:
+            raise CompositionRegistryError(
+                "receipt admitted/unavailable route set must exactly partition generation"
+            )
+        unavailable_route_ids = set(receipt.unavailable_optional_route_ids)
+        if any(
+            route.required and route.route_id in unavailable_route_ids
+            for route in generation.routes
+        ):
+            raise CompositionRegistryError(
+                "required generation routes cannot be unavailable in an admission receipt"
+            )
 
         owner_by_service: dict[str, OwnerApiRelease] = {}
         for route in generation.routes:
