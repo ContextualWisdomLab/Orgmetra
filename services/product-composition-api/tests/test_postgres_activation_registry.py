@@ -294,9 +294,9 @@ def test_activation_migration_is_append_only_and_generation_bound() -> None:
         / "0019_product_composition_activation_registry.sql"
     ).read_text(encoding="utf-8")
 
-    assert "CREATE TABLE product_composition_deployment" in migration
-    assert "CREATE TABLE product_composition_activation_event" in migration
-    assert "REFERENCES product_composition_generation(generation_id)" in migration
+    assert "CREATE TABLE public.product_composition_deployment" in migration
+    assert "CREATE TABLE public.product_composition_activation_event" in migration
+    assert "REFERENCES public.product_composition_generation(generation_id)" in migration
     assert "CREATE TRIGGER product_composition_deployment_append_only_guard" in migration
     assert "CREATE TRIGGER product_composition_activation_event_append_only_guard" in migration
     assert "activation_sequence > 0" in migration
