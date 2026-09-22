@@ -5,7 +5,6 @@ from .activation import (
     ActivationEvent,
     ActivationRegistryError,
     DeploymentIdentity,
-    PostgresActivationRegistry,
     RecoveredActivation,
 )
 from .activation_authorization import (
@@ -54,7 +53,6 @@ __all__ = [
     "OwnerApiRelease",
     "OwnerOperationObservation",
     "OwnerReleaseRecord",
-    "PostgresActivationRegistry",
     "PostgresGenerationRegistry",
     "RecoveredActivation",
     "ReleasedAuthorityEvidence",
