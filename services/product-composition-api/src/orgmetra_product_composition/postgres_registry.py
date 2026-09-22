@@ -273,6 +273,7 @@ class PostgresGenerationRegistry:
 
     @staticmethod
     def _load_record_set(cursor: Any, generation_id: str) -> GenerationRecordSet | None:
+        """Reconstruct normalized durable generation rows from one transaction-local cursor."""
         cursor.execute(_SELECT_GENERATION_SQL, (generation_id,))
         generation_row = cursor.fetchone()
         if generation_row is None:
