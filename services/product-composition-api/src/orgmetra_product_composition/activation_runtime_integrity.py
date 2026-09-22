@@ -1,9 +1,9 @@
 """Bind activation authorization to the runtime capabilities admitted at construction.
 
 The external evidence provider runs outside the deployment row lock by design. It must not
-be able to retarget the clock or PostgreSQL adapters that are used after that callback.
-This module keeps the product-facing wrapper's executable capabilities under a process-local
-construction snapshot while leaving the structural registry internal.
+be able to retarget or weaken the clock or PostgreSQL adapters that are used after that
+callback. This module keeps the product-facing wrapper's executable capabilities under a
+process-local construction snapshot while leaving the structural registry internal.
 """
 
 from __future__ import annotations
@@ -149,7 +149,7 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         authorization_action: AuthorizationAction,
         authorized_state_sequence: int,
     ) -> ActivationAdmissionEvidence:
-        """Validate evidence against the same provider and clock admitted at construction."""
+        """Validate evidence against the same non-rewinding clock admitted at construction."""
 
         self._require_runtime_capabilities()
         if type(deployment) is not DeploymentIdentity:
@@ -161,6 +161,11 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
 
         provider = self.evidence_provider
         clock = self.clock_unix_ms
+        before_provider_unix_ms = clock()
+        self._require_runtime_capabilities()
+        if type(before_provider_unix_ms) is not int or before_provider_unix_ms <= 0:
+            raise ActivationAuthorizationError("clock_unix_ms must return an integer > 0")
+
         evidence = provider(deployment, generation, action, state_sequence)
         self._require_runtime_capabilities()
         if type(evidence) is not ActivationAdmissionEvidence:
@@ -170,6 +175,12 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
 
         now_unix_ms = clock()
         self._require_runtime_capabilities()
+        if type(now_unix_ms) is not int or now_unix_ms <= 0:
+            raise ActivationAuthorizationError("clock_unix_ms must return an integer > 0")
+        if now_unix_ms < before_provider_unix_ms:
+            raise ActivationAuthorizationError(
+                "clock_unix_ms moved backwards across external evidence acquisition"
+            )
         evidence.validate_for(
             deployment_id=deployment.deployment_id,
             environment_id=deployment.environment_id,
