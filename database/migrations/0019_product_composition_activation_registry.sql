@@ -1,4 +1,5 @@
 BEGIN;
+SET LOCAL search_path = pg_catalog, public;
 
 -- Persist product-composition deployment activation as an append-only sequence.
 -- Deployment/environment identifiers and external evidence coordinates are non-PII.
