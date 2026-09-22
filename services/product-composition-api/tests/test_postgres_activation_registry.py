@@ -8,8 +8,11 @@ import pytest
 from orgmetra_product_composition import (
     ActivationConflictError,
     ActivationRegistryError,
+    CompositionRoute,
     DeploymentIdentity,
+    OwnerApiRelease,
     PostgresActivationRegistry,
+    configuration_sha256,
 )
 
 
@@ -72,7 +75,22 @@ def _deployment() -> DeploymentIdentity:
 
 
 def _generation_rows(generation_id: str) -> list[object]:
-    config = "a" * 64
+    owner = OwnerApiRelease(
+        service_id="people_api",
+        release_version="v1.2.3",
+        openapi_sha256="1" * 64,
+        artifact_sha256="2" * 64,
+        release_locator="https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.2.3",
+    )
+    route = CompositionRoute(
+        route_id="people_get",
+        path_template="/v1/people/{person_record_id}",
+        methods=("GET",),
+        owner_release=owner,
+        logical_upstream="service://people-api",
+        required=True,
+    )
+    config = configuration_sha256((route,))
     return [
         ("orgmetra_gateway_composition.v1", config),
         [
