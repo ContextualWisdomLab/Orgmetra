@@ -16,6 +16,7 @@ from orgmetra_product_composition import (
     ReleasedAuthorityEvidence,
     configuration_sha256,
 )
+from orgmetra_product_composition.activation_authorization import _persist_activation_evidence
 
 
 def _generation() -> CompositionGeneration:
@@ -221,6 +222,50 @@ def test_authorized_registry_persists_evidence_inside_structural_activation(monk
         "freshness_check",
         "structural_activate_authorized",
     ]
+
+
+class EvidenceCursor:
+    def __init__(self, *, root_row, observation_rows) -> None:
+        self.root_row = root_row
+        self.observation_rows = observation_rows
+        self.statements: list[str] = []
+        self._fetchone_values = [None, root_row]
+
+    def execute(self, statement: str, params=None) -> None:
+        self.statements.append(statement)
+
+    def fetchone(self):
+        return self._fetchone_values.pop(0)
+
+    def fetchall(self):
+        return list(self.observation_rows)
+
+
+def test_transaction_evidence_writer_verifies_exact_durable_material() -> None:
+    evidence = _evidence()
+    cursor = EvidenceCursor(
+        root_row=evidence._root_row(),
+        observation_rows=evidence._observation_rows(),
+    )
+
+    _persist_activation_evidence(cursor, evidence)
+
+    statements = "\n".join(cursor.statements)
+    assert "product_composition_activation_evidence" in statements
+    assert "product_composition_activation_owner_observation" in statements
+
+
+def test_transaction_evidence_writer_rejects_digest_collision_material() -> None:
+    evidence = _evidence()
+    wrong_root = list(evidence._root_row())
+    wrong_root[-1] = 9_999
+    cursor = EvidenceCursor(
+        root_row=tuple(wrong_root),
+        observation_rows=evidence._observation_rows(),
+    )
+
+    with pytest.raises(ActivationAuthorizationError, match="different durable root material"):
+        _persist_activation_evidence(cursor, evidence)
 
 
 def test_activation_migration_binds_evidence_and_checks_expiry_at_event_insert() -> None:
