@@ -7,6 +7,7 @@ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0001_foundation
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0018_product_composition_generation_registry.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0019_product_composition_activation_registry.sql
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0020_product_composition_activation_authority_enforcement.sql
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f database/migrations/0021_product_composition_activation_observation_wall_clock.sql
 
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
