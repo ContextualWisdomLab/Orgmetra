@@ -1,12 +1,17 @@
 BEGIN;
+SET LOCAL search_path = pg_catalog, public;
 
 -- Persist admitted product-composition generations as immutable normalized authority.
 -- These tables own routing configuration only. They intentionally contain no HR domain,
 -- tenant, Keyverse, Person, Employment, Job, Position, Assignment, or assessment truth.
 -- A generation identifier is never reassigned: callers may repeat the exact same material,
 -- while any semantic successor must receive a new generation_id.
+--
+-- Migration-session search_path is not authority. All owned objects and trigger bindings are
+-- pinned to public while built-ins resolve through pg_catalog first, so a caller-controlled
+-- schema cannot redirect registry creation, foreign keys, or mutation guards.
 
-CREATE TABLE product_composition_generation (
+CREATE TABLE public.product_composition_generation (
     generation_id text PRIMARY KEY,
     schema_version text NOT NULL,
     config_sha256 text NOT NULL,
@@ -22,7 +27,7 @@ CREATE TABLE product_composition_generation (
         CHECK (config_sha256 ~ '^[0-9a-f]{64}$')
 );
 
-CREATE TABLE product_composition_owner_release (
+CREATE TABLE public.product_composition_owner_release (
     generation_id text NOT NULL,
     service_id text NOT NULL,
     release_version text NOT NULL,
@@ -33,7 +38,7 @@ CREATE TABLE product_composition_owner_release (
         PRIMARY KEY (generation_id, service_id),
     CONSTRAINT product_composition_owner_release_generation_fk
         FOREIGN KEY (generation_id)
-        REFERENCES product_composition_generation(generation_id),
+        REFERENCES public.product_composition_generation(generation_id),
     CONSTRAINT product_composition_owner_release_service_check
         CHECK (
             char_length(service_id) BETWEEN 1 AND 64
@@ -58,7 +63,7 @@ CREATE TABLE product_composition_owner_release (
         )
 );
 
-CREATE TABLE product_composition_route (
+CREATE TABLE public.product_composition_route (
     generation_id text NOT NULL,
     route_id text NOT NULL,
     path_template text NOT NULL,
@@ -69,10 +74,10 @@ CREATE TABLE product_composition_route (
         PRIMARY KEY (generation_id, route_id),
     CONSTRAINT product_composition_route_generation_fk
         FOREIGN KEY (generation_id)
-        REFERENCES product_composition_generation(generation_id),
+        REFERENCES public.product_composition_generation(generation_id),
     CONSTRAINT product_composition_route_owner_release_fk
         FOREIGN KEY (generation_id, owner_service_id)
-        REFERENCES product_composition_owner_release(generation_id, service_id),
+        REFERENCES public.product_composition_owner_release(generation_id, service_id),
     CONSTRAINT product_composition_route_id_check
         CHECK (
             char_length(route_id) BETWEEN 1 AND 64
@@ -86,7 +91,7 @@ CREATE TABLE product_composition_route (
         )
 );
 
-CREATE TABLE product_composition_route_method (
+CREATE TABLE public.product_composition_route_method (
     generation_id text NOT NULL,
     route_id text NOT NULL,
     method text NOT NULL,
@@ -94,12 +99,12 @@ CREATE TABLE product_composition_route_method (
         PRIMARY KEY (generation_id, route_id, method),
     CONSTRAINT product_composition_route_method_route_fk
         FOREIGN KEY (generation_id, route_id)
-        REFERENCES product_composition_route(generation_id, route_id),
+        REFERENCES public.product_composition_route(generation_id, route_id),
     CONSTRAINT product_composition_route_method_value_check
         CHECK (method IN ('DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT'))
 );
 
-CREATE FUNCTION reject_product_composition_generation_registry_truncate()
+CREATE FUNCTION public.reject_product_composition_generation_registry_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
@@ -110,43 +115,43 @@ END;
 $$;
 
 CREATE TRIGGER product_composition_generation_append_only_guard
-BEFORE UPDATE OR DELETE ON product_composition_generation
+BEFORE UPDATE OR DELETE ON public.product_composition_generation
 FOR EACH ROW
-EXECUTE FUNCTION reject_append_only_mutation();
+EXECUTE FUNCTION public.reject_append_only_mutation();
 
 CREATE TRIGGER product_composition_owner_release_append_only_guard
-BEFORE UPDATE OR DELETE ON product_composition_owner_release
+BEFORE UPDATE OR DELETE ON public.product_composition_owner_release
 FOR EACH ROW
-EXECUTE FUNCTION reject_append_only_mutation();
+EXECUTE FUNCTION public.reject_append_only_mutation();
 
 CREATE TRIGGER product_composition_route_append_only_guard
-BEFORE UPDATE OR DELETE ON product_composition_route
+BEFORE UPDATE OR DELETE ON public.product_composition_route
 FOR EACH ROW
-EXECUTE FUNCTION reject_append_only_mutation();
+EXECUTE FUNCTION public.reject_append_only_mutation();
 
 CREATE TRIGGER product_composition_route_method_append_only_guard
-BEFORE UPDATE OR DELETE ON product_composition_route_method
+BEFORE UPDATE OR DELETE ON public.product_composition_route_method
 FOR EACH ROW
-EXECUTE FUNCTION reject_append_only_mutation();
+EXECUTE FUNCTION public.reject_append_only_mutation();
 
 CREATE TRIGGER product_composition_generation_truncate_guard
-BEFORE TRUNCATE ON product_composition_generation
+BEFORE TRUNCATE ON public.product_composition_generation
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_product_composition_generation_registry_truncate();
+EXECUTE FUNCTION public.reject_product_composition_generation_registry_truncate();
 
 CREATE TRIGGER product_composition_owner_release_truncate_guard
-BEFORE TRUNCATE ON product_composition_owner_release
+BEFORE TRUNCATE ON public.product_composition_owner_release
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_product_composition_generation_registry_truncate();
+EXECUTE FUNCTION public.reject_product_composition_generation_registry_truncate();
 
 CREATE TRIGGER product_composition_route_truncate_guard
-BEFORE TRUNCATE ON product_composition_route
+BEFORE TRUNCATE ON public.product_composition_route
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_product_composition_generation_registry_truncate();
+EXECUTE FUNCTION public.reject_product_composition_generation_registry_truncate();
 
 CREATE TRIGGER product_composition_route_method_truncate_guard
-BEFORE TRUNCATE ON product_composition_route_method
+BEFORE TRUNCATE ON public.product_composition_route_method
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_product_composition_generation_registry_truncate();
+EXECUTE FUNCTION public.reject_product_composition_generation_registry_truncate();
 
 COMMIT;
