@@ -114,6 +114,7 @@ def test_recovery_persists_fresh_evidence_only_after_locked_state_recheck(monkey
             *,
             expected_activation_sequence,
             expected_generation_id,
+            evidence_bundle_sha256,
             evidence_writer,
         ):
             nonlocal locked_rechecks
@@ -121,6 +122,7 @@ def test_recovery_persists_fresh_evidence_only_after_locked_state_recheck(monkey
             assert deployment_arg == deployment
             assert expected_activation_sequence == 1
             assert expected_generation_id == generation.generation_id
+            assert evidence_bundle_sha256 == evidence.bundle_sha256()
             assert callable(evidence_writer)
             return structural
 
