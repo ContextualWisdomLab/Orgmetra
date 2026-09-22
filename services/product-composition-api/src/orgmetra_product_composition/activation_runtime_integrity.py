@@ -26,22 +26,25 @@ from .admission import CompositionGeneration, _revalidate_generation_snapshot
 
 def _build_runtime_capability_construction_guard():
     constructed_registries: WeakValueDictionary[int, object] = WeakValueDictionary()
-    constructed_capabilities: dict[int, tuple[int, ...]] = {}
+    # Keep the admitted capability objects strongly reachable for exactly the registry
+    # lifetime. Storing only ``id(...)`` would allow a replaced capability to be collected
+    # and a later object to reuse the same process address, defeating an identity snapshot.
+    constructed_capabilities: dict[int, tuple[object, ...]] = {}
     state_lock = RLock()
 
     def discard(registry_object_id: int) -> None:
         with state_lock:
             constructed_capabilities.pop(registry_object_id, None)
 
-    def project(registry: AuthorizedPostgresActivationRegistry) -> tuple[int, ...]:
+    def project(registry: AuthorizedPostgresActivationRegistry) -> tuple[object, ...]:
         return (
-            id(registry.connection_factory),
-            id(registry.evidence_provider),
-            id(registry.clock_unix_ms),
-            id(registry._generation_registry),
-            id(registry._generation_registry.connection_factory),
-            id(registry._structural_registry),
-            id(registry._structural_registry.connection_factory),
+            registry.connection_factory,
+            registry.evidence_provider,
+            registry.clock_unix_ms,
+            registry._generation_registry,
+            registry._generation_registry.connection_factory,
+            registry._structural_registry,
+            registry._structural_registry.connection_factory,
         )
 
     def record_or_require(registry: AuthorizedPostgresActivationRegistry) -> None:
@@ -55,7 +58,19 @@ def _build_runtime_capability_construction_guard():
                 constructed_capabilities[registry_object_id] = current_capabilities
                 finalize(registry, discard, registry_object_id)
                 return
-            if canonical_registry is not registry or canonical_capabilities != current_capabilities:
+            capabilities_match = (
+                canonical_capabilities is not None
+                and len(canonical_capabilities) == len(current_capabilities)
+                and all(
+                    canonical is current
+                    for canonical, current in zip(
+                        canonical_capabilities,
+                        current_capabilities,
+                        strict=True,
+                    )
+                )
+            )
+            if canonical_registry is not registry or not capabilities_match:
                 raise ActivationAuthorizationError(
                     "AuthorizedPostgresActivationRegistry no longer matches its construction snapshot"
                 )
