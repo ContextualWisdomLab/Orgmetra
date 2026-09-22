@@ -120,6 +120,7 @@ class ActivationConflictError(ActivationRegistryError):
 
 
 def _canonical_identifier(field_name: str, value: object) -> str:
+    """Require the stable lower-snake identifier representation used in durable keys."""
     if type(value) is not str:
         raise ActivationRegistryError(f"{field_name} must be an exact built-in str")
     if not 1 <= len(value) <= 64 or _CANONICAL_IDENTIFIER.fullmatch(value) is None:
@@ -130,6 +131,7 @@ def _canonical_identifier(field_name: str, value: object) -> str:
 
 
 def _evidence_digest(value: object) -> str:
+    """Require an exact lowercase SHA-256 digest before binding evidence to history."""
     if type(value) is not str or _SHA256.fullmatch(value) is None:
         raise ActivationRegistryError(
             "evidence_bundle_sha256 must be a lowercase SHA-256 digest"
@@ -138,6 +140,7 @@ def _evidence_digest(value: object) -> str:
 
 
 def _expected_sequence(value: object) -> int:
+    """Require a non-negative compare-and-append predecessor sequence."""
     if type(value) is not int or value < 0:
         raise ActivationRegistryError("expected_previous_sequence must be an integer >= 0")
     return value
@@ -150,10 +153,12 @@ def _build_deployment_identity_construction_runtime():
     state_lock = RLock()
 
     def discard_deployment_identity(deployment_object_id: int) -> None:
+        """Drop field evidence when the corresponding deployment object is collected."""
         with state_lock:
             constructed_fields.pop(deployment_object_id, None)
 
     def record_or_require_deployment_identity(deployment: DeploymentIdentity) -> None:
+        """Record first construction or reject later field retargeting on the same object."""
         deployment_object_id = id(deployment)
         current_fields = (deployment.deployment_id, deployment.environment_id)
         with state_lock:
@@ -183,6 +188,7 @@ class DeploymentIdentity:
     environment_id: str
 
     def __post_init__(self) -> None:
+        """Validate durable key syntax and bind this object to its construction fields."""
         _canonical_identifier("deployment_id", self.deployment_id)
         _canonical_identifier("environment_id", self.environment_id)
         _record_or_require_deployment_identity(self)
@@ -200,6 +206,7 @@ class ActivationEvent:
     evidence_bundle_sha256: str | None = None
 
     def __post_init__(self) -> None:
+        """Enforce sequence, lineage and optional evidence invariants on one event."""
         if type(self.deployment) is not DeploymentIdentity:
             raise ActivationRegistryError("activation event requires exact DeploymentIdentity")
         if type(self.activation_sequence) is not int or self.activation_sequence <= 0:
@@ -225,6 +232,7 @@ class RecoveredActivation:
     generation: CompositionGeneration
 
     def __post_init__(self) -> None:
+        """Require exact event/generation types and matching durable generation identity."""
         if type(self.event) is not ActivationEvent:
             raise ActivationRegistryError("recovery requires exact ActivationEvent")
         if type(self.generation) is not CompositionGeneration:
@@ -245,6 +253,7 @@ class PostgresActivationRegistry:
     connection_factory: PostgresConnectionFactory
 
     def __post_init__(self) -> None:
+        """Reject a registry that cannot open the caller-owned PostgreSQL boundary."""
         if not callable(self.connection_factory):
             raise TypeError("connection_factory must be callable")
 
@@ -406,6 +415,7 @@ class PostgresActivationRegistry:
         evidence_bundle_sha256: str | None = None,
         evidence_writer: TransactionEvidenceWriter | None = None,
     ) -> ActivationEvent:
+        """Lock one deployment and append exactly one compare-and-authorized transition."""
         identity = self._deployment(deployment)
         target_generation_id = _canonical_identifier("generation_id", generation_id)
         expected = _expected_sequence(expected_previous_sequence)
@@ -491,6 +501,7 @@ class PostgresActivationRegistry:
 
     @staticmethod
     def _deployment(deployment: DeploymentIdentity) -> DeploymentIdentity:
+        """Revalidate an exact deployment object before it enters a durable transaction."""
         if type(deployment) is not DeploymentIdentity:
             raise ActivationRegistryError("deployment must be exact DeploymentIdentity")
         DeploymentIdentity.__post_init__(deployment)
@@ -498,6 +509,7 @@ class PostgresActivationRegistry:
 
     @staticmethod
     def _lock_deployment(cursor: Any, deployment: DeploymentIdentity) -> None:
+        """Create-if-absent then lock the durable row that serializes deployment writers."""
         params = (deployment.deployment_id, deployment.environment_id)
         cursor.execute(_INSERT_DEPLOYMENT_SQL, params)
         cursor.execute(_LOCK_DEPLOYMENT_SQL, params)
@@ -506,6 +518,7 @@ class PostgresActivationRegistry:
 
     @staticmethod
     def _latest_event(cursor: Any, deployment: DeploymentIdentity) -> ActivationEvent | None:
+        """Reconstruct the latest append-only event for a locked or snapshot deployment."""
         cursor.execute(
             _SELECT_LATEST_EVENT_SQL,
             (deployment.deployment_id, deployment.environment_id),
@@ -531,6 +544,7 @@ class PostgresActivationRegistry:
 
     @staticmethod
     def _load_generation(cursor: Any, generation_id: str) -> CompositionGeneration:
+        """Reconstruct a persisted generation and translate registry corruption at this boundary."""
         records = PostgresGenerationRegistry._load_record_set(cursor, generation_id)
         if records is None:
             raise ActivationRegistryError("activation target requires a persisted generation")
