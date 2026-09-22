@@ -185,3 +185,30 @@ def test_runtime_capability_snapshot_retains_admitted_clock_identity_until_regis
     del registry
     gc.collect()
     assert admitted_clock() is None
+
+
+def test_runtime_capability_snapshot_does_not_root_registry_through_provider_cycle() -> None:
+    """Identity evidence must not turn a callback cycle into process-lifetime retention."""
+
+    class Provider:
+        registry: AuthorizedPostgresActivationRegistry | None = None
+
+        def __call__(self, *_args: object) -> ActivationAdmissionEvidence:
+            raise AssertionError("provider is not executed in this lifetime contract")
+
+    provider = Provider()
+    registry = AuthorizedPostgresActivationRegistry(
+        connection_factory=lambda: None,
+        evidence_provider=provider,
+        clock_unix_ms=lambda: 1_500,
+    )
+    provider.registry = registry
+    registry_reference = weakref.ref(registry)
+    provider_reference = weakref.ref(provider)
+
+    del registry
+    del provider
+    gc.collect()
+
+    assert registry_reference() is None
+    assert provider_reference() is None
