@@ -161,6 +161,43 @@ def test_external_evidence_provider_cannot_retarget_runtime_clock_after_construc
         )
 
 
+def test_external_evidence_provider_cannot_rewind_admitted_clock_in_place() -> None:
+    """Reject same-identity clock mutation that would make expired evidence appear fresh."""
+
+    evidence, generation = _evidence()
+    deployment = DeploymentIdentity(
+        deployment_id="orgmetra_gateway",
+        environment_id="production",
+    )
+
+    class MutableClock:
+        def __init__(self, value: int) -> None:
+            self.value = value
+
+        def __call__(self) -> int:
+            return self.value
+
+    clock = MutableClock(2_500)
+
+    def provider(*_args: object) -> ActivationAdmissionEvidence:
+        clock.value = 1_500
+        return evidence
+
+    registry = AuthorizedPostgresActivationRegistry(
+        connection_factory=lambda: None,
+        evidence_provider=provider,
+        clock_unix_ms=clock,
+    )
+
+    with pytest.raises(ActivationAuthorizationError, match="moved backwards"):
+        registry._obtain_evidence(
+            deployment,
+            generation,
+            authorization_action="activate",
+            authorized_state_sequence=0,
+        )
+
+
 def test_runtime_capability_snapshot_keeps_non_reusable_identity_witness() -> None:
     """A collected admitted capability stays invalid even if a later address is reused."""
 
