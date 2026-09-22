@@ -55,7 +55,12 @@ def _authority(authority_id: str, release_version: str, digest: str) -> Released
     )
 
 
-def _evidence(*, valid_until_unix_ms: int = 2_000) -> ActivationAdmissionEvidence:
+def _evidence(
+    *,
+    valid_until_unix_ms: int = 2_000,
+    authorization_action: str = "activate",
+    authorized_state_sequence: int = 0,
+) -> ActivationAdmissionEvidence:
     generation = _generation()
     route = generation.routes[0]
     owner = route.owner_release
@@ -64,6 +69,8 @@ def _evidence(*, valid_until_unix_ms: int = 2_000) -> ActivationAdmissionEvidenc
         environment_id="production",
         generation_id=generation.generation_id,
         config_sha256=generation.config_sha256,
+        authorization_action=authorization_action,
+        authorized_state_sequence=authorized_state_sequence,
         keyverse_authority=_authority("keyverse", "v1.0.0", "3" * 64),
         orgmetra_authority=_authority("orgmetra", "v1.0.0", "4" * 64),
         orgmetra_policy_version_code="composition_activation_v1",
@@ -93,6 +100,8 @@ def test_activation_evidence_requires_exact_released_authorities_and_operation_c
         deployment_id="orgmetra_gateway",
         environment_id="production",
         generation=generation,
+        authorization_action="activate",
+        authorized_state_sequence=0,
         now_unix_ms=1_500,
     )
 
@@ -101,6 +110,8 @@ def test_activation_evidence_requires_exact_released_authorities_and_operation_c
         environment_id=evidence.environment_id,
         generation_id=evidence.generation_id,
         config_sha256=evidence.config_sha256,
+        authorization_action=evidence.authorization_action,
+        authorized_state_sequence=evidence.authorized_state_sequence,
         keyverse_authority=evidence.keyverse_authority,
         orgmetra_authority=evidence.orgmetra_authority,
         orgmetra_policy_version_code=evidence.orgmetra_policy_version_code,
@@ -113,6 +124,8 @@ def test_activation_evidence_requires_exact_released_authorities_and_operation_c
             deployment_id="orgmetra_gateway",
             environment_id="production",
             generation=generation,
+            authorization_action="activate",
+            authorized_state_sequence=0,
             now_unix_ms=1_500,
         )
 
@@ -124,6 +137,8 @@ def test_activation_evidence_rejects_expired_or_future_observation() -> None:
             deployment_id="orgmetra_gateway",
             environment_id="production",
             generation=generation,
+            authorization_action="activate",
+            authorized_state_sequence=0,
             now_unix_ms=1_500,
         )
 
@@ -146,6 +161,8 @@ def test_activation_evidence_rejects_expired_or_future_observation() -> None:
         environment_id=evidence.environment_id,
         generation_id=evidence.generation_id,
         config_sha256=evidence.config_sha256,
+        authorization_action=evidence.authorization_action,
+        authorized_state_sequence=evidence.authorized_state_sequence,
         keyverse_authority=evidence.keyverse_authority,
         orgmetra_authority=evidence.orgmetra_authority,
         orgmetra_policy_version_code=evidence.orgmetra_policy_version_code,
@@ -158,6 +175,8 @@ def test_activation_evidence_rejects_expired_or_future_observation() -> None:
             deployment_id="orgmetra_gateway",
             environment_id="production",
             generation=generation,
+            authorization_action="activate",
+            authorized_state_sequence=0,
             now_unix_ms=1_500,
         )
 
@@ -192,10 +211,12 @@ def test_authorized_registry_persists_evidence_inside_structural_activation(monk
             assert callable(evidence_writer)
             return object()
 
-    def evidence_provider(deployment_arg, generation_arg):
+    def evidence_provider(deployment_arg, generation_arg, authorization_action, state_sequence):
         order.append("external_evidence")
         assert deployment_arg == deployment
         assert generation_arg == generation
+        assert authorization_action == "activate"
+        assert state_sequence == 0
         return evidence
 
     def clock_unix_ms() -> int:
@@ -279,6 +300,8 @@ def test_activation_migration_binds_evidence_and_checks_wall_clock_expiry_at_eve
     assert "CREATE TABLE product_composition_activation_evidence" in migration
     assert "CREATE TABLE product_composition_activation_owner_observation" in migration
     assert "evidence_bundle_sha256" in migration
+    assert "authorization_action" in migration
+    assert "authorized_state_sequence" in migration
     assert "authorization_decision_sha256" in migration
     assert "keyverse_release_version" in migration
     assert "orgmetra_policy_version_code" in migration
