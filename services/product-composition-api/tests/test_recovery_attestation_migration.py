@@ -3,7 +3,12 @@
 from pathlib import Path
 
 
-_MIGRATION = Path("database/migrations/0022_product_composition_recovery_attestation.sql")
+_MIGRATION = (
+    Path(__file__).resolve().parents[3]
+    / "database"
+    / "migrations"
+    / "0022_product_composition_recovery_attestation.sql"
+)
 
 
 def test_recovery_attestation_binds_current_state_and_fresh_recovery_evidence() -> None:
