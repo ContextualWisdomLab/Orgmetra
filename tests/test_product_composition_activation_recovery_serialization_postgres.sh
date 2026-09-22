@@ -20,14 +20,21 @@ VALUES ('orgmetra_gateway', 'production');
 SQL
 
 holder_pid=""
+holder_application_name=""
 writer_pid=""
 cleanup() {
     if [[ -n "${writer_pid}" ]]; then
         kill "${writer_pid}" 2>/dev/null || true
         wait "${writer_pid}" 2>/dev/null || true
     fi
+    if [[ -n "${holder_application_name}" ]]; then
+        psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE application_name = '${holder_application_name}';
+        " >/dev/null 2>&1 || true
+    fi
     if [[ -n "${holder_pid}" ]]; then
-        kill "${holder_pid}" 2>/dev/null || true
         wait "${holder_pid}" 2>/dev/null || true
     fi
 }
@@ -57,6 +64,7 @@ wait_for_query_state() {
 
 start_deployment_lock_holder() {
     local application_name="$1"
+    holder_application_name="${application_name}"
     PGAPPNAME="${application_name}" psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 >/tmp/orgmetra-composition-holder.log 2>&1 <<'SQL' &
 BEGIN;
 SELECT 1
@@ -72,9 +80,14 @@ SQL
 }
 
 release_holder() {
-    kill "${holder_pid}" 2>/dev/null || true
+    psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+        SELECT pg_terminate_backend(pid)
+        FROM pg_stat_activity
+        WHERE application_name = '${holder_application_name}';
+    " >/dev/null
     wait "${holder_pid}" 2>/dev/null || true
     holder_pid=""
+    holder_application_name=""
 }
 
 start_deployment_lock_holder "composition_lock_holder_activation"
