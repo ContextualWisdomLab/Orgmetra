@@ -9,7 +9,8 @@ for migration in \
     database/migrations/0019_product_composition_activation_registry.sql \
     database/migrations/0020_product_composition_activation_authority_enforcement.sql \
     database/migrations/0021_product_composition_activation_observation_wall_clock.sql \
-    database/migrations/0022_product_composition_recovery_attestation.sql; do
+    database/migrations/0022_product_composition_recovery_attestation.sql \
+    database/migrations/0023_product_composition_deployment_write_serialization.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
