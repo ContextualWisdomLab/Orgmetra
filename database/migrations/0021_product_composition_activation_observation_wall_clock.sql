@@ -27,7 +27,7 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION validate_product_composition_activation_observation_wall_clock()
+CREATE FUNCTION public.validate_product_composition_activation_observation_wall_clock()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
@@ -54,6 +54,6 @@ $$;
 CREATE TRIGGER product_composition_activation_owner_observation_wall_clock_guard
 BEFORE INSERT ON public.product_composition_activation_owner_observation
 FOR EACH ROW
-EXECUTE FUNCTION validate_product_composition_activation_observation_wall_clock();
+EXECUTE FUNCTION public.validate_product_composition_activation_observation_wall_clock();
 
 COMMIT;
