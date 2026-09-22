@@ -132,6 +132,35 @@ INSERT INTO product_composition_activation_event (
     'required_only_deployment', 'production', 1, 'generation_optional',
     NULL, 'activate', repeat('8', 64)
 );
+
+INSERT INTO product_composition_activation_evidence (
+    evidence_bundle_sha256, deployment_id, environment_id, generation_id, config_sha256,
+    authorization_action, authorized_state_sequence,
+    keyverse_release_version, keyverse_artifact_sha256, keyverse_release_locator,
+    orgmetra_release_version, orgmetra_artifact_sha256, orgmetra_release_locator,
+    orgmetra_policy_version_code, authorization_decision_sha256, valid_until_unix_ms
+) VALUES (
+    repeat('c', 64), 'required_only_deployment', 'production', 'generation_optional', repeat('a', 64),
+    'recover', 1,
+    'v1.0.0', repeat('5', 64),
+    'https://github.com/ContextualWisdomLab/keyverse/releases/tag/v1.0.0',
+    'v1.0.0', repeat('6', 64),
+    'https://github.com/ContextualWisdomLab/Orgmetra/releases/tag/v1.0.0',
+    'composition_activation_v1', repeat('7', 64),
+    floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint + 600000
+);
+SQL
+
+insert_observation c people_get GET d
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+INSERT INTO product_composition_recovery_attestation (
+    deployment_id, environment_id, recovery_sequence, activation_sequence,
+    generation_id, evidence_bundle_sha256
+) VALUES (
+    'required_only_deployment', 'production', 1, 1,
+    'generation_optional', repeat('c', 64)
+);
 SQL
 
 insert_evidence 9 partial_optional_deployment
