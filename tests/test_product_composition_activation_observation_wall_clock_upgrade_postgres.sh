@@ -55,10 +55,12 @@ INSERT INTO product_composition_activation_evidence (
 COMMIT;
 SQL
 
-# Hold an uncommitted predecessor-schema INSERT while 0021 starts. A correct migration
-# must acquire its writer-conflicting lock before the history scan, then observe this row
-# after the writer commits and fail closed. Without the fence, the scan can pass before
-# this row is visible and the later CREATE TRIGGER merely waits, grandfathering bad history.
+# Hold an uncommitted predecessor-schema INSERT while 0021 starts. Readiness is observed
+# through PostgreSQL itself rather than inferred from scheduler timing. A correct migration
+# waits at the writer-conflicting fence, then scans after this transaction commits and fails
+# closed on the impossible row. The unfenced predecessor could scan before visibility and
+# wait only later at CREATE TRIGGER, grandfathering the row.
+PGAPPNAME=orgmetra_wall_clock_upgrade_writer \
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL' &
 BEGIN;
 INSERT INTO product_composition_activation_owner_observation (
@@ -74,11 +76,26 @@ SELECT
     valid_until_unix_ms
 FROM product_composition_activation_evidence
 WHERE evidence_bundle_sha256 = repeat('7', 64);
-SELECT pg_sleep(3);
+SELECT pg_sleep(5);
 COMMIT;
 SQL
 writer_pid=$!
-sleep 1
+
+writer_ready=0
+for _ in {1..50}; do
+    writer_ready="$({ psql "${DATABASE_URL}" -Atqc \
+        "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND application_name = 'orgmetra_wall_clock_upgrade_writer' AND state = 'active' AND query LIKE 'SELECT pg_sleep(%'; } 2>/dev/null)"
+    if [[ "${writer_ready}" == "1" ]]; then
+        break
+    fi
+    sleep 0.1
+done
+
+if [[ "${writer_ready}" != "1" ]]; then
+    wait "${writer_pid}" || true
+    echo "writer was not observed inside the predecessor transaction" >&2
+    exit 1
+fi
 
 set +e
 upgrade_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
