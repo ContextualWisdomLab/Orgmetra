@@ -52,6 +52,15 @@ INSERT INTO product_composition_activation_evidence (
     'composition_activation_v1', repeat('5', 64),
     floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint + 120000
 );
+COMMIT;
+SQL
+
+# Hold an uncommitted predecessor-schema INSERT while 0021 starts. A correct migration
+# must acquire its writer-conflicting lock before the history scan, then observe this row
+# after the writer commits and fail closed. Without the fence, the scan can pass before
+# this row is visible and the later CREATE TRIGGER merely waits, grandfathering bad history.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL' &
+BEGIN;
 INSERT INTO product_composition_activation_owner_observation (
     evidence_bundle_sha256, generation_id, route_id, method, path_template,
     service_id, release_version, openapi_sha256, artifact_sha256,
@@ -65,16 +74,20 @@ SELECT
     valid_until_unix_ms
 FROM product_composition_activation_evidence
 WHERE evidence_bundle_sha256 = repeat('7', 64);
+SELECT pg_sleep(3);
 COMMIT;
 SQL
+writer_pid=$!
+sleep 1
 
 set +e
 upgrade_output="$({ psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
     -f database/migrations/0021_product_composition_activation_observation_wall_clock.sql; } 2>&1)"
 upgrade_status=$?
 set -e
+wait "${writer_pid}"
 
 if [[ ${upgrade_status} -eq 0 || "${upgrade_output}" != *"future-dated owner observation history"* ]]; then
-    echo "0021 did not fail closed on predecessor future-dated observation history: ${upgrade_output}" >&2
+    echo "0021 did not fence concurrent predecessor future-dated observation history: ${upgrade_output}" >&2
     exit 1
 fi
