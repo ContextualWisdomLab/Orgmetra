@@ -6,13 +6,13 @@ Status: Proposed
 
 Issue owner: #432
 
-Verification date: 2026-09-22
+Verification date: 2026-09-23
 
 This ADR is design authority only. It does not make a gateway, shared edge runtime, product-composition service, owner API, database registry, deployment, activation, recovery, or Orgmetra release production-authoritative. Protected `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` remains shipped truth until normal review, exact-head checks, protected integration, and immutable release evidence exist.
 
 ## Context
 
-Protected `ARCHITECTURE.md` places an Orgmetra Gateway between role workspaces and independently owned domain services. It assigns that buyer-visible boundary API aggregation and pre-handler identity integration, while protected executable truth still has no supported deployable product-composition application across independently versioned owner APIs.
+Protected `ARCHITECTURE.md` places an Orgmetra Gateway between role workspaces and independently owned domain services. The buyer-visible boundary needs API aggregation and pre-handler identity integration, but protected executable truth still has no supported deployable product-composition application across independently versioned owner APIs.
 
 That gap is not permission to create another HR bounded context. Person, Employment, Assignment, Organization, Position, Job Architecture/FJA/KSAO, Talent, Performance, Assessment coordination, Workforce Validation, document, integration, and audit truth remain with their existing owners. Product composition is an application adapter. It may consume released identity and authorization contracts, project one product principal, select admitted owner operations, preserve transport and owner semantics, coordinate readiness, and record exact composition activation evidence. It must not become a second source of HR truth, purpose policy, idempotency truth, concurrency truth, retry safety, credentials, or scientific evidence.
 
@@ -20,17 +20,17 @@ CWL also has a reusable edge-runtime owner, `ContextualWisdomLab/pingora-gateway
 
 ## Current executable authority
 
-The implementation stack is deliberately split by authority layer:
+The implementation stack remains deliberately split by authority layer:
 
 - #434 exact `68bdf2d984ca7686219c335a85a6574195675cbe`: process-local route/generation admission and construction-integrity canary, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`.
-- #436 exact `6ebe5ec72ddb5d13b8550064cfc33ff1861d39e3`: normalized durable generation/configuration registry, canonical reconstruction, and atomic 0018 schema+guard publication.
-- #437 exact `c8886e605e65779f38c813635954546f3e4431a4`: durable deployment activation/rollback/recovery, external authorization evidence, owner-operation observations, database-clock freshness, deterministic migration-concurrency testing, atomic 0019 activation-registry publication, and atomic 0022 recovery-attestation publication. It is 91 commits ahead / 0 behind #436 at this verification point.
+- #436 exact `5fd0087179f2e6f23f2bb3853ad1de397fc53b0e`: normalized durable generation/configuration registry, canonical reconstruction, append-only generation material, and caller-search-path-independent 0018 publication.
+- #437 exact `960a5fbfcb98075862cdbee8ee094a9b8d7dcc55`: durable deployment activation/rollback/recovery through migration 0025, transition-bound external evidence, PostgreSQL-clock owner-observation validity, durable restart re-admission, migration upgrade fencing, deployment-row serialization, full-chain schema provenance, trusted trigger-function provenance, generation-anchored activation/recovery relation ownership, checked-as-used process-local runtime capability integrity, and a no-ambiguous-post-commit recovery boundary.
 
-All three remain Draft/unprotected implementation. Their existence does not close `API-01`, prove a released external dependency, establish buyer readiness, or authorize protected integration.
+All three are Draft/unprotected implementation evidence. Their existence does not close `API-01`, prove a released external dependency, establish buyer readiness, or authorize protected integration.
 
 ## Problem and constraints
 
-The product needs a buyer-visible composition boundary that can route independently released owner APIs without copying owner schemas or creating a second HR source of truth. The boundary must survive process restart and deployment change while preserving exact release/configuration/authorization provenance.
+The product needs a buyer-visible composition boundary that can route independently released owner APIs without copying owner schemas or creating a second HR source of truth. The boundary must survive process restart and deployment change while preserving exact release, configuration, authorization, and recovery provenance.
 
 The design is constrained by the following:
 
@@ -39,9 +39,13 @@ The design is constrained by the following:
 - mutable branches, copied sibling source, and cross-service SQL are not integration contracts;
 - remote identity/ACL/owner checks must not hold a local deployment-row lock across network I/O;
 - generation, deployment, activation, rollback, and recovery history must be attributable and fail closed under concurrent writers;
-- migration publication itself is part of durable authority: a relation must not become externally usable before the guards that define its invariant are installed;
+- migration publication and migration-time object provenance are part of durable authority;
+- direct SQL must not have weaker deployment-state serialization than the product adapter;
+- caller-controlled migration `search_path` must not redirect composition authority objects or trigger functions;
+- process-local capability snapshots are defense in depth and never substitute for PostgreSQL or immutable released evidence;
+- once a recovery transaction has committed, a later local observation must not reclassify that committed success as a failure;
 - Draft implementation, source-local tests, or process-local receipts are not protected or released authority; and
-- the final buyer path must include the actually deployed edge/composition/owner/PostgreSQL layers and meet the applicable p95 <=20 ms target without benchmark exclusions.
+- the final buyer path must include every actually deployed edge/composition/owner/PostgreSQL layer and meet the applicable p95 <=20 ms target without benchmark exclusions.
 
 ## Decision
 
@@ -50,7 +54,7 @@ The buyer-visible “Orgmetra Gateway” has two distinct internal responsibilit
 1. **Shared edge transport runtime, externally owned and optional unless a deployment requires it.** It owns connection/proxy/TLS mechanics, bounded transport resources, drain/shutdown, and low-cardinality transport telemetry within its released contract.
 2. **Orgmetra product-composition application.** It owns product-facing authentication integration, runtime-principal projection, admitted route selection, owner API compatibility, exact composition generation/deployment state, activation/re-admission coordination, readiness, and end-to-end preservation of downstream semantics.
 
-The Orgmetra component is an application adapter, not an HR bounded context. It owns no HR application table and performs no cross-service SQL. Its durable state is limited to composition configuration, release coordinates, deployment/activation/recovery evidence, and audit/provenance needed to prove which exact composition generation was admitted or active.
+The Orgmetra component is an application adapter, not an HR bounded context. It owns no HR application table and performs no cross-service SQL. Its durable state is limited to composition configuration, release coordinates, deployment/activation/recovery evidence, and the audit/provenance needed to prove which exact composition generation was admitted or active.
 
 ## Alternatives considered
 
@@ -68,11 +72,27 @@ Rejected. A restart would erase the evidence that authorized the active generati
 
 ### Let migration runners publish tables first and install guards later
 
-Rejected. PostgreSQL DDL is transactional, but an autocommit migration sequence can expose a newly committed relation before later trigger statements. Rows written during that gap are not retroactively validated by triggers. Schema publication therefore must be atomic wherever guards define durable authority.
+Rejected. PostgreSQL DDL is transactional, but an autocommit migration sequence can expose a newly committed relation before later trigger statements. Rows written during that gap are not retroactively validated by triggers. Schema publication must therefore be atomic wherever guards define durable authority.
+
+### Rely on migration-session `search_path` for authority object identity
+
+Rejected. A caller-controlled schema can shadow or receive unqualified objects/functions. Composition authority relations, foreign-key targets, trigger targets, and trigger functions must resolve to the reviewed `public` objects independently of the caller's path.
+
+### Serialize only application-adapter writers
+
+Rejected. Direct SQL activation and recovery would then observe weaker authority than product traffic. Both direct writer paths must acquire the same deployment-row lock before lineage/evidence validation.
+
+### Treat the activation child tables as their own ownership trust root
+
+Rejected. A uniform foreign transfer of every child relation could otherwise look internally consistent. The parent `product_composition_generation` relation is the ownership anchor for deployment/evidence/observation/event/recovery relations.
 
 ### Hold remote verification under `FOR UPDATE`
 
 Rejected. It converts external latency/failure into a long database lock and widens contention. Remote evidence is acquired first, then exact deployment state is locked and revalidated before local persistence.
+
+### Revalidate local wall-clock freshness after recovery commit
+
+Rejected. `recover_active_authorized()` commits before returning. A second fallible local freshness check after that return can tell the caller “failure” after a durable recovery attestation already exists. Local freshness is checked before persistence; PostgreSQL is the commit-time freshness authority.
 
 ## Evidence layers
 
@@ -80,49 +100,45 @@ Evidence layers are intentionally non-interchangeable.
 
 ### Process-local structural evidence
 
-`OwnerApiRelease`, `CompositionRoute`, `CompositionGeneration`, `AdmissionReceipt`, `DeploymentIdentity`, `ReleasedAuthorityEvidence`, `OwnerOperationObservation`, and `ActivationAdmissionEvidence` use process-local construction/issuance integrity where applicable. Valid-looking low-level mutation of an already-constructed object into another semantic meaning is rejected. New legitimate semantics require a new value.
+`OwnerApiRelease`, `CompositionRoute`, `CompositionGeneration`, `AdmissionReceipt`, `DeploymentIdentity`, `ReleasedAuthorityEvidence`, `OwnerOperationObservation`, and `ActivationAdmissionEvidence` use process-local construction/issuance integrity where applicable. Valid-looking low-level mutation of an already-constructed object into another semantic meaning is rejected; new legitimate semantics require a new value.
 
-These controls are defense in depth. Python object identity, a frozen dataclass, a caller digest, or a receipt-shaped value is not durable release/deployment authority.
+The package-root `AuthorizedPostgresActivationRegistry` also binds the admitted evidence provider, validation clock, generation registry, structural activation registry, and their PostgreSQL connection factories to a construction snapshot. It checks that capability identity before durable reads and around the external callback. This protects checked-as-used local capability meaning, but remains process-local defense in depth.
 
-### Durable generation/configuration authority
+Python object identity, a frozen dataclass, a caller digest, or a receipt-shaped value is not durable release/deployment authority.
 
-Migration `0018_product_composition_generation_registry.sql` persists normalized generation, owner-release, route, and route-method material. One `generation_id` cannot acquire two semantic meanings. Durable rows must reconstruct fresh canonical values and reproduce the configuration digest; a stored digest alone is insufficient. Generation material is append-only and destructive rewrite/truncation is rejected.
+### Durable generation/configuration authority — 0018
 
-Migration publication is also an invariant. RED `2c26cbfff8f3e1207e06d45a29699b818b6f1b26` showed that the original 0018 source did not require the generation tables and append-only/TRUNCATE guards to become visible together. #436 exact `6ebe5ec72ddb5d13b8550064cfc33ff1861d39e3` wraps the complete 0018 table/function/trigger DDL in one explicit `BEGIN/COMMIT`. A concurrent session therefore sees either no generation registry or the fully guarded registry.
+Migration `0018_product_composition_generation_registry.sql` persists normalized generation, owner-release, route, and route-method material. One `generation_id` cannot acquire two semantic meanings. Durable rows reconstruct fresh canonical values and reproduce the configuration digest; a stored digest alone is insufficient. Generation material is append-only and destructive rewrite/truncation is rejected.
 
-### Durable activation authority
+0018 publishes the generation registry and its mutation guards atomically. It also pins object publication to trusted `public` rather than trusting caller `search_path`. #436 exact `5fd0087179f2e6f23f2bb3853ad1de397fc53b0e` is the current Draft implementation authority for this layer.
 
-Migration `0019_product_composition_activation_registry.sql` introduces explicit non-PII `(deployment_id, environment_id)` identity, content-addressed external evidence, exact owner-operation observations, and append-only activation events. Activation and rollback serialize on the exact deployment row with `FOR UPDATE`; rollback is a new event targeting previously active immutable generation material rather than mutation of history.
+### Durable activation/recovery authority — 0019 through 0025
 
-The same publication invariant applies here. RED `a28882ef03751e665c422f30c254d7102624fbe7` showed that 0019 could expose deployment/evidence/observation/event relations before lineage, append-only, and TRUNCATE guards were installed under an autocommit runner. #437 exact `c8886e605e65779f38c813635954546f3e4431a4` wraps the complete 0019 ALTER/TABLE/FUNCTION/TRIGGER sequence in one explicit transaction. A concurrent session sees either no 0019 activation registry or the fully guarded registry.
+The ordered composition migration chain is **0018 -> 0019 -> 0020 -> 0021 -> 0022 -> 0023 -> 0024 -> 0025**.
 
-Migration `0020_product_composition_activation_authority_enforcement.sql` refuses predecessor NULL-evidence activation history and makes current activation events evidence-bound. The structural registry remains useful for predecessor-schema/fault tests, but current production schema does not allow evidence-free structural activation history.
+- **0019** introduces non-PII `(deployment_id, environment_id)` identity, content-addressed external evidence, exact owner-operation observations, and append-only activation events. Its relation/function/trigger publication is one transaction and explicitly targets `public`.
+- **0020** refuses predecessor NULL-evidence activation history and makes current activation events evidence-bound. The authority upgrade is transactionally fenced so a predecessor writer cannot cross the preflight/constraint-promotion boundary.
+- **0021** rejects future-dated or already-stale owner-operation observations against PostgreSQL wall clock, refuses grandfathered impossible predecessor history, and fences predecessor writers across the history scan and guard installation.
+- **0022** persists each successful restart re-admission as append-only recovery-attestation history bound to the exact current activation sequence, generation, and fresh `authorization_action='recover'` evidence. Its table and guards publish atomically.
+- **0023** makes direct activation and recovery writers acquire the same `product_composition_deployment` row lock before existing lineage/evidence triggers run. Product and direct-SQL writer serialization therefore share one database authority.
+- **0024** verifies the critical public trigger functions and rebinds all 16 activation/recovery INSERT, append-only, and TRUNCATE triggers to explicit `public.<function>()` identities. Trigger-function provenance is independent of migration-session `search_path`.
+- **0025** locks the parent generation authority plus all five activation/recovery relations and requires every child relation owner to match the owner of `public.product_composition_generation`. It rejects both split ownership and a uniform foreign transfer without silently repairing ownership with `ALTER OWNER`.
 
-### Database-clock observation authority
+The full-chain hostile-search-path contract executes 0018→0025 from a caller-controlled schema and requires all nine composition authority relations to remain in `public`, no authority relation/function to appear in the decoy schema, and all 16 activation/recovery triggers to bind trusted public functions.
 
-Migration `0021_product_composition_activation_observation_wall_clock.sql` rejects new owner-operation observations dated after PostgreSQL wall clock or already stale when persisted. It also refuses an upgrade over predecessor future-dated observation history.
+### Transition and recovery evidence
 
-The upgrade itself is transactional authority. #437 wraps the predecessor-history scan and permanent INSERT-guard installation in one explicit transaction, acquires `SHARE ROW EXCLUSIVE` on `product_composition_activation_owner_observation` before the scan, and holds that writer-conflicting lock through trigger creation. This closes the scan/install TOCTOU where a predecessor-schema writer could otherwise commit impossible history after preflight but before the guard became effective.
+Remote evidence acquisition stays outside the deployment-row lock. Activation/rollback obtains external evidence first, then the structural path locks the deployment, compares the exact prior sequence, reconstructs durable generation material, persists/verifies the evidence bundle, and appends the transition.
 
-The hostile PostgreSQL upgrade contract does not infer concurrency ordering from elapsed wall time. `3e868e804e7aeb15386e1f2b1e3b52a354b448e2` adds a regression forbidding the scheduler-sensitive fixed-sleep handshake; `2f3592ab777b92720f3fdac60f38e28752fcf502` tags the predecessor writer connection and polls `pg_stat_activity` until PostgreSQL itself reports that backend active inside its post-INSERT `pg_sleep`. Only then does the test start migration 0021. The race therefore depends on observed database state rather than runner scheduling.
+Recovery first reads the active durable event/generation and requires historical activation evidence, obtains fresh `recover` evidence outside the lock, then locks the deployment and requires the activation sequence and generation to remain exactly what was externally verified. It reconstructs the generation again, persists/verifies fresh evidence, and appends the next recovery attestation in the same local transaction.
 
-### Durable restart re-admission authority
-
-Migration `0022_product_composition_recovery_attestation.sql` persists each successful fresh restart re-admission as append-only recovery-attestation history bound to the exact current activation sequence, generation, and fresh `authorization_action='recover'` evidence. PostgreSQL rechecks recovery action/state binding, evidence expiry, and exact fresh owner-operation coverage before accepting the attestation. UPDATE, DELETE, and TRUNCATE are rejected.
-
-Remote evidence acquisition stays outside the deployment-row lock. Recovery reads current state, obtains fresh external evidence, then reacquires the exact deployment lock. The locked path fails closed unless activation sequence and generation still equal what was externally verified, reconstructs the generation again, persists/verifies the evidence bundle, and appends the recovery attestation in one local transaction. Network I/O is not held under `FOR UPDATE`.
-
-Recovery-attestation schema publication is atomic as well. RED `7d4ef88e1430796965feba2d49697e69f1f31d79` identified the autocommit visibility gap; `03eb4b0861a4f1de07c9b66c20f71ab28d378559` wraps 0022 table/function/trigger creation in one transaction so no externally visible unguarded attestation relation exists.
-
-The current composition migration order is therefore **0018 -> 0019 -> 0020 -> 0021 -> 0022**.
+Fresh recovery evidence is validated against the admitted local clock before the commit-capable call. PostgreSQL independently applies database-clock freshness while inserting evidence and the attestation. Once `recover_active_authorized()` returns, the durable transaction is committed; the product wrapper does not perform another fallible local-clock or capability decision that could report a false failure after that commit. A later request may fail closed if runtime capability integrity has been lost, but the committed attestation is not retrospectively reclassified.
 
 ## Product-composition contract
 
 The implementation owner introduces a versioned contract equivalent to `orgmetra_gateway_composition.v1`.
 
 A generation binds product/composition release provenance, schema/configuration identity, immutable owner API/OpenAPI/artifact/release coordinates, stable routes and methods, logical upstreams, required/optional readiness status, and deployment/activation coordinates. A Git commit may be provenance but does not replace an immutable consumer/deployment release. A caller-provided digest not reproducibly derived from admitted semantic material is not configuration authority.
-
-### Route admission
 
 Each route carries a stable lower-snake-case `route_id`, exact product path template and declared method set, exact `OwnerApiRelease`, owner-bound logical `service://` upstream, and required/optional status. One owner `service_id` maps to one exact release/OpenAPI/artifact identity per generation.
 
@@ -147,17 +163,15 @@ Composition may map a verified subject only to a namespaced opaque runtime actor
 
 Production activation requires immutable released Keyverse/Orgmetra policy coordinates and exact owner-operation evidence. Synthetic release locators/digests are test fixtures only and cannot establish buyer-ready authority.
 
-## Idempotency, retries, cancellation, and concurrency
+## Idempotency, retries, cancellation, errors, and scientific state
 
 Composition forwards canonical owner-required idempotency and optimistic-concurrency coordinates unchanged. Automatic retry is deny-by-default unless the exact released owner operation contract proves replay safety for the observed request state. An ambiguous post-commit transport failure never becomes a fresh mutation.
 
 User cancellation, upstream cancellation, owner timeout, composition administrative timeout, edge timeout, and connection loss remain distinguishable evidence.
 
-## Error and scientific-state preservation
-
 Owner HTTP status and versioned error/problem identity are preserved unless a separately versioned product contract defines a safe translation. Authorization denial, stale conflict, unavailable owner, timeout, `verification_pending`, `not_verifiable`, invalid evidence, or scientific non-convergence never becomes success. Client-visible failures exclude credentials, restricted HR payloads, stack traces, internal topology, and raw internal trace identifiers.
 
-## Operability, readiness, and recovery
+## Operability and readiness
 
 Edge liveness, composition liveness, configuration validity, generation/activation validity, identity-contract admission, per-owner route admission, fresh recovery re-admission, and buyer product readiness are separate signals. A process-local admission receipt is not buyer-readiness evidence.
 
@@ -174,14 +188,18 @@ Success, rejection, cancellation, timeout, partial response, and owner-unavailab
 - no owner release whose service identity disagrees with logical upstream;
 - no two exact releases for one owner `service_id` in one generation;
 - no exact Path Item split across owner releases without a future released merge/conformance contract;
-- no post-construction owner/route/generation/evidence retarget accepted as fresh authority;
+- no post-construction owner/route/generation/evidence/runtime-capability retarget accepted as fresh authority;
 - no receipt-shaped value treated as durable activation authority;
 - no future-dated or expired owner-operation observation admitted as current evidence;
-- no generation/activation/recovery authority relation externally visible before the guards defining its durable invariants are installed;
-- no predecessor migration writer allowed to cross the 0021 history-scan/guard-install boundary;
-- no concurrency regression that relies only on an arbitrary scheduler sleep to prove the hostile interleaving;
+- no generation/activation/recovery authority relation externally visible before guards defining its durable invariants are installed;
+- no caller-controlled migration path redirecting composition authority relations/functions;
+- no direct-SQL activation/recovery writer bypassing shared deployment-row serialization;
+- no activation/recovery trigger resolving through an untrusted function identity;
+- no child activation/recovery relation owner diverging from parent generation authority at provenance admission;
 - no evidence-free current-schema activation event;
 - no restart recovery claimed without append-only fresh recovery attestation;
+- no post-commit local observation reclassifying a committed recovery as failed;
+- no concurrency regression that relies only on arbitrary scheduler sleep to prove hostile interleaving;
 - no same-hierarchy path aliases, cross-owner ambiguous overlap, split GET/HEAD authority, URI dot-segment alias, or repeated template expression;
 - browser CORS/CSRF/cookie/session behavior explicit when used; and
 - every composition/configuration/deployment/recovery change attributable and auditable.
@@ -196,19 +214,23 @@ For paths designated applicable to the commercial target, p95 must be <=20 ms. E
 
 ## Risks and effects
 
-Atomic migration publication reduces schema-upgrade race surface but does not by itself prove that application transactions, owner releases, or deployment infrastructure are production-ready. Long-running DDL or lock contention remains an operability concern and must be measured on supported PostgreSQL deployment paths.
+The durable-authority design adds schema, lock, migration, test, and operational surface. This is accepted because configuration, activation, recovery, and external authorization need different lifecycles and must remain reconstructable after process exit.
 
-The explicit separation of configuration, activation, and recovery evidence adds schema and test surface. That cost is accepted because it keeps exact meaning, authorization action, and restart attribution reconstructable without moving HR truth into composition.
+Migration-level provenance checks do not themselves prove least-privilege production database-role deployment. Runtime/migrator role separation and privileges remain deployment evidence and must be demonstrated before release. A superuser or object owner can defeat ordinary DDL/DML guards; the production role model therefore cannot be inferred merely from successful migration tests.
+
+Writer-conflicting migration fences can block or be blocked by active transactions. Upgrade rehearsal must measure lock acquisition, timeout/abort behavior, rollback, and retry on supported PostgreSQL deployment paths.
 
 The bounded OpenAPI profile may reject valid future owner forms. Expansion is deliberate: a released owner need, compatibility contract, tests, and architecture review must precede a wider dialect.
 
 ## Verification and integration authority
 
-#433 remains Proposed until independent architecture admission. Its earlier exact source head `912fa44ec3b928500acea0291103cb41f6a6d7fc` had terminal Foundation, SAST, Security, and CodeQL success but no submitted review. ADR/TRACEABILITY have changed materially since then, so predecessor GREEN must not be transferred. Fresh exact-head evidence is required.
+#433 remains Proposed until independent architecture admission. This source currentization moves architecture evidence to current #436 `5fd0087179f2e6f23f2bb3853ad1de397fc53b0e` and #437 `960a5fbfcb98075862cdbee8ee094a9b8d7dcc55`; predecessor checks/reviews do not transfer to the resulting #433 head.
 
-#436 exact `6ebe5ec72ddb5d13b8550064cfc33ff1861d39e3` and #437 exact `c8886e605e65779f38c813635954546f3e4431a4` remain stacked Draft candidates rather than protected `develop`. Their static/Python/PostgreSQL contracts are executable source evidence rather than protected exact-head GREEN. Canonical execution remains owned by #260/#311 after their declared prerequisites. Those owners must not copy mutable composition source. Once their capability reaches protected truth, the composition stack ordinary-forward adopts it and executes the product-composition service, ordered migrations 0018→0022, 0018/0019/0022 atomic-publication contracts, concurrent 0021 upgrade contract, recovery-attestation contract, and 100% owned statement/branch coverage from the same exact candidate tree.
+#436/#437 remain stacked Draft candidates rather than protected `develop`. Their Python/static/PostgreSQL contracts are executable source evidence rather than protected exact-head GREEN. Canonical execution remains owned by #260/#311 after their declared prerequisites. Those owners must not copy mutable composition source. Once their capability reaches protected truth, the composition stack ordinary-forward adopts it and executes the product-composition service, ordered migrations 0018→0025, hostile generation/full-chain search-path contracts, 0020/0021 upgrade-race contracts, recovery-attestation and deployment-serialization contracts, trigger/relation-provenance contracts, runtime-capability integrity, the recovery commit-boundary regression, and 100% owned statement/branch/docstring/edge coverage from one exact candidate tree.
 
-#340 remains an inherited Foundation prerequisite and currently has a required CodeQL failure. No leaf shim, synthetic status, no-op rerun, routine administrator bypass, force-push/destructive rebase, self-approval, or gate weakening is authorized.
+#340 remains an inherited Foundation prerequisite. No leaf shim, synthetic status, no-op rerun, routine administrator bypass, force-push/destructive rebase, self-approval, or gate weakening is authorized.
+
+`API-01` remains Planned under #100 because no protected deployable buyer path exists.
 
 ## RED -> GREEN acceptance
 
@@ -217,9 +239,9 @@ GREEN requires all of the following on current protected/released truth:
 - supported deployable HTTP product composition bound to immutable generation/configuration/deployment identity;
 - released Keyverse consumer evidence and released Orgmetra ACL/purpose evidence;
 - released owner API/OpenAPI/artifact evidence and exact operation-level conformance;
-- fail-closed generation-ID reassignment, partial registry writes, route/release mismatch, invalid activation/rollback/recovery evidence, concurrent state changes, migration publication races, predecessor migration races, stale/future evidence, mutation/truncation attempts, and restart reconstruction;
+- fail-closed generation-ID reassignment, partial registry writes, route/release mismatch, invalid activation/rollback/recovery evidence, concurrent state changes, migration publication/provenance races, stale/future evidence, mutation/truncation attempts, runtime-capability retarget, and restart reconstruction;
 - exact-head pytest plus 100% owned statement/branch/docstring/edge evidence where tooling exposes it;
-- isolated PostgreSQL acceptance through the current ordered migration chain;
+- isolated PostgreSQL acceptance through ordered migrations 0018→0025;
 - Foundation/SAST/Security/CodeQL plus qualifying independent review;
 - supported Podman/Colima and Kubernetes deployment/recovery evidence;
 - fault/security/recovery rehearsal; and
@@ -228,15 +250,16 @@ GREEN requires all of the following on current protected/released truth:
 ## Implementation and release order
 
 1. Keep #432 as buyer-visible composition-gap owner and #433 Proposed until normal architecture admission.
-2. Resolve #340 and the canonical Foundation prerequisites through their owner lanes.
-3. Integrate #260/#311 capabilities to protected truth; composition then ordinary-forward adopts canonical service/PostgreSQL execution without copying mutable sibling source.
-4. Preserve #434 process-local admission, #436 durable generation/configuration, and #437 durable activation/recovery as separate evidence layers while reconciling them onto current protected truth.
-5. Obtain actual immutable Keyverse/Orgmetra/owner releases and prove positive activation plus restart recovery against those releases.
-6. Implement the deployable HTTP composition host and exact owner routing without taking HR domain truth.
-7. Acquire security/fault/recovery and complete buyer-path performance evidence.
-8. #51 reconciles protected ARCHITECTURE/TRD/API/SECURITY/THREAT_MODEL/TEST_STRATEGY/OPERABILITY/TRACEABILITY and reseals `manifest.json` after architecture admission.
-9. #100 changes durable gap state only when buyer/scientific truth actually changes.
-10. Protected integration then immutable Orgmetra release with version/CHANGELOG/tag/package/SBOM/provenance/reproducibility/rollback evidence.
+2. Currentize the architecture-owner TRACEABILITY on the same exact #436/#437 evidence, then reacquire #433 exact-head checks and independent review.
+3. Resolve #340 and canonical Foundation prerequisites through their owner lanes.
+4. Integrate #260/#311 capabilities to protected truth; composition then ordinary-forward adopts canonical service/PostgreSQL execution without copying mutable sibling source.
+5. Preserve #434 process-local admission, #436 durable generation/configuration, and #437 durable activation/recovery as separate evidence layers while reconciling them onto current protected truth.
+6. Obtain actual immutable Keyverse/Orgmetra/owner releases and prove positive activation plus restart recovery against those releases.
+7. Implement the deployable HTTP composition host and exact owner routing without taking HR domain truth.
+8. Acquire security/fault/recovery and complete buyer-path performance evidence.
+9. #51 reconciles protected ARCHITECTURE/TRD/API/SECURITY/THREAT_MODEL/TEST_STRATEGY/OPERABILITY/TRACEABILITY and reseals `manifest.json` after architecture admission.
+10. #100 changes durable gap state only when buyer/scientific truth actually changes.
+11. Protected integration then immutable Orgmetra release with version/CHANGELOG/tag/package/SBOM/provenance/reproducibility/rollback evidence.
 
 ## Consequences
 
@@ -250,6 +273,7 @@ The bounded OpenAPI profile reduces unsupported surface now but leaves an explic
 - Require #260/#311 canonical execution to discover the product-composition service and ordered PostgreSQL roots from the same candidate tree.
 - Re-run exact-head architecture checks after every material ADR/TRACEABILITY change; do not transfer predecessor GREEN.
 - Require independent architecture review before changing Status from Proposed.
+- Prove production database-role least privilege separately from migration trigger/owner provenance.
 - Change buyer-visible gap truth only through #100 after protected deployable evidence exists.
 
 ## References
