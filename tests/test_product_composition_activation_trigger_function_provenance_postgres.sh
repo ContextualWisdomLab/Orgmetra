@@ -104,3 +104,54 @@ if [[ ${update_status} -eq 0 ]]; then
 fi
 
 grep -q "append-only" /tmp/orgmetra-composition-trigger-provenance.log
+
+# A relation owner can alter that table's definition independently of ordinary grants.
+# Final authority publication therefore rejects split ownership instead of silently
+# repairing a drifted owner during an application migration.
+original_owner="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT pg_catalog.pg_get_userbyid(relation.relowner)
+FROM pg_catalog.pg_class AS relation
+JOIN pg_catalog.pg_namespace AS namespace
+  ON namespace.oid = relation.relnamespace
+WHERE namespace.nspname = 'public'
+  AND relation.relname = 'product_composition_deployment';
+")"
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE ROLE orgmetra_composition_foreign_owner NOLOGIN;
+ALTER TABLE public.product_composition_activation_event
+    OWNER TO orgmetra_composition_foreign_owner;
+SQL
+
+set +e
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -f database/migrations/0025_product_composition_activation_relation_owner_provenance.sql \
+    >/tmp/orgmetra-composition-relation-owner-provenance.log 2>&1
+owner_provenance_status=$?
+set -e
+
+if [[ ${owner_provenance_status} -eq 0 ]]; then
+    echo "split durable activation relation ownership was accepted" >&2
+    exit 1
+fi
+
+drifted_owner="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT pg_catalog.pg_get_userbyid(relation.relowner)
+FROM pg_catalog.pg_class AS relation
+JOIN pg_catalog.pg_namespace AS namespace
+  ON namespace.oid = relation.relnamespace
+WHERE namespace.nspname = 'public'
+  AND relation.relname = 'product_composition_activation_event';
+")"
+if [[ "${drifted_owner}" != "orgmetra_composition_foreign_owner" ]]; then
+    echo "relation-owner provenance migration silently repaired ownership drift" >&2
+    exit 1
+fi
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v original_owner="${original_owner}" <<'SQL'
+ALTER TABLE public.product_composition_activation_event OWNER TO :"original_owner";
+DROP ROLE orgmetra_composition_foreign_owner;
+SQL
+
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -f database/migrations/0025_product_composition_activation_relation_owner_provenance.sql
