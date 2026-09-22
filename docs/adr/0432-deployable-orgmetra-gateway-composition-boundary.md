@@ -24,7 +24,7 @@ The implementation stack is deliberately split by authority layer:
 
 - #434 exact `68bdf2d984ca7686219c335a85a6574195675cbe`: process-local route/generation admission and construction-integrity canary, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`.
 - #436 exact `98b4b129073a2afc70f8a533e34c31fdcc15ab07`: normalized durable generation/configuration registry and canonical reconstruction.
-- #437 exact `012c90889ea78db4baa18a2a7973717d00301be1`: durable deployment activation/rollback/recovery, external authorization evidence, owner-operation observations, database-clock freshness, and append-only recovery attestation. It is 84 commits ahead / 0 behind #436 at this verification point.
+- #437 exact `2f3592ab777b92720f3fdac60f38e28752fcf502`: durable deployment activation/rollback/recovery, external authorization evidence, owner-operation observations, database-clock freshness, append-only recovery attestation, and deterministic migration-concurrency testing. It is 86 commits ahead / 0 behind #436 at this verification point.
 
 All three remain Draft/unprotected implementation. Their existence does not close `API-01`, prove a released external dependency, establish buyer readiness, or authorize protected integration.
 
@@ -61,7 +61,9 @@ Migration `0020_product_composition_activation_authority_enforcement.sql` refuse
 
 Migration `0021_product_composition_activation_observation_wall_clock.sql` rejects new owner-operation observations dated after PostgreSQL wall clock or already stale when persisted. It also refuses an upgrade over predecessor future-dated observation history.
 
-The upgrade itself is transactional authority. #437's current repair wraps the predecessor-history scan and permanent INSERT-guard installation in one explicit transaction, acquires `SHARE ROW EXCLUSIVE` on `product_composition_activation_owner_observation` before the scan, and holds that writer-conflicting lock through trigger creation. This closes the scan/install TOCTOU where a predecessor-schema writer could otherwise commit impossible history after preflight but before the guard became effective. `tests/test_product_composition_activation_observation_wall_clock_upgrade_postgres.sh` models that concurrent writer.
+The upgrade itself is transactional authority. #437 wraps the predecessor-history scan and permanent INSERT-guard installation in one explicit transaction, acquires `SHARE ROW EXCLUSIVE` on `product_composition_activation_owner_observation` before the scan, and holds that writer-conflicting lock through trigger creation. This closes the scan/install TOCTOU where a predecessor-schema writer could otherwise commit impossible history after preflight but before the guard became effective.
+
+The hostile PostgreSQL upgrade contract does not infer concurrency ordering from elapsed wall time. `3e868e804e7aeb15386e1f2b1e3b52a354b448e2` adds a regression forbidding the scheduler-sensitive fixed-sleep handshake; `2f3592ab777b92720f3fdac60f38e28752fcf502` tags the predecessor writer connection and polls `pg_stat_activity` until PostgreSQL itself reports that backend active inside its post-INSERT `pg_sleep`. Only then does the test start migration 0021. The race therefore depends on observed database state rather than runner scheduling.
 
 ### Durable restart re-admission authority
 
@@ -133,6 +135,7 @@ Success, rejection, cancellation, timeout, partial response, and owner-unavailab
 - no receipt-shaped value treated as durable activation authority;
 - no future-dated or expired owner-operation observation admitted as current evidence;
 - no predecessor migration writer allowed to cross the 0021 history-scan/guard-install boundary;
+- no concurrency regression that relies only on an arbitrary scheduler sleep to prove the hostile interleaving;
 - no evidence-free current-schema activation event;
 - no restart recovery claimed without append-only fresh recovery attestation;
 - no same-hierarchy path aliases, cross-owner ambiguous overlap, split GET/HEAD authority, URI dot-segment alias, or repeated template expression;
@@ -149,9 +152,9 @@ For paths designated applicable to the commercial target, p95 must be <=20 ms. E
 
 ## Verification and integration authority
 
-#433 remains Proposed until independent architecture admission. Its previous exact source head `912fa44ec3b928500acea0291103cb41f6a6d7fc` had terminal Foundation, SAST, Security, and CodeQL success but no submitted review. This source currentization is a material head change, so predecessor GREEN must not be transferred; fresh exact-head evidence is required.
+#433 remains Proposed until independent architecture admission. Its earlier exact source head `912fa44ec3b928500acea0291103cb41f6a6d7fc` had terminal Foundation, SAST, Security, and CodeQL success but no submitted review. ADR/TRACEABILITY have changed materially since then, so predecessor GREEN must not be transferred. Fresh exact-head evidence is required.
 
-#437 remains stacked on #436 rather than protected `develop`, so its static/Python/PostgreSQL contracts are executable source evidence rather than protected exact-head GREEN. Canonical execution remains owned by #260/#311 after their declared prerequisites. Those owners must not copy mutable #437 source. Once their capability reaches protected truth, the composition stack ordinary-forward adopts it and executes the product-composition service, ordered migrations 0018→0022, concurrent 0021 upgrade contract, recovery-attestation contract, and 100% owned statement/branch coverage from the same exact candidate tree.
+#437 exact `2f3592ab777b92720f3fdac60f38e28752fcf502` remains stacked on #436 rather than protected `develop`, so its static/Python/PostgreSQL contracts are executable source evidence rather than protected exact-head GREEN. Canonical execution remains owned by #260/#311 after their declared prerequisites. Those owners must not copy mutable #437 source. Once their capability reaches protected truth, the composition stack ordinary-forward adopts it and executes the product-composition service, ordered migrations 0018→0022, concurrent 0021 upgrade contract, recovery-attestation contract, and 100% owned statement/branch coverage from the same exact candidate tree.
 
 #340 remains an inherited Foundation prerequisite and currently has a required CodeQL failure. #259/#311 are also blocked by their normal central gate/review dependencies. No leaf shim, synthetic status, no-op rerun, routine administrator bypass, force-push/destructive rebase, self-approval, or gate weakening is authorized.
 
