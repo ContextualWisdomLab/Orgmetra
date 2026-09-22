@@ -4,6 +4,9 @@ from pathlib import Path
 
 
 _MIGRATION = Path("database/migrations/0021_product_composition_activation_observation_wall_clock.sql")
+_UPGRADE_CONTRACT = Path(
+    "tests/test_product_composition_activation_observation_wall_clock_upgrade_postgres.sh"
+)
 
 
 def test_current_schema_rejects_future_dated_owner_observations() -> None:
@@ -36,3 +39,13 @@ def test_wall_clock_upgrade_fences_preflight_and_trigger_installation_atomically
     assert begin_index < lock_index < preflight_index < trigger_index < commit_index
     assert sql[:begin_index].strip().startswith("-- Reject owner-operation observations")
     assert sql[commit_index + len("COMMIT;") :].strip() == ""
+
+
+def test_upgrade_race_contract_waits_for_observed_writer_state() -> None:
+    """Require DB-observed writer readiness instead of a scheduler-sensitive fixed sleep."""
+    contract = _UPGRADE_CONTRACT.read_text(encoding="utf-8")
+
+    assert "pg_stat_activity" in contract
+    assert "writer_ready" in contract
+    assert "writer was not observed inside the predecessor transaction" in contract
+    assert "sleep 1" not in contract
