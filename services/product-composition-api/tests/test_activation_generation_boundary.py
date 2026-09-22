@@ -4,7 +4,6 @@ import pytest
 
 from orgmetra_product_composition import (
     ActivationAdmissionEvidence,
-    AuthorizedPostgresActivationRegistry,
     CompositionContractError,
     CompositionGeneration,
     CompositionRoute,
@@ -13,6 +12,9 @@ from orgmetra_product_composition import (
     OwnerOperationObservation,
     ReleasedAuthorityEvidence,
     configuration_sha256,
+)
+from orgmetra_product_composition.activation_authorization import (
+    AuthorizedPostgresActivationRegistry as AuthorizationRegistry,
 )
 
 
@@ -105,7 +107,7 @@ def test_external_evidence_provider_cannot_retarget_loaded_generation(monkeypatc
         object.__setattr__(generation_arg, "generation_id", "generation_two")
         return _evidence(generation_arg)
 
-    registry = AuthorizedPostgresActivationRegistry(
+    registry = AuthorizationRegistry(
         connection_factory=lambda: None,
         evidence_provider=retargeting_provider,
         clock_unix_ms=lambda: 1_500,
