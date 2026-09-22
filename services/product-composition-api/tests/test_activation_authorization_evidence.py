@@ -184,10 +184,14 @@ def test_authorized_registry_obtains_external_evidence_before_structural_activat
         assert generation_arg == generation
         return _evidence()
 
+    def clock_unix_ms() -> int:
+        order.append("freshness_check")
+        return 1_500
+
     registry = AuthorizedPostgresActivationRegistry(
         connection_factory=lambda: None,
         evidence_provider=evidence_provider,
-        clock_unix_ms=lambda: 1_500,
+        clock_unix_ms=clock_unix_ms,
     )
     monkeypatch.setattr(registry, "_generation_registry", GenerationRegistry())
     monkeypatch.setattr(registry, "_structural_registry", StructuralRegistry())
@@ -198,4 +202,9 @@ def test_authorized_registry_obtains_external_evidence_before_structural_activat
         expected_previous_sequence=0,
     )
 
-    assert order == ["load_generation", "external_evidence", "structural_activate"]
+    assert order == [
+        "load_generation",
+        "external_evidence",
+        "freshness_check",
+        "structural_activate",
+    ]
