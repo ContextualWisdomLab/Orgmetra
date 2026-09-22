@@ -618,6 +618,10 @@ class AuthorizedPostgresActivationRegistry:
         first = self._structural_registry.recover_active(deployment)
         if first is None:
             return None
+        if first.event.evidence_bundle_sha256 is None:
+            raise ActivationAuthorizationError(
+                "authorized recovery requires durable authorization evidence"
+            )
         evidence = self._obtain_evidence(deployment, first.generation)
         second = self._structural_registry.recover_active(deployment)
         if second is None or second != first:
