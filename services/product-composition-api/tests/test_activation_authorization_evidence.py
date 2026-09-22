@@ -7,7 +7,6 @@ import pytest
 from orgmetra_product_composition import (
     ActivationAdmissionEvidence,
     ActivationAuthorizationError,
-    AuthorizedPostgresActivationRegistry,
     CompositionGeneration,
     CompositionRoute,
     DeploymentIdentity,
@@ -16,7 +15,10 @@ from orgmetra_product_composition import (
     ReleasedAuthorityEvidence,
     configuration_sha256,
 )
-from orgmetra_product_composition.activation_authorization import _persist_activation_evidence
+from orgmetra_product_composition.activation_authorization import (
+    AuthorizedPostgresActivationRegistry as AuthorizationRegistry,
+    _persist_activation_evidence,
+)
 
 
 def _generation() -> CompositionGeneration:
@@ -223,7 +225,7 @@ def test_authorized_registry_persists_evidence_inside_structural_activation(monk
         order.append("freshness_check")
         return 1_500
 
-    registry = AuthorizedPostgresActivationRegistry(
+    registry = AuthorizationRegistry(
         connection_factory=lambda: None,
         evidence_provider=evidence_provider,
         clock_unix_ms=clock_unix_ms,
