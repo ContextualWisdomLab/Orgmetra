@@ -3,7 +3,6 @@ from __future__ import annotations
 from orgmetra_product_composition import (
     ActivationAdmissionEvidence,
     ActivationEvent,
-    AuthorizedPostgresActivationRegistry,
     CompositionGeneration,
     CompositionRoute,
     DeploymentIdentity,
@@ -12,6 +11,9 @@ from orgmetra_product_composition import (
     RecoveredActivation,
     ReleasedAuthorityEvidence,
     configuration_sha256,
+)
+from orgmetra_product_composition.activation_authorization import (
+    AuthorizedPostgresActivationRegistry as AuthorizationRegistry,
 )
 
 
@@ -133,7 +135,7 @@ def test_recovery_persists_fresh_evidence_only_after_locked_state_recheck(monkey
         assert state_sequence == 1
         return evidence
 
-    registry = AuthorizedPostgresActivationRegistry(
+    registry = AuthorizationRegistry(
         connection_factory=lambda: None,
         evidence_provider=evidence_provider,
         clock_unix_ms=lambda: 1_500,
@@ -147,3 +149,69 @@ def test_recovery_persists_fresh_evidence_only_after_locked_state_recheck(monkey
     assert recovered.evidence == evidence
     assert initial_reads == 1
     assert locked_rechecks == 1
+
+
+def test_recovery_does_not_reclassify_committed_attestation_with_post_commit_clock(
+    monkeypatch,
+) -> None:
+    deployment = DeploymentIdentity("orgmetra_gateway", "production")
+    generation = _generation()
+    structural = RecoveredActivation(
+        event=ActivationEvent(
+            deployment=deployment,
+            activation_sequence=1,
+            generation_id=generation.generation_id,
+            previous_generation_id=None,
+            event_kind="activate",
+            evidence_bundle_sha256="a" * 64,
+        ),
+        generation=generation,
+    )
+    evidence = _evidence(generation)
+    clock_reads = 0
+
+    class StructuralRegistry:
+        def recover_active(self, deployment_arg):
+            assert deployment_arg == deployment
+            return structural
+
+        def recover_active_authorized(
+            self,
+            deployment_arg,
+            *,
+            expected_activation_sequence,
+            expected_generation_id,
+            evidence_bundle_sha256,
+            evidence_writer,
+        ):
+            assert deployment_arg == deployment
+            assert expected_activation_sequence == 1
+            assert expected_generation_id == generation.generation_id
+            assert evidence_bundle_sha256 == evidence.bundle_sha256()
+            assert callable(evidence_writer)
+            return structural
+
+    def evidence_provider(deployment_arg, generation_arg, authorization_action, state_sequence):
+        assert deployment_arg == deployment
+        assert generation_arg == generation
+        assert authorization_action == "recover"
+        assert state_sequence == 1
+        return evidence
+
+    def clock_unix_ms() -> int:
+        nonlocal clock_reads
+        clock_reads += 1
+        return 1_500 if clock_reads == 1 else 2_500
+
+    registry = AuthorizationRegistry(
+        connection_factory=lambda: None,
+        evidence_provider=evidence_provider,
+        clock_unix_ms=clock_unix_ms,
+    )
+    monkeypatch.setattr(registry, "_structural_registry", StructuralRegistry())
+
+    recovered = registry.recover_active(deployment)
+
+    assert recovered is not None
+    assert recovered.evidence == evidence
+    assert clock_reads == 1
