@@ -55,14 +55,16 @@ def test_all_rebound_trigger_function_calls_are_schema_qualified() -> None:
     assert all(line.startswith("EXECUTE FUNCTION public.") for line in execute_lines)
 
 
-def test_activation_authority_relations_share_one_durable_owner() -> None:
-    """Reject split table ownership that could bypass another relation's trigger authority."""
+def test_activation_authority_relations_share_generation_authority_owner() -> None:
+    """Reject both split ownership and a uniformly retargeted activation authority owner."""
     sql = _RELATION_OWNER_MIGRATION.read_text(encoding="utf-8").strip()
 
     assert sql.startswith("BEGIN;")
     assert sql.endswith("COMMIT;")
     assert "SET LOCAL search_path = pg_catalog, public;" in sql
     assert "IN SHARE ROW EXCLUSIVE MODE;" in sql
+    assert "relation.relname = 'product_composition_generation'" in sql
+    assert "generation authority owner" in sql
     for relation in (
         "product_composition_deployment",
         "product_composition_activation_evidence",
@@ -72,5 +74,4 @@ def test_activation_authority_relations_share_one_durable_owner() -> None:
     ):
         assert f"'{relation}'" in sql
     assert "relation_owner IS DISTINCT FROM expected_owner" in sql
-    assert "is not owned by deployment authority owner" in sql
     assert "ALTER TABLE" not in sql
