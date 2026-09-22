@@ -97,6 +97,16 @@ CREATE TABLE product_composition_route_method (
         CHECK (method IN ('DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT'))
 );
 
+CREATE FUNCTION reject_product_composition_generation_registry_truncate()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+    RAISE EXCEPTION 'product composition generation registry is append-only; TRUNCATE is not allowed';
+END;
+$$;
+
 CREATE TRIGGER product_composition_generation_append_only_guard
 BEFORE UPDATE OR DELETE ON product_composition_generation
 FOR EACH ROW
@@ -116,3 +126,23 @@ CREATE TRIGGER product_composition_route_method_append_only_guard
 BEFORE UPDATE OR DELETE ON product_composition_route_method
 FOR EACH ROW
 EXECUTE FUNCTION reject_append_only_mutation();
+
+CREATE TRIGGER product_composition_generation_truncate_guard
+BEFORE TRUNCATE ON product_composition_generation
+FOR EACH STATEMENT
+EXECUTE FUNCTION reject_product_composition_generation_registry_truncate();
+
+CREATE TRIGGER product_composition_owner_release_truncate_guard
+BEFORE TRUNCATE ON product_composition_owner_release
+FOR EACH STATEMENT
+EXECUTE FUNCTION reject_product_composition_generation_registry_truncate();
+
+CREATE TRIGGER product_composition_route_truncate_guard
+BEFORE TRUNCATE ON product_composition_route
+FOR EACH STATEMENT
+EXECUTE FUNCTION reject_product_composition_generation_registry_truncate();
+
+CREATE TRIGGER product_composition_route_method_truncate_guard
+BEFORE TRUNCATE ON product_composition_route_method
+FOR EACH STATEMENT
+EXECUTE FUNCTION reject_product_composition_generation_registry_truncate();
