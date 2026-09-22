@@ -122,3 +122,54 @@ def test_authorized_recovery_rejects_structural_event_without_durable_evidence(m
         registry.recover_active(deployment)
 
     assert provider_calls == 0
+
+
+def test_authorized_recovery_preserves_durable_evidence_identity_and_fresh_re_admission(
+    monkeypatch,
+) -> None:
+    deployment = DeploymentIdentity("orgmetra_gateway", "production")
+    generation = _generation()
+    durable_evidence_sha256 = "a" * 64
+    structural = RecoveredActivation(
+        event=ActivationEvent(
+            deployment=deployment,
+            activation_sequence=1,
+            generation_id=generation.generation_id,
+            previous_generation_id=None,
+            event_kind="activate",
+            evidence_bundle_sha256=durable_evidence_sha256,
+        ),
+        generation=generation,
+    )
+    evidence = _evidence(generation)
+    provider_calls = 0
+    structural_reads = 0
+
+    class StructuralRegistry:
+        def recover_active(self, deployment_arg):
+            nonlocal structural_reads
+            structural_reads += 1
+            assert deployment_arg == deployment
+            return structural
+
+    def evidence_provider(deployment_arg, generation_arg):
+        nonlocal provider_calls
+        provider_calls += 1
+        assert deployment_arg == deployment
+        assert generation_arg == generation
+        return evidence
+
+    registry = AuthorizedPostgresActivationRegistry(
+        connection_factory=lambda: None,
+        evidence_provider=evidence_provider,
+        clock_unix_ms=lambda: 1_500,
+    )
+    monkeypatch.setattr(registry, "_structural_registry", StructuralRegistry())
+
+    recovered = registry.recover_active(deployment)
+
+    assert recovered is not None
+    assert recovered.event.evidence_bundle_sha256 == durable_evidence_sha256
+    assert recovered.evidence == evidence
+    assert provider_calls == 1
+    assert structural_reads == 2
