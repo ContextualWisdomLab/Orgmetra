@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
-
 import pytest
 
 from orgmetra_product_composition import (
@@ -127,11 +125,18 @@ def test_activation_evidence_rejects_expired_or_future_observation() -> None:
         )
 
     evidence = _evidence()
+    current = evidence.owner_operations[0]
     future_observation = OwnerOperationObservation(
-        **{
-            **evidence.owner_operations[0].__dict__,
-            "observed_at_unix_ms": 1_600,
-        }
+        route_id=current.route_id,
+        path_template=current.path_template,
+        method=current.method,
+        service_id=current.service_id,
+        release_version=current.release_version,
+        openapi_sha256=current.openapi_sha256,
+        artifact_sha256=current.artifact_sha256,
+        observation_sha256=current.observation_sha256,
+        observed_at_unix_ms=1_600,
+        valid_until_unix_ms=current.valid_until_unix_ms,
     )
     future = ActivationAdmissionEvidence(
         deployment_id=evidence.deployment_id,
