@@ -143,6 +143,7 @@ def test_activate_locks_deployment_revalidates_generation_and_appends_next_event
     assert event.generation_id == "generation_one"
     assert event.previous_generation_id is None
     assert event.event_kind == "activate"
+    assert event.evidence_bundle_sha256 is None
     statements = "\n".join(statement for statement, _ in cursor.executed)
     assert "FOR UPDATE" in statements
     assert "product_composition_activation_event" in statements
@@ -152,7 +153,7 @@ def test_activate_rejects_stale_expected_sequence_before_target_write() -> None:
     cursor = ScriptedCursor(
         [
             ("orgmetra_gateway", "production"),
-            (3, "generation_current", "activate", "generation_previous"),
+            (3, "generation_current", "activate", "generation_previous", None),
         ]
     )
     registry = PostgresActivationRegistry(_factory(ScriptedConnection(cursor)))
@@ -189,7 +190,7 @@ def test_activate_rejects_noop_same_generation_transition() -> None:
     cursor = ScriptedCursor(
         [
             ("orgmetra_gateway", "production"),
-            (4, "generation_current", "activate", "generation_previous"),
+            (4, "generation_current", "activate", "generation_previous", None),
         ]
     )
     registry = PostgresActivationRegistry(_factory(ScriptedConnection(cursor)))
@@ -205,7 +206,7 @@ def test_activate_rejects_noop_same_generation_transition() -> None:
 def test_rollback_requires_target_to_have_prior_activation_and_revalidates_it() -> None:
     fetches: list[object] = [
         ("orgmetra_gateway", "production"),
-        (2, "generation_two", "activate", "generation_one"),
+        (2, "generation_two", "activate", "generation_one", None),
         (1,),
         *_generation_rows("generation_one"),
         (3,),
@@ -223,13 +224,14 @@ def test_rollback_requires_target_to_have_prior_activation_and_revalidates_it() 
     assert event.event_kind == "rollback"
     assert event.previous_generation_id == "generation_two"
     assert event.generation_id == "generation_one"
+    assert event.evidence_bundle_sha256 is None
 
 
 def test_rollback_rejects_generation_never_active_on_deployment() -> None:
     cursor = ScriptedCursor(
         [
             ("orgmetra_gateway", "production"),
-            (2, "generation_two", "activate", "generation_one"),
+            (2, "generation_two", "activate", "generation_one", None),
             None,
         ]
     )
@@ -246,7 +248,7 @@ def test_rollback_rejects_generation_never_active_on_deployment() -> None:
 def test_recover_active_uses_one_repeatable_read_snapshot_and_reconstructs_generation() -> None:
     cursor = ScriptedCursor(
         [
-            (7, "generation_one", "activate", "generation_zero"),
+            (7, "generation_one", "activate", "generation_zero", "a" * 64),
             *_generation_rows("generation_one"),
         ]
     )
@@ -257,6 +259,7 @@ def test_recover_active_uses_one_repeatable_read_snapshot_and_reconstructs_gener
     assert recovered is not None
     assert recovered.event.activation_sequence == 7
     assert recovered.event.generation_id == recovered.generation.generation_id
+    assert recovered.event.evidence_bundle_sha256 == "a" * 64
     assert "REPEATABLE READ READ ONLY" in cursor.executed[0][0]
 
 
