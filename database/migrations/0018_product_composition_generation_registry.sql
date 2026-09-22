@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Persist admitted product-composition generations as immutable normalized authority.
 -- These tables own routing configuration only. They intentionally contain no HR domain,
 -- tenant, Keyverse, Person, Employment, Job, Position, Assignment, or assessment truth.
@@ -146,3 +148,5 @@ CREATE TRIGGER product_composition_route_method_truncate_guard
 BEFORE TRUNCATE ON product_composition_route_method
 FOR EACH STATEMENT
 EXECUTE FUNCTION reject_product_composition_generation_registry_truncate();
+
+COMMIT;
