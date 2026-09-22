@@ -19,6 +19,7 @@ SET search_path = composition_full_chain_decoy, public;
 \i database/migrations/0022_product_composition_recovery_attestation.sql
 \i database/migrations/0023_product_composition_deployment_write_serialization.sql
 \i database/migrations/0024_product_composition_activation_trigger_function_provenance.sql
+\i database/migrations/0025_product_composition_activation_relation_owner_provenance.sql
 SQL
 
 public_relation_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
@@ -102,5 +103,36 @@ WHERE NOT trigger_definition.tgisinternal
 ")"
 if [[ "${trusted_activation_trigger_count}" != "16" ]]; then
     echo "activation/recovery authority triggers did not bind exclusively to trusted public functions" >&2
+    exit 1
+fi
+
+shared_activation_owner_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+WITH deployment_owner AS (
+    SELECT relation.relowner AS owner_oid
+    FROM pg_catalog.pg_class AS relation
+    JOIN pg_catalog.pg_namespace AS namespace
+      ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = 'product_composition_deployment'
+      AND relation.relkind = 'r'
+)
+SELECT count(*)
+FROM pg_catalog.pg_class AS relation
+JOIN pg_catalog.pg_namespace AS namespace
+  ON namespace.oid = relation.relnamespace
+CROSS JOIN deployment_owner
+WHERE namespace.nspname = 'public'
+  AND relation.relkind = 'r'
+  AND relation.relname IN (
+      'product_composition_deployment',
+      'product_composition_activation_evidence',
+      'product_composition_activation_owner_observation',
+      'product_composition_activation_event',
+      'product_composition_recovery_attestation'
+  )
+  AND relation.relowner = deployment_owner.owner_oid;
+")"
+if [[ "${shared_activation_owner_count}" != "5" ]]; then
+    echo "activation/recovery authority relations do not share one durable owner" >&2
     exit 1
 fi
