@@ -8,198 +8,183 @@ Related Proposed ADR: `docs/adr/0432-deployable-orgmetra-gateway-composition-bou
 
 ## Protected-truth RED
 
-Protected `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` documents one buyer-visible Orgmetra Gateway and assigns API aggregation plus pre-handler Keyverse authentication responsibility to that boundary. Protected `docs/API_CONTRACT.md`, `docs/TRD.md`, `schemas/openapi.yaml`, and Foundation validation retain OpenAPI 3.2.0. The protected executable repository still has no supported deployable product-composition application across independently versioned owner services. This document is design/acceptance traceability only and does not turn that RED into shipped capability.
+Protected `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` still documents one buyer-visible Orgmetra Gateway while protected executable truth has no supported deployable product-composition application across independently versioned owner services. Protected `docs/API_CONTRACT.md`, `docs/TRD.md`, `schemas/openapi.yaml`, and Foundation validation retain OpenAPI 3.2.0. This file records design and acceptance evidence only; Draft implementation does not become shipped truth.
 
-Draft #434 is the first bounded executable canary under #432. It is stacked on #340 and remains unprotected, so it carries no deployment or release credit.
+`API-01` therefore remains Planned. #100 remains the only writer for `docs/product-technical-gap-baseline.md`, and #51 remains the protected architecture/technical-document reconciliation owner after architecture admission.
 
-## Fresh owner evidence
+## Current executable stack
 
-### Shared edge runtime
+| Layer | Owner | Exact candidate | What it proves | What it does not prove |
+|---|---|---|---|---|
+| Process-local route/generation admission | #434 | `68bdf2d984ca7686219c335a85a6574195675cbe` | canonical route/config identity, bounded OpenAPI path authority, nested construction/use-time integrity | durable generation/deployment authority, HTTP host, released owner evidence |
+| Durable generation/configuration | #436 | `98b4b129073a2afc70f8a533e34c31fdcc15ab07` | normalized reconstructable generation material, atomic registration, non-reassignable `generation_id`, append-only registry | deployment authorization/recovery, identity/ACL release evidence |
+| Durable activation/recovery | #437 | `012c90889ea78db4baa18a2a7973717d00301be1` | append-only activation/rollback, transition-bound external evidence, DB-clock owner observation validity, durable recovery attestation, migration-upgrade concurrency fence | protected exact-head GREEN, immutable external production releases, deployable HTTP composition, buyer-path SLO |
 
-`ContextualWisdomLab/pingora-gateway` protected `main@f8b4c99b8e5d3de79af1ff0c00c0c8fd63b52991` still has no published immutable GitHub Release. Its generic v1 owner contract requires one upstream and excludes product route tables, user-selected destinations, credentials, retry counts, Keyverse identity, and product authentication/authorization. The pg-erd multi-route path is migration-bounded and explicitly not a generic product-policy language.
+#434 remains stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`. #436 is directly stacked on #434. #437 is directly stacked on #436 and is 84 commits ahead / 0 behind that exact parent at this verification point. All are Draft/unprotected candidates.
 
-Two independent gates remain: the shared edge is unreleased, and even a future release of its current generic v1 contract would not implement Orgmetra multi-owner product composition.
-
-### Identity and authorization
-
-`ContextualWisdomLab/keyverse` protected `main@7d9151cd2da260e118020c938c7358e2ee75d541` still has an empty GitHub Release inventory. Keyverse #155 owns durable subject-trust semantics and #158 the broader immutable OIDC relying-party release envelope. Orgmetra #295/#297 own durable subject-to-Person binding/consumer ACL. Orgmetra #65 and domain owners retain purpose/resource authorization. Product composition may project one verified runtime principal but cannot become a second identity, Person-binding, or authorization authority.
-
-### Executable product-composition canary
-
-Draft #434 exact authority is `9ced14ae97f8c07285cdc3975f57a81c717313a2`, stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`, with 110 ordinary-forward commits / 17 changed files, all confined to `services/product-composition-api/**`.
-
-The canary proves only structural admission invariants:
-
-- exact owner release/OpenAPI/artifact/repository attribution and owner-bound logical upstream;
-- one exact `OwnerApiRelease` per `service_id` per generation;
-- one exact `OwnerApiRelease` per exact OpenAPI Path Item in the current product profile;
-- deterministic configuration digest over canonical route material;
-- invalid per-route and cross-route material rejected before configuration identity;
-- URI dot-segment and repeated path-template-expression rejection;
-- one exact OpenAPI template identity per parameter-name-independent path hierarchy;
-- distinct methods may share the same exact template string only inside the same exact owner release;
-- same-owner concrete-before-template precedence only for the same exact owner release and declared method set;
-- cross-owner concrete/template overlap and ambiguous two-templated overlap fail closed;
-- effective-method authority separate from path matching, with GET/HEAD treated as one selected-resource collision authority while declared methods remain exact contract material;
-- canonical 1..64-character lower-snake-case owner/route/generation identities and canonical path-template expressions;
-- process-local construction identity for `OwnerApiRelease`, `CompositionRoute`, and `CompositionGeneration`, rejecting valid-to-valid low-level retargeting of already-constructed evidence;
-- no composition-local retry/idempotency/concurrency taxonomy;
-- canonical process-local `AdmissionReceipt` field binding/source-generation leasing and deterministic receipt ordering;
-- use-time revalidation of owner/route/generation/config evidence; and
-- process-local generation construction/live-lineage protection without claiming durable activation authority.
-
-Production activation/rollback still needs immutable durable generation/configuration/deployment authority that rejects historical ID reassignment across process lifetimes.
-
-## Latest executable finding and repair
-
-The newest integrity finding is not another routing-policy change. After `OwnerApiRelease` construction identity was protected, `CompositionRoute` still lacked an original semantic construction identity. A caller using low-level mutation could retarget an already-created route to another individually valid route ID, path, method tuple, required flag, or a mutually consistent owner/upstream pair before configuration hashing. Constructor shape checks alone could not distinguish that retarget from a genuinely new route value.
-
-Ordinary-forward repair:
-
-- `0637353074d19327940b72821d497ffba131c284` -> `747c2a7a105e3abf23f8ddfbcb5b662f17e61924` -> `6744a55e95073b2c3f8572c62b84e555f580146a` first established process-local construction identity over all five `OwnerApiRelease` coordinates while keeping separately constructed successor releases legal;
-- `5935135daf9eb2a89bcfd32e32105d9bd9563f96` adds regression-first valid-to-valid `CompositionRoute` retarget cases;
-- `946d0a25faf5759233fb0aabeaf61f2fac653740` records a weak-referenceable, lock-protected closure-private route construction snapshot over `route_id`, path template, methods, exact owner release, logical upstream, and required status;
-- `9ced14ae97f8c07285cdc3975f57a81c717313a2` documents owner-release, route, and generation snapshots as process-local integrity evidence rather than durable activation provenance.
-
-The earlier Path Item ownership sequence remains `ede0b6d602d2160af6c3ae37253f9728ac4b1e08` -> `8b7b059d60bf732e1acc33dc63db2ad8d5cbb52a` -> `9852fe6bf1b4cddf1b4710d2908cb42019a0ac86`. The bounded-profile sequence remains `7a30ccd000c5e7b5a69e6f872277e7cf8fab2437` -> `a1b903cabc900b33ac4da36f3781bddc50cf57ee`. The deterministic path-selection sequence remains `fd7e7c69105fa2850dc30dd43014592f1a753eaa` -> `393cb561a1226529553baa6129378281cfba6f27` -> `a98dd5f7ffd175e2a7b3b5ca61255420f2959f8b`. Path-key identity remains `2b4f2211a2e332058bec31af11474d3937899855` -> `2c7bfcf75ec2d353d52ed86cbcd74dba5ddae3ea` -> `bf90bbfbc2eef88d57fd30286b41a86f483a3fa1`. Later test-only commits aligned stale assertions with the three-layer path model without weakening production admission.
-
-Earlier focused local figures at predecessor `cb32ba828...` are predecessor evidence only; material source/test writes followed. Exact `9ced14ae...` currently has no PR-triggered hosted workflow evidence.
-
-## Corrected context map
+## Ownership map
 
 ```mermaid
 flowchart LR
     client[Orgmetra workspaces / API clients]
-    edge[Released shared edge transport\noptional deployment layer]
-    composition[Orgmetra product composition\ndeployable application adapter]
-    keyverse[Keyverse released RP contract\n#155 semantics + #158 release]
-    identity_acl[Orgmetra identity ACL\n#295/#297]
-    authz[Purpose/resource authorization\n#65 + owner services]
-    people[people_core]
-    org[organization_core]
-    jobs[job_architecture]
-    talent[talent owners]
-    perf[performance_management]
-    assess[assessment_coordination]
-    validation[workforce_validation]
+    edge[Released shared edge transport\noptional]
+    composition[Orgmetra product composition\napplication adapter]
+    keyverse[Keyverse\nidentity / RP evidence]
+    acl[Orgmetra identity ACL\nsubject binding]
+    authz[Purpose/resource authorization\ndomain owners]
+    owners[People / Organization / Job / Talent / Performance / Assessment / Workforce APIs]
+    stores[Owner PostgreSQL schemas]
 
     client --> edge
     edge --> composition
-    client -. approved deployment without shared edge .-> composition
-    composition -. verify released identity contract .-> keyverse
-    composition --> identity_acl
-    identity_acl --> authz
-    authz --> people
-    authz --> org
-    authz --> jobs
-    authz --> talent
-    authz --> perf
-    authz --> assess
-    authz --> validation
+    client -. deployment without shared edge .-> composition
+    composition -. released identity evidence .-> keyverse
+    composition --> acl
+    acl --> authz
+    authz --> owners
+    owners --> stores
 ```
 
-The protected product label “Orgmetra Gateway” remains the buyer-facing boundary. Internally, generic edge transport and product composition have different owners. Composition is an application adapter, not an HR bounded context.
+Product composition is an application adapter, not another HR bounded context. It owns no Person, Employment, Assignment, Organization, Position, Job Architecture/FJA/KSAO, Talent, Assessment, Performance, or Workforce scientific truth. It does not query owner application tables. Keyverse retains credential/identity authority; Orgmetra identity/ACL owners retain subject binding; domain owners retain purpose/resource authorization, idempotency, concurrency, retry/replay semantics, errors, and scientific states.
 
-## Ownership matrix
+## Admission authority — #434
 
-| Concern | Owner | Composition role | Forbidden behavior |
-|---|---|---|---|
-| Generic network/proxy/TLS/drain | released shared-edge owner | consume supported released capability | copy mutable edge source or reinterpret single-upstream config as product routing |
-| Product route/admission generation | Orgmetra #432 | bind reproducible admitted owner operations | rewrite constructed owner/route/generation meaning; overclaim full OpenAPI support; split one exact Path Item across owner releases; same-hierarchy aliases; cross-owner/ambiguous path overlap; split GET/HEAD authority; dot-segment aliases; repeated expressions; split owner release identities |
-| Identity issuer/profile | Keyverse | consume released RP verifier/profile | issue credentials or broaden Keyverse with HR claims |
-| Durable subject trust | Keyverse #155 packaged by #158 | preserve released semantics | assume every syntactically valid `sub` is durably bindable |
-| Durable subject-to-Person binding / ACL | Orgmetra #295/#297 | consume/revalidate evidence | mint Person truth in composition |
-| Runtime actor/tenant projection | Orgmetra composition constrained by #295/#297 | map verified identity to request coordinates | implicit UUID cast or decoded-only trust |
-| Purpose/resource authorization | Orgmetra #65 + domain owners | propagate exact context; coarse early denial only | make role/scope/purpose self-authorizing |
-| Person/Employment/Assignment | People | route and preserve owner semantics | query/write People tables |
-| Organization/Position | Organization | route and preserve owner semantics | query/write Organization tables |
-| Job/FJA/KSAO | Job Architecture | route and preserve owner semantics | copy ontology/job schema |
-| Talent/selection | owning Talent context | route and preserve owner semantics | make employment decisions |
-| Assessment assignment intent | assessment coordination | route and preserve owner semantics | own execution/scoring/result truth |
-| Scientific validity/fairness | Workforce Validation | preserve scientific states/errors | coerce pending/not-verifiable/non-convergence to success |
-| Mutation idempotency/replay | owning domain service | forward owner coordinates and consume released replay semantics | invent a second replay taxonomy/state |
-| Optimistic concurrency | owning domain service | forward exact owner coordinate | create composition-local version truth |
-| Retry safety | released owner operation contract | deny by default unless exact owner contract authorizes replay | infer positive safety from method alone |
+Current #434 exact authority is `68bdf2d984ca7686219c335a85a6574195675cbe`, 114 commits / 17 changed files on its current parent. Its relevant invariants include:
 
-## Composition manifest semantics
+- exact owner release/OpenAPI/artifact/repository attribution and owner-bound logical upstream;
+- one exact release identity per owner `service_id` in one generation;
+- one exact owner release per exact Path Item in the current bounded product profile;
+- deterministic configuration digest over canonical route material;
+- fail-closed canonical owner/route/generation identifiers and path-template expressions;
+- parameter-name-independent OpenAPI path identity;
+- same-owner concrete-before-template precedence only when owner release and declared method set agree;
+- cross-owner concrete/template overlap and ambiguous templated overlap rejection;
+- operation authority separated from path matching, with GET/HEAD sharing selected-resource collision authority while declared methods remain exact material;
+- rejection of URI `.`/`..` segments and repeated template expressions;
+- process-local construction snapshots for owner-release, route, generation, deployment/evidence values where defined; and
+- canonical process-local receipt issuance and use-time revalidation.
 
-A future executable `orgmetra_gateway_composition.v1` or equivalent identifies product/composition release provenance, schema/config/generation/activation identity, optional shared-edge release, Keyverse release/profile, Orgmetra identity-ACL version, stable route identity, exact product path and method set, exact owner API/OpenAPI/artifact/release coordinates, owner-bound logical upstream, coarse capability, authoritative tenant/actor/purpose locations, and required/optional criticality.
+A process-local snapshot or receipt proves only that one live object/graph has not been reinterpreted. It is not cross-process release or activation authority.
 
-Configuration digest is computed from canonical semantic projection. A generation identifier cannot be reassigned to a different semantic graph. One owner service maps to one exact owner release per generation. One exact OpenAPI Path Item maps to one exact owner release in the current bounded profile. Owner idempotency/replay/concurrency/error/retry semantics are referenced through released owner evidence rather than copied.
+## Durable generation/configuration authority — #436 / migration 0018
 
-Path concerns remain separate:
+#436 exact `98b4b129073a2afc70f8a533e34c31fdcc15ab07` projects one admitted generation into normalized generation, owner-release, route, and route-method rows through `PostgresGenerationRegistry`.
 
-- **Supported profile:** protected product truth is OpenAPI 3.2.0, while the canary intentionally supports a fail-closed subset of OAS path/method forms.
-- **Path-key identity:** same-hierarchy templates with different placeholder names are one OpenAPI identity and cannot coexist.
-- **Path Item ownership:** distinct methods may reuse one exact path only under the same exact `OwnerApiRelease`; cross-owner Path Item composition requires a future released contract that reconciles path-level shared semantics.
-- **Deterministic path matching:** a concrete path may coexist with its templated counterpart only inside the same exact owner release and same declared method set.
-- **Ambiguity rejection:** overlapping templated paths with no defined winner remain fail-closed.
-- **Operation authority:** after Path Item ownership and path matching are valid, effective-method collision is evaluated separately; GET/HEAD share one selected-resource collision authority.
-- **Canonical URI/template syntax:** dot segments are rejected rather than normalized and a path cannot repeat one template expression.
+Required evidence properties:
 
-A mutable branch, PR SHA, copied schema, floating tag, reachable endpoint, constructor success, self-consistent rewritten graph, split owner release identity, cross-owner exact Path Item, ambiguous path, unsupported method/path form, or receipt-shaped value alone is not route authority. Process-local construction snapshots prove only that a live value has not been reinterpreted since construction; they do not replace immutable release/deployment provenance.
+- one `generation_id` cannot be reassigned to different semantic material;
+- exact re-registration is idempotent only for the complete identical durable record set;
+- generation/children persist atomically;
+- reload reconstructs fresh canonical #434 values and recomputes `config_sha256`;
+- missing, split, or forged route/release material cannot be accepted merely because a stored digest matches a caller value; and
+- UPDATE, DELETE, and TRUNCATE cannot rewrite registry history.
 
-## RED -> GREEN evidence map
+This layer stores composition truth only. It does not copy owner tables, tenant/Person data, Keyverse data, or scientific state.
 
-| RED / risk | Required GREEN evidence | Owner lane |
+## Durable activation/recovery authority — #437 / migrations 0019–0022
+
+Current ordered migration chain is **0018 -> 0019 -> 0020 -> 0021 -> 0022**.
+
+### 0019 — deployment, evidence, activation sequence
+
+`0019_product_composition_activation_registry.sql` introduces explicit non-PII deployment/environment identity, content-addressed external authority evidence, exact owner-operation observations, and append-only activation events. Per-deployment `FOR UPDATE` serializes compare-and-append state. Rollback is another event targeting previously active immutable generation material.
+
+External evidence is evaluated before the deployment lock. After lock acquisition, durable state is rechecked before the event is appended. Composition therefore avoids holding remote network I/O under the local transaction lock.
+
+### 0020 — evidence-bound current activation
+
+`0020_product_composition_activation_authority_enforcement.sql` refuses predecessor NULL-evidence activation history and requires current activation events to identify the exact evidence bundle that authorized them. Evidence-free structural activation remains only a predecessor-schema/fault-test primitive, not current production authority.
+
+### 0021 — database-clock owner-observation authority and upgrade fencing
+
+`0021_product_composition_activation_observation_wall_clock.sql` makes PostgreSQL reject owner-operation observations dated after database wall clock or already stale at persistence. It also refuses upgrade over predecessor future-dated history.
+
+Fresh review found the predecessor migration performed the history scan and trigger installation in separate autocommitted statements. A concurrent predecessor-schema writer could therefore insert impossible future-dated evidence after preflight, commit while `CREATE TRIGGER` waited, and leave that row grandfathered into the upgraded schema.
+
+The repair sequence is:
+
+- `0c4e4972ddf3b10e58b0da1983f91a71299454ee` — RED/static contract requires one explicit transaction and a writer-conflicting migration fence around scan plus guard installation.
+- `e61fdcc775db7fb0fbdb66cf662456f43911f9d9` — migration acquires `SHARE ROW EXCLUSIVE` on `product_composition_activation_owner_observation` before scanning predecessor history and retains it through permanent INSERT-guard creation.
+- `012c90889ea78db4baa18a2a7973717d00301be1` — native PostgreSQL upgrade contract starts a concurrent predecessor writer, keeps it open while 0021 begins, and requires the fenced migration to wait, observe the committed impossible row, then fail closed.
+
+This is a migration-concurrency repair, not a product-policy expansion.
+
+### 0022 — durable restart re-admission
+
+`0022_product_composition_recovery_attestation.sql` records each successful fresh restart re-admission as append-only history bound to exact deployment, current activation sequence, generation, and fresh `authorization_action='recover'` evidence.
+
+The product path obtains fresh remote recovery evidence outside the deployment lock, then locks the deployment and requires the exact active sequence/generation to remain unchanged. It reconstructs generation material again, persists/verifies the evidence bundle, and appends the next recovery attestation atomically. PostgreSQL independently rechecks recovery action/state binding, evidence expiry, and exact fresh owner-operation coverage. UPDATE, DELETE, and TRUNCATE of recovery history are rejected.
+
+A historical activation event therefore remains historical activation evidence; restart authorization is separately attributable rather than silently rewriting the old event.
+
+## External authority boundary
+
+Production positive activation/recovery still requires actual immutable released evidence, not release-shaped fixtures:
+
+- Keyverse released consumer/RP evidence for verified identity;
+- immutable Orgmetra subject-binding / ACL / purpose-policy evidence;
+- exact released owner API/OpenAPI/artifact coordinates;
+- one fresh owner-operation observation for every admitted route/path/method/release coordinate; and
+- exact authorization action plus durable state sequence.
+
+Composition may deny early but may not create Person truth or replace owner authorization. Missing, duplicate, stale, future-dated, wrong-generation, wrong-action, wrong-state, wrong-owner, or incomplete operation evidence fails closed.
+
+## Canonical execution dependency
+
+#260 owns repository-level service runtime discovery/compatibility. Product composition must be evaluated from its own dependency closure rather than inheriting People/Job Analysis runtime floors by name.
+
+#311 owns fail-closed PostgreSQL Foundation root discovery/execution. Its current Draft exact head remains on the #259 stack and intentionally fails when an exact candidate contains an unregistered `tests/test_*_postgres.sh` root. It must not copy mutable #437 files or register phantom paths. Once canonical discovery/execution reaches protected truth, the composition owner must ordinary-forward adopt that protected owner and register/execute its roots from the same exact candidate tree.
+
+Current composition acceptance must then include:
+
+- `services/product-composition-api` under its truthful declared interpreter/dependency closure;
+- exact pytest configuration and 100% owned statement/branch coverage;
+- migration order 0018→0019→0020→0021→0022;
+- current generation/activation/authorization/truncate/wall-clock contracts;
+- `tests/test_product_composition_activation_observation_wall_clock_upgrade_postgres.sh` including the concurrent upgrade race; and
+- `tests/test_product_composition_recovery_attestation_postgres.sh`.
+
+A predecessor-schema, predecessor-head, source-tree `PYTHONPATH`, or feature-local workflow result cannot substitute for this evidence.
+
+## RED → GREEN evidence map
+
+| RED / risk | Required GREEN evidence | Owner |
 |---|---|---|
-| Gateway documented but no deployable composition | supported local + Kubernetes composition bound to immutable identities | #432 |
-| shared edge unreleased or wrong contract | owner immutable release + supported capability | pingora-gateway owner |
-| Keyverse RP consumer unreleased | released verifier/profile/fixtures + provenance/rollback | Keyverse #155/#158 |
-| decoded/unverified identity trusted | issuer/audience/signature/algorithm/time/JWKS verification before projection | Keyverse + Orgmetra conformance |
-| raw subject becomes Person truth | #295/#297 released binding evidence; forged/stale/cross-tenant fails closed | #295/#297 |
-| scope/role bypasses purpose/resource auth | #65/domain-owner denial survives E2E | #65 + domain owner + composition |
-| route lacks released owner API/operation | missing/floating/incompatible owner contract or absent operation rejected | #432/#434 + owner conformance |
-| one service has multiple release identities | reject before admission and on use-time revalidation | #432/#434 |
-| constructed owner release or route is retargeted to another valid meaning | reject against process-local construction snapshot; require new value for new semantics | #432/#434 |
-| one exact Path Item is split across owner releases | reject before configuration identity; broaden only with explicit released path-item merge/conformance evidence | #432/#433/#434 + owner conformance |
-| config digest is caller label | recompute deterministic digest from canonical route material | #434 |
-| generation meaning rewritten | construction identity and use-time graph revalidation reject drift | #432/#434 + activation |
-| canary is presented as full OpenAPI 3.2 support | document/test bounded route profile; broaden only from released-owner evidence | #433/#434 |
-| same hierarchy uses different placeholder names under any methods | reject before hashing; distinct methods may reuse one exact template only inside one owner release | #434 + HTTP E2E |
-| same-owner concrete/template precedence is rejected | allow only same exact owner release + same method set; prove concrete route wins | #434 + HTTP E2E |
-| concrete/template overlap crosses owner boundary | reject before hashing/admission | #434 + HTTP E2E |
-| overlapping templated paths have no deterministic winner | reject unless a future explicit released contract defines semantics | #434 + HTTP E2E |
-| overlapping routes split one effective method authority including GET/HEAD | reject before activation; keep declared method sets unchanged | #434 + HTTP E2E |
-| URI dot segment or repeated template expression admitted | reject before hashing/admission | #434 + HTTP E2E |
-| logical upstream disagrees with owner release | owner-bound upstream invariant rejects route | #434 + HTTP E2E |
-| receipt fields drift or stale source graph is trusted | canonical field binding plus current source-graph revalidation | #434; durable activation independent |
-| tuple ordering changes receipt evidence | deterministic route-ID ordering | #434 + activation evidence |
-| local retry/idempotency/concurrency taxonomy substitutes for owner truth | no local replay taxonomy; exact owner contract controls replay | #432/#434 + owner |
-| route admission is presented as buyer readiness | readiness also requires identity/ACL/runtime/dependency evidence | #432 operability |
-| contradictory tenant/actor/purpose coordinates | deterministic fail closed | composition + identity ACL |
-| ambiguous post-commit failure duplicates mutation | no fresh mutation; only owner-declared same-key replay | fault E2E |
-| owner denial/scientific non-success becomes success | preserve exact status/state/error identity | composition E2E |
-| partial/stale configuration activates | generation-atomic activation against immutable identity | operability |
-| cancellation/timeout leaks resources | bounded cleanup across deployed layers | runtime E2E |
-| composition reaches peer DB | credentials/network/code prohibit cross-service SQL | security |
-| latency benchmark bypasses deployed layer or DB | full deployed path measured | performance acceptance |
+| documented Gateway but no deployable composition | supported local/Kubernetes HTTP composition bound to immutable identities | #432 |
+| owner route lacks immutable release/operation authority | released OpenAPI/artifact + operation conformance, fail closed when absent | #432/#434 + owner |
+| process-local value retargeted after construction | construction/use-time integrity rejects retarget; new meaning requires new value | #434 |
+| same generation ID acquires new durable meaning | normalized registry rejects reassignment and reconstructs digest from durable material | #436 |
+| partial generation rows become activatable | atomic registration and reconstruction fail closed | #436 |
+| activation event has no external authority | current schema requires exact evidence bundle and complete operation observations | #437 / 0020 |
+| authorization decision replayed for another action/state | exact action + authorized state sequence enforced in code and DB | #437 |
+| owner observation claims future/stale knowledge | Python validation plus PostgreSQL wall-clock rejection | #437 / 0021 |
+| concurrent predecessor writer crosses 0021 preflight/guard gap | transaction + `SHARE ROW EXCLUSIVE` fence + concurrent native regression | #437 / 0021 |
+| restart is considered authorized only in process memory | append-only fresh recovery attestation bound to current sequence/generation/evidence | #437 / 0022 |
+| composition queries peer HR tables | service credentials/code/network tests prohibit cross-service SQL | security/domain owners |
+| owner denial/scientific non-success becomes success | exact status/state/error identity preserved end-to-end | composition + owners |
+| benchmark omits deployed layer/database/auth/audit | complete deployed buyer path with separated layer costs | performance acceptance |
+| Draft source is treated as shipped truth | #51/#100 reconcile only after normal protected integration | #51/#100 |
 
-## Identity projection and replay invariants
+## Verification boundary
 
-#155 decides durable subject-correlation eligibility; #158 cannot silently broaden it. #295/#297 remain the durable subject-binding path. Verified Keyverse `sub` maps only to an opaque namespaced actor reference through a versioned ACL. `org`/`workspace` require explicit Orgmetra mapping. #65/domain owners still evaluate business purpose/resource. Missing verifier/JWKS/ACL/owner evidence is failure, never permissive fallback.
+#433's previous exact source head `912fa44ec3b928500acea0291103cb41f6a6d7fc` had terminal Foundation, SAST, Security, and CodeQL success but no submitted review. The ADR and this traceability file have now changed materially to become code-current with #436/#437, so those predecessor check results do not transfer. Fresh exact-head hosted evidence is required before architecture admission.
 
-Product composition has no local replay truth. If an owner commits a mutation but the response is lost, same-key replay occurs only when the exact released owner operation contract authorizes it; the owner returns the original committed identity and composition preserves it. HTTP idempotency semantics constrain the protocol but do not prove application replay safety.
+#437 exact `012c90889ea78db4baa18a2a7973717d00301be1` remains Draft and has no PR-triggered hosted run at this verification point because it is stacked on #436 rather than protected `develop`. Its Python/static/PostgreSQL contracts are source evidence, not exact-head GREEN.
 
-## Performance evidence
+#340 remains an inherited Foundation prerequisite with Foundation/SAST/Security success but a required CodeQL failure. #259 remains Draft with Security and CodeQL failures. #311 remains Draft on #259 and has no protected-base PR-triggered run. These owners must resolve normally; no leaf shim, synthetic status, blind/no-op rerun, self-approval, routine administrator bypass, or gate weakening is valid evidence.
 
-The measured buyer path is:
+## Remaining buyer-visible acceptance
 
-`k6/client -> [shared edge if deployed] -> Orgmetra composition -> owner HTTP -> PostgreSQL -> owner -> composition -> [edge] -> client`
+The composition gap remains open until the following converge on protected/released truth:
 
-For designated ordinary paths p95 <= 20 ms. Evidence records load shape, deployment identity, right-to-use dataset, PostgreSQL/schema/index/RLS state, auth/audit state, identity/ACL coordinates, composition release/config/generation identity, optional edge release, owner API/OpenAPI identity, hardware/runtime, and timestamps. Slow requests are not discarded, samples are not shrunk to pass, and auth/audit/database layers are not skipped.
+1. normal architecture admission for ADR 0432;
+2. canonical service/PostgreSQL exact-candidate execution and 100% owned coverage;
+3. actual immutable Keyverse/Orgmetra/owner releases and positive activation/restart recovery against them;
+4. a deployable HTTP composition host preserving identity, authorization, owner errors and replay/concurrency semantics;
+5. supported local/Podman/Colima and Kubernetes operation, rollback and recovery;
+6. security, fault, cancellation and resource-cleanup acceptance;
+7. full applicable path `client/k6 -> [shared edge if deployed] -> composition -> owner HTTP -> PostgreSQL -> owner -> composition -> [edge] -> client` at p95 <=20 ms without reduced samples, discarded slow requests, disabled auth/audit, mocked owner/DB, or warm-cache-only substitution;
+8. #51 protected documentation/manifest reconciliation and #100 buyer-gap reconciliation; and
+9. version/CHANGELOG/tag/package/immutable release/SBOM/provenance/reproducibility/rollback evidence.
 
-## Deployment and recovery evidence
-
-GREEN requires production-equivalent Podman/Colima boundaries, supported Kubernetes packaging, immutable artifact/image identities, no cross-schema composition credentials, separate liveness/config/identity/route/readiness signals, bounded drain, immutable generation activation/rollback with owner compatibility revalidation, and logs/metrics/traces that exclude credentials/restricted HR payloads and unbounded sensitive labels.
-
-## Single-writer handoff
-
-- #432 remains the executable product-composition gap owner; #434 is its bounded first slice.
-- #433 owns this Proposed ADR/traceability/doctoring lane. This source is current through process-local owner-release and route construction integrity as well as prior bounded-profile, Path Item ownership, path identity/matching, receipt, owner/upstream, release-coherence, use-time revalidation, generation identity, receipt ordering, GET/HEAD, URI dot-segment, and repeated-expression findings.
-- #340 remains the Foundation prerequisite/owner; #434 remains stacked on it to avoid a parallel Foundation writer.
-- #51 remains canonical writer for protected ARCHITECTURE/TRD/API/SECURITY/THREAT_MODEL/TEST_STRATEGY/OPERABILITY/TRACEABILITY and manifest reconciliation after architecture admission.
-- #100 remains sole writer for `docs/product-technical-gap-baseline.md`; `API-01` stays Planned while #434 is unprotected and non-deployable.
-- Keyverse #155/#158, Orgmetra #295/#297/#65, domain API owners, and pingora-gateway retain their authority.
-
-No source in this Proposed lane or Draft #434 grants protected integration, release, deployment, buyer-readiness, or performance credit.
+No open PR, synthetic fixture, commit SHA, process-local receipt, or mutable branch is release authority.
