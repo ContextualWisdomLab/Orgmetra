@@ -193,10 +193,22 @@ class PostgresGenerationRegistry:
 
         return restored
 
-    def load(self, generation_id: str) -> CompositionGeneration | None:
-        """Reload durable rows and reconstruct canonical admitted generation semantics."""
+    def load(
+        self,
+        generation_id: str,
+        *,
+        _connection_factory: PostgresConnectionFactory | None = None,
+    ) -> CompositionGeneration | None:
+        """Reload durable rows through the current or explicitly pinned database capability."""
         lookup_generation_id = _bounded_lookup_generation_id(generation_id)
-        with self.connection_factory() as connection:
+        connection_factory = (
+            self.connection_factory if _connection_factory is None else _connection_factory
+        )
+        if self.connection_factory is not connection_factory:
+            raise CompositionRegistryError(
+                "generation registry no longer uses expected PostgreSQL connection factory"
+            )
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
                 records = self._load_record_set(cursor, lookup_generation_id)
