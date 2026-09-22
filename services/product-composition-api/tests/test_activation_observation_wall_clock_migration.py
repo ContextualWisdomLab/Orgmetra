@@ -3,9 +3,17 @@
 from pathlib import Path
 
 
-_MIGRATION = Path("database/migrations/0021_product_composition_activation_observation_wall_clock.sql")
-_UPGRADE_CONTRACT = Path(
-    "tests/test_product_composition_activation_observation_wall_clock_upgrade_postgres.sh"
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_MIGRATION = (
+    _REPO_ROOT
+    / "database"
+    / "migrations"
+    / "0021_product_composition_activation_observation_wall_clock.sql"
+)
+_UPGRADE_CONTRACT = (
+    _REPO_ROOT
+    / "tests"
+    / "test_product_composition_activation_observation_wall_clock_upgrade_postgres.sh"
 )
 
 
