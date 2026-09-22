@@ -3,6 +3,7 @@ from __future__ import annotations
 from orgmetra_product_composition import (
     ActivationAdmissionEvidence,
     ActivationEvent,
+    AuthorizedPostgresActivationRegistry,
     CompositionGeneration,
     CompositionRoute,
     DeploymentIdentity,
@@ -151,7 +152,7 @@ def test_recovery_persists_fresh_evidence_only_after_locked_state_recheck(monkey
     assert locked_rechecks == 1
 
 
-def test_recovery_does_not_reclassify_committed_attestation_with_post_commit_clock(
+def test_product_recovery_does_not_reclassify_committed_attestation_with_post_commit_clock(
     monkeypatch,
 ) -> None:
     deployment = DeploymentIdentity("orgmetra_gateway", "production")
@@ -203,7 +204,13 @@ def test_recovery_does_not_reclassify_committed_attestation_with_post_commit_clo
         clock_reads += 1
         return 1_500 if clock_reads == 1 else 2_500
 
-    registry = AuthorizationRegistry(
+    class ProductRecoveryHarness(AuthorizedPostgresActivationRegistry):
+        __slots__ = ()
+
+        def _require_runtime_capabilities(self) -> None:
+            return None
+
+    registry = ProductRecoveryHarness(
         connection_factory=lambda: None,
         evidence_provider=evidence_provider,
         clock_unix_ms=clock_unix_ms,
