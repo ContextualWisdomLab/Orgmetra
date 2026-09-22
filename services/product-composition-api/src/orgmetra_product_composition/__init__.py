@@ -10,6 +10,7 @@ from .activation import (
 from .activation_authorization import (
     ActivationAdmissionEvidence,
     ActivationAuthorizationError,
+    AuthorizationAction,
     AuthorizedActivation,
     AuthorizedPostgresActivationRegistry,
     AuthorizedRecoveredActivation,
@@ -41,6 +42,7 @@ __all__ = [
     "ActivationEvent",
     "ActivationRegistryError",
     "AdmissionReceipt",
+    "AuthorizationAction",
     "AuthorizedActivation",
     "AuthorizedPostgresActivationRegistry",
     "AuthorizedRecoveredActivation",
