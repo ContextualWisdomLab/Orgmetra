@@ -18,9 +18,9 @@ Protected `develop@eb9757f8649aaad026a9865508d9aad50c1a7a4f` still documents one
 |---|---|---|---|---|
 | Process-local route/generation admission | #434 | `68bdf2d984ca7686219c335a85a6574195675cbe` | canonical route/config identity, bounded OpenAPI path authority, nested construction/use-time integrity | durable generation/deployment authority, HTTP host, released owner evidence |
 | Durable generation/configuration | #436 | `98b4b129073a2afc70f8a533e34c31fdcc15ab07` | normalized reconstructable generation material, atomic registration, non-reassignable `generation_id`, append-only registry | deployment authorization/recovery, identity/ACL release evidence |
-| Durable activation/recovery | #437 | `012c90889ea78db4baa18a2a7973717d00301be1` | append-only activation/rollback, transition-bound external evidence, DB-clock owner observation validity, durable recovery attestation, migration-upgrade concurrency fence | protected exact-head GREEN, immutable external production releases, deployable HTTP composition, buyer-path SLO |
+| Durable activation/recovery | #437 | `2f3592ab777b92720f3fdac60f38e28752fcf502` | append-only activation/rollback, transition-bound external evidence, DB-clock owner observation validity, durable recovery attestation, transactionally fenced and deterministically exercised migration upgrade | protected exact-head GREEN, immutable external production releases, deployable HTTP composition, buyer-path SLO |
 
-#434 remains stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`. #436 is directly stacked on #434. #437 is directly stacked on #436 and is 84 commits ahead / 0 behind that exact parent at this verification point. All are Draft/unprotected candidates.
+#434 remains stacked on #340 exact `28f2bd28414e217f7e848ba86c0cfdbe97fd518f`. #436 is directly stacked on #434. #437 is directly stacked on #436 and is 86 commits ahead / 0 behind that exact parent at this verification point. All are Draft/unprotected candidates.
 
 ## Ownership map
 
@@ -105,9 +105,14 @@ The repair sequence is:
 
 - `0c4e4972ddf3b10e58b0da1983f91a71299454ee` — RED/static contract requires one explicit transaction and a writer-conflicting migration fence around scan plus guard installation.
 - `e61fdcc775db7fb0fbdb66cf662456f43911f9d9` — migration acquires `SHARE ROW EXCLUSIVE` on `product_composition_activation_owner_observation` before scanning predecessor history and retains it through permanent INSERT-guard creation.
-- `012c90889ea78db4baa18a2a7973717d00301be1` — native PostgreSQL upgrade contract starts a concurrent predecessor writer, keeps it open while 0021 begins, and requires the fenced migration to wait, observe the committed impossible row, then fail closed.
+- `012c90889ea78db4baa18a2a7973717d00301be1` — native PostgreSQL upgrade contract starts a concurrent predecessor writer and requires the fenced migration to fail closed on the committed impossible row.
 
-This is a migration-concurrency repair, not a product-policy expansion.
+A second review found that the first concurrent test used a fixed `sleep 1` to infer that the background writer had reached the intended transaction state. That was scheduler-sensitive and could exercise a different ordering on a slow runner. The test evidence was repaired rather than accepted as-is:
+
+- `3e868e804e7aeb15386e1f2b1e3b52a354b448e2` — RED/static contract requires database-observed writer readiness and forbids the fixed `sleep 1` handshake.
+- `2f3592ab777b92720f3fdac60f38e28752fcf502` — writer connection is tagged with `PGAPPNAME=orgmetra_wall_clock_upgrade_writer`; the shell contract polls `pg_stat_activity` until PostgreSQL reports that exact backend active inside its post-INSERT `SELECT pg_sleep(...)`, then starts migration 0021. If readiness is not observed, the contract fails explicitly.
+
+This turns the hostile interleaving from a scheduler-timing assumption into database-state evidence. The migration policy itself is unchanged.
 
 ### 0022 — durable restart re-admission
 
@@ -141,7 +146,7 @@ Current composition acceptance must then include:
 - exact pytest configuration and 100% owned statement/branch coverage;
 - migration order 0018→0019→0020→0021→0022;
 - current generation/activation/authorization/truncate/wall-clock contracts;
-- `tests/test_product_composition_activation_observation_wall_clock_upgrade_postgres.sh` including the concurrent upgrade race; and
+- `tests/test_product_composition_activation_observation_wall_clock_upgrade_postgres.sh` with database-observed concurrent writer readiness; and
 - `tests/test_product_composition_recovery_attestation_postgres.sh`.
 
 A predecessor-schema, predecessor-head, source-tree `PYTHONPATH`, or feature-local workflow result cannot substitute for this evidence.
@@ -159,6 +164,7 @@ A predecessor-schema, predecessor-head, source-tree `PYTHONPATH`, or feature-loc
 | authorization decision replayed for another action/state | exact action + authorized state sequence enforced in code and DB | #437 |
 | owner observation claims future/stale knowledge | Python validation plus PostgreSQL wall-clock rejection | #437 / 0021 |
 | concurrent predecessor writer crosses 0021 preflight/guard gap | transaction + `SHARE ROW EXCLUSIVE` fence + concurrent native regression | #437 / 0021 |
+| race test passes because runner scheduling happened to match | observe exact writer backend state in PostgreSQL before starting migration | #437 tests |
 | restart is considered authorized only in process memory | append-only fresh recovery attestation bound to current sequence/generation/evidence | #437 / 0022 |
 | composition queries peer HR tables | service credentials/code/network tests prohibit cross-service SQL | security/domain owners |
 | owner denial/scientific non-success becomes success | exact status/state/error identity preserved end-to-end | composition + owners |
@@ -167,9 +173,9 @@ A predecessor-schema, predecessor-head, source-tree `PYTHONPATH`, or feature-loc
 
 ## Verification boundary
 
-#433's previous exact source head `912fa44ec3b928500acea0291103cb41f6a6d7fc` had terminal Foundation, SAST, Security, and CodeQL success but no submitted review. The ADR and this traceability file have now changed materially to become code-current with #436/#437, so those predecessor check results do not transfer. Fresh exact-head hosted evidence is required before architecture admission.
+#433's earlier exact source head `912fa44ec3b928500acea0291103cb41f6a6d7fc` had terminal Foundation, SAST, Security, and CodeQL success but no submitted review. ADR/TRACEABILITY have changed materially to reflect #436/#437 and the deterministic concurrency evidence, so those predecessor check results do not transfer. Fresh exact-head hosted evidence is required before architecture admission.
 
-#437 exact `012c90889ea78db4baa18a2a7973717d00301be1` remains Draft and has no PR-triggered hosted run at this verification point because it is stacked on #436 rather than protected `develop`. Its Python/static/PostgreSQL contracts are source evidence, not exact-head GREEN.
+#437 exact `2f3592ab777b92720f3fdac60f38e28752fcf502` remains Draft and has no PR-triggered hosted run at this verification point because it is stacked on #436 rather than protected `develop`. Its Python/static/PostgreSQL contracts are source evidence, not exact-head GREEN.
 
 #340 remains an inherited Foundation prerequisite with Foundation/SAST/Security success but a required CodeQL failure. #259 remains Draft with Security and CodeQL failures. #311 remains Draft on #259 and has no protected-base PR-triggered run. These owners must resolve normally; no leaf shim, synthetic status, blind/no-op rerun, self-approval, routine administrator bypass, or gate weakening is valid evidence.
 
