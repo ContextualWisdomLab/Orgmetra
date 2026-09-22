@@ -141,7 +141,7 @@ def test_authorized_recovery_rejects_structural_event_without_durable_evidence(m
     assert provider_calls == 0
 
 
-def test_authorized_recovery_preserves_durable_evidence_identity_and_fresh_re_admission(
+def test_authorized_recovery_preserves_activation_evidence_and_persists_fresh_re_admission(
     monkeypatch,
 ) -> None:
     deployment = DeploymentIdentity("orgmetra_gateway", "production")
@@ -161,12 +161,31 @@ def test_authorized_recovery_preserves_durable_evidence_identity_and_fresh_re_ad
     evidence = _evidence(generation)
     provider_calls = 0
     structural_reads = 0
+    locked_rechecks = 0
 
     class StructuralRegistry:
         def recover_active(self, deployment_arg):
             nonlocal structural_reads
             structural_reads += 1
             assert deployment_arg == deployment
+            return structural
+
+        def recover_active_authorized(
+            self,
+            deployment_arg,
+            *,
+            expected_activation_sequence,
+            expected_generation_id,
+            evidence_bundle_sha256,
+            evidence_writer,
+        ):
+            nonlocal locked_rechecks
+            locked_rechecks += 1
+            assert deployment_arg == deployment
+            assert expected_activation_sequence == structural.event.activation_sequence
+            assert expected_generation_id == generation.generation_id
+            assert evidence_bundle_sha256 == evidence.bundle_sha256()
+            assert callable(evidence_writer)
             return structural
 
     def evidence_provider(deployment_arg, generation_arg, authorization_action, state_sequence):
@@ -191,4 +210,5 @@ def test_authorized_recovery_preserves_durable_evidence_identity_and_fresh_re_ad
     assert recovered.event.evidence_bundle_sha256 == durable_evidence_sha256
     assert recovered.evidence == evidence
     assert provider_calls == 1
-    assert structural_reads == 2
+    assert structural_reads == 1
+    assert locked_rechecks == 1
