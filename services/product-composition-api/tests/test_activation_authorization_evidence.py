@@ -268,7 +268,7 @@ def test_transaction_evidence_writer_rejects_digest_collision_material() -> None
         _persist_activation_evidence(cursor, evidence)
 
 
-def test_activation_migration_binds_evidence_and_checks_expiry_at_event_insert() -> None:
+def test_activation_migration_binds_evidence_and_checks_wall_clock_expiry_at_event_insert() -> None:
     migration = (
         Path(__file__).resolve().parents[3]
         / "database"
@@ -282,5 +282,5 @@ def test_activation_migration_binds_evidence_and_checks_expiry_at_event_insert()
     assert "authorization_decision_sha256" in migration
     assert "keyverse_release_version" in migration
     assert "orgmetra_policy_version_code" in migration
-    assert "transaction_timestamp()" in migration
+    assert "clock_timestamp()" in migration
     assert "activation authorization evidence is expired" in migration
