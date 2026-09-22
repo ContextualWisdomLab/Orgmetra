@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import gc
+from pathlib import Path
 import weakref
 
 import pytest
@@ -225,3 +227,23 @@ def test_runtime_capabilities_must_support_non_rooting_identity_evidence() -> No
             evidence_provider=lambda *_args: None,  # type: ignore[return-value]
             clock_unix_ms=NonWeakClock(),
         )
+
+
+def test_runtime_integrity_owned_functions_are_documented() -> None:
+    """Require a docstring for every production function owned by the runtime-integrity module."""
+
+    module_path = (
+        Path(__file__).parents[1]
+        / "src"
+        / "orgmetra_product_composition"
+        / "activation_runtime_integrity.py"
+    )
+    tree = ast.parse(module_path.read_text(encoding="utf-8"))
+    missing = [
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and ast.get_docstring(node) is None
+    ]
+
+    assert missing == []
