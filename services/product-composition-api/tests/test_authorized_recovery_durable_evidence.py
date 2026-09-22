@@ -63,6 +63,8 @@ def _evidence(generation: CompositionGeneration) -> ActivationAdmissionEvidence:
         environment_id="production",
         generation_id=generation.generation_id,
         config_sha256=generation.config_sha256,
+        authorization_action="recover",
+        authorized_state_sequence=1,
         keyverse_authority=_authority("keyverse", "3" * 64),
         orgmetra_authority=_authority("orgmetra", "4" * 64),
         orgmetra_policy_version_code="composition_activation_v1",
@@ -117,11 +119,13 @@ def test_authorized_recovery_rejects_structural_event_without_durable_evidence(m
             assert deployment_arg == deployment
             return structural
 
-    def evidence_provider(deployment_arg, generation_arg):
+    def evidence_provider(deployment_arg, generation_arg, authorization_action, state_sequence):
         nonlocal provider_calls
         provider_calls += 1
         assert deployment_arg == deployment
         assert generation_arg == generation
+        assert authorization_action == "recover"
+        assert state_sequence == 1
         return _evidence(generation)
 
     registry = AuthorizedPostgresActivationRegistry(
@@ -165,11 +169,13 @@ def test_authorized_recovery_preserves_durable_evidence_identity_and_fresh_re_ad
             assert deployment_arg == deployment
             return structural
 
-    def evidence_provider(deployment_arg, generation_arg):
+    def evidence_provider(deployment_arg, generation_arg, authorization_action, state_sequence):
         nonlocal provider_calls
         provider_calls += 1
         assert deployment_arg == deployment
         assert generation_arg == generation
+        assert authorization_action == "recover"
+        assert state_sequence == 1
         return evidence
 
     registry = AuthorizedPostgresActivationRegistry(
