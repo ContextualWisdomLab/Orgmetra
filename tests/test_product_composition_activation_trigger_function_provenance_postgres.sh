@@ -117,6 +117,20 @@ WHERE namespace.nspname = 'public'
   AND relation.relname = 'product_composition_deployment';
 ")"
 
+generation_owner="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT pg_catalog.pg_get_userbyid(relation.relowner)
+FROM pg_catalog.pg_class AS relation
+JOIN pg_catalog.pg_namespace AS namespace
+  ON namespace.oid = relation.relnamespace
+WHERE namespace.nspname = 'public'
+  AND relation.relname = 'product_composition_generation';
+")"
+
+if [[ "${generation_owner}" != "${original_owner}" ]]; then
+    echo "test prerequisite failed: generation and deployment authority owners already differ" >&2
+    exit 1
+fi
+
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
 CREATE ROLE orgmetra_composition_foreign_owner NOLOGIN;
 ALTER TABLE public.product_composition_activation_event
@@ -148,8 +162,61 @@ if [[ "${drifted_owner}" != "orgmetra_composition_foreign_owner" ]]; then
     exit 1
 fi
 
+# Uniformly moving the entire activation/recovery subsystem is still authority drift.
+# The generation registry is the parent durable composition authority and remains the
+# owner anchor; 0025 must not accept a foreign owner merely because all five child
+# relations were transferred together.
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+ALTER TABLE public.product_composition_deployment
+    OWNER TO orgmetra_composition_foreign_owner;
+ALTER TABLE public.product_composition_activation_evidence
+    OWNER TO orgmetra_composition_foreign_owner;
+ALTER TABLE public.product_composition_activation_owner_observation
+    OWNER TO orgmetra_composition_foreign_owner;
+ALTER TABLE public.product_composition_recovery_attestation
+    OWNER TO orgmetra_composition_foreign_owner;
+SQL
+
+set +e
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 \
+    -f database/migrations/0025_product_composition_activation_relation_owner_provenance.sql \
+    >/tmp/orgmetra-composition-uniform-owner-drift.log 2>&1
+uniform_owner_status=$?
+set -e
+
+if [[ ${uniform_owner_status} -eq 0 ]]; then
+    echo "uniform foreign activation/recovery relation ownership was accepted" >&2
+    exit 1
+fi
+
+grep -q "generation authority owner" /tmp/orgmetra-composition-uniform-owner-drift.log
+
+foreign_owner_count="$(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "
+SELECT count(*)
+FROM pg_catalog.pg_class AS relation
+JOIN pg_catalog.pg_namespace AS namespace
+  ON namespace.oid = relation.relnamespace
+WHERE namespace.nspname = 'public'
+  AND relation.relname IN (
+      'product_composition_deployment',
+      'product_composition_activation_evidence',
+      'product_composition_activation_owner_observation',
+      'product_composition_activation_event',
+      'product_composition_recovery_attestation'
+  )
+  AND pg_catalog.pg_get_userbyid(relation.relowner) = 'orgmetra_composition_foreign_owner';
+")"
+if [[ "${foreign_owner_count}" != "5" ]]; then
+    echo "relation-owner provenance migration changed uniformly drifted ownership" >&2
+    exit 1
+fi
+
 psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -v original_owner="${original_owner}" <<'SQL'
+ALTER TABLE public.product_composition_deployment OWNER TO :"original_owner";
+ALTER TABLE public.product_composition_activation_evidence OWNER TO :"original_owner";
+ALTER TABLE public.product_composition_activation_owner_observation OWNER TO :"original_owner";
 ALTER TABLE public.product_composition_activation_event OWNER TO :"original_owner";
+ALTER TABLE public.product_composition_recovery_attestation OWNER TO :"original_owner";
 DROP ROLE orgmetra_composition_foreign_owner;
 SQL
 
