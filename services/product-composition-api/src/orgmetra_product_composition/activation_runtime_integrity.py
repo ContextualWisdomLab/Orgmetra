@@ -120,6 +120,18 @@ def _build_runtime_capability_construction_guard():
 _record_or_require_runtime_capabilities = _build_runtime_capability_construction_guard()
 
 
+def _require_pinned_connection_factory(
+    adapter: PostgresGenerationRegistry | PostgresActivationRegistry,
+    expected_factory: object,
+) -> None:
+    """Reject nested adapter drift after the outer runtime guard and before database use."""
+
+    if adapter.connection_factory is not expected_factory:
+        raise ActivationAuthorizationError(
+            "AuthorizedPostgresActivationRegistry no longer matches its construction snapshot"
+        )
+
+
 class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry):
     """Product-facing activation registry with checked-as-used executable capabilities."""
 
@@ -137,11 +149,16 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         _record_or_require_runtime_capabilities(self)
 
     def _load_target(self, generation_id: str) -> CompositionGeneration:
-        """Load through the adapter instance that was checked at the use boundary."""
+        """Load through the adapter and DB factory checked at the use boundary."""
 
         generation_registry = self._generation_registry
+        connection_factory = generation_registry.connection_factory
         self._require_runtime_capabilities()
-        generation = generation_registry.load(generation_id)
+        _require_pinned_connection_factory(generation_registry, connection_factory)
+        generation = generation_registry.load(
+            generation_id,
+            _connection_factory=connection_factory,
+        )
         if generation is None:
             raise ActivationAuthorizationError(
                 "activation authorization requires a persisted generation"
@@ -205,7 +222,7 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         generation_id: str,
         expected_previous_sequence: int,
     ) -> AuthorizedActivation:
-        """Pin the checked structural adapter before committing an authorized activation."""
+        """Pin checked adapter and DB factory before committing authorized activation."""
 
         generation = self._load_target(generation_id)
         evidence = self._obtain_evidence(
@@ -215,13 +232,16 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
             authorized_state_sequence=expected_previous_sequence,
         )
         structural_registry = self._structural_registry
+        connection_factory = structural_registry.connection_factory
         self._require_runtime_capabilities()
+        _require_pinned_connection_factory(structural_registry, connection_factory)
         event = structural_registry.activate_authorized(
             deployment,
             generation_id=generation.generation_id,
             expected_previous_sequence=expected_previous_sequence,
             evidence_bundle_sha256=evidence.bundle_sha256(),
             evidence_writer=self._evidence_writer(evidence),
+            _connection_factory=connection_factory,
         )
         return AuthorizedActivation(event=event, generation=generation, evidence=evidence)
 
@@ -232,7 +252,7 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         generation_id: str,
         expected_previous_sequence: int,
     ) -> AuthorizedActivation:
-        """Pin the checked structural adapter before committing an authorized rollback."""
+        """Pin checked adapter and DB factory before committing authorized rollback."""
 
         generation = self._load_target(generation_id)
         evidence = self._obtain_evidence(
@@ -242,13 +262,16 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
             authorized_state_sequence=expected_previous_sequence,
         )
         structural_registry = self._structural_registry
+        connection_factory = structural_registry.connection_factory
         self._require_runtime_capabilities()
+        _require_pinned_connection_factory(structural_registry, connection_factory)
         event = structural_registry.rollback_authorized(
             deployment,
             generation_id=generation.generation_id,
             expected_previous_sequence=expected_previous_sequence,
             evidence_bundle_sha256=evidence.bundle_sha256(),
             evidence_writer=self._evidence_writer(evidence),
+            _connection_factory=connection_factory,
         )
         return AuthorizedActivation(event=event, generation=generation, evidence=evidence)
 
@@ -264,8 +287,13 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         """
 
         structural_registry = self._structural_registry
+        connection_factory = structural_registry.connection_factory
         self._require_runtime_capabilities()
-        first = structural_registry.recover_active(deployment)
+        _require_pinned_connection_factory(structural_registry, connection_factory)
+        first = structural_registry.recover_active(
+            deployment,
+            _connection_factory=connection_factory,
+        )
         self._require_runtime_capabilities()
         if first is None:
             return None
@@ -282,13 +310,16 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         )
 
         structural_registry = self._structural_registry
+        connection_factory = structural_registry.connection_factory
         self._require_runtime_capabilities()
+        _require_pinned_connection_factory(structural_registry, connection_factory)
         second = structural_registry.recover_active_authorized(
             deployment,
             expected_activation_sequence=first.event.activation_sequence,
             expected_generation_id=first.generation.generation_id,
             evidence_bundle_sha256=evidence.bundle_sha256(),
             evidence_writer=self._evidence_writer(evidence),
+            _connection_factory=connection_factory,
         )
 
         # Do not add a fallible capability/freshness recheck here. The structural call above
