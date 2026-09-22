@@ -3,11 +3,18 @@
 from pathlib import Path
 
 
-_TRIGGER_MIGRATION = Path(
-    "database/migrations/0024_product_composition_activation_trigger_function_provenance.sql"
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_TRIGGER_MIGRATION = (
+    _REPO_ROOT
+    / "database"
+    / "migrations"
+    / "0024_product_composition_activation_trigger_function_provenance.sql"
 )
-_RELATION_OWNER_MIGRATION = Path(
-    "database/migrations/0025_product_composition_activation_relation_owner_provenance.sql"
+_RELATION_OWNER_MIGRATION = (
+    _REPO_ROOT
+    / "database"
+    / "migrations"
+    / "0025_product_composition_activation_relation_owner_provenance.sql"
 )
 
 
