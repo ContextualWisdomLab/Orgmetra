@@ -159,8 +159,8 @@ def test_external_evidence_provider_cannot_retarget_runtime_clock_after_construc
         )
 
 
-def test_runtime_capability_snapshot_retains_admitted_clock_identity_until_registry_dies() -> None:
-    """Keep original executable capabilities alive so object-id reuse cannot spoof the snapshot."""
+def test_runtime_capability_snapshot_keeps_non_reusable_identity_witness() -> None:
+    """A collected admitted capability stays invalid even if a later address is reused."""
 
     class Clock:
         def __call__(self) -> int:
@@ -174,17 +174,13 @@ def test_runtime_capability_snapshot_retains_admitted_clock_identity_until_regis
         clock_unix_ms=clock,
     )
 
-    del clock
     registry.clock_unix_ms = Clock()
+    del clock
     gc.collect()
 
-    assert admitted_clock() is not None
+    assert admitted_clock() is None
     with pytest.raises(ActivationAuthorizationError, match="construction snapshot"):
         registry._require_runtime_capabilities()
-
-    del registry
-    gc.collect()
-    assert admitted_clock() is None
 
 
 def test_runtime_capability_snapshot_does_not_root_registry_through_provider_cycle() -> None:
@@ -212,3 +208,20 @@ def test_runtime_capability_snapshot_does_not_root_registry_through_provider_cyc
 
     assert registry_reference() is None
     assert provider_reference() is None
+
+
+def test_runtime_capabilities_must_support_non_rooting_identity_evidence() -> None:
+    """Fail closed when a callable cannot provide a weak-reference identity witness."""
+
+    class NonWeakClock:
+        __slots__ = ()
+
+        def __call__(self) -> int:
+            return 1_500
+
+    with pytest.raises(TypeError, match="clock_unix_ms must support weak-reference identity"):
+        AuthorizedPostgresActivationRegistry(
+            connection_factory=lambda: None,
+            evidence_provider=lambda *_args: None,  # type: ignore[return-value]
+            clock_unix_ms=NonWeakClock(),
+        )
