@@ -9,7 +9,7 @@ SET LOCAL search_path = pg_catalog, public;
 LOCK TABLE public.product_composition_activation_event IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE public.product_composition_recovery_attestation IN SHARE ROW EXCLUSIVE MODE;
 
-CREATE FUNCTION lock_product_composition_deployment_write()
+CREATE FUNCTION public.lock_product_composition_deployment_write()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
@@ -35,11 +35,11 @@ $$;
 CREATE TRIGGER product_composition_activation_event_00_deployment_lock_guard
 BEFORE INSERT ON public.product_composition_activation_event
 FOR EACH ROW
-EXECUTE FUNCTION lock_product_composition_deployment_write();
+EXECUTE FUNCTION public.lock_product_composition_deployment_write();
 
 CREATE TRIGGER product_composition_recovery_attestation_00_deployment_lock_guard
 BEFORE INSERT ON public.product_composition_recovery_attestation
 FOR EACH ROW
-EXECUTE FUNCTION lock_product_composition_deployment_write();
+EXECUTE FUNCTION public.lock_product_composition_deployment_write();
 
 COMMIT;
