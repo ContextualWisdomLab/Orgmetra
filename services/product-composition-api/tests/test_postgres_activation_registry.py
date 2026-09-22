@@ -11,9 +11,9 @@ from orgmetra_product_composition import (
     CompositionRoute,
     DeploymentIdentity,
     OwnerApiRelease,
-    PostgresActivationRegistry,
     configuration_sha256,
 )
+from orgmetra_product_composition.activation import PostgresActivationRegistry
 
 
 class ScriptedCursor:
@@ -165,7 +165,10 @@ def test_activate_rejects_stale_expected_sequence_before_target_write() -> None:
             expected_previous_sequence=2,
         )
 
-    assert not any("INSERT INTO public.product_composition_activation_event" in sql for sql, _ in cursor.executed)
+    assert not any(
+        "INSERT INTO public.product_composition_activation_event" in sql
+        for sql, _ in cursor.executed
+    )
 
 
 def test_activate_rejects_unknown_or_partial_target_generation() -> None:
@@ -276,7 +279,9 @@ def test_activation_registry_rejects_invalid_factory_sequence_and_generation_key
 
     registry = PostgresActivationRegistry(_factory(ScriptedConnection(ScriptedCursor([]))))
     with pytest.raises(ActivationRegistryError, match="expected_previous_sequence"):
-        registry.activate(_deployment(), generation_id="generation_one", expected_previous_sequence=-1)
+        registry.activate(
+            _deployment(), generation_id="generation_one", expected_previous_sequence=-1
+        )
     with pytest.raises(ActivationRegistryError, match="generation_id"):
         registry.activate(_deployment(), generation_id="", expected_previous_sequence=0)
 
