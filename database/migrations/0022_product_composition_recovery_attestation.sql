@@ -2,6 +2,10 @@
 -- Remote verification still happens before the deployment lock. The local transaction
 -- rechecks the exact active activation sequence/generation, persists the evidence bundle,
 -- and appends one recovery attestation while holding that deployment lock.
+-- Create the table, validation function, and all mutation guards atomically so concurrent
+-- sessions can never observe an unguarded recovery-attestation relation during upgrade.
+
+BEGIN;
 
 CREATE TABLE public.product_composition_recovery_attestation (
     deployment_id text NOT NULL,
@@ -161,3 +165,5 @@ CREATE TRIGGER product_composition_recovery_attestation_truncate_guard
 BEFORE TRUNCATE ON public.product_composition_recovery_attestation
 FOR EACH STATEMENT
 EXECUTE FUNCTION reject_product_composition_activation_registry_truncate();
+
+COMMIT;
