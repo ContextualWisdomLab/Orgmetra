@@ -11,8 +11,10 @@ from dataclasses import dataclass, field
 import hashlib
 import json
 import re
+from threading import RLock
 from time import time_ns
 from typing import Any, Callable, Literal
+from weakref import WeakValueDictionary, finalize
 
 from .activation import (
     ActivationEvent,
@@ -169,7 +171,39 @@ def _state_sequence(value: object) -> int:
     return value
 
 
-@dataclass(frozen=True, slots=True)
+def _build_construction_runtime(
+    label: str,
+    projector: Callable[[Any], tuple[object, ...]],
+) -> Callable[[Any], None]:
+    """Build a process-local construction snapshot guard for one evidence value type."""
+    constructed_objects: WeakValueDictionary[int, object] = WeakValueDictionary()
+    constructed_fields: dict[int, tuple[object, ...]] = {}
+    state_lock = RLock()
+
+    def discard_construction(object_id: int) -> None:
+        with state_lock:
+            constructed_fields.pop(object_id, None)
+
+    def record_or_require(value: object) -> None:
+        object_id = id(value)
+        current_fields = projector(value)
+        with state_lock:
+            canonical_object = constructed_objects.get(object_id)
+            canonical_fields = constructed_fields.get(object_id)
+            if canonical_object is None and canonical_fields is None:
+                constructed_objects[object_id] = value
+                constructed_fields[object_id] = current_fields
+                finalize(value, discard_construction, object_id)
+                return
+            if canonical_object is not value or canonical_fields != current_fields:
+                raise ActivationAuthorizationError(
+                    f"{label} no longer matches its construction snapshot"
+                )
+
+    return record_or_require
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class ReleasedAuthorityEvidence:
     """Immutable release coordinate for one external activation authority."""
 
@@ -195,9 +229,21 @@ class ReleasedAuthorityEvidence:
         object.__setattr__(self, "release_version", release_version)
         object.__setattr__(self, "artifact_sha256", artifact_sha256)
         object.__setattr__(self, "release_locator", locator)
+        _record_or_require_released_authority_construction(self)
 
 
-@dataclass(frozen=True, slots=True)
+_record_or_require_released_authority_construction = _build_construction_runtime(
+    "ReleasedAuthorityEvidence",
+    lambda value: (
+        value.authority_id,
+        value.release_version,
+        value.artifact_sha256,
+        value.release_locator,
+    ),
+)
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class OwnerOperationObservation:
     """Fresh observation for one route operation on one exact owner release."""
 
@@ -250,9 +296,11 @@ class OwnerOperationObservation:
             raise ActivationAuthorizationError(
                 "owner operation evidence must expire after observation"
             )
+        _record_or_require_owner_observation_construction(self)
 
     def authority_key(self) -> tuple[str, str, str, str, str, str, str]:
         """Return the exact generation operation identity covered by this observation."""
+        OwnerOperationObservation.__post_init__(self)
         return (
             self.route_id,
             self.path_template,
@@ -264,7 +312,24 @@ class OwnerOperationObservation:
         )
 
 
-@dataclass(frozen=True, slots=True)
+_record_or_require_owner_observation_construction = _build_construction_runtime(
+    "OwnerOperationObservation",
+    lambda value: (
+        value.route_id,
+        value.path_template,
+        value.method,
+        value.service_id,
+        value.release_version,
+        value.openapi_sha256,
+        value.artifact_sha256,
+        value.observation_sha256,
+        value.observed_at_unix_ms,
+        value.valid_until_unix_ms,
+    ),
+)
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class ActivationAdmissionEvidence:
     """Fresh allow evidence bound to one deployment, transition intent, and exact generation."""
 
@@ -298,7 +363,11 @@ class ActivationAdmissionEvidence:
             _identifier("generation_id", self.generation_id),
         )
         object.__setattr__(self, "config_sha256", _sha256("config_sha256", self.config_sha256))
-        object.__setattr__(self, "authorization_action", _authorization_action(self.authorization_action))
+        object.__setattr__(
+            self,
+            "authorization_action",
+            _authorization_action(self.authorization_action),
+        )
         object.__setattr__(
             self,
             "authorized_state_sequence",
@@ -308,12 +377,14 @@ class ActivationAdmissionEvidence:
             raise ActivationAuthorizationError(
                 "keyverse_authority must be exact ReleasedAuthorityEvidence"
             )
+        ReleasedAuthorityEvidence.__post_init__(self.keyverse_authority)
         if self.keyverse_authority.authority_id != "keyverse":
             raise ActivationAuthorizationError("keyverse_authority must identify keyverse")
         if type(self.orgmetra_authority) is not ReleasedAuthorityEvidence:
             raise ActivationAuthorizationError(
                 "orgmetra_authority must be exact ReleasedAuthorityEvidence"
             )
+        ReleasedAuthorityEvidence.__post_init__(self.orgmetra_authority)
         if self.orgmetra_authority.authority_id != "orgmetra":
             raise ActivationAuthorizationError("orgmetra_authority must identify orgmetra")
         policy_version = _exact_text(
@@ -337,7 +408,10 @@ class ActivationAdmissionEvidence:
             raise ActivationAuthorizationError(
                 "owner_operations must be an exact tuple of OwnerOperationObservation values"
             )
+        for observation in self.owner_operations:
+            OwnerOperationObservation.__post_init__(observation)
         _unix_ms("valid_until_unix_ms", self.valid_until_unix_ms)
+        _record_or_require_activation_evidence_construction(self)
 
     def validate_for(
         self,
@@ -350,6 +424,7 @@ class ActivationAdmissionEvidence:
         now_unix_ms: int,
     ) -> None:
         """Require freshness and exact transition/route/owner coverage before use."""
+        ActivationAdmissionEvidence.__post_init__(self)
         expected_deployment_id = _identifier("deployment_id", deployment_id)
         expected_environment_id = _identifier("environment_id", environment_id)
         expected_action = _authorization_action(authorization_action)
@@ -369,7 +444,9 @@ class ActivationAdmissionEvidence:
         ):
             raise ActivationAuthorizationError("authorization evidence targets another generation")
         if self.authorization_action != expected_action:
-            raise ActivationAuthorizationError("authorization evidence targets another authorization action")
+            raise ActivationAuthorizationError(
+                "authorization evidence targets another authorization action"
+            )
         if self.authorized_state_sequence != expected_state_sequence:
             raise ActivationAuthorizationError("authorization evidence targets another state sequence")
         if now >= self.valid_until_unix_ms:
@@ -411,6 +488,7 @@ class ActivationAdmissionEvidence:
 
     def bundle_sha256(self) -> str:
         """Digest exact evidence coordinates for durable attribution."""
+        ActivationAdmissionEvidence.__post_init__(self)
         material = {
             "deployment_id": self.deployment_id,
             "environment_id": self.environment_id,
@@ -455,6 +533,7 @@ class ActivationAdmissionEvidence:
 
     def _root_row(self) -> tuple[object, ...]:
         """Project the exact non-PII durable root material behind the bundle digest."""
+        ActivationAdmissionEvidence.__post_init__(self)
         return (
             self.deployment_id,
             self.environment_id,
@@ -475,6 +554,7 @@ class ActivationAdmissionEvidence:
 
     def _observation_rows(self) -> tuple[tuple[object, ...], ...]:
         """Project deterministic durable owner-operation evidence without response payloads."""
+        ActivationAdmissionEvidence.__post_init__(self)
         return tuple(
             (
                 item.route_id,
@@ -490,6 +570,25 @@ class ActivationAdmissionEvidence:
             )
             for item in sorted(self.owner_operations, key=lambda value: (value.route_id, value.method))
         )
+
+
+_record_or_require_activation_evidence_construction = _build_construction_runtime(
+    "ActivationAdmissionEvidence",
+    lambda value: (
+        value.deployment_id,
+        value.environment_id,
+        value.generation_id,
+        value.config_sha256,
+        value.authorization_action,
+        value.authorized_state_sequence,
+        value.keyverse_authority,
+        value.orgmetra_authority,
+        value.orgmetra_policy_version_code,
+        value.authorization_decision_sha256,
+        value.owner_operations,
+        value.valid_until_unix_ms,
+    ),
+)
 
 
 ActivationEvidenceProvider = Callable[
@@ -518,6 +617,7 @@ class AuthorizedRecoveredActivation:
 
 def _persist_activation_evidence(cursor: Any, evidence: ActivationAdmissionEvidence) -> None:
     """Persist or verify one content-addressed evidence bundle inside activation transaction."""
+    ActivationAdmissionEvidence.__post_init__(evidence)
     bundle_sha256 = evidence.bundle_sha256()
     root_row = evidence._root_row()
     cursor.execute(_INSERT_EVIDENCE_SQL, (bundle_sha256, *root_row))
