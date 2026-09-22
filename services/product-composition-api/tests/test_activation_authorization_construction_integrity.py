@@ -5,8 +5,10 @@ import pytest
 from orgmetra_product_composition import (
     ActivationAdmissionEvidence,
     ActivationAuthorizationError,
+    AuthorizedPostgresActivationRegistry,
     CompositionGeneration,
     CompositionRoute,
+    DeploymentIdentity,
     OwnerApiRelease,
     OwnerOperationObservation,
     ReleasedAuthorityEvidence,
@@ -124,3 +126,31 @@ def test_activation_evidence_cannot_be_valid_to_valid_retargeted_after_construct
 
     with pytest.raises(ActivationAuthorizationError, match="construction snapshot"):
         _validate(evidence, generation)
+
+
+def test_external_evidence_provider_cannot_retarget_runtime_clock_after_construction() -> None:
+    evidence, generation = _evidence()
+    deployment = DeploymentIdentity(
+        deployment_id="orgmetra_gateway",
+        environment_id="production",
+    )
+    holder: dict[str, AuthorizedPostgresActivationRegistry] = {}
+
+    def provider(*_args: object) -> ActivationAdmissionEvidence:
+        holder["registry"].clock_unix_ms = lambda: 1_500
+        return evidence
+
+    registry = AuthorizedPostgresActivationRegistry(
+        connection_factory=lambda: None,
+        evidence_provider=provider,
+        clock_unix_ms=lambda: 2_500,
+    )
+    holder["registry"] = registry
+
+    with pytest.raises(ActivationAuthorizationError, match="construction snapshot"):
+        registry._obtain_evidence(
+            deployment,
+            generation,
+            authorization_action="activate",
+            authorized_state_sequence=0,
+        )
