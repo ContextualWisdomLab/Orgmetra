@@ -7,11 +7,11 @@ SET LOCAL search_path = pg_catalog, public;
 -- persisted and rechecked against transition intent, expiry, and operation coverage
 -- inside the event-insert transaction.
 
-ALTER TABLE product_composition_generation
+ALTER TABLE public.product_composition_generation
     ADD CONSTRAINT product_composition_generation_config_identity_unique
     UNIQUE (generation_id, config_sha256);
 
-CREATE TABLE product_composition_deployment (
+CREATE TABLE public.product_composition_deployment (
     deployment_id text NOT NULL,
     environment_id text NOT NULL,
     registered_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
@@ -29,7 +29,7 @@ CREATE TABLE product_composition_deployment (
         )
 );
 
-CREATE TABLE product_composition_activation_evidence (
+CREATE TABLE public.product_composition_activation_evidence (
     evidence_bundle_sha256 text NOT NULL,
     deployment_id text NOT NULL,
     environment_id text NOT NULL,
@@ -60,10 +60,10 @@ CREATE TABLE product_composition_activation_evidence (
         ),
     CONSTRAINT product_composition_activation_evidence_deployment_fk
         FOREIGN KEY (deployment_id, environment_id)
-        REFERENCES product_composition_deployment(deployment_id, environment_id),
+        REFERENCES public.product_composition_deployment(deployment_id, environment_id),
     CONSTRAINT product_composition_activation_evidence_generation_fk
         FOREIGN KEY (generation_id, config_sha256)
-        REFERENCES product_composition_generation(generation_id, config_sha256),
+        REFERENCES public.product_composition_generation(generation_id, config_sha256),
     CONSTRAINT product_composition_activation_evidence_bundle_digest_check
         CHECK (evidence_bundle_sha256 ~ '^[0-9a-f]{64}$'),
     CONSTRAINT product_composition_activation_evidence_action_check
@@ -109,7 +109,7 @@ CREATE TABLE product_composition_activation_evidence (
         CHECK (valid_until_unix_ms > 0)
 );
 
-CREATE TABLE product_composition_activation_owner_observation (
+CREATE TABLE public.product_composition_activation_owner_observation (
     evidence_bundle_sha256 text NOT NULL,
     generation_id text NOT NULL,
     route_id text NOT NULL,
@@ -126,16 +126,16 @@ CREATE TABLE product_composition_activation_owner_observation (
         PRIMARY KEY (evidence_bundle_sha256, route_id, method),
     CONSTRAINT product_composition_activation_owner_observation_evidence_fk
         FOREIGN KEY (evidence_bundle_sha256, generation_id)
-        REFERENCES product_composition_activation_evidence(
+        REFERENCES public.product_composition_activation_evidence(
             evidence_bundle_sha256,
             generation_id
         ),
     CONSTRAINT product_composition_activation_owner_observation_route_method_fk
         FOREIGN KEY (generation_id, route_id, method)
-        REFERENCES product_composition_route_method(generation_id, route_id, method),
+        REFERENCES public.product_composition_route_method(generation_id, route_id, method),
     CONSTRAINT product_composition_activation_owner_observation_owner_fk
         FOREIGN KEY (generation_id, service_id)
-        REFERENCES product_composition_owner_release(generation_id, service_id),
+        REFERENCES public.product_composition_owner_release(generation_id, service_id),
     CONSTRAINT product_composition_activation_owner_observation_release_check
         CHECK (
             char_length(release_version) BETWEEN 1 AND 64
@@ -157,7 +157,7 @@ CREATE TABLE product_composition_activation_owner_observation (
         )
 );
 
-CREATE TABLE product_composition_activation_event (
+CREATE TABLE public.product_composition_activation_event (
     deployment_id text NOT NULL,
     environment_id text NOT NULL,
     activation_sequence bigint NOT NULL,
@@ -170,13 +170,13 @@ CREATE TABLE product_composition_activation_event (
         PRIMARY KEY (deployment_id, environment_id, activation_sequence),
     CONSTRAINT product_composition_activation_event_deployment_fk
         FOREIGN KEY (deployment_id, environment_id)
-        REFERENCES product_composition_deployment(deployment_id, environment_id),
+        REFERENCES public.product_composition_deployment(deployment_id, environment_id),
     CONSTRAINT product_composition_activation_event_generation_fk
         FOREIGN KEY (generation_id)
-        REFERENCES product_composition_generation(generation_id),
+        REFERENCES public.product_composition_generation(generation_id),
     CONSTRAINT product_composition_activation_event_previous_generation_fk
         FOREIGN KEY (previous_generation_id)
-        REFERENCES product_composition_generation(generation_id),
+        REFERENCES public.product_composition_generation(generation_id),
     CONSTRAINT product_composition_activation_event_evidence_fk
         FOREIGN KEY (
             evidence_bundle_sha256,
@@ -184,7 +184,7 @@ CREATE TABLE product_composition_activation_event (
             environment_id,
             generation_id
         )
-        REFERENCES product_composition_activation_evidence(
+        REFERENCES public.product_composition_activation_evidence(
             evidence_bundle_sha256,
             deployment_id,
             environment_id,
@@ -207,14 +207,14 @@ CREATE TABLE product_composition_activation_event (
 );
 
 CREATE INDEX product_composition_activation_event_generation_idx
-    ON product_composition_activation_event (
+    ON public.product_composition_activation_event (
         deployment_id,
         environment_id,
         generation_id,
         activation_sequence
     );
 
-CREATE FUNCTION validate_product_composition_activation_observation_insert()
+CREATE FUNCTION public.validate_product_composition_activation_observation_insert()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
@@ -269,7 +269,7 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION validate_product_composition_activation_insert()
+CREATE FUNCTION public.validate_product_composition_activation_insert()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
@@ -384,7 +384,7 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION reject_product_composition_activation_registry_truncate()
+CREATE FUNCTION public.reject_product_composition_activation_registry_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
@@ -395,53 +395,53 @@ END;
 $$;
 
 CREATE TRIGGER product_composition_activation_owner_observation_insert_guard
-BEFORE INSERT ON product_composition_activation_owner_observation
+BEFORE INSERT ON public.product_composition_activation_owner_observation
 FOR EACH ROW
-EXECUTE FUNCTION validate_product_composition_activation_observation_insert();
+EXECUTE FUNCTION public.validate_product_composition_activation_observation_insert();
 
 CREATE TRIGGER product_composition_activation_event_lineage_guard
-BEFORE INSERT ON product_composition_activation_event
+BEFORE INSERT ON public.product_composition_activation_event
 FOR EACH ROW
-EXECUTE FUNCTION validate_product_composition_activation_insert();
+EXECUTE FUNCTION public.validate_product_composition_activation_insert();
 
 CREATE TRIGGER product_composition_deployment_append_only_guard
-BEFORE UPDATE OR DELETE ON product_composition_deployment
+BEFORE UPDATE OR DELETE ON public.product_composition_deployment
 FOR EACH ROW
-EXECUTE FUNCTION reject_append_only_mutation();
+EXECUTE FUNCTION public.reject_append_only_mutation();
 
 CREATE TRIGGER product_composition_activation_evidence_append_only_guard
-BEFORE UPDATE OR DELETE ON product_composition_activation_evidence
+BEFORE UPDATE OR DELETE ON public.product_composition_activation_evidence
 FOR EACH ROW
-EXECUTE FUNCTION reject_append_only_mutation();
+EXECUTE FUNCTION public.reject_append_only_mutation();
 
 CREATE TRIGGER product_composition_activation_owner_observation_append_only_guard
-BEFORE UPDATE OR DELETE ON product_composition_activation_owner_observation
+BEFORE UPDATE OR DELETE ON public.product_composition_activation_owner_observation
 FOR EACH ROW
-EXECUTE FUNCTION reject_append_only_mutation();
+EXECUTE FUNCTION public.reject_append_only_mutation();
 
 CREATE TRIGGER product_composition_activation_event_append_only_guard
-BEFORE UPDATE OR DELETE ON product_composition_activation_event
+BEFORE UPDATE OR DELETE ON public.product_composition_activation_event
 FOR EACH ROW
-EXECUTE FUNCTION reject_append_only_mutation();
+EXECUTE FUNCTION public.reject_append_only_mutation();
 
 CREATE TRIGGER product_composition_deployment_truncate_guard
-BEFORE TRUNCATE ON product_composition_deployment
+BEFORE TRUNCATE ON public.product_composition_deployment
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_product_composition_activation_registry_truncate();
+EXECUTE FUNCTION public.reject_product_composition_activation_registry_truncate();
 
 CREATE TRIGGER product_composition_activation_evidence_truncate_guard
-BEFORE TRUNCATE ON product_composition_activation_evidence
+BEFORE TRUNCATE ON public.product_composition_activation_evidence
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_product_composition_activation_registry_truncate();
+EXECUTE FUNCTION public.reject_product_composition_activation_registry_truncate();
 
 CREATE TRIGGER product_composition_activation_owner_observation_truncate_guard
-BEFORE TRUNCATE ON product_composition_activation_owner_observation
+BEFORE TRUNCATE ON public.product_composition_activation_owner_observation
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_product_composition_activation_registry_truncate();
+EXECUTE FUNCTION public.reject_product_composition_activation_registry_truncate();
 
 CREATE TRIGGER product_composition_activation_event_truncate_guard
-BEFORE TRUNCATE ON product_composition_activation_event
+BEFORE TRUNCATE ON public.product_composition_activation_event
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_product_composition_activation_registry_truncate();
+EXECUTE FUNCTION public.reject_product_composition_activation_registry_truncate();
 
 COMMIT;
