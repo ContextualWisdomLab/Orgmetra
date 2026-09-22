@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from threading import RLock
 from typing import Any, Callable
+from weakref import WeakValueDictionary, finalize
 
 from .admission import CompositionGeneration
 from .registry import (
@@ -116,16 +118,54 @@ def _bounded_lookup_generation_id(value: object) -> str:
     return value
 
 
-@dataclass(frozen=True, slots=True)
+def _build_generation_connection_factory_guard():
+    """Bind each live generation registry to the DB capability admitted at construction."""
+
+    constructed_registries: WeakValueDictionary[int, object] = WeakValueDictionary()
+    constructed_factories: dict[int, object] = {}
+    state_lock = RLock()
+
+    def discard(registry_object_id: int) -> None:
+        """Release the factory witness when its registry becomes unreachable."""
+
+        with state_lock:
+            constructed_factories.pop(registry_object_id, None)
+
+    def record_or_require(registry: PostgresGenerationRegistry) -> None:
+        """Record first construction or reject later connection-factory retargeting."""
+
+        registry_object_id = id(registry)
+        current_factory = registry.connection_factory
+        with state_lock:
+            canonical_registry = constructed_registries.get(registry_object_id)
+            canonical_factory = constructed_factories.get(registry_object_id)
+            if canonical_registry is None and canonical_factory is None:
+                constructed_registries[registry_object_id] = registry
+                constructed_factories[registry_object_id] = current_factory
+                finalize(registry, discard, registry_object_id)
+                return
+            if canonical_registry is not registry or canonical_factory is not current_factory:
+                raise CompositionRegistryError(
+                    "generation registry no longer matches its construction snapshot"
+                )
+
+    return record_or_require
+
+
+_record_or_require_generation_connection_factory = _build_generation_connection_factory_guard()
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class PostgresGenerationRegistry:
     """Atomically persist and reload immutable normalized generation material."""
 
     connection_factory: PostgresConnectionFactory
 
     def __post_init__(self) -> None:
-        """Reject an unusable database boundary before durability is attempted."""
+        """Reject an unusable database boundary and bind its construction-time identity."""
         if not callable(self.connection_factory):
             raise TypeError("connection_factory must be callable")
+        _record_or_require_generation_connection_factory(self)
 
     def register(self, records: GenerationRecordSet) -> CompositionGeneration:
         """Persist one generation exactly once, or accept an exact idempotent replay.
@@ -138,8 +178,10 @@ class PostgresGenerationRegistry:
         if type(records) is not GenerationRecordSet:
             raise CompositionRegistryError("records must be exact GenerationRecordSet evidence")
         restored = records.restore_generation()
+        connection_factory = self.connection_factory
+        _record_or_require_generation_connection_factory(self)
 
-        with self.connection_factory() as connection:
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     _INSERT_GENERATION_SQL,
@@ -199,15 +241,15 @@ class PostgresGenerationRegistry:
         *,
         _connection_factory: PostgresConnectionFactory | None = None,
     ) -> CompositionGeneration | None:
-        """Reload durable rows through the current or explicitly pinned database capability."""
+        """Reload durable rows through the construction-bound or explicitly pinned DB capability."""
         lookup_generation_id = _bounded_lookup_generation_id(generation_id)
-        connection_factory = (
-            self.connection_factory if _connection_factory is None else _connection_factory
-        )
-        if self.connection_factory is not connection_factory:
+        current_factory = self.connection_factory
+        if _connection_factory is not None and current_factory is not _connection_factory:
             raise CompositionRegistryError(
                 "generation registry no longer uses expected PostgreSQL connection factory"
             )
+        _record_or_require_generation_connection_factory(self)
+        connection_factory = current_factory if _connection_factory is None else _connection_factory
         with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_READ_ONLY_SQL)
