@@ -17,3 +17,22 @@ def test_current_schema_rejects_future_dated_owner_observations() -> None:
     assert "NEW.observed_at_unix_ms > wall_clock_unix_ms" in sql
     assert "NEW.valid_until_unix_ms <= wall_clock_unix_ms" in sql
     assert "BEFORE INSERT ON public.product_composition_activation_owner_observation" in sql
+
+
+def test_wall_clock_upgrade_fences_preflight_and_trigger_installation_atomically() -> None:
+    """Prevent a concurrent impossible observation from slipping between scan and trigger install."""
+    sql = _MIGRATION.read_text(encoding="utf-8")
+    begin_index = sql.index("BEGIN;")
+    lock_index = sql.index(
+        "LOCK TABLE public.product_composition_activation_owner_observation "
+        "IN SHARE ROW EXCLUSIVE MODE;"
+    )
+    preflight_index = sql.index("DO $$")
+    trigger_index = sql.index(
+        "CREATE TRIGGER product_composition_activation_owner_observation_wall_clock_guard"
+    )
+    commit_index = sql.rindex("COMMIT;")
+
+    assert begin_index < lock_index < preflight_index < trigger_index < commit_index
+    assert sql[:begin_index].strip().startswith("-- Reject owner-operation observations")
+    assert sql[commit_index + len("COMMIT;") :].strip() == ""
