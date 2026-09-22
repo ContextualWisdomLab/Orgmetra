@@ -113,6 +113,16 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION reject_product_composition_activation_registry_truncate()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+    RAISE EXCEPTION 'product composition activation registry is append-only; TRUNCATE is not allowed';
+END;
+$$;
+
 CREATE TRIGGER product_composition_activation_event_lineage_guard
 BEFORE INSERT ON product_composition_activation_event
 FOR EACH ROW
@@ -127,3 +137,13 @@ CREATE TRIGGER product_composition_activation_event_append_only_guard
 BEFORE UPDATE OR DELETE ON product_composition_activation_event
 FOR EACH ROW
 EXECUTE FUNCTION reject_append_only_mutation();
+
+CREATE TRIGGER product_composition_deployment_truncate_guard
+BEFORE TRUNCATE ON product_composition_deployment
+FOR EACH STATEMENT
+EXECUTE FUNCTION reject_product_composition_activation_registry_truncate();
+
+CREATE TRIGGER product_composition_activation_event_truncate_guard
+BEFORE TRUNCATE ON product_composition_activation_event
+FOR EACH STATEMENT
+EXECUTE FUNCTION reject_product_composition_activation_registry_truncate();
