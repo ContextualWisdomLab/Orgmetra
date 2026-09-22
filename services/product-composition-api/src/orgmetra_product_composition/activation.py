@@ -295,6 +295,7 @@ class PostgresActivationRegistry:
         expected_previous_sequence: int,
         evidence_bundle_sha256: str,
         evidence_writer: TransactionEvidenceWriter,
+        _connection_factory: PostgresConnectionFactory | None = None,
     ) -> ActivationEvent:
         """Append activation with local evidence persistence inside the locked transaction."""
         return self._transition(
@@ -304,6 +305,7 @@ class PostgresActivationRegistry:
             event_kind="activate",
             evidence_bundle_sha256=evidence_bundle_sha256,
             evidence_writer=evidence_writer,
+            _connection_factory=_connection_factory,
         )
 
     def rollback_authorized(
@@ -314,6 +316,7 @@ class PostgresActivationRegistry:
         expected_previous_sequence: int,
         evidence_bundle_sha256: str,
         evidence_writer: TransactionEvidenceWriter,
+        _connection_factory: PostgresConnectionFactory | None = None,
     ) -> ActivationEvent:
         """Append rollback with local evidence persistence inside the locked transaction."""
         return self._transition(
@@ -323,12 +326,19 @@ class PostgresActivationRegistry:
             event_kind="rollback",
             evidence_bundle_sha256=evidence_bundle_sha256,
             evidence_writer=evidence_writer,
+            _connection_factory=_connection_factory,
         )
 
-    def recover_active(self, deployment: DeploymentIdentity) -> RecoveredActivation | None:
+    def recover_active(
+        self,
+        deployment: DeploymentIdentity,
+        *,
+        _connection_factory: PostgresConnectionFactory | None = None,
+    ) -> RecoveredActivation | None:
         """Recover active event and generation from one repeatable-read database snapshot."""
         identity = self._deployment(deployment)
-        with self.connection_factory() as connection:
+        connection_factory = self._resolved_connection_factory(_connection_factory)
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(_REPEATABLE_READ_ONLY_SQL)
                 current = self._latest_event(cursor, identity)
@@ -345,6 +355,7 @@ class PostgresActivationRegistry:
         expected_generation_id: str,
         evidence_bundle_sha256: str,
         evidence_writer: TransactionEvidenceWriter,
+        _connection_factory: PostgresConnectionFactory | None = None,
     ) -> RecoveredActivation:
         """Persist fresh recovery evidence only while the expected active state remains locked."""
         identity = self._deployment(deployment)
@@ -358,8 +369,9 @@ class PostgresActivationRegistry:
         evidence_digest = _evidence_digest(evidence_bundle_sha256)
         if not callable(evidence_writer):
             raise ActivationRegistryError("evidence_writer must be callable")
+        connection_factory = self._resolved_connection_factory(_connection_factory)
 
-        with self.connection_factory() as connection:
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 self._lock_deployment(cursor, identity)
                 current = self._latest_event(cursor, identity)
@@ -414,6 +426,7 @@ class PostgresActivationRegistry:
         event_kind: EventKind,
         evidence_bundle_sha256: str | None = None,
         evidence_writer: TransactionEvidenceWriter | None = None,
+        _connection_factory: PostgresConnectionFactory | None = None,
     ) -> ActivationEvent:
         """Lock one deployment and append exactly one compare-and-authorized transition."""
         identity = self._deployment(deployment)
@@ -428,8 +441,9 @@ class PostgresActivationRegistry:
             )
         if evidence_writer is not None and not callable(evidence_writer):
             raise ActivationRegistryError("evidence_writer must be callable")
+        connection_factory = self._resolved_connection_factory(_connection_factory)
 
-        with self.connection_factory() as connection:
+        with connection_factory() as connection:
             with connection.cursor() as cursor:
                 self._lock_deployment(cursor, identity)
                 current = self._latest_event(cursor, identity)
@@ -498,6 +512,18 @@ class PostgresActivationRegistry:
                     event_kind=event_kind,
                     evidence_bundle_sha256=evidence_digest,
                 )
+
+    def _resolved_connection_factory(
+        self,
+        expected: PostgresConnectionFactory | None,
+    ) -> PostgresConnectionFactory:
+        """Pin the current factory or reject drift from a caller-admitted factory."""
+        connection_factory = self.connection_factory if expected is None else expected
+        if self.connection_factory is not connection_factory:
+            raise ActivationRegistryError(
+                "activation registry no longer uses expected PostgreSQL connection factory"
+            )
+        return connection_factory
 
     @staticmethod
     def _deployment(deployment: DeploymentIdentity) -> DeploymentIdentity:
