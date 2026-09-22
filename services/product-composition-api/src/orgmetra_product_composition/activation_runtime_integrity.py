@@ -37,7 +37,6 @@ def _build_runtime_capability_construction_guard():
         with state_lock:
             constructed_capabilities.pop(registry_object_id, None)
 
-    @staticmethod
     def capability_reference(label: str, capability: object) -> ReferenceType[object]:
         try:
             return ref(capability)
