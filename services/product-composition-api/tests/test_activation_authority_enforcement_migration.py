@@ -18,3 +18,19 @@ def test_current_activation_schema_requires_authorization_evidence() -> None:
     assert "WHERE evidence_bundle_sha256 IS NULL" in migration
     assert "cannot enforce authorized activation while structural events exist" in migration
     assert "ALTER COLUMN evidence_bundle_sha256 SET NOT NULL" in migration
+
+
+def test_authority_upgrade_fences_writers_before_preflight_and_not_null_publish() -> None:
+    migration = _migration_text().strip()
+
+    assert migration.startswith("BEGIN;")
+    assert migration.endswith("COMMIT;")
+
+    lock = migration.index(
+        "LOCK TABLE public.product_composition_activation_event IN SHARE ROW EXCLUSIVE MODE;"
+    )
+    preflight = migration.index("WHERE evidence_bundle_sha256 IS NULL")
+    enforce = migration.index("ALTER COLUMN evidence_bundle_sha256 SET NOT NULL")
+    commit = migration.rindex("COMMIT;")
+
+    assert lock < preflight < enforce < commit
