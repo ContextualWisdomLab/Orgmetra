@@ -51,7 +51,7 @@ writer_pid=$!
 writer_ready=0
 for _ in {1..50}; do
     writer_ready="$({ psql "${DATABASE_URL}" -Atqc \
-        "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND application_name = 'orgmetra_activation_authority_upgrade_writer' AND state = 'active' AND query LIKE 'SELECT pg_sleep(%'; } 2>/dev/null)"
+        "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND application_name = 'orgmetra_activation_authority_upgrade_writer' AND state = 'active' AND query LIKE 'SELECT pg_sleep(%';"; } 2>/dev/null)"
     if [[ "${writer_ready}" == "1" ]]; then
         break
     fi
