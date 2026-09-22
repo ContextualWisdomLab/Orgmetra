@@ -180,13 +180,15 @@ def test_authorized_registry_persists_evidence_inside_structural_activation(monk
             *,
             generation_id: str,
             expected_previous_sequence: int,
-            activation_evidence,
+            evidence_bundle_sha256: str,
+            evidence_writer,
         ):
             order.append("structural_activate_authorized")
             assert deployment_arg == deployment
             assert generation_id == generation.generation_id
             assert expected_previous_sequence == 0
-            assert activation_evidence == evidence
+            assert evidence_bundle_sha256 == evidence.bundle_sha256()
+            assert callable(evidence_writer)
             return object()
 
     def evidence_provider(deployment_arg, generation_arg):
