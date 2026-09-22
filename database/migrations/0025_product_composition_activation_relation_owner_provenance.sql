@@ -3,10 +3,12 @@ SET LOCAL search_path = pg_catalog, public;
 
 -- Durable activation authority is split across several append-only relations. A
 -- relation owner can alter or destroy that relation independently of ordinary
--- grants, including changing its trigger enforcement. Fail closed if authority
--- ownership has drifted instead of silently reassigning ownership during an
--- application migration.
+-- grants, including changing its trigger enforcement. The immutable generation
+-- registry is the parent durable composition authority, so activation/recovery
+-- relations must retain that same owner rather than merely agreeing with each
+-- other. Fail closed on drift instead of silently reassigning ownership.
 LOCK TABLE
+    public.product_composition_generation,
     public.product_composition_deployment,
     public.product_composition_activation_evidence,
     public.product_composition_activation_owner_observation,
@@ -26,11 +28,11 @@ BEGIN
     JOIN pg_catalog.pg_namespace AS namespace
       ON namespace.oid = relation.relnamespace
     WHERE namespace.nspname = 'public'
-      AND relation.relname = 'product_composition_deployment'
+      AND relation.relname = 'product_composition_generation'
       AND relation.relkind = 'r';
 
     IF expected_owner IS NULL THEN
-        RAISE EXCEPTION 'product composition deployment authority relation is missing';
+        RAISE EXCEPTION 'product composition generation authority relation is missing';
     END IF;
 
     FOREACH relation_name IN ARRAY ARRAY[
@@ -57,7 +59,7 @@ BEGIN
 
         IF relation_owner IS DISTINCT FROM expected_owner THEN
             RAISE EXCEPTION
-                'required public activation authority relation % is not owned by deployment authority owner',
+                'required public activation authority relation % is not owned by generation authority owner',
                 relation_name;
         END IF;
     END LOOP;
