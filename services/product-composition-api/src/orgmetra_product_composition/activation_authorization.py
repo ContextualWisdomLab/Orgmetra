@@ -20,7 +20,7 @@ from .activation import (
     DeploymentIdentity,
     PostgresActivationRegistry as StructuralPostgresActivationRegistry,
 )
-from .admission import CompositionGeneration
+from .admission import CompositionGeneration, _revalidate_generation_snapshot
 from .postgres_registry import PostgresConnectionFactory, PostgresGenerationRegistry
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -325,6 +325,7 @@ class ActivationAdmissionEvidence:
         expected_environment_id = _identifier("environment_id", environment_id)
         if type(generation) is not CompositionGeneration:
             raise ActivationAuthorizationError("generation must be exact CompositionGeneration")
+        _revalidate_generation_snapshot(generation)
         now = _unix_ms("now_unix_ms", now_unix_ms)
         if (
             self.deployment_id != expected_deployment_id
@@ -555,6 +556,7 @@ class AuthorizedPostgresActivationRegistry:
         if type(deployment) is not DeploymentIdentity:
             raise ActivationAuthorizationError("deployment must be exact DeploymentIdentity")
         DeploymentIdentity.__post_init__(deployment)
+        _revalidate_generation_snapshot(generation)
         evidence = self.evidence_provider(deployment, generation)
         if type(evidence) is not ActivationAdmissionEvidence:
             raise ActivationAuthorizationError(
