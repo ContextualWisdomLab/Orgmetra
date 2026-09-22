@@ -40,7 +40,12 @@ FOR UPDATE
 """.strip()
 
 _SELECT_LATEST_EVENT_SQL = """
-SELECT activation_sequence, generation_id, event_kind, previous_generation_id
+SELECT
+    activation_sequence,
+    generation_id,
+    event_kind,
+    previous_generation_id,
+    evidence_bundle_sha256
 FROM public.product_composition_activation_event
 WHERE deployment_id = %s AND environment_id = %s
 ORDER BY activation_sequence DESC
@@ -173,6 +178,7 @@ class ActivationEvent:
     generation_id: str
     previous_generation_id: str | None
     event_kind: EventKind
+    evidence_bundle_sha256: str | None = None
 
     def __post_init__(self) -> None:
         if type(self.deployment) is not DeploymentIdentity:
@@ -188,6 +194,8 @@ class ActivationEvent:
             raise ActivationRegistryError("first activation cannot have a previous generation")
         if self.activation_sequence > 1 and self.previous_generation_id is None:
             raise ActivationRegistryError("successor activation requires previous generation")
+        if self.evidence_bundle_sha256 is not None:
+            _evidence_digest(self.evidence_bundle_sha256)
 
 
 @dataclass(frozen=True, slots=True)
@@ -391,6 +399,7 @@ class PostgresActivationRegistry:
                     generation_id=target_generation_id,
                     previous_generation_id=previous_generation_id,
                     event_kind=event_kind,
+                    evidence_bundle_sha256=evidence_digest,
                 )
 
     @staticmethod
@@ -417,13 +426,20 @@ class PostgresActivationRegistry:
         row = cursor.fetchone()
         if row is None:
             return None
-        activation_sequence, generation_id, event_kind, previous_generation_id = row
+        (
+            activation_sequence,
+            generation_id,
+            event_kind,
+            previous_generation_id,
+            evidence_bundle_sha256,
+        ) = row
         return ActivationEvent(
             deployment=deployment,
             activation_sequence=activation_sequence,
             generation_id=generation_id,
             previous_generation_id=previous_generation_id,
             event_kind=event_kind,
+            evidence_bundle_sha256=evidence_bundle_sha256,
         )
 
     @staticmethod
