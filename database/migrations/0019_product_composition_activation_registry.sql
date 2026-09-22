@@ -1,7 +1,8 @@
 -- Persist product-composition deployment activation as an append-only sequence.
 -- Deployment/environment identifiers and external evidence coordinates are non-PII.
 -- Remote verification happens before the deployment lock; exact evidence material is
--- persisted and its expiry is checked again inside the event-insert transaction.
+-- persisted and rechecked against transition intent, expiry, and operation coverage
+-- inside the event-insert transaction.
 
 ALTER TABLE product_composition_generation
     ADD CONSTRAINT product_composition_generation_config_identity_unique
@@ -31,6 +32,8 @@ CREATE TABLE product_composition_activation_evidence (
     environment_id text NOT NULL,
     generation_id text NOT NULL,
     config_sha256 text NOT NULL,
+    authorization_action text NOT NULL,
+    authorized_state_sequence bigint NOT NULL,
     keyverse_release_version text NOT NULL,
     keyverse_artifact_sha256 text NOT NULL,
     keyverse_release_locator text NOT NULL,
@@ -60,6 +63,10 @@ CREATE TABLE product_composition_activation_evidence (
         REFERENCES product_composition_generation(generation_id, config_sha256),
     CONSTRAINT product_composition_activation_evidence_bundle_digest_check
         CHECK (evidence_bundle_sha256 ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT product_composition_activation_evidence_action_check
+        CHECK (authorization_action IN ('activate', 'rollback', 'recover')),
+    CONSTRAINT product_composition_activation_evidence_state_sequence_check
+        CHECK (authorized_state_sequence >= 0),
     CONSTRAINT product_composition_activation_evidence_keyverse_artifact_check
         CHECK (keyverse_artifact_sha256 ~ '^[0-9a-f]{64}$'),
     CONSTRAINT product_composition_activation_evidence_orgmetra_artifact_check
@@ -268,6 +275,8 @@ DECLARE
     latest_sequence bigint;
     latest_generation_id text;
     evidence_valid_until_unix_ms bigint;
+    evidence_authorization_action text;
+    evidence_authorized_state_sequence bigint;
     wall_clock_unix_ms bigint;
 BEGIN
     SELECT activation_sequence, generation_id
@@ -311,8 +320,14 @@ BEGIN
     END IF;
 
     IF NEW.evidence_bundle_sha256 IS NOT NULL THEN
-        SELECT evidence.valid_until_unix_ms
-        INTO evidence_valid_until_unix_ms
+        SELECT
+            evidence.valid_until_unix_ms,
+            evidence.authorization_action,
+            evidence.authorized_state_sequence
+        INTO
+            evidence_valid_until_unix_ms,
+            evidence_authorization_action,
+            evidence_authorized_state_sequence
         FROM public.product_composition_activation_evidence AS evidence
         WHERE evidence.evidence_bundle_sha256 = NEW.evidence_bundle_sha256
           AND evidence.deployment_id = NEW.deployment_id
@@ -321,6 +336,11 @@ BEGIN
 
         IF NOT FOUND THEN
             RAISE EXCEPTION 'product composition activation evidence does not bind exact deployment generation';
+        END IF;
+
+        IF evidence_authorization_action IS DISTINCT FROM NEW.event_kind
+           OR evidence_authorized_state_sequence IS DISTINCT FROM NEW.activation_sequence - 1 THEN
+            RAISE EXCEPTION 'product composition activation evidence does not authorize exact transition intent';
         END IF;
 
         wall_clock_unix_ms := floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint;
