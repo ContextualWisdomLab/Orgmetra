@@ -6,6 +6,7 @@ from orgmetra_product_composition import (
     ActivationAdmissionEvidence,
     ActivationAuthorizationError,
     ActivationEvent,
+    ActivationRegistryError,
     AuthorizedPostgresActivationRegistry,
     CompositionGeneration,
     CompositionRoute,
@@ -82,6 +83,18 @@ def _evidence(generation: CompositionGeneration) -> ActivationAdmissionEvidence:
         ),
         valid_until_unix_ms=2_000,
     )
+
+
+def test_activation_event_rejects_invalid_durable_evidence_digest() -> None:
+    with pytest.raises(ActivationRegistryError, match="evidence_bundle_sha256"):
+        ActivationEvent(
+            deployment=DeploymentIdentity("orgmetra_gateway", "production"),
+            activation_sequence=1,
+            generation_id="generation_one",
+            previous_generation_id=None,
+            event_kind="activate",
+            evidence_bundle_sha256="not_a_digest",
+        )
 
 
 def test_authorized_recovery_rejects_structural_event_without_durable_evidence(monkeypatch) -> None:
