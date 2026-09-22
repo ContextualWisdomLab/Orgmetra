@@ -268,7 +268,7 @@ DECLARE
     latest_sequence bigint;
     latest_generation_id text;
     evidence_valid_until_unix_ms bigint;
-    transaction_unix_ms bigint;
+    wall_clock_unix_ms bigint;
 BEGIN
     SELECT activation_sequence, generation_id
     INTO latest_sequence, latest_generation_id
@@ -323,8 +323,8 @@ BEGIN
             RAISE EXCEPTION 'product composition activation evidence does not bind exact deployment generation';
         END IF;
 
-        transaction_unix_ms := floor(extract(epoch FROM transaction_timestamp()) * 1000)::bigint;
-        IF transaction_unix_ms >= evidence_valid_until_unix_ms THEN
+        wall_clock_unix_ms := floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint;
+        IF wall_clock_unix_ms >= evidence_valid_until_unix_ms THEN
             RAISE EXCEPTION 'product composition activation authorization evidence is expired';
         END IF;
 
@@ -350,7 +350,7 @@ BEGIN
                     AND observation.release_version = owner_release.release_version
                     AND observation.openapi_sha256 = owner_release.openapi_sha256
                     AND observation.artifact_sha256 = owner_release.artifact_sha256
-                    AND transaction_unix_ms < observation.valid_until_unix_ms
+                    AND wall_clock_unix_ms < observation.valid_until_unix_ms
               )
         ) THEN
             RAISE EXCEPTION 'product composition activation evidence lacks fresh exact owner operation coverage';
