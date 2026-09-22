@@ -6,6 +6,7 @@
 -- sessions can never observe an unguarded recovery-attestation relation during upgrade.
 
 BEGIN;
+SET LOCAL search_path = pg_catalog, public;
 
 CREATE TABLE public.product_composition_recovery_attestation (
     deployment_id text NOT NULL,
