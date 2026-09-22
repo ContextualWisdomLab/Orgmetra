@@ -21,8 +21,10 @@ from .postgres_registry import PostgresGenerationRegistry
 from .registry import CompositionRegistryError
 
 PostgresConnectionFactory = Callable[[], AbstractContextManager[Any]]
+TransactionEvidenceWriter = Callable[[Any], None]
 EventKind = Literal["activate", "rollback"]
 _CANONICAL_IDENTIFIER = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 _INSERT_DEPLOYMENT_SQL = """
 INSERT INTO public.product_composition_deployment (deployment_id, environment_id)
@@ -68,6 +70,20 @@ VALUES (%s, %s, %s, %s, %s, %s)
 RETURNING activation_sequence
 """.strip()
 
+_INSERT_AUTHORIZED_EVENT_SQL = """
+INSERT INTO public.product_composition_activation_event (
+    deployment_id,
+    environment_id,
+    activation_sequence,
+    generation_id,
+    previous_generation_id,
+    event_kind,
+    evidence_bundle_sha256
+)
+VALUES (%s, %s, %s, %s, %s, %s, %s)
+RETURNING activation_sequence
+""".strip()
+
 _REPEATABLE_READ_ONLY_SQL = "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
 
 
@@ -85,6 +101,14 @@ def _canonical_identifier(field_name: str, value: object) -> str:
     if not 1 <= len(value) <= 64 or _CANONICAL_IDENTIFIER.fullmatch(value) is None:
         raise ActivationRegistryError(
             f"{field_name} must be canonical 1..64-character lower snake_case"
+        )
+    return value
+
+
+def _evidence_digest(value: object) -> str:
+    if type(value) is not str or _SHA256.fullmatch(value) is None:
+        raise ActivationRegistryError(
+            "evidence_bundle_sha256 must be a lowercase SHA-256 digest"
         )
     return value
 
@@ -184,7 +208,12 @@ class RecoveredActivation:
 
 @dataclass(frozen=True, slots=True)
 class PostgresActivationRegistry:
-    """Serialize deployment activation and recover active durable configuration."""
+    """Serialize structural activation and recover durable configuration.
+
+    ``activate`` and ``rollback`` remain structural primitives for migration and fault
+    tests. Product-facing positive authorization uses the authorized methods so evidence
+    is persisted under the same transaction and deployment lock as the event append.
+    """
 
     connection_factory: PostgresConnectionFactory
 
@@ -199,7 +228,7 @@ class PostgresActivationRegistry:
         generation_id: str,
         expected_previous_sequence: int,
     ) -> ActivationEvent:
-        """Append a normal activation after compare-and-locking the deployment state."""
+        """Append a structural activation after compare-and-locking deployment state."""
         return self._transition(
             deployment,
             generation_id=generation_id,
@@ -214,12 +243,50 @@ class PostgresActivationRegistry:
         generation_id: str,
         expected_previous_sequence: int,
     ) -> ActivationEvent:
-        """Append rollback to a generation that was previously active on this deployment."""
+        """Append structural rollback to a generation previously active on deployment."""
         return self._transition(
             deployment,
             generation_id=generation_id,
             expected_previous_sequence=expected_previous_sequence,
             event_kind="rollback",
+        )
+
+    def activate_authorized(
+        self,
+        deployment: DeploymentIdentity,
+        *,
+        generation_id: str,
+        expected_previous_sequence: int,
+        evidence_bundle_sha256: str,
+        evidence_writer: TransactionEvidenceWriter,
+    ) -> ActivationEvent:
+        """Append activation with local evidence persistence inside the locked transaction."""
+        return self._transition(
+            deployment,
+            generation_id=generation_id,
+            expected_previous_sequence=expected_previous_sequence,
+            event_kind="activate",
+            evidence_bundle_sha256=evidence_bundle_sha256,
+            evidence_writer=evidence_writer,
+        )
+
+    def rollback_authorized(
+        self,
+        deployment: DeploymentIdentity,
+        *,
+        generation_id: str,
+        expected_previous_sequence: int,
+        evidence_bundle_sha256: str,
+        evidence_writer: TransactionEvidenceWriter,
+    ) -> ActivationEvent:
+        """Append rollback with local evidence persistence inside the locked transaction."""
+        return self._transition(
+            deployment,
+            generation_id=generation_id,
+            expected_previous_sequence=expected_previous_sequence,
+            event_kind="rollback",
+            evidence_bundle_sha256=evidence_bundle_sha256,
+            evidence_writer=evidence_writer,
         )
 
     def recover_active(self, deployment: DeploymentIdentity) -> RecoveredActivation | None:
@@ -241,10 +308,21 @@ class PostgresActivationRegistry:
         generation_id: str,
         expected_previous_sequence: int,
         event_kind: EventKind,
+        evidence_bundle_sha256: str | None = None,
+        evidence_writer: TransactionEvidenceWriter | None = None,
     ) -> ActivationEvent:
         identity = self._deployment(deployment)
         target_generation_id = _canonical_identifier("generation_id", generation_id)
         expected = _expected_sequence(expected_previous_sequence)
+        evidence_digest = (
+            None if evidence_bundle_sha256 is None else _evidence_digest(evidence_bundle_sha256)
+        )
+        if (evidence_digest is None) != (evidence_writer is None):
+            raise ActivationRegistryError(
+                "authorized transition requires both evidence digest and local writer"
+            )
+        if evidence_writer is not None and not callable(evidence_writer):
+            raise ActivationRegistryError("evidence_writer must be callable")
 
         with self.connection_factory() as connection:
             with connection.cursor() as cursor:
@@ -279,17 +357,29 @@ class PostgresActivationRegistry:
                 self._load_generation(cursor, target_generation_id)
                 next_sequence = current_sequence + 1
                 previous_generation_id = None if current is None else current.generation_id
-                cursor.execute(
-                    _INSERT_EVENT_SQL,
-                    (
+                if evidence_writer is not None:
+                    evidence_writer(cursor)
+                    statement = _INSERT_AUTHORIZED_EVENT_SQL
+                    params = (
                         identity.deployment_id,
                         identity.environment_id,
                         next_sequence,
                         target_generation_id,
                         previous_generation_id,
                         event_kind,
-                    ),
-                )
+                        evidence_digest,
+                    )
+                else:
+                    statement = _INSERT_EVENT_SQL
+                    params = (
+                        identity.deployment_id,
+                        identity.environment_id,
+                        next_sequence,
+                        target_generation_id,
+                        previous_generation_id,
+                        event_kind,
+                    )
+                cursor.execute(statement, params)
                 inserted = cursor.fetchone()
                 if inserted != (next_sequence,):
                     raise ActivationRegistryError(
