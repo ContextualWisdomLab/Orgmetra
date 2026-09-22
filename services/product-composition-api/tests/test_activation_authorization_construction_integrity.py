@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import gc
+import weakref
+
 import pytest
 
 from orgmetra_product_composition import (
@@ -154,3 +157,31 @@ def test_external_evidence_provider_cannot_retarget_runtime_clock_after_construc
             authorization_action="activate",
             authorized_state_sequence=0,
         )
+
+
+def test_runtime_capability_snapshot_retains_admitted_clock_identity_until_registry_dies() -> None:
+    """Keep original executable capabilities alive so object-id reuse cannot spoof the snapshot."""
+
+    class Clock:
+        def __call__(self) -> int:
+            return 1_500
+
+    clock = Clock()
+    admitted_clock = weakref.ref(clock)
+    registry = AuthorizedPostgresActivationRegistry(
+        connection_factory=lambda: None,
+        evidence_provider=lambda *_args: None,  # type: ignore[return-value]
+        clock_unix_ms=clock,
+    )
+
+    del clock
+    registry.clock_unix_ms = Clock()
+    gc.collect()
+
+    assert admitted_clock() is not None
+    with pytest.raises(ActivationAuthorizationError, match="construction snapshot"):
+        registry._require_runtime_capabilities()
+
+    del registry
+    gc.collect()
+    assert admitted_clock() is None
