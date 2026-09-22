@@ -26,6 +26,8 @@ from .postgres_registry import PostgresGenerationRegistry
 
 
 def _build_runtime_capability_construction_guard():
+    """Build the process-local identity guard without retaining capability lifetimes."""
+
     constructed_registries: WeakValueDictionary[int, object] = WeakValueDictionary()
     # Weak references are identity witnesses without process-lifetime roots. If an
     # admitted capability is replaced and collected, the dead reference can never be
@@ -34,10 +36,14 @@ def _build_runtime_capability_construction_guard():
     state_lock = RLock()
 
     def discard(registry_object_id: int) -> None:
+        """Discard identity witnesses when their registry becomes unreachable."""
+
         with state_lock:
             constructed_capabilities.pop(registry_object_id, None)
 
     def capability_reference(label: str, capability: object) -> ReferenceType[object]:
+        """Return a non-rooting identity witness or fail closed for unsupported callables."""
+
         try:
             return ref(capability)
         except TypeError as exc:
@@ -46,6 +52,8 @@ def _build_runtime_capability_construction_guard():
             ) from exc
 
     def project(registry: AuthorizedPostgresActivationRegistry) -> tuple[object, ...]:
+        """Project caller-supplied capabilities after validating internal adapter topology."""
+
         if type(registry._generation_registry) is not PostgresGenerationRegistry:
             raise ActivationAuthorizationError(
                 "generation registry no longer matches the admitted PostgreSQL adapter type"
@@ -69,6 +77,8 @@ def _build_runtime_capability_construction_guard():
         )
 
     def record_or_require(registry: AuthorizedPostgresActivationRegistry) -> None:
+        """Record first-use capability identity or reject any later construction drift."""
+
         registry_object_id = id(registry)
         current_capabilities = project(registry)
         with state_lock:
@@ -115,13 +125,19 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
     __slots__ = ("__weakref__",)
 
     def __post_init__(self) -> None:
+        """Validate base construction and admit the executable capability identity once."""
+
         super().__post_init__()
         _record_or_require_runtime_capabilities(self)
 
     def _require_runtime_capabilities(self) -> None:
+        """Reject any post-construction executable capability or adapter retargeting."""
+
         _record_or_require_runtime_capabilities(self)
 
     def _load_target(self, generation_id: str) -> CompositionGeneration:
+        """Load one generation only through the admitted PostgreSQL capability topology."""
+
         self._require_runtime_capabilities()
         return super()._load_target(generation_id)
 
@@ -134,6 +150,7 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         authorized_state_sequence: int,
     ) -> ActivationAdmissionEvidence:
         """Validate evidence against the same provider and clock admitted at construction."""
+
         self._require_runtime_capabilities()
         if type(deployment) is not DeploymentIdentity:
             raise ActivationAuthorizationError("deployment must be exact DeploymentIdentity")
@@ -173,6 +190,7 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         evidence/attestation insertion. Once the locked transaction commits, a later local wall
         clock sample must not turn a successful recovery attestation into an ambiguous failure.
         """
+
         structural_registry = self._structural_registry
         self._require_runtime_capabilities()
         first = structural_registry.recover_active(deployment)
