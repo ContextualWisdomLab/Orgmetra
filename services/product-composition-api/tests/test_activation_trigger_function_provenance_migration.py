@@ -23,8 +23,9 @@ def test_activation_trigger_functions_rebind_to_public_owned_authority() -> None
     ):
         assert f"public.{relation}" in sql
     assert "IN SHARE ROW EXCLUSIVE MODE;" in sql
-    assert "to_regprocedure(format('public.%I()', function_name))" in sql
-    assert "function_record.proowner IS DISTINCT FROM expected_owner" in sql
+    assert "pg_catalog.to_regprocedure(" in sql
+    assert "pg_catalog.format('public.%I()', function_name)" in sql
+    assert "function_owner IS DISTINCT FROM expected_owner" in sql
     assert "CREATE TRIGGER product_composition_activation_event_00_deployment_lock_guard" in sql
     assert "EXECUTE FUNCTION public.lock_product_composition_deployment_write();" in sql
     assert "CREATE TRIGGER product_composition_activation_event_lineage_guard" in sql
