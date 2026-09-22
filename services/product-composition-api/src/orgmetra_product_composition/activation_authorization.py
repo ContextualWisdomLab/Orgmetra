@@ -1,9 +1,8 @@
 """Fail-closed external re-admission evidence for composition activation.
 
 Remote identity, ACL, and owner-operation checks run through a caller-supplied verifier
-before the structural activation registry acquires its deployment row lock. This module
-validates the returned evidence against the exact persisted generation; it does not copy
-Keyverse policy or owner-service schemas into Orgmetra composition.
+before the structural activation registry acquires its deployment row lock. Exact evidence
+coordinates are then persisted by a local transaction callback before the event append.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ import hashlib
 import json
 import re
 from time import time_ns
-from typing import Callable, Literal
+from typing import Any, Callable, Literal
 
 from .activation import (
     ActivationEvent,
@@ -31,6 +30,83 @@ _POLICY_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _ALLOWED_METHODS = frozenset({"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"})
 _FLOATING_RELEASES = frozenset({"develop", "head", "latest", "main", "master"})
 AuthorityId = Literal["keyverse", "orgmetra"]
+
+_INSERT_EVIDENCE_SQL = """
+INSERT INTO public.product_composition_activation_evidence (
+    evidence_bundle_sha256,
+    deployment_id,
+    environment_id,
+    generation_id,
+    config_sha256,
+    keyverse_release_version,
+    keyverse_artifact_sha256,
+    keyverse_release_locator,
+    orgmetra_release_version,
+    orgmetra_artifact_sha256,
+    orgmetra_release_locator,
+    orgmetra_policy_version_code,
+    authorization_decision_sha256,
+    valid_until_unix_ms
+)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+ON CONFLICT (evidence_bundle_sha256) DO NOTHING
+RETURNING evidence_bundle_sha256
+""".strip()
+
+_SELECT_EVIDENCE_SQL = """
+SELECT
+    deployment_id,
+    environment_id,
+    generation_id,
+    config_sha256,
+    keyverse_release_version,
+    keyverse_artifact_sha256,
+    keyverse_release_locator,
+    orgmetra_release_version,
+    orgmetra_artifact_sha256,
+    orgmetra_release_locator,
+    orgmetra_policy_version_code,
+    authorization_decision_sha256,
+    valid_until_unix_ms
+FROM public.product_composition_activation_evidence
+WHERE evidence_bundle_sha256 = %s
+""".strip()
+
+_INSERT_OBSERVATION_SQL = """
+INSERT INTO public.product_composition_activation_owner_observation (
+    evidence_bundle_sha256,
+    generation_id,
+    route_id,
+    method,
+    path_template,
+    service_id,
+    release_version,
+    openapi_sha256,
+    artifact_sha256,
+    observation_sha256,
+    observed_at_unix_ms,
+    valid_until_unix_ms
+)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+ON CONFLICT (evidence_bundle_sha256, route_id, method) DO NOTHING
+""".strip()
+
+_SELECT_OBSERVATIONS_SQL = """
+SELECT
+    route_id,
+    method,
+    path_template,
+    service_id,
+    release_version,
+    openapi_sha256,
+    artifact_sha256,
+    observation_sha256,
+    observed_at_unix_ms,
+    valid_until_unix_ms
+FROM public.product_composition_activation_owner_observation
+WHERE evidence_bundle_sha256 = %s
+ORDER BY route_id, method
+""".strip()
 
 
 class ActivationAuthorizationError(ActivationRegistryError):
@@ -298,7 +374,7 @@ class ActivationAdmissionEvidence:
                 )
 
     def bundle_sha256(self) -> str:
-        """Digest exact evidence coordinates for later durable attribution."""
+        """Digest exact evidence coordinates for durable attribution."""
         material = {
             "deployment_id": self.deployment_id,
             "environment_id": self.environment_id,
@@ -339,6 +415,42 @@ class ActivationAdmissionEvidence:
         encoded = json.dumps(material, separators=(",", ":"), sort_keys=True).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
+    def _root_row(self) -> tuple[object, ...]:
+        """Project the exact non-PII durable root material behind the bundle digest."""
+        return (
+            self.deployment_id,
+            self.environment_id,
+            self.generation_id,
+            self.config_sha256,
+            self.keyverse_authority.release_version,
+            self.keyverse_authority.artifact_sha256,
+            self.keyverse_authority.release_locator,
+            self.orgmetra_authority.release_version,
+            self.orgmetra_authority.artifact_sha256,
+            self.orgmetra_authority.release_locator,
+            self.orgmetra_policy_version_code,
+            self.authorization_decision_sha256,
+            self.valid_until_unix_ms,
+        )
+
+    def _observation_rows(self) -> tuple[tuple[object, ...], ...]:
+        """Project deterministic durable owner-operation evidence without response payloads."""
+        return tuple(
+            (
+                item.route_id,
+                item.method,
+                item.path_template,
+                item.service_id,
+                item.release_version,
+                item.openapi_sha256,
+                item.artifact_sha256,
+                item.observation_sha256,
+                item.observed_at_unix_ms,
+                item.valid_until_unix_ms,
+            )
+            for item in sorted(self.owner_operations, key=lambda value: (value.route_id, value.method))
+        )
+
 
 ActivationEvidenceProvider = Callable[
     [DeploymentIdentity, CompositionGeneration], ActivationAdmissionEvidence
@@ -364,17 +476,51 @@ class AuthorizedRecoveredActivation:
     evidence: ActivationAdmissionEvidence
 
 
+def _persist_activation_evidence(cursor: Any, evidence: ActivationAdmissionEvidence) -> None:
+    """Persist or verify one content-addressed evidence bundle inside activation transaction."""
+    bundle_sha256 = evidence.bundle_sha256()
+    root_row = evidence._root_row()
+    cursor.execute(_INSERT_EVIDENCE_SQL, (bundle_sha256, *root_row))
+    cursor.fetchone()
+    cursor.execute(_SELECT_EVIDENCE_SQL, (bundle_sha256,))
+    if cursor.fetchone() != root_row:
+        raise ActivationAuthorizationError(
+            "activation evidence digest is bound to different durable root material"
+        )
+
+    for observation in evidence.owner_operations:
+        cursor.execute(
+            _INSERT_OBSERVATION_SQL,
+            (
+                bundle_sha256,
+                evidence.generation_id,
+                observation.route_id,
+                observation.method,
+                observation.path_template,
+                observation.service_id,
+                observation.release_version,
+                observation.openapi_sha256,
+                observation.artifact_sha256,
+                observation.observation_sha256,
+                observation.observed_at_unix_ms,
+                observation.valid_until_unix_ms,
+            ),
+        )
+    cursor.execute(_SELECT_OBSERVATIONS_SQL, (bundle_sha256,))
+    if tuple(cursor.fetchall()) != evidence._observation_rows():
+        raise ActivationAuthorizationError(
+            "activation evidence digest is bound to different durable owner observations"
+        )
+
+
 @dataclass(slots=True)
 class AuthorizedPostgresActivationRegistry:
     """Re-admit durable state without remote I/O under the deployment row lock.
 
-    Activation validates external evidence before delegating to the structural registry.
-    Recovery samples durable state twice around external verification so a concurrent
-    activation cannot be returned under evidence for an obsolete generation.
-
-    Evidence freshness is not yet enforced by PostgreSQL at event commit time. This
-    wrapper therefore must remain Draft until the evidence digest/expiry is persisted and
-    checked in the same transaction that appends the activation event.
+    The provider runs before the lock. The structural registry then persists/verifies the
+    evidence bundle and appends the event in one connection transaction; PostgreSQL checks
+    evidence expiry and exact operation coverage at event insert time. Recovery remains
+    read-only and samples state twice around external verification.
     """
 
     connection_factory: PostgresConnectionFactory
@@ -422,6 +568,13 @@ class AuthorizedPostgresActivationRegistry:
         )
         return evidence
 
+    @staticmethod
+    def _evidence_writer(evidence: ActivationAdmissionEvidence) -> Callable[[Any], None]:
+        def write(cursor: Any) -> None:
+            _persist_activation_evidence(cursor, evidence)
+
+        return write
+
     def activate(
         self,
         deployment: DeploymentIdentity,
@@ -429,13 +582,15 @@ class AuthorizedPostgresActivationRegistry:
         generation_id: str,
         expected_previous_sequence: int,
     ) -> AuthorizedActivation:
-        """Validate remote evidence before structural activation acquires its row lock."""
+        """Authorize remotely, then persist evidence and append under one local transaction."""
         generation = self._load_target(generation_id)
         evidence = self._obtain_evidence(deployment, generation)
-        event = self._structural_registry.activate(
+        event = self._structural_registry.activate_authorized(
             deployment,
             generation_id=generation.generation_id,
             expected_previous_sequence=expected_previous_sequence,
+            evidence_bundle_sha256=evidence.bundle_sha256(),
+            evidence_writer=self._evidence_writer(evidence),
         )
         return AuthorizedActivation(event=event, generation=generation, evidence=evidence)
 
@@ -446,13 +601,15 @@ class AuthorizedPostgresActivationRegistry:
         generation_id: str,
         expected_previous_sequence: int,
     ) -> AuthorizedActivation:
-        """Validate rollback target evidence before structural rollback acquires its row lock."""
+        """Authorize rollback, then persist evidence and append under one local transaction."""
         generation = self._load_target(generation_id)
         evidence = self._obtain_evidence(deployment, generation)
-        event = self._structural_registry.rollback(
+        event = self._structural_registry.rollback_authorized(
             deployment,
             generation_id=generation.generation_id,
             expected_previous_sequence=expected_previous_sequence,
+            evidence_bundle_sha256=evidence.bundle_sha256(),
+            evidence_writer=self._evidence_writer(evidence),
         )
         return AuthorizedActivation(event=event, generation=generation, evidence=evidence)
 
