@@ -436,7 +436,7 @@ class ActivationAdmissionEvidence:
         authorized_state_sequence: int,
         now_unix_ms: int,
     ) -> None:
-        """Require freshness and exact transition/route/owner coverage before use."""
+        """Require freshness and whole-route owner coverage before evidence can be used."""
         ActivationAdmissionEvidence.__post_init__(self)
         expected_deployment_id = _identifier("deployment_id", deployment_id)
         expected_environment_id = _identifier("environment_id", environment_id)
@@ -465,28 +465,51 @@ class ActivationAdmissionEvidence:
         if now >= self.valid_until_unix_ms:
             raise ActivationAuthorizationError("activation authorization evidence is expired")
 
-        expected_operations = {
-            (
-                route.route_id,
-                route.path_template,
-                method,
-                route.owner_release.service_id,
-                route.owner_release.release_version,
-                route.owner_release.openapi_sha256,
-                route.owner_release.artifact_sha256,
-            )
+        expected_operations_by_route = {
+            route.route_id: {
+                (
+                    route.route_id,
+                    route.path_template,
+                    method,
+                    route.owner_release.service_id,
+                    route.owner_release.release_version,
+                    route.owner_release.openapi_sha256,
+                    route.owner_release.artifact_sha256,
+                )
+                for method in route.methods
+            }
             for route in generation.routes
-            for method in route.methods
         }
+        expected_operations = set().union(*expected_operations_by_route.values())
         observed_operations = [item.authority_key() for item in self.owner_operations]
-        if len(set(observed_operations)) != len(observed_operations):
+        observed_operation_set = set(observed_operations)
+        if len(observed_operation_set) != len(observed_operations):
             raise ActivationAuthorizationError(
                 "owner operation evidence must not contain duplicates"
             )
-        if set(observed_operations) != expected_operations:
+        if not observed_operation_set.issubset(expected_operations):
             raise ActivationAuthorizationError(
-                "activation requires exact owner operation coverage for the generation"
+                "owner operation evidence targets another generation route operation"
             )
+
+        for route in generation.routes:
+            expected_route_operations = expected_operations_by_route[route.route_id]
+            observed_route_operations = {
+                operation
+                for operation in observed_operation_set
+                if operation[0] == route.route_id
+            }
+            if route.required:
+                if observed_route_operations != expected_route_operations:
+                    raise ActivationAuthorizationError(
+                        f"required route {route.route_id} requires exact owner operation coverage"
+                    )
+                continue
+            if observed_route_operations and observed_route_operations != expected_route_operations:
+                raise ActivationAuthorizationError(
+                    f"optional route {route.route_id} owner operation evidence must be absent or complete"
+                )
+
         for observation in self.owner_operations:
             if observation.observed_at_unix_ms > now:
                 raise ActivationAuthorizationError(
