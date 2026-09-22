@@ -122,6 +122,7 @@ class ActivationAuthorizationError(ActivationRegistryError):
 
 
 def _exact_text(field_name: str, value: object, *, maximum: int) -> str:
+    """Require exact bounded text before it can participate in authority identity."""
     if type(value) is not str:
         raise ActivationAuthorizationError(f"{field_name} must be an exact built-in str")
     if not value or len(value) > maximum:
@@ -130,6 +131,7 @@ def _exact_text(field_name: str, value: object, *, maximum: int) -> str:
 
 
 def _identifier(field_name: str, value: object) -> str:
+    """Require the canonical lower-snake identifier representation used in durable evidence."""
     text = _exact_text(field_name, value, maximum=64)
     if _IDENTIFIER.fullmatch(text) is None:
         raise ActivationAuthorizationError(f"{field_name} must be canonical lower snake_case")
@@ -137,6 +139,7 @@ def _identifier(field_name: str, value: object) -> str:
 
 
 def _sha256(field_name: str, value: object) -> str:
+    """Require an exact lowercase SHA-256 digest for content-addressed authority evidence."""
     text = _exact_text(field_name, value, maximum=64)
     if _SHA256.fullmatch(text) is None:
         raise ActivationAuthorizationError(f"{field_name} must be a lowercase SHA-256 digest")
@@ -144,6 +147,7 @@ def _sha256(field_name: str, value: object) -> str:
 
 
 def _release_version(field_name: str, value: object) -> str:
+    """Reject floating refs and require an immutable release-version representation."""
     text = _exact_text(field_name, value, maximum=64)
     if text.lower() in _FLOATING_RELEASES or text.lower().startswith(("refs/", "pr-")):
         raise ActivationAuthorizationError(f"{field_name} must identify an immutable release")
@@ -153,12 +157,14 @@ def _release_version(field_name: str, value: object) -> str:
 
 
 def _unix_ms(field_name: str, value: object) -> int:
+    """Require a positive exact integer wall-clock value expressed in milliseconds."""
     if type(value) is not int or value <= 0:
         raise ActivationAuthorizationError(f"{field_name} must be an integer > 0")
     return value
 
 
 def _authorization_action(value: object) -> AuthorizationAction:
+    """Constrain durable evidence intent to the three supported state-transition actions."""
     if type(value) is not str or value not in ("activate", "rollback", "recover"):
         raise ActivationAuthorizationError(
             "authorization_action must be activate, rollback, or recover"
@@ -167,6 +173,7 @@ def _authorization_action(value: object) -> AuthorizationAction:
 
 
 def _state_sequence(value: object) -> int:
+    """Require the non-negative durable state sequence authorized by the evidence bundle."""
     if type(value) is not int or value < 0:
         raise ActivationAuthorizationError("authorized_state_sequence must be an integer >= 0")
     return value
@@ -182,10 +189,12 @@ def _build_construction_runtime(
     state_lock = RLock()
 
     def discard_construction(object_id: int) -> None:
+        """Discard projected field evidence when its weakly tracked value is collected."""
         with state_lock:
             constructed_fields.pop(object_id, None)
 
     def record_or_require(value: object) -> None:
+        """Record first construction or reject later semantic retargeting of the same value."""
         object_id = id(value)
         current_fields = projector(value)
         with state_lock:
@@ -214,6 +223,7 @@ class ReleasedAuthorityEvidence:
     release_locator: str
 
     def __post_init__(self) -> None:
+        """Bind authority identity, artifact digest and version to the canonical release URL."""
         if self.authority_id not in ("keyverse", "orgmetra"):
             raise ActivationAuthorizationError("authority_id must be keyverse or orgmetra")
         release_version = _release_version("release_version", self.release_version)
@@ -260,6 +270,7 @@ class OwnerOperationObservation:
     valid_until_unix_ms: int
 
     def __post_init__(self) -> None:
+        """Normalize one observed operation and bind it to its immutable owner release."""
         object.__setattr__(self, "route_id", _identifier("route_id", self.route_id))
         object.__setattr__(self, "service_id", _identifier("service_id", self.service_id))
         object.__setattr__(
@@ -348,6 +359,7 @@ class ActivationAdmissionEvidence:
     valid_until_unix_ms: int
 
     def __post_init__(self) -> None:
+        """Validate exact authority, transition and owner-operation material at construction."""
         object.__setattr__(
             self,
             "deployment_id",
@@ -671,6 +683,7 @@ class AuthorizedPostgresActivationRegistry:
     _structural_registry: StructuralPostgresActivationRegistry = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Validate executable inputs and construct PostgreSQL adapters from one factory."""
         if not callable(self.connection_factory):
             raise TypeError("connection_factory must be callable")
         if not callable(self.evidence_provider):
@@ -681,6 +694,7 @@ class AuthorizedPostgresActivationRegistry:
         self._structural_registry = StructuralPostgresActivationRegistry(self.connection_factory)
 
     def _load_target(self, generation_id: str) -> CompositionGeneration:
+        """Require the requested activation target to exist in durable generation authority."""
         generation = self._generation_registry.load(generation_id)
         if generation is None:
             raise ActivationAuthorizationError(
@@ -696,6 +710,7 @@ class AuthorizedPostgresActivationRegistry:
         authorization_action: AuthorizationAction,
         authorized_state_sequence: int,
     ) -> ActivationAdmissionEvidence:
+        """Acquire and validate exact external evidence for one intended durable transition."""
         if type(deployment) is not DeploymentIdentity:
             raise ActivationAuthorizationError("deployment must be exact DeploymentIdentity")
         DeploymentIdentity.__post_init__(deployment)
@@ -719,7 +734,9 @@ class AuthorizedPostgresActivationRegistry:
 
     @staticmethod
     def _evidence_writer(evidence: ActivationAdmissionEvidence) -> Callable[[Any], None]:
+        """Bind one evidence value to a transaction-local persistence callback."""
         def write(cursor: Any) -> None:
+            """Persist the captured evidence using the caller's already-open transaction."""
             _persist_activation_evidence(cursor, evidence)
 
         return write
