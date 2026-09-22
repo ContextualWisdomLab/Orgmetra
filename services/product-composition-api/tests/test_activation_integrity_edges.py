@@ -11,10 +11,10 @@ from orgmetra_product_composition import (
     CompositionRoute,
     DeploymentIdentity,
     OwnerApiRelease,
-    PostgresActivationRegistry,
     RecoveredActivation,
     configuration_sha256,
 )
+from orgmetra_product_composition.activation import PostgresActivationRegistry
 
 
 class ScriptedCursor:
@@ -127,7 +127,11 @@ def test_recovered_activation_requires_exact_matching_values() -> None:
 def test_registry_rejects_non_identity_deployment_and_failed_lock() -> None:
     registry = PostgresActivationRegistry(_factory([]))
     with pytest.raises(ActivationRegistryError, match="DeploymentIdentity"):
-        registry.activate(object(), generation_id="generation_one", expected_previous_sequence=0)  # type: ignore[arg-type]
+        registry.activate(
+            object(),  # type: ignore[arg-type]
+            generation_id="generation_one",
+            expected_previous_sequence=0,
+        )
 
     registry = PostgresActivationRegistry(_factory([("other", "production")]))
     with pytest.raises(ActivationRegistryError, match="deployment lock"):
