@@ -30,6 +30,7 @@ _POLICY_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _ALLOWED_METHODS = frozenset({"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"})
 _FLOATING_RELEASES = frozenset({"develop", "head", "latest", "main", "master"})
 AuthorityId = Literal["keyverse", "orgmetra"]
+AuthorizationAction = Literal["activate", "rollback", "recover"]
 
 _INSERT_EVIDENCE_SQL = """
 INSERT INTO public.product_composition_activation_evidence (
@@ -38,6 +39,8 @@ INSERT INTO public.product_composition_activation_evidence (
     environment_id,
     generation_id,
     config_sha256,
+    authorization_action,
+    authorized_state_sequence,
     keyverse_release_version,
     keyverse_artifact_sha256,
     keyverse_release_locator,
@@ -48,7 +51,7 @@ INSERT INTO public.product_composition_activation_evidence (
     authorization_decision_sha256,
     valid_until_unix_ms
 )
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (evidence_bundle_sha256) DO NOTHING
 RETURNING evidence_bundle_sha256
 """.strip()
@@ -59,6 +62,8 @@ SELECT
     environment_id,
     generation_id,
     config_sha256,
+    authorization_action,
+    authorized_state_sequence,
     keyverse_release_version,
     keyverse_artifact_sha256,
     keyverse_release_locator,
@@ -147,6 +152,20 @@ def _release_version(field_name: str, value: object) -> str:
 def _unix_ms(field_name: str, value: object) -> int:
     if type(value) is not int or value <= 0:
         raise ActivationAuthorizationError(f"{field_name} must be an integer > 0")
+    return value
+
+
+def _authorization_action(value: object) -> AuthorizationAction:
+    if type(value) is not str or value not in ("activate", "rollback", "recover"):
+        raise ActivationAuthorizationError(
+            "authorization_action must be activate, rollback, or recover"
+        )
+    return value
+
+
+def _state_sequence(value: object) -> int:
+    if type(value) is not int or value < 0:
+        raise ActivationAuthorizationError("authorized_state_sequence must be an integer >= 0")
     return value
 
 
@@ -247,12 +266,14 @@ class OwnerOperationObservation:
 
 @dataclass(frozen=True, slots=True)
 class ActivationAdmissionEvidence:
-    """Fresh allow evidence bound to one deployment and exact generation."""
+    """Fresh allow evidence bound to one deployment, transition intent, and exact generation."""
 
     deployment_id: str
     environment_id: str
     generation_id: str
     config_sha256: str
+    authorization_action: AuthorizationAction
+    authorized_state_sequence: int
     keyverse_authority: ReleasedAuthorityEvidence
     orgmetra_authority: ReleasedAuthorityEvidence
     orgmetra_policy_version_code: str
@@ -277,6 +298,12 @@ class ActivationAdmissionEvidence:
             _identifier("generation_id", self.generation_id),
         )
         object.__setattr__(self, "config_sha256", _sha256("config_sha256", self.config_sha256))
+        object.__setattr__(self, "authorization_action", _authorization_action(self.authorization_action))
+        object.__setattr__(
+            self,
+            "authorized_state_sequence",
+            _state_sequence(self.authorized_state_sequence),
+        )
         if type(self.keyverse_authority) is not ReleasedAuthorityEvidence:
             raise ActivationAuthorizationError(
                 "keyverse_authority must be exact ReleasedAuthorityEvidence"
@@ -318,11 +345,15 @@ class ActivationAdmissionEvidence:
         deployment_id: str,
         environment_id: str,
         generation: CompositionGeneration,
+        authorization_action: AuthorizationAction,
+        authorized_state_sequence: int,
         now_unix_ms: int,
     ) -> None:
-        """Require freshness and exact route/owner coverage before activation or recovery."""
+        """Require freshness and exact transition/route/owner coverage before use."""
         expected_deployment_id = _identifier("deployment_id", deployment_id)
         expected_environment_id = _identifier("environment_id", environment_id)
+        expected_action = _authorization_action(authorization_action)
+        expected_state_sequence = _state_sequence(authorized_state_sequence)
         if type(generation) is not CompositionGeneration:
             raise ActivationAuthorizationError("generation must be exact CompositionGeneration")
         _revalidate_generation_snapshot(generation)
@@ -337,6 +368,10 @@ class ActivationAdmissionEvidence:
             or self.config_sha256 != generation.config_sha256
         ):
             raise ActivationAuthorizationError("authorization evidence targets another generation")
+        if self.authorization_action != expected_action:
+            raise ActivationAuthorizationError("authorization evidence targets another authorization action")
+        if self.authorized_state_sequence != expected_state_sequence:
+            raise ActivationAuthorizationError("authorization evidence targets another state sequence")
         if now >= self.valid_until_unix_ms:
             raise ActivationAuthorizationError("activation authorization evidence is expired")
 
@@ -381,6 +416,8 @@ class ActivationAdmissionEvidence:
             "environment_id": self.environment_id,
             "generation_id": self.generation_id,
             "config_sha256": self.config_sha256,
+            "authorization_action": self.authorization_action,
+            "authorized_state_sequence": self.authorized_state_sequence,
             "keyverse_authority": {
                 "release_version": self.keyverse_authority.release_version,
                 "artifact_sha256": self.keyverse_authority.artifact_sha256,
@@ -423,6 +460,8 @@ class ActivationAdmissionEvidence:
             self.environment_id,
             self.generation_id,
             self.config_sha256,
+            self.authorization_action,
+            self.authorized_state_sequence,
             self.keyverse_authority.release_version,
             self.keyverse_authority.artifact_sha256,
             self.keyverse_authority.release_locator,
@@ -454,7 +493,7 @@ class ActivationAdmissionEvidence:
 
 
 ActivationEvidenceProvider = Callable[
-    [DeploymentIdentity, CompositionGeneration], ActivationAdmissionEvidence
+    [DeploymentIdentity, CompositionGeneration, AuthorizationAction, int], ActivationAdmissionEvidence
 ]
 ClockUnixMs = Callable[[], int]
 
@@ -520,8 +559,8 @@ class AuthorizedPostgresActivationRegistry:
 
     The provider runs before the lock. The structural registry then persists/verifies the
     evidence bundle and appends the event in one connection transaction; PostgreSQL checks
-    evidence expiry and exact operation coverage at event insert time. Recovery remains
-    read-only and samples state twice around external verification.
+    evidence expiry, transition intent, and exact operation coverage at event insert time.
+    Recovery remains read-only and samples state twice around external verification.
     """
 
     connection_factory: PostgresConnectionFactory
@@ -552,12 +591,17 @@ class AuthorizedPostgresActivationRegistry:
         self,
         deployment: DeploymentIdentity,
         generation: CompositionGeneration,
+        *,
+        authorization_action: AuthorizationAction,
+        authorized_state_sequence: int,
     ) -> ActivationAdmissionEvidence:
         if type(deployment) is not DeploymentIdentity:
             raise ActivationAuthorizationError("deployment must be exact DeploymentIdentity")
         DeploymentIdentity.__post_init__(deployment)
         _revalidate_generation_snapshot(generation)
-        evidence = self.evidence_provider(deployment, generation)
+        action = _authorization_action(authorization_action)
+        state_sequence = _state_sequence(authorized_state_sequence)
+        evidence = self.evidence_provider(deployment, generation, action, state_sequence)
         if type(evidence) is not ActivationAdmissionEvidence:
             raise ActivationAuthorizationError(
                 "evidence_provider must return exact ActivationAdmissionEvidence"
@@ -566,6 +610,8 @@ class AuthorizedPostgresActivationRegistry:
             deployment_id=deployment.deployment_id,
             environment_id=deployment.environment_id,
             generation=generation,
+            authorization_action=action,
+            authorized_state_sequence=state_sequence,
             now_unix_ms=self.clock_unix_ms(),
         )
         return evidence
@@ -586,7 +632,12 @@ class AuthorizedPostgresActivationRegistry:
     ) -> AuthorizedActivation:
         """Authorize remotely, then persist evidence and append under one local transaction."""
         generation = self._load_target(generation_id)
-        evidence = self._obtain_evidence(deployment, generation)
+        evidence = self._obtain_evidence(
+            deployment,
+            generation,
+            authorization_action="activate",
+            authorized_state_sequence=expected_previous_sequence,
+        )
         event = self._structural_registry.activate_authorized(
             deployment,
             generation_id=generation.generation_id,
@@ -605,7 +656,12 @@ class AuthorizedPostgresActivationRegistry:
     ) -> AuthorizedActivation:
         """Authorize rollback, then persist evidence and append under one local transaction."""
         generation = self._load_target(generation_id)
-        evidence = self._obtain_evidence(deployment, generation)
+        evidence = self._obtain_evidence(
+            deployment,
+            generation,
+            authorization_action="rollback",
+            authorized_state_sequence=expected_previous_sequence,
+        )
         event = self._structural_registry.rollback_authorized(
             deployment,
             generation_id=generation.generation_id,
@@ -624,7 +680,12 @@ class AuthorizedPostgresActivationRegistry:
             raise ActivationAuthorizationError(
                 "authorized recovery requires durable authorization evidence"
             )
-        evidence = self._obtain_evidence(deployment, first.generation)
+        evidence = self._obtain_evidence(
+            deployment,
+            first.generation,
+            authorization_action="recover",
+            authorized_state_sequence=first.event.activation_sequence,
+        )
         second = self._structural_registry.recover_active(deployment)
         if second is None or second != first:
             raise ActivationAuthorizationError(
@@ -634,6 +695,8 @@ class AuthorizedPostgresActivationRegistry:
             deployment_id=deployment.deployment_id,
             environment_id=deployment.environment_id,
             generation=second.generation,
+            authorization_action="recover",
+            authorized_state_sequence=second.event.activation_sequence,
             now_unix_ms=self.clock_unix_ms(),
         )
         return AuthorizedRecoveredActivation(
