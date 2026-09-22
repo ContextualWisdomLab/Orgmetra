@@ -62,6 +62,25 @@ WHERE deployment_id = %s
 LIMIT 1
 """.strip()
 
+_SELECT_LATEST_RECOVERY_SEQUENCE_SQL = """
+SELECT COALESCE(MAX(recovery_sequence), 0)
+FROM public.product_composition_recovery_attestation
+WHERE deployment_id = %s AND environment_id = %s
+""".strip()
+
+_INSERT_RECOVERY_ATTESTATION_SQL = """
+INSERT INTO public.product_composition_recovery_attestation (
+    deployment_id,
+    environment_id,
+    recovery_sequence,
+    activation_sequence,
+    generation_id,
+    evidence_bundle_sha256
+)
+VALUES (%s, %s, %s, %s, %s, %s)
+RETURNING recovery_sequence
+""".strip()
+
 _INSERT_EVENT_SQL = """
 INSERT INTO public.product_composition_activation_event (
     deployment_id,
@@ -307,6 +326,74 @@ class PostgresActivationRegistry:
                 if current is None:
                     return None
                 generation = self._load_generation(cursor, current.generation_id)
+                return RecoveredActivation(event=current, generation=generation)
+
+    def recover_active_authorized(
+        self,
+        deployment: DeploymentIdentity,
+        *,
+        expected_activation_sequence: int,
+        expected_generation_id: str,
+        evidence_bundle_sha256: str,
+        evidence_writer: TransactionEvidenceWriter,
+    ) -> RecoveredActivation:
+        """Persist fresh recovery evidence only while the expected active state remains locked."""
+        identity = self._deployment(deployment)
+        expected_sequence = _expected_sequence(expected_activation_sequence)
+        if expected_sequence == 0:
+            raise ActivationRegistryError("authorized recovery requires an active sequence > 0")
+        expected_generation = _canonical_identifier(
+            "expected_generation_id",
+            expected_generation_id,
+        )
+        evidence_digest = _evidence_digest(evidence_bundle_sha256)
+        if not callable(evidence_writer):
+            raise ActivationRegistryError("evidence_writer must be callable")
+
+        with self.connection_factory() as connection:
+            with connection.cursor() as cursor:
+                self._lock_deployment(cursor, identity)
+                current = self._latest_event(cursor, identity)
+                if (
+                    current is None
+                    or current.activation_sequence != expected_sequence
+                    or current.generation_id != expected_generation
+                ):
+                    raise ActivationConflictError(
+                        "activation changed during external recovery re-admission"
+                    )
+                if current.evidence_bundle_sha256 is None:
+                    raise ActivationRegistryError(
+                        "authorized recovery requires durable authorization evidence"
+                    )
+
+                generation = self._load_generation(cursor, expected_generation)
+                evidence_writer(cursor)
+                cursor.execute(
+                    _SELECT_LATEST_RECOVERY_SEQUENCE_SQL,
+                    (identity.deployment_id, identity.environment_id),
+                )
+                row = cursor.fetchone()
+                if row is None or type(row[0]) is not int or row[0] < 0:
+                    raise ActivationRegistryError(
+                        "recovery attestation sequence query returned invalid durable state"
+                    )
+                next_recovery_sequence = row[0] + 1
+                cursor.execute(
+                    _INSERT_RECOVERY_ATTESTATION_SQL,
+                    (
+                        identity.deployment_id,
+                        identity.environment_id,
+                        next_recovery_sequence,
+                        current.activation_sequence,
+                        current.generation_id,
+                        evidence_digest,
+                    ),
+                )
+                if cursor.fetchone() != (next_recovery_sequence,):
+                    raise ActivationRegistryError(
+                        "recovery attestation insert did not return expected durable sequence"
+                    )
                 return RecoveredActivation(event=current, generation=generation)
 
     def _transition(
