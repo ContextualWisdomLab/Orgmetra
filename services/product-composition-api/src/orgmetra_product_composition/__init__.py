@@ -12,11 +12,11 @@ from .activation_authorization import (
     ActivationAuthorizationError,
     AuthorizationAction,
     AuthorizedActivation,
-    AuthorizedPostgresActivationRegistry,
     AuthorizedRecoveredActivation,
     OwnerOperationObservation,
     ReleasedAuthorityEvidence,
 )
+from .activation_runtime_integrity import AuthorizedPostgresActivationRegistry
 from .admission import (
     AdmissionReceipt,
     CompositionContractError,
