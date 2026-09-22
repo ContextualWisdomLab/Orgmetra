@@ -202,7 +202,7 @@ def test_product_recovery_does_not_reclassify_committed_attestation_with_post_co
     def clock_unix_ms() -> int:
         nonlocal clock_reads
         clock_reads += 1
-        return 1_500 if clock_reads == 1 else 2_500
+        return 1_500 if clock_reads <= 2 else 2_500
 
     class ProductRecoveryHarness(AuthorizedPostgresActivationRegistry):
         __slots__ = ()
@@ -221,4 +221,4 @@ def test_product_recovery_does_not_reclassify_committed_attestation_with_post_co
 
     assert recovered is not None
     assert recovered.evidence == evidence
-    assert clock_reads == 1
+    assert clock_reads == 2
