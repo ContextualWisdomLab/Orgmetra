@@ -2,7 +2,8 @@
 
 Remote identity, ACL, and owner-operation checks run through a caller-supplied verifier
 before the structural activation registry acquires its deployment row lock. Exact evidence
-coordinates are then persisted by a local transaction callback before the event append.
+coordinates are then persisted by a local transaction callback before activation append or
+while recovery rechecks the same active state under that lock.
 """
 
 from __future__ import annotations
@@ -657,10 +658,10 @@ def _persist_activation_evidence(cursor: Any, evidence: ActivationAdmissionEvide
 class AuthorizedPostgresActivationRegistry:
     """Re-admit durable state without remote I/O under the deployment row lock.
 
-    The provider runs before the lock. The structural registry then persists/verifies the
-    evidence bundle and appends the event in one connection transaction; PostgreSQL checks
-    evidence expiry, transition intent, and exact operation coverage at event insert time.
-    Recovery remains read-only and samples state twice around external verification.
+    The provider runs before the lock. Activation/rollback persist evidence and append the
+    transition in one local transaction. Recovery samples state once, performs external
+    verification, then locks and rechecks that same state while persisting a recovery
+    attestation. PostgreSQL independently checks evidence intent, expiry and operation coverage.
     """
 
     connection_factory: PostgresConnectionFactory
@@ -772,7 +773,7 @@ class AuthorizedPostgresActivationRegistry:
         return AuthorizedActivation(event=event, generation=generation, evidence=evidence)
 
     def recover_active(self, deployment: DeploymentIdentity) -> AuthorizedRecoveredActivation | None:
-        """Re-admit recovery outside DB transactions and reject concurrent state changes."""
+        """Re-admit recovery, then persist that fresh evidence under a locked state recheck."""
         first = self._structural_registry.recover_active(deployment)
         if first is None:
             return None
@@ -786,11 +787,13 @@ class AuthorizedPostgresActivationRegistry:
             authorization_action="recover",
             authorized_state_sequence=first.event.activation_sequence,
         )
-        second = self._structural_registry.recover_active(deployment)
-        if second is None or second != first:
-            raise ActivationAuthorizationError(
-                "activation changed during external recovery re-admission"
-            )
+        second = self._structural_registry.recover_active_authorized(
+            deployment,
+            expected_activation_sequence=first.event.activation_sequence,
+            expected_generation_id=first.generation.generation_id,
+            evidence_bundle_sha256=evidence.bundle_sha256(),
+            evidence_writer=self._evidence_writer(evidence),
+        )
         evidence.validate_for(
             deployment_id=deployment.deployment_id,
             environment_id=deployment.environment_id,
