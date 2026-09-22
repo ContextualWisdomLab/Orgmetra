@@ -2,6 +2,12 @@
 -- Application validation performs the same check before persistence, but current production
 -- PostgreSQL truth must enforce the temporal evidence boundary independently of caller code.
 -- Existing future-dated history cannot be grandfathered into the stronger authority boundary.
+-- Fence writers before the predecessor-history scan so no impossible observation can commit
+-- between the preflight and installation of the permanent INSERT guard.
+
+BEGIN;
+
+LOCK TABLE public.product_composition_activation_owner_observation IN SHARE ROW EXCLUSIVE MODE;
 
 DO $$
 DECLARE
@@ -48,3 +54,5 @@ CREATE TRIGGER product_composition_activation_owner_observation_wall_clock_guard
 BEFORE INSERT ON public.product_composition_activation_owner_observation
 FOR EACH ROW
 EXECUTE FUNCTION validate_product_composition_activation_observation_wall_clock();
+
+COMMIT;
