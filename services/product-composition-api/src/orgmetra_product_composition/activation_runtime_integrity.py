@@ -16,6 +16,7 @@ from .activation_authorization import (
     ActivationAdmissionEvidence,
     ActivationAuthorizationError,
     AuthorizationAction,
+    AuthorizedActivation,
     AuthorizedPostgresActivationRegistry as _AuthorizedPostgresActivationRegistry,
     AuthorizedRecoveredActivation,
     _authorization_action,
@@ -136,10 +137,16 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         _record_or_require_runtime_capabilities(self)
 
     def _load_target(self, generation_id: str) -> CompositionGeneration:
-        """Load one generation only through the admitted PostgreSQL capability topology."""
+        """Load through the adapter instance that was checked at the use boundary."""
 
+        generation_registry = self._generation_registry
         self._require_runtime_capabilities()
-        return super()._load_target(generation_id)
+        generation = generation_registry.load(generation_id)
+        if generation is None:
+            raise ActivationAuthorizationError(
+                "activation authorization requires a persisted generation"
+            )
+        return generation
 
     def _obtain_evidence(
         self,
@@ -190,6 +197,60 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
             now_unix_ms=now_unix_ms,
         )
         return evidence
+
+    def activate(
+        self,
+        deployment: DeploymentIdentity,
+        *,
+        generation_id: str,
+        expected_previous_sequence: int,
+    ) -> AuthorizedActivation:
+        """Pin the checked structural adapter before committing an authorized activation."""
+
+        generation = self._load_target(generation_id)
+        evidence = self._obtain_evidence(
+            deployment,
+            generation,
+            authorization_action="activate",
+            authorized_state_sequence=expected_previous_sequence,
+        )
+        structural_registry = self._structural_registry
+        self._require_runtime_capabilities()
+        event = structural_registry.activate_authorized(
+            deployment,
+            generation_id=generation.generation_id,
+            expected_previous_sequence=expected_previous_sequence,
+            evidence_bundle_sha256=evidence.bundle_sha256(),
+            evidence_writer=self._evidence_writer(evidence),
+        )
+        return AuthorizedActivation(event=event, generation=generation, evidence=evidence)
+
+    def rollback(
+        self,
+        deployment: DeploymentIdentity,
+        *,
+        generation_id: str,
+        expected_previous_sequence: int,
+    ) -> AuthorizedActivation:
+        """Pin the checked structural adapter before committing an authorized rollback."""
+
+        generation = self._load_target(generation_id)
+        evidence = self._obtain_evidence(
+            deployment,
+            generation,
+            authorization_action="rollback",
+            authorized_state_sequence=expected_previous_sequence,
+        )
+        structural_registry = self._structural_registry
+        self._require_runtime_capabilities()
+        event = structural_registry.rollback_authorized(
+            deployment,
+            generation_id=generation.generation_id,
+            expected_previous_sequence=expected_previous_sequence,
+            evidence_bundle_sha256=evidence.bundle_sha256(),
+            evidence_writer=self._evidence_writer(evidence),
+        )
+        return AuthorizedActivation(event=event, generation=generation, evidence=evidence)
 
     def recover_active(
         self,
