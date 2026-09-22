@@ -52,7 +52,7 @@ CREATE TABLE public.product_composition_recovery_attestation (
         CHECK (evidence_bundle_sha256 ~ '^[0-9a-f]{64}$')
 );
 
-CREATE FUNCTION validate_product_composition_recovery_attestation_insert()
+CREATE FUNCTION public.validate_product_composition_recovery_attestation_insert()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
@@ -155,16 +155,16 @@ $$;
 CREATE TRIGGER product_composition_recovery_attestation_insert_guard
 BEFORE INSERT ON public.product_composition_recovery_attestation
 FOR EACH ROW
-EXECUTE FUNCTION validate_product_composition_recovery_attestation_insert();
+EXECUTE FUNCTION public.validate_product_composition_recovery_attestation_insert();
 
 CREATE TRIGGER product_composition_recovery_attestation_append_only_guard
 BEFORE UPDATE OR DELETE ON public.product_composition_recovery_attestation
 FOR EACH ROW
-EXECUTE FUNCTION reject_append_only_mutation();
+EXECUTE FUNCTION public.reject_append_only_mutation();
 
 CREATE TRIGGER product_composition_recovery_attestation_truncate_guard
 BEFORE TRUNCATE ON public.product_composition_recovery_attestation
 FOR EACH STATEMENT
-EXECUTE FUNCTION reject_product_composition_activation_registry_truncate();
+EXECUTE FUNCTION public.reject_product_composition_activation_registry_truncate();
 
 COMMIT;
