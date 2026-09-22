@@ -12,7 +12,9 @@ from __future__ import annotations
 import re
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from threading import RLock
 from typing import Any, Callable, Literal
+from weakref import WeakValueDictionary, finalize
 
 from .admission import CompositionGeneration
 from .postgres_registry import PostgresGenerationRegistry
@@ -93,7 +95,39 @@ def _expected_sequence(value: object) -> int:
     return value
 
 
-@dataclass(frozen=True, slots=True)
+def _build_deployment_identity_construction_runtime():
+    """Build process-local snapshots so one identity object cannot be retargeted."""
+    constructed_deployments: WeakValueDictionary[int, DeploymentIdentity] = WeakValueDictionary()
+    constructed_fields: dict[int, tuple[str, str]] = {}
+    state_lock = RLock()
+
+    def discard_deployment_identity(deployment_object_id: int) -> None:
+        with state_lock:
+            constructed_fields.pop(deployment_object_id, None)
+
+    def record_or_require_deployment_identity(deployment: DeploymentIdentity) -> None:
+        deployment_object_id = id(deployment)
+        current_fields = (deployment.deployment_id, deployment.environment_id)
+        with state_lock:
+            canonical_deployment = constructed_deployments.get(deployment_object_id)
+            canonical_fields = constructed_fields.get(deployment_object_id)
+            if canonical_deployment is None and canonical_fields is None:
+                constructed_deployments[deployment_object_id] = deployment
+                constructed_fields[deployment_object_id] = current_fields
+                finalize(deployment, discard_deployment_identity, deployment_object_id)
+                return
+            if canonical_deployment is not deployment or canonical_fields != current_fields:
+                raise ActivationRegistryError(
+                    "DeploymentIdentity no longer matches its construction snapshot"
+                )
+
+    return record_or_require_deployment_identity
+
+
+_record_or_require_deployment_identity = _build_deployment_identity_construction_runtime()
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class DeploymentIdentity:
     """Explicit non-PII deployment/environment coordinate for activation serialization."""
 
@@ -103,6 +137,7 @@ class DeploymentIdentity:
     def __post_init__(self) -> None:
         _canonical_identifier("deployment_id", self.deployment_id)
         _canonical_identifier("environment_id", self.environment_id)
+        _record_or_require_deployment_identity(self)
 
 
 @dataclass(frozen=True, slots=True)
