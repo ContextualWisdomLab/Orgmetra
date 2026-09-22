@@ -9,9 +9,9 @@ construction snapshot while leaving the structural registry internal.
 from __future__ import annotations
 
 from threading import RLock
-from weakref import WeakValueDictionary, finalize
+from weakref import ReferenceType, WeakValueDictionary, finalize, ref
 
-from .activation import DeploymentIdentity
+from .activation import DeploymentIdentity, PostgresActivationRegistry
 from .activation_authorization import (
     ActivationAdmissionEvidence,
     ActivationAuthorizationError,
@@ -22,29 +22,51 @@ from .activation_authorization import (
     _state_sequence,
 )
 from .admission import CompositionGeneration, _revalidate_generation_snapshot
+from .postgres_registry import PostgresGenerationRegistry
 
 
 def _build_runtime_capability_construction_guard():
     constructed_registries: WeakValueDictionary[int, object] = WeakValueDictionary()
-    # Keep the admitted capability objects strongly reachable for exactly the registry
-    # lifetime. Storing only ``id(...)`` would allow a replaced capability to be collected
-    # and a later object to reuse the same process address, defeating an identity snapshot.
-    constructed_capabilities: dict[int, tuple[object, ...]] = {}
+    # Weak references are identity witnesses without process-lifetime roots. If an
+    # admitted capability is replaced and collected, the dead reference can never be
+    # satisfied by a later object that happens to reuse the same CPython address.
+    constructed_capabilities: dict[int, tuple[ReferenceType[object], ...]] = {}
     state_lock = RLock()
 
     def discard(registry_object_id: int) -> None:
         with state_lock:
             constructed_capabilities.pop(registry_object_id, None)
 
+    @staticmethod
+    def capability_reference(label: str, capability: object) -> ReferenceType[object]:
+        try:
+            return ref(capability)
+        except TypeError as exc:
+            raise TypeError(
+                f"{label} must support weak-reference identity for runtime integrity"
+            ) from exc
+
     def project(registry: AuthorizedPostgresActivationRegistry) -> tuple[object, ...]:
+        if type(registry._generation_registry) is not PostgresGenerationRegistry:
+            raise ActivationAuthorizationError(
+                "generation registry no longer matches the admitted PostgreSQL adapter type"
+            )
+        if type(registry._structural_registry) is not PostgresActivationRegistry:
+            raise ActivationAuthorizationError(
+                "structural registry no longer matches the admitted PostgreSQL adapter type"
+            )
+        if registry._generation_registry.connection_factory is not registry.connection_factory:
+            raise ActivationAuthorizationError(
+                "generation registry no longer uses the admitted PostgreSQL connection factory"
+            )
+        if registry._structural_registry.connection_factory is not registry.connection_factory:
+            raise ActivationAuthorizationError(
+                "structural registry no longer uses the admitted PostgreSQL connection factory"
+            )
         return (
             registry.connection_factory,
             registry.evidence_provider,
             registry.clock_unix_ms,
-            registry._generation_registry,
-            registry._generation_registry.connection_factory,
-            registry._structural_registry,
-            registry._structural_registry.connection_factory,
         )
 
     def record_or_require(registry: AuthorizedPostgresActivationRegistry) -> None:
@@ -55,15 +77,22 @@ def _build_runtime_capability_construction_guard():
             canonical_capabilities = constructed_capabilities.get(registry_object_id)
             if canonical_registry is None and canonical_capabilities is None:
                 constructed_registries[registry_object_id] = registry
-                constructed_capabilities[registry_object_id] = current_capabilities
+                constructed_capabilities[registry_object_id] = tuple(
+                    capability_reference(label, capability)
+                    for label, capability in zip(
+                        ("connection_factory", "evidence_provider", "clock_unix_ms"),
+                        current_capabilities,
+                        strict=True,
+                    )
+                )
                 finalize(registry, discard, registry_object_id)
                 return
             capabilities_match = (
                 canonical_capabilities is not None
                 and len(canonical_capabilities) == len(current_capabilities)
                 and all(
-                    canonical is current
-                    for canonical, current in zip(
+                    canonical_reference() is current
+                    for canonical_reference, current in zip(
                         canonical_capabilities,
                         current_capabilities,
                         strict=True,
