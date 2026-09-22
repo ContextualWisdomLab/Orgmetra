@@ -172,8 +172,12 @@ def test_product_recovery_does_not_reclassify_committed_attestation_with_post_co
     clock_reads = 0
 
     class StructuralRegistry:
-        def recover_active(self, deployment_arg):
+        def __init__(self, connection_factory):
+            self.connection_factory = connection_factory
+
+        def recover_active(self, deployment_arg, *, _connection_factory=None):
             assert deployment_arg == deployment
+            assert _connection_factory is self.connection_factory
             return structural
 
         def recover_active_authorized(
@@ -184,12 +188,14 @@ def test_product_recovery_does_not_reclassify_committed_attestation_with_post_co
             expected_generation_id,
             evidence_bundle_sha256,
             evidence_writer,
+            _connection_factory=None,
         ):
             assert deployment_arg == deployment
             assert expected_activation_sequence == 1
             assert expected_generation_id == generation.generation_id
             assert evidence_bundle_sha256 == evidence.bundle_sha256()
             assert callable(evidence_writer)
+            assert _connection_factory is self.connection_factory
             return structural
 
     def evidence_provider(deployment_arg, generation_arg, authorization_action, state_sequence):
@@ -215,7 +221,11 @@ def test_product_recovery_does_not_reclassify_committed_attestation_with_post_co
         evidence_provider=evidence_provider,
         clock_unix_ms=clock_unix_ms,
     )
-    monkeypatch.setattr(registry, "_structural_registry", StructuralRegistry())
+    monkeypatch.setattr(
+        registry,
+        "_structural_registry",
+        StructuralRegistry(registry.connection_factory),
+    )
 
     recovered = registry.recover_active(deployment)
 
