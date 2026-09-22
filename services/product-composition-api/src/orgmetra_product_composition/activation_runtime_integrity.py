@@ -158,6 +158,8 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
     ) -> ActivationAdmissionEvidence:
         """Validate evidence against the same non-rewinding clock admitted at construction."""
 
+        provider = self.evidence_provider
+        clock = self.clock_unix_ms
         self._require_runtime_capabilities()
         if type(deployment) is not DeploymentIdentity:
             raise ActivationAuthorizationError("deployment must be exact DeploymentIdentity")
@@ -166,8 +168,6 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         action = _authorization_action(authorization_action)
         state_sequence = _state_sequence(authorized_state_sequence)
 
-        provider = self.evidence_provider
-        clock = self.clock_unix_ms
         before_provider_unix_ms = clock()
         self._require_runtime_capabilities()
         if type(before_provider_unix_ms) is not int or before_provider_unix_ms <= 0:
