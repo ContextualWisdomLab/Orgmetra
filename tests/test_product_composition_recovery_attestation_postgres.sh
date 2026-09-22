@@ -11,7 +11,8 @@ for migration in \
     database/migrations/0021_product_composition_activation_observation_wall_clock.sql \
     database/migrations/0022_product_composition_recovery_attestation.sql \
     database/migrations/0023_product_composition_deployment_write_serialization.sql \
-    database/migrations/0024_product_composition_activation_trigger_function_provenance.sql; do
+    database/migrations/0024_product_composition_activation_trigger_function_provenance.sql \
+    database/migrations/0025_product_composition_activation_relation_owner_provenance.sql; do
     psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${migration}"
 done
 
