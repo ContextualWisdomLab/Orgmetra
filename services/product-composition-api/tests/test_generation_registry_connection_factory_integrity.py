@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import gc
+import weakref
+
 import pytest
 
 from orgmetra_product_composition import (
@@ -94,3 +97,39 @@ def test_generation_register_rejects_construction_factory_drift_before_use() -> 
         registry.register(_records())
 
     assert replacement_calls == [0]
+
+
+def test_generation_factory_identity_guard_does_not_root_registry_cycle() -> None:
+    """Construction evidence must not keep a registry/factory callback cycle alive."""
+
+    class Factory:
+        registry: PostgresGenerationRegistry | None = None
+
+        def __call__(self) -> None:
+            raise AssertionError("factory is not executed in this lifetime contract")
+
+    factory = Factory()
+    registry = PostgresGenerationRegistry(factory)  # type: ignore[arg-type]
+    factory.registry = registry
+    registry_reference = weakref.ref(registry)
+    factory_reference = weakref.ref(factory)
+
+    del registry
+    del factory
+    gc.collect()
+
+    assert registry_reference() is None
+    assert factory_reference() is None
+
+
+def test_generation_factory_identity_requires_non_rooting_witness() -> None:
+    """Fail closed when a callable cannot provide weak-reference identity evidence."""
+
+    class NonWeakFactory:
+        __slots__ = ()
+
+        def __call__(self) -> None:
+            raise AssertionError("non-weak factory must be rejected at construction")
+
+    with pytest.raises(TypeError, match="weak-reference identity"):
+        PostgresGenerationRegistry(NonWeakFactory())  # type: ignore[arg-type]

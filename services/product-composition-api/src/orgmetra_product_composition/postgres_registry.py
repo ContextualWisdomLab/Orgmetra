@@ -12,7 +12,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from threading import RLock
 from typing import Any, Callable
-from weakref import WeakValueDictionary, finalize
+from weakref import ReferenceType, WeakValueDictionary, finalize, ref
 
 from .admission import CompositionGeneration
 from .registry import (
@@ -119,10 +119,10 @@ def _bounded_lookup_generation_id(value: object) -> str:
 
 
 def _build_generation_connection_factory_guard():
-    """Bind each live generation registry to the DB capability admitted at construction."""
+    """Bind each live generation registry to a non-rooting construction factory witness."""
 
     constructed_registries: WeakValueDictionary[int, object] = WeakValueDictionary()
-    constructed_factories: dict[int, object] = {}
+    constructed_factories: dict[int, ReferenceType[object]] = {}
     state_lock = RLock()
 
     def discard(registry_object_id: int) -> None:
@@ -130,6 +130,16 @@ def _build_generation_connection_factory_guard():
 
         with state_lock:
             constructed_factories.pop(registry_object_id, None)
+
+    def factory_reference(factory: object) -> ReferenceType[object]:
+        """Return a non-rooting identity witness or reject unsupported DB callables."""
+
+        try:
+            return ref(factory)
+        except TypeError as exc:
+            raise TypeError(
+                "connection_factory must support weak-reference identity for registry integrity"
+            ) from exc
 
     def record_or_require(registry: PostgresGenerationRegistry) -> None:
         """Record first construction or reject later connection-factory retargeting."""
@@ -141,10 +151,13 @@ def _build_generation_connection_factory_guard():
             canonical_factory = constructed_factories.get(registry_object_id)
             if canonical_registry is None and canonical_factory is None:
                 constructed_registries[registry_object_id] = registry
-                constructed_factories[registry_object_id] = current_factory
+                constructed_factories[registry_object_id] = factory_reference(current_factory)
                 finalize(registry, discard, registry_object_id)
                 return
-            if canonical_registry is not registry or canonical_factory is not current_factory:
+            factory_matches = (
+                canonical_factory is not None and canonical_factory() is current_factory
+            )
+            if canonical_registry is not registry or not factory_matches:
                 raise CompositionRegistryError(
                     "generation registry no longer matches its construction snapshot"
                 )
