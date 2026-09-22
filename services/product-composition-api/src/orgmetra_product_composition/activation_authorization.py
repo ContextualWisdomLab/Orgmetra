@@ -1,8 +1,9 @@
-"""Fail-closed external re-admission evidence for product-composition activation.
+"""Fail-closed external re-admission evidence for composition activation.
 
-This module does not fetch Keyverse, Orgmetra policy, or owner services itself. Callers
-supply a verifier callback that may perform remote I/O before any deployment-row lock is
-acquired. The returned evidence is then checked against the exact persisted generation.
+Remote identity, ACL, and owner-operation checks run through a caller-supplied verifier
+before the structural activation registry acquires its deployment row lock. This module
+validates the returned evidence against the exact persisted generation; it does not copy
+Keyverse policy or owner-service schemas into Orgmetra composition.
 """
 
 from __future__ import annotations
@@ -19,7 +20,6 @@ from .activation import (
     ActivationRegistryError,
     DeploymentIdentity,
     PostgresActivationRegistry as StructuralPostgresActivationRegistry,
-    RecoveredActivation,
 )
 from .admission import CompositionGeneration
 from .postgres_registry import PostgresConnectionFactory, PostgresGenerationRegistry
@@ -104,7 +104,7 @@ class ReleasedAuthorityEvidence:
 
 @dataclass(frozen=True, slots=True)
 class OwnerOperationObservation:
-    """Fresh observation for one exact route operation on one exact owner release."""
+    """Fresh observation for one route operation on one exact owner release."""
 
     route_id: str
     path_template: str
@@ -120,22 +120,44 @@ class OwnerOperationObservation:
     def __post_init__(self) -> None:
         object.__setattr__(self, "route_id", _identifier("route_id", self.route_id))
         object.__setattr__(self, "service_id", _identifier("service_id", self.service_id))
-        object.__setattr__(self, "path_template", _exact_text("path_template", self.path_template, maximum=256))
+        object.__setattr__(
+            self,
+            "path_template",
+            _exact_text("path_template", self.path_template, maximum=256),
+        )
         method = _exact_text("method", self.method, maximum=7)
         if method not in _ALLOWED_METHODS:
             raise ActivationAuthorizationError("method is not an admitted HTTP method")
         object.__setattr__(self, "method", method)
-        object.__setattr__(self, "release_version", _release_version("release_version", self.release_version))
-        object.__setattr__(self, "openapi_sha256", _sha256("openapi_sha256", self.openapi_sha256))
-        object.__setattr__(self, "artifact_sha256", _sha256("artifact_sha256", self.artifact_sha256))
-        object.__setattr__(self, "observation_sha256", _sha256("observation_sha256", self.observation_sha256))
+        object.__setattr__(
+            self,
+            "release_version",
+            _release_version("release_version", self.release_version),
+        )
+        object.__setattr__(
+            self,
+            "openapi_sha256",
+            _sha256("openapi_sha256", self.openapi_sha256),
+        )
+        object.__setattr__(
+            self,
+            "artifact_sha256",
+            _sha256("artifact_sha256", self.artifact_sha256),
+        )
+        object.__setattr__(
+            self,
+            "observation_sha256",
+            _sha256("observation_sha256", self.observation_sha256),
+        )
         observed_at = _unix_ms("observed_at_unix_ms", self.observed_at_unix_ms)
         valid_until = _unix_ms("valid_until_unix_ms", self.valid_until_unix_ms)
         if valid_until <= observed_at:
-            raise ActivationAuthorizationError("owner operation evidence must expire after observation")
+            raise ActivationAuthorizationError(
+                "owner operation evidence must expire after observation"
+            )
 
     def authority_key(self) -> tuple[str, str, str, str, str, str, str]:
-        """Return the exact generation-owned operation identity this observation covers."""
+        """Return the exact generation operation identity covered by this observation."""
         return (
             self.route_id,
             self.path_template,
@@ -149,7 +171,7 @@ class OwnerOperationObservation:
 
 @dataclass(frozen=True, slots=True)
 class ActivationAdmissionEvidence:
-    """Fresh allow evidence bound to one deployment and one exact generation."""
+    """Fresh allow evidence bound to one deployment and exact generation."""
 
     deployment_id: str
     environment_id: str
@@ -163,20 +185,38 @@ class ActivationAdmissionEvidence:
     valid_until_unix_ms: int
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "deployment_id", _identifier("deployment_id", self.deployment_id))
-        object.__setattr__(self, "environment_id", _identifier("environment_id", self.environment_id))
-        object.__setattr__(self, "generation_id", _identifier("generation_id", self.generation_id))
+        object.__setattr__(
+            self,
+            "deployment_id",
+            _identifier("deployment_id", self.deployment_id),
+        )
+        object.__setattr__(
+            self,
+            "environment_id",
+            _identifier("environment_id", self.environment_id),
+        )
+        object.__setattr__(
+            self,
+            "generation_id",
+            _identifier("generation_id", self.generation_id),
+        )
         object.__setattr__(self, "config_sha256", _sha256("config_sha256", self.config_sha256))
         if type(self.keyverse_authority) is not ReleasedAuthorityEvidence:
-            raise ActivationAuthorizationError("keyverse_authority must be exact ReleasedAuthorityEvidence")
+            raise ActivationAuthorizationError(
+                "keyverse_authority must be exact ReleasedAuthorityEvidence"
+            )
         if self.keyverse_authority.authority_id != "keyverse":
             raise ActivationAuthorizationError("keyverse_authority must identify keyverse")
         if type(self.orgmetra_authority) is not ReleasedAuthorityEvidence:
-            raise ActivationAuthorizationError("orgmetra_authority must be exact ReleasedAuthorityEvidence")
+            raise ActivationAuthorizationError(
+                "orgmetra_authority must be exact ReleasedAuthorityEvidence"
+            )
         if self.orgmetra_authority.authority_id != "orgmetra":
             raise ActivationAuthorizationError("orgmetra_authority must identify orgmetra")
         policy_version = _exact_text(
-            "orgmetra_policy_version_code", self.orgmetra_policy_version_code, maximum=128
+            "orgmetra_policy_version_code",
+            self.orgmetra_policy_version_code,
+            maximum=128,
         )
         if _POLICY_VERSION.fullmatch(policy_version) is None:
             raise ActivationAuthorizationError(
@@ -215,7 +255,10 @@ class ActivationAdmissionEvidence:
             or self.environment_id != expected_environment_id
         ):
             raise ActivationAuthorizationError("authorization evidence targets another deployment")
-        if self.generation_id != generation.generation_id or self.config_sha256 != generation.config_sha256:
+        if (
+            self.generation_id != generation.generation_id
+            or self.config_sha256 != generation.config_sha256
+        ):
             raise ActivationAuthorizationError("authorization evidence targets another generation")
         if now >= self.valid_until_unix_ms:
             raise ActivationAuthorizationError("activation authorization evidence is expired")
@@ -235,14 +278,18 @@ class ActivationAdmissionEvidence:
         }
         observed_operations = [item.authority_key() for item in self.owner_operations]
         if len(set(observed_operations)) != len(observed_operations):
-            raise ActivationAuthorizationError("owner operation evidence must not contain duplicates")
+            raise ActivationAuthorizationError(
+                "owner operation evidence must not contain duplicates"
+            )
         if set(observed_operations) != expected_operations:
             raise ActivationAuthorizationError(
                 "activation requires exact owner operation coverage for the generation"
             )
         for observation in self.owner_operations:
             if observation.observed_at_unix_ms > now:
-                raise ActivationAuthorizationError("owner operation observation is from the future")
+                raise ActivationAuthorizationError(
+                    "owner operation observation is from the future"
+                )
             if now >= observation.valid_until_unix_ms:
                 raise ActivationAuthorizationError("owner operation observation is expired")
             if self.valid_until_unix_ms > observation.valid_until_unix_ms:
@@ -251,7 +298,7 @@ class ActivationAdmissionEvidence:
                 )
 
     def bundle_sha256(self) -> str:
-        """Return a deterministic digest for durable attribution without copying remote payloads."""
+        """Digest exact evidence coordinates for later durable attribution."""
         material = {
             "deployment_id": self.deployment_id,
             "environment_id": self.environment_id,
@@ -301,7 +348,7 @@ ClockUnixMs = Callable[[], int]
 
 @dataclass(frozen=True, slots=True)
 class AuthorizedActivation:
-    """Structural activation result plus the fresh external evidence used to allow it."""
+    """Structural activation result plus the external evidence that allowed it."""
 
     event: ActivationEvent
     generation: CompositionGeneration
@@ -319,12 +366,15 @@ class AuthorizedRecoveredActivation:
 
 @dataclass(slots=True)
 class AuthorizedPostgresActivationRegistry:
-    """Re-admit durable activation with external evidence before structural mutation.
+    """Re-admit durable state without remote I/O under the deployment row lock.
 
-    The evidence provider is invoked only after the target generation is loaded and before
-    the structural registry enters its deployment ``FOR UPDATE`` transaction. Recovery is
-    sampled twice around the external verifier; a concurrent activation causes fail-closed
-    rejection instead of returning authorization for an obsolete event.
+    Activation validates external evidence before delegating to the structural registry.
+    Recovery samples durable state twice around external verification so a concurrent
+    activation cannot be returned under evidence for an obsolete generation.
+
+    Evidence freshness is not yet enforced by PostgreSQL at event commit time. This
+    wrapper therefore must remain Draft until the evidence digest/expiry is persisted and
+    checked in the same transaction that appends the activation event.
     """
 
     connection_factory: PostgresConnectionFactory
@@ -379,19 +429,13 @@ class AuthorizedPostgresActivationRegistry:
         generation_id: str,
         expected_previous_sequence: int,
     ) -> AuthorizedActivation:
-        """Obtain fresh evidence before the structural registry acquires its row lock."""
+        """Validate remote evidence before structural activation acquires its row lock."""
         generation = self._load_target(generation_id)
         evidence = self._obtain_evidence(deployment, generation)
         event = self._structural_registry.activate(
             deployment,
             generation_id=generation.generation_id,
             expected_previous_sequence=expected_previous_sequence,
-        )
-        evidence.validate_for(
-            deployment_id=deployment.deployment_id,
-            environment_id=deployment.environment_id,
-            generation=generation,
-            now_unix_ms=self.clock_unix_ms(),
         )
         return AuthorizedActivation(event=event, generation=generation, evidence=evidence)
 
@@ -402,19 +446,13 @@ class AuthorizedPostgresActivationRegistry:
         generation_id: str,
         expected_previous_sequence: int,
     ) -> AuthorizedActivation:
-        """Authorize rollback target before append-only structural rollback mutation."""
+        """Validate rollback target evidence before structural rollback acquires its row lock."""
         generation = self._load_target(generation_id)
         evidence = self._obtain_evidence(deployment, generation)
         event = self._structural_registry.rollback(
             deployment,
             generation_id=generation.generation_id,
             expected_previous_sequence=expected_previous_sequence,
-        )
-        evidence.validate_for(
-            deployment_id=deployment.deployment_id,
-            environment_id=deployment.environment_id,
-            generation=generation,
-            now_unix_ms=self.clock_unix_ms(),
         )
         return AuthorizedActivation(event=event, generation=generation, evidence=evidence)
 
