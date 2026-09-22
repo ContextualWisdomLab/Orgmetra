@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Persist product-composition deployment activation as an append-only sequence.
 -- Deployment/environment identifiers and external evidence coordinates are non-PII.
 -- Remote verification happens before the deployment lock; exact evidence material is
@@ -440,3 +442,5 @@ CREATE TRIGGER product_composition_activation_event_truncate_guard
 BEFORE TRUNCATE ON product_composition_activation_event
 FOR EACH STATEMENT
 EXECUTE FUNCTION reject_product_composition_activation_registry_truncate();
+
+COMMIT;
