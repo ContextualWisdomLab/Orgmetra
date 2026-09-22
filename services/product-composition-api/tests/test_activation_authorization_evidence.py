@@ -299,8 +299,8 @@ def test_activation_migration_binds_evidence_and_checks_wall_clock_expiry_at_eve
         / "0019_product_composition_activation_registry.sql"
     ).read_text(encoding="utf-8")
 
-    assert "CREATE TABLE product_composition_activation_evidence" in migration
-    assert "CREATE TABLE product_composition_activation_owner_observation" in migration
+    assert "CREATE TABLE public.product_composition_activation_evidence" in migration
+    assert "CREATE TABLE public.product_composition_activation_owner_observation" in migration
     assert "evidence_bundle_sha256" in migration
     assert "authorization_action" in migration
     assert "authorized_state_sequence" in migration
