@@ -8,6 +8,15 @@ from .activation import (
     PostgresActivationRegistry,
     RecoveredActivation,
 )
+from .activation_authorization import (
+    ActivationAdmissionEvidence,
+    ActivationAuthorizationError,
+    AuthorizedActivation,
+    AuthorizedPostgresActivationRegistry,
+    AuthorizedRecoveredActivation,
+    OwnerOperationObservation,
+    ReleasedAuthorityEvidence,
+)
 from .admission import (
     AdmissionReceipt,
     CompositionContractError,
@@ -27,10 +36,15 @@ from .registry import (
 )
 
 __all__ = [
+    "ActivationAdmissionEvidence",
+    "ActivationAuthorizationError",
     "ActivationConflictError",
     "ActivationEvent",
     "ActivationRegistryError",
     "AdmissionReceipt",
+    "AuthorizedActivation",
+    "AuthorizedPostgresActivationRegistry",
+    "AuthorizedRecoveredActivation",
     "CompositionContractError",
     "CompositionGeneration",
     "CompositionRegistryError",
@@ -38,10 +52,12 @@ __all__ = [
     "DeploymentIdentity",
     "GenerationRecordSet",
     "OwnerApiRelease",
+    "OwnerOperationObservation",
     "OwnerReleaseRecord",
     "PostgresActivationRegistry",
     "PostgresGenerationRegistry",
     "RecoveredActivation",
+    "ReleasedAuthorityEvidence",
     "RouteMethodRecord",
     "RouteRecord",
     "admit_generation",
