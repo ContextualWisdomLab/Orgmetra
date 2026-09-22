@@ -3,8 +3,11 @@
 from pathlib import Path
 
 
-_MIGRATION = Path(
-    "database/migrations/0023_product_composition_deployment_write_serialization.sql"
+_MIGRATION = (
+    Path(__file__).resolve().parents[3]
+    / "database"
+    / "migrations"
+    / "0023_product_composition_deployment_write_serialization.sql"
 )
 
 
