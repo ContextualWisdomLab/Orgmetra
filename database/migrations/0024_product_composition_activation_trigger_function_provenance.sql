@@ -18,7 +18,7 @@ DECLARE
     expected_owner oid;
     function_name text;
     function_oid oid;
-    function_record record;
+    function_owner oid;
 BEGIN
     SELECT relation.relowner
     INTO expected_owner
@@ -52,11 +52,11 @@ BEGIN
         END IF;
 
         SELECT function_definition.proowner
-        INTO function_record
+        INTO function_owner
         FROM pg_catalog.pg_proc AS function_definition
         WHERE function_definition.oid = function_oid;
 
-        IF function_record.proowner IS DISTINCT FROM expected_owner THEN
+        IF function_owner IS DISTINCT FROM expected_owner THEN
             RAISE EXCEPTION
                 'required public trigger function %() is not owned by deployment authority owner',
                 function_name;
