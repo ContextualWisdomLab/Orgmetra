@@ -60,6 +60,8 @@ def _evidence(generation: CompositionGeneration) -> ActivationAdmissionEvidence:
         environment_id="production",
         generation_id=generation.generation_id,
         config_sha256=generation.config_sha256,
+        authorization_action="activate",
+        authorized_state_sequence=0,
         keyverse_authority=_authority("keyverse", "3" * 64),
         orgmetra_authority=_authority("orgmetra", "4" * 64),
         orgmetra_policy_version_code="composition_activation_v1",
@@ -95,9 +97,11 @@ def test_external_evidence_provider_cannot_retarget_loaded_generation(monkeypatc
         def activate_authorized(self, *args, **kwargs):
             raise AssertionError("structural activation must not receive a retargeted generation")
 
-    def retargeting_provider(deployment_arg, generation_arg):
+    def retargeting_provider(deployment_arg, generation_arg, authorization_action, state_sequence):
         assert deployment_arg == deployment
         assert generation_arg is generation
+        assert authorization_action == "activate"
+        assert state_sequence == 0
         object.__setattr__(generation_arg, "generation_id", "generation_two")
         return _evidence(generation_arg)
 
