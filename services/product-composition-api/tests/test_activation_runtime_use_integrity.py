@@ -123,7 +123,11 @@ def test_generation_registry_use_is_pinned_before_runtime_guard(
     expected_generation = _generation("generation_one")
     retargeted_generation = _generation("generation_two")
 
-    def fake_load(self: PostgresGenerationRegistry, _generation_id: str) -> CompositionGeneration:
+    def fake_load(
+        self: PostgresGenerationRegistry,
+        _generation_id: str,
+        **_kwargs: object,
+    ) -> CompositionGeneration:
         return expected_generation if self is admitted_registry else retargeted_generation
 
     monkeypatch.setattr(PostgresGenerationRegistry, "load", fake_load)
