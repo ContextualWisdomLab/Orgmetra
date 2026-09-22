@@ -9,7 +9,6 @@ construction snapshot while leaving the structural registry internal.
 from __future__ import annotations
 
 from threading import RLock
-from typing import Any
 from weakref import WeakValueDictionary, finalize
 
 from .activation import DeploymentIdentity
@@ -18,6 +17,7 @@ from .activation_authorization import (
     ActivationAuthorizationError,
     AuthorizationAction,
     AuthorizedPostgresActivationRegistry as _AuthorizedPostgresActivationRegistry,
+    AuthorizedRecoveredActivation,
     _authorization_action,
     _state_sequence,
 )
@@ -120,7 +120,49 @@ class AuthorizedPostgresActivationRegistry(_AuthorizedPostgresActivationRegistry
         )
         return evidence
 
-    def recover_active(self, deployment: DeploymentIdentity) -> Any:
-        """Reject capability retargeting before the first durable recovery read."""
+    def recover_active(
+        self,
+        deployment: DeploymentIdentity,
+    ) -> AuthorizedRecoveredActivation | None:
+        """Persist recovery without a fallible local freshness decision after commit.
+
+        Freshness is checked before the durable write and independently by PostgreSQL at
+        evidence/attestation insertion. Once the locked transaction commits, a later local wall
+        clock sample must not turn a successful recovery attestation into an ambiguous failure.
+        """
+        structural_registry = self._structural_registry
         self._require_runtime_capabilities()
-        return super().recover_active(deployment)
+        first = structural_registry.recover_active(deployment)
+        self._require_runtime_capabilities()
+        if first is None:
+            return None
+        if first.event.evidence_bundle_sha256 is None:
+            raise ActivationAuthorizationError(
+                "authorized recovery requires durable authorization evidence"
+            )
+
+        evidence = self._obtain_evidence(
+            deployment,
+            first.generation,
+            authorization_action="recover",
+            authorized_state_sequence=first.event.activation_sequence,
+        )
+
+        structural_registry = self._structural_registry
+        self._require_runtime_capabilities()
+        second = structural_registry.recover_active_authorized(
+            deployment,
+            expected_activation_sequence=first.event.activation_sequence,
+            expected_generation_id=first.generation.generation_id,
+            evidence_bundle_sha256=evidence.bundle_sha256(),
+            evidence_writer=self._evidence_writer(evidence),
+        )
+
+        # Do not add a fallible capability/freshness recheck here. The structural call above
+        # commits the durable attestation before returning; PostgreSQL is the commit-time clock
+        # authority, and a post-commit exception would make the caller observe false failure.
+        return AuthorizedRecoveredActivation(
+            event=second.event,
+            generation=second.generation,
+            evidence=evidence,
+        )
