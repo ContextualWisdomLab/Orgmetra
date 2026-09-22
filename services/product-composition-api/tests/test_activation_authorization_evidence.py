@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from orgmetra_product_composition import (
@@ -159,9 +161,10 @@ def test_activation_evidence_rejects_expired_or_future_observation() -> None:
         )
 
 
-def test_authorized_registry_obtains_external_evidence_before_structural_activation(monkeypatch) -> None:
+def test_authorized_registry_persists_evidence_inside_structural_activation(monkeypatch) -> None:
     generation = _generation()
     deployment = DeploymentIdentity("orgmetra_gateway", "production")
+    evidence = _evidence()
     order: list[str] = []
 
     class GenerationRegistry:
@@ -171,18 +174,26 @@ def test_authorized_registry_obtains_external_evidence_before_structural_activat
             return generation
 
     class StructuralRegistry:
-        def activate(self, deployment_arg, *, generation_id: str, expected_previous_sequence: int):
-            order.append("structural_activate")
+        def activate_authorized(
+            self,
+            deployment_arg,
+            *,
+            generation_id: str,
+            expected_previous_sequence: int,
+            activation_evidence,
+        ):
+            order.append("structural_activate_authorized")
             assert deployment_arg == deployment
             assert generation_id == generation.generation_id
             assert expected_previous_sequence == 0
+            assert activation_evidence == evidence
             return object()
 
     def evidence_provider(deployment_arg, generation_arg):
         order.append("external_evidence")
         assert deployment_arg == deployment
         assert generation_arg == generation
-        return _evidence()
+        return evidence
 
     def clock_unix_ms() -> int:
         order.append("freshness_check")
@@ -206,5 +217,23 @@ def test_authorized_registry_obtains_external_evidence_before_structural_activat
         "load_generation",
         "external_evidence",
         "freshness_check",
-        "structural_activate",
+        "structural_activate_authorized",
     ]
+
+
+def test_activation_migration_binds_evidence_and_checks_expiry_at_event_insert() -> None:
+    migration = (
+        Path(__file__).resolve().parents[3]
+        / "database"
+        / "migrations"
+        / "0019_product_composition_activation_registry.sql"
+    ).read_text(encoding="utf-8")
+
+    assert "CREATE TABLE product_composition_activation_evidence" in migration
+    assert "CREATE TABLE product_composition_activation_owner_observation" in migration
+    assert "evidence_bundle_sha256" in migration
+    assert "authorization_decision_sha256" in migration
+    assert "keyverse_release_version" in migration
+    assert "orgmetra_policy_version_code" in migration
+    assert "transaction_timestamp()" in migration
+    assert "activation authorization evidence is expired" in migration
