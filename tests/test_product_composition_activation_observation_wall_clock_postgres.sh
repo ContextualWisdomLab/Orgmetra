@@ -63,7 +63,7 @@ INSERT INTO product_composition_activation_evidence (
     orgmetra_policy_version_code,
     authorization_decision_sha256,
     valid_until_unix_ms
-+) VALUES (
+) VALUES (
     repeat(:'bundle_digit', 64),
     'orgmetra_gateway',
     'production',
