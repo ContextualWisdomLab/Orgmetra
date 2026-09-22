@@ -6,6 +6,7 @@
 -- between the preflight and installation of the permanent INSERT guard.
 
 BEGIN;
+SET LOCAL search_path = pg_catalog, public;
 
 LOCK TABLE public.product_composition_activation_owner_observation IN SHARE ROW EXCLUSIVE MODE;
 
