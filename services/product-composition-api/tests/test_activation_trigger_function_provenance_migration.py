@@ -1,16 +1,19 @@
-"""Contracts for schema-qualified trigger-function provenance in durable activation state."""
+"""Contracts for schema-qualified provenance in durable activation state."""
 
 from pathlib import Path
 
 
-_MIGRATION = Path(
+_TRIGGER_MIGRATION = Path(
     "database/migrations/0024_product_composition_activation_trigger_function_provenance.sql"
+)
+_RELATION_OWNER_MIGRATION = Path(
+    "database/migrations/0025_product_composition_activation_relation_owner_provenance.sql"
 )
 
 
 def test_activation_trigger_functions_rebind_to_public_owned_authority() -> None:
     """Require final-schema triggers to bind trusted public functions under a writer fence."""
-    sql = _MIGRATION.read_text(encoding="utf-8").strip()
+    sql = _TRIGGER_MIGRATION.read_text(encoding="utf-8").strip()
 
     assert sql.startswith("BEGIN;")
     assert sql.endswith("COMMIT;")
@@ -40,8 +43,8 @@ def test_activation_trigger_functions_rebind_to_public_owned_authority() -> None
 
 
 def test_all_rebound_trigger_function_calls_are_schema_qualified() -> None:
-    """Reject search-path dependent trigger-function resolution in the final migration."""
-    sql = _MIGRATION.read_text(encoding="utf-8")
+    """Reject search-path dependent trigger-function resolution in the final trigger migration."""
+    sql = _TRIGGER_MIGRATION.read_text(encoding="utf-8")
 
     execute_lines = [
         line.strip()
@@ -50,3 +53,24 @@ def test_all_rebound_trigger_function_calls_are_schema_qualified() -> None:
     ]
     assert execute_lines
     assert all(line.startswith("EXECUTE FUNCTION public.") for line in execute_lines)
+
+
+def test_activation_authority_relations_share_one_durable_owner() -> None:
+    """Reject split table ownership that could bypass another relation's trigger authority."""
+    sql = _RELATION_OWNER_MIGRATION.read_text(encoding="utf-8").strip()
+
+    assert sql.startswith("BEGIN;")
+    assert sql.endswith("COMMIT;")
+    assert "SET LOCAL search_path = pg_catalog, public;" in sql
+    assert "IN SHARE ROW EXCLUSIVE MODE;" in sql
+    for relation in (
+        "product_composition_deployment",
+        "product_composition_activation_evidence",
+        "product_composition_activation_owner_observation",
+        "product_composition_activation_event",
+        "product_composition_recovery_attestation",
+    ):
+        assert f"'{relation}'" in sql
+    assert "relation_owner IS DISTINCT FROM expected_owner" in sql
+    assert "is not owned by deployment authority owner" in sql
+    assert "ALTER TABLE" not in sql
