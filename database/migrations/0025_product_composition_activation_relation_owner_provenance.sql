@@ -66,4 +66,134 @@ BEGIN
 END;
 $relation_owner_provenance$;
 
+-- Admission and durable generation authority preserve required=False routes as
+-- optional. Activation must therefore require every operation for required
+-- routes, allow a wholly unobserved optional route, and fail closed when any
+-- optional route is only partially observed. Replacing the existing trigger
+-- function keeps its trusted public identity and trigger bindings from 0024.
+CREATE OR REPLACE FUNCTION public.validate_product_composition_activation_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+    latest_sequence bigint;
+    latest_generation_id text;
+    evidence_valid_until_unix_ms bigint;
+    evidence_authorization_action text;
+    evidence_authorized_state_sequence bigint;
+    wall_clock_unix_ms bigint;
+BEGIN
+    SELECT activation_sequence, generation_id
+    INTO latest_sequence, latest_generation_id
+    FROM public.product_composition_activation_event
+    WHERE deployment_id = NEW.deployment_id
+      AND environment_id = NEW.environment_id
+    ORDER BY activation_sequence DESC
+    LIMIT 1;
+
+    IF latest_sequence IS NULL THEN
+        IF NEW.activation_sequence <> 1
+           OR NEW.previous_generation_id IS NOT NULL
+           OR NEW.event_kind <> 'activate' THEN
+            RAISE EXCEPTION 'first product composition activation must be sequence 1 activate with no previous generation';
+        END IF;
+    ELSE
+        IF NEW.activation_sequence <> latest_sequence + 1 THEN
+            RAISE EXCEPTION 'product composition activation sequence must advance exactly by one';
+        END IF;
+
+        IF NEW.previous_generation_id IS DISTINCT FROM latest_generation_id THEN
+            RAISE EXCEPTION 'product composition activation previous generation must match current deployment state';
+        END IF;
+
+        IF NEW.generation_id = latest_generation_id THEN
+            RAISE EXCEPTION 'product composition activation cannot append a no-op generation transition';
+        END IF;
+
+        IF NEW.event_kind = 'rollback'
+           AND NOT EXISTS (
+               SELECT 1
+               FROM public.product_composition_activation_event AS prior
+               WHERE prior.deployment_id = NEW.deployment_id
+                 AND prior.environment_id = NEW.environment_id
+                 AND prior.activation_sequence < NEW.activation_sequence
+                 AND prior.generation_id = NEW.generation_id
+           ) THEN
+            RAISE EXCEPTION 'product composition rollback target must have been previously active';
+        END IF;
+    END IF;
+
+    IF NEW.evidence_bundle_sha256 IS NOT NULL THEN
+        SELECT
+            evidence.valid_until_unix_ms,
+            evidence.authorization_action,
+            evidence.authorized_state_sequence
+        INTO
+            evidence_valid_until_unix_ms,
+            evidence_authorization_action,
+            evidence_authorized_state_sequence
+        FROM public.product_composition_activation_evidence AS evidence
+        WHERE evidence.evidence_bundle_sha256 = NEW.evidence_bundle_sha256
+          AND evidence.deployment_id = NEW.deployment_id
+          AND evidence.environment_id = NEW.environment_id
+          AND evidence.generation_id = NEW.generation_id;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'product composition activation evidence does not bind exact deployment generation';
+        END IF;
+
+        IF evidence_authorization_action IS DISTINCT FROM NEW.event_kind
+           OR evidence_authorized_state_sequence IS DISTINCT FROM NEW.activation_sequence - 1 THEN
+            RAISE EXCEPTION 'product composition activation evidence does not authorize exact transition intent';
+        END IF;
+
+        wall_clock_unix_ms := floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint;
+        IF wall_clock_unix_ms >= evidence_valid_until_unix_ms THEN
+            RAISE EXCEPTION 'product composition activation authorization evidence is expired';
+        END IF;
+
+        IF EXISTS (
+            SELECT 1
+            FROM public.product_composition_route_method AS route_method
+            JOIN public.product_composition_route AS route
+              ON route.generation_id = route_method.generation_id
+             AND route.route_id = route_method.route_id
+            JOIN public.product_composition_owner_release AS owner_release
+              ON owner_release.generation_id = route.generation_id
+             AND owner_release.service_id = route.owner_service_id
+            WHERE route_method.generation_id = NEW.generation_id
+              AND (
+                  route.required
+                  OR EXISTS (
+                      SELECT 1
+                      FROM public.product_composition_activation_owner_observation AS route_observation
+                      WHERE route_observation.evidence_bundle_sha256 = NEW.evidence_bundle_sha256
+                        AND route_observation.generation_id = route_method.generation_id
+                        AND route_observation.route_id = route_method.route_id
+                  )
+              )
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM public.product_composition_activation_owner_observation AS observation
+                  WHERE observation.evidence_bundle_sha256 = NEW.evidence_bundle_sha256
+                    AND observation.generation_id = route_method.generation_id
+                    AND observation.route_id = route_method.route_id
+                    AND observation.method = route_method.method
+                    AND observation.path_template = route.path_template
+                    AND observation.service_id = route.owner_service_id
+                    AND observation.release_version = owner_release.release_version
+                    AND observation.openapi_sha256 = owner_release.openapi_sha256
+                    AND observation.artifact_sha256 = owner_release.artifact_sha256
+                    AND wall_clock_unix_ms < observation.valid_until_unix_ms
+              )
+        ) THEN
+            RAISE EXCEPTION 'product composition activation evidence lacks fresh exact owner operation coverage';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
 COMMIT;
