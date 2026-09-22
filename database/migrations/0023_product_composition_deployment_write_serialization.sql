@@ -1,4 +1,5 @@
 BEGIN;
+SET LOCAL search_path = pg_catalog, public;
 
 -- Activation and restart-recovery are one deployment-state authority. Application adapters
 -- already serialize both operations by locking product_composition_deployment, but direct
